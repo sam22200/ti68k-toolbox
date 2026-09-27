@@ -1,2 +1,9 @@
+FROM ubuntu:22.04 AS keyfix
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y gcc libgtk2.0-dev && rm -rf /var/lib/apt/lists/*
+COPY tiemu-keyfix.c /src/
+RUN gcc -O2 -shared -fPIC -o /src/tiemu-keyfix.so /src/tiemu-keyfix.c $(pkg-config --cflags --libs gtk+-2.0) -lX11 -ldl
+
 FROM ubuntu:22.04
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y tiemu && rm -rf /var/lib/apt/lists/*
+COPY --from=keyfix /src/tiemu-keyfix.so /usr/local/lib/
+ENV LD_PRELOAD=/usr/local/lib/tiemu-keyfix.so
