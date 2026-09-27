@@ -1,0 +1,23 @@
+[Settings]
+Archive=0
+Pack=0
+Packed Variable=
+Project Name=bobble
+GCC Switches=-Os -Wall -W -Wwrite-strings
+GNU Assembler Switches=
+Assembler Switches=-g -t
+GNU Linker Switches=
+Linker Switches=
+Debug Info=0
+Standard Library=1
+Command Line=
+Post-Build Process=
+
+[Included Files]
+C File 1=bobble.c
+Archive File 1=extgraph.a
+Header File 1=sprites_bob.h
+Header File 2=trig_tables.h
+Header File 3=sprite_test.h
+Header File 4=extgraph.h
+
