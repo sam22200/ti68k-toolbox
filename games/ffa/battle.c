@@ -324,15 +324,17 @@ void battle_render(void)
     s16 hx = 116, mx = 18, k;
     char s[24], *p;
     RtSprite spr;
-    // background: dark wall, light floor (drawn as two rectangles and a few joints)
-    draw_rect(0, 0, 160, 40, C_DGRAY);
-    for (k = 7; k < 40; k += 8) draw_rect(0, k, 160, 1, C_BLACK);
-    draw_rect(0, 40, 160, 30, C_LGRAY);
-    draw_rect(0, 40, 160, 1, C_BLACK);
+    // background: the room where the fight happens (Chrono Trigger style), hero-centred
+    {
+        const Room *r = &rooms[st.room];
+        draw_tilemap(world_tilemap(), world_cam(st.x + HB_W / 2, RT_W, r->w * TILE), world_cam(st.y, 70, r->h * TILE));
+    }
     // monster
     if (st.battle == 1) { ml = mon1_light[0]; md = mon1_dark[0]; mm = mon1_mask[0]; mh = MON1_H; }
     else if (st.battle == 2) { ml = mon2_light[0]; md = mon2_dark[0]; mm = mon2_mask[0]; mh = MON2_H; }
     else { ml = mon3_light[0]; md = mon3_dark[0]; mm = mon3_mask[0]; mh = MON3_H; }
+    if (st.bp == BP_RUN || st.bp == BP_MENU || st.bp == BP_MAGIC || st.bp == BP_ITEM)
+        mh -= (rt_frame >> 4) & 1 ? 1 : 0;   // breathing: the sprite bobs by one pixel
     if (st.bp == BP_MACT && st.bt < 12 && !st.bsub) mx += st.bt;          // lunge
     else if (st.bp == BP_MACT && st.bt < 24 && !st.bsub) mx += 24 - st.bt;
     if (!(st.bp == BP_INTRO && (st.bt & 2)) && !(st.mhp == 0 && st.bp == BP_MSG && (st.bt & 4))

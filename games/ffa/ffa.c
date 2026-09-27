@@ -269,6 +269,12 @@ void game_render(void)
     }
     if (!data_ok) { draw_clear(); draw_text(4, 40, "ffadat missing: send it", F_MEDIUM, C_BLACK); return; }
     draw_tilemap(world_tilemap(), cx, cy);
+    {                                        // chests already opened
+        s16 ox, oy;
+        u8 i;
+        RtSprite s = { 16, 16, chest_open_light[0], chest_open_dark[0], chest_open_mask[0] };
+        for (i = 0; story_opened(i, &ox, &oy); i++) draw_sprite(ox * TILE - cx, oy * TILE - cy, &s);
+    }
     draw_actors(cx, cy);
     if (st.shop) shop_render();
     if (st.dlg_on) dialog_render(st.y - cy > 60);

@@ -306,6 +306,12 @@ void auto_equip(void)                        // stand-in for the APPS menu: wear
     }
 }
 
+// Where each find sits (room, cell), to draw it opened once taken (story_draw_opened).
+static const u8 find_at[NFIND][3] = {
+    { 0, 0, 0 },                             // the corpse's key: nothing to open
+    { 11, 6, 7 }, { 12, 2, 7 }, { 13, 10, 7 }, { 14, 15, 3 }, { 0, 0, 0 }, { 16, 9, 3 }, { 17, 9, 3 },
+};
+
 static u8 found(u8 f)
 {
     const Find *d = &finds[f];
@@ -421,6 +427,14 @@ static u8 start(u8 ev, s16 arg)
 }
 
 static u8 find(u8 f) { return found(f) ? 0 : start(EV_FIND, f); }
+
+u8 story_opened(u8 i, s16 *cx, s16 *cy)      // i-th opened chest of this room: 1 and its cell
+{
+    u8 f, n = 0;
+    for (f = 0; f < NFIND; f++)
+        if (find_at[f][0] == rooms[st.room].id && found(f) && n++ == i) { *cx = find_at[f][1]; *cy = find_at[f][2]; return 1; }
+    return 0;
+}
 
 u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
 {

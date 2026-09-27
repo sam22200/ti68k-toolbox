@@ -118,6 +118,7 @@ void dialog_render(u8 top);
 u8 story_trigger(s16 p, u8 examine);                 // start the event of a trigger, 1 if any
 u8 story_run(void);                                  // one frame of the current event, 1 = done
 void story_room(void);                               // spawn the NPCs of the current room
+u8 story_opened(u8 i, s16 *cx, s16 *cy);             // opened chests of the room
 void npc_step(void);                                 // move the actors towards their targets
 void shop_render(void);
 void battle_start(u8 n);                             // n = 0: pick from the room's table

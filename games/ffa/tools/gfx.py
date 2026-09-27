@@ -281,6 +281,11 @@ def main():
         for head, body in ((hd, bd), (hu, bu)):
             for l in legs:
                 npc.append(outlined(grid(head + body + l, 16, 24, 1, 2)))
+    open_chest = ["..bbbbbbbbbbbb..", ".bddddddddddddb.", "bdbbbbbbbbbbbbdb", "bdbllllllllllbdb",
+                  "bdbllllllllllbdb", "bbbbbbbbbbbbbbbb", "bwwwwwwwwwwwwwwb", "bbbbbbbbbbbbbbbb",
+                  "bddddddbbddddddb", "bdlllldbbdlllldb", "bdlllldbbdlllldb", "bdllllllllllllldb"[:16],
+                  "bddddddddddddddb", "bbbbbbbbbbbbbbbb", ".bb..........bb.", "................"]
+    emit("chest_open", [planes(grid(open_chest, 16, 16), 16)], 16, 16, "u16", out)
     out.append("#define NPC_KINDS %d" % len(NPCS))
     emit("npc", [planes(g, 16) for g in npc], 16, 24, "u16", out)
     # battle: monsters 1..3 (field sprites of the original, 2x EPX, shaded) and the hero
