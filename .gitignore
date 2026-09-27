@@ -42,3 +42,7 @@ __pycache__/
 /tools/bin/zx0
 /tools/bin/dzx0
 /chrono_fire_camp.gif
+
+# FFA remake: generated from the local ffa_en/ data (original art)
+/games/ffa/rooms.h
+/games/ffa/experiments/*.png
