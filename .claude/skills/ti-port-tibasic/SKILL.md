@@ -106,10 +106,30 @@ below, then `/ti-commit`.
 
 ## Lessons (FFA, `games/ffa/`)
 
-- FFA room format (`murK` = room K+1, picture `decK+1`): row 1 = [encounter rate `frc`, row of
-  the door table]; the grid starts at row 2, column 2 (cell of pixel (a, b) = `mur[b/9+2,
-  a/9+2]`, 9-px cells, 17 × 8 on a 153 × 71 picture); values: 0 wall, > 0.9 walkable, 1/3…
-  fractions = walkable with a special meaning, 3–199 door to room p, 200–299 world map, 300
-  chocobo, 450+ other map, ≥ 500 story script (`scenar`), ≤ -2 text (`text⌊|p|/10⌋+1`). Door
-  table (row `mur[1,2]`): door ids in columns 1..6, the key flag `clef[·]` at column id+6, the
-  arrival (b, a) in the last column at rows 2k-1, 2k.
+- **FFA room format** (`murK` = room K+1, picture `decK+1`, parser `tools/murparse.py`):
+  row 1 = [encounter rate `frc`, row of the door table] and is also the top exit row; column 1
+  is the left exit column; the door-table row doubles as the bottom exit row; C = `mur[2,1]`
+  holds the arrival column. Logic cell (x, y) = (a/9 + 1, b/9 + 1). Values: 0 wall, > 0.9
+  walkable, 3..199 door, 200+ other maps, >= 500 story script (walked on), -100 < p < -1 text
+  (solid, read with ENTER). Door table: ids in columns 1.., key flag at column i+6 (0 none,
+  -1 on foot), arrival (b, a) in column C, read from the room being **left**, -1 = keep.
+  Metadata sits on unreachable border cells: sanitize (a non-wall cell with no walkable
+  neighbour is a wall; the door-table row keeps only exits). Keys no program sets = locked.
+- **Walls auto-tiled from the collision grid** (3/4 view: face above a floor cell, upper face
+  two cells up, dark top elsewhere) + a per-room layout (floor rectangles under furniture,
+  objects, fills): the art cannot disagree with the logic. One tile set per area, not per room
+  (24.8 -> 15.3 KB).
+- **Story scripts as C coroutines** (protothread macros SAY/ASK/WAIT/WALK/FADE/BATTLE, the
+  resume line in the state): readable, saveable, testable; one macro per line (`__LINE__`).
+- **Scenarios = story checkpoints** (flags and items of each walkthrough step) + fights and
+  dialogue states for benches: every room and fight is testable alone.
+- **A play-through test** (BFS over the collision grid with the real keys, fights fought,
+  dialogues read) caught what unit tests did not (the examine probe missing a chest).
+- **Size**: 64 KB per TI variable: big data goes to a data variable read in place (`rt_file`),
+  saves go through `rt_save` (written at exit). Text: draw a dialogue page once into a
+  plane-format buffer, copy it byte-aligned (281k -> 218k per frame).
+- Colour CC0 assets (Ninja Adventure) convert well to 4 greys with per-object luminance
+  quantiles; 1-bit original sprites become battle sprites with 2x EPX + automatic shading
+  (highlight top-left, shade bottom-right) + a white outline.
+- OR-mode text cannot be light on dark: dialogue boxes are light with black text; greyed text
+  on black is invisible (put a light band behind it).

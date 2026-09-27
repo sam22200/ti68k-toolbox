@@ -62,7 +62,7 @@ matches the logic.
 | castle courtyard, 121-tile set, 2 NPCs (105) | 117k |
 | throne hall, Edouard (106) | 111k |
 | dungeon hall (110) | 105k |
-| battle vs the boss, menu open (52) | 186k |
+| battle vs the boss, menu open, room backdrop (52) | 230k (186k on a plain background) |
 | throne hall with a full dialogue box (53) | 218k (was 281k: the text is drawn once now) |
 
 Tiles are shared per area (castle 87, outside 121, dungeon 31 tiles: 15.3 KB, was 24.8 KB

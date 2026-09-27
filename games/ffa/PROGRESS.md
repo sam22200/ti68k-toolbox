@@ -74,22 +74,25 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 - **Save / Continue**: menu Save (a snapshot `Save {magic, Game}`, `rt_save`), title Continue
   (`rt_load`, magic checked). New runtime API; TI writes `ffasav` at exit and archives it.
   Verified on the Titanium (save, quit, relaunch, Continue in the courtyard).
+- **Polish**: opened chests drawn once taken; battles in the current room (CT style, 230k per
+  frame on the TI, was 186k on a plain background); monsters breathe. A fight verified on the
+  Titanium with the keys.
 - **Play-through test**: title to End of Part I with the real keys (BFS `walk_to` over the
   collision grid, doors pushed, dialogues read, fights fought with Attack, the riddle answered
   from the notice); the hero's stats are injected before the dungeon (the guide levels up
   there). 288 s of play, 13 fights. The examine probe now starts at the hitbox edge (it
   missed a chest from the lower part of a cell).
 
-## Remaining (in order)
+## Remaining (part I is complete; these are improvements)
 
-1. (done) Rooms. Layout in
-   `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
-   NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
-   `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
-2. (done) Title / new game.
-6. Options (battle speed, active/wait); materia AP (no level reachable in part I).
-7. Perf/size: move sprites and room maps to `ffadat` too when the program grows (52 KB now);
-   profile the dialogue box (~116k).
+1. Options menu (battle speed, active/wait mode); materia AP and levels (none reachable in
+   part I); the Antidote has no use yet (no poison in part I).
+2. Scenes: camera pans to show NPCs below the view (the ceremony), NPC side views.
+3. Art: more varied castle tiles (the keep roof is a flat dark mass), a battle intro swirl.
+4. Perf: the dialogue box still costs ~116k (name tag text, the copy loop); size 52 KB: move
+   sprites and room maps to `ffadat` before part II.
+5. Part II (world map, Milunia village...): a new skill run, starting from `docs/part1.md`'s
+   method (spec from the code and the guide, then room by room).
 
 ## Current bugs / failing tests
 
@@ -98,6 +101,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Polish, then a full play-through of part I on the PC (a key script from the title to the End
-screen) and on the Titanium: opened chests shown, camera pans in scenes, battle background
-art, monster idle animation, sound-free hit effects.
+Part I is done and verified (PC tests incl. a full play-through, Titanium runs). Ask the
+user whether to polish part I (list above) or to start part II.
