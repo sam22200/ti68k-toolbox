@@ -1,8 +1,9 @@
 NAME := ffa
 SRC := ffa.c world.c dialog.c story.c battle.c
 TESTS := test_ffa.c
-CFLAGS_GAME := -Wno-implicit-fallthrough
+
 include ../../runtime/rt.mk
+PC_CFLAGS += -Wno-implicit-fallthrough   # the story coroutines fall through on purpose
 
 PY := ../../tools/pyenv/bin/python
 gfx.h: tools/gfx.py

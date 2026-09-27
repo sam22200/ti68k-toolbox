@@ -84,6 +84,13 @@ void game_scenario(u16 n)
         place_somewhere(room_index[n - 100]);
     else if (n >= 1 && n <= 9)
         checkpoint(n);
+    else if (n >= 50 && n <= 53) {           // 50..52: a fight against monster 1..3 (menu open
+        checkpoint(n == 52 ? 5 : 3);         // after the intro); 53: room 6, a dialogue open
+        story_room();
+        if (n == 53) { world_enter(room_index[6], 13, 3); story_room(); dialog_open(T_SWORD_A, 0); st.dlg_shown = 500; st.mode = M_TEXT; }
+        else { battle_start(n - 49); st.ja = 30 * 256 - 1; }
+        return;
+    }
     else
         world_enter(room_index[8], 4, 4);    // ffa: dec8, a = 27, b = 27
     story_room();

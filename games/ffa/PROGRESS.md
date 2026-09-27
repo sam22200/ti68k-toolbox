@@ -56,6 +56,8 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 - `auto_equip()` wears what is owned (stand-in until the APPS menu).
 - **Room 4 done** (all 14 part I rooms now): 'field' style (grass, trees, castle front, gate,
   house with its message), the way south shows the End of Part I screen.
+- **TI milestone**: tile sets shared per area (15.3 KB), `ffa.89z` 60 KB, runs on the Titanium
+  (story1 verified, ESC to HOME). Render: rooms 105-117k, battle 186k, dialogue 281k of 375k.
 
 ## Remaining (in order)
 
@@ -66,8 +68,9 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 2. Title / new game: name entry, growth stat choice, intro text, "20 years after..." fade.
 6. Menus (APPS): Item, Equip (replace auto_equip), Materia, Status, Save; materia AP (not
    counted yet: no level reachable in part I).
-7. TI milestone: `make bench` on the heaviest room, size (tile sets shared per area, data in
-   archived files or ZX0 if > 64 KB), run on the Titanium.
+7. Perf: the dialogue box costs ~125k (text redrawn every frame): render the page once into
+   a RAM strip and blit it as opaque sprites. Size: 60 KB of 64 KB; ZX0 (`lib/unpack68k.s`)
+   for the tile sets / sprites before adding much more.
 
 ## Current bugs / failing tests
 
@@ -76,5 +79,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-TI milestone: `make ti` size, `make bench` on the heaviest rooms (5, 4) and a battle, a run on
-the Titanium. Then the APPS menu, the title / name / intro.
+The APPS menu (Item, Equip replacing auto_equip, Materia, Status, Save), then the title / name /
+growth stat / intro, then the dialogue perf fix.

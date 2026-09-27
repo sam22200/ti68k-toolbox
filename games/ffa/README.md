@@ -8,7 +8,8 @@ Original data: `ffa_en/` (local only). Skill: `ti-port-tibasic`. Progress: `PROG
 ```sh
 make test                  # unit + integration tests (no window)
 make pc && ./ffa_pc        # arrows move, shift runs, 2nd/ENTER examine, ESC quits
-make ti                    # ffa.89z (not yet: stand-in tiles too big, see PROGRESS.md)
+make ti                    # ffa.89z (60 KB: Titanium; too big for an AMS 2 TI-89)
+make bench BENCH=40        # ffab.89z -> ffab(N): cycles per frame of scenario N
 ```
 `rooms.h` is generated from the local `ffa_en/` data by `tools/rooms.py` (make does it).
 
@@ -54,6 +55,19 @@ matches the logic.
 2nd/ENTER to skip or turn the page, Yes/No choices. `story.c`: each event is a C coroutine
 (`SAY`, `ASK`, `WAIT`, `WALK`, `FADE`), its resume point is one state field.
 
+## Measured (Titanium, TiEmu cycles per frame, budget 375k; 2026-09-27)
+
+| screen (scenario) | render |
+|---|---|
+| castle courtyard, 121-tile set, 2 NPCs (105) | 117k |
+| throne hall, Edouard (106) | 111k |
+| dungeon hall (110) | 105k |
+| battle vs the boss, menu open (52) | 186k |
+| throne hall with a full dialogue box (53) | 281k (the 72 characters of text cost ~125k) |
+
+Tiles are shared per area (castle 87, outside 121, dungeon 31 tiles: 15.3 KB, was 24.8 KB
+per room). `ffa.89z` is 60 KB. Verified running on the Titanium (story1 scene, ESC to HOME).
+
 ## Scenarios (`--scenario N` / `ffa(N)`)
 
 | N | state |
@@ -68,4 +82,6 @@ matches the logic.
 | 7 | + Buster Sword, Bronze Bangle, room 5 in front of the throne hall door (ceremony next) |
 | 8 | + knighted, room 18 (Olen gives Cure next) |
 | 9 | + Cure materia, room 4: the exit south ends part I |
+| 50, 51, 52 | a fight against monster 1, 2, 3 (the boss), command menu open |
+| 53 | room 6 with a full dialogue box open (bench) |
 | 100 + r | room r (original number), hero on the free cell nearest the centre |
