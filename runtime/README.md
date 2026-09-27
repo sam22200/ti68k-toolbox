@@ -68,9 +68,11 @@ include ../../runtime/rt.mk
    e.g. `0 RIGHT` / `30 RIGHT A` / `60`), `--frames N`, `--headless`, `--shot F.png`, `--seed N`,
    `--scale N`. In the window: F2 save state, F3 load, F12 screenshot, Tab 8× speed, P pause,
    O single step. `--headless --keys k.txt --frames 90 --shot s.png` renders without a window.
-3. **Calculator last** (`make ti`, then `ti-run NAME.89z` or type `NAME(3)` for scenario 3), on
-   the Titanium; the TI-89 HW2 only for a release.
-4. **Costs on the TI, no screenshots to compare**: `make bench` builds `NAMEb.89z`; `NAMEb(S)` runs
+3. **Calculator last of all** (`make ti`, then `ti-run NAME.89z` or type `NAME(3)` for scenario 3),
+   on the Titanium, once everything passes without UI (the emulator is slow: screenshots); the
+   TI-89 HW2 only for a release.
+4. **Costs on the TI, no screenshots to compare**: `tools/bin/ti-cycles` runs a TI build on the PC
+   with datasheet cycles (`CLAUDE.md`); in the emulator, `make bench` builds `NAMEb.89z`; `NAMEb(S)` runs
    RT_BENCH updates then renders from scenario S and prints cycles per frame (TiEmu counts:
    optimistic for ExtGraph code, performance §1). `make bench BENCH=8` sets the count; the renders
    draw the *final* state, so pick S and BENCH so that it is the heaviest screen.

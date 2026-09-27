@@ -5,6 +5,10 @@ description: Launch, drive and check a TI-89 program in the TiEmu emulator (Dock
 
 # TI-89 emulator (TiEmu)
 
+**The last step of the development flow** (`CLAUDE.md`): every check that can run without UI
+(unit tests, PC headless runs, `ti-cycles`) comes first; the emulator is slow (restart, typed keys,
+screenshots to read) and is used once, at a milestone, for what only the calculator runs.
+
 Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$PATH`).
 
 | Command | Purpose |
@@ -15,6 +19,13 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 | `ti-send file…` | fallback only: types the path into TiEmu's file chooser (slow, needs HOME) |
 | `ti-key [--hold S] TOKEN…` | keys: `ENTER ESC HOME CLEAR 2ND UP…`, or text `'hello()'` |
 | `ti-shot out.png [--lcd]` | screenshot; `--lcd` = screen only, enlarged |
+
+**Not everything needs the emulator.** TiEmu 3.04 (Ubuntu) has no command line control, no D-Bus
+interface and no GDB, and exports none of its internals: memory and registers are only in its GUI
+debugger (F11). For cycle counts and for checking what a routine drew, run the program on the PC
+with `ti-cycles` (datasheet cycles per marked zone, the screen from memory as a PNG, no window;
+`CLAUDE.md`, performance §10). Keep TiEmu for what touches the hardware: grayscale, keyboard,
+interrupts, link, files, and the final run of a build.
 
 ## Test loop
 

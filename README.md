@@ -8,13 +8,15 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 | Path | What |
 |---|---|
 | `runtime/` | **Portable Game Runtime**: one C engine, PC (SDL2) and TI backends, unit tests, PC/TI cross-check ([README](runtime/README.md)) |
-| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported), `life/` (Game of Life on the runtime, glider), `flappy/` (Flappy Bird ported from sdlbird), `ffa/` (Final Fantasy Alternative remade from TI-Basic, in progress) |
+| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported), `life/` (Game of Life on the runtime, glider), `flappy/` (Flappy Bird ported from sdlbird), `ffa/` (Final Fantasy Alternative remade from TI-Basic, in progress), `mode7/` (Mode 7 demo decompiled and optimised, [OPTIMISATIONS](games/mode7/OPTIMISATIONS.md)) |
 | `lib/` | shared code: ZX0/LZ4 decoders in 68000 asm, ZX0 packer |
 | `experiments/` | small measured tests (hardware, timers, keyboard, graphics, benchmarks) |
 | `hello/` | reference Hello World |
-| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-group`/`ti-key`/`ti-shot` (TiEmu in Docker, `Dockerfile.tiemu` + `tiemu-keyfix.c`), `ti-table`, `zx0` |
+| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-group`/`ti-key`/`ti-shot` (TiEmu in Docker, `Dockerfile.tiemu` + `tiemu-keyfix.c`), `ti-table`, `zx0`, `ti-cycles` (cycle counter, `tools/m68kbench/`) |
 | `.claude/skills/` | Claude Code skills and the knowledge base (`ti89-c-dev/reference/*.md`) |
 | `CLAUDE.md` | project rules and workflow |
+
+**Install**: [docs/INSTALL.md](docs/INSTALL.md) (Ubuntu / Linux, macOS).
 
 ## Quick start (runtime game)
 
@@ -46,6 +48,8 @@ Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
 - `tools/bin/zx0`, `tools/bin/dzx0`: ZX0 v2 host packer/unpacker, built from
   [einar-saukas/ZX0](https://github.com/einar-saukas/ZX0) (`gcc -O2 -o zx0 src/zx0.c src/optimize.c src/compress.c src/memory.c`,
   `gcc -O2 -o dzx0 src/dzx0.c`).
+- `tools/musashi/`: the Musashi 68000 core (MIT), `git clone https://github.com/kstenerud/Musashi tools/musashi`;
+  `make -C tools/m68kbench` then builds `tools/bin/ti-cycles`.
 - `runtime/platform-sw/amsfont.h`: AMS fonts, extracted from `tools/rom/` by `make`.
 - `sources/`, `ffa_en/`: third-party reference sources and TI-Basic programs.
 - Build outputs: `*.89z`, `*_pc`, `*_test`, …

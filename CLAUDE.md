@@ -40,11 +40,28 @@ ti-cc -o name src.c             # build → name.89z (skill ti89-c-dev)
 ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 HW2 AMSpatch, 89u unpatched)
 ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
+ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycles per zone, screen as PNG
 ```
 
-A change is only "done" once it has been **verified running**: for runtime games, unit tests on the
-PC plus a TI run at milestones; for code that touches the hardware directly (interrupts, keyboard,
-grayscale, timers, runtime backend), seen in the emulator (printed numbers or screenshot read).
+**Measure cycles with `ti-cycles`, not TiEmu** (`tools/m68kbench/`): a headless 68000 (Musashi) with
+the MC68000 datasheet timings (movem, shifts, mulu/muls: all verified by `test/cyctest.c`), AMS ROM
+calls emulated with an estimated cost, zones marked with `bench.h` (`BENCH_BEGIN/END`, `BENCH_SHOT`
+for the screen from memory). A 20-million-cycle run takes 0.05 s. Programs run under it must not
+touch the I/O ports (build them with a `-DBENCH` variant); TiEmu has no CLI, D-Bus or GDB to read
+memory, so hardware paths (grayscale, keyboard, interrupts) are still checked in the emulator.
+
+**Development flow: tests without UI, the calculator last of all.** The TI emulator is by far the
+slowest way to check anything (a restart, keys typed, a screenshot to take and read: tens of
+seconds per check, and flaky): avoid it at all costs. In this order:
+1. **Unit tests** on the PC, headless: `make test` (`sw_step` + asserts on the state, pixel and
+   plane checksums), as much of the program as possible.
+2. **Real runs without UI**: PC headless runs (`--headless --keys F --frames N --shot F.png`) and
+   the TI binary itself under `ti-cycles` (cycles per zone, `BENCH_VALUE` numbers, the screen read
+   from memory as a PNG and a checksum per scenario).
+3. **The emulator, last of the last**: once, at a milestone or a release, and only for what the
+   PC cannot run (grayscale driver, keyboard matrix, interrupts, timers, link, files, AMS
+   dialogs). Prefer printed numbers; one screenshot at most.
+A change is "done" once 1 and 2 pass; code that touches the hardware also gets 3, at the end.
 Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) only for a release.
 
 **New games use the Portable Game Runtime** (`runtime/README.md`; roadmap:
@@ -56,8 +73,9 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
   already cross-checked (identical plane checksums PC/TI), so game logic needs no TI run per change.
 - Every game with state has an **injection door**: `game_scenario(n)` jumps to a precise state
   (`--scenario N` on the PC, `name(N)` on the TI), plus PC state files and input scripts.
-- On the TI prefer non-UI checks that print numbers (`make bench`, printed checksums) over
-  screenshots of drawn scenes.
+- On the TI side, measure and check without UI: `ti-cycles` (cycles, screen from memory), or
+  printed numbers (`make bench`, printed checksums); screenshots of drawn scenes only as the last
+  step (flow above).
 
 ## Skills and knowledge
 
@@ -77,7 +95,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
     with its bugs.
   - `sources/`: old reference sources (TICT tutorials, TI-Chess, TICT-Explorer, small games),
     indexed in `sources/README.md`. Read-only.
-- `ti89-emulator`: drive TiEmu (keys, sending files, screenshots, saved states, pitfalls).
+- `ti89-emulator`: drive TiEmu (keys, sending files, screenshots, saved states, pitfalls): the last step only.
 - `ti-port-sdl`: port an open SDL game (upstream pick, engine + tests on the PC, TI bench and run,
   graphics variants compared on screenshots, TI again, knowledge update, commit).
 - `ti-port-tibasic`: remake a TI-Basic game (FFA): extraction, understanding with the guide, part by
@@ -125,7 +143,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`)
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
@@ -137,7 +155,8 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
   and CPU exceptions; `bigprog/`: size limits, packing, data files read from archive; `heapcode/`: running code from the heap; `link/`: link timeouts;
   `sprites/`: ExtGraph mirror routines; `tilemap/`: TileMap engine + pre-shifted sprites; `fonts/`: AMS fonts read in place; `hwsync/`: LCD sync bit and 16 kHz fine timer; `render/`, `ai/`, `struct/`, `compress/`, `maps/`: the
   measured ideas of game-techniques §13; `bench/m7row.s`: C-callable asm example). `sources/`: old reference sources.
-- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-table`, `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
+- `tools/m68kbench/`: `ti-cycles` sources, `bench.h` markers, self-test. `docs/INSTALL.md`: toolchain install (Ubuntu, macOS).
+- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-table`, `ti-cycles` (host 68000 cycle counter, built from `tools/m68kbench/` with Musashi in `tools/musashi/`), `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
   (numpy, scipy, pillow) for asset pipelines.
 - `tools/gcc4ti-bin/`: installed GCC4TI (HTML docs in `doc/html/`); `tools/build-gcc4ti.sh`
   rebuilds it in Docker (GCC 4.1.2 does not build with the host gcc).
@@ -146,7 +165,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 - `ti89decode.py`: TI-Basic file decoder (`ffa_en/`: the TI-Basic game it was written for).
 - Local only, not in git (`.gitignore`, see `README.md`): `sources/`, `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
-  `patches`), `tools/bin/zx0`/`dzx0` (host builds), `runtime/platform-sw/amsfont.h` (extracted
+  `patches`, `musashi`), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
 - `docs/resources.md`: tutorials, game sources, sites, sprite/tileset/map sites for assets.
 

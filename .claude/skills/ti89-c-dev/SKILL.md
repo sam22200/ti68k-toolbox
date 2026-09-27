@@ -64,9 +64,13 @@ tools/bin/ti-cc -o name src.c [more.c]     # → name.89z; ExtGraph always avail
 disable). ExtGraph's TileMap engine needs `tools/extgraph/lib/tilemap.a` on the command line
 (performance §7; pre-shifted sprites `preshift.h` are in `extgraph.a`). The
 variable name on the calculator is fixed at build time by `-o`: renaming the .89z does not change it.
-`name` = variable name on the calculator (≤ 8 characters, lowercase). Then test with the
-`ti89-emulator` skill (`ti-run name.89z`) on the Titanium (`TI_CALC=89t`, default); add
-`TI_CALC=89` / `89u` (TI-89 HW2) only for a release. Runtime games: unit tests on the PC first.
+`name` = variable name on the calculator (≤ 8 characters, lowercase). Then test **without UI**
+(`CLAUDE.md`, development flow): unit tests on the PC first (runtime games: `make test`), then the
+TI binary under `tools/bin/ti-cycles` (datasheet cycles per zone, the screen read from memory:
+build a `-DBENCH` variant without I/O ports). The `ti89-emulator` skill (`ti-run name.89z`, a
+screenshot) comes last, once, for what only the calculator runs (grayscale, keyboard,
+interrupts, link, files), on the Titanium (`TI_CALC=89t`, default); add `TI_CALC=89` / `89u`
+(TI-89 HW2) only for a release.
 
 Skeleton: see `hello/hello.c` (`#define USE_TI89`, `OPTIMIZE_ROM_CALLS`, `SAVE_SCREEN`,
 `#include <tigcclib.h>`, `void _main(void)`). Library docs: `tools/gcc4ti-bin/doc/html/`, one page

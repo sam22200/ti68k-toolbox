@@ -52,8 +52,10 @@ confirm the placeholders behave. Fix the feel (jump height, speed) against the u
 
 ## 3. TI, benchmark without UI
 
-`make bench` → `<name>b.89z`; `TI_ARGS=N ti-run <name>b.89z [data]` per scenario (a clean
-restart each time) (worst cases: most objects on screen). Read the printed cycles per frame, not a drawing.
+Without the emulator first: run the TI binary under `tools/bin/ti-cycles` (datasheet cycles per
+marked zone, the screen from memory; a `-DBENCH` build without I/O ports), worst-case scenarios
+(most objects on screen). `make bench` → `<name>b.89z` with `TI_ARGS=N ti-run <name>b.89z [data]`
+only for what needs the real hardware path. Read the printed cycles per frame, not a drawing.
 Budget: ~360k cycles per frame at 30 fps on hardware (grayscale driver included); TiEmu
 under-counts `movem` and shifts, so keep a margin (`ti68k-performance.md` §1). Over budget:
 optimise from the knowledge base (tables, redraw only what changes, TileMap, pre-shifted
@@ -61,7 +63,8 @@ sprites), measure again. Program size: note it (TI-89 AMS 2 limit 24,576 bytes).
 
 ## 4. TI for real
 
-`make ti`, `ti-run <name>.89z` (Titanium). Keys for a `_rowread` game: `ti-key --hold 0.4 …`.
+The last step, once (`CLAUDE.md`, development flow: the emulator is slow, avoid it until
+everything passes without UI). `make ti`, `ti-run <name>.89z` (Titanium). Keys for a `_rowread` game: `ti-key --hold 0.4 …`.
 Stuck modifier or a command that does not arrive: `ti-emu restart`. Check with printed numbers
 or one screenshot read back (`ti-shot x.png --lcd`), and that ESC returns to HOME.
 

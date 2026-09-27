@@ -31,6 +31,9 @@ outline on the hero, NPCs and monsters). Titanium only; ASM only after asking.
 - **One part, then one room at a time**. A room is done when its tests pass, it runs on the PC,
   and it is committed (`/ti-commit` after each room). The TI only at the milestones (engine
   benchmark, end of part), when nearly everything is right on the PC.
+- **No UI until the end** (`CLAUDE.md`, development flow): unit tests and the play-through test
+  on the PC, headless shots read back, `ti-cycles` for the TI binary; the TI emulator (slow,
+  screenshots) only at the milestones below.
 - **Injection everywhere**: story flags, discoveries (chests, keys), hero stats, inventory,
   room and position are all settable from a scenario number, a PC state file or a `--set`
   script, so that any room or fight can be tested alone.
