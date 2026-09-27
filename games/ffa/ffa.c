@@ -5,9 +5,9 @@
 #include "ffa.h"
 #include "gfx.h"
 #include "rooms.h"
+#include "texts.h"
 
 Game st;
-static const RtSprite hero_spr = { 16, 24, hero_light[0], hero_dark[0], hero_mask[0] };
 
 static void new_game(void)
 {
@@ -20,6 +20,12 @@ static void new_game(void)
     st.hero.str = 10; st.hero.def = 5; st.hero.mag = 12; st.hero.mdef = 6;
     st.hero.spd = 15; st.hero.luck = 3;
     st.hero.exp = 0; st.hero.gils = 100;
+    for (k = 0; k < NITEM; k++) st.item[k] = 0;
+    for (k = 0; k < NARM; k++) st.own[k] = 0;
+    for (k = 0; k < NMAT; k++) st.mat[k] = 0;
+    st.item[I_POTION] = 3; st.item[I_ANTIDOTE] = 1;
+    for (k = 0; k < 7; k++) st.name[k] = "Arthur"[k];
+    st.devi = 5000 + rt_rand() % 100 + 1;   // ffa: 5000+rand(100)
     st.co = 15 + rt_rand() % 5 + 1;          // 15+rand(5): 16..20 steps
 }
 
@@ -54,7 +60,8 @@ void game_scenario(u16 n)
     if (n >= 100 && n < 100 + sizeof(room_index) && room_index[n - 100] != 255)
         place_somewhere(room_index[n - 100]);
     else
-        world_enter(room_index[8], 4, 3);    // ffa: dec8, a = 27, b = 27
+        world_enter(room_index[8], 4, 4);    // ffa: dec8, a = 27, b = 27
+    story_room();
 }
 
 static void fade_step(void)
@@ -67,6 +74,7 @@ static void fade_step(void)
             const Door *d = &rooms[st.room].door[st.next_door];
             if (d->dest == ROOM_OUT) { st.mode = M_END; return; }
             world_enter(d->dest, d->ax, d->ay);
+            story_room();
         }
         st.mode = M_FADE_IN;
     } else if (!--st.fade) {
@@ -103,8 +111,8 @@ static void walk(void)
         st.cell_in = c;
         if ((c & 0xC0) == CELL_TRIG && rooms[st.room].trig[c & 0x3F] >= 5000) {
             st.trig = rooms[st.room].trig[c & 0x3F];
-            st.mode = M_TEXT;
-            return;
+            if (story_trigger(st.trig, 0)) { st.anim = 0; return; }
+            st.trig = 0;
         }
     }
     if (input_pressed(K_A | K_ENTER)) {      // examine the cell in front of the hero
@@ -112,7 +120,8 @@ static void walk(void)
         c = world_cell(st.x + HB_W / 2 + fx[st.dir] * (HB_W / 2 + 4), st.y + HB_H / 2 + fy[st.dir] * (HB_H / 2 + 4));
         if ((c & 0xC0) == CELL_TRIG && rooms[st.room].trig[c & 0x3F] < 0) {
             st.trig = rooms[st.room].trig[c & 0x3F];
-            st.mode = M_TEXT;
+            if (story_trigger(st.trig, 1)) { st.anim = 0; return; }
+            st.mode = M_TEXT;               // not remade yet: placeholder box showing p
         }
     }
 }
@@ -123,9 +132,13 @@ u8 game_update(void)
     switch (st.mode) {
     case M_WALK: walk(); break;
     case M_FADE_OUT: case M_FADE_IN: fade_step(); break;
-    case M_TEXT: case M_BATTLE:
+    case M_TEXT:
+        if (st.dlg_on) { dialog_update(); if (!st.dlg_on) st.mode = M_WALK; break; }
+        /* fall through: placeholder box */
+    case M_BATTLE:
         if (input_pressed(K_A | K_ENTER)) { st.mode = M_WALK; st.trig = 0; }
         break;
+    case M_SCRIPT: story_run(); break;
     case M_END: break;
     }
     return 1;
@@ -141,6 +154,34 @@ static void put_num(char *s, s16 v)
     *s = 0;
 }
 
+static void draw_actors(s16 cx, s16 cy)       // hero and NPCs, back to front (by feet y)
+{
+    static const u8 cycle[4] = { 0, 1, 0, 2 };   // stand, step, stand, other step
+    s16 ys[NNPC + 1];
+    u8 order[NNPC + 1], n = 0, i, j, t;
+    for (i = 1; i < NNPC; i++) if (st.npc[i].on) { order[n] = i; ys[n++] = st.npc[i].y; }
+    order[n] = 0; ys[n++] = st.y;
+    for (i = 1; i < n; i++)                  // insertion sort, n <= 4
+        for (j = i; j && ys[j - 1] > ys[j]; j--) {
+            s16 y = ys[j]; ys[j] = ys[j - 1]; ys[j - 1] = y;
+            t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
+        }
+    for (i = 0; i < n; i++) {
+        RtSprite s;
+        s.w = 16; s.h = 24;
+        if (!order[i]) {
+            u8 f = st.dir * 3 + (st.anim ? cycle[(st.anim >> 2) & 3] : 0);
+            s.light = hero_light[f]; s.dark = hero_dark[f]; s.mask = hero_mask[f];
+            draw_sprite(st.x + SPR_DX - cx, st.y + SPR_DY - cy, &s);
+        } else {
+            const Npc *p = &st.npc[order[i]];
+            u8 f = p->spr * 6 + (p->dir == DIR_UP ? 3 : 0) + (p->anim ? cycle[(p->anim >> 2) & 3] : 0);
+            s.light = npc_light[f]; s.dark = npc_dark[f]; s.mask = npc_mask[f];
+            draw_sprite(p->x + SPR_DX - cx, p->y + SPR_DY - cy, &s);
+        }
+    }
+}
+
 void game_render(void)
 {
     const Room *r = &rooms[st.room];
@@ -152,13 +193,13 @@ void game_render(void)
         return;
     }
     draw_tilemap(&r->map, cx, cy);
-    draw_sprite(st.x + SPR_DX - cx, st.y + SPR_DY - cy, &hero_spr);
-    if (st.mode == M_TEXT || st.mode == M_BATTLE) {
+    draw_actors(cx, cy);
+    if (st.dlg_on) dialog_render(st.y - cy > 60);
+    if ((st.mode == M_TEXT && !st.dlg_on) || st.mode == M_BATTLE) {
         draw_rect(4, 70, 152, 26, C_BLACK);
         draw_rect(5, 71, 150, 24, C_WHITE);
         if (st.mode == M_BATTLE) draw_text(8, 74, "A monster attacks!", F_SMALL, C_BLACK);
-        else if (st.trig == -1) draw_text(8, 74, "The door is locked.", F_SMALL, C_BLACK);
         else { s[0] = 'p'; s[1] = '='; put_num(s + 2, st.trig); draw_text(8, 74, s, F_SMALL, C_BLACK); }
     }
-    if (st.mode == M_FADE_OUT || st.mode == M_FADE_IN) fade_planes(st.fade);
+    if (st.fade) fade_planes(st.fade);
 }

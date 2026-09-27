@@ -19,6 +19,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from murparse import Room
+import art
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PICS = os.path.join(HERE, '..', '..', '..', 'ffa_en', 'pictures')
@@ -51,12 +52,12 @@ def cell_code(v, room, trig):
 
 
 def picture_tiles(u, w, h, px, py):
-    """Stand-in tiles: the original picture, one 9x9 cell -> 16x16, placed at grid x = a/9 + 1."""
+    """Stand-in tiles: the original picture, one 9x9 cell -> 16x16, at grid (a/9 + 1, b/9 + 1)."""
     path = os.path.join(PICS, 'dec%d.png' % u)
     src = Image.open(path).convert('L') if os.path.exists(path) else Image.new('L', (153, 71), 0)
     big = Image.new('L', (w * 16, h * 16), 0)             # outside the picture: black
     up = src.resize((src.width * 16 // 9, src.height * 16 // 9), Image.NEAREST)
-    big.paste(up, ((1 + px) * 16, py * 16))
+    big.paste(up, ((1 + px) * 16, (1 + py) * 16))
     tiles, tmap = [], []
     for ty in range(h):
         for tx in range(w):
@@ -87,7 +88,17 @@ def build(u):
     doors = []
     for d in r.doors:
         doors.append(d)
-    tiles, tmap = picture_tiles(u, w, h, px, py)
+    if u in art.LAYOUTS:
+        lay = art.LAYOUTS[u]
+        v = art.View(r, lay)
+        g = art.render(v, lay['style'], lay['objects'])
+        big = [[3] * (w * 16) for _ in range(h * 16)]      # padding: black
+        for y in range(len(g)):
+            for x in range(len(g[0])):
+                big[py * 16 + y][px * 16 + x] = g[y][x]
+        tiles, tmap = art.tiles_of(big, w, h)
+    else:
+        tiles, tmap = picture_tiles(u, w, h, px, py)
     return {'u': u, 'w': w, 'h': h, 'px': px, 'py': py, 'frc': int(r.frc * 10), 'cells': cells,
             'trig': trig, 'doors': doors, 'tiles': tiles, 'tmap': tmap}
 
@@ -125,7 +136,7 @@ def main():
                 dest = 0xFF                                   # out of scope: never opens
             tr = rooms[idx[tgt]] if tgt in idx else None
             ax = d['a'] // 9 + 1 + tr['px'] if tr and d['a'] >= 0 else -1
-            ay = d['b'] // 9 + tr['py'] if tr and d['b'] >= 0 else -1
+            ay = d['b'] // 9 + 1 + tr['py'] if tr and d['b'] >= 0 else -1
             key = d['key']
             if key > 0 and key not in settable:
                 key = KEY_NEVER

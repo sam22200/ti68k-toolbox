@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../runtime/platform-sw/rt_sw.h"
 #include "ffa.h"
+#include "texts.h"
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -58,10 +59,11 @@ int main(void)
 {
     s16 x0;
     u16 k;
+    u8 seen = 0, npc_seen = 0;
 
-    // new game: room 8, original a = 27, b = 27 (cell 4, 3), first-level stats
+    // new game: room 8, original a = 27, b = 27 (cell 4, 4), first-level stats
     sw_init(0);
-    CHECK(rooms[st.room].id == 8 && st.x == 4 * TILE + HB_X0 && st.y == 3 * TILE + HB_Y0);
+    CHECK(rooms[st.room].id == 8 && st.x == 4 * TILE + HB_X0 && st.y == 4 * TILE + HB_Y0);
     CHECK(st.hero.hp == 80 && st.hero.mpm == 15 && st.hero.gils == 100 && st.flag[6] && st.flag[8]);
 
     // walking: 1.5 px per frame, 3 when running (shift / K_B)
@@ -77,32 +79,68 @@ int main(void)
     hold(K_LEFT, 60);
     CHECK(world_cell(st.x - 1, st.y) == CELL_WALL && !world_solid(world_cell(st.x, st.y)));
 
-    // corner sliding: room 6, cell (2,2) is a wall and (3,2) floor; the hitbox overlaps
+    // corner sliding: room 6, cell (2,3) is a wall and (3,3) floor; the hitbox overlaps
     // column 2 by 4 px and goes up: it slides right into column 3 instead of stopping
     sw_init(0);
-    put(6, 3 * TILE - 4, 3 * TILE + HB_Y0);
-    CHECK(world_solid(world_cell(2 * TILE + 8, 2 * TILE + 8)) && !world_solid(world_cell(3 * TILE + 8, 2 * TILE + 8)));
+    put(6, 3 * TILE - 4, 4 * TILE + HB_Y0);
+    CHECK(world_solid(world_cell(2 * TILE + 8, 3 * TILE + 8)) && !world_solid(world_cell(3 * TILE + 8, 3 * TILE + 8)));
     hold(K_UP, 16);
-    CHECK(st.y < 3 * TILE && st.x >= 3 * TILE);
+    CHECK(st.y < 4 * TILE && st.x >= 3 * TILE);
     // too much overlap (8 px): no slide, blocked
-    put(6, 3 * TILE - 8, 3 * TILE + HB_Y0);
+    put(6, 3 * TILE - 8, 4 * TILE + HB_Y0);
     hold(K_UP, 16);
-    CHECK(st.y >= 3 * TILE && st.x == 3 * TILE - 8);
+    CHECK(st.y >= 4 * TILE && st.x == 3 * TILE - 8);
 
-    // door with a fade: room 8 -> room 6 (stairs); arrival a = 117, b = 18 -> cell (14, 2)
+    // story1: stepping on 500 under the stairs brings Edouard down; the hero steps aside
     sw_init(0);
     hold(K_RIGHT, 11);                       // x = 4 * 16 + 3 + 16 (column 5, under the stairs)
     CHECK(st.x == 5 * TILE + HB_X0 + 1);
-    for (k = 0; k < 40 && st.mode != M_FADE_OUT; k++) {
-        sw_step(K_UP);
-        if (st.mode == M_TEXT) { sw_step(0); sw_step(K_A); }   // story trigger 500 on the way
+    for (k = 0; k < 40 && st.mode == M_WALK; k++) sw_step(K_UP);
+    CHECK(st.mode == M_SCRIPT && !st.flag[9]);
+    for (k = 0; k < 600 && st.mode == M_SCRIPT; k++) {
+        if (st.dlg_on && st.dlg_text == T_STORY1) seen = 1;
+        if (st.npc[1].on) npc_seen = 1;
+        sw_step(k % 8 == 0 ? K_A : 0);       // read the dialogue
     }
+    CHECK(st.mode == M_WALK && st.flag[9] && seen && npc_seen && !st.npc[1].on);
+    CHECK(st.x == 6 * TILE + HB_X0 && st.y == 2 * TILE + HB_Y0 && st.dir == DIR_LEFT);
+    for (k = 0; k < 100; k++) sw_step(K_UP); // the 500 cell does not trigger twice
+    hold(0, 1);
+
+    // door with a fade: room 8 -> room 6 (stairs); arrival a = 117, b = 18 -> cell (14, 3)
+    hold(K_LEFT, 11);
+    for (k = 0; k < 40 && st.mode != M_FADE_OUT; k++) sw_step(K_UP);
     CHECK(st.mode == M_FADE_OUT && rooms[st.room].id == 8);
     hold(0, FADE_FRAMES * 2);
     CHECK(sw_level(80, 50) < 3);             // lighter while fading
     hold(0, FADE_FRAMES * 8);
     CHECK(rooms[st.room].id == 6 && st.mode == M_WALK);
-    CHECK((st.x >> 4) == 14 && (st.y >> 4) == 2);
+    CHECK((st.x >> 4) == 14 && (st.y >> 4) == 3);
+
+    // bed: Yes heals, No does not; the potion on the desk is found once
+    sw_init(0);
+    st.hero.hp = 3; st.hero.mp = 1;
+    put(8, 4 * TILE + HB_X0, 2 * TILE + HB_Y0);
+    st.dir = DIR_LEFT;
+    sw_step(K_A);
+    CHECK(st.mode == M_SCRIPT);
+    for (k = 0; k < 60 && !(st.dlg_on && st.dlg_shown >= 6); k++) sw_step(0);
+    sw_step(K_DOWN); sw_step(K_A);           // No
+    hold(0, 5);
+    CHECK(st.mode == M_WALK && st.hero.hp == 3);
+    sw_step(K_A);
+    for (k = 0; k < 60 && !(st.dlg_on && st.dlg_shown >= 6); k++) sw_step(0);
+    sw_step(K_A);                            // Yes
+    for (k = 0; k < 200 && st.mode == M_SCRIPT; k++) sw_step(0);
+    CHECK(st.mode == M_WALK && st.hero.hp == st.hero.hpm && st.hero.mp == st.hero.mpm && !st.fade);
+    put(8, 7 * TILE + HB_X0, 6 * TILE + HB_Y0);
+    st.dir = DIR_DOWN;
+    sw_step(K_A);
+    for (k = 0; k < 200 && st.mode == M_SCRIPT; k++) sw_step(k % 8 == 0 ? K_A : 0);
+    CHECK(st.item[I_POTION] == 4 && st.flag[40]);
+    sw_step(K_A);
+    hold(0, 3);
+    CHECK(st.mode != M_SCRIPT && st.item[I_POTION] == 4);
 
     // locked door: room 13 -> 14 needs clef[3] (the injured-number riddle)
     sw_init(113);

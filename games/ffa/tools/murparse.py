@@ -3,7 +3,8 @@
 Original room format (TI-Basic `mov`/`redess`, 1-based matrix indices):
 - row 1 = [encounter rate frc, row index dr of the door table, ...]; mur[2,1] = C.
 - walk grid: the cell under hero pixel (a, b) is mur[b/9+2, a/9+2]; 9-px cells. The logical grid
-  is columns 1..C-1 (column 1 = left exits at a = -9) and rows 2..dr (the door-table row doubles as the bottom exit row).
+  is columns 1..C-1 (column 1 = left exits at a = -9) and rows 1..dr (row 1 = top exits at
+  b = -9, the door-table row doubles as the bottom exit row): cell (x, y) = (a/9 + 1, b/9 + 1).
 - values: 0 wall; > 0.9 walkable; 3..199 door to room p; 200..299 world map; 300 chocobo;
   450+ other map; >= 500 story script (scenar); <= -2 text (program text{int(|p|/10)+1}).
 - door table (row dr): door ids in columns 1.., key flag clef[k] at column i+6 (0 none,
@@ -54,8 +55,10 @@ class Room:
         C = int(m[1][0])
         self.C, self.dr = C, dr
         at = lambda r, c: m[r - 1][c - 1] if r - 1 < len(m) and c - 1 < len(m[r - 1]) else Fraction(0)
-        self.grid = [[at(r, c) for c in range(1, C)] for r in range(2, dr + 1)]
-        self.w, self.h = C - 1, dr - 1
+        self.grid = [[at(r, c) for c in range(1, C)] for r in range(1, dr + 1)]
+        self.w, self.h = C - 1, dr
+        for (y, x) in ((0, 0), (0, 1), (1, 0)):          # header: frc, dr, C
+            self.grid[y][x] = Fraction(0)
         self._sanitize()
         self.doors = []
         i = 1

@@ -2,6 +2,7 @@
 #ifndef FFA_H
 #define FFA_H
 #include "../../runtime/core/rt.h"
+#include "gfx_ids.h"
 
 // ---------------------------------------------------------------- rooms (tools/rooms.py)
 typedef struct { u8 dest, key; s8 ax, ay; } Door;   // dest: room index, 0xFE = leaves part I,
@@ -36,7 +37,7 @@ extern const u8 room_index[];                        // original id -> index (25
 #define STEP_PX 16                                   // one original step = one tile walked
 
 enum { DIR_DOWN, DIR_UP, DIR_LEFT, DIR_RIGHT };
-enum { M_WALK, M_FADE_OUT, M_FADE_IN, M_TEXT, M_BATTLE, M_END };
+enum { M_WALK, M_FADE_OUT, M_FADE_IN, M_TEXT, M_BATTLE, M_END, M_SCRIPT };
 #define FADE_STEPS 4                                 // 0 = normal .. 3 = white (4 greys)
 #define FADE_FRAMES 3                                // frames per fade step
 
@@ -48,6 +49,16 @@ typedef struct {
     u8 str, def, mag, mdef, spd, luck;
 } Hero;
 
+enum { I_POTION, I_HIPOTION, I_ETHER, I_TETHER, I_XPOTION, I_ELIXIR, I_ANTIDOTE, NITEM };
+enum { A_SWORD = 1, A_WRIST = 9, A_BANGLE = 25, NARM = 32 };      // armat rows of the original
+enum { MAT_FIRE = 2, MAT_CURE = 3, NMAT = 18 };                   // maglist rows
+
+#define NNPC 4
+typedef struct {
+    u8 on, spr, dir, anim;
+    s16 x, y, tx, ty;                                // hitbox top-left, walk target
+} Npc;
+
 typedef struct {
     u8 mode, room, dir, anim, fade, fade_t, next_room, next_door;
     s16 x, y;                                        // hitbox top-left, pixels in the room
@@ -58,6 +69,18 @@ typedef struct {
     u8 cell_in;                                      // code of the cell under the hitbox centre
     u8 flag[NFLAG];
     Hero hero;
+    char name[9];
+    u8 item[NITEM], own[NARM], mat[NMAT];            // counts, owned equipment, owned materia
+    u16 num;                                         // number shown by '\2' (the riddle's devi)
+    u16 devi;                                        // riddle number, 5000 + rand(100)
+    // dialogue
+    u8 dlg_on, dlg_text, dlg_ask, dlg_page, dlg_cur, ans;
+    u16 dlg_shown;
+    // story script (story.c): event, resume point, timer; actors
+    u8 ev, timer, hwalk;
+    u16 pc;
+    s16 arg;
+    Npc npc[NNPC];
 } Game;
 extern Game st;
 
@@ -67,5 +90,14 @@ u8 world_solid(u8 code);
 void world_move(s16 dx, s16 dy);                     // collide + slide, may open a door
 s16 world_cam(s16 p, s16 view, s16 size);
 void fade_planes(u8 level);                          // lighten the visible planes by level
+
+void dialog_open(u8 text, u8 ask);                   // ask: Yes/No on the last page -> st.ans
+void dialog_update(void);
+void dialog_render(u8 top);
+
+u8 story_trigger(s16 p, u8 examine);                 // start the event of a trigger, 1 if any
+u8 story_run(void);                                  // one frame of the current event, 1 = done
+void story_room(void);                               // spawn the NPCs of the current room
+void npc_step(void);                                 // move the actors towards their targets
 
 #endif
