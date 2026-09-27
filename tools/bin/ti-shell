@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runs a command (default: a shell) in the Linux development container (tools/Dockerfile.dev),
+# with the repository mounted at the same path: the way to build and test on macOS.
+#   ti-shell                          interactive shell
+#   ti-shell make -C runtime/demo test
+T=$(cd "$(dirname "$0")/.." && pwd)
+W=$(cd "$T/.." && pwd)
+docker build -q --platform linux/amd64 -t ti-dev -f "$T/Dockerfile.dev" "$T" >/dev/null || exit 1
+TTY=; [ -t 0 ] && TTY=-it
+[ $# -gt 0 ] || set -- bash
+exec docker run --rm $TTY --platform linux/amd64 -u "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e PATH="$T/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  -v "$W:$W" -w "$PWD" ti-dev "$@"

@@ -1,0 +1,7 @@
+# Linux development shell (tools/bin/ti-shell): everything but the emulator, for hosts that cannot
+# run the toolchain natively (macOS). GCC4TI (tools/gcc4ti-bin, built by tools/build-gcc4ti.sh)
+# is an x86-64 Linux build: this image is linux/amd64 (Rosetta / QEMU on Apple Silicon).
+FROM ubuntu:22.04
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      build-essential git curl unzip python3 python3-venv libsdl2-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
