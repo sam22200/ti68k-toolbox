@@ -100,6 +100,63 @@ static u16 *tm_mono;                               // dark rows only, 16 per til
 
 void tilemap_dirty(void) { tm_pl.force_update = 1; }
 
+static char *symstr(char *sym, const char *name)   // "\0name\0" -> the SYMSTR pointer
+{
+    char *d = sym;
+    *d++ = 0;
+    while (*name && d < sym + 10) *d++ = *name++;
+    *d = 0;
+    return d;
+}
+
+#define SAV_EXTRA 6                                // 0, "sav", 0, OTH_TAG
+u8 rt_load(const char *name, void *data, u16 size)
+{
+    char sym[12];
+    SYM_ENTRY *e = SymFindPtr(symstr(sym, name), 0);
+    const unsigned char *p;
+    if (!e) return 0;
+    p = HeapDeref(e->handle);
+    if (*(const u16 *)p != size + SAV_EXTRA || p[2 + size + SAV_EXTRA - 1] != OTH_TAG) return 0;
+    memcpy(data, p + 2, size);
+    return 1;
+}
+
+static const void *sv_data;
+static u16 sv_size;
+static char sv_name[10];
+
+u8 rt_save(const char *name, const void *data, u16 size)
+{
+    u8 k;
+    for (k = 0; name[k] && k < 8; k++) sv_name[k] = name[k];
+    sv_name[k] = 0;
+    sv_data = data;
+    sv_size = size;
+    return 1;
+}
+
+static void save_write(void)                       // after the teardown: c-patterns §10
+{
+    char sym[12], *s = symstr(sym, sv_name);
+    SYM_ENTRY *e = SymFindPtr(s, 0);
+    HANDLE h;
+    HSym hs;
+    unsigned char *p;
+    if (e && e->flags.bits.archived) EM_moveSymFromExtMem(s, HS_NULL);   // unarchive FIRST
+    h = HeapAlloc(2 + sv_size + SAV_EXTRA);
+    if (h == H_NULL) return;
+    hs = SymAdd(s);
+    if (hs.folder == 0) { HeapFree(h); return; }
+    DerefSym(hs)->handle = h;
+    p = HeapDeref(h);
+    *(u16 *)p = sv_size + SAV_EXTRA;
+    memcpy(p + 2, sv_data, sv_size);
+    p += 2 + sv_size;
+    *p++ = 0; *p++ = 's'; *p++ = 'a'; *p++ = 'v'; *p++ = 0; *p = OTH_TAG;
+    EM_moveSymToExtMem(s, HS_NULL);                // archived: survives a RAM reset
+}
+
 const void *rt_file(const char *name, u16 *size)   // c-patterns §1: data read in place
 {
     char sym[12], *d = sym;
@@ -293,5 +350,6 @@ out:
     if (tm_mono) free(tm_mono);
 #endif
     FontSetSys(old_font);
+    if (sv_data) { save_write(); sv_data = 0; }    // statics survive between runs
     GKeyFlush();
 }

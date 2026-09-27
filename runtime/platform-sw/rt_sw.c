@@ -157,6 +157,31 @@ const void *rt_file(const char *name, u16 *size)   // NAME.bin, loaded once, kep
     return cache[k].data;
 }
 
+// ---------------------------------------------------------------- save files
+u8 rt_load(const char *name, void *data, u16 size)
+{
+    char path[32];
+    FILE *f;
+    u8 ok;
+    snprintf(path, sizeof path, "%s.sav", name);
+    if (!(f = fopen(path, "rb"))) return 0;
+    ok = fread(data, 1, size, f) == size && fgetc(f) == EOF;
+    fclose(f);
+    return ok;
+}
+
+u8 rt_save(const char *name, const void *data, u16 size)
+{
+    char path[32];
+    FILE *f;
+    u8 ok;
+    snprintf(path, sizeof path, "%s.sav", name);
+    if (!(f = fopen(path, "wb"))) return 0;
+    ok = fwrite(data, 1, size, f) == size;
+    fclose(f);
+    return ok;
+}
+
 // ---------------------------------------------------------------- frame driver
 void sw_init(u16 scenario)
 {

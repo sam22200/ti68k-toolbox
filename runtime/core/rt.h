@@ -114,6 +114,14 @@ extern void *rt_light, *rt_dark;       // hidden planes this frame (rt_dark only
 // RT_NULL when missing; *size gets its length in bytes when size is not RT_NULL.
 const void *rt_file(const char *name, u16 *size);
 
+// Save files (a game's own state): rt_load copies the save NAME into data when it exists with
+// exactly `size` bytes (1 = loaded). rt_save records a save: the PC writes NAME.sav at once;
+// the TI writes the variable NAME (OTH "sav", archived) when the program exits, after the
+// grayscale teardown (AMS may open dialogs: c-patterns §10), so `data` must stay valid until
+// then (a static copy). 1 = written or scheduled.
+u8 rt_load(const char *name, void *data, u16 size);
+u8 rt_save(const char *name, const void *data, u16 size);
+
 // ---------------------------------------------------------------- utilities
 u16 rt_rand(void);                     // wyhash16, deterministic (rt_seed)
 extern u16 rt_seed;
