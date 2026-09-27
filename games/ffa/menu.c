@@ -61,7 +61,7 @@ static void use_item(u8 i)                    // objet, obj = 1: outside battles
 
 u8 menu_update(void)                          // 0 = quit the game
 {
-    u8 go = input_pressed(K_A | K_ENTER), back = input_pressed(K_B | K_ESC), n = count();
+    u8 go = input_pressed(K_A | K_ENTER) != 0, back = input_pressed(K_B | K_ESC) != 0, n = count();
     if (go || input_pressed(K_UP | K_DOWN)) st.mmsg = 0;
     if (input_pressed(K_UP)) st.mcur = st.mcur ? st.mcur - 1 : n - 1;
     if (input_pressed(K_DOWN)) st.mcur = st.mcur + 1 < n ? st.mcur + 1 : 0;

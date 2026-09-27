@@ -40,7 +40,7 @@ static u8 letter_index(char c)
 
 void title_update(void)
 {
-    u8 go = input_pressed(K_A | K_ENTER);
+    u8 go = input_pressed(K_A | K_ENTER) != 0;   // K_ENTER is bit 8: != 0 before the u8
     if (st.tfade == 1) { if (!(rt_frame & 1) && st.fade) st.fade--; if (!st.fade) st.tfade = 0; return; }
     if (st.tfade == 2) {                     // fading out, then the next step
         if (!(rt_frame & 1) && st.fade < 3) { st.fade++; return; }

@@ -425,6 +425,9 @@ int main(void)
     CHECK(st.mode == M_GAMEOVER);
     sw_step(0); sw_step(K_A);
     CHECK(st.mode == M_TITLE);
+    for (k = 0; k < 400 && st.mode != M_WALK && st.mode != M_SCRIPT && st.mode != M_TEXT; k++) sw_step(k % 8 == 0 ? K_A : 0);
+    printf("new game after game over: room %u at %d,%d mode %u\n", rooms[st.room].id, st.x >> 4, st.y >> 4, st.mode);
+    CHECK(rooms[st.room].id == 8 && st.x >> 4 == 4 && st.y >> 4 == 4 && st.hero.lv == 1);
 
     // title: New Game, growth stat Magic, name "Bo", the intro, then the bedroom fading in
     sw_init(0);
@@ -542,6 +545,14 @@ int main(void)
     sw_step(K_A); sw_step(0);                                // a Potion: +100 HP
     CHECK(st.item[I_POTION] == k - 1 && st.hero.hp == (st.hero.hpm < 120 ? st.hero.hpm : 120));
     sw_step(K_B); sw_step(0); sw_step(K_B); sw_step(0);
+    CHECK(st.mode == M_WALK);
+    // ENTER and ESC (bits 8 and 9) work in the menu like 2nd and shift
+    sw_step(K_ESC); sw_step(0); sw_step(K_DOWN); sw_step(0); sw_step(K_DOWN); sw_step(0);
+    sw_step(K_ENTER); sw_step(0);
+    CHECK(st.mode == M_MENU && st.menu == 3);
+    sw_step(K_ESC); sw_step(0);
+    CHECK(st.mode == M_MENU && st.menu == 0);
+    sw_step(K_ESC); sw_step(0);
     CHECK(st.mode == M_WALK);
 
     // room 4: the house message, and the way south ends part I
