@@ -73,7 +73,7 @@ or one screenshot read back (`ti-shot x.png --lcd`), and that ESC returns to HOM
 ## 5. Graphics (SDL first)
 
 - Draw the sprites, tiles and fonts in 4 greys (`RtSprite` light/dark/mask, `RtTilemap`), sized
-  for 160×100. Upstream art can be a starting point (check the licence, keep copyrighted art out of
+  for 160×100 (references per category: `ti-art-refs`). Upstream art can be a starting point (check the licence, keep copyrighted art out of
   git or the repo private), usually redrawn at this resolution.
 - **Visibility**: white outline on the main character and the obstacles/enemies (mask dilated by
   one pixel, `ti68k-c-patterns.md` § sprites); contrast the playfield against the background

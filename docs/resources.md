@@ -59,6 +59,7 @@ redistribute them in a published game without checking).
   sheets, useful when a game is missing from The Spriters Resource.
 - VideoGameSprites, https://www.videogamesprites.net/ : classic sprites, strongest on SNES-era
   JRPGs (Final Fantasy…).
+- The chosen sheets per category (scenery, characters, UI, portraits): the `ti-art-refs` skill.
 - VGMaps, https://vgmaps.com/ : complete maps and reconstructed levels; the reference for
   rebuilding a level layout or a tile map (Zelda-like overworlds, platformer stages).
 

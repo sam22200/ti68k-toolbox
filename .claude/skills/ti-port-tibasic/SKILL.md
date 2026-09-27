@@ -68,7 +68,8 @@ outline on the hero, NPCs and monsters). Titanium only; ASM only after asking.
   each candidate (e.g. 8, 16, 32 px) as mock-ups on the PC (screenshots, grey and `RT_MONO`) and
   as a TI bench (cost of the tile map + hero + NPCs per frame). Pick with reasons (readability,
   screen fraction of the hero, scrolling, map memory, art effort); record it in the README.
-- Style references (16-bit): Chrono Trigger, Seiken Densetsu 3, Sword of Mana; the tile is the
+- Style references (16-bit): Chrono Trigger, Seiken Densetsu 3, Sword of Mana; the pick per
+  category (scenery, characters, UI, portraits) in the `ti-art-refs` skill; the tile is the
   grid unit, characters are taller than one tile (16×24 on 16×16 tiles); perspective: top-down
   3/4 with walls showing their face.
 - Compare 2 to 4 art variants on the same screenshot before drawing all the rooms.

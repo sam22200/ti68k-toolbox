@@ -106,6 +106,8 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
   graphics variants compared on screenshots, TI again, knowledge update, commit).
 - `ti-port-tibasic`: remake a TI-Basic game (FFA): extraction, understanding with the guide, part by
   part and room by room, new 16-bit style engine and art, `PROGRESS.md` checkpoints.
+- `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
+  the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) and push to
   `github.com/sam22200/ti68k-toolbox`.
 - When you learn something new and verified about the platform, add it to
