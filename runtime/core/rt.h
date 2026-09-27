@@ -106,6 +106,14 @@ void draw_tilemap(const RtTilemap *m, s16 camx, s16 camy);       // opaque, whol
 void tilemap_dirty(void);              // call after changing map cells of the current map
 extern void *rt_light, *rt_dark;       // hidden planes this frame (rt_dark only in grey)
 
+// ---------------------------------------------------------------- data files
+// Big read-only data (tile sets, sprites, maps) kept outside the program (64 KB per variable):
+// TI: the variable NAME (type OTH, made with ttbin2oth; archive it: it is read in place, from
+// Flash, never copied; a RAM one is locked). PC: the file NAME.bin in the current directory
+// (the same bytes in the host's byte order). Returns the data (after the TI size word) or
+// RT_NULL when missing; *size gets its length in bytes when size is not RT_NULL.
+const void *rt_file(const char *name, u16 *size);
+
 // ---------------------------------------------------------------- utilities
 u16 rt_rand(void);                     // wyhash16, deterministic (rt_seed)
 extern u16 rt_seed;

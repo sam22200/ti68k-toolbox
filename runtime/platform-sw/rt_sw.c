@@ -122,12 +122,39 @@ static void text_plane(u8 *p, s16 x, s16 y, const char *s, u8 font)
 
 void draw_text(s16 x, s16 y, const char *s, u8 font, u8 color)
 {
-#ifdef RT_MONO
-    if (color & 2) text_plane(sw_planes[0], x, y, s, font);
-#else
-    if (color & 1) text_plane(sw_planes[0], x, y, s, font);
-    if (color & 2) text_plane(sw_planes[1], x, y, s, font);
+#ifdef RT_MONO                                  // through rt_light / rt_dark like the TI:
+    if (color & 2) text_plane(rt_light, x, y, s, font);   // a game may point them at its own
+#else                                           // plane-format buffer to render text once
+    if (color & 1) text_plane(rt_light, x, y, s, font);
+    if (color & 2) text_plane(rt_dark, x, y, s, font);
 #endif
+}
+
+// ---------------------------------------------------------------- data files
+const void *rt_file(const char *name, u16 *size)   // NAME.bin, loaded once, kept
+{
+    static struct { char name[12]; void *data; u16 size; } cache[8];
+    char path[32];
+    FILE *f;
+    long n;
+    u8 k;
+    for (k = 0; k < 8 && cache[k].data; k++)
+        if (!strcmp(cache[k].name, name)) { if (size) *size = cache[k].size; return cache[k].data; }
+    if (k == 8 || strlen(name) > 10) return RT_NULL;
+    snprintf(path, sizeof path, "%s.bin", name);
+    if (!(f = fopen(path, "rb"))) return RT_NULL;
+    fseek(f, 0, SEEK_END);
+    n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (n <= 0 || n > 65518 || !(cache[k].data = malloc(n)) || fread(cache[k].data, 1, n, f) != (size_t)n) {
+        fclose(f);
+        return RT_NULL;
+    }
+    fclose(f);
+    strcpy(cache[k].name, name);
+    cache[k].size = (u16)n;
+    if (size) *size = (u16)n;
+    return cache[k].data;
 }
 
 // ---------------------------------------------------------------- frame driver

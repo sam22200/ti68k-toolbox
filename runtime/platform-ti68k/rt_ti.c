@@ -100,6 +100,22 @@ static u16 *tm_mono;                               // dark rows only, 16 per til
 
 void tilemap_dirty(void) { tm_pl.force_update = 1; }
 
+const void *rt_file(const char *name, u16 *size)   // c-patterns §1: data read in place
+{
+    char sym[12], *d = sym;
+    SYM_ENTRY *e;
+    const unsigned char *p;
+    *d++ = 0;
+    while (*name && d < sym + 10) *d++ = *name++;
+    *d = 0;
+    e = SymFindPtr(d, 0);                          // SYMSTR form: a pointer to the final 0
+    if (!e) return RT_NULL;
+    if (!e->flags.bits.archived) HLock(e->handle); // a RAM variable must not move
+    p = HeapDeref(e->handle);
+    if (size) *size = *(const u16 *)p;             // data + 0 + "dat" + 0 + OTH tag
+    return p + 2;
+}
+
 void draw_tilemap(const RtTilemap *m, s16 camx, s16 camy)
 {
     if (!tm_big && !(tm_big = malloc(GRAY_BIG_VSCREEN_SIZE))) return;
