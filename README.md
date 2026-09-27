@@ -12,7 +12,7 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 | `lib/` | shared code: ZX0/LZ4 decoders in 68000 asm, ZX0 packer |
 | `experiments/` | small measured tests (hardware, timers, keyboard, graphics, benchmarks) |
 | `hello/` | reference Hello World |
-| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-group`/`ti-key`/`ti-shot` (TiEmu in Docker), `ti-table`, `zx0` |
+| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-group`/`ti-key`/`ti-shot` (TiEmu in Docker, `Dockerfile.tiemu` + `tiemu-keyfix.c`), `ti-table`, `zx0` |
 | `.claude/skills/` | Claude Code skills and the knowledge base (`ti89-c-dev/reference/*.md`) |
 | `CLAUDE.md` | project rules and workflow |
 
@@ -23,8 +23,13 @@ cd runtime/demo
 make test            # unit tests on the PC, no window
 make pc && ./demo_pc # play on the PC (arrows, 2nd = Ctrl/Space, ESC)
 make ti              # demo.89z for the calculator
-../../tools/bin/ti-run demo.89z
+../../tools/bin/ti-run demo.89z   # clean TiEmu restart, file sent at boot, runs demo()
 ```
+
+In TiEmu, play with the PC keyboard (TiEmu window focused): arrows, **AltGr = 2nd**, Shift =
+shift, **Right Ctrl = alpha**, Left Ctrl = ◆, Enter, Esc. The Docker image preloads
+`tools/tiemu-keyfix.c`, which translates the host's keycodes for TiEmu 3.04 and releases keys
+TiEmu missed (no more stuck keys); `TI_KEYFIX=0 ti-emu start` runs TiEmu without it.
 
 ## Not in the repository (local setup)
 

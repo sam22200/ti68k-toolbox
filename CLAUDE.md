@@ -115,7 +115,8 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 - Never `free(NULL)` (AMS crashes with an Address Error); statics survive between runs, so reset
   pointers to freed memory at the top of `_main`.
 - Use the Docker TiEmu from `tools/bin/ti-emu`, never the system `tiemu` (the image adds
-  `tools/tiemu-keyfix.c`: without it keys stick when TiEmu misses a release).
+  `tools/tiemu-keyfix.c`: evdev keycodes translated for TiEmu 3.04, AltGr = 2nd, Right Ctrl =
+  alpha, lost releases replayed; without it the PC arrows do nothing and keys stick).
 - `ti-cc` builds with -Os plus dead-code removal and `-mregparm=5` (asm routines reading stack
   arguments need `__stkparm__`, or `TI_CC_PLAIN=1`). Build with -Os (default `ti-cc`); -O2 can be slower (it turned a 16-bit multiply into a library
   call). Check hot loops for `__mulsi3`/`__divsi3`/float helpers in the asm (`tigcc -S`).
