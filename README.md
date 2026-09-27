@@ -1,0 +1,46 @@
+# TI-68K Game Development Toolbox
+
+Native games for the TI-89 / TI-89 Titanium (Motorola 68000), written in C with GCC4TI and
+ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_Development_Toolbox.pdf)
+(1 portable runtime, 2 Open Flappy Bird port, 3 TI-BASIC → C, 4 keypad "touch" gestures,
+5 Game Boy ROM → C, 6 Prince of Persia).
+
+| Path | What |
+|---|---|
+| `runtime/` | **Portable Game Runtime**: one C engine, PC (SDL2) and TI backends, unit tests, PC/TI cross-check ([README](runtime/README.md)) |
+| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported) |
+| `lib/` | shared code: ZX0/LZ4 decoders in 68000 asm, ZX0 packer |
+| `experiments/` | small measured tests (hardware, timers, keyboard, graphics, benchmarks) |
+| `hello/` | reference Hello World |
+| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-key`/`ti-shot` (TiEmu in Docker), `ti-table`, `zx0` |
+| `.claude/skills/` | Claude Code skills and the knowledge base (`ti89-c-dev/reference/*.md`) |
+| `CLAUDE.md` | project rules and workflow |
+
+## Quick start (runtime game)
+
+```sh
+cd runtime/demo
+make test            # unit tests on the PC, no window
+make pc && ./demo_pc # play on the PC (arrows, 2nd = Ctrl/Space, ESC)
+make ti              # demo.89z for the calculator
+../../tools/bin/ti-run demo.89z
+```
+
+## Not in the repository (local setup)
+
+Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
+
+- `tools/gcc4ti-bin/`: GCC4TI, built in Docker by `tools/build-gcc4ti.sh` (sources in `tools/gcc4ti/`,
+  `tools/tarballs/`).
+- `tools/extgraph/`: ExtGraph 2 (LGPL), with `lib/extgraph.a`, `tilemap.a` and headers.
+- `tools/rom/`: TI OS images (TI-89 AMS 2.09, Titanium AMS 3.10, AMSpatch); `tools/tiemu/`:
+  TiEmu profiles and saved states built from them; `tools/patches/`: HW3Patch.
+- `tools/sdl2/`: SDL2 2.30 headers extracted from `libsdl2-dev` (`apt-get download` + `dpkg -x`;
+  the library is the system's `libSDL2-2.0.so.0`), plus `lib/libSDL2.so` symlink.
+- `tools/pyenv/`: Python venv with numpy, scipy, pillow.
+- `tools/bin/zx0`, `tools/bin/dzx0`: ZX0 v2 host packer/unpacker, built from
+  [einar-saukas/ZX0](https://github.com/einar-saukas/ZX0) (`gcc -O2 -o zx0 src/zx0.c src/optimize.c src/compress.c src/memory.c`,
+  `gcc -O2 -o dzx0 src/dzx0.c`).
+- `runtime/platform-sw/amsfont.h`: AMS fonts, extracted from `tools/rom/` by `make`.
+- `sources/`, `ffa_en/`: third-party reference sources and TI-Basic programs.
+- Build outputs: `*.89z`, `*_pc`, `*_test`, …
