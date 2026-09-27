@@ -577,6 +577,12 @@ while (running) {
 - Never `HeapUnlock` a handle you did not lock (`if (!HeapGetLock(h)) { HLock(h); mine = 1; }`):
   unlocking the running program lets the heap compressor move code that is executing
   (TICT-Explorer crash, history v0.26).
+- Lock heap blocks you keep a pointer to (`p = HLock(h)`, not `HeapDeref(h)`) before any other
+  allocation: **verified** (Mode 7 rebuild, `sources/mode7/`): `GrayOn()`'s `HeapAllocHigh`
+  compacted the heap and moved the unlocked texture blocks under their pointers. `HeapFree`
+  takes a locked handle.
+- AMS names that clash with ordinary identifiers (tigcclib macros, compile errors far from the
+  cause): `FillTriangle` (ROM call), `off` (macro).
 
 ## 10. Files: save games, high scores, level packs
 

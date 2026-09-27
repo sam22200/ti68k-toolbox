@@ -60,6 +60,14 @@ void m7row_asm(unsigned char *out asm("%a0"), const short *horz asm("%a1"),
 ```
 Build: `ti-cc -o name main.c m7row.s` (tigcc assembles `.s` itself).
 
+- **Motorola operands without `%`** in a `.s` file: `ti-cc ... -Wa,--register-prefix-optional`
+  (**verified**, `sources/mode7/src/render.s`).
+- **`(d8,pc,Xn)` reaches only -128..127 bytes and GNU as truncates a farther offset without an
+  error** (**verified**: a table moved after its routine gave wrong masks): keep such tables
+  just before the code that indexes them.
+- Save a callee-saved register **whole**: an old routine saving `d3` with `move.w` then using
+  `moveq` into it worked under its TIGCC caller and broke under GCC4TI, which keeps 32-bit values
+  in `d3` (**verified**).
 - **A68k syntax** (`.asm`, the syntax of all the old sources: `xdef`, `dc.b`, `d0` without `%`) is
   also accepted by tigcc (it calls its bundled `a68k`): compiled by the analysis, not run here.
 - **Inline asm** for one instruction (**verified**, `muls16` in `ti68k-performance.md` §4):
