@@ -1,0 +1,30 @@
+#!/bin/sh
+# Sends one or more TI files (.89z .89p .89g .89y...) to the running TiEmu instance.
+# Usage: ti-send FILE...
+# F10 = "Send file to TiEmu", then the path is typed into the GTK file chooser. Sending overwrites
+# the existing variable. The calculator must be on the HOME screen (not inside a program).
+set -e
+for f in "$@"; do
+  [ -f "$f" ] || { echo "ti-send: $f not found" >&2; exit 1; }
+  p=$(cd "$(dirname "$f")" && pwd)/$(basename "$f")
+  W=$(xdotool search --name '^TiEmu \(' | head -1)
+  [ -n "$W" ] || { echo "ti-send: TiEmu window not found (ti-emu start)" >&2; exit 1; }
+  xdotool windowactivate --sync "$W"; sleep 0.3
+  xdotool key F10
+  D=$(timeout 10 xdotool search --sync --name '^Open File$' | head -1)
+  [ -n "$D" ] || { echo "ti-send: the file chooser did not open" >&2; exit 1; }
+  sleep 0.5; xdotool windowactivate --sync "$D"; sleep 0.3
+  # '/' always opens the Location field (Ctrl+L toggles it). GTK's inline completion corrupts a
+  # path typed at the end of the field, so we type it before a '=' sentinel removed afterwards.
+  xdotool type --delay 30 '/'; sleep 0.3
+  xdotool key ctrl+a BackSpace; xdotool type '='; xdotool key Left
+  xdotool type --delay 15 "$p"
+  xdotool key End BackSpace Return
+  for i in $(seq 1 40); do
+    xdotool search --name '^Open File$' >/dev/null 2>&1 || break; sleep 0.25
+  done
+  if xdotool search --name '^Open File$' >/dev/null 2>&1; then
+    echo "ti-send: the file chooser stayed open (path rejected?)" >&2; exit 1
+  fi
+  sleep 1.5  # let the emulator finish receiving
+done

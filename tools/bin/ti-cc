@@ -1,0 +1,17 @@
+#!/bin/sh
+# Compiles for the TI-89 / 89 Titanium with GCC4TI; ExtGraph 2 is always available.
+# Usage: ti-cc -o NAME file.c [more .c/.s/.a] [tigcc options]   → NAME.89z (+ .9xz/.v2z per USE_*)
+# NAME = variable name on the calculator (≤ 8 characters, lowercase).
+# extgraph.a is always passed to the linker: ld-tigcc only pulls in the functions actually used.
+T=$(cd "$(dirname "$0")/.." && pwd)
+export TIGCC="$T/gcc4ti-bin"
+export PATH="$TIGCC/bin:$PATH"
+EG="$T/extgraph/lib"
+# Size/speed flags from L. Debroux's modern GCC4TI projects (ti89_authenticator): dead code and data
+# removal, register parameters for all functions, linker optimisations. Verified on Puzzle Bobble
+# (12,849 → 12,067 bytes, runs on HW2 and HW3). TI_CC_PLAIN=1 disables them (e.g. for old asm code
+# that expects stack parameters). COMPRESSED_FORMAT_RELOCS: Bobble 12,067 → 11,773, HW2 + HW3 verified.
+OPT="-ffunction-sections -fdata-sections -fomit-frame-pointer -mregparm=5 -mno-bss -DCOMPRESSED_FORMAT_RELOCS
+     --optimize-code --cut-ranges --reorder-sections --remove-unused --merge-constants"
+[ -n "$TI_CC_PLAIN" ] && OPT=
+exec tigcc -Os -Wall -W $OPT -I"$EG" "$@" "$EG/extgraph.a"

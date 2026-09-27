@@ -1,0 +1,46 @@
+#!/bin/sh
+# Drives the emulator: [TI_CALC=89t|89|89u] ti-emu start | stop | restart | status | save
+#   save: saves the current state into the profile's sav_file (TiEmu menu > Calculator state >
+#         Save state image); the emulator will restart from that state.
+#   TI_CALC=89t (default): TI-89 Titanium, AMS 3.10     TI_CALC=89: TI-89 HW2, AMS 2.09 AMSpatch
+#   TI_CALC=89u: TI-89 HW2, official unpatched AMS 2.09 (24 KB program limit, execution protection)
+# TiEmu 3.04 from Ubuntu 22.04 (tilibs 2011) in Docker, shown on the host display: the TiEmu of
+# Ubuntu 24.04 corrupts files sent to a TI-89 Titanium.
+# Profile (config, OS image, saved state): tools/tiemu/$TI_CALC/.tiemu (starts from sav_file).
+T=$(cd "$(dirname "$0")/.." && pwd)
+P="$T/tiemu/${TI_CALC:-89t}"
+[ -d "$P" ] || { echo "ti-emu: unknown profile $P" >&2; exit 2; }
+W=$(cd "$T/.." && pwd)
+case "$1" in
+  start)
+    xdotool search --name '^TiEmu \(' >/dev/null 2>&1 && { echo "TiEmu already running"; exit 0; }
+    docker image inspect tiemu-jammy >/dev/null 2>&1 || docker build -q -t tiemu-jammy -f "$T/Dockerfile.tiemu" "$T" >/dev/null
+    docker run -d --rm --name tiemu --network host -u "$(id -u):$(id -g)" \
+      -e DISPLAY="$DISPLAY" -e XAUTHORITY=/xauth -v "$XAUTHORITY:/xauth:ro" \
+      -e HOME="$P" -v "$W:$W" -w "$W" tiemu-jammy tiemu >/dev/null
+    timeout 30 xdotool search --sync --name '^TiEmu \(' >/dev/null || { echo "ti-emu: no window after 30 s ('Set ROM version' dialog?)" >&2; exit 1; }
+    sleep 2; echo "TiEmu ready" ;;
+  stop) docker kill tiemu >/dev/null 2>&1; echo "TiEmu stopped" ;;
+  restart) "$0" stop; sleep 1; "$0" start ;;
+  save)
+    SAV="$P/.tiemu/ti${TI_CALC:-89t}.sav"
+    W=$(xdotool search --name '^TiEmu \(' | head -1)
+    [ -n "$W" ] || { echo "ti-emu: TiEmu is not running" >&2; exit 1; }
+    xdotool windowactivate --sync "$W"; sleep 0.3
+    # popup menu (right click): positions relative to the click point, for this container's GTK theme
+    eval "$(xdotool getwindowgeometry --shell "$W")"
+    CX=$((X + 110)); CY=$((Y + 44))
+    xdotool mousemove $CX $CY click 3; sleep 0.8
+    xdotool mousemove $((CX + 70)) $((CY + 133)); sleep 0.8
+    xdotool mousemove $((CX + 220)) $((CY + 131)) mousemove $((CX + 347)) $((CY + 181)) click 1
+    D=$(timeout 10 xdotool search --sync --name '^Save File$' | head -1)
+    [ -n "$D" ] || { echo "ti-emu: no Save File dialog (menu layout changed?)" >&2; exit 1; }
+    sleep 0.5; xdotool windowactivate --sync "$D"; sleep 0.3
+    xdotool key ctrl+a BackSpace; xdotool type '='; xdotool key Left
+    xdotool type --delay 15 "$SAV"; xdotool key End BackSpace Return; sleep 1.5
+    xdotool search --name '^Save File$' >/dev/null 2>&1 && { echo "ti-emu: save not confirmed" >&2; exit 1; }
+    sed -i "s#^sav_file=.*#sav_file=$SAV#" "$P/.tiemu/tiemu.ini"
+    echo "state saved: $SAV" ;;
+  status) xdotool search --name '^TiEmu \(' >/dev/null 2>&1 && echo "running" || echo "stopped" ;;
+  *) echo "usage: [TI_CALC=89t|89|89u] ti-emu start|stop|restart|status|save" >&2; exit 2 ;;
+esac

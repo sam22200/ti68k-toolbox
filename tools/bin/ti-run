@@ -1,0 +1,8 @@
+#!/bin/sh
+# Sends a program (plus optional extra files), then runs it from the HOME screen.
+# Usage: ti-run PROG.89z [EXTRA...]   → runs name() where name = PROG's file name
+set -e
+D=$(dirname "$0")
+NAME=$(basename "$1" | sed 's/\.[^.]*$//')
+"$D/ti-send" "$@"
+"$D/ti-key" HOME CLEAR CLEAR "$NAME()" ENTER

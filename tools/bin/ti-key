@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Presses TI-89 keys in TiEmu (through xdotool).
+
+Usage: ti-key [--hold S] [--gap S] TOKEN...
+  Named key : 2ND SHIFT ESC APPS DIAMOND ALPHA HOME MODE CATALOG BS CLEAR
+              UP DOWN LEFT RIGHT  (click on the skin button, TI-89 or TI-89 Titanium)
+              ENTER F1..F5 STO EE NEG ON (keyboard)
+  Other token: text typed on the keyboard (a-z 0-9 ( ) , . + - * / = ^ | space)
+  e.g. ti-key HOME CLEAR 'hello()' ENTER      ti-key --hold 0.3 LEFT 2ND
+
+--hold S: how long each key stays down (default 0.12; 0.3+ for games reading keys with _rowread)
+--gap S : pause between two keys (default 0.12)
+
+Why two methods:
+- named keys are clicks on the skin: that works everywhere (games included); on the keyboard,
+  ESC/CLEAR/arrows are unreliable (the CLEAR keycode is Print Screen, grabbed by Flameshot...).
+- text goes through the keyboard: TiEmu matches the hardware keycode against its Linux PCKEY table
+  (XFree86 keycodes, US layout, see src/gui/calc/pckeys.h + skins/ti89.map), so we send raw
+  keycodes, independent of the host layout (AZERTY is fine).
+Never send the Menu key: its keyval opens TiEmu's popup menu.
+"""
+import subprocess, sys, time
+
+# Skin buttons: (reference width, height, coordinates), scaled to the actual window size
+CLICK_89T = {
+    "2ND": (63, 330), "SHIFT": (114, 339), "ESC": (166, 339), "APPS": (166, 376),
+    "DIAMOND": (63, 367), "ALPHA": (114, 376), "HOME": (63, 405), "MODE": (114, 410),
+    "CATALOG": (166, 412), "BS": (218, 412), "CLEAR": (268, 405),
+    "UP": (245, 312), "DOWN": (245, 372), "LEFT": (213, 342), "RIGHT": (277, 342),
+}
+CLICK_89 = {
+    "2ND": (36, 228), "SHIFT": (73, 228), "ESC": (110, 228), "APPS": (110, 257),
+    "DIAMOND": (36, 257), "ALPHA": (73, 257), "HOME": (36, 283), "MODE": (73, 283),
+    "CATALOG": (110, 283), "BS": (147, 283), "CLEAR": (184, 283),
+    "UP": (167, 216), "DOWN": (167, 257), "LEFT": (138, 235), "RIGHT": (192, 235),
+}
+SKINS = {"TI89t": (331, 740, CLICK_89T), "TI89": (221, 503, CLICK_89)}  # key = model in the window title "TiEmu (TI89t)"
+KEYS = {"ENTER": 36, "STO": 23, "EE": 106, "NEG": 20, "ON": 78, "F1": 67, "F2": 68, "F3": 69, "F4": 70, "F5": 71}
+CHARS = {"(": 34, ")": 35, ",": 59, ".": 60, "/": 61, "+": 86, "*": 63, "-": 82, "=": 21,
+         "^": 99, "|": 51, " ": 65}
+for row, first in zip(("qwertyuiop", "asdfghjkl", "zxcvbnm"), (24, 38, 52)):
+    for i, c in enumerate(row):
+        CHARS[c] = first + i
+for i, c in enumerate("1234567890"):
+    CHARS[c] = 10 + i
+
+
+def xdo(*args):
+    return subprocess.run(["xdotool", *args], check=True, capture_output=True, text=True).stdout
+
+
+def main(argv):
+    hold, gap, toks = 0.12, 0.12, []
+    while argv:
+        a = argv.pop(0)
+        if a in ("--hold", "--gap"):
+            v = float(argv.pop(0))
+            hold, gap = (v, gap) if a == "--hold" else (hold, v)
+        elif a in ("-h", "--help"):
+            sys.exit(__doc__)
+        else:
+            toks.append(a)
+    actions = []
+    for t in toks:
+        u = t.upper()
+        if u in CLICK_89T:
+            actions.append(("click", u))
+        elif u in KEYS:
+            actions.append(("key", KEYS[u]))
+        else:
+            for c in t.lower():
+                if c not in CHARS:
+                    sys.exit(f"ti-key: unsupported character: {c!r}")
+                actions.append(("key", CHARS[c]))
+    win = xdo("search", "--name", r"^TiEmu \(").split()
+    if not win:
+        sys.exit("ti-key: TiEmu window not found (run ti-emu start)")
+    w = win[0]
+    ref_w, ref_h, click = SKINS[xdo("getwindowname", w).strip()[len("TiEmu ("):-1]]
+    geo = dict(l.split("=") for l in xdo("getwindowgeometry", "--shell", w).split())
+    width, height = int(geo["WIDTH"]), int(geo["HEIGHT"])
+    xdo("windowactivate", "--sync", w)
+    time.sleep(0.3)  # otherwise the first key is lost while the focus changes
+    for kind, arg in actions:
+        if kind == "click":
+            x, y = click[arg]
+            xdo("mousemove", "--window", w, str(x * width // ref_w), str(y * height // ref_h))
+            xdo("mousedown", "1"); time.sleep(hold); xdo("mouseup", "1")
+        else:
+            xdo("keydown", str(arg)); time.sleep(hold); xdo("keyup", str(arg))
+        time.sleep(gap)
+
+
+main(sys.argv[1:])

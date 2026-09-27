@@ -1,0 +1,44 @@
+# Third-party, copyrighted or generated tools (see README.md, "Not in the repository")
+/tools/gcc4ti/
+/tools/gcc4ti-bin/
+/tools/tarballs/
+/tools/extgraph/
+/tools/rom/
+/tools/tiemu/
+/tools/patches/
+/tools/pyenv/
+/tools/sdl2/
+/runtime/platform-sw/amsfont.h
+
+# Third-party sources and programs
+/sources/
+/ffa_en/
+*.zip
+
+# Build outputs
+*.89z
+*.9xz
+*.v2z
+*.89y
+*.o
+*_pc
+*_test
+*.state
+shot-*.png
+__pycache__/
+*.pyc
+
+# Generated test data
+/experiments/compress/bin/
+/experiments/maps/level.bin
+/experiments/maps/levels
+
+# Local state
+/.tiemu/
+/.claude/scheduled_tasks.lock
+/.claude/settings.local.json
+
+# Host binaries (ZX0 v2 built from github.com/einar-saukas/ZX0) and duplicates
+/tools/bin/zx0
+/tools/bin/dzx0
+/chrono_fire_camp.gif

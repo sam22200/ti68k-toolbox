@@ -1,0 +1,13 @@
+#!/bin/sh
+# Screenshot of the TiEmu window: ti-shot OUT.png [--lcd]   (--lcd: screen only, enlarged x2)
+# Fails if the window is missing (otherwise `import` would wait for the user to click).
+W=$(xdotool search --name '^TiEmu \(' | head -1)
+[ -n "$W" ] || { echo "ti-shot: TiEmu window not found" >&2; exit 1; }
+import -window "$W" "$1" || exit 1
+if [ "$2" = "--lcd" ]; then
+  # keep the top 31% of the window: it contains the LCD on both the ti89t and ti89 skins (30% cut
+  # the last LCD rows with the 220x492 window)
+  G=$(xdotool getwindowgeometry "$W" | sed -n 's/.*Geometry: \([0-9]*\)x\([0-9]*\).*/\1 \2/p')
+  set -- "$1" $G
+  convert "$1" -crop "$2x$(($3 * 31 / 100))+0+0" -resize 200% "$1"
+fi

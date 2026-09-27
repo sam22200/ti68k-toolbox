@@ -1,0 +1,2 @@
+FROM debian/eol:jessie
+RUN apt-get update && apt-get install -y --force-yes build-essential bzip2 patch flex bison texinfo && rm -rf /var/lib/apt/lists/*
