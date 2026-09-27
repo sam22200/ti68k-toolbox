@@ -141,8 +141,12 @@ static u8 ev_story2(void)                    // room 6: "Father, I don't see whe
     BEGIN;
     WALK(-1, 13, 3);                         // original: b = 18, a = 108
     st.dir = DIR_LEFT;
+    WALK(1, 11, 3);                          // Edouard comes over (the room scrolls: he was off screen)
+    st.npc[1].dir = DIR_RIGHT;
     SAY(T_SWORD_Q);
     SAY(T_SWORD_A);
+    WALK(1, 6, 4);                           // back to his cell (the -9 text cell)
+    st.npc[1].dir = DIR_DOWN;
     st.flag[10] = 1;
     END;
 }

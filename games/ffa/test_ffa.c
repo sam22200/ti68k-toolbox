@@ -266,7 +266,19 @@ int main(void)
 
     // story2 runs on arrival (the 501 cell), Edouard stands at his -9 cell
     CHECK(st.mode == M_SCRIPT && st.npc[1].on && st.npc[1].spr == SPR_KING);
-    run_script();
+    {                                        // Edouard walks to the hero: on screen while he talks
+        u8 seen = 0, off = 0;
+        for (k = 0; k < 5000 && st.mode == M_SCRIPT; k++) {
+            if (st.dlg_on) {
+                s16 cx = world_cam(st.x + HB_W / 2, RT_W, rooms[st.room].w * TILE);
+                s16 sx = st.npc[1].x + SPR_DX - cx;
+                if (sx >= 0 && sx <= RT_W - 16) seen = 1; else off = 1;
+            }
+            sw_step(k % 6 == 0 ? K_A : 0);
+        }
+        CHECK(seen && !off);
+    }
+    CHECK(st.npc[1].x == 6 * TILE + HB_X0 && st.npc[1].y == 4 * TILE + HB_Y0);   // back on his cell
     CHECK(st.mode == M_WALK && st.flag[10] && st.x == 13 * TILE + HB_X0 && st.y == 3 * TILE + HB_Y0);
     for (k = 0; k < 30; k++) sw_step(k & 1 ? K_RIGHT : K_LEFT);   // no second story2
     CHECK(st.mode == M_WALK);
