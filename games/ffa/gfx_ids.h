@@ -9,3 +9,8 @@
 #define SPR_SELLER 6
 #define SPR_PRISONER 7
 #define NPC_KINDS 8
+#define MON1_H 42
+#define MON2_H 61
+#define MON3_H 64
+#define BHERO_H 42
+#define BHEROS_H 42

@@ -1,5 +1,5 @@
 NAME := ffa
-SRC := ffa.c world.c dialog.c story.c
+SRC := ffa.c world.c dialog.c story.c battle.c
 TESTS := test_ffa.c
 CFLAGS_GAME := -Wno-implicit-fallthrough
 include ../../runtime/rt.mk

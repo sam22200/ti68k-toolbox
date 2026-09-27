@@ -17,9 +17,12 @@ static void new_game(void)
     st.hero.lv = 1;
     st.hero.hp = st.hero.hpm = 80;
     st.hero.mp = st.hero.mpm = 15;
-    st.hero.str = 10; st.hero.def = 5; st.hero.mag = 12; st.hero.mdef = 6;
-    st.hero.spd = 15; st.hero.luck = 3;
-    st.hero.exp = 0; st.hero.gils = 100;
+    st.hero.st[S_STR] = 10 * STAT; st.hero.st[S_DEF] = 5 * STAT; st.hero.st[S_MAG] = 12 * STAT;
+    st.hero.st[S_MDEF] = 6 * STAT; st.hero.st[S_SPD] = 15 * STAT; st.hero.st[S_LUCK] = 3 * STAT;
+    st.hero.speci = S_STR;                   // growth stat (chosen at the title later)
+    st.hero.st[S_STR] += STAT / 4;           // ffa: #speci + 0.25
+    st.hero.exp = 0; st.hero.expt = st.hero.expn = 370; st.hero.gils = 100;
+    st.hero.jl = 0;
     for (k = 0; k < NITEM; k++) st.item[k] = 0;
     for (k = 0; k < NARM; k++) st.own[k] = 0;
     for (k = 0; k < NMAT; k++) st.mat[k] = 0;
@@ -55,8 +58,8 @@ static void place_somewhere(u8 room)         // first free cell from the room ce
 static void checkpoint(u8 n)
 {
     static const u8 room_at[10] = { 8, 6, 7, 12, 14, 11, 16, 5, 18, 4 };
-    static const s8 cell[10][2] = { { 4, 4 }, { 13, 3 }, { 10, 3 }, { 4, 3 }, { 15, 5 }, { 4, 7 },
-                                    { 9, 8 }, { 9, 7 }, { 5, 7 }, { 9, 7 } };
+    static const s8 cell[10][2] = { { 4, 4 }, { 13, 3 }, { 10, 3 }, { 4, 3 }, { 15, 5 }, { 6, 2 },
+                                    { 9, 8 }, { 9, 7 }, { 5, 7 }, { 9, 7 } };   // room 11 is padded by 2 columns
     if (n >= 1) { st.flag[9] = st.flag[10] = 1; }
     if (n >= 2) { st.flag[1] = st.flag[11] = 1; }
     if (n >= 3) { st.flag[2] = 1; }
@@ -66,6 +69,7 @@ static void checkpoint(u8 n)
     if (n >= 7) { st.own[A_SWORD] = 1; st.flag[8] = 0; st.own[A_BANGLE] = 1; }
     if (n >= 8) { st.flag[7] = st.flag[8] = 1; }
     if (n >= 9) { st.mat[MAT_CURE] = 1; }
+    auto_equip();
     world_enter(room_index[room_at[n]], cell[n][0], cell[n][1]);
 }
 
@@ -123,8 +127,7 @@ static void walk(void)
         st.mc += rooms[st.room].frc;
         if (rooms[st.room].frc && st.mc > st.co * 10) {
             st.mc = 0;
-            st.co = 15 + rt_rand() % 5 + 1;
-            st.mode = M_BATTLE;
+            battle_start(0);
             return;
         }
     }
@@ -157,8 +160,11 @@ u8 game_update(void)
     case M_TEXT:
         if (st.dlg_on) { dialog_update(); if (!st.dlg_on) st.mode = M_WALK; break; }
         /* fall through: placeholder box */
-    case M_BATTLE:
         if (input_pressed(K_A | K_ENTER)) { st.mode = M_WALK; st.trig = 0; }
+        break;
+    case M_BATTLE: battle_update(); break;
+    case M_GAMEOVER:
+        if (input_pressed(K_A | K_ENTER)) game_scenario(0);   // original: back to HOME, all lost
         break;
     case M_SCRIPT: story_run(); break;
     case M_END: break;
@@ -209,6 +215,14 @@ void game_render(void)
     const Room *r = &rooms[st.room];
     s16 cx = world_cam(st.x + HB_W / 2, RT_W, r->w * TILE), cy = world_cam(st.y + HB_H / 2, RT_H, r->h * TILE);
     char s[24];
+    if (st.mode == M_BATTLE) { battle_render(); return; }
+    if (st.mode == M_GAMEOVER) {
+        draw_clear();
+        draw_rect(0, 0, 160, 100, C_BLACK);
+        draw_rect(40, 40, 80, 16, C_WHITE);
+        draw_text(53, 44, "Game Over", F_MEDIUM, C_BLACK);
+        return;
+    }
     if (st.mode == M_END) {
         draw_clear();
         draw_text(40, 40, "End of Part I", F_MEDIUM, C_BLACK);
@@ -218,11 +232,10 @@ void game_render(void)
     draw_actors(cx, cy);
     if (st.shop) shop_render();
     if (st.dlg_on) dialog_render(st.y - cy > 60);
-    if ((st.mode == M_TEXT && !st.dlg_on) || st.mode == M_BATTLE) {
+    if (st.mode == M_TEXT && !st.dlg_on) {
         draw_rect(4, 70, 152, 26, C_BLACK);
         draw_rect(5, 71, 150, 24, C_WHITE);
-        if (st.mode == M_BATTLE) draw_text(8, 74, "A monster attacks!", F_SMALL, C_BLACK);
-        else { s[0] = 'p'; s[1] = '='; put_num(s + 2, st.trig); draw_text(8, 74, s, F_SMALL, C_BLACK); }
+        { s[0] = 'p'; s[1] = '='; put_num(s + 2, st.trig); draw_text(8, 74, s, F_SMALL, C_BLACK); }
     }
     if (st.fade) fade_planes(st.fade);
 }

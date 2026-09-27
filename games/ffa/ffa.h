@@ -37,17 +37,23 @@ extern const u8 room_index[];                        // original id -> index (25
 #define STEP_PX 16                                   // one original step = one tile walked
 
 enum { DIR_DOWN, DIR_UP, DIR_LEFT, DIR_RIGHT };
-enum { M_WALK, M_FADE_OUT, M_FADE_IN, M_TEXT, M_BATTLE, M_END, M_SCRIPT };
+enum { M_WALK, M_FADE_OUT, M_FADE_IN, M_TEXT, M_BATTLE, M_END, M_SCRIPT, M_GAMEOVER };
 #define FADE_STEPS 4                                 // 0 = normal .. 3 = white (4 greys)
 #define FADE_FRAMES 3                                // frames per fade step
 
 // ---------------------------------------------------------------- story state
 #define NFLAG 128                                    // clef[1..120] of the original, same indices
+#define STAT 20                                      // stats are fixed point x 20 (+0.25 = +5)
 typedef struct {
-    u8 lv;
-    u16 hp, hpm, mp, mpm, exp, gils;
-    u8 str, def, mag, mdef, spd, luck;
+    u8 lv, speci;                                    // level; the stat chosen to grow more
+    u16 hp, hpm, mp, mpm, exp, expt, expn, gils;
+    u16 st[6];                                       // strength, vitality, magic, spirit, speed,
+                                                     // luck (x STAT): forc def mag defm vit chan
+    u16 jl;                                          // limit gauge, 0 .. LIMIT_FULL
+    u8 weapon, armor, acc[2], slot[2];               // equipped (armat rows, materia rows)
 } Hero;
+enum { S_STR, S_DEF, S_MAG, S_MDEF, S_SPD, S_LUCK };
+#define LIMIT_FULL (30 * 256)
 
 enum { I_POTION, I_HIPOTION, I_ETHER, I_TETHER, I_XPOTION, I_ELIXIR, I_ANTIDOTE, NITEM };
 enum { A_SWORD = 1, A_WRIST = 9, A_BANGLE = 25, NARM = 32 };      // armat rows of the original
@@ -77,8 +83,16 @@ typedef struct {
     u8 dlg_on, dlg_text, dlg_ask, dlg_page, dlg_cur, ans;
     u16 dlg_shown;
     // story script (story.c): event, resume point, timer; actors
-    u8 ev, timer, hwalk, shop;                       // shop: the shop window is open
-    u16 pc;
+    u8 ev, timer, hwalk, shop;                       // shop: 1 shop window, 2 number entry
+    u8 digit[4], dpos;                               // number entry (the riddle)
+    u8 battle, won;                                  // monster n of the fight, result
+    u8 ret_mode;                                     // mode to go back to after the fight
+    // battle (battle.c)
+    u8 bp, bcur, bsub, bt, qu, bwho, bmsg, bflash;
+    u16 mhp, ja, jae;                                // monster HP, ATB gauges (x 256)
+    s16 bnum;                                        // number shown (damage / heal)
+    u8 bdrop;
+    u16 stats_kills, stats_flight;    u16 pc;
     s16 arg;
     Npc npc[NNPC];
 } Game;
@@ -100,5 +114,11 @@ u8 story_run(void);                                  // one frame of the current
 void story_room(void);                               // spawn the NPCs of the current room
 void npc_step(void);                                 // move the actors towards their targets
 void shop_render(void);
+void battle_start(u8 n);                             // n = 0: pick from the room's table
+void battle_update(void);
+void battle_render(void);
+void hero_level_up(void);
+u8 has_materia(u8 m);
+void auto_equip(void);                               // best gear and materia (until the menu)
 
 #endif
