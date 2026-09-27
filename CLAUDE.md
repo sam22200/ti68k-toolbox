@@ -6,8 +6,13 @@ We write programs for the TI-89 (Motorola 68000), mostly **in C with GCC4TI**, i
 operations that already have a verified asm version (decompressors in `lib/`: table at the top of `ti68k-asm.md`): C code
 calls that version (linked `.s`, or an `asm()` block for a few instructions), not a C rewrite.
 
-**The machine is extremely slow** (68000 at ~12 MHz, no FPU, no cache, 16-bit bus: ~400k cycles
-per frame at 30 fps). Every design choice must be performance-driven:
+**Two hard constraints drive every choice: 1. performance (the strongest), 2. visibility.**
+
+**1. Performance. The machine is extremely slow** (68000 at ~12 MHz, no FPU, no cache, 16-bit bus: ~400k cycles
+per frame at 30 fps). Every design choice must be performance-driven, using everything already
+measured in this project, not re-derived: the verified asm routines (`lib/`, `ti68k-asm.md`), ExtGraph
+and its TileMap engine / pre-shifted sprites, the runtime primitive costs (performance §7), the
+benchmarks and verdicts of `experiments/` (game-techniques §13):
 - **Types**: `unsigned` whenever a value cannot be negative (signed `x % 8` compiles to a full
   division, unsigned to one AND; signed `/ 4` needs a fix-up, unsigned is one shift); the
   **smallest type** that fits for storage (arrays, tables, structs); `short` for computations;
@@ -21,6 +26,11 @@ per frame at 30 fps). Every design choice must be performance-driven:
   spread work over frames, cheap heuristics over exact algorithms. Measure hot paths
 (`experiments/bench/`) and read the generated asm; details in
 `.claude/skills/ti89-c-dev/reference/ti68k-performance.md`.
+
+**2. Visibility.** 160×100 in 4 greys on a small, low-contrast LCD: every sprite must read at a
+glance. Main sprites (hero, NPCs, enemies) get a **white outline** (mask dilated by one pixel:
+free at run time, `ti68k-c-patterns.md` § sprites), contrast against the background (a busy or
+mid-grey scenery behind a black/white character), no detail smaller than 2 pixels that matters.
 
 ## Workflow
 
@@ -109,7 +119,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start)
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
