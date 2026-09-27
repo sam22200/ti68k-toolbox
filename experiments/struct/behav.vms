@@ -1,0 +1,41 @@
+; Walker behaviour, same as fsm_update in vm.c. r0 x, r1 y, r2 dir, r3 len, r4 wait, r5 i, r6 tmp
+.entry pure
+.entry native
+
+pure:                   ; all in bytecode: 6 opcodes per walking frame
+        MOV r5, r3      ; i = len
+walk:   LDB r6, r2, DX
+        ADD r0, r6
+        LDB r6, r2, DY
+        ADD r1, r6
+        YIELD
+        DJNZ r5, walk
+        MOV r5, r4      ; i = wait
+wt:     YIELD
+        DJNZ r5, wt
+        ADDI r2, 1      ; turn right
+        ANDI r2, 3
+        JNZ r2, pure
+        ADDI r3, 1      ; full turn: len++, wraps 9 -> 2
+        JLTI r3, 9, pure
+        LDI r3, 2
+        JMP pure
+
+native:                 ; the step is a native call: 3 opcodes per walking frame
+        MOV r5, r3
+nwalk:  CALL 0          ; x += dx[dir], y += dy[dir]
+        YIELD
+        DJNZ r5, nwalk
+        MOV r5, r4
+nwt:    YIELD
+        DJNZ r5, nwt
+        ADDI r2, 1
+        ANDI r2, 3
+        JNZ r2, native
+        ADDI r3, 1
+        JLTI r3, 9, native
+        LDI r3, 2
+        JMP native
+
+DX:     .db 1, 0, -1, 0
+DY:     .db 0, 1, 0, -1
