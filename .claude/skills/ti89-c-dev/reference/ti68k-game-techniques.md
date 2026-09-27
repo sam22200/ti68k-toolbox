@@ -276,6 +276,27 @@ are the author's (CodeWalrus thread, `sources/web/codewalrus-570-x3d.txt`).
   precomputed grid** (108 per pixel) against 6,080 with incremental 8.8 u/v stepping (152 per
   pixel). A 40×25 frame is then ~110k cycles of sampling, consistent with the engine's ~24 fps
   once drawing is added.
+- **Measured on a real engine** (**verified** with `ti-cycles`, `games/mode7/`: David Coz's Mode 7
+  demo, 128×100 view, far rows full resolution, near rows 2×2): the original frame costs 666k
+  datasheet cycles, the optimised one 362k (same pixels):
+  - **Texel index without a shift**: one 32 KB block of 256-byte rows holding both 128×128
+    textures side by side, `v` kept as 8.24, index = `swap` + `move.b` of `u`'s integer: 20 cycles
+    saved per sample (`lsl.w #7` is 20).
+  - **Texels pre-encoded with their plane bits at the top of the byte**, shifted into two byte
+    accumulators with `add.b d0,d0` / `addx.b dN,dN` (16 cycles per pixel for both planes), one
+    `move.b` per plane every 8 pixels: no colour compare chain, no `or.b` to memory, no screen
+    clear. Far floor 224k → 137k (~66 cycles per sample, the floor with exact 16.16 stepping).
+  - Half-resolution rows: 2 bits per texel, then a 16-byte nibble-doubling table per byte; write
+    the doubled line in the same loop (no `memcpy` pass).
+  - **Rebuild the texture cache only when its window moves to another map cell**: the original
+    rebuilt a 16 KB texture every frame (112k); now 15k at rest, 71k while driving.
+  - Per-row divisions by the row index: a table (−9k).
+  - GrayDBuf: draw into the hidden planes (−35k of plane copies); its planes are dark first,
+    light at +0xF00: swap the data (texel codes, sprite planes, face colours), not the routines.
+- 3D objects with it (flat triangles, 16 per frame covering 10 % of the view): 487k → 190k with
+  `muls16`/`divs32_16` in the projection (the C `long` code called `__mulsi3` and the ROM's 32-bit
+  division) and the scanline loop in asm with one copy per colour (no test per line); spans still
+  cost ~400 cycles per line.
 
 ## 9. Roguelikes and tile RPGs — from CalcRogue, Zelda, Crystal Engine
 

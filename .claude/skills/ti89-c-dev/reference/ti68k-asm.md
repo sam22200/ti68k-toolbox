@@ -61,7 +61,7 @@ void m7row_asm(unsigned char *out asm("%a0"), const short *horz asm("%a1"),
 Build: `ti-cc -o name main.c m7row.s` (tigcc assembles `.s` itself).
 
 - **Motorola operands without `%`** in a `.s` file: `ti-cc ... -Wa,--register-prefix-optional`
-  (**verified**, `sources/mode7/src/render.s`).
+  (**verified**, `games/mode7/src/render.s`).
 - **`(d8,pc,Xn)` reaches only -128..127 bytes and GNU as truncates a farther offset without an
   error** (**verified**: a table moved after its routine gave wrong masks): keep such tables
   just before the code that indexes them.

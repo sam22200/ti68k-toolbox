@@ -434,6 +434,16 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
 
 ## 10. How to measure
 
+0. **First choice: `tools/bin/ti-cycles`** (**verified**, `tools/m68kbench/test/cyctest.c`: `nop`
+   4, `lsl.l #8` 24, `lsl.w #7` 20, `movem.l` of 10 registers 92, `mulu.w #$FFFF` 70 (+4 for the
+   immediate), `mulu.w #0` 38, `move.b (a0,d1.w),d0` 14, `divu.w` 140: the datasheet, where TiEmu
+   gives ~12 for any `movem` and ignores the 2n of shifts). It runs the `.89z` on the PC under
+   Musashi, headless, in a fraction of a second, reports the cycles of the zones marked with
+   `tools/m68kbench/bench.h` and writes the virtual screen from memory as a PNG (`BENCH_SHOT`), so a
+   benchmark also checks the picture (a checksum per scenario: an optimisation must not change
+   it). Limits: no I/O ports (build a `-DBENCH` variant without grayscale, keyboard and
+   interrupts); AMS ROM calls are emulated with an estimated cost, listed apart; no wait states
+   (the TI-89 has none). Example: `games/mode7/` (`make bench`, `tools/bench.py`).
 1. Put the candidate code in a copy of `experiments/bench/bench.c` (volatile inputs, volatile
    sink, loop-carried dependencies so GCC cannot hoist or fold the work; beware strength
    reduction, which turned `(la + i) * lb` into additions until XOR was used).
