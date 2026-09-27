@@ -8,7 +8,7 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 | Path | What |
 |---|---|
 | `runtime/` | **Portable Game Runtime**: one C engine, PC (SDL2) and TI backends, unit tests, PC/TI cross-check ([README](runtime/README.md)) |
-| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported) |
+| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported), `life/` (Game of Life on the runtime, glider) |
 | `lib/` | shared code: ZX0/LZ4 decoders in 68000 asm, ZX0 packer |
 | `experiments/` | small measured tests (hardware, timers, keyboard, graphics, benchmarks) |
 | `hello/` | reference Hello World |
