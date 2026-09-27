@@ -459,6 +459,9 @@ behaviour right anyway. ON is not in the matrix (auto-int 6).
 - Auto power-down in a custom input loop: `OSTimerRestart(APD_TIMER)` on entry, then
   `if (OSTimerExpired(APD_TIMER)) { off(); OSTimerRestart(APD_TIMER); }` (TI-Chess, TICT-Explorer,
   TICT S1P6); needs int 5 still chained to AMS. After `off()`, grayscale may need resyncing.
+- **Key masks wider than a byte** (**verified**, FFA menu on the Titanium): the runtime's
+  `input_pressed(K_B | K_ESC)` is a `u32` and ESC is bit 9; stored into a `u8` it is always 0, so
+  ESC and ENTER did nothing in the menus while shift and 2nd worked. Compare with `!= 0` first.
 - `_rowread(0)` (no row masked) returns the OR of all rows: `while (_rowread(0));` waits until
   every key is released (keyreleased demo; used in our benchmarks).
 - AMS key codes: the auto-repeat flag is 0x800 (`key & ~0x800`); `OSdequeue(&key, kbd_queue())`

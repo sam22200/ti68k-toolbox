@@ -32,7 +32,8 @@ void game_render(void);      // draw the whole frame
 - Input: `input_held(K_UP)`, `input_pressed(K_A)`, `input_released(...)`, one snapshot per
   frame. Keys: arrows, `K_A` [2nd], `K_B` [shift], `K_C` [◆], `K_D` [alpha], `K_ENTER`, `K_ESC`,
   `K_DIGIT(1..9)` (keypad grid, for gestures). PC: arrows, Ctrl/Space/Z, Shift/X, C, V, Enter,
-  Esc, keypad or number row.
+  Esc, keypad or number row. The macros return the `u32` key bits: `K_ENTER`, `K_ESC` and the
+  digits are above bit 7, so `u8 go = input_pressed(K_A | K_ENTER)` loses them; write `!= 0`.
 - Drawing (hidden planes, double-buffered): `draw_clear`, `draw_rect(x, y, w, h, C_*)`,
   `draw_sprite(x, y, &RtSprite)` (8/16/32 wide, masked or opaque, clipped), `draw_text(x, y, s,
   F_SMALL|F_MEDIUM, C_*)`, `draw_tilemap(&RtTilemap, camx, camy)` + `tilemap_dirty()`.
