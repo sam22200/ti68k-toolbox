@@ -80,6 +80,8 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 - `ti89-emulator`: drive TiEmu (keys, sending files, screenshots, saved states, pitfalls).
 - `ti-port-sdl`: port an open SDL game (upstream pick, engine + tests on the PC, TI bench and run,
   graphics variants compared on screenshots, TI again, knowledge update, commit).
+- `ti-port-tibasic`: remake a TI-Basic game (FFA): extraction, understanding with the guide, part by
+  part and room by room, new 16-bit style engine and art, `PROGRESS.md` checkpoints.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) and push to
   `github.com/sam22200/ti68k-toolbox`.
 - When you learn something new and verified about the platform, add it to
@@ -121,7 +123,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`)
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
