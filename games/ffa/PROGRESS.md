@@ -31,10 +31,16 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   FADE), actors drawn back to front.
 - **Room 8 done**: story1 (Edouard comes down, hero steps aside), bed (Sleep? heal with fade),
   plaque, Larc's door, desk potion (once, flag 40). Tests for each.
+- NPC sprites from parts (`tools/gfx.py` HEADS x BODIES): Edouard, Olen, Jess, Larc, villager,
+  soldier, seller, prisoner (down and up views, 3 walk frames).
+- Story checkpoints: scenarios 1..9 inject the flags and items of each walkthrough step.
+- **Room 6 done**: throne hall art (runner, throne, banners, pillars, stairs), Edouard standing,
+  story2 on arrival, Edouard's lines by flags, the knighting ceremony (story5, 23 lines, Olen,
+  Jess, Larc and a villager coming and going). Arriving by a door on a story cell runs it.
 
 ## Remaining (in order)
 
-1. Rooms one by one (6, 5, 7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
+1. Rooms one by one (5, 7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
    `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
@@ -51,5 +57,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Room 6 (throne hall): layout, Edouard standing at the -9 cell (story_room), story2 (501),
-Edouard's lines (-9, D3), then story5 (505, the ceremony) once the sword is found.
+Room 5 (courtyard): layout, soldier (-7.1) and potion seller (-12, shop1: Potion 50 g) as NPCs,
+the locked exit to room 4 (clef[7]) and Olen's door (clef[8]).

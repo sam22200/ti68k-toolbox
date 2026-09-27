@@ -303,6 +303,92 @@ TORCH = ascii_art([                      # 16x16 wall torch (flame white/light)
 ])
 
 
+PILLAR = ascii_art(                      # 16x72: capital, fluted shaft, base (stands on 4 cells)
+    ["bbbbbbbbbbbbbbbb", "bwwwwwwwwwwwwwwb", "bllllllllllllllb", "bbbbbbbbbbbbbbbb",
+     ".bwllbwllbwlldb.", ".bwllbwllbwlldb."] +
+    [".bwllbwllbwlldb."] * 56 +
+    ["bbbbbbbbbbbbbbbb", "bwwwwwwwwwwwwwwb", "bllllllllllllllb", "bddddddddddddddb", "bbbbbbbbbbbbbbbb",
+     "................", "................", "................", "................", "................"])
+
+THRONE = ascii_art([                     # 32x32 throne against the back wall
+    "..........bbbbbbbbbbbb..........",
+    ".........bwwwwwwwwwwwwb.........",
+    "........bwllllllllllllwb........",
+    "........bwlbbbbbbbbbblwb........",
+    "........bwlbddddddddblwb........",
+    "........bwlbdddwwdddblwb........",
+    "........bwlbddwwwwddblwb........",
+    "........bwlbdddwwdddblwb........",
+    "........bwlbddddddddblwb........",
+    "........bwlbddddddddblwb........",
+    "........bwlbddddddddblwb........",
+    "......bbbwlbddddddddblwbbb......",
+    ".....bwwbwlbddddddddblwbwwb.....",
+    ".....bwlbwlbddddddddblwblwb.....",
+    ".....bwlbbbbbbbbbbbbbbbbblwb....."[:32],
+    ".....bwlbwwwwwwwwwwwwwwwblwb....."[:32],
+    ".....bwlbllllllllllllllblwb......"[:32],
+    ".....bbbbbbbbbbbbbbbbbbbbbbb....."[:32],
+    ".....bllbddddddddddddddbllb......"[:32],
+    ".....bllbddddddddddddddbllb......"[:32],
+    ".....bbbbbbbbbbbbbbbbbbbbbb......"[:32],
+    "....bwwwwwwwwwwwwwwwwwwwwwwb....",
+    "....bllllllllllllllllllllllb....",
+    "....bbbbbbbbbbbbbbbbbbbbbbbb....",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+])
+
+BANNER = ascii_art([                     # 16x32 hanging banner with the Strife crest
+    "bbbbbbbbbbbbbbbb",
+    "bwwwwwwwwwwwwwwb",
+    ".bbbbbbbbbbbbbb.",
+    ".bddddddddddddb.",
+    ".bdlllllllllldb.",
+    ".bdlddddddddldb.",
+    ".bdldddwwdddldb.",
+    ".bdlddwwwwddldb.",
+    ".bdldwwbbwwdldb.",
+    ".bdlddwwwwddldb.",
+    ".bdldddwwdddldb.",
+    ".bdlddddddddldb.",
+    ".bdlllllllllldb.",
+    ".bddddddddddddb.",
+    ".bddddddddddddb.",
+    ".bdddddbbddddddb"[:16],
+    ".bddddb..bdddddb"[:16],
+    ".bdddb....bdddb.",
+    ".bddb......bddb.",
+    ".bdb........bdb.",
+    ".bb..........bb.",
+] + ["................"] * 11)
+
+
+def runner(w, h):                        # royal carpet runner: dark with a light border
+    W, H = w * 16, h * 16
+    g = []
+    for y in range(H):
+        r = []
+        for x in range(W):
+            e = min(x, W - 1 - x)
+            if e == 0:
+                r.append(3)
+            elif e < 3:
+                r.append(1)
+            elif e == 3:
+                r.append(3)
+            else:
+                r.append(0 if (x + y) % 16 == 0 or (W - x + y) % 16 == 0 else 2)
+        g.append(r)
+    return g
+
+
 def carpet(w, h):                        # w x h cells, dark border, light diamond pattern
     W, H = w * 16, h * 16
     g = []
@@ -341,10 +427,15 @@ def OBJ():
         'door': DOOR,
         'carpet3x2': carpet(3, 2),
         'shield': SHIELD, 'swords': SWORDS, 'window': WINDOW, 'torch': TORCH,
+        'pillar': PILLAR, 'throne': THRONE, 'banner': BANNER, 'runner5x7': runner(5, 7),
     }
 
 
 LAYOUTS = {
+    6: {'style': 'slabs', 'floor': [(4, 4, 1, 4), (14, 4, 1, 4)], 'objects': [
+        ('runner5x7', 7, 3, 0, 0), ('throne', 8, 1, 8, 8), ('banner', 5, 1, 0, 2), ('banner', 12, 1, 0, 2),
+        ('torch', 3, 2, 0, 0), ('torch', 7, 2, 4, 0), ('torch', 11, 2, 8, 0), ('window', 15, 1, 0, 4),
+        ('stairs', 14, 2, 0, 0), ('pillar', 4, 4, 0, -12), ('pillar', 14, 4, 0, -12)]},
     8: {'style': 'slabs', 'floor': [(2, 2, 2, 2), (15, 2, 2, 2), (2, 6, 2, 2), (11, 6, 2, 2)], 'objects': [
         ('carpet3x2', 5, 4, 0, 0), ('swords', 3, 0, 0, 6), ('torch', 4, 1, 6, 0), ('torch', 6, 1, 4, 0),
         ('shield', 7, 0, 0, 6), ('window', 13, 0, 0, 4), ('shield', 16, 0, 0, 6), ('swords', 12, 0, 0, 6), ('bed', 2, 2, 0, 0), ('stairs', 5, 1, 0, 0),

@@ -10,6 +10,33 @@ static int fails;
 static void hold(u32 k, u16 n) { while (n--) sw_step(k); }
 static u8 idx(u8 id) { return room_index[id]; }
 static void put(u8 id, s16 x, s16 y) { st.room = idx(id); st.x = x; st.y = y; st.mode = M_WALK; }
+// Run the current event to its end, pressing 2nd to read; returns the number of texts shown.
+static u16 run_script(void)
+{
+    u16 k, n = 0;
+    u8 last = 0xFF;
+    for (k = 0; k < 5000 && st.mode == M_SCRIPT; k++) {
+        if (st.dlg_on && st.dlg_text != last) { last = st.dlg_text; n++; }
+        if (!st.dlg_on) last = 0xFF;
+        sw_step(k % 6 == 0 ? K_A : 0);
+    }
+    return n;
+}
+
+// Examine what is in front of the hero; returns the first text shown (0xFF = none).
+static u8 talk(void)
+{
+    u8 t = 0xFF;
+    u16 k;
+    sw_step(0);
+    sw_step(K_A);
+    for (k = 0; k < 400 && st.mode != M_WALK; k++) {
+        if (st.dlg_on && t == 0xFF) t = st.dlg_text;
+        sw_step(k % 6 == 0 ? K_A : 0);
+    }
+    return t;
+}
+
 static u8 cell_at(u8 room, s16 cx, s16 cy) { return rooms[room].cell[cy * rooms[room].w + cx]; }
 
 // Every door of every room: stand on a free neighbour, push into it, end up in the right room
@@ -114,8 +141,38 @@ int main(void)
     hold(0, FADE_FRAMES * 2);
     CHECK(sw_level(80, 50) < 3);             // lighter while fading
     hold(0, FADE_FRAMES * 8);
-    CHECK(rooms[st.room].id == 6 && st.mode == M_WALK);
-    CHECK((st.x >> 4) == 14 && (st.y >> 4) == 3);
+    CHECK(rooms[st.room].id == 6 && (st.x >> 4) >= 13 && (st.y >> 4) == 3);
+
+    // story2 runs on arrival (the 501 cell), Edouard stands at his -9 cell
+    CHECK(st.mode == M_SCRIPT && st.npc[1].on && st.npc[1].spr == SPR_KING);
+    run_script();
+    CHECK(st.mode == M_WALK && st.flag[10] && st.x == 13 * TILE + HB_X0 && st.y == 3 * TILE + HB_Y0);
+    for (k = 0; k < 30; k++) sw_step(k & 1 ? K_RIGHT : K_LEFT);   // no second story2
+    CHECK(st.mode == M_WALK);
+
+    // Edouard's lines follow the flags; silent once the dungeon key is taken
+    sw_init(1);
+    put(6, 7 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    st.dir = DIR_LEFT;
+    CHECK(talk() == T_ED_SWORD);
+    st.flag[11] = 1;
+    CHECK(talk() == T_ED_CLOSED);
+    st.flag[1] = 1;
+    CHECK(talk() == 0xFF && st.mode == M_WALK);
+
+    // the ceremony (story5) needs the sword; injected at checkpoint 7 (in the courtyard)
+    sw_init(2);
+    put(6, 9 * TILE + HB_X0, 7 * TILE + HB_Y0);
+    hold(K_DOWN, 12);
+    CHECK(st.mode == M_WALK);                // no sword: nothing
+    sw_init(7);
+    CHECK(rooms[st.room].id == 5 && st.own[A_SWORD] && !st.flag[8]);
+    for (k = 0; k < 40 && st.mode != M_SCRIPT; k++) sw_step(k < 12 ? K_UP : 0);
+    CHECK(rooms[st.room].id == 6 && st.mode == M_SCRIPT);
+    k = run_script();
+    CHECK(st.mode == M_WALK && st.flag[7] && st.flag[8] && k >= 23);
+    CHECK(st.x == 6 * TILE + HB_X0 && st.y == 5 * TILE + HB_Y0);
+    CHECK(st.npc[1].on && !st.npc[2].on && !st.npc[3].on && !st.npc[4].on && !st.npc[5].on);
 
     // bed: Yes heals, No does not; the potion on the desk is found once
     sw_init(0);

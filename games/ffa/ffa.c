@@ -50,6 +50,25 @@ static void place_somewhere(u8 room)         // first free cell from the room ce
     world_enter(room, 1, 1);
 }
 
+// Story checkpoints (walkthrough steps of docs/part1.md): flags and items of that moment, the
+// hero where the next step starts. 1..9, see README.
+static void checkpoint(u8 n)
+{
+    static const u8 room_at[10] = { 8, 6, 7, 12, 14, 11, 16, 5, 18, 4 };
+    static const s8 cell[10][2] = { { 4, 4 }, { 13, 3 }, { 10, 3 }, { 4, 3 }, { 15, 5 }, { 4, 7 },
+                                    { 9, 8 }, { 9, 7 }, { 5, 7 }, { 9, 7 } };
+    if (n >= 1) { st.flag[9] = st.flag[10] = 1; }
+    if (n >= 2) { st.flag[1] = st.flag[11] = 1; }
+    if (n >= 3) { st.flag[2] = 1; }
+    if (n >= 4) { st.flag[3] = 1; }
+    if (n >= 5) { st.flag[17] = 1; st.mat[MAT_FIRE] = 1; st.own[A_WRIST] = 1; }
+    if (n >= 6) { st.flag[5] = 1; st.item[I_HIPOTION]++; }
+    if (n >= 7) { st.own[A_SWORD] = 1; st.flag[8] = 0; st.own[A_BANGLE] = 1; }
+    if (n >= 8) { st.flag[7] = st.flag[8] = 1; }
+    if (n >= 9) { st.mat[MAT_CURE] = 1; }
+    world_enter(room_index[room_at[n]], cell[n][0], cell[n][1]);
+}
+
 void game_scenario(u16 n)
 {
     Game z = { 0 };
@@ -59,6 +78,8 @@ void game_scenario(u16 n)
     st.dir = DIR_DOWN;
     if (n >= 100 && n < 100 + sizeof(room_index) && room_index[n - 100] != 255)
         place_somewhere(room_index[n - 100]);
+    else if (n >= 1 && n <= 9)
+        checkpoint(n);
     else
         world_enter(room_index[8], 4, 4);    // ffa: dec8, a = 27, b = 27
     story_room();
@@ -75,6 +96,7 @@ static void fade_step(void)
             if (d->dest == ROOM_OUT) { st.mode = M_END; return; }
             world_enter(d->dest, d->ax, d->ay);
             story_room();
+            st.cell_in = 0xFF;                // arriving on a story cell runs it (original scenar)
         }
         st.mode = M_FADE_IN;
     } else if (!--st.fade) {

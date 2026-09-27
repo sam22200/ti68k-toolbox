@@ -89,7 +89,69 @@ KING = (
      ["bdddbwllwbdddb", "bdddbwllwbdddb", ".bddbwllwbddb.", ".bbbbbbbbbbbb.", "..bb.........."],
      ["bdddbwllwbdddb", "bdddbwllwbdddb", ".bddbwllwbddb.", ".bbbbbbbbbbbb.", "..........bb.."]],
 )
-NPCS = [('KING', KING)]
+# Parts for the other NPCs: heads (down view; the up view fills the face with the hair level),
+# bodies, legs. 14 columns each.
+HEADS = {
+    'bald_beard': ("l", ["....bbbbbb....", "...bllllllb...", "..bllwwwwllb..", "..blwwwwwwlb..",
+                         ".bdlwbwwbwldb.", ".bdlwwwwwwldb.", ".bdllwwwwlldb.", "..bwwwwwwwwb..",
+                         "...bwwwwwwb..."]),
+    'long_hair': ("d", ["....bbbbbb....", "...bddddddb...", "..bddddddddb..", ".bddwwwwwwddb.",
+                        ".bdwbwwwwbwdb.", ".bdwwwwwwwwdb.", ".bddwwbbwwddb.", ".bdd.bwwb.ddb.",
+                        ".bdd..bb..ddb."]),
+    'light_hair': ("l", ["....bbbbbb....", "...bllllllb...", "..bllllllllb..", ".bllldlldllllb",
+                         ".blldwwwwwdllb", ".bldwwwwwwdlb.", ".bldbwwwwbdlb.", "..bdwwwwwwdb..",
+                         "...bwwbbwwb..."]),
+    'helmet': ("l", ["....bbbbbb....", "...bllllllb...", "..bllwllllb...", "..bbbbbbbbbb..",
+                     "..bdwwwwwwdb..", "..bdbwwwwbdb..", "..bdwwwwwwdb..", "...bwwbbwwb...",
+                     "....bwwwwb...."]),
+    'cap': ("d", ["..............", "....bbbbbb....", "...bddddddb...", "..bbbbbbbbbb..",
+                  "..bwwwwwwwwb..", "..bwbwwwwbwb..", "..bwwwwwwwwb..", "...bwwbbwwb...",
+                  "....bwwwwb...."]),
+    'wild': ("d", ["...bb.bb.bb...", "..bddbddbddb..", ".bddddddddddb.", ".bddwwwwwwddb.",
+                   ".bdwbwwwwbwdb.", ".bdwwwwwwwwdb.", ".bddwbbbbwddb.", "..bdwwwwwwdb..",
+                   "...bdddddb...."]),
+}
+BODIES = {
+    'robe': ["..bbbddddbbb..", ".bddbddddbddb.", "bdddbllllbdddb", "bwddbddddbddwb", "bwddbddddbddwb",
+             "bdddbddddbdddb", "bdddbddddbdddb"],
+    'dress': ["..bbbllllbbb..", ".bllbwwwwbllb.", "blllbwwwwblllb", "bwllbwwwwbllwb", "bwlllwwwwlllwb",
+              "blllllwwlllllb", "bllllllllllllb"],
+    'armor': ["..bbbbbbbbbb..", ".blbllllllblb.", "bllbldlldlbllb", "bwlbllllllblwb", "bwbbbbbbbbbbwb",
+              "bllbldlldlbllb", ".bbbllllllbbb."],
+    'tunic': ["..bbbwwwwbbb..", ".bwwbwwwwbwwb.", "bwwlbwwwwblwwb", "bwlbwwwwwwblwb", "blbbbbbbbbbbbl",
+              "bllbddddddbllb", ".bbbbbbbbbbbb."],
+    'rags': ["..bbbddddbbb..", ".bddbdlldbddb.", "bddlbldddblddb", "bwdbddldddbdwb", "blbbdddddddbbl",
+             "bllbdldddldbllb"[:14], ".bbbbbbbbbbbb."],
+}
+HEM = [["bdddddddddddddb"[:14], "bddddddddddddb", ".bddddddddddb.", ".bbbbbbbbbbbb.", "..bb......bb.."],
+       ["bddddddddddddb", "bddddddddddddb", ".bddddddddddb.", ".bbbbbbbbbbbb.", "..bb.........."],
+       ["bddddddddddddb", "bddddddddddddb", ".bddddddddddb.", ".bbbbbbbbbbbb.", "..........bb.."]]
+HEM_L = [[r.replace('d', 'l') for r in f] for f in HEM]
+
+
+def head_up(hair, rows):
+    out = []
+    for y, r in enumerate(rows):
+        out.append(r if y < 2 else ''.join(hair if c in 'wlbd' and 0 < x < 13 and r[x - 1:x + 2].count('.') == 0 else c
+                                            for x, c in enumerate(r)))
+    return out
+
+
+def person(head, body, legs):
+    hair, hd = HEADS[head]
+    b = BODIES[body]
+    return (hd, head_up(hair, hd), b, b, legs)
+
+
+NPCS = [('KING', KING),
+        ('OLEN', person('bald_beard', 'robe', HEM)),
+        ('JESS', person('long_hair', 'dress', HEM_L)),
+        ('LARC', person('light_hair', 'armor', LEGS_FRONT)),
+        ('VILLAGER', person('cap', 'tunic', LEGS_FRONT)),
+        ('SOLDIER', person('helmet', 'armor', LEGS_FRONT)),
+        ('SELLER', person('cap', 'robe', HEM)),
+        ('PRISONER', person('wild', 'rags', LEGS_FRONT))]
+
 
 
 def grid(rows, w, h, ox=0, oy=0):

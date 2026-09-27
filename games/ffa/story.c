@@ -6,7 +6,7 @@
 #include "texts.h"
 
 enum {
-    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST,
+    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5,
     NEV
 };
 
@@ -18,6 +18,7 @@ enum {
 #define ASK(t) do { dialog_open(t, 1); YIELD_UNTIL(!st.dlg_on); } while (0)
 #define WAIT(n) do { st.timer = (n); YIELD_UNTIL(!--st.timer); } while (0)
 #define WALK(i, cx, cy) do { actor_to(i, cx, cy); YIELD_UNTIL(actor_idle(i)); } while (0)
+#define WALK2(i, x1, y1, j, x2, y2) do { actor_to(i, x1, y1); actor_to(j, x2, y2); YIELD_UNTIL(actor_idle(i) && actor_idle(j)); } while (0)
 #define FADE(l) do { st.arg = (l); st.timer = 0; YIELD_UNTIL(fade_to()); } while (0)
 
 // ---------------------------------------------------------------- actors
@@ -36,11 +37,11 @@ static u8 actor_idle(s8 i)
 
 static void step_one(s16 *x, s16 *y, s16 tx, s16 ty, u8 *dir, u8 *anim)
 {
-    if (*x == tx && *y == ty) { *anim = 0; return; }
-    if (*x < tx) { (*x)++; *dir = DIR_RIGHT; }
-    else if (*x > tx) { (*x)--; *dir = DIR_LEFT; }
-    else if (*y < ty) { (*y)++; *dir = DIR_DOWN; }
-    else { (*y)--; *dir = DIR_UP; }
+    if (*x == tx && *y == ty) { *anim = 0; return; }   // vertical first, then horizontal
+    if (*y < ty) { (*y)++; *dir = DIR_DOWN; }
+    else if (*y > ty) { (*y)--; *dir = DIR_UP; }
+    else if (*x < tx) { (*x)++; *dir = DIR_RIGHT; }
+    else { (*x)--; *dir = DIR_LEFT; }
     (*anim)++;
 }
 
@@ -72,11 +73,14 @@ static u8 fade_to(void)                      // one fade step every FADE_FRAMES 
     return st.fade == (u8)st.arg;
 }
 
-void story_room(void)                        // NPCs standing in the room (none yet)
+void story_room(void)                        // NPCs standing in the room
 {
     u8 i;
     for (i = 0; i < NNPC; i++) st.npc[i].on = 0;
     st.hwalk = 0;
+    switch (rooms[st.room].id) {
+    case 6: npc_put(1, SPR_KING, 6, 4, DIR_DOWN); break;          // Edouard, cell -9
+    }
 }
 
 // ---------------------------------------------------------------- events
@@ -126,7 +130,65 @@ static u8 ev_chest(void)                     // one-shot find: st.arg = flag | i
     END;
 }
 
-static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest };
+static u8 ev_story2(void)                    // room 6: "Father, I don't see where my sword is"
+{
+    BEGIN;
+    WALK(-1, 13, 3);                         // original: b = 18, a = 108
+    st.dir = DIR_LEFT;
+    SAY(T_SWORD_Q);
+    SAY(T_SWORD_A);
+    st.flag[10] = 1;
+    END;
+}
+
+static u8 ev_story5(void)                    // room 6: the knighting ceremony
+{
+    BEGIN;
+    WALK(-1, 6, 5);                          // before the Lord (original: b = 36, a = 45)
+    st.dir = DIR_UP;
+    SAY(T_C1);
+    SAY(T_C2);
+    npc_put(2, SPR_OLEN, 8, 9, DIR_UP);
+    npc_put(3, SPR_JESS, 10, 9, DIR_UP);
+    WALK2(2, 8, 7, 3, 10, 7);
+    SAY(T_C3);
+    npc_put(4, SPR_LARC, 9, 9, DIR_UP);
+    WALK(4, 9, 6);
+    SAY(T_C4);
+    SAY(T_C5);
+    SAY(T_C6);
+    SAY(T_C7);
+    WAIT(16);
+    SAY(T_C8);
+    SAY(T_C9);
+    SAY(T_C10);
+    SAY(T_C11);
+    SAY(T_C12);
+    SAY(T_C13);
+    WALK2(2, 8, 9, 3, 10, 9);                // Olen and Jess leave
+    st.npc[2].on = st.npc[3].on = 0;
+    SAY(T_C14);
+    SAY(T_C15);
+    WALK(4, 9, 9);                           // Larc leaves
+    st.npc[4].on = 0;
+    SAY(T_C16);
+    npc_put(5, SPR_VILLAGER, 9, 9, DIR_UP);
+    WALK(5, 9, 7);
+    SAY(T_C17);
+    SAY(T_C18);
+    SAY(T_C19);
+    WALK(5, 9, 9);
+    st.npc[5].on = 0;
+    SAY(T_C20);
+    SAY(T_C21);
+    SAY(T_C22);
+    SAY(T_C23);
+    st.flag[7] = st.flag[8] = 1;
+    st.dir = DIR_DOWN;
+    END;
+}
+
+static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5 };
 
 static u8 start(u8 ev, s16 arg)
 {
@@ -147,6 +209,15 @@ u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
         if (p == -35) return start(EV_SAY, T_PLAQUE8);
         if (p == -30) return start(EV_SAY, T_LARC_DOOR);
         if (p == -190) return st.flag[40] ? 0 : start(EV_CHEST, 40 | I_POTION << 8);
+        break;
+    case 6:
+        if (p == 5010) return st.flag[10] ? 0 : start(EV_STORY2, 0);
+        if (p == -90) {                      // Edouard (D3); silent once the key is taken
+            if (!st.flag[11]) return start(EV_SAY, T_ED_SWORD);
+            if (!st.flag[1]) return start(EV_SAY, T_ED_CLOSED);
+            return 1;
+        }
+        if (p == 5050) return st.own[A_SWORD] && !st.flag[8] && !st.flag[7] ? start(EV_STORY5, 0) : 0;
         break;
     }
     return 0;

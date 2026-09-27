@@ -12,7 +12,7 @@ for u in map(int, sys.argv[2:]):
     r = Room(u)
     src = Image.open(os.path.join(PICS, 'dec%d.png' % u)).convert('RGB')
     c = Image.new('RGB', ((r.w) * 9 * Z, (r.h + 1) * 9 * Z), (60, 60, 90))
-    c.paste(src.resize((src.width * Z, src.height * Z), Image.NEAREST), (9 * Z, 0))
+    c.paste(src.resize((src.width * Z, src.height * Z), Image.NEAREST), (9 * Z, 9 * Z))
     d = ImageDraw.Draw(c)
     for y in range(r.h):
         for x in range(r.w):

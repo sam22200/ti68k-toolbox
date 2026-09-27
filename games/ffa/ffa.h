@@ -53,7 +53,7 @@ enum { I_POTION, I_HIPOTION, I_ETHER, I_TETHER, I_XPOTION, I_ELIXIR, I_ANTIDOTE,
 enum { A_SWORD = 1, A_WRIST = 9, A_BANGLE = 25, NARM = 32 };      // armat rows of the original
 enum { MAT_FIRE = 2, MAT_CURE = 3, NMAT = 18 };                   // maglist rows
 
-#define NNPC 4
+#define NNPC 6                                       // slot 0 = the hero's scripted target
 typedef struct {
     u8 on, spr, dir, anim;
     s16 x, y, tx, ty;                                // hitbox top-left, walk target

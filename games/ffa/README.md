@@ -59,4 +59,13 @@ matches the logic.
 | N | state |
 |---|---|
 | 0 | new game: room 8 (hero's bedroom), first-level stats |
+| 1 | story1 and story2 done, room 6 (throne hall) |
+| 2 | + Dungeon Key (Olen), room 7 under the dungeon door |
+| 3 | + little key, room 12 |
+| 4 | + riddle solved, room 14 (prison hall) |
+| 5 | + switch, Fire materia, Power Wrist, room 11 under the weapon room door |
+| 6 | + boss beaten (Cell 2 Key), room 16 |
+| 7 | + Buster Sword, Bronze Bangle, room 5 in front of the throne hall door (ceremony next) |
+| 8 | + knighted, room 18 (Olen gives Cure next) |
+| 9 | + Cure materia, room 4: the exit south ends part I |
 | 100 + r | room r (original number), hero on the free cell nearest the centre |
