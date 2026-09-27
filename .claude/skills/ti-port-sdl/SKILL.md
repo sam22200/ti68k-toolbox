@@ -52,8 +52,8 @@ confirm the placeholders behave. Fix the feel (jump height, speed) against the u
 
 ## 3. TI, benchmark without UI
 
-`make bench` → `<name>b.89z`; `ti-send`, then `ti-key HOME CLEAR '<name>b(N)' ENTER` per
-scenario (worst cases: most objects on screen). Read the printed cycles per frame, not a drawing.
+`make bench` → `<name>b.89z`; `TI_ARGS=N ti-run <name>b.89z [data]` per scenario (a clean
+restart each time) (worst cases: most objects on screen). Read the printed cycles per frame, not a drawing.
 Budget: ~360k cycles per frame at 30 fps on hardware (grayscale driver included); TiEmu
 under-counts `movem` and shifts, so keep a margin (`ti68k-performance.md` §1). Over budget:
 optimise from the knowledge base (tables, redraw only what changes, TileMap, pre-shifted

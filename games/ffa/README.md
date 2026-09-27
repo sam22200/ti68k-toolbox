@@ -8,7 +8,9 @@ Original data: `ffa_en/` (local only). Skill: `ti-port-tibasic`. Progress: `PROG
 ```sh
 make test                  # unit + integration tests (no window)
 make pc && ./ffa_pc        # arrows move, shift runs, 2nd/ENTER examine, ESC quits
-make ti                    # ffa.89z (57 KB, Titanium) + ffadat.89y (15 KB of tiles): send both
+make ti                    # ffa.89z (57 KB, Titanium) + ffadat.89y (15 KB of tiles)
+ti-run ffa.89z ffadat.89y  # clean emulator restart with both files, runs ffa()
+make ti TI_FLAGS=-DDEBUG_KEYS   # prints rt_keys top-left in the field (stuck-key checks)
 make bench BENCH=40        # ffab.89z -> ffab(N): cycles per frame of scenario N
 ```
 `rooms.h` is generated from the local `ffa_en/` data by `tools/rooms.py` (make does it).

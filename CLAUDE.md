@@ -38,7 +38,7 @@ mid-grey scenery behind a black/white character), no detail smaller than 2 pixel
 export PATH=$PWD/tools/bin:$PATH
 ti-cc -o name src.c             # build → name.89z (skill ti89-c-dev)
 ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 HW2 AMSpatch, 89u unpatched)
-ti-run name.89z                 # send + run (skill ti89-emulator)
+ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
 ```
 
@@ -135,7 +135,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
   and CPU exceptions; `bigprog/`: size limits, packing, data files read from archive; `heapcode/`: running code from the heap; `link/`: link timeouts;
   `sprites/`: ExtGraph mirror routines; `tilemap/`: TileMap engine + pre-shifted sprites; `fonts/`: AMS fonts read in place; `hwsync/`: LCD sync bit and 16 kHz fine timer; `render/`, `ai/`, `struct/`, `compress/`, `maps/`: the
   measured ideas of game-techniques §13; `bench/m7row.s`: C-callable asm example). `sources/`: old reference sources.
-- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-key ti-shot ti-table`, `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
+- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-table`, `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
   (numpy, scipy, pillow) for asset pipelines.
 - `tools/gcc4ti-bin/`: installed GCC4TI (HTML docs in `doc/html/`); `tools/build-gcc4ti.sh`
   rebuilds it in Docker (GCC 4.1.2 does not build with the host gcc).

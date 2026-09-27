@@ -10,15 +10,19 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 | Command | Purpose |
 |---|---|
 | `ti-emu start\|stop\|restart\|status\|save` | TiEmu in Docker. `TI_CALC=89t` (default, Titanium AMS 3.10) or `TI_CALC=89` (TI-89 HW2, AMS 2.09 AMSpatch) or `TI_CALC=89u` (TI-89 HW2, official unpatched AMS 2.09: the one to test program size limits and execution protection; no saved state, boots to a fresh HOME) |
-| `ti-run prog.89z [extra…]` | send, then run `prog()` from HOME |
-| `ti-send file…` | send only (overwrites the existing variable) |
+| `ti-run prog.89z [extra…]` | **the way to test a build**: `ti-emu restart` from the clean saved state with the files sent at boot (`-send=`, several files merged by `ti-group`), then `prog($TI_ARGS)` |
+| `ti-emu restart file…` | clean state + files sent at boot, without running |
+| `ti-send file…` | fallback only: types the path into TiEmu's file chooser (slow, needs HOME) |
 | `ti-key [--hold S] TOKEN…` | keys: `ENTER ESC HOME CLEAR 2ND UP…`, or text `'hello()'` |
 | `ti-shot out.png [--lcd]` | screenshot; `--lcd` = screen only, enlarged |
 
 ## Test loop
 
-1. `ti-emu status` → if stopped, `ti-emu start` (resumes from the saved state, on the HOME screen).
-2. **Keep the same instance** between builds: `ti-run build/prog.89z`.
+**Rule: every new build goes in with `ti-run` (or `ti-emu restart file…`).** Never quit a running
+game to HOME to resend it, never type paths into the file chooser: a restart from the `.sav` takes
+~7 s, leaves no stale variable, save or stuck key behind, and sends every file at once.
+
+1. `ti-run build/prog.89z [data.89y]` (restarts from the saved state, on the HOME screen, and runs).
 3. **Check the result**: prefer programs that print numbers (runtime `make bench`, checksums) and
    read them with one `ti-shot /scratchpad/x.png --lcd`; screenshots of drawn scenes only when the
    look itself is under test. Model: the Titanium (default); the TI-89 HW2 only for a release.
