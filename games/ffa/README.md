@@ -13,6 +13,8 @@ ti-run ffa.89z ffadat.89y  # clean emulator restart with both files, runs ffa();
                            # TiEmu: arrows, AltGr = 2nd, Shift runs, Enter, Esc = menu
 make ti TI_FLAGS=-DDEBUG_KEYS   # prints rt_keys top-left in the field (stuck-key checks)
 make bench BENCH=40        # ffab.89z -> ffab(N): cycles per frame of scenario N
+make xcheck                # ffac.89z under ti-cycles (with ffadat.89y) = PC headless, 18 scenarios
+../../tools/bin/ti-cycles --file ffadat.89y --arg 105 --frames 40 ffac.89z   # datasheet cycles
 ```
 `rooms.h` is generated from the local `ffa_en/` data by `tools/rooms.py` (make does it).
 
@@ -60,14 +62,14 @@ matches the logic.
 
 ## Measured (Titanium, TiEmu cycles per frame, budget 375k; 2026-09-27)
 
-| screen (scenario) | render |
-|---|---|
-| castle courtyard, 121-tile set, 2 NPCs (105) | 117k |
-| throne hall, Edouard (106) | 111k |
-| dungeon hall (110) | 105k |
-| battle vs the boss, menu open, room backdrop (52) | 230k (186k on a plain background) |
-| battle vs monster 1, hero in its 48-wide pose (50) | 235k |
-| throne hall with a full dialogue box (53) | 218k (was 281k: the text is drawn once now) |
+| screen (scenario) | render | `ti-cycles` (datasheet, no grey driver) |
+|---|---|---|
+| castle courtyard, 121-tile set, 2 NPCs (105) | 117k | 96k |
+| throne hall, Edouard (106) | 111k | 93k |
+| dungeon hall (110) | 105k | 86k |
+| battle vs the boss, menu open, room backdrop (52) | 230k (186k on a plain background) | 228k |
+| battle vs monster 1, hero in its 48-wide pose (50) | 235k | 221k |
+| throne hall with a full dialogue box (53) | 218k (was 281k: the text is drawn once now) | 190k |
 
 Tiles are shared per area (castle 87, outside 121, dungeon 31 tiles: 15.3 KB, was 24.8 KB
 per room) and live in the data variable `ffadat` (`rt_file`) with the sprites (16 KB, `gfx.h`

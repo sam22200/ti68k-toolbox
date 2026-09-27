@@ -16,3 +16,7 @@ ffadat.89y: ffadat.be.bin                 # the TI data variable (send it with f
 	$(ROOT)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat ffadat.be.bin ffadat
 ti: ffadat.89y
 $(NAME)_pc $(NAME)_test $(NAME).89z: gfx.h gfx_ids.h rooms.h
+
+TI_FILES := ffadat.89y
+XCHECK := 0 10 1 2 3 4 5 6 7 8 9 50 51 52 53 105 106 110
+cycles: ffadat.89y
