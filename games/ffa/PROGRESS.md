@@ -20,17 +20,25 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   random encounters (placeholder), End of Part I screen.
 - Tests: `make test` (walk speed, walls, corner slide, door + fade, every door of every room
   lands in the right room on a free cell, encounters).
+- `docs/part1.md`: full spec of part I (rooms, flags, stats, battle formulas, all texts).
+- Art style chosen on room 8 (`experiments/style_mockup.py`): "slabs" = light grey floor slabs,
+  dark brick wall faces two tiles tall (the header row becomes an upper face with a cornice),
+  black wall tops, CC0 furniture (Ninja Adventure, `sources/assets/`, converted with per-object
+  luminance quantiles) plus own ASCII objects (bed, desk, stairs, door, carpet, wall decos).
+- Hero sprite: 4 directions x 3 walk frames, white outline (`tools/gfx.py`); NPC Edouard.
+- Dialogue (`dialog.c`, `texts.h`: every part I text): name tag, 24 columns x 3 lines of the
+  6x8 font, typewriter, pages, Yes/No. Events (`story.c`): C coroutines (SAY, ASK, WAIT, WALK,
+  FADE), actors drawn back to front.
+- **Room 8 done**: story1 (Edouard comes down, hero steps aside), bed (Sleep? heal with fade),
+  plaque, Larc's door, desk potion (once, flag 40). Tests for each.
 
 ## Remaining (in order)
 
-1. `docs/part1.md`: spec of part I (texts, flags, stats, battles) — written by a sub-agent,
-   check it.
-2. Art style comparison (CC0 Ninja Adventure tileset converted to 4 greys vs own drawing vs
-   upscaled original), on room 8: pick one.
-3. Text system: dialogue table (from the spec), box with typewriter, name substitution.
-4. Script system (story1..story5, scenar 500-505) as bytecode, NPC sprites.
-5. Rooms one by one (8, 6, 5, 7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): art, texts, chests,
-   scripts, tests, `/ti-commit` each.
+1. Rooms one by one (6, 5, 7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
+   `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
+   NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
+   `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
+2. Title / new game: name entry, growth stat choice, intro text, "20 years after..." fade.
 6. Battle system (part I monsters, boss of room 16, Fire/Cure, limit, items), menus (APPS),
    shop, bed, level-ups.
 7. TI milestone: `make bench` on the heaviest room, size (tile sets shared per area, data in
@@ -43,4 +51,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Wait for / read `docs/part1.md`, then do step 2 on room 8.
+Room 6 (throne hall): layout, Edouard standing at the -9 cell (story_room), story2 (501),
+Edouard's lines (-9, D3), then story5 (505, the ceremony) once the sword is found.

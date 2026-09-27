@@ -38,6 +38,22 @@ TiEmu cycles, runtime README): the choice is readability, tile memory and art ef
 - Triggers: texts are solid objects examined with 2nd; story scripts run when stepped on.
 - Encounters: the original counter (`mc += frc` per step of one tile, fight above 15+rand(5)).
 
+## Art (style chosen on room 8, `experiments/style_mockup.py`)
+
+Compared on the same view (grey and mono): planks (busy: the hero sinks in), white stone
+(readable but washed out), the upscaled original, and **slabs** (chosen): light grey floor,
+dark brick wall faces two tiles tall with a cornice, black wall tops. The hero is dark with a
+white outline, so he stands out on the light floor. Furniture comes from the CC0 Ninja Adventure
+tileset (Pixel-boy) converted to 4 greys with per-object luminance quantiles, plus own ASCII
+objects. Walls are auto-tiled from the collision grid (`tools/art.py`), so the art always
+matches the logic.
+
+## Text and events
+
+`dialog.c`: speaker name tag, 3 lines of 24 characters (6×8 font), 2 characters per frame,
+2nd/ENTER to skip or turn the page, Yes/No choices. `story.c`: each event is a C coroutine
+(`SAY`, `ASK`, `WAIT`, `WALK`, `FADE`), its resume point is one state field.
+
 ## Scenarios (`--scenario N` / `ffa(N)`)
 
 | N | state |
