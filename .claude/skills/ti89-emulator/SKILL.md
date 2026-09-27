@@ -47,6 +47,12 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 - Never run `import -window` without a valid window id (it waits for the user to click): use
   `ti-shot`. Never send Print Screen (keycode 107 starts Spectacle/Flameshot) or the Menu key
   (it opens TiEmu's menu). `ti-key` handles this.
+- **Stuck keys** (a key the program still sees held after release; FFA's hero walking alone):
+  TiEmu clears a key only on its GTK release event, and loses it when the release goes to
+  another window or a skin click is released off the key. `tools/tiemu-keyfix.c` (LD_PRELOAD in
+  the image) replays releases the X server says happened and moves mouse releases back to the
+  press point (**verified**: a synthetic press without release sticks with `TI_KEYFIX=0`, is
+  released within 50 ms with the fix). Debug a game's keys by printing `rt_keys` on screen.
 - One instance at a time (container named `tiemu`): `ti-emu stop` before switching models.
 - **No digits in program names**: typing digits through the PC keyboard is unreliable (`int5rate()`
   came out as `tan(`, and the keypad keycodes opened MEMORY/2nd menus and left a modifier stuck).
