@@ -6,11 +6,11 @@ include ../../runtime/rt.mk
 PC_CFLAGS += -Wno-implicit-fallthrough   # the story coroutines fall through on purpose
 
 PY := ../../tools/pyenv/bin/python
-gfx.h: tools/gfx.py
-	$(PY) tools/gfx.py > $@
+gfx.h gfx.bin gfx.be.bin: tools/gfx.py         # sprites: macros + the block appended to ffadat
+	$(PY) tools/gfx.py > gfx.h
 gfx_ids.h: tools/gfx.py
 	$(PY) tools/gfx.py --ids > $@
-rooms.h ffadat.bin ffadat.be.bin: tools/rooms.py tools/murparse.py tools/art.py
+rooms.h ffadat.bin ffadat.be.bin: tools/rooms.py tools/murparse.py tools/art.py gfx.bin
 	$(PY) tools/rooms.py > rooms.h
 ffadat.89y: ffadat.be.bin                 # the TI data variable (send it with ffa.89z, archive it)
 	$(ROOT)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat ffadat.be.bin ffadat

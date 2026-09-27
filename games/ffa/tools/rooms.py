@@ -108,7 +108,8 @@ DATA = 'ffadat'                      # data variable (TI) / file (PC): the tile 
 
 
 def write_data(tilesets):
-    """ffadat: u16 count, u16 word offset of each set, then the tile words (TileMap order).
+    """ffadat: u16 block count, u16 word offset of each block, then the blocks: the tile sets
+    (tile words, TileMap order), then the sprites (gfx.bin / gfx.be.bin from tools/gfx.py).
     DATA.bin in the host's byte order (PC), DATA.be.bin big-endian for ttbin2oth (TI)."""
     import struct
     words, offs = [], []
@@ -117,11 +118,14 @@ def write_data(tilesets):
         for t in ts:
             for d, l in t:
                 words += [d, l]
-    head = [len(tilesets)] + [1 + len(tilesets) + o for o in offs]
+    offs.append(len(words))                   # the sprite block, after the tile words
+    head = [len(offs)] + [1 + len(offs) + o for o in offs]
     allw = head + words
-    assert len(allw) * 2 < 65000
-    open(os.path.join(HERE, '..', DATA + '.bin'), 'wb').write(struct.pack('<%dH' % len(allw), *allw))
-    open(os.path.join(HERE, '..', DATA + '.be.bin'), 'wb').write(struct.pack('>%dH' % len(allw), *allw))
+    for fn, end in (('.bin', '<'), ('.be.bin', '>')):
+        gfx = open(os.path.join(HERE, '..', 'gfx' + fn), 'rb').read()
+        data = struct.pack(end + '%dH' % len(allw), *allw) + gfx
+        assert len(data) < 65000
+        open(os.path.join(HERE, '..', DATA + fn), 'wb').write(data)
 
 
 def main():

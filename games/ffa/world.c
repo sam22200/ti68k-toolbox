@@ -22,6 +22,7 @@ u8 world_solid(u8 code)
 
 static RtTilemap world_map;
 static const u16 *tileset[4];
+const u8 *gfx_data;                           // the sprites (gfx.h), the last block of ffadat
 
 const RtTilemap *world_tilemap(void)          // the current room's map with its area's tiles
 {
@@ -35,7 +36,8 @@ u8 world_load(void)
     const u16 *d = rt_file("ffadat", RT_NULL);
     u8 k;
     if (!d) return 0;
-    for (k = 0; k < d[0] && k < 4; k++) tileset[k] = d + d[1 + k];
+    for (k = 0; k + 1 < d[0] && k < 4; k++) tileset[k] = d + d[1 + k];
+    gfx_data = (const u8 *)(d + d[d[0]]);
     return 1;
 }
 
