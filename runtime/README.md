@@ -36,7 +36,8 @@ void game_render(void);      // draw the whole frame
   digits are above bit 7, so `u8 go = input_pressed(K_A | K_ENTER)` loses them; write `!= 0`.
 - Drawing (hidden planes, double-buffered): `draw_clear`, `draw_rect(x, y, w, h, C_*)`,
   `draw_sprite(x, y, &RtSprite)` (8/16/32 wide, masked or opaque, clipped), `draw_text(x, y, s,
-  F_SMALL|F_MEDIUM, C_*)`, `draw_tilemap(&RtTilemap, camx, camy)` + `tilemap_dirty()`.
+  F_SMALL|F_MEDIUM, C_*)`, `draw_tilemap(&RtTilemap, camx, camy)` + `tilemap_dirty()`
+  (the TI rebuilds its plane when `map`, `tiles` or `w` change, so one struct refilled per room works).
   Data formats are ExtGraph's (see `rt.h`): the same arrays work on both targets.
 - `rt_rand()` (wyhash16, deterministic from `rt_seed`), `rt_ticks()` (256 Hz; virtual on the PC).
 - `rt_file(name, &size)`: big read-only data outside the program (64 KB per variable): on the TI

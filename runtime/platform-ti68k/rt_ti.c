@@ -93,7 +93,8 @@ void draw_sprite(s16 x, s16 y, const RtSprite *s)
 // leaves its margin; each frame it is blitted with the sub-tile offset (performance §6).
 static Plane tm_pl;
 static char *tm_big;
-static const RtTilemap *tm_cur;
+static RtTilemap tm_cur;                           // the map the plane was set up for (a copy:
+                                                   // games may pass one struct refilled per room)
 #ifdef RT_MONO
 static u16 *tm_mono;                               // dark rows only, 16 per tile
 #endif
@@ -177,12 +178,12 @@ void draw_tilemap(const RtTilemap *m, s16 camx, s16 camy)
 {
     if (!tm_big && !(tm_big = malloc(GRAY_BIG_VSCREEN_SIZE))) return;
     rt_clamp_cam(m, &camx, &camy);
-    if (m != tm_cur) {
+    if (m->map != tm_cur.map || m->tiles != tm_cur.tiles || m->w != tm_cur.w) {
 #ifdef RT_MONO
         u16 k, *d;
         const u16 *t = m->tiles;
         if (tm_mono) free(tm_mono);                // AMS free(NULL) is not safe
-        if (!(d = tm_mono = malloc(m->ntiles * 32))) { tm_cur = 0; return; }
+        if (!(d = tm_mono = malloc(m->ntiles * 32))) { tm_cur.map = 0; return; }
         for (k = m->ntiles * 16; k--; t += 2) *d++ = *t;
         tm_pl.sprites = tm_mono;
 #else
@@ -192,7 +193,7 @@ void draw_tilemap(const RtTilemap *m, s16 camx, s16 camy)
         tm_pl.width = m->w;
         tm_pl.big_vscreen = tm_big;
         tm_pl.force_update = 1;
-        tm_cur = m;
+        tm_cur = *m;
     }
 #ifdef RT_MONO
     DrawPlane(camx, camy, &tm_pl, rt_light, TM_RPLC89, TM_16B);
@@ -261,7 +262,7 @@ void _main(void)
 #endif
 
     // statics keep their values between runs (the program runs from its own file, c-patterns §1)
-    tm_big = 0; tm_cur = 0;
+    tm_big = 0; tm_cur.map = 0;
 #ifdef RT_MONO
     tm_mono = 0;
 #endif
