@@ -239,6 +239,16 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   160×100 37k; `GrayClearScreen2B_R` 3.3k (TiEmu; `movem`, ~17k real); 6 characters of text
   through AMS `DrawStr` + `PortSet` on two planes 92k (F_4x6) / 75k (F_6x8), with the in-place
   font and one `long` OR per row 9.7k / 11.4k (**~8× faster**).
+- **Per-call overhead dominates small `draw_rect`s: draw repeated shapes as sprites** (**verified**,
+  `games/flappy/`, Titanium TiEmu): a Flappy frame with 4 pipes drawn as 6-colour stripes (28
+  `draw_rect` per pipe) plus the game-over panel cost 431k cycles; with each pipe half as one
+  opaque 16-px sprite of identical rows (`RtSprite` mask `RT_NULL`, `h` set per call) and the caps
+  as one masked 32-px sprite, 244k; a playing frame with 3 pipes, 158k. Same for a scrolling
+  striped band: six 32x4 opaque sprites instead of 20 rects.
+- **`RT_BENCH` renders the final state**: pick the scenario and the `BENCH` count so that this
+  state is the worst case (an autopilot that died and restarted measured an empty screen:
+  100k instead of the real cost). Check the state with the same `--scenario N --frames BENCH
+  --shot` on the PC first.
 
 - **Pixels**: `EXT_SETPIX`/`EXT_CLRPIX`/`EXT_XORPIX`/`EXT_GETPIX` (ExtGraph) are the fastest
   single-pixel writes (measured above). For lines and walks, step the address and mask instead of

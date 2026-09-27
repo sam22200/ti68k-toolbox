@@ -151,6 +151,11 @@ GrayOff();                                       // BEFORE freeing anything it u
   (small items, sprites on a plain background), but always ask the question for the main
   character. Leave room: a 16-pixel-wide sprite with an outline needs a 14-pixel shape, or a
   32-bit-wide routine.
+- **Tilting a small sprite (verified on screenshots, `games/flappy/gfx.py`): RotSprite, and only
+  45° steps.** Generate the frames offline: Scale2x three times (8×), rotate with nearest
+  sampling, take one sample per 8×8 block, then add the outline. On a 13×10 bird, 45° and 90° stay
+  clean (pixel diagonals); 20–30° are noise with any method (plain rotation, supersampled majority
+  vote, column shear). Use -45°/0°/45°/90° poses and pick by angle thresholds.
 - **Second colour set for free: swap the plane pointers** (Hockey team 2, Sumo's second wrestler):
   draw the same sprite with `(dark, light)` instead of `(light, dark)`: light grey ↔ dark grey,
   black stays black. Works with a mask shared by both planes.
