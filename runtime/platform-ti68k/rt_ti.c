@@ -3,6 +3,9 @@
 // copied to LCD_MEM). Run as prog() or prog(N) to start in game_scenario(N).
 // -DRT_BENCH=N: non-UI benchmark, N updates then N renders from scenario prog(S), prints the
 // cycles per frame and waits for a key.
+// -DRT_CYCLES: the same game under tools/bin/ti-cycles, never on a calculator (bench.h writes to
+// 0xE00000): no grayscale, interrupts or keyboard; scenario, keys and frame count come from
+// ti-cycles (--arg, --keys, --frames), zones 1 update / 2 render, the screen at the end.
 #define USE_TI89
 #define MIN_AMS 200                                // fonts read in place (OO_CondGetAttr)
 #define SAVE_SCREEN
@@ -10,6 +13,9 @@
 #include "extgraph.h"
 #include "tilemap.h"
 #include "../core/rt.h"
+#ifdef RT_CYCLES
+#include "../../tools/m68kbench/bench.h"
+#endif
 
 #if C_WHITE != COLOR_WHITE || C_LGRAY != COLOR_LIGHTGRAY || C_DGRAY != COLOR_DARKGRAY || C_BLACK != COLOR_BLACK
 #error rt.h colours must equal ExtGraph's COLOR_*
@@ -25,6 +31,7 @@ static u16 bench_upd, bench_rnd;
 DEFINE_INT_HANDLER(tick_handler) { ticks++; }
 u16 rt_ticks(void) { return ticks; }
 
+#ifndef RT_CYCLES
 // TI-89 matrix (c-patterns ยง5): row 0 = up left down right 2nd shift diamond alpha = K_UP..K_D;
 // ENTER row 1 b0, ESC row 6 b0; digits in rows 4, 3, 2 (columns 1-4-7, 2-5-8, 3-6-9) bits 1-3.
 static u32 read_keys(void)
@@ -35,6 +42,7 @@ static u32 read_keys(void)
     u16 pad = spread[(r4 >> 1) & 7] | spread[(r3 >> 1) & 7] << 1 | spread[(r2 >> 1) & 7] << 2;
     return (r0 & 0xFF) | (r1 & 1) << 8 | (r6 & 1) << 9 | (u32)pad << 16;
 }
+#endif
 
 void draw_clear(void)
 {
@@ -246,6 +254,39 @@ static short get_fonts(void)                       // c-patterns / performance ย
     return 1;
 }
 
+#ifdef RT_CYCLES
+void _main(void)                                   // the PC --headless loop (rt_sdl.c, sw_step)
+{
+    long frames = BENCH_FRAMES;
+    void *planes = malloc(2 * RT_PSIZE);
+    u8 go = 1;
+    tm_big = 0; tm_cur.map = 0;
+#ifdef RT_MONO
+    tm_mono = 0;
+#endif
+    rt_frame = 0; rt_keys = rt_prev = 0; rt_seed = 1; rt_state = 0; rt_state_size = 0;
+    if (!get_fonts() || !planes) return;
+    rt_dark = planes;                              // GrayDBuf's layout: DrawPlane writes the
+    rt_light = (u8 *)planes + 0xF00;               // light plane at dark + 0xF00
+    BENCH_DARK_FIRST(1);
+    BENCH_NAME(1, "update"); BENCH_NAME(2, "render");
+    draw_clear();
+    game_init();
+    game_scenario(BENCH_ARG);
+    while (go && (frames < 0 || rt_frame < frames)) {
+        rt_prev = rt_keys;
+        rt_keys = BENCH_KEYS(rt_frame);
+        BENCH_BEGIN(1); go = game_update(); BENCH_END(1);
+        if (go) { BENCH_BEGIN(2); game_render(); BENCH_END(2); }
+        rt_frame++;
+    }
+    BENCH_VALUE(rt_frame);
+    BENCH_SHOT(planes);
+    if (tm_big) free(tm_big);
+    if (sv_data) { save_write(); sv_data = 0; }
+    free(planes);
+}
+#else
 void _main(void)
 {
     INT_HANDLER old_int1 = GetIntVec(AUTO_INT_1);
@@ -354,3 +395,4 @@ out:
     if (sv_data) { save_write(); sv_data = 0; }    // statics survive between runs
     GKeyFlush();
 }
+#endif
