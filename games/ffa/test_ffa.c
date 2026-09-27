@@ -226,6 +226,44 @@ int main(void)
     hold(K_UP, 20);
     CHECK(rooms[st.room].id == 5 && st.mode == M_TEXT && st.dlg_text == T_LOCKED);
 
+    // room 7: the books; the 504 cell under the dungeon door sets clef[11] silently
+    sw_init(1);
+    put(7, 3 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    story_room();
+    st.dir = DIR_UP;
+    CHECK(talk() == T_BOOK_EXCALIBUR);
+    put(7, 6 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    CHECK(talk() == T_BOOK_LANGUAGE);
+    put(7, 3 * TILE + HB_X0, 7 * TILE + HB_Y0);
+    CHECK(talk() == T_BOOK_CLOUD);
+    put(7, 7 * TILE + HB_X0, 7 * TILE + HB_Y0);
+    CHECK(talk() == T_BOOK_WAR);
+    put(7, 9 * TILE + HB_X0, 3 * TILE + HB_Y0);
+    st.cell_in = 0;
+    hold(K_UP, 10);
+    CHECK(st.flag[11] && st.mode == M_WALK);
+    hold(K_UP, 20);                          // the dungeon door needs the Dungeon Key
+    CHECK(st.mode == M_TEXT && st.dlg_text == T_LOCKED);
+
+    // room 18: Olen gives the Dungeon Key, then encourages; Cure once the sword is found
+    sw_init(1);
+    put(18, 5 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    story_room();
+    st.dir = DIR_LEFT;
+    CHECK(st.npc[1].spr == SPR_OLEN && st.npc[2].spr == SPR_JESS);
+    CHECK(talk() == T_OLEN_KEY && st.flag[1]);
+    CHECK(talk() == T_OLEN_COURAGE);
+    st.own[A_SWORD] = 1;
+    CHECK(talk() == T_OLEN_CURE && st.mat[MAT_CURE]);
+    CHECK(talk() == T_OLEN_LUCK);
+    put(18, 10 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    CHECK(talk() == 0xFF);                   // Jess is silent after the sword
+    st.own[A_SWORD] = 0;
+    CHECK(talk() == T_JESS);
+    put(18, 10 * TILE + HB_X0, 7 * TILE + HB_Y0);
+    CHECK(talk() == T_CARROTS);
+
     // locked door: room 13 -> 14 needs clef[3] (the injured-number riddle)
     sw_init(113);
     for (k = 0; k < NFLAG; k++) st.flag[k] = 0;

@@ -59,6 +59,10 @@ class Room:
         self.w, self.h = C - 1, dr
         for (y, x) in ((0, 0), (0, 1), (1, 0)):          # header: frc, dr, C
             self.grid[y][x] = Fraction(0)
+        for x in range(self.w):                           # door-table row: only exits count
+            v = self.grid[dr - 1][x]
+            if not (2 < v < 500):
+                self.grid[dr - 1][x] = Fraction(0)
         self._sanitize()
         self.doors = []
         i = 1

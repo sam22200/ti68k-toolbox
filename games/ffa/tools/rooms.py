@@ -4,7 +4,7 @@
 One original 9-px cell = one 16x16 tile. Logic grid = murparse.Room.grid, padded with walls to
 at least 11 x 7 cells (the TileMap engine's screen) and centred: pad offsets are applied to the
 arrival cells. Cell codes (u8): 0 wall, 1 floor, 0x80|d door d (solid, bumping opens it),
-0x40|t trigger t (value in the room's trigger table, original p x 10: <= -20 text (solid, read
+0x40|t trigger t (value in the room's trigger table, original p x 10: < -10 text (solid, read
 with 2nd), >= 5000 story script (walkable, runs when stepped on)).
 
 Tiles: art from ART (tools/art.py) when the room has a layout, else the original picture
@@ -43,7 +43,7 @@ def cell_code(v, room, trig):
         if d is None:
             return 0
         return 0x80 | d
-    if v >= 500 or v <= -2:
+    if v >= 500 or -100 < v < -1:
         t = int(v * 10)
         if t not in trig:
             trig.append(t)

@@ -428,6 +428,83 @@ GATE = ascii_art([                       # 16x16 castle gate: dark arch, portcul
 ])
 
 
+LAMP = ascii_art([                       # 16x32 standing candelabrum
+    ".......bb.......",
+    "......bwwb......",
+    "......bwlb......",
+    ".......bb.......",
+    "..bb..bddb..bb..",
+    ".bwwb.bddb.bwwb.",
+    ".bwlb.bddb.bwlb.",
+    "..bb..bddb..bb..",
+    ".bddbbbddbbbddb.",
+    "..bbddddddddbb..",
+    "....bbbddbbb....",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    "......bddb......",
+    ".....bbddbb.....",
+    "....bddddddb....",
+    "...bddllllddb...",
+    "...bbbbbbbbbb...",
+] + ["................"] * 8)
+
+TABLE = ascii_art(                       # 48x32 dining table with a cloth
+    ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "bwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwb"] +
+    ["bwllllllllllllllllllllllllllllllllllllllllllllwb"] * 12 +
+    ["bwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwb",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "bdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdb",
+     "bdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdlbdb",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     ".bdb........................................bdb.",
+     ".bdb........................................bdb.",
+     ".bdb........................................bdb.",
+     ".bbb........................................bbb."] +
+    ["................................................"] * 9)
+
+CARROTS = ascii_art([                    # 16x16 carrots on a plate
+    "................",
+    "....b.b.........",
+    "...bdbdb.b......",
+    "....bdbdbdb.....",
+    "....bllbdb......",
+    "...bllllbb......",
+    "..bllllb........",
+    ".bllllb.bb......",
+    ".blllb.bllb.....",
+    "..bbb.bllllb....",
+    "....bwbbllb.....",
+    "...bwwwwbbwb....",
+    "...bbbbbbbbb....",
+    "................",
+    "................",
+    "................",
+])
+
+CHAIR = ascii_art([                      # 16x24 chair seen from the side
+    "..bbb...........",
+    "..bdb...........",
+    "..bdb...........",
+    "..bdb...........",
+    "..bdb...........",
+    "..bdb...........",
+    "..bdbbbbbbbb....",
+    "..bdllllllldb...",
+    "..bbbbbbbbbbb...",
+    "..bdb.....bdb...",
+    "..bdb.....bdb...",
+    "..bbb.....bbb...",
+] + ["................"] * 4)
+
+
 def carpet(w, h):                        # w x h cells, dark border, light diamond pattern
     W, H = w * 16, h * 16
     g = []
@@ -460,18 +537,31 @@ def OBJ():
         'desk': DESK,
         'pot': cc0(0, 608, 16, 16),
         'jar': cc0(16, 608, 16, 16),
-        'table': cc0(208, 624, 48, 16),
         'chair': cc0(24, 592, 8, 16),
         'stairs': STAIRS_UP,
         'door': DOOR,
         'carpet3x2': carpet(3, 2),
         'shield': SHIELD, 'swords': SWORDS, 'window': WINDOW, 'torch': TORCH,
         'gate': GATE, 'tree': cc0(0, 160, 32, 32), 'pine': cc0(96, 160, 32, 32), 'bush': cc0(0, 336, 16, 16),
+        'lamp': LAMP, 'table': TABLE, 'carrots': CARROTS, 'chair2': CHAIR,
         'pillar': PILLAR, 'throne': THRONE, 'banner': BANNER, 'runner5x7': runner(5, 7),
     }
 
 
 LAYOUTS = {
+    7: {'style': 'slabs', 'floor': [(3, 2, 2, 1), (6, 2, 2, 1), (3, 5, 2, 1), (6, 5, 2, 1),
+                                    (2, 2, 1, 2), (12, 2, 1, 2), (2, 6, 1, 1), (12, 6, 1, 2)],
+        'objects': [
+        ('bookcase', 3, 2, 0, 0), ('bookcase', 6, 2, 0, 0), ('bookcase', 3, 5, 0, 0), ('bookcase', 6, 5, 0, 0),
+        ('lamp', 2, 2, 0, -8), ('lamp', 12, 2, 0, -8), ('lamp', 2, 6, 0, -8), ('lamp', 12, 6, 0, -8),
+        ('door', 9, 1, 0, 0), ('shield', 5, 0, 0, 6), ('swords', 7, 0, 0, 6), ('torch', 11, 1, 0, 0),
+        ('window', 3, 0, 0, 4)]},
+    18: {'style': 'slabs', 'floor': [(2, 2, 2, 2), (7, 2, 2, 2), (5, 2, 1, 1), (10, 2, 1, 1),
+                                     (9, 5, 3, 2), (8, 6, 1, 1), (2, 7, 1, 1)],
+         'objects': [
+        ('bed', 2, 2, 0, 0), ('bed', 7, 2, 0, 0), ('dresser', 5, 1, 0, 0), ('wardrobe', 10, 1, 0, 0),
+        ('table', 9, 5, 0, 0), ('carrots', 10, 5, 0, 6), ('chair2', 8, 6, 2, -6), ('pot', 2, 7, 0, 0),
+        ('window', 7, 0, 8, 4), ('torch', 4, 1, 0, 0), ('shield', 12, 0, 0, 6)]},
     5: {'style': 'court', 'fill': [(1, 1, 6, 2, 'grass'), (12, 1, 6, 2, 'grass'), (16, 7, 1, 1, 'grass')],
         'objects': [
         ('tree', 1, 1, -4, -10), ('pine', 3, 1, -2, -8), ('tree', 5, 1, 0, -10),

@@ -40,10 +40,14 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 - **Room 5 done**: courtyard style 'court' (cobbles, light brick faces, dark roofs, grass and
   CC0 trees), soldier and seller NPCs, shop (Potion 50 g, 2nd buys, ESC/shift leaves), locked
   exits (clef[7] south, clef[8] Olen's room).
+- **Rooms 7 and 18 done**: bookcase room (4 books, candelabra, 504 sets clef[11], dungeon
+  door locked without the key); Olen and Jess's room (beds, table, carrots; Olen gives the
+  Dungeon Key, then Cure after the sword; Jess silent after the sword). Texts are
+  -100 < p < -1 (-1.5 was lost as a wall); the door-table row keeps only exits.
 
 ## Remaining (in order)
 
-1. Rooms one by one (7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
+1. Rooms one by one (10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
    `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
@@ -60,5 +64,6 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Room 7 (bookcase room): layout, the 4 book texts, 504 (clef[11]) under the dungeon door,
-the dungeon door (clef[1], Dungeon Key).
+Dungeon, room 10 (first hall): a 'dungeon' style (dark slabs, dark bricks), the corpse on the
+wall (-18: little key, clef[2]), the exits to 7, 11 and 12; then the battle system is needed
+(random encounters in rooms 10-16, frc 1.2-1.5).

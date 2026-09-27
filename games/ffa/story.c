@@ -6,7 +6,7 @@
 #include "texts.h"
 
 enum {
-    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5, EV_SHOP,
+    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5, EV_SHOP, EV_OLEN,
     NEV
 };
 
@@ -83,6 +83,8 @@ void story_room(void)                        // NPCs standing in the room
     case 6: npc_put(1, SPR_KING, 6, 4, DIR_DOWN); break;          // Edouard, cell -9
     case 5: npc_put(1, SPR_SOLDIER, 4, 4, DIR_DOWN);              // cell -7.1
             npc_put(2, SPR_SELLER, 12, 5, DIR_DOWN); break;       // cell -12
+    case 18: npc_put(1, SPR_OLEN, 4, 4, DIR_DOWN);                // cell -10
+             npc_put(2, SPR_JESS, 10, 3, DIR_DOWN); break;        // cell -11
     }
 }
 
@@ -242,7 +244,26 @@ void shop_render(void)
     num(134, 45, st.hero.gils);
 }
 
-static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5, ev_shop };
+static u8 ev_olen(void)                      // room 18: Olen (D4): the Dungeon Key, then Cure
+{
+    BEGIN;
+    if (!st.flag[1]) {
+        SAY(T_OLEN_KEY);
+        SAY(T_FOUND_DKEY);
+        st.flag[1] = 1;
+    } else if (st.own[A_SWORD] && !st.mat[MAT_CURE]) {
+        SAY(T_OLEN_CURE);
+        SAY(T_FOUND_CURE);
+        st.mat[MAT_CURE] = 1;
+    } else if (st.mat[MAT_CURE]) {
+        SAY(T_OLEN_LUCK);
+    } else {
+        SAY(T_OLEN_COURAGE);
+    }
+    END;
+}
+
+static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5, ev_shop, ev_olen };
 
 static u8 start(u8 ev, s16 arg)
 {
@@ -277,6 +298,18 @@ u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
         if (p == -71) return start(EV_SAY, T_SOLDIER5);
         if (p == -120) return start(EV_SHOP, 0);
         if (p == 5140) return 0;             // "Finally you come back": late game (clef[56])
+        break;
+    case 7:
+        if (p == 5040) { st.flag[11] = 1; return 0; }   // silent: changes Edouard's line
+        if (p == -20) return start(EV_SAY, T_BOOK_EXCALIBUR);
+        if (p == -15) return start(EV_SAY, T_BOOK_LANGUAGE);
+        if (p == -40) return start(EV_SAY, T_BOOK_CLOUD);
+        if (p == -30) return start(EV_SAY, T_BOOK_WAR);
+        break;
+    case 18:
+        if (p == -100) return start(EV_OLEN, 0);
+        if (p == -110) return st.own[A_SWORD] ? 1 : start(EV_SAY, T_JESS);   // silent after the sword
+        if (p == -85) return start(EV_SAY, T_CARROTS);
         break;
     }
     return 0;
