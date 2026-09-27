@@ -61,7 +61,8 @@ include ../../runtime/rt.mk
    the Titanium; the TI-89 HW2 only for a release.
 4. **Costs on the TI, no screenshots to compare**: `make bench` builds `NAMEb.89z`; `NAMEb(S)` runs
    RT_BENCH updates then renders from scenario S and prints cycles per frame (TiEmu counts:
-   optimistic for ExtGraph code, performance §1).
+   optimistic for ExtGraph code, performance §1). `make bench BENCH=8` sets the count; the renders
+   draw the *final* state, so pick S and BENCH so that it is the heaviest screen.
 
 ## Verified (Titanium, TiEmu, 2026-09-27)
 
