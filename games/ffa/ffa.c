@@ -153,7 +153,7 @@ static void walk(void)
 
 u8 game_update(void)
 {
-    if (input_pressed(K_ESC) && st.mode == M_WALK) return 0;   // (the ESC menu comes later)
+    if (input_pressed(K_ESC) && (st.mode == M_WALK || st.mode == M_END || st.mode == M_GAMEOVER)) return 0;
     switch (st.mode) {
     case M_WALK: walk(); break;
     case M_FADE_OUT: case M_FADE_IN: fade_step(); break;
@@ -223,9 +223,17 @@ void game_render(void)
         draw_text(53, 44, "Game Over", F_MEDIUM, C_BLACK);
         return;
     }
-    if (st.mode == M_END) {
-        draw_clear();
-        draw_text(40, 40, "End of Part I", F_MEDIUM, C_BLACK);
+    if (st.mode == M_END) {                  // leaving for the world map: end of part I
+        char s2[8];
+        draw_rect(0, 0, 160, 100, C_BLACK);
+        draw_rect(20, 26, 120, 48, C_DGRAY);
+        draw_rect(22, 28, 116, 44, C_WHITE);
+        draw_text(41, 32, "End of Part I", F_MEDIUM, C_BLACK);
+        draw_text(29, 46, "Knight", F_MEDIUM, C_BLACK);
+        draw_text(71, 46, st.name, F_MEDIUM, C_BLACK);
+        draw_text(29, 58, "Level", F_MEDIUM, C_BLACK);
+        put_num(s2, st.hero.lv);
+        draw_text(71, 58, s2, F_MEDIUM, C_BLACK);
         return;
     }
     draw_tilemap(&r->map, cx, cy);

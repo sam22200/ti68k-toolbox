@@ -97,6 +97,7 @@ def bricks(x, y, light):                 # wall face: bricks 8x4, mortar, top hi
 
 
 STYLES = {
+    'field': {'floor': tile(grass), 'face': tile(lambda x, y: bricks(x, y, True)), 'top': tile(roof), 'rim': 3},
     'court': {'floor': tile(cobble), 'face': tile(lambda x, y: bricks(x, y, True)), 'top': tile(roof), 'rim': 3},
     'slabs': {'floor': tile(floor_tiles), 'face': tile(lambda x, y: bricks(x, y, False)), 'top': 3, 'rim': 2},
     'planks': {'floor': tile(floor_planks), 'face': tile(lambda x, y: bricks(x, y, False)), 'top': 3, 'rim': 2},
@@ -639,6 +640,26 @@ ROCKS = ascii_art([
 ])
 
 
+HOUSE = ascii_art([                      # 48x16 house front: door, two windows, a sign
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "bwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwb",
+    "bwllllllllllllllllllllllllllllllllllllllllllllwb",
+    "bwlbbbbbbbllllllllllbbbbbbbblllllllllbbbbbbbblwb",
+    "bwlbwwbwwblllllllllbddddddddbllllllllbwwbwwwblwb",
+    "bwlbwwbwwbllbbbbblllbdddddddbllllllllbwwbwwwblwb",
+    "bwlbbbbbbbllbwwwblllbddddwddbllllllllbbbbbbbblwb",
+    "bwlbwwbwwbllbbbbblllbddddbddbllllllllbwwbwwwblwb",
+    "bwlbwwbwwbllllllllllbdddddddbllllllllbwwbwwwblwb",
+    "bwlbbbbbbbllllllllllbdddddddblllllllllbbbbbbblwb"[:48],
+    "bwllllllllllllllllllbdddddddbllllllllllllllllllb"[:48],
+    "bwllllllllllllllllllbdddddddblllllllllllllllllwb",
+    "bddddddddddddddddddddbbbbbbbbdddddddddddddddddddb"[:48],
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "................................................",
+    "................................................",
+])
+
+
 def carpet(w, h):                        # w x h cells, dark border, light diamond pattern
     W, H = w * 16, h * 16
     g = []
@@ -680,12 +701,25 @@ def OBJ():
         'lamp': LAMP, 'table': TABLE, 'carrots': CARROTS, 'chair2': CHAIR,
         'chest': CHEST, 'corpse': CORPSE, 'notice': NOTICE, 'switch': SWITCH, 'bars': BARS,
         'prison_bed': PRISON_BED, 'skull': SKULL, 'bones': BONES, 'rocks': ROCKS,
+        'house': HOUSE,
         'pillar': PILLAR, 'throne': THRONE, 'banner': BANNER, 'runner5x7': runner(5, 7),
     }
 
 
 D = {'style': 'dungeon', 'debris': 9}
 LAYOUTS = {
+    4: {'style': 'field',
+        'fill': [(1, 1, 4, 2, 'grass'), (13, 1, 4, 2, 'grass'), (16, 3, 1, 7, 'grass'), (1, 7, 1, 3, 'grass'),
+                 (1, 9, 7, 1, 'grass'), (11, 9, 6, 1, 'grass'), (8, 6, 3, 4, 'cobble'), (5, 7, 3, 1, 'cobble'),
+                 (11, 7, 3, 1, 'cobble')],
+        'floor': [(1, 5, 3, 1)],
+        'objects': [
+        ('tree', 1, 1, -6, -10), ('pine', 2, 1, 4, -8), ('tree', 3, 2, 0, -6), ('tree', 13, 1, 4, -10),
+        ('pine', 15, 1, 0, -8), ('tree', 15, 2, 4, -4), ('tree', 16, 4, -8, 0), ('pine', 16, 6, -8, 0),
+        ('tree', 16, 8, -8, 0), ('tree', 1, 7, -10, 0), ('pine', 1, 8, -8, 4), ('tree', 2, 9, -6, -2),
+        ('pine', 5, 9, -4, -4), ('tree', 12, 9, 0, -2), ('pine', 14, 9, 0, -4),
+        ('house', 1, 5, 0, 0), ('gate', 9, 5, 0, 0), ('banner', 7, 3, 0, 4), ('banner', 11, 3, 0, 4),
+        ('torch', 8, 5, 0, 0), ('torch', 10, 5, 4, 0), ('window', 6, 3, 0, 8), ('window', 12, 3, 0, 8)]},
     10: dict(D, objects=[('corpse', 5, 1, 0, 0), ('door', 9, 1, 0, 0), ('torch', 3, 1, 0, 0), ('torch', 15, 1, 0, 0),
                          ('torch', 7, 5, 4, 0), ('torch', 12, 5, 0, 0)]),
     11: dict(D, objects=[('door', 4, 1, 0, 0), ('chest', 4, 7, 0, 0), ('torch', 2, 1, 0, 0)]),

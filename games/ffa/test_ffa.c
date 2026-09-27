@@ -396,6 +396,16 @@ int main(void)
     CHECK(talk() == T_FOUND_SWORD && st.own[A_SWORD] && !st.flag[8] && st.hero.weapon == A_SWORD);
     CHECK(has_materia(MAT_FIRE));
 
+    // room 4: the house message, and the way south ends part I
+    sw_init(9);
+    CHECK(rooms[st.room].id == 4 && st.flag[7] && st.mat[MAT_CURE]);
+    put(4, 2 * TILE + HB_X0, 6 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    CHECK(talk() == T_MESSAGE4);
+    sw_init(9);
+    for (k = 0; k < 200 && st.mode != M_END; k++) sw_step(K_DOWN);
+    CHECK(st.mode == M_END);
+
     CHECK(sw_step(K_ESC) == 0);
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;

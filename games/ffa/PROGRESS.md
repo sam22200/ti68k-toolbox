@@ -54,10 +54,12 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   fight, prison cells, Power Wrist, boss (story4: the prisoner walks up, fight, Cell 2 Key),
   Buster Sword (shuts Olen's room), Bronze Bangle, Gold Seal chest.
 - `auto_equip()` wears what is owned (stand-in until the APPS menu).
+- **Room 4 done** (all 14 part I rooms now): 'field' style (grass, trees, castle front, gate,
+  house with its message), the way south shows the End of Part I screen.
 
 ## Remaining (in order)
 
-1. Room 4 (castle front, exterior), then the end of part I screen. Layout in
+1. (done) Rooms. Layout in
    `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
@@ -74,5 +76,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Room 4 (castle front: exterior style, the house sign -7.4, exit to 19 = End of Part I). Then
-the APPS menu (Item, Equip, Materia, Status, Save), the title / name / intro, the TI milestone.
+TI milestone: `make ti` size, `make bench` on the heaviest rooms (5, 4) and a battle, a run on
+the Titanium. Then the APPS menu, the title / name / intro.

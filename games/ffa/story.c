@@ -488,6 +488,7 @@ u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
         if (p == -190) return start(EV_SAY, T_GOLD_SEAL);
         break;
     case 17: if (p == -180) return find(F_BANGLE); break;
+    case 4: if (p == -74) return start(EV_SAY, T_MESSAGE4); break;
     }
     return 0;
 }
