@@ -77,7 +77,7 @@ typedef struct {
     u8 dlg_on, dlg_text, dlg_ask, dlg_page, dlg_cur, ans;
     u16 dlg_shown;
     // story script (story.c): event, resume point, timer; actors
-    u8 ev, timer, hwalk;
+    u8 ev, timer, hwalk, shop;                       // shop: the shop window is open
     u16 pc;
     s16 arg;
     Npc npc[NNPC];
@@ -99,5 +99,6 @@ u8 story_trigger(s16 p, u8 examine);                 // start the event of a tri
 u8 story_run(void);                                  // one frame of the current event, 1 = done
 void story_room(void);                               // spawn the NPCs of the current room
 void npc_step(void);                                 // move the actors towards their targets
+void shop_render(void);
 
 #endif

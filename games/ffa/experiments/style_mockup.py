@@ -19,7 +19,7 @@ for style in ('slabs', 'planks', 'stone', 'original'):
         world = Image.new('RGB', (r.w * 16, r.h * 16))
         world.paste(src.point(lambda v: 0 if v < 128 else 255).convert('RGB').resize((src.width * 16 // 9, src.height * 16 // 9), Image.NEAREST), (16, 16))
     else:
-        world = art.to_image(art.render(art.View(r, lay), style, lay['objects']))
+        world = art.to_image(art.render_layout(art.View(r, lay), dict(lay, style=style)))
     hs = hero(16)
     hx, hy = CELL[0] * 16, CELL[1] * 16
     world.paste(hs, (hx - 1, hy + 16 - hs.height + 1), hs)

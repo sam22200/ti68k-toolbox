@@ -37,10 +37,13 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 - **Room 6 done**: throne hall art (runner, throne, banners, pillars, stairs), Edouard standing,
   story2 on arrival, Edouard's lines by flags, the knighting ceremony (story5, 23 lines, Olen,
   Jess, Larc and a villager coming and going). Arriving by a door on a story cell runs it.
+- **Room 5 done**: courtyard style 'court' (cobbles, light brick faces, dark roofs, grass and
+  CC0 trees), soldier and seller NPCs, shop (Potion 50 g, 2nd buys, ESC/shift leaves), locked
+  exits (clef[7] south, clef[8] Olen's room).
 
 ## Remaining (in order)
 
-1. Rooms one by one (5, 7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
+1. Rooms one by one (7, 18, 10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
    `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
@@ -57,5 +60,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Room 5 (courtyard): layout, soldier (-7.1) and potion seller (-12, shop1: Potion 50 g) as NPCs,
-the locked exit to room 4 (clef[7]) and Olen's door (clef[8]).
+Room 7 (bookcase room): layout, the 4 book texts, 504 (clef[11]) under the dungeon door,
+the dungeon door (clef[1], Dungeon Key).

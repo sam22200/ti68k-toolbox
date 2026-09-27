@@ -139,7 +139,7 @@ static void walk(void)
     }
     if (input_pressed(K_A | K_ENTER)) {      // examine the cell in front of the hero
         static const s8 fx[4] = { 0, 0, -1, 1 }, fy[4] = { 1, -1, 0, 0 };
-        c = world_cell(st.x + HB_W / 2 + fx[st.dir] * (HB_W / 2 + 4), st.y + HB_H / 2 + fy[st.dir] * (HB_H / 2 + 4));
+        c = world_cell(st.x + HB_W / 2 + fx[st.dir] * (HB_W / 2 + 4), st.y + HB_H / 2 + fy[st.dir] * (HB_H / 2 + 8));
         if ((c & 0xC0) == CELL_TRIG && rooms[st.room].trig[c & 0x3F] < 0) {
             st.trig = rooms[st.room].trig[c & 0x3F];
             if (story_trigger(st.trig, 1)) { st.anim = 0; return; }
@@ -150,7 +150,7 @@ static void walk(void)
 
 u8 game_update(void)
 {
-    if (input_pressed(K_ESC)) return 0;
+    if (input_pressed(K_ESC) && st.mode == M_WALK) return 0;   // (the ESC menu comes later)
     switch (st.mode) {
     case M_WALK: walk(); break;
     case M_FADE_OUT: case M_FADE_IN: fade_step(); break;
@@ -216,6 +216,7 @@ void game_render(void)
     }
     draw_tilemap(&r->map, cx, cy);
     draw_actors(cx, cy);
+    if (st.shop) shop_render();
     if (st.dlg_on) dialog_render(st.y - cy > 60);
     if ((st.mode == M_TEXT && !st.dlg_on) || st.mode == M_BATTLE) {
         draw_rect(4, 70, 152, 26, C_BLACK);

@@ -6,7 +6,7 @@
 #include "texts.h"
 
 enum {
-    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5,
+    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5, EV_SHOP,
     NEV
 };
 
@@ -14,6 +14,7 @@ enum {
 #define END } st.pc = 0; return 1
 #define EXIT do { st.pc = 0; return 1; } while (0)
 #define YIELD_UNTIL(c) do { st.pc = __LINE__; case __LINE__: if (!(c)) return 0; } while (0)
+#define YIELD do { st.pc = __LINE__; return 0; case __LINE__:; } while (0)
 #define SAY(t) do { dialog_open(t, 0); YIELD_UNTIL(!st.dlg_on); } while (0)
 #define ASK(t) do { dialog_open(t, 1); YIELD_UNTIL(!st.dlg_on); } while (0)
 #define WAIT(n) do { st.timer = (n); YIELD_UNTIL(!--st.timer); } while (0)
@@ -80,6 +81,8 @@ void story_room(void)                        // NPCs standing in the room
     st.hwalk = 0;
     switch (rooms[st.room].id) {
     case 6: npc_put(1, SPR_KING, 6, 4, DIR_DOWN); break;          // Edouard, cell -9
+    case 5: npc_put(1, SPR_SOLDIER, 4, 4, DIR_DOWN);              // cell -7.1
+            npc_put(2, SPR_SELLER, 12, 5, DIR_DOWN); break;       // cell -12
     }
 }
 
@@ -188,7 +191,58 @@ static u8 ev_story5(void)                    // room 6: the knighting ceremony
     END;
 }
 
-static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5 };
+// Potion seller (shop1): Potion 50 g, one per press of 2nd; ESC or shift leaves.
+#define PRICE_POTION 50
+static u8 shop_input(void)
+{
+    if (input_pressed(K_ESC | K_B)) return 1;
+    if (input_pressed(K_A | K_ENTER)) {
+        if (st.hero.gils < PRICE_POTION) { st.arg = 1; return 1; }
+        st.hero.gils -= PRICE_POTION;
+        if (st.item[I_POTION] < 99) st.item[I_POTION]++;
+    }
+    return 0;
+}
+
+static u8 ev_shop(void)
+{
+    BEGIN;
+    SAY(T_SELLER);
+    st.shop = 1;
+    st.arg = 0;
+    YIELD;                                   // the key that closed the greeting is not a buy
+    YIELD_UNTIL(shop_input());
+    st.shop = 0;
+    if (st.arg) SAY(T_SHOP_POOR);
+    SAY(T_SHOP_BYE);
+    END;
+}
+
+static void num(s16 x, s16 y, u16 v)         // right-aligned number ending at x
+{
+    char t[6];
+    u8 k = 5;
+    t[5] = 0;
+    do t[--k] = '0' + v % 10; while ((v /= 10) && k);
+    draw_text(x - (5 - k) * 6, y, t + k, F_MEDIUM, C_BLACK);
+}
+
+void shop_render(void)
+{
+    draw_rect(20, 14, 120, 44, C_BLACK);
+    draw_rect(21, 15, 118, 42, C_DGRAY);
+    draw_rect(22, 16, 116, 40, C_WHITE);
+    draw_text(26, 19, "Potion", F_MEDIUM, C_BLACK);
+    num(122, 19, PRICE_POTION);
+    draw_text(128, 19, "g", F_MEDIUM, C_BLACK);
+    draw_text(26, 31, "Owned", F_MEDIUM, C_BLACK);
+    num(122, 31, st.item[I_POTION]);
+    draw_rect(22, 42, 116, 1, C_LGRAY);
+    draw_text(26, 45, "Gils", F_MEDIUM, C_BLACK);
+    num(134, 45, st.hero.gils);
+}
+
+static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5, ev_shop };
 
 static u8 start(u8 ev, s16 arg)
 {
@@ -218,6 +272,11 @@ u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
             return 1;
         }
         if (p == 5050) return st.own[A_SWORD] && !st.flag[8] && !st.flag[7] ? start(EV_STORY5, 0) : 0;
+        break;
+    case 5:
+        if (p == -71) return start(EV_SAY, T_SOLDIER5);
+        if (p == -120) return start(EV_SHOP, 0);
+        if (p == 5140) return 0;             // "Finally you come back": late game (clef[56])
         break;
     }
     return 0;

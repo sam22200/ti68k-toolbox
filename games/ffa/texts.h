@@ -22,7 +22,7 @@ enum {
     T_HOLDS_KEY, T_FOUND_LKEY, T_NOTICE, T_FOUND_ETHER, T_SWITCH_Q, T_LOCK_NOISE, T_TRAP, T_FOUND_ANTIDOTE,
     T_RIDDLE, T_RIGHT, T_FALSE, T_FOUND_FIRE, T_CELLS_SIGN, T_PLAQUE15, T_HOLDS_SOMETHING, T_FOUND_WRIST,
     T_FOUND_SWORD, T_GOLD_SEAL, T_BOSS1, T_BOSS2, T_BOSS3, T_FOUND_CELL2, T_CELL2, T_FOUND_BANGLE,
-    T_NOTHING,
+    T_NOTHING, T_SHOP_POOR, T_SHOP_BYE,
     NTEXT
 };
 
@@ -111,6 +111,8 @@ static const Text texts[NTEXT] = {
     { SP_HERO, "Cell 2! This prisoner must have come from there..." },
     { SP_NONE, "Found: Armor Bronze Bangle!" },
     { SP_NONE, "Nothing special." },
+    { SP_SELLER, "Sorry, not enough gils." },
+    { SP_SELLER, "See you later." },
 };
 
 #endif

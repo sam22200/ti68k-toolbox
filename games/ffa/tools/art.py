@@ -67,6 +67,24 @@ def floor_planks(x, y):                  # light planks 8 px high, dark seams, s
     return 0 if y % 8 == 0 else 1
 
 
+def cobble(x, y):                        # courtyard cobbles: small light stones, dark joints
+    xo = (x + (3 if (y // 6) % 2 else 0)) % 6
+    yo = y % 6
+    if yo == 5 or xo == 5:
+        return 2
+    return 0 if (xo == 0 and yo == 0) else 1
+
+
+def roof(x, y):                          # keep roof / battlement top: dark stone courses
+    if y % 8 == 0 or (x + (4 if (y // 8) % 2 else 0)) % 8 == 0:
+        return 2
+    return 3
+
+
+def grass(x, y):                         # short grass: light grey with dark blades
+    return 2 if (x * 5 + y * 3) % 11 == 0 or (x * 3 + y * 7) % 13 == 0 else 1
+
+
 def bricks(x, y, light):                 # wall face: bricks 8x4, mortar, top highlight
     if y >= 14:
         return 3                         # base shadow
@@ -79,6 +97,7 @@ def bricks(x, y, light):                 # wall face: bricks 8x4, mortar, top hi
 
 
 STYLES = {
+    'court': {'floor': tile(cobble), 'face': tile(lambda x, y: bricks(x, y, True)), 'top': tile(roof), 'rim': 3},
     'slabs': {'floor': tile(floor_tiles), 'face': tile(lambda x, y: bricks(x, y, False)), 'top': 3, 'rim': 2},
     'planks': {'floor': tile(floor_planks), 'face': tile(lambda x, y: bricks(x, y, False)), 'top': 3, 'rim': 2},
     # name: floor, wall face, wall top level, rim level
@@ -389,6 +408,26 @@ def runner(w, h):                        # royal carpet runner: dark with a ligh
     return g
 
 
+GATE = ascii_art([                       # 16x16 castle gate: dark arch, portcullis
+    "....bbbbbbbb....",
+    "..bbddddddddbb..",
+    ".bddbbbbbbbbddb.",
+    ".bdbbdbbdbbdbdb.",
+    "bdbbbdbbdbbdbbdb",
+    "bdbdbbbbbbbbbdbd"[:16],
+    "bdbbbdbbdbbdbbdb",
+    "bdbbbdbbdbbdbbdb",
+    "bdbdbbbbbbbbbdbb",
+    "bdbbbdbbdbbdbbdb",
+    "bdbbbdbbdbbdbbdb",
+    "bdbdbbbbbbbbbdbb",
+    "bdbbbdbbdbbdbbdb",
+    "bdbbbdbbdbbdbbdb",
+    "bdbbbbbbbbbbbbdb",
+    "bbbbbbbbbbbbbbbb",
+])
+
+
 def carpet(w, h):                        # w x h cells, dark border, light diamond pattern
     W, H = w * 16, h * 16
     g = []
@@ -427,11 +466,20 @@ def OBJ():
         'door': DOOR,
         'carpet3x2': carpet(3, 2),
         'shield': SHIELD, 'swords': SWORDS, 'window': WINDOW, 'torch': TORCH,
+        'gate': GATE, 'tree': cc0(0, 160, 32, 32), 'pine': cc0(96, 160, 32, 32), 'bush': cc0(0, 336, 16, 16),
         'pillar': PILLAR, 'throne': THRONE, 'banner': BANNER, 'runner5x7': runner(5, 7),
     }
 
 
 LAYOUTS = {
+    5: {'style': 'court', 'fill': [(1, 1, 6, 2, 'grass'), (12, 1, 6, 2, 'grass'), (16, 7, 1, 1, 'grass')],
+        'objects': [
+        ('tree', 1, 1, -4, -10), ('pine', 3, 1, -2, -8), ('tree', 5, 1, 0, -10),
+        ('tree', 12, 1, 0, -10), ('pine', 14, 1, 0, -8), ('tree', 16, 1, -2, -10),
+        ('tree', 1, 2, -8, -2), ('tree', 15, 2, 8, -2),
+        ('door', 3, 6, 0, 0), ('gate', 9, 6, 0, 0), ('door', 15, 6, 0, 0),
+        ('banner', 8, 4, 0, 4), ('banner', 10, 4, 0, 4), ('torch', 7, 6, 4, 0), ('torch', 11, 6, 0, 0),
+        ('window', 2, 4, 0, 4), ('window', 16, 4, 0, 4)]},
     6: {'style': 'slabs', 'floor': [(4, 4, 1, 4), (14, 4, 1, 4)], 'objects': [
         ('runner5x7', 7, 3, 0, 0), ('throne', 8, 1, 8, 8), ('banner', 5, 1, 0, 2), ('banner', 12, 1, 0, 2),
         ('torch', 3, 2, 0, 0), ('torch', 7, 2, 4, 0), ('torch', 11, 2, 8, 0), ('window', 15, 1, 0, 4),
@@ -494,9 +542,12 @@ def render(room, style, layout, px=0, py=0):
                         g[Y + j][X + i] = 2 if (x * 16 + i + j) % 8 else 3
             else:
                 t = S['top']
-                for j in range(16):
-                    for i in range(16):
-                        g[Y + j][X + i] = t
+                if isinstance(t, list):
+                    blit(g, t, X, Y)
+                else:
+                    for j in range(16):
+                        for i in range(16):
+                            g[Y + j][X + i] = t
                 # rim where the top meets floor (left / right / top side) or a face
                 for (dx, dy) in ((-1, 0), (1, 0), (0, -1)):
                     if not wall(x + dx, y + dy):
@@ -505,6 +556,25 @@ def render(room, style, layout, px=0, py=0):
                             g[Y + j][X + i] = S['rim']
                             i2, j2 = (1 if dx < 0 else 14, k) if dx else (k, 1)
                             g[Y + j2][X + i2] = 3
+    return g
+
+
+FILLS = {'grass': tile(grass), 'cobble': tile(cobble), 'roof': tile(roof)}
+
+
+def render_layout(room, lay, px=0, py=0):
+    g = render(room, lay['style'], [], px, py)
+    for (x, y, w, h, name) in lay.get('fill', []):
+        for j in range(h):
+            for i in range(w):
+                blit(g, FILLS[name], (x + i + px) * 16, (y + j + py) * 16)
+    objs = OBJ()
+    for (name, cx, cy, dx, dy) in lay['objects']:
+        blit(g, objs[name], (cx + px) * 16 + dx, (cy + py) * 16 + dy)
+    return g
+
+
+def _unused(g, layout, px, py):
     objs = OBJ()
     for (name, cx, cy, dx, dy) in layout:
         blit(g, objs[name], (cx + px) * 16 + dx, (cy + py) * 16 + dy)

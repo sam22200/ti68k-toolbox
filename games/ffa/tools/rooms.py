@@ -91,7 +91,7 @@ def build(u):
     if u in art.LAYOUTS:
         lay = art.LAYOUTS[u]
         v = art.View(r, lay)
-        g = art.render(v, lay['style'], lay['objects'])
+        g = art.render_layout(v, lay)
         big = [[3] * (w * 16) for _ in range(h * 16)]      # padding: black
         for y in range(len(g)):
             for x in range(len(g[0])):

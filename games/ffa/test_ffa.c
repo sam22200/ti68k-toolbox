@@ -199,6 +199,33 @@ int main(void)
     hold(0, 3);
     CHECK(st.mode != M_SCRIPT && st.item[I_POTION] == 4);
 
+    // room 5: the soldier talks, the seller sells Potions at 50 g until the gils run out
+    sw_init(1);
+    put(5, 4 * TILE + HB_X0, 5 * TILE + HB_Y0);
+    story_room();
+    st.dir = DIR_UP;
+    CHECK(st.npc[1].spr == SPR_SOLDIER && st.npc[2].spr == SPR_SELLER);
+    CHECK(talk() == T_SOLDIER5);
+    put(5, 13 * TILE + HB_X0, 5 * TILE + HB_Y0);
+    st.dir = DIR_LEFT;
+    sw_step(0); sw_step(K_A);
+    for (k = 0; k < 200 && !st.shop; k++) sw_step(k % 6 == 0 ? K_A : 0);
+    CHECK(st.shop && st.hero.gils == 100 && st.item[I_POTION] == 3);
+    sw_step(0); sw_step(K_A); sw_step(0); sw_step(K_A);
+    CHECK(st.hero.gils == 0 && st.item[I_POTION] == 5);
+    sw_step(0); sw_step(K_A);               // no gils left: "Sorry, not enough gils."
+    CHECK(!st.shop && st.hero.gils == 0 && st.item[I_POTION] == 5);
+    k = run_script();
+    CHECK(st.mode == M_WALK && k == 2);
+    // the exit to room 4 needs the ceremony (clef[7]); Olen's door is shut after the sword
+    put(5, 9 * TILE + HB_X0, 8 * TILE + HB_Y0);
+    hold(K_DOWN, 20);
+    CHECK(rooms[st.room].id == 5 && st.mode == M_TEXT && st.dlg_text == T_LOCKED);
+    sw_init(7);
+    put(5, 15 * TILE + HB_X0, 7 * TILE + HB_Y0);
+    hold(K_UP, 20);
+    CHECK(rooms[st.room].id == 5 && st.mode == M_TEXT && st.dlg_text == T_LOCKED);
+
     // locked door: room 13 -> 14 needs clef[3] (the injured-number riddle)
     sw_init(113);
     for (k = 0; k < NFLAG; k++) st.flag[k] = 0;
