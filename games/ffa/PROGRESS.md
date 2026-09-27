@@ -44,16 +44,26 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   door locked without the key); Olen and Jess's room (beds, table, carrots; Olen gives the
   Dungeon Key, then Cure after the sword; Jess silent after the sword). Texts are
   -100 < p < -1 (-1.5 was lost as a wall); the door-table row keeps only exits.
+- **Battle system** (`battle.c`): ATB in wait mode, Attack/Braver, Magic (Fire 4 MP, Cure 5 MP,
+  only with the materia in a sword slot), Item (Potion, Hi-Potion, Ether), Run (3/4, never vs
+  bosses); the original formulas in integers (stats x 20); monster AI (spell odds, special x1.5);
+  limit gauge; rewards, drops, level ups (original table checked), Game Over -> new game.
+  Battle sprites: the original pictures, 2x EPX, auto-shaded, white outline.
+- **Dungeon rooms 10-17 done**: 'dungeon' style with deterministic debris; corpse key, chests
+  (one-shot finds), notice (devi re-rolled), riddle (4-digit entry), switch toggle, trap chest
+  fight, prison cells, Power Wrist, boss (story4: the prisoner walks up, fight, Cell 2 Key),
+  Buster Sword (shuts Olen's room), Bronze Bangle, Gold Seal chest.
+- `auto_equip()` wears what is owned (stand-in until the APPS menu).
 
 ## Remaining (in order)
 
-1. Rooms one by one (10, 11, 12, 13, 14, 15, 16, 17, 4): layout in
+1. Room 4 (castle front, exterior), then the end of part I screen. Layout in
    `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
 2. Title / new game: name entry, growth stat choice, intro text, "20 years after..." fade.
-6. Battle system (part I monsters, boss of room 16, Fire/Cure, limit, items), menus (APPS),
-   shop, bed, level-ups.
+6. Menus (APPS): Item, Equip (replace auto_equip), Materia, Status, Save; materia AP (not
+   counted yet: no level reachable in part I).
 7. TI milestone: `make bench` on the heaviest room, size (tile sets shared per area, data in
    archived files or ZX0 if > 64 KB), run on the Titanium.
 
@@ -64,6 +74,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Dungeon, room 10 (first hall): a 'dungeon' style (dark slabs, dark bricks), the corpse on the
-wall (-18: little key, clef[2]), the exits to 7, 11 and 12; then the battle system is needed
-(random encounters in rooms 10-16, frc 1.2-1.5).
+Room 4 (castle front: exterior style, the house sign -7.4, exit to 19 = End of Part I). Then
+the APPS menu (Item, Equip, Materia, Status, Save), the title / name / intro, the TI milestone.

@@ -34,7 +34,11 @@ static u8 door_try(u8 code)                  // bumped into a door cell: open it
     const Door *d;
     if (!(code & CELL_DOOR)) return 0;
     d = &cur()->door[code & 0x3F];
-    if (d->dest == 0xFF) return 0;
+    if (d->dest == 0xFF) {                   // out of part I (room 73): locked for good
+        dialog_open(1, 0);                   // T_WEAPON_ROOM
+        st.mode = M_TEXT;
+        return 1;
+    }
     if (d->key == KEY_NEVER || (d->key && d->key != 0xFF && !st.flag[d->key])) {
         dialog_open(0, 0);                   // T_LOCKED: "The door is locked."
         st.mode = M_TEXT;

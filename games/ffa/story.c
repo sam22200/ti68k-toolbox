@@ -6,7 +6,7 @@
 #include "texts.h"
 
 enum {
-    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5, EV_SHOP, EV_OLEN,
+    EV_NONE, EV_SAY, EV_STORY1, EV_BED, EV_CHEST, EV_STORY2, EV_STORY5, EV_SHOP, EV_OLEN, EV_FIND, EV_NOTICE, EV_SWITCH, EV_TRAP, EV_RIDDLE, EV_BOSS,
     NEV
 };
 
@@ -20,6 +20,7 @@ enum {
 #define WAIT(n) do { st.timer = (n); YIELD_UNTIL(!--st.timer); } while (0)
 #define WALK(i, cx, cy) do { actor_to(i, cx, cy); YIELD_UNTIL(actor_idle(i)); } while (0)
 #define WALK2(i, x1, y1, j, x2, y2) do { actor_to(i, x1, y1); actor_to(j, x2, y2); YIELD_UNTIL(actor_idle(i) && actor_idle(j)); } while (0)
+#define BATTLE(n) do { battle_start(n); YIELD_UNTIL(st.mode == M_SCRIPT); } while (0)
 #define FADE(l) do { st.arg = (l); st.timer = 0; YIELD_UNTIL(fade_to()); } while (0)
 
 // ---------------------------------------------------------------- actors
@@ -229,8 +230,22 @@ static void num(s16 x, s16 y, u16 v)         // right-aligned number ending at x
     draw_text(x - (5 - k) * 6, y, t + k, F_MEDIUM, C_BLACK);
 }
 
+static void numentry_render(void)
+{
+    u8 i;
+    char c[2] = { 0, 0 };
+    draw_rect(52, 20, 56, 30, C_BLACK);
+    draw_rect(53, 21, 54, 28, C_WHITE);
+    for (i = 0; i < 4; i++) {
+        c[0] = '0' + st.digit[i];
+        if (i == st.dpos) { draw_rect(60 + i * 11, 26, 9, 12, C_LGRAY); draw_rect(60 + i * 11, 39, 9, 2, C_BLACK); }
+        draw_text(62 + i * 11, 28, c, F_MEDIUM, C_BLACK);
+    }
+}
+
 void shop_render(void)
 {
+    if (st.shop == 2) { numentry_render(); return; }
     draw_rect(20, 14, 120, 44, C_BLACK);
     draw_rect(21, 15, 118, 42, C_DGRAY);
     draw_rect(22, 16, 116, 40, C_WHITE);
@@ -255,6 +270,7 @@ static u8 ev_olen(void)                      // room 18: Olen (D4): the Dungeon 
         SAY(T_OLEN_CURE);
         SAY(T_FOUND_CURE);
         st.mat[MAT_CURE] = 1;
+        auto_equip();
     } else if (st.mat[MAT_CURE]) {
         SAY(T_OLEN_LUCK);
     } else {
@@ -263,7 +279,139 @@ static u8 ev_olen(void)                      // room 18: Olen (D4): the Dungeon 
     END;
 }
 
-static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5, ev_shop, ev_olen };
+// One-shot finds (chests, corpses): optional first line, the "Found" line, what it gives.
+enum { G_FLAG, G_OWN, G_MAT };
+typedef struct { u8 pre, text, kind, idx, item; } Find;
+enum { F_LKEY, F_POTION11, F_ETHER12, F_ANTIDOTE13, F_FIRE, F_WRIST, F_SWORD, F_BANGLE, NFIND };
+static const Find finds[NFIND] = {
+    { T_HOLDS_KEY, T_FOUND_LKEY, G_FLAG, 2, 0xFF },
+    { 0xFF, T_FOUND_POTION, G_FLAG, 43, I_POTION },
+    { 0xFF, T_FOUND_ETHER, G_FLAG, 44, I_ETHER },
+    { 0xFF, T_FOUND_ANTIDOTE, G_FLAG, 45, I_ANTIDOTE },
+    { 0xFF, T_FOUND_FIRE, G_MAT, MAT_FIRE, 0xFF },
+    { T_HOLDS_SOMETHING, T_FOUND_WRIST, G_OWN, A_WRIST, 0xFF },
+    { 0xFF, T_FOUND_SWORD, G_OWN, A_SWORD, 0xFF },
+    { 0xFF, T_FOUND_BANGLE, G_OWN, A_BANGLE, 0xFF },
+};
+
+void auto_equip(void)                        // stand-in for the APPS menu: wear what is owned
+{
+    u8 k = 0;
+    st.hero.weapon = st.own[A_SWORD] ? A_SWORD : 0;
+    st.hero.armor = st.own[A_BANGLE] ? A_BANGLE : 0;
+    st.hero.acc[0] = st.own[A_WRIST] ? A_WRIST : 0;
+    st.hero.slot[0] = st.hero.slot[1] = 0;
+    if (st.hero.weapon) {                    // the Buster Sword has 2 slots
+        if (st.mat[MAT_FIRE]) st.hero.slot[k++] = MAT_FIRE;
+        if (st.mat[MAT_CURE]) st.hero.slot[k++] = MAT_CURE;
+    }
+}
+
+static u8 found(u8 f)
+{
+    const Find *d = &finds[f];
+    return d->kind == G_FLAG ? st.flag[d->idx] : d->kind == G_OWN ? st.own[d->idx] : st.mat[d->idx];
+}
+
+static u8 ev_find(void)
+{
+    BEGIN;
+    if (finds[st.arg].pre != 0xFF) SAY(finds[st.arg].pre);
+    SAY(finds[st.arg].text);
+    {
+        const Find *d = &finds[st.arg];
+        if (d->kind == G_FLAG) st.flag[d->idx] = 1;
+        else if (d->kind == G_OWN) st.own[d->idx] = 1;
+        else st.mat[d->idx] = 1;
+        if (d->item != 0xFF) st.item[d->item]++;
+        if (st.arg == F_SWORD) st.flag[8] = 0;   // Olen's room shuts until the ceremony
+        auto_equip();
+    }
+    END;
+}
+
+static u8 ev_notice(void)                    // room 12: the number is re-rolled at each reading
+{
+    BEGIN;
+    st.devi = 5000 + rt_rand() % 100 + 1;
+    st.num = st.devi;
+    SAY(T_NOTICE);
+    END;
+}
+
+static u8 ev_switch(void)                    // room 13: toggles clef[17] (door 11 -> 16)
+{
+    BEGIN;
+    ASK(T_SWITCH_Q);
+    if (!st.ans) EXIT;
+    st.flag[17] ^= 1;
+    SAY(T_LOCK_NOISE);
+    END;
+}
+
+static u8 ev_trap(void)                      // room 13: the trap chest, a random fight each time
+{
+    BEGIN;
+    SAY(T_TRAP);
+    BATTLE(0);
+    END;
+}
+
+// Number entry: 4 digits, up/down change, left/right move, 2nd confirms, ESC cancels (st.ans 0)
+static u8 num_input(void)
+{
+    if (input_pressed(K_ESC)) { st.ans = 0; return 1; }
+    if (input_pressed(K_A | K_ENTER)) { st.ans = 1; return 1; }
+    if (input_pressed(K_LEFT) && st.dpos) st.dpos--;
+    if (input_pressed(K_RIGHT) && st.dpos < 3) st.dpos++;
+    if (input_pressed(K_UP)) st.digit[st.dpos] = st.digit[st.dpos] == 9 ? 0 : st.digit[st.dpos] + 1;
+    if (input_pressed(K_DOWN)) st.digit[st.dpos] = st.digit[st.dpos] ? st.digit[st.dpos] - 1 : 9;
+    return 0;
+}
+
+static u8 ev_riddle(void)                    // room 13: story3, the answer is devi - 3000
+{
+    BEGIN;
+    SAY(T_RIDDLE);
+    st.digit[0] = st.digit[1] = st.digit[2] = st.digit[3] = 0;
+    st.dpos = 0;
+    st.shop = 2;
+    YIELD;
+    YIELD_UNTIL(num_input());
+    st.shop = 0;
+    if (!st.ans) EXIT;
+    if (st.devi && st.digit[0] * 1000 + st.digit[1] * 100 + st.digit[2] * 10 + st.digit[3] == st.devi - 3000) {
+        SAY(T_RIGHT);
+        st.flag[3] = 1;
+    } else {
+        SAY(T_FALSE);
+    }
+    END;
+}
+
+static u8 ev_boss(void)                      // room 16: story4, the prisoner guarding the sword
+{
+    BEGIN;
+    npc_put(1, SPR_PRISONER, 9, 8, DIR_UP);
+    WAIT(20);
+    SAY(T_BOSS1);
+    st.dir = DIR_DOWN;
+    SAY(T_BOSS2);
+    WALK(1, (st.x - HB_X0 + 8) >> 4, 8);     // to the hero's column, then up to him
+    WALK(1, (st.x - HB_X0 + 8) >> 4, ((st.y - HB_Y0 + 8) >> 4) + 1);
+    st.npc[1].dir = DIR_UP;
+    SAY(T_BOSS3);
+    BATTLE(3);
+    st.npc[1].on = 0;
+    SAY(T_FOUND_CELL2);
+    SAY(T_CELL2);
+    st.flag[5] = 1;
+    END;
+}
+
+static u8 (*const events[NEV])(void) = { 0, ev_say, ev_story1, ev_bed, ev_chest, ev_story2, ev_story5, ev_shop, ev_olen,
+                                         ev_find, ev_notice, ev_switch, ev_trap, ev_riddle, ev_boss };
+
 
 static u8 start(u8 ev, s16 arg)
 {
@@ -273,6 +421,8 @@ static u8 start(u8 ev, s16 arg)
     st.mode = M_SCRIPT;
     return 1;
 }
+
+static u8 find(u8 f) { return found(f) ? 0 : start(EV_FIND, f); }
 
 u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
 {
@@ -311,6 +461,33 @@ u8 story_trigger(s16 p, u8 examine)          // p = original value x 10
         if (p == -110) return st.own[A_SWORD] ? 1 : start(EV_SAY, T_JESS);   // silent after the sword
         if (p == -85) return start(EV_SAY, T_CARROTS);
         break;
+    case 10: if (p == -180) return find(F_LKEY); break;
+    case 11: if (p == -180) return find(F_POTION11); break;
+    case 12:
+        if (p == -60) return start(EV_NOTICE, 0);
+        if (p == -180) return find(F_ETHER12);
+        break;
+    case 13:
+        if (p == -40) return start(EV_SWITCH, 0);
+        if (p == -20) return start(EV_TRAP, 0);
+        if (p == -180) return find(F_ANTIDOTE13);
+        if (p == 5020) return st.flag[3] ? 0 : start(EV_RIDDLE, 0);
+        break;
+    case 14:
+        if (p == -180) return find(F_FIRE);
+        if (p == -30) return start(EV_SAY, T_CELLS_SIGN);
+        break;
+    case 15:
+        if (p == -70) return start(EV_SAY, T_PLAQUE15);
+        if (p == -180) return find(F_WRIST);
+        if (p == -80) return 1;              // no handler in the original: nothing
+        break;
+    case 16:
+        if (p == 5030) return st.flag[5] ? 0 : start(EV_BOSS, 0);
+        if (p == -180) return find(F_SWORD);
+        if (p == -190) return start(EV_SAY, T_GOLD_SEAL);
+        break;
+    case 17: if (p == -180) return find(F_BANGLE); break;
     }
     return 0;
 }

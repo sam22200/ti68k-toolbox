@@ -34,7 +34,7 @@ typedef struct { u8 speaker; const char *s; } Text;
 
 static const Text texts[NTEXT] = {
     { SP_NONE, "The door is locked." },
-    { SP_NONE, "The Weapon Room is not behind this door, anyway..." },
+    { SP_NONE, "The door is locked. The Weapon Room is not behind this door, anyway..." },
     // room 8
     { SP_EDOUARD, "My son... as you know, today is a great day for you: you'll be named KNIGHT. As soon as you're ready, come downstairs." },
     { SP_NONE, "Sleep?" },

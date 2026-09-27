@@ -505,6 +505,140 @@ CHAIR = ascii_art([                      # 16x24 chair seen from the side
 ] + ["................"] * 4)
 
 
+CHEST = ascii_art([                      # 16x16 chest (closed)
+    "................",
+    "................",
+    "..bbbbbbbbbbbb..",
+    ".bwwwwwwwwwwwwb.",
+    ".bwllllllllllwb.",
+    ".bllllllllllllb.",
+    "bbbbbbbbbbbbbbbb",
+    "bddddddbbddddddb",
+    "bdlllldbwdllllldb"[:16],
+    "bdlllldbbdllllldb"[:16],
+    "bdllllllllllllldb"[:16],
+    "bdddddddddddddddb"[:16],
+    "bbbbbbbbbbbbbbbb",
+    ".bb..........bb.",
+    "................",
+    "................",
+])
+
+CORPSE = ascii_art([                     # 16x16 skeleton chained to the wall
+    "..bb........bb..",
+    "..bwb......bwb..",
+    "...bwb.bb.bwb...",
+    "....bwbwwbwb....",
+    ".....bwbbwb.....",
+    "......bwwb......",
+    "....bbbwwbbb....",
+    "...bwbwbbwbwb...",
+    "...bwbbwwbbwb...",
+    "....bbwbbwbb....",
+    "......bwwb......",
+    ".....bwbbwb.....",
+    "....bwb..bwb....",
+    "....bwb..bwb....",
+    "...bwwb..bwwb...",
+    "...bbbb..bbbb...",
+])
+
+NOTICE = ascii_art([                     # 16x16 notice board on the wall
+    "................",
+    ".bbbbbbbbbbbbbb.",
+    ".bddddddddddddb.",
+    ".bdwwwwwwwwwwdb.",
+    ".bdwbbbwbbbbwdb.",
+    ".bdwwwwwwwwwwdb.",
+    ".bdwbbwbbbbwwdb.",
+    ".bdwwwwwwwwwwdb.",
+    ".bdwbbbbwbbbwdb.",
+    ".bdwwwwwwwwwwdb.",
+    ".bddddddddddddb.",
+    ".bbbbbbbbbbbbbb.",
+    "...bdb....bdb...",
+    "...bbb....bbb...",
+    "................",
+    "................",
+])
+
+SWITCH = ascii_art([                     # 16x16 lever in the wall
+    "................",
+    "..........bb....",
+    ".........bwwb...",
+    ".........bwlb...",
+    "..........bb....",
+    ".........bdb....",
+    "........bdb.....",
+    ".......bdb......",
+    "....bbbbbbbb....",
+    "....bllllllb....",
+    "....bldddddlb..."[:16],
+    "....bllllllb....",
+    "....bbbbbbbb....",
+    "................",
+    "................",
+    "................",
+])
+
+BARS = ascii_art(                        # 16x16 cell door: iron bars in the wall
+    ["bbbbbbbbbbbbbbbb", "bddddddddddddddb"] +
+    ["bdbwbbwbbwbbwbdb", "bdblbblbblbblbdb"] * 6 +
+    ["bddddddddddddddb", "bbbbbbbbbbbbbbbb"])
+
+PRISON_BED = ascii_art([                 # 32x16 plank bed with a skeleton lying on it
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "bllllllllllllllllllllllllllllllb",
+    "blbwwb.lllbbbbbbbbbllllbwbllbwbb"[:32],
+    "blbwbwbllbwbwbwbwbwbbbbwbwbbwbwb",
+    "blbwwbllllbbbbbbbbbllllbwbllbwbb"[:32],
+    "bllbbllllllllllllllllllbbllllbbb"[:32],
+    "bllllllllllllllllllllllllllllllb",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "bddddddddddddddddddddddddddddddb",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "bdb..........................bdb",
+    "bbb..........................bbb",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+])
+
+SKULL = ascii_art([                      # 8x8 floor debris
+    "..bbbb..",
+    ".bwwwwb.",
+    "bwbwwbwb",
+    "bwbwwbwb",
+    "bwwwwwwb",
+    ".bwbbwb.",
+    "..bwwb..",
+    "..bbbb..",
+])
+
+BONES = ascii_art([
+    "bb....bb",
+    "bwb..bwb",
+    ".bwbbwb.",
+    "..bwwb..",
+    "..bwwb..",
+    ".bwbbwb.",
+    "bwb..bwb",
+    "bb....bb",
+])
+
+ROCKS = ascii_art([
+    "........",
+    "...bb...",
+    "..bllb..",
+    ".bllddb.",
+    ".bbbbbb.",
+    "........",
+    "bb......",
+    "bdb.....",
+])
+
+
 def carpet(w, h):                        # w x h cells, dark border, light diamond pattern
     W, H = w * 16, h * 16
     g = []
@@ -544,11 +678,26 @@ def OBJ():
         'shield': SHIELD, 'swords': SWORDS, 'window': WINDOW, 'torch': TORCH,
         'gate': GATE, 'tree': cc0(0, 160, 32, 32), 'pine': cc0(96, 160, 32, 32), 'bush': cc0(0, 336, 16, 16),
         'lamp': LAMP, 'table': TABLE, 'carrots': CARROTS, 'chair2': CHAIR,
+        'chest': CHEST, 'corpse': CORPSE, 'notice': NOTICE, 'switch': SWITCH, 'bars': BARS,
+        'prison_bed': PRISON_BED, 'skull': SKULL, 'bones': BONES, 'rocks': ROCKS,
         'pillar': PILLAR, 'throne': THRONE, 'banner': BANNER, 'runner5x7': runner(5, 7),
     }
 
 
+D = {'style': 'dungeon', 'debris': 9}
 LAYOUTS = {
+    10: dict(D, objects=[('corpse', 5, 1, 0, 0), ('door', 9, 1, 0, 0), ('torch', 3, 1, 0, 0), ('torch', 15, 1, 0, 0),
+                         ('torch', 7, 5, 4, 0), ('torch', 12, 5, 0, 0)]),
+    11: dict(D, objects=[('door', 4, 1, 0, 0), ('chest', 4, 7, 0, 0), ('torch', 2, 1, 0, 0)]),
+    12: dict(D, objects=[('notice', 3, 1, 0, 0), ('chest', 2, 7, 0, 0), ('torch', 5, 1, 0, 0), ('torch', 13, 1, 0, 0)]),
+    13: dict(D, objects=[('switch', 5, 1, 0, 0), ('chest', 9, 2, 0, 0), ('chest', 10, 7, 0, 0),
+                         ('bars', 14, 1, 0, 0), ('torch', 8, 1, 0, 0)]),
+    14: dict(D, objects=[('bars', 3, 3, 0, 0), ('bars', 4, 3, 0, 0), ('bars', 6, 3, 0, 0), ('bars', 7, 3, 0, 0),
+                         ('bars', 9, 3, 0, 0), ('bars', 10, 3, 0, 0), ('chest', 15, 3, 0, 0), ('notice', 4, 5, 0, 0),
+                         ('torch', 5, 2, 4, 0), ('torch', 8, 2, 4, 0)]),
+    15: dict(D, floor=[(7, 3, 2, 1)], objects=[('prison_bed', 7, 3, 0, 0), ('notice', 13, 2, 0, 0)]),
+    16: dict(D, debris=4, objects=[('chest', 9, 3, 0, 0), ('chest', 3, 6, 0, 0), ('torch', 6, 2, 0, 0), ('torch', 12, 2, 0, 0)]),
+    17: dict(D, debris=4, objects=[('chest', 9, 3, 0, 0), ('torch', 7, 2, 0, 0)]),
     7: {'style': 'slabs', 'floor': [(3, 2, 2, 1), (6, 2, 2, 1), (3, 5, 2, 1), (6, 5, 2, 1),
                                     (2, 2, 1, 2), (12, 2, 1, 2), (2, 6, 1, 1), (12, 6, 1, 2)],
         'objects': [
@@ -659,6 +808,14 @@ def render_layout(room, lay, px=0, py=0):
             for i in range(w):
                 blit(g, FILLS[name], (x + i + px) * 16, (y + j + py) * 16)
     objs = OBJ()
+    if lay.get('debris'):                    # a few skulls, bones and rocks on free floor cells
+        busy = {(o[1], o[2]) for o in lay['objects']}
+        kinds = ('skull', 'bones', 'rocks')
+        for y in range(room.h):
+            for x in range(room.w):
+                hsh = (x * 73 + y * 151 + room.w * 7) % 97
+                if room.kind(x, y) == 'floor' and (x, y) not in busy and hsh < lay['debris']:
+                    blit(g, objs[kinds[hsh % 3]], (x + px) * 16 + 4 + hsh % 5, (y + py) * 16 + 4 + hsh % 4)
     for (name, cx, cy, dx, dy) in lay['objects']:
         blit(g, objs[name], (cx + px) * 16 + dx, (cy + py) * 16 + dy)
     return g

@@ -37,6 +37,20 @@ static u8 talk(void)
     return t;
 }
 
+// Fight: Attack whenever the menu opens (Braver when the limit is full); returns frames used.
+static u16 fight(void)
+{
+    u16 k;
+    for (k = 0; k < 6000 && st.mode == M_BATTLE; k++) sw_step(k & 1 ? 0 : K_A);
+    return k;
+}
+
+static void strong(void)                     // a level-20-like hero for the scripted fights
+{
+    st.hero.lv = 20; st.hero.hp = st.hero.hpm = 400; st.hero.mp = st.hero.mpm = 60;
+    st.hero.st[S_STR] = 30 * STAT; st.hero.st[S_DEF] = 20 * STAT; st.hero.st[S_SPD] = 25 * STAT;
+}
+
 static u8 cell_at(u8 room, s16 cx, s16 cy) { return rooms[room].cell[cy * rooms[room].w + cx]; }
 
 // Every door of every room: stand on a free neighbour, push into it, end up in the right room
@@ -276,6 +290,111 @@ int main(void)
     sw_init(0);
     for (k = 0; k < 1000; k++) sw_step(k & 32 ? K_LEFT : K_RIGHT);
     CHECK(st.mode == M_WALK && st.steps > 30);
+
+    // battles: a random fight in room 10 is won by attacking; rewards and a new threshold
+    sw_init(110);
+    for (k = 0; k < 2000 && st.mode != M_BATTLE; k++) sw_step(k & 64 ? K_LEFT : K_RIGHT);
+    CHECK(st.mode == M_BATTLE && (st.battle == 1 || st.battle == 2) && st.qu);
+    {
+        u16 exp0 = st.hero.exp, g0 = st.hero.gils, n = st.battle;
+        k = fight();
+        CHECK(st.mode == M_WALK && st.won && st.hero.hp > 0 && k < 3000);
+        CHECK(st.hero.exp - exp0 == (n == 1 ? 85 : 125) && st.hero.gils - g0 == (n == 1 ? 50 : 70));
+        CHECK(st.co >= 21 && st.co <= 36);
+        printf("battle vs monster %u won in %u frames, hp %u/%u\n", n, k, st.hero.hp, st.hero.hpm);
+    }
+    // level ups follow the original table (Lv3 at 777 exp: hpm 96, mpm 17, expt 1224)
+    sw_init(0);
+    st.hero.exp = 777;
+    hero_level_up();
+    CHECK(st.hero.lv == 3 && st.hero.expt == 1224 && st.hero.hpm == 96 && st.hero.mpm == 17);
+    CHECK(st.hero.st[S_STR] == 10 * STAT + STAT / 4 + 2 * 10 + 2 * STAT / 4);   // speci Strength
+    // a weak hero against the boss: Game Over, then 2nd starts a new game
+    sw_init(6);
+    st.flag[5] = 0;
+    st.hero.hp = 10;
+    battle_start(3);
+    fight();
+    CHECK(st.mode == M_GAMEOVER);
+    sw_step(0); sw_step(K_A);
+    CHECK(st.mode == M_WALK && rooms[st.room].id == 8 && st.hero.hp == 80);
+
+    // dungeon: the corpse holds the little key, once
+    sw_init(110);
+    put(10, 5 * TILE + HB_X0, 2 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    CHECK(talk() == T_HOLDS_KEY && st.flag[2]);
+    CHECK(talk() == 0xFF);
+    // the notice re-rolls the number; the riddle wants devi - 3000
+    sw_init(3);
+    put(12, 3 * TILE + HB_X0, 2 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    CHECK(talk() == T_NOTICE && st.devi > 5000 && st.devi <= 5100);
+    {
+        u16 ans = st.devi - 3000;
+        put(13, 15 * TILE + HB_X0, 6 * TILE + HB_Y0);
+        st.cell_in = 0;
+        for (k = 0; k < 20 && st.mode == M_WALK; k++) sw_step(K_RIGHT);
+        CHECK(st.mode == M_SCRIPT);
+        for (k = 0; k < 200 && st.shop != 2; k++) sw_step(k % 6 == 0 ? K_A : 0);
+        st.digit[0] = 9; st.digit[1] = 9; st.digit[2] = 9; st.digit[3] = 9;   // wrong first
+        sw_step(0); sw_step(K_A);
+        run_script();
+        CHECK(!st.flag[3] && st.mode == M_WALK);
+        hold(K_LEFT, 12);
+        st.cell_in = 0;
+        for (k = 0; k < 20 && st.mode == M_WALK; k++) sw_step(K_RIGHT);
+        for (k = 0; k < 200 && st.shop != 2; k++) sw_step(k % 6 == 0 ? K_A : 0);
+        st.digit[0] = ans / 1000; st.digit[1] = ans / 100 % 10; st.digit[2] = ans / 10 % 10; st.digit[3] = ans % 10;
+        sw_step(0); sw_step(K_A);
+        run_script();
+        CHECK(st.flag[3] && st.mode == M_WALK);
+    }
+    // the switch toggles clef[17]; the trap chest starts a fight and comes back
+    put(13, 5 * TILE + HB_X0, 2 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    sw_step(0); sw_step(K_A);
+    for (k = 0; k < 100 && !(st.dlg_on && st.dlg_ask && st.dlg_shown >= 16); k++) sw_step(0);
+    sw_step(K_A);
+    run_script();
+    CHECK(st.flag[17] == 1);
+    put(13, 9 * TILE + HB_X0, 3 * TILE + HB_Y0);
+    strong();
+    sw_step(0); sw_step(K_A);
+    for (k = 0; k < 300 && st.mode != M_BATTLE; k++) sw_step(k % 6 == 0 ? K_A : 0);
+    CHECK(st.mode == M_BATTLE && st.qu);
+    fight();
+    for (k = 0; k < 100 && st.mode == M_SCRIPT; k++) sw_step(0);
+    CHECK(st.mode == M_WALK);
+
+    // prison finds: Fire (14), Power Wrist (15), Bronze Bangle (17), worn by auto_equip
+    sw_init(4);
+    put(14, 15 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    CHECK(talk() == T_FOUND_FIRE && st.mat[MAT_FIRE]);
+    put(15, 7 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    CHECK(talk() == T_HOLDS_SOMETHING && st.own[A_WRIST] && st.hero.acc[0] == A_WRIST);
+    put(17, 9 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    CHECK(talk() == T_FOUND_BANGLE && st.hero.armor == A_BANGLE);
+
+    // the boss: the 503 ring, the prisoner walks up, the fight, the Cell 2 Key; then the sword
+    sw_init(5);
+    CHECK(rooms[st.room].id == 11 && st.flag[17]);
+    for (k = 0; k < 80 && rooms[st.room].id == 11; k++) sw_step(K_UP);
+    hold(0, 30);
+    CHECK(rooms[st.room].id == 16);
+    strong();
+    for (k = 0; k < 60 && st.mode != M_SCRIPT; k++) sw_step(K_UP);
+    CHECK(st.mode == M_SCRIPT);
+    for (k = 0; k < 2000 && st.mode != M_BATTLE; k++) sw_step(k % 6 == 0 ? K_A : 0);
+    CHECK(st.mode == M_BATTLE && st.battle == 3 && !st.qu);
+    fight();
+    run_script();
+    CHECK(st.mode == M_WALK && st.flag[5] && st.item[I_HIPOTION] >= 1 && st.hero.exp >= 330);
+    put(16, 9 * TILE + HB_X0, 4 * TILE + HB_Y0);
+    st.dir = DIR_UP;
+    CHECK(talk() == T_FOUND_SWORD && st.own[A_SWORD] && !st.flag[8] && st.hero.weapon == A_SWORD);
+    CHECK(has_materia(MAT_FIRE));
 
     CHECK(sw_step(K_ESC) == 0);
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
