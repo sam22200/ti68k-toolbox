@@ -41,6 +41,10 @@ __pycache__/
 # Host binaries (ZX0 v2 built from github.com/einar-saukas/ZX0) and duplicates
 /tools/bin/zx0
 /tools/bin/dzx0
+# ti-cycles: Musashi (github.com/kstenerud/Musashi) and the host build (make -C tools/m68kbench)
+/tools/musashi/
+/tools/m68kbench/build/
+/tools/bin/ti-cycles
 /chrono_fire_camp.gif
 
 # FFA remake: generated from the local ffa_en/ data (original art)
