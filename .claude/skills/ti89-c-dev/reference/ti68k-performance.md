@@ -459,3 +459,12 @@ Only after measuring that a specific C routine is the bottleneck and after the o
 (better algorithm, tables, pointers, ExtGraph routine, inline `asm` for one instruction). Then
 **ask the user first** (project rule). Candidates: inner rendering loops (span filling, texture
 mapping), bulk copies not covered by ExtGraph.
+
+### Text in a dialogue box (verified, TiEmu, FFA scenario 53, 2026-09-27)
+
+- 72 characters of `draw_text` (6x8 font, both planes) redrawn every frame: ~125k cycles.
+- The same page drawn once into a plane-format RAM buffer (only the characters the
+  typewriter adds), then shown as 5 opaque 32x31 sprites: still ~75k (ExtGraph shifts the
+  rows); copied byte by byte into both planes at a byte-aligned x: the whole box 116k (the
+  frame, the name tag and the copy). Frame 281k -> 218k. Draw static text once; place it on
+  a byte boundary so it can be copied without shifts.

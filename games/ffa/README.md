@@ -8,7 +8,7 @@ Original data: `ffa_en/` (local only). Skill: `ti-port-tibasic`. Progress: `PROG
 ```sh
 make test                  # unit + integration tests (no window)
 make pc && ./ffa_pc        # arrows move, shift runs, 2nd/ENTER examine, ESC quits
-make ti                    # ffa.89z (60 KB: Titanium; too big for an AMS 2 TI-89)
+make ti                    # ffa.89z (52 KB, Titanium) + ffadat.89y (15 KB of tiles): send both
 make bench BENCH=40        # ffab.89z -> ffab(N): cycles per frame of scenario N
 ```
 `rooms.h` is generated from the local `ffa_en/` data by `tools/rooms.py` (make does it).
@@ -63,10 +63,11 @@ matches the logic.
 | throne hall, Edouard (106) | 111k |
 | dungeon hall (110) | 105k |
 | battle vs the boss, menu open (52) | 186k |
-| throne hall with a full dialogue box (53) | 281k (the 72 characters of text cost ~125k) |
+| throne hall with a full dialogue box (53) | 218k (was 281k: the text is drawn once now) |
 
 Tiles are shared per area (castle 87, outside 121, dungeon 31 tiles: 15.3 KB, was 24.8 KB
-per room). `ffa.89z` is 60 KB. Verified running on the Titanium (story1 scene, ESC to HOME).
+per room) and live in the data variable `ffadat` (`rt_file`): `ffa.89z` is 52 KB. Verified
+running on the Titanium (story1 scene, ESC to HOME).
 
 ## Scenarios (`--scenario N` / `ffa(N)`)
 

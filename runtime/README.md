@@ -38,6 +38,11 @@ void game_render(void);      // draw the whole frame
   F_SMALL|F_MEDIUM, C_*)`, `draw_tilemap(&RtTilemap, camx, camy)` + `tilemap_dirty()`.
   Data formats are ExtGraph's (see `rt.h`): the same arrays work on both targets.
 - `rt_rand()` (wyhash16, deterministic from `rt_seed`), `rt_ticks()` (256 Hz; virtual on the PC).
+- `rt_file(name, &size)`: big read-only data outside the program (64 KB per variable): on the TI
+  the variable NAME (OTH, `ttbin2oth -89 dat NAME.be.bin NAME`, read in place, archived or
+  locked in RAM), on the PC the file `NAME.bin` in the host byte order. Returns RT_NULL when
+  missing. `draw_text` writes through `rt_light`/`rt_dark` on both targets, so a game can point
+  them at its own plane-format buffer to render text once (FFA's dialogue box).
 - Mono build: `-DRT_MONO` (sprites and tiles draw their dark plane in black).
 - State: set `rt_state`/`rt_state_size` to a POD struct in `game_init` for PC save/load.
 

@@ -66,6 +66,11 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   growth stat choice, name entry (8 letters, up/down/left/right), LIONHEART's words and
   "20 years after..." with fades, then the bedroom fades in. Scenario 0 = title now;
   scenario 10 = new game straight in room 8 (the tests use it).
+- **Size**: tile sets moved to the data variable `ffadat` (15.3 KB, `rt_file`, new runtime API):
+  `ffa.89z` 52 KB + `ffadat.89y` 15 KB. Send both (`ti-send ffadat.89y`, `ti-send ffa.89z`).
+- **Dialogue perf**: the page's text is drawn once into a small plane (new characters only)
+  and copied byte-aligned into both planes: 281k -> 218k per frame (room alone 102k). The box
+  still costs ~116k: profile it (name tag text, the byte copy loop) if a scene needs more.
 
 ## Remaining (in order)
 
@@ -76,9 +81,8 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 2. (done) Title / new game.
 6. Save / load (TI: a variable, PC: a file; the runtime has no TI save API yet: see
    experiments/files) and Options (battle speed); materia AP (no level reachable in part I).
-7. Perf: the dialogue box costs ~125k (text redrawn every frame): render the page once into
-   a RAM strip and blit it as opaque sprites. Size: 60 KB of 64 KB; ZX0 (`lib/unpack68k.s`)
-   for the tile sets / sprites before adding much more.
+7. Perf/size: move sprites and room maps to `ffadat` too when the program grows (52 KB now);
+   profile the dialogue box (~116k).
 
 ## Current bugs / failing tests
 
@@ -87,5 +91,6 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-The dialogue perf fix (281k -> text drawn once into a RAM strip), then save/load, then polish
-(opened chests, camera pans in scenes, battle background art), then a full TI run of part I.
+Save / load (TI: a save variable written by the program, `experiments/files`; PC: `--save`),
+then Continue on the title. Then polish: opened chests, camera pans in scenes, battle
+background art, monster idle animation, a full TI play-through of part I.
