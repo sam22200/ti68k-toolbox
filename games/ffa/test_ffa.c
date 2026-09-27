@@ -96,6 +96,113 @@ static void doors_all(void)
     CHECK(tested >= 20);
 }
 
+
+// ---------------------------------------------------------------- play-through driver
+static u16 frames_played;
+static void pump(void)                       // let scripts, dialogues, fades and fights run
+{
+    u16 k;
+    for (k = 0; k < 20000 && st.mode != M_WALK && st.mode != M_END; k++, frames_played++) {
+        if (st.mode == M_GAMEOVER) return;
+        sw_step(k % 4 == 0 ? K_A : 0);
+    }
+}
+
+static u8 walkable_cell(s16 cx, s16 cy)
+{
+    const Room *r = &rooms[st.room];
+    u8 c;
+    if (cx < 0 || cy < 0 || cx >= r->w || cy >= r->h) return 0;
+    c = r->cell[cy * r->w + cx];
+    return c == CELL_FLOOR || ((c & 0xC0) == CELL_TRIG && r->trig[c & 0x3F] >= 5000);
+}
+
+
+static u8 in_cell(s16 cx, s16 cy)
+{
+    return st.x >= cx * TILE && st.x <= cx * TILE + TILE - HB_W && st.y >= cy * TILE && st.y <= cy * TILE + TILE - HB_H;
+}
+
+static void go_cell(s16 cx, s16 cy)          // one step to a 4-neighbour cell, centred
+{
+    u16 k;
+    s16 tx = cx * TILE + HB_X0, ty = cy * TILE + HB_Y0;
+    for (k = 0; k < 80 && st.mode == M_WALK && !(in_cell(cx, cy) && st.x - tx <= 2 && tx - st.x <= 2 && st.y - ty <= 2 && ty - st.y <= 2); k++) {
+        u32 key = 0;
+        if (st.x < tx - 1) key = K_RIGHT; else if (st.x > tx + 1) key = K_LEFT;
+        else if (st.y < ty - 1) key = K_DOWN; else if (st.y > ty + 1) key = K_UP;
+        if (!key) break;
+        sw_step(key); frames_played++;
+    }
+    pump();
+}
+
+// Walk to a cell by BFS over the collision grid, pumping events and fights on the way.
+static u8 walk_to(s16 tx, s16 ty)
+{
+    static s16 prev[64 * 16];
+    static s16 queue[64 * 16];
+    const Room *r;
+    u8 tries;
+    for (tries = 0; tries < 8; tries++) {
+        s16 sx, sy, h = 0, n = 0, c, path[128], len = 0;
+        r = &rooms[st.room];
+        sx = (st.x + HB_W / 2) >> 4; sy = (st.y + HB_H / 2) >> 4;
+        if (sx == tx && sy == ty) { go_cell(tx, ty); return 1; }
+        for (c = 0; c < r->w * r->h; c++) prev[c] = -1;
+        queue[n++] = sy * r->w + sx; prev[sy * r->w + sx] = sy * r->w + sx;
+        while (h < n) {
+            s16 cur = queue[h++], x = cur % r->w, y = cur / r->w, d;
+            static const s8 dx[4] = { 1, -1, 0, 0 }, dy[4] = { 0, 0, 1, -1 };
+            if (cur == ty * r->w + tx) break;
+            for (d = 0; d < 4; d++) {
+                s16 nx = x + dx[d], ny = y + dy[d];
+                if (!walkable_cell(nx, ny) && !(nx == tx && ny == ty)) continue;
+                if (prev[ny * r->w + nx] >= 0) continue;
+                prev[ny * r->w + nx] = cur;
+                queue[n++] = ny * r->w + nx;
+            }
+        }
+        if (prev[ty * r->w + tx] < 0) { printf("walk_to: no path to %d,%d in room %u\n", tx, ty, r->id); return 0; }
+        for (c = ty * r->w + tx; c != sy * r->w + sx && len < 128; c = prev[c]) path[len++] = c;
+        while (len--) {
+            u8 room = st.room;
+            go_cell(path[len] % r->w, path[len] / r->w);
+            if (st.room != room || st.mode == M_END) return 1;
+        }
+        sx = (st.x + HB_W / 2) >> 4; sy = (st.y + HB_H / 2) >> 4;
+        if (sx == tx && sy == ty) return 1;
+    }
+    return 0;
+}
+
+static void push(u32 key)                    // bump into a door; fights on the way are fought
+{
+    u8 room = st.room, tries;
+    u16 k;
+    for (tries = 0; tries < 6 && st.room == room && st.mode != M_END; tries++) {
+        for (k = 0; k < 60 && st.room == room && st.mode == M_WALK; k++) { sw_step(key); frames_played++; }
+        pump();
+    }
+}
+
+static void examine(u8 dir)
+{
+    st.dir = dir;
+    sw_step(0); sw_step(K_A); frames_played += 2;
+    pump();
+}
+
+static u8 goto_room(u8 id, s16 cx, s16 cy, u32 key)   // walk next to a door, push through
+{
+    walk_to(cx, cy);
+    push(key);
+    sw_step(0); frames_played++;             // a story cell on arrival starts on this frame
+    pump();
+    if (rooms[st.room].id != id) printf("goto_room: expected %u, in %u at %d,%d\n", id, rooms[st.room].id, st.x >> 4, st.y >> 4);
+    return rooms[st.room].id == id;
+}
+
 int main(void)
 {
     s16 x0;
@@ -468,6 +575,101 @@ int main(void)
     for (k = 0; k < 30 && st.mode != M_WALK; k++) sw_step(0);
     CHECK(st.mode == M_WALK && rooms[st.room].id == 5 && st.hero.gils == 1234 && st.hero.lv == 5 && st.own[A_SWORD]);
     remove(SAVE_NAME ".sav");
+
+
+    // ---------------------------------------------------------------- part I, title to end
+    {
+        u8 ok = 1, i;
+        remove(SAVE_NAME ".sav");
+        sw_init(0);
+        rt_seed = 7;
+        for (k = 0; k < 20; k++) sw_step(0);
+        for (i = 0; i < 12 && st.mode == M_TITLE; i++) { sw_step(K_A); hold(0, 20); }
+        CHECK(st.mode == M_FADE_IN || st.mode == M_WALK);
+        pump();
+        ok &= walk_to(5, 2);                                  // story1
+        CHECK(st.flag[9]);
+        ok &= walk_to(7, 6); examine(DIR_DOWN);               // the desk potion
+        CHECK(st.flag[40]);
+        ok &= goto_room(6, 5, 2, K_UP);                       // stairs -> throne hall
+        pump();
+        CHECK(st.flag[10]);                                   // story2 on arrival
+        ok &= goto_room(5, 9, 8, K_DOWN);
+        ok &= goto_room(18, 15, 7, K_UP);                     // Olen's room
+        ok &= walk_to(5, 4); examine(DIR_LEFT);               // the Dungeon Key
+        CHECK(st.flag[1]);
+        ok &= goto_room(5, 4, 8, K_DOWN);
+        ok &= goto_room(7, 3, 7, K_UP);                       // bookcase room
+        strong();                                             // injected: the guide levels up here
+        ok &= goto_room(10, 9, 2, K_UP);                      // the dungeon
+        ok &= walk_to(5, 2); examine(DIR_UP);                 // the little key
+        CHECK(st.flag[2]);
+        ok &= goto_room(12, 6, 8, K_DOWN);
+        ok &= walk_to(3, 2); examine(DIR_UP);                 // the notice: devi
+        CHECK(st.devi > 5000);
+        ok &= goto_room(13, 17, 6, K_RIGHT);
+        ok &= walk_to(5, 2);
+        st.dir = DIR_UP; sw_step(0); sw_step(K_A);            // the switch: Yes
+        for (k = 0; k < 200 && !(st.dlg_on && st.dlg_ask && st.dlg_shown >= 16); k++) sw_step(0);
+        sw_step(K_A); pump();
+        CHECK(st.flag[17]);
+        ok &= walk_to(15, 6);
+        {                                                     // the riddle: devi - 3000
+            u16 ans = st.devi - 3000;
+            for (k = 0; k < 20 && st.mode == M_WALK; k++) sw_step(K_RIGHT);
+            for (k = 0; k < 400 && st.shop != 2; k++) sw_step(k % 6 == 0 ? K_A : 0);
+            st.digit[0] = ans / 1000; st.digit[1] = ans / 100 % 10; st.digit[2] = ans / 10 % 10; st.digit[3] = ans % 10;
+            sw_step(0); sw_step(K_A); pump();
+        }
+        CHECK(st.flag[3]);
+        ok &= goto_room(14, 17, 6, K_RIGHT);                  // the prison
+        ok &= walk_to(16, 3); examine(DIR_LEFT);              // Fire
+        CHECK(st.mat[MAT_FIRE]);
+        ok &= goto_room(15, 9, 4, K_UP);                      // cell 3
+        ok &= walk_to(7, 4); examine(DIR_UP);                 // Power Wrist
+        CHECK(st.own[A_WRIST]);
+        ok &= goto_room(14, 10, 8, K_DOWN);
+        ok &= goto_room(13, 1, 6, K_LEFT);
+        ok &= goto_room(12, 1, 6, K_LEFT);
+        ok &= goto_room(10, 6, 1, K_UP);
+        ok &= goto_room(11, 17, 4, K_RIGHT);
+        ok &= goto_room(16, 6, 2, K_UP);                      // the weapon room: the boss
+        pump();
+        ok &= walk_to(9, 5);
+        pump();
+        CHECK(st.flag[5]);                                    // Cell 2 Key
+        ok &= walk_to(9, 4);
+        examine(DIR_UP);                                      // Buster Sword
+        CHECK(st.own[A_SWORD] && !st.flag[8]);
+        ok &= goto_room(11, 9, 8, K_DOWN);
+        ok &= goto_room(10, 2, 4, K_LEFT);
+        ok &= goto_room(12, 6, 8, K_DOWN);
+        ok &= goto_room(13, 17, 6, K_RIGHT);
+        ok &= goto_room(14, 17, 6, K_RIGHT);
+        ok &= goto_room(17, 6, 4, K_UP);                      // cell 2
+        ok &= walk_to(9, 4); examine(DIR_UP);                 // Bronze Bangle
+        CHECK(st.own[A_BANGLE]);
+        ok &= goto_room(14, 9, 8, K_DOWN);
+        ok &= goto_room(13, 1, 6, K_LEFT);
+        ok &= goto_room(12, 1, 6, K_LEFT);
+        ok &= goto_room(10, 6, 1, K_UP);
+        ok &= goto_room(7, 9, 2, K_UP);
+        ok &= goto_room(5, 9, 8, K_DOWN);
+        ok &= goto_room(6, 9, 7, K_UP);                       // the ceremony on arrival
+        pump();
+        CHECK(st.flag[7] && st.flag[8]);
+        ok &= goto_room(5, 9, 8, K_DOWN);
+        ok &= goto_room(18, 15, 7, K_UP);
+        ok &= walk_to(5, 4); examine(DIR_LEFT);               // Cure
+        CHECK(st.mat[MAT_CURE]);
+        ok &= goto_room(5, 4, 8, K_DOWN);
+        ok &= goto_room(4, 9, 8, K_DOWN);                     // out of the castle
+        walk_to(9, 8); push(K_DOWN);
+        CHECK(st.mode == M_END);
+        printf("play-through: %s, %u frames (%u s), level %u, %u fights won\n", ok ? "ok" : "PATH ERRORS",
+               frames_played, frames_played / 32, st.hero.lv, st.stats_kills);
+        CHECK(ok);
+    }
 
     sw_init(10);
     sw_step(0); sw_step(K_ESC);              // ESC opens the menu; Quit leaves the game

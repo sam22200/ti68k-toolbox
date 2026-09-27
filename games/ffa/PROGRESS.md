@@ -74,6 +74,11 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 - **Save / Continue**: menu Save (a snapshot `Save {magic, Game}`, `rt_save`), title Continue
   (`rt_load`, magic checked). New runtime API; TI writes `ffasav` at exit and archives it.
   Verified on the Titanium (save, quit, relaunch, Continue in the courtyard).
+- **Play-through test**: title to End of Part I with the real keys (BFS `walk_to` over the
+  collision grid, doors pushed, dialogues read, fights fought with Attack, the riddle answered
+  from the notice); the hero's stats are injected before the dungeon (the guide levels up
+  there). 288 s of play, 13 fights. The examine probe now starts at the hitbox edge (it
+  missed a chest from the lower part of a cell).
 
 ## Remaining (in order)
 

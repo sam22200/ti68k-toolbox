@@ -69,6 +69,13 @@ Tiles are shared per area (castle 87, outside 121, dungeon 31 tiles: 15.3 KB, wa
 per room) and live in the data variable `ffadat` (`rt_file`): `ffa.89z` is 52 KB. Verified
 running on the Titanium (story1 scene, ESC to HOME).
 
+## Tests
+
+`make test`: movement, collisions, corner sliding, every door of every room, each room's
+events, the shop, battles (formulas, level-up table, Game Over, the boss), the menu, save and
+Continue, the title, and a **play-through of part I** from the title to the end screen with
+the real keys (288 s of play; the hero's stats are injected before the dungeon).
+
 ## Scenarios (`--scenario N` / `ffa(N)`)
 
 | N | state |

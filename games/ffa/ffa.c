@@ -166,8 +166,9 @@ static void walk(void)
         }
     }
     if (input_pressed(K_A | K_ENTER)) {      // examine the cell in front of the hero
-        static const s8 fx[4] = { 0, 0, -1, 1 }, fy[4] = { 1, -1, 0, 0 };
-        c = world_cell(st.x + HB_W / 2 + fx[st.dir] * (HB_W / 2 + 4), st.y + HB_H / 2 + fy[st.dir] * (HB_H / 2 + 8));
+        // 10 px beyond the hitbox edge the hero faces: the next cell from anywhere in his own
+        static const s8 px[4] = { HB_W / 2, HB_W / 2, -10, HB_W + 9 }, py[4] = { HB_H + 9, -10, HB_H / 2, HB_H / 2 };
+        c = world_cell(st.x + px[st.dir], st.y + py[st.dir]);
         if ((c & 0xC0) == CELL_TRIG && rooms[st.room].trig[c & 0x3F] < 0) {
             st.trig = rooms[st.room].trig[c & 0x3F];
             if (story_trigger(st.trig, 1)) { st.anim = 0; return; }
