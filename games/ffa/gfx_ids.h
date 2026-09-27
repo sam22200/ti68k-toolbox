@@ -12,5 +12,4 @@
 #define MON1_H 42
 #define MON2_H 61
 #define MON3_H 64
-#define BHERO_H 42
-#define BHEROS_H 42
+#define BHERO_H 51

@@ -211,7 +211,7 @@ static u8 menu_n(void) { return st.bp == BP_MENU ? 4 : st.bp == BP_MAGIC ? 2 : 3
 
 void battle_update(void)
 {
-    u8 go = input_pressed(K_A | K_ENTER), back = input_pressed(K_B | K_ESC);
+    u8 go = input_pressed(K_A | K_ENTER) != 0, back = input_pressed(K_B | K_ESC) != 0;
     st.bt++;
     switch (st.bp) {
     case BP_INTRO:
@@ -321,7 +321,7 @@ void battle_render(void)
 {
     const u32 *ml, *md, *mm;
     u8 mh;
-    s16 hx = 116, mx = 18, k;
+    s16 hx = 100, mx = 18, k;             // hx: left of the hero's 48-wide grid
     char s[24], *p;
     RtSprite spr;
     // background: the room where the fight happens (Chrono Trigger style), hero-centred
@@ -342,25 +342,30 @@ void battle_render(void)
         spr.w = 32; spr.h = mh; spr.light = ml; spr.dark = md; spr.mask = mm;
         draw_sprite(mx, 68 - mh, &spr);
     }
-    // hero: steps towards the monster to strike
-    if (st.bp == BP_HACT && (act == ACT_ATTACK || act == ACT_LIMIT))
-        hx -= st.bt < 16 ? st.bt * 4 : (32 - st.bt) * 4;
+    // hero, the original's 3 poses (bcomb): wind-up while dashing in, strike (the hit at 16),
+    // guard while stepping back; spells are cast arms raised. 48 wide: a 32 + a 16 sprite.
     if (!(st.bp == BP_MACT && st.bwho == 2 && st.bt < 22 && (st.bt & 2))) {
-        u8 sw = st.hero.weapon == A_SWORD;
+        u8 f = st.hero.weapon == A_SWORD ? 3 : 0;
+        if (st.bp == BP_HACT && (act == ACT_ATTACK || act == ACT_LIMIT)) {
+            if (st.bt < 12) { f += 1; hx = 100 - st.bt * 6; }
+            else if (st.bt < 22) { f += 2; hx = 32; }
+            else hx = 32 + (st.bt - 21) * 7;
+        } else if (st.bp == BP_HACT && act != ACT_ITEM && st.bt >= 4 && st.bt < 26) f += 1;
         spr.w = 32; spr.h = BHERO_H;
-        spr.light = sw ? bheros_light[0] : bhero_light[0];
-        spr.dark = sw ? bheros_dark[0] : bhero_dark[0];
-        spr.mask = sw ? bheros_mask[0] : bhero_mask[0];
+        spr.light = bhero_light[f]; spr.dark = bhero_dark[f]; spr.mask = bhero_mask[f];
         draw_sprite(hx, 68 - BHERO_H, &spr);
+        spr.w = 16;
+        spr.light = (const void *)bheror_light[f]; spr.dark = (const void *)bheror_dark[f]; spr.mask = (const void *)bheror_mask[f];
+        draw_sprite(hx + 32, 68 - BHERO_H, &spr);
     }
     // spell effects: fire flickers on the monster, cure sparkles on the hero
     if (st.bp == BP_HACT && act == ACT_FIRE && st.bt >= 6 && st.bt < 22)
         for (k = 0; k < 5; k++) draw_rect(mx + 6 + ((k * 7 + st.bt * 3) % 20), 68 - mh / 2 - ((k * 5 + st.bt * 2) % 18), 3, 4, k & 1 ? C_WHITE : C_BLACK);
     if (st.bp == BP_HACT && act == ACT_CURE && st.bt >= 6 && st.bt < 26)
-        for (k = 0; k < 4; k++) draw_rect(hx + 6 + k * 6, 60 - ((st.bt * 2 + k * 9) % 36), 2, 2, C_WHITE);
+        for (k = 0; k < 4; k++) draw_rect(hx + 22 + k * 6, 60 - ((st.bt * 2 + k * 9) % 36), 2, 2, C_WHITE);
     // damage / heal number
     if (st.bwho && (st.bp == BP_HACT || st.bp == BP_MACT)) {
-        s16 x = st.bwho == 1 ? mx + 8 : hx + 8, y = 68 - (st.bwho == 1 ? mh : BHERO_H) - 4 - (st.bt & 15) / 4;
+        s16 x = st.bwho == 1 ? mx + 8 : hx + 24, y = 68 - (st.bwho == 1 ? mh : BHERO_H) - 4 - (st.bt & 15) / 4;
         if (st.bnum == 0 && st.bwho) { box(x - 2, y - 1, 28, 10); draw_text(x + 1, y, "Miss", F_MEDIUM, C_BLACK); }
         else {
             p = utoa5(s, st.bnum < 0 ? -st.bnum : st.bnum);
