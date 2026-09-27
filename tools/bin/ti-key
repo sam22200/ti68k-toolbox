@@ -13,7 +13,8 @@ Usage: ti-key [--hold S] [--gap S] TOKEN...
 
 Why two methods:
 - named keys are clicks on the skin: that works everywhere (games included); on the keyboard,
-  ESC/CLEAR/arrows are unreliable (the CLEAR keycode is Print Screen, grabbed by Flameshot...).
+  ESC/CLEAR/arrows were unreliable (TiEmu reads XFree86 keycodes: tools/tiemu-keyfix.c now
+  translates the host's evdev arrows; the CLEAR keycode is Print Screen, grabbed by Flameshot...).
 - text goes through the keyboard: TiEmu matches the hardware keycode against its Linux PCKEY table
   (XFree86 keycodes, US layout, see src/gui/calc/pckeys.h + skins/ti89.map), so we send raw
   keycodes, independent of the host layout (AZERTY is fine).
