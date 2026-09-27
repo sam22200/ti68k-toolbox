@@ -3,9 +3,9 @@
 #include "ffa.h"
 
 enum { MN_ROOT, MN_ITEMS, MN_EQUIP, MN_MATERIA, MN_STATUS };
-enum { R_ITEMS, R_EQUIP, R_MATERIA, R_STATUS, R_QUIT, NROOT };
+enum { R_ITEMS, R_EQUIP, R_MATERIA, R_STATUS, R_SAVE, R_QUIT, NROOT };
 
-static const char *const root_name[NROOT] = { "Items", "Equip", "Materia", "Status", "Quit" };
+static const char *const root_name[NROOT] = { "Items", "Equip", "Materia", "Status", "Save", "Quit" };
 static const char *const item_name[NITEM] = { "Potion", "Hi-Potion", "Ether", "Turbo Ether", "X-Potion", "Elixir", "Antidote" };
 static const char *const mat_name[NMAT] = { 0, 0, "Fire", "Cure" };
 
@@ -62,7 +62,7 @@ static void use_item(u8 i)                    // objet, obj = 1: outside battles
 u8 menu_update(void)                          // 0 = quit the game
 {
     u8 go = input_pressed(K_A | K_ENTER), back = input_pressed(K_B | K_ESC), n = count();
-    st.mmsg = go ? 0 : st.mmsg;
+    if (go || input_pressed(K_UP | K_DOWN)) st.mmsg = 0;
     if (input_pressed(K_UP)) st.mcur = st.mcur ? st.mcur - 1 : n - 1;
     if (input_pressed(K_DOWN)) st.mcur = st.mcur + 1 < n ? st.mcur + 1 : 0;
     if (back) {
@@ -74,6 +74,7 @@ u8 menu_update(void)                          // 0 = quit the game
     switch (st.menu) {
     case MN_ROOT:
         if (st.mcur == R_QUIT) return 0;
+        if (st.mcur == R_SAVE) { st.mmsg = game_save() ? 3 : 4; break; }
         st.menu = st.mcur + 1;
         st.mcur = 0;
         break;
@@ -134,9 +135,11 @@ void menu_render(void)
     u8 i;
     const Hero *h = &st.hero;
     box(0, 0, 60, 100);                       // commands
-    for (i = 0; i < NROOT; i++) draw_text(12, 6 + i * 11, root_name[i], F_MEDIUM, C_BLACK);
-    if (st.menu == MN_ROOT) cursor(5, 7 + st.mcur * 11);
-    else cursor(5, 7 + (st.menu - 1) * 11);
+    for (i = 0; i < NROOT; i++) draw_text(12, 5 + i * 10, root_name[i], F_MEDIUM, C_BLACK);
+    if (st.menu == MN_ROOT) cursor(5, 6 + st.mcur * 10);
+    else cursor(5, 6 + (st.menu - 1) * 10);
+    if (st.mmsg == 3) draw_text(6, 88, "Saved.", F_SMALL, C_BLACK);
+    if (st.mmsg == 4) draw_text(6, 88, "Save failed.", F_SMALL, C_BLACK);
     draw_text(6, 70, "Gils", F_SMALL, C_BLACK);
     num(56, 70, h->gils, F_SMALL);
     draw_text(6, 78, "Steps", F_SMALL, C_BLACK);

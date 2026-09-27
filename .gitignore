@@ -51,3 +51,4 @@ __pycache__/
 /games/ffa/ffadat.bin
 /games/ffa/ffadat.be.bin
 *.89y
+*.sav

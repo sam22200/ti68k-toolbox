@@ -16,9 +16,13 @@ static const u8 stat_of[6] = { S_STR, S_MAG, S_DEF, S_MDEF, S_SPD, S_LUCK };
 static const char letters[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 #define NLETTER 53
 
+static Save loaded;
+static u8 can_continue;
+
 void title_open(void)
 {
     u8 k;
+    can_continue = game_saved(&loaded);
     st.mode = M_TITLE;
     st.tstep = TS_TITLE;
     st.tcur = 0;
@@ -62,7 +66,15 @@ void title_update(void)
     }
     switch (st.tstep) {
     case TS_TITLE:
-        if (go) st.tfade = 2;                // New Game (Continue comes with saving)
+        if (input_pressed(K_UP | K_DOWN) && can_continue) st.tcur ^= 1;
+        if (go && st.tcur) {                 // Continue: the saved state, walking
+            st = loaded.g;
+            story_room();
+            st.fade = 3; st.fade_t = 0;
+            st.mode = M_FADE_IN;
+            return;
+        }
+        if (go) st.tfade = 2;                // New Game
         break;
     case TS_STAT:
         if (input_pressed(K_UP)) st.tcur = st.tcur ? st.tcur - 1 : 5;
@@ -112,8 +124,8 @@ void title_render(void)
         draw_text(47, 32, "ALTERNATIVE", F_MEDIUM, C_BLACK);
         draw_rect(52, 60, 56, 22, C_WHITE);
         draw_text(59, 63, "New Game", F_MEDIUM, C_BLACK);
-        draw_text(59, 72, "Continue", F_MEDIUM, C_LGRAY);
-        draw_rect(55, 64, 2, 5, C_BLACK);
+        draw_text(59, 72, "Continue", F_MEDIUM, can_continue ? C_BLACK : C_LGRAY);
+        draw_rect(55, 64 + st.tcur * 9, 2, 5, C_BLACK);
         draw_rect(0, 88, 160, 9, C_DGRAY);
         draw_rect(0, 89, 160, 7, C_LGRAY);
         draw_text(28, 90, "remake of David COZ's game", F_SMALL, C_BLACK);

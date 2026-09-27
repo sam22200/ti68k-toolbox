@@ -33,6 +33,20 @@ static void new_game(void)
 }
 
 static u8 data_ok;
+static Save save;                            // the snapshot rt_save writes (TI: at exit)
+
+u8 game_save(void)
+{
+    save.magic = SAVE_MAGIC;
+    save.g = st;
+    save.g.mode = M_WALK;                    // saved from the menu: resume walking
+    return rt_save(SAVE_NAME, &save, sizeof save);
+}
+
+u8 game_saved(Save *s)
+{
+    return rt_load(SAVE_NAME, s, sizeof *s) && s->magic == SAVE_MAGIC;
+}
 
 void game_init(void)
 {

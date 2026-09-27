@@ -129,6 +129,11 @@ void auto_equip(void);
 void menu_open(void);
 u8 menu_update(void);                                // 0 = quit
 void menu_render(void);
+typedef struct { u32 magic; Game g; } Save;          // the save file: magic + version, then st
+#define SAVE_MAGIC 0x46464131UL                      // "FFA1": change it when Game changes
+#define SAVE_NAME "ffasav"
+u8 game_save(void);
+u8 game_saved(Save *s);                              // 1 = a valid save was read into s
 void title_open(void);
 void title_update(void);
 void title_render(void);                               // best gear and materia (until the menu)

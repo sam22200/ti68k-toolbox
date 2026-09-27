@@ -447,6 +447,28 @@ int main(void)
     for (k = 0; k < 200 && st.mode != M_END; k++) sw_step(K_DOWN);
     CHECK(st.mode == M_END);
 
+    // save from the menu, then Continue on the title restores the room, flags and stats
+    remove(SAVE_NAME ".sav");
+    sw_init(0);
+    CHECK(st.mode == M_TITLE);
+    for (k = 0; k < 20; k++) sw_step(0);
+    sw_step(K_DOWN); sw_step(0);
+    CHECK(st.tcur == 0);                     // no save: Continue is not selectable
+    sw_init(7);
+    st.hero.gils = 1234; st.hero.lv = 5;
+    sw_step(0); sw_step(K_ESC);
+    for (k = 0; k < 4; k++) { sw_step(K_DOWN); sw_step(0); }
+    sw_step(K_A); sw_step(0);
+    CHECK(st.mode == M_MENU && st.mmsg == 3);
+    sw_init(0);
+    for (k = 0; k < 20; k++) sw_step(0);     // the title fades in first
+    sw_step(K_DOWN); sw_step(0);
+    CHECK(st.tcur == 1);
+    sw_step(K_A);
+    for (k = 0; k < 30 && st.mode != M_WALK; k++) sw_step(0);
+    CHECK(st.mode == M_WALK && rooms[st.room].id == 5 && st.hero.gils == 1234 && st.hero.lv == 5 && st.own[A_SWORD]);
+    remove(SAVE_NAME ".sav");
+
     sw_init(10);
     sw_step(0); sw_step(K_ESC);              // ESC opens the menu; Quit leaves the game
     CHECK(st.mode == M_MENU);
