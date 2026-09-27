@@ -67,7 +67,7 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   "20 years after..." with fades, then the bedroom fades in. Scenario 0 = title now;
   scenario 10 = new game straight in room 8 (the tests use it).
 - **Size**: tile sets moved to the data variable `ffadat` (15.3 KB, `rt_file`, new runtime API):
-  `ffa.89z` 57 KB + `ffadat.89y` 15 KB. Send both (`ti-send ffadat.89y`, `ti-send ffa.89z`).
+  then the sprites too: `ffa.89z` 41 KB + `ffadat.89y` 31 KB. `ti-run ffa.89z ffadat.89y` sends both.
 - **Dialogue perf**: the page's text is drawn once into a small plane (new characters only)
   and copied byte-aligned into both planes: 281k -> 218k per frame (room alone 102k). The box
   still costs ~116k: profile it (name tag text, the byte copy loop) if a scene needs more.
@@ -89,8 +89,8 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
    part I); the Antidote has no use yet (no poison in part I).
 2. Scenes: camera pans to show NPCs below the view (the ceremony), NPC side views.
 3. Art: more varied castle tiles (the keep roof is a flat dark mass), a battle intro swirl.
-4. Perf: the dialogue box still costs ~116k (name tag text, the copy loop); size 57 KB: move
-   sprites and room maps to `ffadat` before part II.
+4. Perf: the dialogue box still costs ~116k (name tag text, the copy loop); room maps and texts
+   could join the sprites in `ffadat` if part II needs the room.
 5. Part II (world map, Milunia village...): a new skill run, starting from `docs/part1.md`'s
    method (spec from the code and the guide, then room by room).
 

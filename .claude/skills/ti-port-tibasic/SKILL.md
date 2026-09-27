@@ -128,6 +128,9 @@ below, then `/ti-commit`.
 - **Size**: 64 KB per TI variable: big data goes to a data variable read in place (`rt_file`),
   saves go through `rt_save` (written at exit). Text: draw a dialogue page once into a
   plane-format buffer, copy it byte-aligned (281k -> 218k per frame).
+- **The TI run must change rooms**: the PC backend redraws the map every frame, the TI one caches
+  the TileMap plane; a stale cache (new room's logic under the old room's picture) passed every
+  PC test. Walk through a door (and back, a key still held) at each TI milestone.
 - Colour CC0 assets (Ninja Adventure) convert well to 4 greys with per-object luminance
   quantiles; 1-bit original sprites become battle sprites with 2x EPX + automatic shading
   (highlight top-left, shade bottom-right) + a white outline.

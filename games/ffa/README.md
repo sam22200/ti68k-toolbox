@@ -8,7 +8,7 @@ Original data: `ffa_en/` (local only). Skill: `ti-port-tibasic`. Progress: `PROG
 ```sh
 make test                  # unit + integration tests (no window)
 make pc && ./ffa_pc        # arrows move, shift runs, 2nd/ENTER examine, ESC quits
-make ti                    # ffa.89z (57 KB, Titanium) + ffadat.89y (15 KB of tiles)
+make ti                    # ffa.89z (41 KB, Titanium) + ffadat.89y (31 KB: tiles + sprites)
 ti-run ffa.89z ffadat.89y  # clean emulator restart with both files, runs ffa(); keyboard in
                            # TiEmu: arrows, AltGr = 2nd, Shift runs, Enter, Esc = menu
 make ti TI_FLAGS=-DDEBUG_KEYS   # prints rt_keys top-left in the field (stuck-key checks)
@@ -70,7 +70,8 @@ matches the logic.
 | throne hall with a full dialogue box (53) | 218k (was 281k: the text is drawn once now) |
 
 Tiles are shared per area (castle 87, outside 121, dungeon 31 tiles: 15.3 KB, was 24.8 KB
-per room) and live in the data variable `ffadat` (`rt_file`): `ffa.89z` is 57 KB (52 KB before the hero's attack poses). Verified
+per room) and live in the data variable `ffadat` (`rt_file`) with the sprites (16 KB, `gfx.h`
+macros point into it): `ffa.89z` is 41 KB (57 KB with the sprites inside). Verified
 running on the Titanium (story1 scene, ESC to HOME).
 
 ## Tests

@@ -36,6 +36,11 @@ void _main(void) { ... }      // entry point, NOT main()
   rotation and keyboard demos run unchanged. `-mregparm=5` passes parameters in registers for every
   function: hand-written asm routines that read their arguments from the stack must be declared
   `__attribute__((__stkparm__))` (or build with `TI_CC_PLAIN=1`).
+- **`Symbol 'RefreshGrayBuffer16B' too far for size 2 reloc`** (**verified**, FFA at 57 KB): with
+  `--reorder-sections`, ExtGraph's TileMap modules call each other with 16-bit PC-relative
+  references, and ~32 KB of game code and data placed between them breaks the link after a
+  harmless change. Link order does not help; move the big const data (sprites, maps) to a data
+  file read in place (`rt_file`): FFA 57 → 41 KB links again.
 - **`-DCOMPRESSED_FORMAT_RELOCS`** (GCC4TI, compressed relocation table): Puzzle Bobble 12,067 →
   **11,773 bytes** (−2.4 %), runs on the Titanium and the unpatched TI-89 (**verified**). Now in
   `ti-cc`. `-fmerge-all-constants` and `-DMERGE_BSS` changed nothing here. Fischer's games also
