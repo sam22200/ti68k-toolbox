@@ -320,6 +320,14 @@ int main(void)
     hold(0, 3);
     CHECK(st.mode != M_SCRIPT && st.item[I_POTION] == 4);
 
+    // bump the desk chest from the left, slide over it, stop at the east wall: no drift once released
+    sw_init(10);
+    put(8, 5 * TILE + HB_X0, 7 * TILE - 3);  // 3 px into the chest's row: slides up over it
+    hold(K_RIGHT, 90);
+    CHECK(st.x >> 4 == 9 && st.y + HB_H <= 7 * TILE);   // around the chest, against the east wall
+    x0 = st.x;
+    { s16 y0 = st.y; hold(0, 30); CHECK(st.x == x0 && st.y == y0 && !st.anim); }
+
     // room 5: the soldier talks, the seller sells Potions at 50 g until the gils run out
     sw_init(1);
     put(5, 4 * TILE + HB_X0, 5 * TILE + HB_Y0);

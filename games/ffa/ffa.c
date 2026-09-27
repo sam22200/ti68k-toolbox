@@ -276,6 +276,9 @@ void game_render(void)
         for (i = 0; story_opened(i, &ox, &oy); i++) draw_sprite(ox * TILE - cx, oy * TILE - cy, &s);
     }
     draw_actors(cx, cy);
+#ifdef DEBUG_KEYS
+    { char t[5]; u8 k; for (k = 0; k < 4; k++) t[k] = "0123456789ABCDEF"[(rt_keys >> (12 - 4 * k)) & 15]; t[4] = 0; draw_rect(0, 0, 20, 7, C_WHITE); draw_text(1, 1, t, F_SMALL, C_BLACK); }
+#endif
     if (st.shop) shop_render();
     if (st.dlg_on) dialog_render(st.y - cy > 60);
     if (st.mode == M_TEXT && !st.dlg_on) {
