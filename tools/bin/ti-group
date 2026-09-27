@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Merges single-variable TI-89 files (.89z .89y .89p...) into one group file (.89g).
+
+Usage: ti-group OUT.89g FILE...
+TiEmu's -send= keeps only the last file given, so ti-emu sends one group instead.
+Layout (TI-GRAPH LINK): 0x3C-byte header (signature, folder, comment, entry count at 0x3A), then
+16-byte entries (offset, name[8], type, attr, u16) - a folder entry (type 0x1F, u16 = its
+variable count) before the variables - then the file size, A5 5A, and each variable's block
+(4 zero bytes, size-prefixed data, checksum) copied unchanged from its single file.
+"""
+import struct, sys
+
+
+def read_single(path):
+    d = open(path, 'rb').read()
+    if d[:8] not in (b'**TI89**', b'**TI92P*') or struct.unpack_from('<H', d, 0x3A)[0] != 1:
+        sys.exit(f'ti-group: {path} is not a single-variable TI-89 file')
+    off, name, vtype, attr = struct.unpack_from('<I8sBB', d, 0x3C)
+    size = struct.unpack_from('<I', d, 0x4C)[0]
+    return d[0x0A:0x12], name, vtype, attr, d[off:size]
+
+
+def main(out, paths):
+    vars_ = [read_single(p) for p in paths]
+    folder = vars_[0][0]
+    n = len(vars_) + 1
+    at = 0x3C + 16 * n + 6
+    head = bytearray(b'**TI89**' + b'\x01\x00' + folder + b'group by ti-group'.ljust(40, b'\0'))
+    head += struct.pack('<H', n)
+    head += struct.pack('<I8sBBH', at, folder, 0x1F, 0, len(vars_))
+    blocks = b''
+    for _, name, vtype, attr, block in vars_:
+        head += struct.pack('<I8sBBH', at + len(blocks), name, vtype, attr, 0)
+        blocks += block
+    head += struct.pack('<I', at + len(blocks)) + b'\xA5\x5A'
+    open(out, 'wb').write(bytes(head) + blocks)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
+    main(sys.argv[1], sys.argv[2:])

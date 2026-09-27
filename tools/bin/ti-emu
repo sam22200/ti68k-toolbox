@@ -1,5 +1,7 @@
 #!/bin/sh
 # Drives the emulator: [TI_CALC=89t|89|89u] ti-emu start | stop | restart | status | save
+#   start/restart [FILE...]: boot from the profile's clean saved state and send the TI files
+#         (-send=, no file chooser). The way to test a new build: `ti-emu restart a.89z b.89y`.
 #   save: saves the current state into the profile's sav_file (TiEmu menu > Calculator state >
 #         Save state image); the emulator will restart from that state.
 #   TI_CALC=89t (default): TI-89 Titanium, AMS 3.10     TI_CALC=89: TI-89 HW2, AMS 2.09 AMSpatch
@@ -14,14 +16,19 @@ W=$(cd "$T/.." && pwd)
 case "$1" in
   start)
     xdotool search --name '^TiEmu \(' >/dev/null 2>&1 && { echo "TiEmu already running"; exit 0; }
+    shift; SEND=""
+    for f in "$@"; do [ -f "$f" ] || { echo "ti-emu: $f not found" >&2; exit 1; }; done
+    if [ $# -gt 1 ]; then                      # -send= keeps only its last file: one group
+      "$T/bin/ti-group" "$P/send.89g" "$@" || exit 1; SEND="-send=$P/send.89g"
+    elif [ $# = 1 ]; then SEND="-send=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; fi
     docker image inspect tiemu-jammy >/dev/null 2>&1 || docker build -q -t tiemu-jammy -f "$T/Dockerfile.tiemu" "$T" >/dev/null
     docker run -d --rm --name tiemu --network host -u "$(id -u):$(id -g)" \
       -e DISPLAY="$DISPLAY" -e XAUTHORITY=/xauth -v "$XAUTHORITY:/xauth:ro" \
-      -e HOME="$P" -v "$W:$W" -w "$W" tiemu-jammy tiemu >/dev/null
+      -e HOME="$P" -v "$W:$W" -w "$W" tiemu-jammy tiemu $SEND >/dev/null
     timeout 30 xdotool search --sync --name '^TiEmu \(' >/dev/null || { echo "ti-emu: no window after 30 s ('Set ROM version' dialog?)" >&2; exit 1; }
-    sleep 2; echo "TiEmu ready" ;;
+    sleep $((2 + 3 * ($# > 0))); echo "TiEmu ready" ;;
   stop) docker kill tiemu >/dev/null 2>&1; echo "TiEmu stopped" ;;
-  restart) "$0" stop; sleep 1; "$0" start ;;
+  restart) "$0" stop; sleep 1; shift; "$0" start "$@" ;;
   save)
     SAV="$P/.tiemu/ti${TI_CALC:-89t}.sav"
     W=$(xdotool search --name '^TiEmu \(' | head -1)
