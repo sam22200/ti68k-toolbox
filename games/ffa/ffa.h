@@ -70,6 +70,7 @@ typedef struct {
     u8 mode, room, dir, anim, fade, fade_t, next_room, next_door;
     s16 x, y;                                        // hitbox top-left, pixels in the room
     u8 sub;                                          // sub-pixel phase (1.5 px/frame walk)
+    u8 lock;                                         // arrows held when entering a room, ignored until released
     u8 walked;                                       // pixels since the last step
     u16 steps, mc, co;                               // steps; encounter counter and threshold
     s16 trig;                                        // trigger being handled (p x 10), 0 none

@@ -130,19 +130,22 @@ static void fade_step(void)
         st.mode = M_FADE_IN;
     } else if (!--st.fade) {
         st.mode = M_WALK;
+        st.lock = rt_keys & (K_UP | K_DOWN | K_LEFT | K_RIGHT);   // no bounce back through the door
     }
 }
 
 static void walk(void)
 {
     s16 v, dx = 0, dy = 0;
-    u8 c;
+    u8 c, arrows;
     st.sub ^= 1;
     v = input_held(K_B) ? 3 : 1 + st.sub;    // walk 1.5 px/frame (48 px/s), run 3 px/frame
-    if (input_held(K_LEFT)) { dx = -v; st.dir = DIR_LEFT; }
-    if (input_held(K_RIGHT)) { dx = v; st.dir = DIR_RIGHT; }
-    if (input_held(K_UP)) { dy = -v; st.dir = DIR_UP; }
-    if (input_held(K_DOWN)) { dy = v; st.dir = DIR_DOWN; }
+    st.lock &= rt_keys;
+    arrows = rt_keys & ~st.lock;
+    if (arrows & K_LEFT) { dx = -v; st.dir = DIR_LEFT; }
+    if (arrows & K_RIGHT) { dx = v; st.dir = DIR_RIGHT; }
+    if (arrows & K_UP) { dy = -v; st.dir = DIR_UP; }
+    if (arrows & K_DOWN) { dy = v; st.dir = DIR_DOWN; }
     if (dx || dy) { world_move(dx, dy); st.anim++; } else st.anim = 0;
     if (st.mode != M_WALK) return;
 

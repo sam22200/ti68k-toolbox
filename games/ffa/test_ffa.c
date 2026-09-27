@@ -320,6 +320,16 @@ int main(void)
     hold(0, 3);
     CHECK(st.mode != M_SCRIPT && st.item[I_POTION] == 4);
 
+    // up the throne-hall stairs with Up held: the bedroom, no bounce back while it stays held
+    sw_init(1);
+    CHECK(rooms[st.room].id == 6);
+    hold(K_RIGHT, 11);
+    hold(K_UP, 150);
+    CHECK(rooms[st.room].id == 8 && st.mode == M_WALK);
+    hold(0, 2);
+    hold(K_UP, 60);                          // pressed again: back down to the throne hall
+    CHECK(rooms[st.room].id == 6);
+
     // bump the desk chest from the left, slide over it, stop at the east wall: no drift once released
     sw_init(10);
     put(8, 5 * TILE + HB_X0, 7 * TILE - 3);  // 3 px into the chest's row: slides up over it
