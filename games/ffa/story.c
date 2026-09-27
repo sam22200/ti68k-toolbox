@@ -270,7 +270,6 @@ static u8 ev_olen(void)                      // room 18: Olen (D4): the Dungeon 
         SAY(T_OLEN_CURE);
         SAY(T_FOUND_CURE);
         st.mat[MAT_CURE] = 1;
-        auto_equip();
     } else if (st.mat[MAT_CURE]) {
         SAY(T_OLEN_LUCK);
     } else {
@@ -325,7 +324,6 @@ static u8 ev_find(void)
         else st.mat[d->idx] = 1;
         if (d->item != 0xFF) st.item[d->item]++;
         if (st.arg == F_SWORD) st.flag[8] = 0;   // Olen's room shuts until the ceremony
-        auto_equip();
     }
     END;
 }

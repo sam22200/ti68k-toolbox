@@ -1,5 +1,5 @@
 NAME := ffa
-SRC := ffa.c world.c dialog.c story.c battle.c
+SRC := ffa.c world.c dialog.c story.c battle.c menu.c
 TESTS := test_ffa.c
 
 include ../../runtime/rt.mk

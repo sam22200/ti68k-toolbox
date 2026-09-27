@@ -373,9 +373,9 @@ int main(void)
     st.dir = DIR_UP;
     CHECK(talk() == T_FOUND_FIRE && st.mat[MAT_FIRE]);
     put(15, 7 * TILE + HB_X0, 4 * TILE + HB_Y0);
-    CHECK(talk() == T_HOLDS_SOMETHING && st.own[A_WRIST] && st.hero.acc[0] == A_WRIST);
+    CHECK(talk() == T_HOLDS_SOMETHING && st.own[A_WRIST] && !st.hero.acc[0]);   // equip it in the menu
     put(17, 9 * TILE + HB_X0, 4 * TILE + HB_Y0);
-    CHECK(talk() == T_FOUND_BANGLE && st.hero.armor == A_BANGLE);
+    CHECK(talk() == T_FOUND_BANGLE && st.own[A_BANGLE]);
 
     // the boss: the 503 ring, the prisoner walks up, the fight, the Cell 2 Key; then the sword
     sw_init(5);
@@ -393,8 +393,27 @@ int main(void)
     CHECK(st.mode == M_WALK && st.flag[5] && st.item[I_HIPOTION] >= 1 && st.hero.exp >= 330);
     put(16, 9 * TILE + HB_X0, 4 * TILE + HB_Y0);
     st.dir = DIR_UP;
-    CHECK(talk() == T_FOUND_SWORD && st.own[A_SWORD] && !st.flag[8] && st.hero.weapon == A_SWORD);
-    CHECK(has_materia(MAT_FIRE));
+    CHECK(talk() == T_FOUND_SWORD && st.own[A_SWORD] && !st.flag[8] && !st.hero.weapon);
+
+    // the menu: equip the sword, put Fire in slot 1, drink a Potion, then quit
+    st.hero.weapon = st.hero.slot[0] = st.hero.slot[1] = 0;
+    st.hero.hp = 20;
+    sw_step(0); sw_step(K_ESC);
+    CHECK(st.mode == M_MENU);
+    sw_step(K_DOWN); sw_step(0); sw_step(K_A); sw_step(0);   // Equip
+    sw_step(K_A); sw_step(0);                                // weapon: Buster Sword
+    CHECK(st.hero.weapon == A_SWORD);
+    sw_step(K_B); sw_step(0); sw_step(K_DOWN); sw_step(0); sw_step(K_A); sw_step(0);   // Materia
+    sw_step(K_A); sw_step(0);                                // slot 1: Fire
+    CHECK(has_materia(MAT_FIRE) && st.hero.slot[0] == MAT_FIRE);
+    sw_step(K_B); sw_step(0);
+    for (k = 0; k < 2; k++) { sw_step(K_UP); sw_step(0); }   // Items
+    sw_step(K_A); sw_step(0);
+    k = st.item[I_POTION];
+    sw_step(K_A); sw_step(0);                                // a Potion: +100 HP
+    CHECK(st.item[I_POTION] == k - 1 && st.hero.hp == (st.hero.hpm < 120 ? st.hero.hpm : 120));
+    sw_step(K_B); sw_step(0); sw_step(K_B); sw_step(0);
+    CHECK(st.mode == M_WALK);
 
     // room 4: the house message, and the way south ends part I
     sw_init(9);
@@ -406,7 +425,11 @@ int main(void)
     for (k = 0; k < 200 && st.mode != M_END; k++) sw_step(K_DOWN);
     CHECK(st.mode == M_END);
 
-    CHECK(sw_step(K_ESC) == 0);
+    sw_init(0);
+    sw_step(0); sw_step(K_ESC);              // ESC opens the menu; Quit leaves the game
+    CHECK(st.mode == M_MENU);
+    sw_step(K_UP); sw_step(0);
+    CHECK(sw_step(K_A) == 0);
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;
 }

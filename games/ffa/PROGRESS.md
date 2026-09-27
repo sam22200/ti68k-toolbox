@@ -58,6 +58,10 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   house with its message), the way south shows the End of Part I screen.
 - **TI milestone**: tile sets shared per area (15.3 KB), `ffa.89z` 60 KB, runs on the Titanium
   (story1 verified, ESC to HOME). Render: rooms 105-117k, battle 186k, dialogue 281k of 375k.
+- **Main menu** (`menu.c`, ESC while walking): Items (used outside battles), Equip (cycles the
+  owned weapon/armor/accessories, one accessory once), Materia (Fire/Cure in the 2 sword slots,
+  "No Slot" unarmed), Status (stats, limit gauge), Quit. Equipping is manual again, like the
+  original; `auto_equip` only serves the injected checkpoints.
 
 ## Remaining (in order)
 
@@ -66,8 +70,8 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
 2. Title / new game: name entry, growth stat choice, intro text, "20 years after..." fade.
-6. Menus (APPS): Item, Equip (replace auto_equip), Materia, Status, Save; materia AP (not
-   counted yet: no level reachable in part I).
+6. Save / load (TI: a variable, PC: a file; the runtime has no TI save API yet: see
+   experiments/files) and Options (battle speed); materia AP (no level reachable in part I).
 7. Perf: the dialogue box costs ~125k (text redrawn every frame): render the page once into
    a RAM strip and blit it as opaque sprites. Size: 60 KB of 64 KB; ZX0 (`lib/unpack68k.s`)
    for the tile sets / sprites before adding much more.
@@ -79,5 +83,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-The APPS menu (Item, Equip replacing auto_equip, Materia, Status, Save), then the title / name /
-growth stat / intro, then the dialogue perf fix.
+The title / name entry / growth stat choice / intro text ("In a poor Milunian family...",
+"20 years after..."), then the dialogue perf fix, then save/load.

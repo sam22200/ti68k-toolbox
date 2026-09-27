@@ -160,7 +160,8 @@ static void walk(void)
 
 u8 game_update(void)
 {
-    if (input_pressed(K_ESC) && (st.mode == M_WALK || st.mode == M_END || st.mode == M_GAMEOVER)) return 0;
+    if (input_pressed(K_ESC) && (st.mode == M_END || st.mode == M_GAMEOVER)) return 0;
+    if (input_pressed(K_ESC) && st.mode == M_WALK) { menu_open(); return 1; }
     switch (st.mode) {
     case M_WALK: walk(); break;
     case M_FADE_OUT: case M_FADE_IN: fade_step(); break;
@@ -170,6 +171,7 @@ u8 game_update(void)
         if (input_pressed(K_A | K_ENTER)) { st.mode = M_WALK; st.trig = 0; }
         break;
     case M_BATTLE: battle_update(); break;
+    case M_MENU: return menu_update();
     case M_GAMEOVER:
         if (input_pressed(K_A | K_ENTER)) game_scenario(0);   // original: back to HOME, all lost
         break;
@@ -223,6 +225,7 @@ void game_render(void)
     s16 cx = world_cam(st.x + HB_W / 2, RT_W, r->w * TILE), cy = world_cam(st.y + HB_H / 2, RT_H, r->h * TILE);
     char s[24];
     if (st.mode == M_BATTLE) { battle_render(); return; }
+    if (st.mode == M_MENU) { menu_render(); return; }
     if (st.mode == M_GAMEOVER) {
         draw_clear();
         draw_rect(0, 0, 160, 100, C_BLACK);
