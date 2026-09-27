@@ -43,6 +43,10 @@ void game_render(void);      // draw the whole frame
   locked in RAM), on the PC the file `NAME.bin` in the host byte order. Returns RT_NULL when
   missing. `draw_text` writes through `rt_light`/`rt_dark` on both targets, so a game can point
   them at its own plane-format buffer to render text once (FFA's dialogue box).
+- `rt_load(name, data, size)` / `rt_save(name, data, size)`: a game's save. PC: `NAME.sav` at
+  once. TI: the OTH variable NAME ("sav"), written **when the program exits**, after the
+  grayscale teardown, then archived (c-patterns §10: SymAdd and Flash writes may need AMS
+  dialogs); keep `data` valid until then. Verified on the Titanium (FFA: save, quit, Continue).
 - Mono build: `-DRT_MONO` (sprites and tiles draw their dark plane in black).
 - State: set `rt_state`/`rt_state_size` to a POD struct in `game_init` for PC save/load.
 

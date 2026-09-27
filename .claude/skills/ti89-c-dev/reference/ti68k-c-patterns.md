@@ -617,6 +617,8 @@ Unarchive first and archive after if needed, as above.
 - Keep every `short`/`long` field at an **even offset** (68000 address error otherwise).
 - `symptr->flags.bits.hidden = 1` hides the file from VAR-LINK.
 - Read in place with `HeapDeref` (works for archived files too); lock only if not already locked.
+- The runtime does it for games: `rt_save` records the data, `rt_ti.c` writes and archives the
+  variable after the teardown (**verified**, Titanium, FFA save/Continue, 2026-09-27).
 - Write saves **after the teardown** (grayscale off, vectors restored): `SymAdd` can open a
   "create folder?" dialog and archive operations can start a garbage-collect dialog, both need AMS.
   Archive afterwards (`EM_moveSymToExtMem`) if the save must survive a RAM reset.

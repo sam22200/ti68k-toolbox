@@ -71,6 +71,9 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 - **Dialogue perf**: the page's text is drawn once into a small plane (new characters only)
   and copied byte-aligned into both planes: 281k -> 218k per frame (room alone 102k). The box
   still costs ~116k: profile it (name tag text, the byte copy loop) if a scene needs more.
+- **Save / Continue**: menu Save (a snapshot `Save {magic, Game}`, `rt_save`), title Continue
+  (`rt_load`, magic checked). New runtime API; TI writes `ffasav` at exit and archives it.
+  Verified on the Titanium (save, quit, relaunch, Continue in the courtyard).
 
 ## Remaining (in order)
 
@@ -79,8 +82,7 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
 2. (done) Title / new game.
-6. Save / load (TI: a variable, PC: a file; the runtime has no TI save API yet: see
-   experiments/files) and Options (battle speed); materia AP (no level reachable in part I).
+6. Options (battle speed, active/wait); materia AP (no level reachable in part I).
 7. Perf/size: move sprites and room maps to `ffadat` too when the program grows (52 KB now);
    profile the dialogue box (~116k).
 
@@ -91,6 +93,6 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-Save / load (TI: a save variable written by the program, `experiments/files`; PC: `--save`),
-then Continue on the title. Then polish: opened chests, camera pans in scenes, battle
-background art, monster idle animation, a full TI play-through of part I.
+Polish, then a full play-through of part I on the PC (a key script from the title to the End
+screen) and on the Titanium: opened chests shown, camera pans in scenes, battle background
+art, monster idle animation, sound-free hit effects.
