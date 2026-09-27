@@ -72,7 +72,8 @@ per room). `ffa.89z` is 60 KB. Verified running on the Titanium (story1 scene, E
 
 | N | state |
 |---|---|
-| 0 | new game: room 8 (hero's bedroom), first-level stats |
+| 0 | title screen (the normal start): New Game, growth stat, name, intro |
+| 10 | new game straight in room 8 (hero's bedroom), first-level stats |
 | 1 | story1 and story2 done, room 6 (throne hall) |
 | 2 | + Dungeon Key (Olen), room 7 under the dungeon door |
 | 3 | + little key, room 12 |

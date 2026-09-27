@@ -62,6 +62,10 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
   owned weapon/armor/accessories, one accessory once), Materia (Fire/Cure in the 2 sword slots,
   "No Slot" unarmed), Status (stats, limit gauge), Quit. Equipping is manual again, like the
   original; `auto_equip` only serves the injected checkpoints.
+- **Title and intro** (`title.c`): title (New Game; Continue greyed until saving exists),
+  growth stat choice, name entry (8 letters, up/down/left/right), LIONHEART's words and
+  "20 years after..." with fades, then the bedroom fades in. Scenario 0 = title now;
+  scenario 10 = new game straight in room 8 (the tests use it).
 
 ## Remaining (in order)
 
@@ -69,7 +73,7 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
    `tools/art.py` LAYOUTS (floor rects under furniture, objects), NPC sprites (`tools/gfx.py`
    NPCS: Olen, Jess, Larc, seller, soldier, villager, prisoner), events in `story.c`
    `story_trigger`, tests, `/ti-commit` each. Dungeon rooms: a 'dungeon' style.
-2. Title / new game: name entry, growth stat choice, intro text, "20 years after..." fade.
+2. (done) Title / new game.
 6. Save / load (TI: a variable, PC: a file; the runtime has no TI save API yet: see
    experiments/files) and Options (battle speed); materia AP (no level reachable in part I).
 7. Perf: the dialogue box costs ~125k (text redrawn every frame): render the page once into
@@ -83,5 +87,5 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Next step
 
-The title / name entry / growth stat choice / intro text ("In a poor Milunian family...",
-"20 years after..."), then the dialogue perf fix, then save/load.
+The dialogue perf fix (281k -> text drawn once into a RAM strip), then save/load, then polish
+(opened chests, camera pans in scenes, battle background art), then a full TI run of part I.

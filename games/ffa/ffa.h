@@ -37,7 +37,7 @@ extern const u8 room_index[];                        // original id -> index (25
 #define STEP_PX 16                                   // one original step = one tile walked
 
 enum { DIR_DOWN, DIR_UP, DIR_LEFT, DIR_RIGHT };
-enum { M_WALK, M_FADE_OUT, M_FADE_IN, M_TEXT, M_BATTLE, M_END, M_SCRIPT, M_GAMEOVER, M_MENU };
+enum { M_WALK, M_FADE_OUT, M_FADE_IN, M_TEXT, M_BATTLE, M_END, M_SCRIPT, M_GAMEOVER, M_MENU, M_TITLE };
 #define FADE_STEPS 4                                 // 0 = normal .. 3 = white (4 greys)
 #define FADE_FRAMES 3                                // frames per fade step
 
@@ -94,6 +94,7 @@ typedef struct {
     u8 bdrop;
     u16 stats_kills, stats_flight;
     u8 menu, mcur, mmsg;                             // main menu (menu.c)
+    u8 tstep, tcur, tfade;                           // title and intro (title.c)
     u16 pc;
     s16 arg;
     Npc npc[NNPC];
@@ -124,6 +125,9 @@ u8 has_materia(u8 m);
 void auto_equip(void);
 void menu_open(void);
 u8 menu_update(void);                                // 0 = quit
-void menu_render(void);                               // best gear and materia (until the menu)
+void menu_render(void);
+void title_open(void);
+void title_update(void);
+void title_render(void);                               // best gear and materia (until the menu)
 
 #endif

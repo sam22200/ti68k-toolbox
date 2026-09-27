@@ -72,7 +72,7 @@ static void doors_all(void)
                 for (n = 0; n < 4; n++) {        // a floor neighbour below/above/left/right
                     s16 fx = cx + nx[n], fy = cy + ny[n];
                     if (fx < 0 || fy < 0 || fx >= r->w || fy >= r->h || cell_at(i, fx, fy) != CELL_FLOOR) continue;
-                    sw_init(0);
+                    sw_init(10);
                     for (k = 0; k < NFLAG; k++) st.flag[k] = 1;   // every key
                     put(r->id, fx * TILE + HB_X0, fy * TILE + HB_Y0);
                     st.cell_in = cell_at(i, fx, fy);
@@ -103,7 +103,7 @@ int main(void)
     u8 seen = 0, npc_seen = 0;
 
     // new game: room 8, original a = 27, b = 27 (cell 4, 4), first-level stats
-    sw_init(0);
+    sw_init(10);
     CHECK(rooms[st.room].id == 8 && st.x == 4 * TILE + HB_X0 && st.y == 4 * TILE + HB_Y0);
     CHECK(st.hero.hp == 80 && st.hero.mpm == 15 && st.hero.gils == 100 && st.flag[6] && st.flag[8]);
 
@@ -116,13 +116,13 @@ int main(void)
     CHECK(st.x - x0 == 12);
 
     // walls: pushing left for long stops flush against the wall, inside the room
-    sw_init(0);
+    sw_init(10);
     hold(K_LEFT, 60);
     CHECK(world_cell(st.x - 1, st.y) == CELL_WALL && !world_solid(world_cell(st.x, st.y)));
 
     // corner sliding: room 6, cell (2,3) is a wall and (3,3) floor; the hitbox overlaps
     // column 2 by 4 px and goes up: it slides right into column 3 instead of stopping
-    sw_init(0);
+    sw_init(10);
     put(6, 3 * TILE - 4, 4 * TILE + HB_Y0);
     CHECK(world_solid(world_cell(2 * TILE + 8, 3 * TILE + 8)) && !world_solid(world_cell(3 * TILE + 8, 3 * TILE + 8)));
     hold(K_UP, 16);
@@ -133,7 +133,7 @@ int main(void)
     CHECK(st.y >= 4 * TILE && st.x == 3 * TILE - 8);
 
     // story1: stepping on 500 under the stairs brings Edouard down; the hero steps aside
-    sw_init(0);
+    sw_init(10);
     hold(K_RIGHT, 11);                       // x = 4 * 16 + 3 + 16 (column 5, under the stairs)
     CHECK(st.x == 5 * TILE + HB_X0 + 1);
     for (k = 0; k < 40 && st.mode == M_WALK; k++) sw_step(K_UP);
@@ -189,7 +189,7 @@ int main(void)
     CHECK(st.npc[1].on && !st.npc[2].on && !st.npc[3].on && !st.npc[4].on && !st.npc[5].on);
 
     // bed: Yes heals, No does not; the potion on the desk is found once
-    sw_init(0);
+    sw_init(10);
     st.hero.hp = 3; st.hero.mp = 1;
     put(8, 4 * TILE + HB_X0, 2 * TILE + HB_Y0);
     st.dir = DIR_LEFT;
@@ -287,7 +287,7 @@ int main(void)
     sw_init(110);
     for (k = 0; k < 2000 && st.mode != M_BATTLE; k++) sw_step(k & 64 ? K_LEFT : K_RIGHT);
     CHECK(st.mode == M_BATTLE && st.steps <= 20 * 10 / 12 + 2);
-    sw_init(0);
+    sw_init(10);
     for (k = 0; k < 1000; k++) sw_step(k & 32 ? K_LEFT : K_RIGHT);
     CHECK(st.mode == M_WALK && st.steps > 30);
 
@@ -304,7 +304,7 @@ int main(void)
         printf("battle vs monster %u won in %u frames, hp %u/%u\n", n, k, st.hero.hp, st.hero.hpm);
     }
     // level ups follow the original table (Lv3 at 777 exp: hpm 96, mpm 17, expt 1224)
-    sw_init(0);
+    sw_init(10);
     st.hero.exp = 777;
     hero_level_up();
     CHECK(st.hero.lv == 3 && st.hero.expt == 1224 && st.hero.hpm == 96 && st.hero.mpm == 17);
@@ -317,7 +317,29 @@ int main(void)
     fight();
     CHECK(st.mode == M_GAMEOVER);
     sw_step(0); sw_step(K_A);
+    CHECK(st.mode == M_TITLE);
+
+    // title: New Game, growth stat Magic, name "Bo", the intro, then the bedroom fading in
+    sw_init(0);
+    CHECK(st.mode == M_TITLE && st.tstep == 0);
+    for (k = 0; k < 20; k++) sw_step(0);
+    sw_step(K_A);
+    for (k = 0; k < 20; k++) sw_step(0);
+    CHECK(st.tstep == 1);
+    sw_step(K_DOWN); sw_step(0); sw_step(K_A);
+    for (k = 0; k < 20; k++) sw_step(0);
+    CHECK(st.tstep == 2);
+    {
+        u8 i;
+        for (i = 0; i < 25; i++) { sw_step(K_DOWN); sw_step(0); }   // 'A' (1) - 25 -> 'c'...
+        st.name[0] = 'B'; st.name[1] = 'o'; st.name[2] = ' '; st.name[3] = 0;
+        sw_step(K_A);
+        for (i = 0; i < 6 && st.mode == M_TITLE; i++) { hold(0, 20); sw_step(K_A); }
+    }
+    for (k = 0; k < 40 && st.mode != M_WALK; k++) sw_step(0);
     CHECK(st.mode == M_WALK && rooms[st.room].id == 8 && st.hero.hp == 80);
+    CHECK(st.name[0] == 'B' && st.name[1] == 'o' && st.name[2] == 0);
+    CHECK(st.hero.speci == S_MAG && st.hero.st[S_MAG] == 12 * STAT + STAT / 4 && st.hero.st[S_STR] == 10 * STAT);
 
     // dungeon: the corpse holds the little key, once
     sw_init(110);
@@ -425,7 +447,7 @@ int main(void)
     for (k = 0; k < 200 && st.mode != M_END; k++) sw_step(K_DOWN);
     CHECK(st.mode == M_END);
 
-    sw_init(0);
+    sw_init(10);
     sw_step(0); sw_step(K_ESC);              // ESC opens the menu; Quit leaves the game
     CHECK(st.mode == M_MENU);
     sw_step(K_UP); sw_step(0);

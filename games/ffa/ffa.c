@@ -80,6 +80,7 @@ void game_scenario(u16 n)
     new_game();
     st.mode = M_WALK;
     st.dir = DIR_DOWN;
+    if (n == 0) { title_open(); return; }    // the normal start: the title screen
     if (n >= 100 && n < 100 + sizeof(room_index) && room_index[n - 100] != 255)
         place_somewhere(room_index[n - 100]);
     else if (n >= 1 && n <= 9)
@@ -92,7 +93,7 @@ void game_scenario(u16 n)
         return;
     }
     else
-        world_enter(room_index[8], 4, 4);    // ffa: dec8, a = 27, b = 27
+        world_enter(room_index[8], 4, 4);    // 10 = new game in room 8 (ffa: a = 27, b = 27)
     story_room();
 }
 
@@ -172,8 +173,9 @@ u8 game_update(void)
         break;
     case M_BATTLE: battle_update(); break;
     case M_MENU: return menu_update();
+    case M_TITLE: title_update(); break;
     case M_GAMEOVER:
-        if (input_pressed(K_A | K_ENTER)) game_scenario(0);   // original: back to HOME, all lost
+        if (input_pressed(K_A | K_ENTER)) game_scenario(0);   // back to the title (original: HOME)
         break;
     case M_SCRIPT: story_run(); break;
     case M_END: break;
@@ -226,6 +228,7 @@ void game_render(void)
     char s[24];
     if (st.mode == M_BATTLE) { battle_render(); return; }
     if (st.mode == M_MENU) { menu_render(); return; }
+    if (st.mode == M_TITLE) { title_render(); return; }
     if (st.mode == M_GAMEOVER) {
         draw_clear();
         draw_rect(0, 0, 160, 100, C_BLACK);
