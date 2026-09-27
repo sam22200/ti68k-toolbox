@@ -46,3 +46,8 @@ __pycache__/
 # FFA remake: generated from the local ffa_en/ data (original art)
 /games/ffa/rooms.h
 /games/ffa/experiments/*.png
+
+# FFA data file (generated)
+/games/ffa/ffadat.bin
+/games/ffa/ffadat.be.bin
+*.89y

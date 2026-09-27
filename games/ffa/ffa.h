@@ -9,7 +9,8 @@ typedef struct { u8 dest, key; s8 ax, ay; } Door;   // dest: room index, 0xFE = 
                                                     // 0xFF = out of scope; key: flag, 0 none;
                                                     // arrival cell, -1 = keep that coordinate
 typedef struct {
-    u8 id, w, h, px, py, frc, ndoor, ntrig;         // id = original room number, frc x 10
+    u8 id, w, h, px, py, frc, ndoor, ntrig, set;    // id = original room number, frc x 10,
+                                                     // set = tile set in the ffadat file
     const u8 *cell;                                  // w x h cell codes (below)
     const s16 *trig;                                 // original p x 10
     const Door *door;
@@ -101,6 +102,8 @@ typedef struct {
 } Game;
 extern Game st;
 
+u8 world_load(void);                                 // tile sets from ffadat, 0 = missing
+const RtTilemap *world_tilemap(void);                // the current room's map and tiles
 void world_enter(u8 room, s8 cx, s8 cy);             // put the hero in a cell of a room
 u8 world_cell(s16 px, s16 py);                       // cell code under a pixel of the room
 u8 world_solid(u8 code);

@@ -32,8 +32,11 @@ static void new_game(void)
     st.co = 15 + rt_rand() % 5 + 1;          // 15+rand(5): 16..20 steps
 }
 
+static u8 data_ok;
+
 void game_init(void)
 {
+    data_ok = world_load();
     rt_state = &st;
     rt_state_size = sizeof(st);
 }
@@ -249,7 +252,8 @@ void game_render(void)
         draw_text(71, 58, s2, F_MEDIUM, C_BLACK);
         return;
     }
-    draw_tilemap(&r->map, cx, cy);
+    if (!data_ok) { draw_clear(); draw_text(4, 40, "ffadat missing: send it", F_MEDIUM, C_BLACK); return; }
+    draw_tilemap(world_tilemap(), cx, cy);
     draw_actors(cx, cy);
     if (st.shop) shop_render();
     if (st.dlg_on) dialog_render(st.y - cy > 60);

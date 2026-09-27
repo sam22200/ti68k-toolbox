@@ -54,6 +54,38 @@ static u16 page_chars(void)                  // characters on the current page
     return n;
 }
 
+// The page's text is drawn once into a small plane (only the characters newly shown by the
+// typewriter) at its screen x, then copied byte by byte into both hidden planes every frame
+// (x 8..151 is byte-aligned: no shift). 72 characters of draw_text cost ~125k a frame; 5 opaque
+// 32x31 sprites still ~75k (TI bench, scenario 53); the copy is a few k.
+#define SROWS 31                              // the box's white inside: y0 + 2 .. y0 + 32
+static u8 scratch[RT_PBYTES * SROWS];         // plane format: draw_text can write into it
+static u16 sdrawn = 0xFFFF;
+static u8 spage, stext;
+
+static void strip_update(void)
+{
+    u16 n = 0, i;
+    u8 l, a, c, k;
+    void *ol = rt_light, *od = rt_dark;
+    if (sdrawn == 0xFFFF || spage != st.dlg_page || stext != st.dlg_text || st.dlg_shown < sdrawn) {
+        for (i = 0; i < sizeof(scratch); i++) scratch[i] = 0;
+        sdrawn = 0; spage = st.dlg_page; stext = st.dlg_text;
+    }
+    if (st.dlg_shown == sdrawn) return;
+    rt_light = rt_dark = scratch;
+    for (l = st.dlg_page * LINES; l < nline && l < st.dlg_page * LINES + LINES; l++)
+        for (a = ls[l], c = 0; a < le[l]; a++, c++, n++)
+            if (n >= sdrawn && n < st.dlg_shown) {
+                char t[2];
+                t[0] = buf[a]; t[1] = 0;
+                draw_text(9 + c * 6, 3 + (l - st.dlg_page * LINES) * 10, t, F_MEDIUM, C_LGRAY);
+            }
+    rt_light = ol; rt_dark = od;
+    sdrawn = st.dlg_shown;
+    (void)k;
+}
+
 void dialog_open(u8 text, u8 ask)
 {
     st.dlg_text = text;
@@ -89,13 +121,14 @@ void dialog_update(void)                     // one frame while st.dlg_on
 void dialog_render(u8 top)
 {
     s16 y0 = top ? 2 : 63, x, y;
-    u8 i, sp = texts[st.dlg_text].speaker;
-    u16 left;
-    char line[COLS + 2];
+    u8 sp = texts[st.dlg_text].speaker;
     ensure();
-    draw_rect(3, y0, 154, 35, C_BLACK);
-    draw_rect(4, y0 + 1, 152, 33, C_DGRAY);
-    draw_rect(5, y0 + 2, 150, 31, C_WHITE);
+    // frame as thin rectangles: the copied text strip (x 8..151) fills the inside
+    draw_rect(3, y0, 154, 1, C_BLACK); draw_rect(3, y0 + 34, 154, 1, C_BLACK);
+    draw_rect(3, y0 + 1, 1, 33, C_BLACK); draw_rect(156, y0 + 1, 1, 33, C_BLACK);
+    draw_rect(4, y0 + 1, 152, 1, C_DGRAY); draw_rect(4, y0 + 33, 152, 1, C_DGRAY);
+    draw_rect(4, y0 + 2, 1, 31, C_DGRAY); draw_rect(155, y0 + 2, 1, 31, C_DGRAY);
+    draw_rect(5, y0 + 2, 3, 31, C_WHITE); draw_rect(152, y0 + 2, 3, 31, C_WHITE);
     if (sp) {                                // name tag on the box's top edge
         const char *nm = speaker_name[sp][0] == '\1' ? st.name : speaker_name[sp];
         u8 w = 0;
@@ -105,12 +138,15 @@ void dialog_render(u8 top)
         draw_rect(9, y + 1, w * 6 + 4, 8, C_LGRAY);
         draw_text(11, y + 1, nm, F_MEDIUM, C_BLACK);
     }
-    left = st.dlg_shown;
-    for (i = 0; i < LINES && st.dlg_page * LINES + i < nline && left; i++) {
-        u8 l = st.dlg_page * LINES + i, a = ls[l], e = le[l], k = 0;
-        while (a < e && left) { line[k++] = buf[a++]; left--; }
-        line[k] = 0;
-        draw_text(9, y0 + 5 + i * 10, line, F_MEDIUM, C_BLACK);
+    strip_update();
+    {                                         // copy x 8..151 (bytes 1..18) of each row
+        const u8 *src = scratch + 1;
+        u8 *l = (u8 *)rt_light + (y0 + 2) * RT_PBYTES + 1, *d = rt_dark ? (u8 *)rt_dark + (y0 + 2) * RT_PBYTES + 1 : 0;
+        u8 r, b;
+        for (r = 0; r < SROWS; r++, src += RT_PBYTES, l += RT_PBYTES) {
+            for (b = 0; b < 18; b++) l[b] = src[b];
+            if (d) { for (b = 0; b < 18; b++) d[b] = src[b]; d += RT_PBYTES; }
+        }
     }
     if (st.dlg_shown >= page_chars()) {
         if ((st.dlg_page + 1) * LINES >= nline && st.dlg_ask) {   // Yes / No at the right
