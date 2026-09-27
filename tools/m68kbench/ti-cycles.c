@@ -295,6 +295,11 @@ static long rom_call(int n)
         for (i = 0; i < len; i++) wr8(dst + i, c);
         m68k_set_reg(M68K_REG_A0, dst);
         return 60 + len * 4; }                                                 /* ~15,900 per 3840 */
+    case 0x27e: {                                                              /* strlen */
+        uint32_t p = arg32(0), n = 0;
+        while (rd8(p + n)) n++;
+        m68k_set_reg(M68K_REG_D0, n);
+        return 40 + n * 10; }
     case 0xa2: r = halloc(arg32(0)); m68k_set_reg(M68K_REG_A0, r ? handles[r] : 0); return 1000;   /* malloc */
     case 0x90: case 0x92: case 0x94:                                           /* HeapAlloc(High)(Throw) */
         r = halloc(arg32(0)); m68k_set_reg(M68K_REG_D0, r); return 1000;
@@ -486,7 +491,7 @@ int main(int argc, char **argv)
         else prog = argv[i];
     }
     if (!prog) { fprintf(stderr, "usage: ti-cycles [--arg N] [--png F] [--max Mcycles] [--trace-rom] [--file F.89y] [--save-dir D] [--keys F] [--frames N] prog.89z\n"); return 2; }
-    romname[0x26a] = "memcpy"; romname[0x27c] = "memset"; romname[0x2a8] = "_ds32s32";
+    romname[0x26a] = "memcpy"; romname[0x27c] = "memset"; romname[0x27e] = "strlen"; romname[0x2a8] = "_ds32s32";
     romname[0x2aa] = "_du32u32"; romname[0x90] = "HeapAlloc"; romname[0x99] = "HLock";
     romname[0x283] = "SymFindPtr"; romname[0x5c] = "SymAdd"; romname[0x162] = "EM_moveSymToExtMem";
     romname[0x3fa] = "OO_CondGetAttr"; romname[0xa2] = "malloc"; romname[0x96] = "HeapDeref";
