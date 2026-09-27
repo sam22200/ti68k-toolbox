@@ -45,6 +45,9 @@ Example: `feat(runtime): add TileMap engine to the TI backend`
 1. **Repository check.** `git status`, `git remote -v`. The remote is
    `https://github.com/sam22200/ti68k-toolbox` (branch `main`). If the repo or remote is missing,
    stop and tell the user rather than creating one silently.
+   Identity: this repo commits as the personal address, set locally
+   (`git config user.email` must print `coz.samuel@gmail.com`, not the global work address); if it
+   does not, run `git config user.email coz.samuel@gmail.com` before committing.
 
 2. **Files to commit: only this session's work.**
    - Stage by **explicit path** (`git add <path> ...`); never `git add -A`, `git add .` or `-u`.
