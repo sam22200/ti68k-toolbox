@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Recursive-descent disassembler for the Mode 7 demo (NOSTUB TIGCC program, unpacked PPG).
+
+Input: code.bin (the program variable without its 2-byte size word) with its AMS relocation
+table at the end (word pairs target, location, read backwards from the 0xF3 tag, 0 = end).
+Output: mode7.s, GNU as source (tigcc as, --register-prefix-optional) that reassembles to the
+same bytes, with labels, relocations as label references and ROM calls named.
+"""
+import json, re, sys
+import capstone as C
+
+d = open('code.bin', 'rb').read()
+assert d[-1] == 0xF3
+relocs = {}                                          # location -> target (both code offsets)
+i = len(d) - 1
+while True:
+    i -= 2; w = (d[i] << 8) | d[i + 1]
+    if w == 0: break
+    i -= 2; relocs[w] = (d[i] << 8) | d[i + 1]
+BSSREF = (0xc2 + 2 - 2, 0x22c, 0x2d6, 0x2dc)   # startup table at 0x164: longs relocated to the malloc'd bss
+TABLE = i                                            # the relocation table starts here
+rom = {int(k): v for k, v in json.load(open('romcalls.json')).items()}
+extra = json.load(open('tools/hints.json')) if len(sys.argv) < 2 else {}
+code_entries = [int(x, 16) for x in extra.get('code', [])]
+names = {int(k, 16): v for k, v in extra.get('names', {}).items()}
+comments = {int(k, 16): v for k, v in extra.get('comments', {}).items()}
+datafmt = {int(k, 16): v for k, v in extra.get('data', {}).items()}   # addr -> 'w','l','b','s'
+
+md = C.Cs(C.CS_ARCH_M68K, C.CS_MODE_BIG_ENDIAN | C.CS_MODE_M68K_000)
+md.detail = True
+insns = {}                                           # addr -> insn
+coderefs, datarefs, calls = set([0]), set(), set([0])
+work = [0] + code_entries
+coderefs |= set(code_entries); calls |= set(code_entries)
+for t in relocs.values(): datarefs.add(t)
+
+class Insn:
+    def __init__(s, x):
+        s.address, s.size, s.mnemonic, s.op_str = x.address, x.size, x.mnemonic, x.op_str
+        if s.mnemonic.startswith('btst') and s.op_str.startswith('#') and '(pc)' in s.op_str:
+            s.op_str = re.sub(r'\$([0-9a-f]+)\(pc', lambda g: '$%x(pc' % (int(g.group(1), 16) + 2), s.op_str)
+        if s.mnemonic.endswith('.b') and s.op_str.startswith('#$') and d[s.address + 2] == 0xff:
+            s.op_str = '#-$%x' % (256 - int(s.op_str[2:s.op_str.index(',')], 16)) + s.op_str[s.op_str.index(','):]
+
+def decode(a):
+    for x in md.disasm(d[a:a + 10], a, 1): return Insn(x)
+    return None
+
+while work:
+    a = work.pop()
+    while a < TABLE and a not in insns:
+        x = decode(a)
+        if x is None: print('bad decode at %x' % a, file=sys.stderr); break
+        insns[a] = x
+        m, ops = x.mnemonic, x.op_str
+        # pc-relative targets
+        for t in re.findall(r'\$([0-9a-f]+)\(pc', ops):
+            t = int(t, 16)
+            if m.startswith(('jsr', 'jmp')): coderefs.add(t); calls.add(t); work.append(t)
+            else: datarefs.add(t)
+        if m.startswith(('b', 'db')) and not m.startswith(('bset', 'bclr', 'btst', 'bchg')):
+            t = int(ops.split('$')[-1], 16)
+            coderefs.add(t); work.append(t)
+            if m.startswith('bsr'): calls.add(t)
+            if m.startswith('bra'): break
+        if m in ('rts', 'rte', 'rtr') or m.startswith('jmp'): break
+        a += x.size
+
+# ---- output ----------------------------------------------------------------------------
+labels = {}
+for t in sorted(coderefs | datarefs):
+    labels[t] = names.get(t, ('f_%04x' if t in calls else '.L%04x' if t in insns else 'L_%04x') % t)
+for t, n in names.items(): labels[t] = n
+
+def lab(t): return labels.get(t) or 'L_%04x' % t
+
+rom_regs = set(); c8_regs = set()
+def gnu(x):
+    """capstone operand string -> GNU as motorola syntax, pc refs and relocs as labels"""
+    m, ops = x.mnemonic, x.op_str
+    note = ''
+    if m.startswith(('b', 'db')) and not m.startswith(('bset', 'bclr', 'btst', 'bchg')):
+        parts = ops.rsplit('$', 1)
+        ops = parts[0] + lab(int(parts[1], 16))
+    ops = re.sub(r'\$([0-9a-f]+)\(pc', lambda g: lab(int(g.group(1), 16)) + '(pc', ops)
+    # relocated absolute longs inside this instruction
+    for loc in range(x.address + 2, x.address + x.size - 3, 2):
+        if loc in relocs:
+            t = relocs[loc]
+            pat = r'\$0\.l' if (loc > x.address + 2 and re.search(r'\$0\.l', ops)) else r'#\$0\b|\$0\.l'
+            ops = re.sub(pat, lambda g: '#' + lab(t) if g.group(0).startswith('#') else '(%s).l' % lab(t), ops, 1)
+            note = 'reloc'
+        if loc in BSSREF: note = 'BSS+0 (the 4-byte bss block, relocated at startup)'
+    ops = re.sub(r'-\$([0-9a-f]+)', r'-0x\1', ops)
+    ops = re.sub(r'\$([0-9a-f]+)', r'0x\1', ops)
+    ops = re.sub(r'\ba7\b', 'sp', ops)
+    if m == 'moveq':
+        v = int(ops[1:ops.index(',')], 16); ops = '#%d%s' % (v - 256 if v > 127 else v, ops[ops.index(','):])
+    return m, ops, note
+
+out = []
+out.append('| Mode 7 - Demo 2 (David Coz, 2005): complete disassembly of modebin (the unpacked PPG).\n'
+           '| Generated by tools/m7dis.py (names in tools/hints.json). Reassembles to the same bytes:\n'
+           '|   as -m68000 --register-prefix-optional mode7.s; objcopy -O binary; tools/cmp.py\n'
+           '| Column 2 = offset in the program. ROM calls are named; the C reconstruction is src/.\n'
+           '| _start_tigcc.._main: TIGCC startup (SAVE_SCREEN, MIN_AMS 101, 4-byte BSS); GrayOn..GrayOff:\n'
+           '| TIGCC grayscale library; rand, __mulsi3, __divsi3: TIGCC library.\n')
+out.append('\t.text\n_base:\n')
+a = 0
+def emit_data(a, end):
+    while a < end:
+        if a in labels: out.append('%s:\n' % lab(a))
+        n = end - a
+        nxt = min([t for t in labels if a < t < end] + [end])
+        if a in relocs and nxt - a >= 4:
+            out.append('\t.long %s\n' % lab(relocs[a])); a += 4; continue
+        chunk = d[a:min(nxt, a + 16)]
+        # stop the chunk at a relocation
+        for k in range(1, len(chunk)):
+            if a + k in relocs: chunk = chunk[:k]; break
+        out.append('\t.byte %s\n' % ','.join('0x%02x' % b for b in chunk))
+        a += len(chunk)
+
+while a < TABLE:
+    if a in insns:
+        if a in labels: out.append('%s:\n' % lab(a))
+        if a in calls: rom_regs.clear(); c8_regs.clear()
+        x = insns[a]
+        m, ops, note = gnu(x)
+        c = []
+        if a in comments: c.append(comments[a])
+        if note.startswith('BSS'): c.append(note)
+        mm = m == 'movea.l' and re.match(r'(0x[0-9a-f]+)\((a\d)\)', ops)
+        if mm and int(mm.group(1), 16) % 4 == 0 and mm.group(2) in rom_regs:
+            n = int(mm.group(1), 16) // 4
+            if n in rom: c.append('ROM ' + rom[n])
+        dst = ops.split(',')[-1].strip() if ',' in ops else ''
+        if m.startswith('movea') and ops.startswith('0xc8.w,'): rom_regs.add(dst)
+        elif m.startswith('movea') and ops.startswith('#0xc8,'): c8_regs.add(dst); rom_regs.discard(dst)
+        elif m.startswith('movea') and re.match(r'\((a\d)\),', ops) and ops[1:3] in c8_regs: rom_regs.add(dst)
+        elif dst:
+            rom_regs.discard(dst); c8_regs.discard(dst)
+        line = '\t%s\t%s' % (m, ops) if ops else '\t%s' % m
+        out.append('%-44s| %04x %s\n' % (line, a, ' '.join(c)) if c or True else line + '\n')
+        a += x.size
+    else:
+        end = a
+        while end < TABLE and end not in insns: end += 1
+        emit_data(a, end)
+        a = end
+out.append('| relocation table (AMS format) and tag\n')
+emit_data(TABLE, len(d))
+txt = ''.join(out)
+defined = set(re.findall(r'^([.\w]+):', txt, re.M))
+used = set(re.findall(r'\b((?:f_|L_|\.L)[0-9a-f]{4})\b', txt)) | set(labels.values())
+sets = ''.join('\t.set\t%s, _base+0x%04x\n' % (n, t) for t, n in sorted(labels.items()) if n not in defined and n in used)
+txt = txt.replace('_base:\n', '_base:\n' + sets, 1)
+open('mode7.s', 'w').write(txt)
+print('insns', len(insns), 'code bytes', sum(x.size for x in insns.values()), 'table', hex(TABLE),
+      'functions', len([t for t in coderefs if t in insns]))

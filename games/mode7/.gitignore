@@ -1,0 +1,12 @@
+# the original demo and everything extracted from it (make downloads and regenerates them)
+/mode7/
+/mode7.zip
+/modebin.bin
+/code.bin
+/romcalls.json
+/mode7.s
+/src/data.c
+/src/trig.s
+/preview/
+/build/
+/tools/bench_*.png
