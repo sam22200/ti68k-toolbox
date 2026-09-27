@@ -12,4 +12,6 @@
 #define BENCH_STOP()        (BENCH_IO(0x14, long) = 0)
 #define BENCH_CYCLES        BENCH_IO(0x18, unsigned long)
 #define BENCH_ARG           BENCH_IO(0x1C, short)
+#define BENCH_KEYS(frame)   (BENCH_IO(0x24, long) = (frame), BENCH_IO(0x24, unsigned long))
+#define BENCH_FRAMES        BENCH_IO(0x28, long)
 #endif
