@@ -41,14 +41,18 @@ ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 H
 ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
 ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycles per zone, screen as PNG
+make xcheck                     # runtime game: TI binary under ti-cycles = PC headless, per scenario
 ```
 
 **Measure cycles with `ti-cycles`, not TiEmu** (`tools/m68kbench/`): a headless 68000 (Musashi) with
 the MC68000 datasheet timings (movem, shifts, mulu/muls: all verified by `test/cyctest.c`), AMS ROM
 calls emulated with an estimated cost, zones marked with `bench.h` (`BENCH_BEGIN/END`, `BENCH_SHOT`
 for the screen from memory). A 20-million-cycle run takes 0.05 s. Programs run under it must not
-touch the I/O ports (build them with a `-DBENCH` variant); TiEmu has no CLI, D-Bus or GDB to read
-memory, so hardware paths (grayscale, keyboard, interrupts) are still checked in the emulator.
+touch the I/O ports (build them with a `-DBENCH` variant; runtime games: `make cycles`, `-DRT_CYCLES`).
+It also emulates the VAT (`--file data.89y`, saves written by `--save-dir`), the AMS fonts and key
+scripts (`--keys`, `--frames`): `make xcheck` checks a runtime game's TI binary against the PC,
+same screen checksum per scenario. TiEmu has no CLI, D-Bus or GDB to read memory, so only the
+hardware paths (grayscale, keyboard, interrupts) are still checked in the emulator.
 
 **Development flow: tests without UI, the calculator last of all.** The TI emulator is by far the
 slowest way to check anything (a restart, keys typed, a screenshot to take and read: tens of
@@ -57,10 +61,12 @@ seconds per check, and flaky): avoid it at all costs. In this order:
    plane checksums), as much of the program as possible.
 2. **Real runs without UI**: PC headless runs (`--headless --keys F --frames N --shot F.png`) and
    the TI binary itself under `ti-cycles` (cycles per zone, `BENCH_VALUE` numbers, the screen read
-   from memory as a PNG and a checksum per scenario).
+   from memory as a PNG and a checksum per scenario; `make xcheck` for runtime games, data files
+   and saves included). Compare screens by checksum; read a PNG (`ti-cycles --png`, PC `--shot`)
+   only when a checksum differs or for an art review.
 3. **The emulator, last of the last**: once, at a milestone or a release, and only for what the
-   PC cannot run (grayscale driver, keyboard matrix, interrupts, timers, link, files, AMS
-   dialogs). Prefer printed numbers; one screenshot at most.
+   PC cannot run (grayscale driver, keyboard matrix, interrupts, timers, link, real archive
+   and Flash, AMS dialogs). Prefer printed numbers; one screenshot at most.
 A change is "done" once 1 and 2 pass; code that touches the hardware also gets 3, at the end.
 Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) only for a release.
 

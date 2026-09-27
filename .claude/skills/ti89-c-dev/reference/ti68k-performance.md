@@ -441,7 +441,9 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
    Musashi, headless, in a fraction of a second, reports the cycles of the zones marked with
    `tools/m68kbench/bench.h` and writes the virtual screen from memory as a PNG (`BENCH_SHOT`), so a
    benchmark also checks the picture (a checksum per scenario: an optimisation must not change
-   it). Limits: no I/O ports (build a `-DBENCH` variant without grayscale, keyboard and
+   it). Runtime games: `make cycles` / `make xcheck` (the VAT with `--file`, saves, the AMS
+   fonts and key scripts are emulated; **verified**: FFA's 18 scenarios, life, flappy and the demo
+   give the PC's checksums). Limits: no I/O ports (build a `-DBENCH` variant without grayscale, keyboard and
    interrupts); AMS ROM calls are emulated with an estimated cost, listed apart; no wait states
    (the TI-89 has none). Example: `games/mode7/` (`make bench`, `tools/bench.py`).
 1. Put the candidate code in a copy of `experiments/bench/bench.c` (volatile inputs, volatile

@@ -21,7 +21,8 @@ description: Write, compile, optimise or port C code (GCC4TI/TIGCC) for the TI-8
 - **New games: the Portable Game Runtime** (`runtime/README.md`): the game is portable C against
   `runtime/core/rt.h` (hooks `game_init/scenario/update/render`), unit-tested and played on the PC
   (SDL) first, built for the TI with the same Makefile. Engine → game design → graphics last;
-  an injection door (`game_scenario(n)`) per game; TI checks as printed numbers (`make bench`).
+  an injection door (`game_scenario(n)`) per game; TI checks without UI under `ti-cycles`
+  (`make cycles`, `make xcheck`: the TI binary's screen equal to the PC's, per scenario).
 
 ## Knowledge base — read before writing non-trivial code
 
@@ -67,9 +68,11 @@ variable name on the calculator is fixed at build time by `-o`: renaming the .89
 `name` = variable name on the calculator (≤ 8 characters, lowercase). Then test **without UI**
 (`CLAUDE.md`, development flow): unit tests on the PC first (runtime games: `make test`), then the
 TI binary under `tools/bin/ti-cycles` (datasheet cycles per zone, the screen read from memory:
-build a `-DBENCH` variant without I/O ports). The `ti89-emulator` skill (`ti-run name.89z`, a
-screenshot) comes last, once, for what only the calculator runs (grayscale, keyboard,
-interrupts, link, files), on the Titanium (`TI_CALC=89t`, default); add `TI_CALC=89` / `89u`
+build a `-DBENCH` variant without I/O ports; data files `--file x.89y`, saves `--save-dir`, key
+scripts `--keys`, AMS fonts; runtime games: `make cycles`, `make xcheck`). Never check a routine or
+a drawing through the emulator when `ti-cycles` can run it. The `ti89-emulator` skill (`ti-run
+name.89z`, a screenshot) comes last, once, for what only the calculator runs (grayscale driver,
+keyboard matrix, interrupts, link, real archive and Flash), on the Titanium (`TI_CALC=89t`, default); add `TI_CALC=89` / `89u`
 (TI-89 HW2) only for a release.
 
 Skeleton: see `hello/hello.c` (`#define USE_TI89`, `OPTIMIZE_ROM_CALLS`, `SAVE_SCREEN`,

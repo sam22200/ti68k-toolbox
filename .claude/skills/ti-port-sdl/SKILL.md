@@ -53,9 +53,11 @@ confirm the placeholders behave. Fix the feel (jump height, speed) against the u
 ## 3. TI, benchmark without UI
 
 Without the emulator first: run the TI binary under `tools/bin/ti-cycles` (datasheet cycles per
-marked zone, the screen from memory; a `-DBENCH` build without I/O ports), worst-case scenarios
-(most objects on screen). `make bench` → `<name>b.89z` with `TI_ARGS=N ti-run <name>b.89z [data]`
-only for what needs the real hardware path. Read the printed cycles per frame, not a drawing.
+marked zone, the screen from memory): `make cycles` (`-DRT_CYCLES`, zones update and render) on
+the worst-case scenarios (most objects on screen), and `make xcheck` (same screen checksum as the
+PC per scenario, `KEYS=` script, `TI_FILES=` data files). Read the printed cycles per frame and
+checksums, not a drawing; `--png` only when a checksum differs. `make bench` (`<name>b.89z`,
+`TI_ARGS=N ti-run`) only for what needs the real hardware path (grayscale driver cost).
 Budget: ~360k cycles per frame at 30 fps on hardware (grayscale driver included); TiEmu
 under-counts `movem` and shifts, so keep a margin (`ti68k-performance.md` §1). Over budget:
 optimise from the knowledge base (tables, redraw only what changes, TileMap, pre-shifted
@@ -85,8 +87,9 @@ or one screenshot read back (`ti-shot x.png --lcd`), and that ESC returns to HOM
 
 ## 6. TI again
 
-`make bench` (the graphics cost: same scenarios, compare with step 3), then `make ti` and a real
-run with one screenshot read back. Fix what differs from the SDL render.
+Without UI first: `make cycles` (the graphics cost: same scenarios, compare with step 3) and
+`make xcheck` (a differing checksum = the TI render differs from the SDL one: fix it there, with
+`ti-cycles --png` to see it). Then, once, `make ti` and a real run with one screenshot read back.
 
 ## 7. Conclude
 

@@ -23,9 +23,10 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 **Not everything needs the emulator.** TiEmu 3.04 (Ubuntu) has no command line control, no D-Bus
 interface and no GDB, and exports none of its internals: memory and registers are only in its GUI
 debugger (F11). For cycle counts and for checking what a routine drew, run the program on the PC
-with `ti-cycles` (datasheet cycles per marked zone, the screen from memory as a PNG, no window;
-`CLAUDE.md`, performance §10). Keep TiEmu for what touches the hardware: grayscale, keyboard,
-interrupts, link, files, and the final run of a build.
+with `ti-cycles` (datasheet cycles per marked zone, the screen from memory as a PNG and a
+checksum, data files `--file`, saves `--save-dir`, key scripts `--keys`, no window; runtime games:
+`make xcheck`; `CLAUDE.md`, performance §10). Keep TiEmu for what touches the hardware: grayscale
+driver, keyboard matrix, interrupts, link, real archive and Flash, and the final run of a build.
 
 ## Test loop
 

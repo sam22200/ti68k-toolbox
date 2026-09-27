@@ -32,8 +32,9 @@ outline on the hero, NPCs and monsters). Titanium only; ASM only after asking.
   and it is committed (`/ti-commit` after each room). The TI only at the milestones (engine
   benchmark, end of part), when nearly everything is right on the PC.
 - **No UI until the end** (`CLAUDE.md`, development flow): unit tests and the play-through test
-  on the PC, headless shots read back, `ti-cycles` for the TI binary; the TI emulator (slow,
-  screenshots) only at the milestones below.
+  on the PC, headless shots read back, `ti-cycles` for the TI binary (`make xcheck`: every
+  scenario's screen equal to the PC's, the data variable and the save files included); the TI
+  emulator (slow, screenshots) only at the milestones below.
 - **Injection everywhere**: story flags, discoveries (chests, keys), hero stats, inventory,
   room and position are all settable from a scenario number, a PC state file or a `--set`
   script, so that any room or fight can be tested alone.
@@ -96,10 +97,11 @@ For each room of the part, in the guide's order:
 
 ## 5. Milestones on the TI
 
-- After the engine: `make bench` on the heaviest room (tile map + hero + NPCs + a text box),
-  read the cycles, check the size (AMS 2 limit 24,576 bytes: data in archived files or packed
+- After the engine: `make cycles` under `ti-cycles` on the heaviest room (tile map + hero + NPCs
+  + a text box), read the cycles, check the size (AMS 2 limit 24,576 bytes: data in archived files or packed
   with ZX0, `lib/unpack68k.s`, beyond that).
-- End of a part: `make ti`, a run through the part with one or two screenshots read back.
+- End of a part: `make xcheck` with the play-through key script (every scenario, data and saves),
+  then once `make ti`, a run through the part with one or two screenshots read back.
 
 ## 6. Conclude, knowledge, commit
 
