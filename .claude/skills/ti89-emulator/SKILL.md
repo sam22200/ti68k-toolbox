@@ -47,6 +47,9 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 - Never run `import -window` without a valid window id (it waits for the user to click): use
   `ti-shot`. Never send Print Screen (keycode 107 starts Spectacle/Flameshot) or the Menu key
   (it opens TiEmu's menu). `ti-key` handles this.
+- **Playing with the PC keyboard** (the shim below): arrows = TI arrows, AltGr = 2nd, Right Ctrl =
+  alpha, Shift = shift, Left Ctrl = ◆, Enter, Esc, Backspace. TiEmu 3.04 reads XFree86 keycodes and
+  today's X servers send evdev ones: without the translation the PC arrows did nothing.
 - **Stuck keys** (a key the program still sees held after release; FFA's hero walking alone):
   TiEmu clears a key only on its GTK release event, and loses it when the release goes to
   another window or a skin click is released off the key. `tools/tiemu-keyfix.c` (LD_PRELOAD in
