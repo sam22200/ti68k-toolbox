@@ -85,6 +85,10 @@ CURE materia; stop before the world map (room 4's bottom exit to room 19 = "End 
 
 ## Remaining (part I is complete; these are improvements)
 
+0. Port the play-test fixes made in the local CT art test `games/ffa_ct/` (not in git: its
+   `PROGRESS.md` lists them): Equip/Materia choice lists, Continue after a game over, no debug
+   box on taken chests, faster walk with a distance-based walk cycle, a held arrow crossing
+   doors, fight modes On/Half/Off, a lighter cached battle background.
 1. Options menu (battle speed, active/wait mode); materia AP and levels (none reachable in
    part I); the Antidote has no use yet (no poison in part I).
 2. Scenes: camera pans to show NPCs below the view (the ceremony), NPC side views.
