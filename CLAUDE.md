@@ -85,6 +85,11 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 
 ## Skills and knowledge
 
+Collaboration rules (French replies, emulator etiquette, git, copyrighted art, notes for other
+agents such as Codex; `AGENTS.md` links to this file): `docs/working-rules.md`. The skills below
+are plain Markdown (`.claude/skills/<name>/SKILL.md`): any agent reads the matching one before
+that kind of task.
+
 - `ti89-c-dev`: write, build and port C code. Its references are the project's knowledge base,
   **read them before writing non-trivial code**:
   - `.claude/skills/ti89-c-dev/reference/ti68k-c-patterns.md`: screen, grayscale planes,
@@ -108,8 +113,8 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
   part and room by room, new 16-bit style engine and art, `PROGRESS.md` checkpoints.
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
-- `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) and push to
-  `github.com/sam22200/ti68k-toolbox`.
+- `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
+  per task, push to `github.com/sam22200/ti68k-toolbox`, merge into `main` once the tests pass.
 - When you learn something new and verified about the platform, add it to
   `ti68k-c-patterns.md` or `ti68k-performance.md` (mark it **verified** if it was tested in the
   emulator).
@@ -171,7 +176,8 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 - `tools/extgraph/`: ExtGraph 2. `tools/patches/`: HW3Patch. `tools/rom/`: official OSes + AMSpatch.
 - `tools/tiemu/{89t,89,89u}/`: TiEmu profiles (config, image, `.sav` state; absolute paths, do not move).
 - `ti89decode.py`: TI-Basic file decoder (`ffa_en/`: the TI-Basic game it was written for).
-- Local only, not in git (`.gitignore`, see `README.md`): `sources/`, `ffa_en/`, third-party and
+- Local only, not in git (`.gitignore`, see `README.md`): `games/ffa_ct/` (FFA with Chrono Trigger
+  sprites, an art test: `.git/info/exclude`, state in its `PROGRESS.md`), `sources/`, `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
   `patches`, `musashi`), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
