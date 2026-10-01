@@ -1,0 +1,10 @@
+run: max speed 1.0 px/frame, frames from rest to max 2, x after 30 frames held +58.00 px
+stop from run (ground, release): 2 frames
+jump (tap): apex 19 px, frames to apex 11, airtime 23 frames
+jump (held): apex 19 px (no variable jump if equal)
+running jump: horizontal distance 46 px over 23 frames
+m_dash_r: 10 frames after the dash press dx=+25.0 dy=-2.0; max objects 8; speeds f13..f18 (5.00,0.00) (5.00,0.00) (5.00,0.00) (3.50,0.00) (2.00,0.00) (2.00,0.00)
+m_dash_u: 10 frames after the dash press dx=+0.0 dy=-25.0; max objects 8; speeds f13..f18 (0.00,-5.00) (0.00,-5.00) (0.00,-5.00) (0.00,-3.50) (0.00,-2.00) (0.00,-1.50)
+m_dash_ur: 10 frames after the dash press dx=+23.0 dy=-22.0; max objects 8; speeds f13..f18 (3.54,-3.54) (3.54,-3.54) (3.54,-3.54) (2.47,-2.47) (2.00,-1.50) (2.00,-1.50)
+m_dash_none: 10 frames after the dash press dx=+20.0 dy=-2.0; max objects 8; speeds f13..f18 (1.00,0.00) (1.00,0.00) (1.00,0.00) (2.00,0.00) (2.00,0.00) (2.00,0.00)
+fall from rest: terminal speed 2.0 px/frame reached at frame 10

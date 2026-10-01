@@ -1,0 +1,13 @@
+# title: press jump, wait for begin_game (80 frames), then play room 0
+0
+10 A
+12
+120 RIGHT
+150 RIGHT A
+160 RIGHT
+170 RIGHT B
+175 RIGHT
+200 LEFT
+230 LEFT A
+240 UP B
+250

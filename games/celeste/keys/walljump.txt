@@ -1,0 +1,12 @@
+# scenario 1: against the step, jump then jump again: wall jump; wall slide holding right
+0 RIGHT
+15 RIGHT A
+16 RIGHT
+17 RIGHT A
+18
+40 RIGHT
+55 RIGHT A
+56 RIGHT
+57 RIGHT A
+58 RIGHT
+90

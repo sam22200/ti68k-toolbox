@@ -1,0 +1,23 @@
+# from a ccleste TAS (test-tas.txt), first 100 frames
+0 
+27 RIGHT A
+28 RIGHT
+37 RIGHT B
+38 RIGHT
+39 
+45 RIGHT
+49 RIGHT B
+51 RIGHT
+57 RIGHT A
+59 RIGHT
+63 RIGHT A
+65 
+69 UP B
+70 
+75 RIGHT
+81 RIGHT A
+82 RIGHT
+88 UP B
+90 
+91 A
+92 

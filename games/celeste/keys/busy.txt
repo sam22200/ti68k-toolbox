@@ -1,0 +1,19 @@
+# move around a crowded room: run, jumps, dashes in all directions
+0
+5 RIGHT
+20 RIGHT A
+22 RIGHT
+26 RIGHT UP B
+28 RIGHT
+45 LEFT A
+47 LEFT
+50 LEFT B
+52
+60 A
+62 UP B
+64
+80 RIGHT A
+82 RIGHT
+90 RIGHT B
+92 RIGHT
+120

@@ -1,0 +1,4 @@
+# generated: the cart extraction and its reference traces (make), hash files
+x/
+traces/
+*.hash

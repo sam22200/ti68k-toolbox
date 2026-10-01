@@ -1,0 +1,6 @@
+room (3,0): max objects 21, collide calls/frame max 111 avg 91, objects scanned/frame max 2205 avg 1453, deaths 1
+room (6,0): max objects 21, collide calls/frame max 49 avg 28, objects scanned/frame max 735 avg 396, deaths 2
+room (7,0): max objects 17, collide calls/frame max 75 avg 59, objects scanned/frame max 1173 avg 639, deaths 2
+room (1,2): max objects 14, collide calls/frame max 53 avg 34, objects scanned/frame max 630 avg 304, deaths 2
+room (4,2): max objects 10, collide calls/frame max 59 avg 41, objects scanned/frame max 590 avg 376, deaths 2
+room (0,3): max objects 16, collide calls/frame max 62 avg 43, objects scanned/frame max 896 avg 429, deaths 2

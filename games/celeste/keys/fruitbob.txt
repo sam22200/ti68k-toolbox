@@ -1,0 +1,15 @@
+# scenario 1: break the fake wall as in fakewall.txt, then walk away: the fruit bobs (off40 wraps)
+0 RIGHT
+10 RIGHT A
+12 RIGHT
+16
+35 RIGHT A
+37 RIGHT
+56
+62 A
+63
+70 LEFT UP B
+71 LEFT
+100 LEFT B
+101 RIGHT
+140

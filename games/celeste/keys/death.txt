@@ -1,0 +1,5 @@
+# scenario 1: over the step into the spike pit, death, restart, respawn
+0 RIGHT
+10 RIGHT A
+12 RIGHT
+60
