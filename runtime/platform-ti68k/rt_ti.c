@@ -357,10 +357,13 @@ void _main(void)
         rt_light = GrayDBufGetHiddenPlane(LIGHT_PLANE);
         rt_dark = GrayDBufGetHiddenPlane(DARK_PLANE);
 #endif
-        rt_frame++;
-        while ((u16)(ticks - last) < RT_FRAME_TICKS) pokeIO(0x600005, 0x1D);   // sleep
-        last += RT_FRAME_TICKS;
-        if ((u16)(ticks - last) > 2 * RT_FRAME_TICKS) last = ticks;   // too slow: no catch-up
+        {
+            u16 len = RT_FRAME_LEN(rt_frame);
+            rt_frame++;
+            while ((u16)(ticks - last) < len) pokeIO(0x600005, 0x1D);   // sleep
+            last += len;
+            if ((u16)(ticks - last) > 2 * len) last = ticks;   // too slow: no catch-up
+        }
     }
     while (_rowread(0)) ;                          // do not leak keys to AMS
 #endif

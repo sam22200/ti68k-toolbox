@@ -38,6 +38,13 @@ typedef int32_t s32;
 #ifndef RT_FRAME_TICKS
 #define RT_FRAME_TICKS 8
 #endif
+// Ticks per pair of frames (default 2 * RT_FRAME_TICKS): an odd value alternates frames of
+// RT_FRAME_TICKS2 / 2 and one more tick, e.g. -DRT_FRAME_TICKS2=17 gives 8, 9, 8, 9... =
+// 30.1 fps (a PICO-8 cart's 30 fps). Define it for every file (CFLAGS_GAME), not in a source.
+#ifndef RT_FRAME_TICKS2
+#define RT_FRAME_TICKS2 (2 * RT_FRAME_TICKS)
+#endif
+#define RT_FRAME_LEN(frame) ((RT_FRAME_TICKS2 >> 1) + ((frame) & RT_FRAME_TICKS2 & 1))
 #define RT_HZ 256
 
 // ---------------------------------------------------------------- game hooks (the game defines)
