@@ -1,0 +1,13 @@
+# scenario 1: full jump (held), short tap, jump buffer before landing, running jump
+0
+5 A
+30
+50 A
+51
+90 A
+91
+110 A
+111
+120 RIGHT A
+125 RIGHT
+140

@@ -1,0 +1,2 @@
+# scenario 0: spawn sequence, then stand still (title card appears and goes)
+0

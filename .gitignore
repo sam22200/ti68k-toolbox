@@ -58,3 +58,6 @@ __pycache__/
 *.sav
 /games/ffa/gfx.bin
 /games/ffa/gfx.be.bin
+# PICO-8 ports: shrinko8 (github.com/thisismypassport/shrinko8) and z8lua (github.com/samhocevar/z8lua)
+/tools/shrinko8/
+/tools/z8lua/

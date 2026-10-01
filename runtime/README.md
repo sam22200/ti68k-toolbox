@@ -29,6 +29,9 @@ u8   game_update(void);      // one fixed step (256 / RT_FRAME_TICKS Hz, 32 fps)
 void game_render(void);      // draw the whole frame
 ```
 
+- Frame rate: `RT_FRAME_TICKS` ticks of 256 Hz per frame (8 = 32 fps). `-DRT_FRAME_TICKS2=17`
+  (in `CFLAGS_GAME`, for every file) alternates frames of 8 and 9 ticks: 30.1 fps, a PICO-8
+  cart's 30 fps (`games/celeste`); the PC's virtual clock follows it.
 - Input: `input_held(K_UP)`, `input_pressed(K_A)`, `input_released(...)`, one snapshot per
   frame. Keys: arrows, `K_A` [2nd], `K_B` [shift], `K_C` [◆], `K_D` [alpha], `K_ENTER`, `K_ESC`,
   `K_DIGIT(1..9)` (keypad grid, for gestures). PC: arrows, Ctrl/Space/Z, Shift/X, C, V, Enter,

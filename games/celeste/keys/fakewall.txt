@@ -1,0 +1,14 @@
+# scenario 1: step, ledge, jump + up-left dash next to the fake wall, dash left: it breaks, the fruit
+0 RIGHT
+10 RIGHT A
+12 RIGHT
+16
+35 RIGHT A
+37 RIGHT
+56
+62 A
+63
+70 LEFT UP B
+71 LEFT
+100 LEFT B
+101 LEFT

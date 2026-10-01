@@ -85,7 +85,7 @@ Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) o
 
 ## Skills and knowledge
 
-Collaboration rules (French replies, emulator etiquette, git, copyrighted art, notes for other
+Collaboration rules (French replies, emulator etiquette, git, notes for other
 agents such as Codex; `AGENTS.md` links to this file): `docs/working-rules.md`. The skills below
 are plain Markdown (`.claude/skills/<name>/SKILL.md`): any agent reads the matching one before
 that kind of task.
@@ -111,6 +111,9 @@ that kind of task.
   graphics variants compared on screenshots, TI again, knowledge update, commit).
 - `ti-port-tibasic`: remake a TI-Basic game (FFA): extraction, understanding with the guide, part by
   part and room by room, new 16-bit style engine and art, `PROGRESS.md` checkpoints.
+- `ti-port-pico8`: port a PICO-8 cart (Celeste Classic…): cart decoded with shrinko8, run
+  headless under z8lua for reference traces, `/grilling` on the port decisions, Lua translated
+  to bit-exact 16.16 C (`assets/p8num.h`) diffed against the traces, native rendering.
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
@@ -156,7 +159,7 @@ that kind of task.
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua)
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
@@ -179,7 +182,7 @@ that kind of task.
 - Local only, not in git (`.gitignore`, see `README.md`): `games/ffa_ct/` (FFA with Chrono Trigger
   sprites, an art test: `.git/info/exclude`, state in its `PROGRESS.md`), `sources/`, `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
-  `patches`, `musashi`), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
+  `patches`, `musashi`, `shrinko8`, `z8lua`), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
 - `docs/resources.md`: tutorials, game sources, sites, sprite/tileset/map sites for assets.
 

@@ -1,0 +1,24 @@
+# scenario 1: dashes in every direction, one without direction, one with no dash left
+0
+5 UP B
+6
+35 RIGHT B
+36
+60 LEFT UP B
+61
+90 B
+91
+120 UP RIGHT B
+121
+125 B
+126
+150 DOWN B
+151
+170 LEFT B
+171
+190 DOWN LEFT B
+191
+200 UP B
+201
+210 DOWN RIGHT B
+211

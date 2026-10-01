@@ -1,0 +1,17 @@
+# scenario 0: spawn, run, jumps, wall jump, dashes, a death and the respawn
+0
+40 RIGHT
+55 RIGHT A
+58 RIGHT
+60 RIGHT A
+61
+80 LEFT
+100 UP B
+101
+140 RIGHT
+150 RIGHT A
+152 RIGHT
+250
+300 RIGHT UP B
+301 RIGHT
+320

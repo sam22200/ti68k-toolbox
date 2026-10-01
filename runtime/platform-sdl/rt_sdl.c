@@ -110,7 +110,7 @@ int main(int argc, char **argv)
             SDL_UnlockTexture(tex);
             SDL_RenderCopy(ren, tex, RT_NULL, RT_NULL);
             SDL_RenderPresent(ren);
-            next += RT_FRAME_TICKS * 1000 / RT_HZ;             // 31 ms at 8 ticks (32.3 fps)
+            next += RT_FRAME_LEN(rt_frame - 1) * 1000 / RT_HZ;  // 31 ms at 8 ticks (32.3 fps)
             {
                 Uint64 now = SDL_GetTicks64();
                 if (next > now) SDL_Delay((Uint32)(next - now));

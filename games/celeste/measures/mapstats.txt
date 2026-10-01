@@ -1,0 +1,55 @@
+flag values used: [(0, 173), (2, 40), (3, 17), (4, 10), (19, 16)]
+fg layer (flag 3, mask 8) tiles: []
+bg (mask 4): 11 distinct 8x8 tiles, 293 distinct 2x2 blocks (16x16 metatiles) over rooms 0-30
+terrain (mask 2): 45 distinct 8x8 tiles, 371 distinct 2x2 blocks (16x16 metatiles) over rooms 0-30
+bg+terrain: 55 distinct 8x8 tiles, 791 distinct 2x2 blocks (16x16 metatiles) over rooms 0-30
+tiles in both bg and terrain layers: 0
+
+per room: hazards / objects in the rows a 100-px window cannot show at once
+(top band = rows 0-3, y 0..31; bottom band = rows 12-15, y 96..127)
+room  0 (0,0): top {}  bottom {'spawn': 1, 'spike': 7}
+room  1 (1,0): top {}  bottom {'spike': 3, 'spawn': 1}
+room  2 (2,0): top {}  bottom {'spawn': 1, 'spring': 2}
+room  3 (3,0): top {}  bottom {'spawn': 1, 'fall_floor': 6}
+room  4 (4,0): top {}  bottom {'chest': 1, 'key': 1}
+room  5 (5,0): top {}  bottom {}
+room  6 (6,0): top {'spike': 2, 'fly_fruit': 1}  bottom {'platform': 3, 'spawn': 1}
+room  7 (7,0): top {}  bottom {'spring': 1, 'fall_floor': 4, 'spawn': 1}
+room  8 (0,1): top {'fake_wall': 1}  bottom {'spawn': 1, 'spike': 13, 'spring': 2}
+room  9 (1,1): top {}  bottom {'spawn': 1, 'fall_floor': 4}
+room 10 (2,1): top {'balloon': 1, 'spike': 3}  bottom {'spawn': 1, 'fall_floor': 4}
+room 11 (3,1): top {}  bottom {'spawn': 1}
+room 12 (4,1): top {'balloon': 1, 'spike': 2}  bottom {'spike': 7, 'spawn': 1, 'key': 1, 'chest': 1}
+room 13 (5,1): top {'fruit': 1, 'spike': 3}  bottom {'spawn': 1, 'spring': 1}
+room 14 (6,1): top {'spike': 5}  bottom {'spike': 2, 'spawn': 1, 'fall_floor': 5}
+room 15 (7,1): top {}  bottom {'spawn': 1, 'spring': 1, 'fall_floor': 1}
+room 16 (0,2): top {}  bottom {'spike': 3, 'spawn': 1, 'fake_wall': 1, 'spring': 1}
+room 17 (1,2): top {'spike': 13, 'balloon': 1}  bottom {'spawn': 1, 'spike': 8, 'platform': 1}
+room 18 (2,2): top {'spike': 6, 'chest': 1}  bottom {'spike': 3, 'spawn': 1, 'key': 1}
+room 19 (3,2): top {'spike': 2, 'balloon': 1}  bottom {}
+room 20 (4,2): top {'spike': 7, 'spring': 1, 'balloon': 1}  bottom {'balloon': 3}
+room 21 (5,2): top {}  bottom {'spawn': 1}
+room 22 (6,2): top {'spike': 5}  bottom {'spawn': 1, 'fly_fruit': 1}
+room 23 (7,2): top {'spike': 3}  bottom {'spike': 4, 'spawn': 1}
+room 24 (0,3): top {'spike': 11}  bottom {'spike': 15, 'spawn': 1, 'chest': 1, 'spring': 1, 'fall_floor': 1}
+room 25 (1,3): top {'spike': 4}  bottom {'spike': 3, 'spawn': 1, 'key': 1}
+room 26 (2,3): top {'spike': 9}  bottom {'spike': 3, 'spawn': 1}
+room 27 (3,3): top {'spike': 5, 'spawn': 1, 'chest': 1, 'key': 1}  bottom {'spike': 1, 'balloon': 1, 'fall_floor': 2}
+room 28 (4,3): top {'fruit': 1, 'spike': 2}  bottom {'spike': 3, 'spring': 1}
+room 29 (5,3): top {'spike': 7, 'chest': 1, 'key': 1}  bottom {'spike': 11, 'balloon': 2}
+room 30 (6,3): top {}  bottom {'spawn': 1}
+
+colours per sprite group (PICO-8 index: pixels)
+  player 1-7: {0: 158, 1: 14, 3: 31, 7: 15, 8: 145, 15: 85}
+  hair (colour 8 in player): {}
+  objects 8-31: {0: 870, 1: 89, 2: 12, 3: 8, 4: 48, 5: 64, 6: 66, 7: 109, 8: 104, 9: 100, 10: 60, 11: 6}
+  spikes: {0: 152, 5: 16, 6: 48, 7: 40}
+  terrain/bg 32-127: {0: 3017, 1: 15, 2: 31, 3: 56, 4: 72, 5: 423, 6: 132, 7: 1179, 8: 1, 9: 98, 10: 92, 11: 57, 12: 723, 13: 129, 14: 119}
+  title/logo 128-255: {0: 3426, 1: 518, 2: 1533, 3: 727, 4: 163, 5: 419, 6: 180, 7: 83, 8: 565, 9: 137, 10: 144, 11: 271, 12: 6, 13: 7, 14: 6, 15: 7}
+  sprite 1: {0: 22, 1: 2, 3: 4, 7: 2, 8: 22, 15: 12}
+  sprite 2: {0: 22, 1: 2, 3: 4, 7: 2, 8: 22, 15: 12}
+  sprite 3: {0: 22, 1: 2, 3: 4, 7: 2, 8: 22, 15: 12}
+  sprite 4: {0: 22, 1: 2, 3: 4, 7: 2, 8: 22, 15: 12}
+  sprite 5: {0: 26, 1: 2, 3: 4, 7: 2, 8: 18, 15: 12}
+  sprite 6: {0: 22, 1: 2, 3: 3, 7: 3, 8: 22, 15: 12}
+  sprite 7: {0: 22, 1: 2, 3: 8, 7: 2, 8: 17, 15: 13}

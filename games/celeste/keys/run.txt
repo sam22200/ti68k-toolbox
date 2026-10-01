@@ -1,0 +1,6 @@
+# scenario 1: run right into the step, then left to the screen edge (draw clamp)
+0
+5 RIGHT
+30
+40 LEFT
+90

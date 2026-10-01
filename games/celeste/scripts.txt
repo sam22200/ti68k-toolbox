@@ -1,0 +1,24 @@
+# trace test scripts: name (keys/<name>.txt), scenario (0 = game start, 1 = player on the spawn
+# tile), frames. Read by the Makefile (reference traces) and test_celeste.c.
+idle 0 90
+run 1 120
+jump 1 140
+walljump 1 90
+dash 1 220
+death 1 140
+fakewall 1 160
+fruitbob 1 260
+exit 0 100
+play 0 400
+fuzz_00 1 1500
+fuzz_01 1 1500
+fuzz_02 1 1500
+fuzz_03 1 1500
+fuzz_04 1 1500
+fuzz_05 1 1500
+fuzz_06 1 1500
+fuzz_07 1 1500
+fuzz_08 1 1500
+fuzz_09 1 1500
+fuzz_10 1 1500
+fuzz_11 1 1500

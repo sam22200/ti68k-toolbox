@@ -9,7 +9,7 @@
 
 u8 sw_planes[2][RT_PSIZE];
 
-u16 rt_ticks(void) { return (u16)(rt_frame * RT_FRAME_TICKS); }   // virtual clock: deterministic
+u16 rt_ticks(void) { return (u16)(((u32)rt_frame * RT_FRAME_TICKS2) >> 1); }   // virtual clock: deterministic
 
 static void put(u8 *p, s16 x, s16 y, u8 on)
 {
