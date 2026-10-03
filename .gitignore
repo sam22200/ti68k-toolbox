@@ -61,3 +61,6 @@ __pycache__/
 # PICO-8 ports: shrinko8 (github.com/thisismypassport/shrinko8) and z8lua (github.com/samhocevar/z8lua)
 /tools/shrinko8/
 /tools/z8lua/
+# Game Boy ports: Ghidra + GhidraBoy (tools/ghidra), commercial ROMs (roms/)
+/tools/ghidra/
+/roms/
