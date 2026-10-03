@@ -52,4 +52,6 @@ Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
   `make -C tools/m68kbench` then builds `tools/bin/ti-cycles`.
 - `runtime/platform-sw/amsfont.h`: AMS fonts, extracted from `tools/rom/` by `make`.
 - `sources/`, `ffa_en/`: third-party reference sources and TI-Basic programs.
+- `tools/ghidra/`, `roms/`: Ghidra 11.4.2 with the GhidraBoy extension and the Game Boy ROMs
+  for `ti-port-gb` (install steps in its `SKILL.md`; PyBoy goes into `tools/pyenv`).
 - Build outputs: `*.89z`, `*_pc`, `*_test`, …
