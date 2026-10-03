@@ -115,6 +115,10 @@ that kind of task.
 - `ti-port-pico8`: port a PICO-8 cart (Celeste Classic…): cart decoded with shrinko8, run
   headless under z8lua for reference traces, `/grilling` on the port decisions, Lua translated
   to bit-exact 16.16 C (`assets/p8num.h`) diffed against the traces, native rendering.
+- `ti-port-gb`: port a Game Boy game from its ROM (Bubble Ghost…): decompiled with Ghidra +
+  GhidraBoy (headless, pseudo-C per function), run headless under PyBoy for RAM traces and
+  VRAM dumps, `/grilling` on the port decisions, logic translated to C bit-exact with the
+  traces, native rendering. ROMs in `roms/gb/` (local).
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
@@ -183,7 +187,7 @@ that kind of task.
 - Local only, not in git (`.gitignore`, see `README.md`): `games/ffa_ct/` (FFA with Chrono Trigger
   sprites, an art test: `.git/info/exclude`, state in its `PROGRESS.md`), `sources/`, `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
-  `patches`, `musashi`, `shrinko8`, `z8lua`), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
+  `patches`, `musashi`, `shrinko8`, `z8lua`, `ghidra`), `roms/` (commercial ROMs), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
 - `docs/resources.md`: tutorials, game sources, sites, sprite/tileset/map sites for assets.
 
