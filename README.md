@@ -12,7 +12,7 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 | `lib/` | shared code: ZX0/LZ4 decoders in 68000 asm, ZX0 packer |
 | `experiments/` | small measured tests (hardware, timers, keyboard, graphics, benchmarks) |
 | `hello/` | reference Hello World |
-| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-group`/`ti-key`/`ti-shot` (TiEmu in Docker, `Dockerfile.tiemu` + `tiemu-keyfix.c`), `ti-table`, `zx0`, `ti-cycles` (cycle counter, `tools/m68kbench/`) |
+| `tools/bin/` | `ti-cc` (build), `ti-emu`/`ti-run`/`ti-send`/`ti-group`/`ti-key`/`ti-shot` (TiEmu in Docker, `Dockerfile.tiemu` + `tiemu-keyfix.c`), `ti-table`, `ti-view` (PNG/GIF gallery on the LAN, e.g. for an iPad), `zx0`, `ti-cycles` (cycle counter, `tools/m68kbench/`) |
 | `.claude/skills/` | Claude Code skills and the knowledge base (`ti89-c-dev/reference/*.md`) |
 | `CLAUDE.md` (`AGENTS.md` links to it) | project rules and workflow, for any coding agent; collaboration rules in `docs/working-rules.md` |
 

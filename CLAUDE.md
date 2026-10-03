@@ -40,6 +40,7 @@ ti-cc -o name src.c             # build → name.89z (skill ti89-c-dev)
 ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 HW2 AMSpatch, 89u unpatched)
 ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
+ti-view                         # PNG/GIF captures on the LAN, newest first: http://<PC IP>:8000 (iPad Safari)
 ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycles per zone, screen as PNG
 make xcheck                     # runtime game: TI binary under ti-cycles = PC headless, per scenario
 ```
@@ -172,7 +173,7 @@ that kind of task.
   `sprites/`: ExtGraph mirror routines; `tilemap/`: TileMap engine + pre-shifted sprites; `fonts/`: AMS fonts read in place; `hwsync/`: LCD sync bit and 16 kHz fine timer; `render/`, `ai/`, `struct/`, `compress/`, `maps/`: the
   measured ideas of game-techniques §13; `bench/m7row.s`: C-callable asm example). `sources/`: old reference sources.
 - `tools/m68kbench/`: `ti-cycles` sources, `bench.h` markers, self-test. `docs/INSTALL.md`: toolchain install (Ubuntu, macOS).
-- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-table`, `ti-cycles` (host 68000 cycle counter, built from `tools/m68kbench/` with Musashi in `tools/musashi/`), `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
+- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-table ti-view`, `ti-cycles` (host 68000 cycle counter, built from `tools/m68kbench/` with Musashi in `tools/musashi/`), `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
   (numpy, scipy, pillow) for asset pipelines.
 - `tools/gcc4ti-bin/`: installed GCC4TI (HTML docs in `doc/html/`); `tools/build-gcc4ti.sh`
   rebuilds it in Docker (GCC 4.1.2 does not build with the host gcc).
