@@ -116,6 +116,10 @@ What a TI-89 port of a DMG game depends on. Hardware numbers are the documented 
   `screen.image` (PIL). ~3,000 frames per second headless here (6,000 frames in 1.9 s with
   start-up). Trust it for game state; traces of timing-sensitive raster code
   are less trustworthy (check against a second emulator, e.g. SameBoy, when it matters).
+  Verified 2026-10-03: inputs sent from inside a hook (`hook_register`) are dropped (queue
+  them for the next `tick()`); a hook runs mid-frame while the PPU draws, so
+  `screen.image` read there mixes new and old lines (read it after the tick); hooks on
+  bank 0 addresses work as breakpoints for `--logic` and `--poke-at`.
 
 ## 8. Pitfalls
 

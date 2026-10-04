@@ -80,12 +80,17 @@ code indexes across variables (`(&DAT_c0b4)[i]`: a table).
 ## 6. The trace test (C side)
 
 - `test_<name>.c` loads the same key script (`sw_load_script`, `sw_script_keys`), maps the
-  keys as `gbtrace.py --map` (A=a, B=b, C=start, D=select), steps one `game_update()` per GB
-  frame and prints `"<frame> name=hex ..."` with the same names and widths as `--trace`.
-- The reference comes from `gbtrace.py ROM --load pre.state --poke ... --keys K --trace
-  <vars> --sym <name>.sym --from F`: the frame numbering must match (frame 0 = the first
-  update of the level). Align once by tracing the frame counter or the first moving
-  variable, then fix the offset in `scripts.txt`.
+  keys as `gbtrace.py --map` (A=a, B=b, C=start, D=select), steps one GB logic frame per
+  script frame (not `game_update()`, which runs two at 30 fps) and prints `"<frame>
+  addr=hex ..."` with the same names and widths as `--trace`.
+- The reference comes from `gbtrace.py ROM --load pre.state --boot-keys A --poke ...
+  --poke-at <level start> --logic <after the update> --stall N --keys K --trace <vars>`: frame
+  0 is the first logic frame of the level on both sides, whatever the loading takes.
+- Ghidra's pseudo-C drops what a callee leaves in registers. When a trace diverges after a
+  call, read the callee in `disasm.s` for the registers it changes (Bubble Ghost:
+  `blow_bubble` overwrites E, which its caller tests next).
+- The state the game had before the level matters too: the joypad bytes keep the title's
+  last read (A held), so `keys_pressed` at frame 0 differs unless the port starts the same.
 - The ROM is commercial: `make traces` regenerates `traces/` from `roms/gb/` when the ROM is
   present; the tests print "ROM missing: trace tests skipped" otherwise. Never commit traces
   that contain ROM data (level bytes); traces of positions and counters are our own
