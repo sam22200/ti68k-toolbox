@@ -93,6 +93,9 @@ void _main(void) { ... }      // entry point, NOT main()
 - Without `SAVE_SCREEN`, save and restore the screen yourself: `LCD_BUFFER s; LCD_save(s); … LCD_restore(s);`.
 - `int` is **16-bit** (TIGCC default). Use `long` for anything above 32767 (scores, timers,
   products like `norm * cos`). `sizeof(int) == 2`.
+  Byte pairs promote to that `int`: `(u32)(hi << 8 | lo)` is **negative** for `hi >= 0x80` and
+  sign-extends (0xFFFFxxxx); write `(u32)(u16)(hi << 8 | lo)`. Code that passes every PC test
+  breaks there (Desolate's 12-px blitter: caught by `make xcheck`, TI ≠ PC checksum).
 - No FPU: avoid `float` in the game loop. Use fixed point (§6) and precomputed tables.
   `sqrt`/`atan2` are fine once at init (Puzzle Bobble's `calc()`).
 

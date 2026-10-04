@@ -79,7 +79,7 @@ static int var_new[NVAR];                    /* created by the program (SymAdd):
 static const char *save_dir;
 static long bench_frames = -1;
 static uint32_t key_frame;
-static struct { int frame; uint32_t keys; } script[1024];
+static struct { int frame; uint32_t keys; } script[32768];
 static int nscript;
 
 static unsigned long long now(void) { return total + (unsigned long long)m68k_cycles_run(); }
@@ -251,7 +251,7 @@ static int load_script(const char *path)
     FILE *f = fopen(path, "r");
     char line[256], w[16];
     if (!f) return -1;
-    while (fgets(line, sizeof line, f) && nscript < 1024) {
+    while (fgets(line, sizeof line, f) && nscript < 32768) {
         int fr, n, m;
         const char *s;
         uint32_t k = 0;

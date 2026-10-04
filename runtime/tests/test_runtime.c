@@ -46,7 +46,7 @@ static void test_render(void)
 
 static void test_input_and_script(void)
 {
-    SwScript sc;
+    static SwScript sc;
     FILE *f = fopen("/tmp/rt_test_keys.txt", "w");
     CHECK(sw_parse_keys("UP A 5 # comment") == (K_UP | K_A | K_DIGIT(5)));
     CHECK(K_DIGIT(1) == 0x10000UL && K_DIGIT(9) == 0x1000000UL);

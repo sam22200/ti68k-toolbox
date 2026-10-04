@@ -47,9 +47,12 @@ static void blit(u8 *p, s16 x, s16 y, u8 w, u8 h, const void *data, const void *
     }
 }
 
-void draw_clear(void)
+void draw_clear(void)                  // like every draw_*: into rt_light / rt_dark (the TI's)
 {
-    memset(sw_planes, 0, sizeof(sw_planes));
+    memset(rt_light, 0, RT_PSIZE);
+#ifndef RT_MONO
+    memset(rt_dark, 0, RT_PSIZE);
+#endif
 }
 
 void rt_fill(u16 x1, u16 y1, u16 x2, u16 y2, u8 color)
@@ -58,10 +61,10 @@ void rt_fill(u16 x1, u16 y1, u16 x2, u16 y2, u8 color)
     for (y = y1; y <= y2; y++)
         for (x = x1; x <= x2; x++) {
 #ifdef RT_MONO
-            put(sw_planes[0], x, y, color >> 1);
+            put((u8 *)rt_light, x, y, color >> 1);
 #else
-            put(sw_planes[0], x, y, color & 1);
-            put(sw_planes[1], x, y, color >> 1);
+            put((u8 *)rt_light, x, y, color & 1);
+            put((u8 *)rt_dark, x, y, color >> 1);
 #endif
         }
 }
@@ -69,10 +72,10 @@ void rt_fill(u16 x1, u16 y1, u16 x2, u16 y2, u8 color)
 void draw_sprite(s16 x, s16 y, const RtSprite *s)
 {
 #ifdef RT_MONO
-    blit(sw_planes[0], x, y, s->w, s->h, s->dark, s->mask);
+    blit((u8 *)rt_light, x, y, s->w, s->h, s->dark, s->mask);
 #else
-    blit(sw_planes[0], x, y, s->w, s->h, s->light, s->mask);
-    blit(sw_planes[1], x, y, s->w, s->h, s->dark, s->mask);
+    blit((u8 *)rt_light, x, y, s->w, s->h, s->light, s->mask);
+    blit((u8 *)rt_dark, x, y, s->w, s->h, s->dark, s->mask);
 #endif
 }
 
@@ -85,10 +88,10 @@ static void tile16(s16 x, s16 y, const u16 *t)     // opaque, rows (dark, light)
         for (c = 0; c < 16; c++) {
             u16 bit = 0x8000 >> c;
 #ifdef RT_MONO
-            put(sw_planes[0], x + c, y + r, (t[0] & bit) != 0);
+            put((u8 *)rt_light, x + c, y + r, (t[0] & bit) != 0);
 #else
-            put(sw_planes[0], x + c, y + r, (t[1] & bit) != 0);
-            put(sw_planes[1], x + c, y + r, (t[0] & bit) != 0);
+            put((u8 *)rt_light, x + c, y + r, (t[1] & bit) != 0);
+            put((u8 *)rt_dark, x + c, y + r, (t[0] & bit) != 0);
 #endif
         }
 }
@@ -334,7 +337,7 @@ int sw_load_script(SwScript *s, const char *path)
     char line[256];
     s->n = s->pos = 0;
     if (!f) return -1;
-    while (fgets(line, sizeof(line), f) && s->n < 256) {
+    while (fgets(line, sizeof(line), f) && s->n < SW_SCRIPT_MAX) {
         int fr, n;
         if (sscanf(line, " %d%n", &fr, &n) != 1) continue;   // blank or comment
         s->frame[s->n] = fr;

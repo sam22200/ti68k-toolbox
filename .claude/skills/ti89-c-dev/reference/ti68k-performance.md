@@ -245,6 +245,14 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   opaque 16-px sprite of identical rows (`RtSprite` mask `RT_NULL`, `h` set per call) and the caps
   as one masked 32-px sprite, 244k; a playing frame with 3 pipes, 158k. Same for a scrolling
   striped band: six 32x4 opaque sprites instead of 20 rects.
+- **Non-16-px tiles: draw them in byte-aligned groups, and cache the static screen** (`ti-cycles`
+  datasheet counts, `games/desolate/`, 1.5× of a TI-83 game: 12×12 tiles at x = 8 + 12c): a
+  generic any-x blit (12-bit row shifted into a `long`, three masked byte writes) cost 1.22M
+  cycles for the 96 tiles of a screen (two planes); two tiles side by side are exactly 3 whole
+  bytes, so per pair row `p[0] = a0; p[1] = a1 | b0 >> 4; p[2] = b0 << 4 | b1 >> 4` from tiles
+  stored as bytes: 212k (**5.7× faster**; with `u16` rows GCC's `lsr.w #8/#12` kept it at 317k).
+  The room is composed once into a private plane pair (on changes only) and copied each frame
+  with unrolled `long` moves: 45k, a whole play frame 59k with the hero sprite.
 - **`RT_BENCH` renders the final state**: pick the scenario and the `BENCH` count so that this
   state is the worst case (an autopilot that died and restarted measured an empty screen:
   100k instead of the real cost). Check the state with the same `--scenario N --frames BENCH
