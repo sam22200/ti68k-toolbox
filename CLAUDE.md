@@ -121,6 +121,12 @@ that kind of task.
   of the GB memory (protothreads for the waits, the ROM itself as the data file), traces
   comparing whole RAM regions, a generic VRAM/OAM renderer; skeleton in its `assets/`. ROMs
   in `roms/gb/` (local).
+- `ti-port-ti83`: port a TI-83/83+/84+ asm game (Desolate…): program file read and its load
+  address scored, Ghidra's Z80 processor (headless), the original run headless without a TI
+  ROM (`ti83run.py`: Z80 core, LCD, keypad, interrupts, grey, the OS and shell routines in
+  Python) for reference screens and dumps, analysis split between sub-agents, `/grilling`,
+  the logic rewritten routine by routine in C, light tests (one per mechanic, a bot-played
+  walkthrough, TI = PC by `xcheck`). Programs in `roms/ti83/` (local).
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
@@ -189,9 +195,11 @@ that kind of task.
 - Local only, not in git (`.gitignore`, see `README.md`): `games/ffa_ct/` (FFA with Chrono Trigger
   sprites, an art test: `.git/info/exclude`, state in its `PROGRESS.md`), `games/bubble_ghost/`
   (Game Boy Bubble Ghost ported with `ti-port-gb`, commercial: `.git/info/exclude`, state in its
-  `README.md`), `sources/`, `ffa_en/`, third-party and
+  `README.md`), `games/desolate/` (TI-83 Desolate ported with `ti-port-ti83`, freeware whose
+  readme forbids redistribution: `.git/info/exclude`, state in its `README.md`), `sources/`,
+  `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
-  `patches`, `musashi`, `shrinko8`, `z8lua`, `ghidra`), `roms/` (commercial ROMs), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
+  `patches`, `musashi`, `shrinko8`, `z8lua`, `ghidra`), `roms/` (commercial ROMs, TI-83 programs), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
 - `docs/resources.md`: tutorials, game sources, sites, sprite/tileset/map sites for assets.
 
