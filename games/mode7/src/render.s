@@ -752,8 +752,39 @@ TriSpans:
 | pixel, and the screen needs no clearing. The sampling (16.16 u and v, the steps, the rows) is
 | the original's instruction for instruction, v being kept as v << 8 (8.24) for the index.
 | ---------------------------------------------------------------------------------------------
+| Packed stepping (from rwill's "Just some small effects", knowledge base game techniques §14):
+| the texel index d1.w = v_int << 8 | u_int is stepped as a whole: the u fraction's carry goes in
+| with addx.w, the v fraction's carry adds 0x100. 20-22 cycles per pixel instead of 36 for the two
+| add.l and the swap / move.b index. The index is linear (v * 256 + u): it differs from the
+| original's per-byte wrap only when u crosses a multiple of 256, i.e. outside the texture.
+| PACK_STEPS fu, fv: from u, v (d4, d5) and their steps (d6, d7) in 16.16, set d1 = the index,
+| d4 / d5 = the fractions, fu / fv = the step fractions, d6 = dv_int << 8 + du_int, d7 = 0x100.
+	.macro	PACK_STEPS fu, fv
+	move.l	d5, d1
+	swap	d1
+	lsl.w	#8, d1
+	move.l	d4, d0
+	swap	d0
+	move.b	d0, d1
+	movea.w	d6, \fu
+	movea.w	d7, \fv
+	swap	d6
+	swap	d7
+	lsl.w	#8, d7
+	add.w	d7, d6
+	move.w	#0x100, d7
+	.endm
+| STEP fu, fv: next texel. add.w An,Dn sets X like any add.
+	.macro	STEP fu, fv
+	add.w	\fu, d4                          |  4  u fraction, X = its carry
+	addx.w	d6, d1                           |  4  index += dv_int << 8 + du_int + X
+	add.w	\fv, d5                          |  4  v fraction
+	bcc.s	1f                               | 10 (8 when it falls through)
+	add.w	d7, d1                           |  4  its carry: next row
+1:
+	.endm
 | void Mode7FarFast(void *dest, unsigned char *tex, short u, short v, unsigned char angle)
-|   tex = the block + 128. ~71 cycles per pixel (the original: ~88 on white, ~115 otherwise).
+|   tex = the block + 128. ~53 cycles per pixel (~66 before the packed stepping) (the original: ~88 on white, ~115 otherwise).
 	.globl	Mode7FarFast, Mode7NearFast, BuildTexture8W, BuildTexture16W, SkyCopy
 | per-row quotients of the floor routines (the original divides twice per row), index = the
 | row's distance index (far 6..20, near 22..60)
@@ -836,23 +867,16 @@ Mode7FarFast:
 	neg.l	d5
 	add.l	d2, d4
 	add.l	d1, d5
-	lsl.l	#8, d5                           | v and its step as 8.24
-	lsl.l	#8, d7
+	PACK_STEPS a3, a4                        | index d1 = v << 8 | u, fractions in d4 / d5
 	lea.l	16(a1), a2                       | end of the row
 .Lff_byte:
 	.rept	8
-	move.l	d5, d1                           | index = v << 8 | u
-	swap	d1
-	move.l	d4, d0
-	swap	d0
-	move.b	d0, d1
-	move.b	(a0, d1.w), d0
-	add.b	d0, d0                           | bit 7: dark
-	addx.b	d3, d3
-	add.b	d0, d0                           | bit 6: light
-	addx.b	d2, d2
-	add.l	d6, d4
-	add.l	d7, d5
+	move.b	(a0, d1.w), d0                   | 14
+	add.b	d0, d0                           |  4  bit 7: dark
+	addx.b	d3, d3                           |  4
+	add.b	d0, d0                           |  4  bit 6: light
+	addx.b	d2, d2                           |  4
+	STEP	a3, a4                           | 20-22
 	.endr
 	move.b	d3, 0xf00(a1)
 	move.b	d2, (a1)+
@@ -931,23 +955,16 @@ Mode7NearFast:
 	add.l	d1, d5
 	add.l	d6, d6
 	add.l	d7, d7
-	lsl.l	#8, d5
-	lsl.l	#8, d7
+	PACK_STEPS a4, a5
 	lea.l	16(a1), a2
 .Lnf_byte:
 	.rept	4
-	move.l	d5, d1
-	swap	d1
-	move.l	d4, d0
-	swap	d0
-	move.b	d0, d1
 	move.b	(a0, d1.w), d0
 	add.b	d0, d0                           | bit 7: the plane at +0xF00
 	addx.b	d3, d3
 	add.b	d0, d0                           | bit 6: the plane at dest
 	addx.b	d2, d2
-	add.l	d6, d4
-	add.l	d7, d5
+	STEP	a4, a5
 	.endr
 	andi.w	#15, d3                          | 4 texels: each bit doubled (2-pixel texels)
 	move.b	(a3, d3.w), d3
