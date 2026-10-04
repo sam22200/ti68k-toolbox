@@ -3,6 +3,7 @@
 an iPad or any browser, newest first, the page reloads by itself when a new capture appears.
 
   ti-view [--port 8000] [DIR...]     then open http://<PC IP>:8000 in Safari
+                                     (/?only=gif: the GIFs only, e.g. ti-gif recordings)
 
 Default DIRs: the repo and this repo's agent scratchpads (/tmp/claude-<uid>/<repo path, / as ->). Only .png/.gif/.jpg files
 under those DIRs are served (nothing else is readable); tools/, sources/, .git are skipped.
@@ -15,13 +16,13 @@ SKIP = {'.git', 'tools', 'sources', 'node_modules', '__pycache__'}
 LIMIT = 80
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-def scan(roots):
+def scan(roots, exts=EXTS):
     found = []
     for root in roots:
         for d, dirs, files in os.walk(root):
             dirs[:] = [x for x in dirs if x not in SKIP]
             for f in files:
-                if f.lower().endswith(EXTS):
+                if f.lower().endswith(exts):
                     p = os.path.join(d, f)
                     try:
                         found.append((os.path.getmtime(p), p))
@@ -33,10 +34,11 @@ def scan(roots):
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>ti-view</title><style>
 body{{margin:0;padding:12px;background:#222;color:#ddd;font:14px -apple-system,sans-serif}}
-.c{{margin:0 0 18px}} .c p{{margin:4px 0;word-break:break-all}} .t{{color:#888}}
+.c{{margin:0 0 18px}} nav{{margin:0 0 12px}} nav a{{color:#9cf;margin-right:14px}}
+.g{{background:#9cf;color:#222;border-radius:3px;padding:0 4px;font-size:12px}} .c p{{margin:4px 0;word-break:break-all}} .t{{color:#888}}
 img{{max-width:100%;image-rendering:pixelated;background:#555;min-width:min(480px,100%)}}
 </style></head><body>{body}<script>
-const v={stamp!r};setInterval(()=>fetch('/stamp').then(r=>r.text()).then(s=>{{if(s!==v)location.reload()}}),2000);
+const v={stamp!r};setInterval(()=>fetch('/stamp'+location.search).then(r=>r.text()).then(s=>{{if(s!==v)location.reload()}}),2000);
 </script></body></html>"""
 
 class Handler(BaseHTTPRequestHandler):
@@ -57,8 +59,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
+        exts = ('.gif',) if urllib.parse.parse_qs(url.query).get('only') == ['gif'] else EXTS
         if url.path == '/stamp':
-            s = scan(self.roots)
+            s = scan(self.roots, exts)
             return self.send(200, 'text/plain', (f'{s[0][0]}{s[0][1]}{len(s)}' if s else '').encode())
         if url.path == '/img':
             p = os.path.realpath(urllib.parse.parse_qs(url.query).get('p', [''])[0])
@@ -70,12 +73,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, 'text/plain', b'not found')
         if url.path != '/':
             return self.send(404, 'text/plain', b'not found')
-        s = scan(self.roots)
+        s = scan(self.roots, exts)
         body = ''.join(
-            f'<div class="c"><p>{html.escape(self.rel(p))} <span class="t">'
+            f'<div class="c"><p>{html.escape(self.rel(p))} '
+            f'{"<span class=g>GIF</span> " if p.lower().endswith(".gif") else ""}<span class="t">'
             f'{time.strftime("%H:%M:%S", time.localtime(m))}</span></p>'
             f'<img src="/img?p={urllib.parse.quote(p)}&m={m}"></div>' for m, p in s) \
             or '<p>No PNG/GIF yet.</p>'
+        body = '<nav><a href="/">All</a><a href="/?only=gif">GIF only</a></nav>' + body
         stamp = f'{s[0][0]}{s[0][1]}{len(s)}' if s else ''
         self.send(200, 'text/html; charset=utf-8', PAGE.format(body=body, stamp=stamp).encode())
 

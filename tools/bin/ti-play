@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Play a runtime key script (games/*/keys/*.txt: lines "<frame> <keys...>", held until the next
+line) in TiEmu in real time, through the PC keyboard (xdotool keydown/keyup), so several keys
+are held at once (diagonals), which ti-key's skin clicks cannot do.
+
+Usage: ti-play SCRIPT [FPS]        (FPS of the game, default 30.1; start it right after ENTER)
+  e.g. ti-key HOME CLEAR CLEAR 'mgs()'; ti-gif x.gif 36 & ti-key ENTER; ti-play keys/win.txt
+
+Open loop: TiEmu's speed drifts against the wall clock, so a script for the emulator should end
+its moves against walls (time-insensitive) and be checked on the PC with its timeline scaled by
++-10 % (MGS keys/win.txt). Keys: UP DOWN LEFT RIGHT (verified: tools/tiemu-keyfix.c maps the
+PC arrows), ENTER, ESC; A = [2nd] (AltGr) and B = [shift] are the keyfix's mappings.
+"""
+import subprocess
+import sys
+import time
+
+KEYCODES = {'UP': 111, 'DOWN': 116, 'LEFT': 113, 'RIGHT': 114, 'ENTER': 36, 'ESC': 9,
+            'A': 108, 'B': 50}
+
+
+def xdo(*args):
+    subprocess.run(['xdotool', *args], check=True)
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+        sys.exit(__doc__)
+    fps = float(sys.argv[2]) if len(sys.argv) > 2 else 30.1
+    events = []
+    for line in open(sys.argv[1]):
+        p = line.split('#')[0].split()
+        if p:
+            keys = set(k.upper() for k in p[1:])
+            bad = keys - set(KEYCODES)
+            if bad:
+                sys.exit('ti-play: unsupported keys %s' % sorted(bad))
+            events.append((int(p[0]), keys))
+    held = set()
+    t0 = time.time()
+    try:
+        for frame, keys in events:
+            t = t0 + frame / fps
+            while time.time() < t:
+                time.sleep(0.002)
+            for k in held - keys:
+                xdo('keyup', str(KEYCODES[k]))
+            for k in keys - held:
+                xdo('keydown', str(KEYCODES[k]))
+            held = keys
+    finally:
+        for k in held:
+            xdo('keyup', str(KEYCODES[k]))
+
+
+main()
