@@ -22,17 +22,17 @@ Every change sits in the sources behind `#ifndef ORIGINAL`, marked *optimised* i
 
 | cycles / frame | original | optimised | gain |
 |---|---:|---:|---:|
-| scenario 0 (start) | 666,518 | 362,430 | **−46 %** |
-| scenario 1 (distant 3D, 10 % of the view) | 1,059,860 | 492,062 | **−54 %** |
-| scenario 2 (driving) | 686,896 | 414,938 | **−40 %** |
-| ≈ fps at 12 MHz (grayscale included) | 16 / 10 / 16 | 30 / 22 / 26 | |
+| scenario 0 (start) | 666,518 | 334,650 | **−50 %** |
+| scenario 1 (distant 3D, 10 % of the view) | 1,059,860 | 464,282 | **−56 %** |
+| scenario 2 (driving) | 686,896 | 387,158 | **−44 %** |
+| ≈ fps at 12 MHz (grayscale included) | 16 / 10 / 16 | 33 / 24 / 28 | |
 
 Per zone, scenario 0 (scenario 2 for the textures while driving):
 
 | zone | original | optimised | gain |
 |---|---:|---:|---:|
-| Mode 7 far rows (15 × 128 px) | 224,410 | 137,286 | −39 % |
-| Mode 7 near rows (20 × 64 texels) + line doubling | 133,176 + 11,802 | 125,404 | −14 % |
+| Mode 7 far rows (15 × 128 px) | 224,410 | 120,406 | −46 % |
+| Mode 7 near rows (20 × 64 texels) + line doubling | 133,176 + 11,802 | 114,504 | −21 % |
 | textures, at rest | 111,938 | 14,779 | −87 % |
 | textures, driving | 111,938 | 70,907 | −37 % |
 | clear the screen | 17,484 | 0 | −100 % |
@@ -56,6 +56,7 @@ In order, frame cycles for scenarios 0 / 1 / 2:
 | `TriSpans`: one loop per colour | 376,440 | 506,072 | 426,901 |
 | near rows: nibble-doubling table | 370,048 | 499,680 | 420,509 |
 | physics: `muls.w` | 363,616 | 493,248 | 416,124 |
+| packed u,v stepping (§11) | 334,650 | 464,282 | 387,158 |
 | a dead `memset` dropped | 362,430 | 492,062 | 414,938 |
 
 ---
@@ -248,16 +249,47 @@ The same change in the ship physics and collisions: 11k → 4.8k (the speed stay
 
 ---
 
-## What costs the most now (scenario 0, 362k)
+### 11. Packed u,v stepping (added 2026-10, from the TI-89 demoscene)
+
+- **Idea**: rwill's *Just some small effects* (pouet 85624; knowledge base, game techniques §14) steps its texture coordinates as one 16-bit texel index.
+- **Change** (`render.s`, macros `PACK_STEPS` / `STEP`): at the start of each row the index `d1.w = v_int << 8 | u_int` is built once, the fractions stay in `d4.w` / `d5.w`, the step fractions in two address registers. Per pixel:
+
+```asm
+	add.w	a3, d4               |  4  u fraction, X = its carry
+	addx.w	d6, d1               |  4  index += dv_int << 8 + du_int + X
+	add.w	a4, d5               |  4  v fraction
+	bcc.s	1f                   | 10  (8 + 4 below on a carry)
+	add.w	d7, d1               |      d7 = 0x100: the next texture row
+1:
+```
+
+  - That replaces the two `add.l` and the `swap`/`move.b` index (36 cycles) with 20-22.
+- **Exactness**: the index is linear (`v * 256 + u`), where the original wraps u in its byte. They differ only when u crosses a multiple of 256, which is outside the texture: the three scenarios keep their checksums; on a 240-frame drive with turns (bench scenario 5) only rows 45-47, the horizon rows the original already reads from outside its texture, differ.
+- **Far rows** 137k → 120k (~63 cycles per sample with the row set-up), **near rows** 125k → 115k: −8 % per frame.
+- **Side by side at calculator speed** (`orig_vs_opt.gif`): the original and the optimised build on the same 240-frame drive (bench scenario 5), each panel showing the last frame its build would have finished at 12 MHz (+10 % for the grayscale driver): 673k vs 365k cycles per frame on average, ~16 vs ~30 fps.
+
+  ![original vs optimised](orig_vs_opt.gif)
+
+  Regenerated with (SP = any scratch directory):
+
+```sh
+make bench ORIGINAL=1 && ../../tools/bin/ti-cycles --arg 5 --png $SP/orig/f%d.png build/m7bench.89z > $SP/orig/log.txt
+make bench && ../../tools/bin/ti-cycles --arg 5 --png $SP/opt/f%d.png build/m7bench.89z > $SP/opt/log.txt
+../../tools/pyenv/bin/python ../../experiments/demoscene/sidebyside.py orig_vs_opt.gif "Mode 7 ..." \
+    $SP/orig "original (2005)" $SP/opt "optimised + packed u,v stepping" --width 128
+```
+
+- **Side note**: on that drive with turns, the optimised build before this step already differed from the original by a few pixels on every row (13,422 pixels over 235 of 240 frames; the three straight-line scenarios match). Not investigated: a slightly different ship trajectory is one candidate.
+
+## What costs the most now (scenario 0, 335k)
 
 | zone | cycles | share |
 |---|---:|---:|
-| Mode 7 far rows | 137k | 38 % |
-| Mode 7 near rows | 125k | 35 % |
-| 3D | 60k | 16 % |
-| textures, sprite, sky, physics | 39k | 11 % |
+| Mode 7 far rows | 120k | 36 % |
+| Mode 7 near rows | 115k | 34 % |
+| 3D | 60k | 18 % |
+| textures, sprite, sky, physics | 39k | 12 % |
 
-The floor is at ~66 cycles per sample, which is about the limit with exact 16.16 stepping. Beyond that, the ideas change the pixels slightly:
-- 8.8 stepping in 16-bit words (add.w instead of add.l);
+The floor is now at ~63 cycles per sample. Beyond that, the ideas change the pixels slightly:
 - far rows at half resolution (−65k);
 - the precomputed-grid approach of the Mode7 Engine (knowledge base, game techniques §8).

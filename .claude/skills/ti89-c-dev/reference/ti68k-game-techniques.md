@@ -285,7 +285,8 @@ are the author's (CodeWalrus thread, `sources/web/codewalrus-570-x3d.txt`).
   - **Texels pre-encoded with their plane bits at the top of the byte**, shifted into two byte
     accumulators with `add.b d0,d0` / `addx.b dN,dN` (16 cycles per pixel for both planes), one
     `move.b` per plane every 8 pixels: no colour compare chain, no `or.b` to memory, no screen
-    clear. Far floor 224k → 137k (~66 cycles per sample, the floor with exact 16.16 stepping).
+    clear. Far floor 224k → 137k (~66 cycles per sample), then 120k with the texel index stepped as one
+    word (§14, packed u,v stepping).
   - Half-resolution rows: 2 bits per texel, then a 16-byte nibble-doubling table per byte; write
     the doubled line in the same loop (no `memcpy` pass).
   - **Rebuild the texture cache only when its window moves to another map cell**: the original
@@ -652,3 +653,57 @@ slower on hardware than shown. Sources are in `experiments/` (the directory is g
 | Bytecode VM, 17 opcodes (`vm.c`, script by `vmasm.py`) | per opcode: switch 222 cycles, computed goto (`&&label`, works in GCC 4.1) 182. The behaviour costs 1,273 / 1,043 cycles vs 171 native (6–7×); with the step as a native call 900 / 769. Script 96 bytes, read in place from an archived file at the same speed | For level scripts and cut-scenes, not per-frame physics; keep heavy steps native |
 | Arena vs AMS heap (`alloc.c`) | AMS `malloc` ~48,000 cycles per call (with the calculator's heap as it was), `free` 1,875; arena alloc 117 (loop included), release = 1 store; pool alloc + free 398, handle lookup with generation check 257, stale handle caught | Never `malloc` during play: one arena or pool per level |
 
+
+## 14. The TI-68k demoscene (pouet.net), compared with §5–13 (2026-10)
+
+All 10 prods of pouet's "TI-8x (68k)" platform were read: *Just some small effects* and *NICCC89*
+(rwill), *Trip* and *High School Love* (adinpsz), *Der Rechner* (NPLI), *TV Noise*, *Revenge* and
+*FOZEO* (Orion_), *alchimie7invite*, *Ze Fujibee Demo* (TI-92+). Only Revenge and Fujibee ship
+sources; the others were disassembled (Ghidra, binaries unpacked). Most demo code is naive (a
+subroutine or a `bset` per pixel, `__mulsi3`, ROM lines, `memcpy` back buffers): **the ideas are
+worth taking, the loops are not**. Cycle figures: "measured" = `ti-cycles` on our C version in
+`experiments/demoscene/`, otherwise datasheet estimates read from the disassembly. The demos also
+spend 20–35 % of the CPU on beeper music (an 8 kHz int-5 player): a cost to remember for §12's
+link-port sound.
+
+**Measured** (`experiments/demoscene/`, C, -Os, 160×100, both planes)
+
+| Technique (seen in) | Result | Verdict |
+|---|---|---|
+| **Voxel terrain**, Comanche style (jsseffec), `voxel.c`: 128×128 map, slices front to back, one "highest row" per column so each pixel is written once, slope shading baked | terrain only: 40 columns × 16 slices **369k**, 40 × 24 **479k**, 80 × 33 (the demo's size) **1.22M**; + 31k clear; + 100–210k to rebuild the y table when the camera height changes. In 40 × 24: 960 samples (~220 cycles each in C), 363 fills, 2,701 row pairs. The demo: ~1.0M + its 145k plane conversion, 9–10 fps | **NEW.** **Slice loop in asm** (`voxasm.s`, same pixels as the C): 40 × 16 **258k**, 40 × 24 **319k** (−33 %), 80 × 33 **695k** (−43 %); clear with `movem` 15k (C 31k). Per sample ~104 cycles when hidden, ~180 per fill + ~39 per row (the `or.b` to both planes). 40 × 24 runs at ~32 fps alone on a 240-frame flight (C ~21 fps): a flight or overworld game fits with room for sprites. Keep: height + shade in one word, `ytab[slice][height]` instead of a `muls` per sample (rebuilt only when the height changes), U/V with the map column/row in the high word (`swap`, no shift), fill routine out of line (GCC spills less: −7 %) |
+| **Raster wobble**, vertical (Der Rechner), `wobble.c`: each screen row copied from `y + sin[(4y + t)] >> 4` | **55k** per frame vs 37k for a plain copy of the picture (~180 cycles per row for the table read and clamp) | **NEW, use it**: heat haze, underwater, a hit or teleport warp, on a picture or on the finished frame copied through a row table |
+| Raster wobble, horizontal: each row shifted by −8..7 pixels (long shifts) | **195k** per frame in C | Only for a band of rows or a short effect |
+
+`experiments/demoscene/sidebyside.py` turns two such runs (per frame: `BENCH_VALUE` of its cycles, then
+`BENCH_SHOT`) into a side-by-side GIF at calculator speed: voxel C vs asm (`voxel.c -DMOVIE=240`,
+`experiments/demoscene/voxel_c_vs_asm.gif`), Mode 7 original vs optimised (bench scenario 5,
+`games/mode7/orig_vs_opt.gif`).
+
+**Not measured, compared on paper** (except the packed stepping, measured in Mode 7)
+
+| Technique (seen in) | Cost | Verdict |
+|---|---|---|
+| Texture stepping with u, v packed in one 16-bit index (jsseffec sphere and rotozoom); our version: `add.w a3,d4 / addx.w d6,d1 / add.w a4,d5 / bcc.s 1f / add.w d7,d1` | 20–22 cycles per step instead of 36 | **Adopted in `games/mode7`** (OPTIMISATIONS §11, measured): far rows 137k → 120k, near rows 125k → 115k, frame −8 % (362k → 335k); same pixels except the horizon rows the original reads outside its texture. Index linear (`v·256 + u`): only differs when u crosses a multiple of 256 |
+| "Nibble-planar" 2-bpp buffer (NICCC89, jsseffec): one byte = 4 pixels × 2 planes, converted to the planes every frame | conversion 142–148 cycles per 16 pixels = **~145k per frame**, fixed | **Worse** for games (paid even when little is drawn). Only for full-screen per-pixel effects (~9 cycles/pixel vs ~20 for our `add.b`/`addx.b` accumulators) |
+| Table c2p for 2×1 chunky cells (Der Rechner): 4 table words ORed = 8 pixels on both planes | ~100 cycles per 8 pixels inline | Same family: a low-resolution procedural layer (fog, water, a plasma title) |
+| 2×2 Bayer dither on 32–64 intensity levels, tables per row parity (jsseffec) | free at run time | ~13 apparent levels for backdrops and effects; never on main sprites (visibility) |
+| **Streaming cut-scene** (NICCC89): 1,800 polygon frames, 333 KB in 17 archived variables; each chunk = 7 separately packed streams (flags, descriptors, X, Y, indices as deltas…); the next chunk is unpacked a slice per frame into a second 40 KB buffer while the current one plays; colours, scaling and clipping all done offline | ~185 bytes per frame; ~10 fps | **NEW pattern** for long vector cut-scenes or data bigger than RAM. Use our asm LZ4 (26 cycles per byte: a 4 KB slice ≈ 100k) and read the archive in place instead of `FRead` |
+| Outlines drawn right after each face, faces in painter's order (Trip) | one line per edge | **NEW**: hidden lines vanish for free and low-poly objects get the outline of our visibility rule |
+| Short spans (≤ 7 pixels) dispatched by (length, x & 3) to straight-line code; edges stepped with `add.w`/`addx.w`, 2 rows per loop (NICCC89) | 98–270 cycles per row vs ~400 in our Mode 7 3D filler (§8) | Candidate for the flat filler (asm) |
+| Sphere by lookup map (Trip/HSL planet): 64×64 words (u, v, shade), rotation = `u + t` | 280 cycles per pixel as written (11 fps), ~45 optimised | Low: a game uses pre-rendered frames (16 angles of a 32×32 grey sprite = 4 KB, one blit). The map only if the texture changes at run time |
+| Bump mapping 80×49 cells (jsseffec): `light[pos + (h[x] − h[x+1]) + (h[x] − h[x+384]) << 7]` | ~530k + conversion | Too costly full screen; a 32×32 torch would be ~1/5 |
+| Feedback blur trails (jsseffec bobs): 80×50 intensity buffer, zoom passes, decay table | ~270–370k (estimate) | Low for games |
+| Pseudo-3D road (Trip) | ~220–250k: 3 `divs` per row and overdraw | **Worse** than ours (155k, §13). Take its tricks: curve = `sin(z + t) − sin(t)` (no accumulator, no drift), stripes and dashes from bits of z, a clip window that widens as the intro transition |
+| Twister (Der Rechner): 4 edges `x_i = tab[(y/2 + angle + 64i) & 255]`, face visible iff `x_{i+1} > x_i` | the demo plots with `bset` (~155 cycles per pixel); spans would be ~10× faster | Good edge maths for pillars, ropes, screws |
+| Point-mirrored noise (TV Noise): generate half the screen, write each byte twice | ~450k with `rand()` | With xorshift (performance §4) ~8× cheaper: TV static, hit flash |
+| Small tricks: contrast fades with `OSContrastUp`/`Dn` (Revenge; restore the contrast at exit, not tested on hardware); fused scroll-and-OR text ticker, ~11k per frame (Revenge); point-set morph by ±1 per coordinate per frame (Revenge); one rotated shape drawn per frame and shared by many bobs (alchimie7); procedural texture `(u & v) >> 8` with no memory (alchimie7's Sierpinski rotozoom) | cheap | Title screens, menus, transitions |
+
+**Rejected or dangerous**
+- ICE-PACK unpacker (Revenge): measured on the same 3,929 bytes, 2,693 B packed and 165 cycles
+  per output byte, against ZX0 2,503 B and 87 (LZ4: 3,135 B and 28): keep ZX0 (§13).
+- Revenge's launcher unpacks the program into the heap and jumps into the HW2 "ghost space":
+  not portable (code in RAM, patterns §4).
+- Fujibee uses `a7` as a data register inside a `movem` loop while the grey interrupt runs: an
+  interrupt then pushes to address ~0. Never do this.
+- The demos' 3D engines (32-bit multiplies, a division per vertex, bubble or selection sort, ROM
+  `DrawLine`/`FillTriangle`) and their `memcpy` back buffers: §5 and GrayDBuf already do better.

@@ -292,7 +292,9 @@ void _main(void)
  * frame (--png), and for scenario 1 the pixels covered by the 3D objects.
  *   0  start line at rest, 16 frames
  *   1  start line, 8 distant "mountains" (16 triangles, ~10 % of the view), 16 frames
- *   2  full throttle from the start line, 160 frames (the textures move) */
+ *   2  full throttle from the start line, 160 frames (the textures move)
+ *   5  a 240-frame drive with turns: per frame, its cycles (BENCH_VALUE) and a screen (a movie
+ *      for tools/movie.py) */
 static unsigned char planes[2][0xF00];
 static const char *zone_names[] = { 0, "frame", "clear planes", "ship physics", "sky",
     "texture far (8x8)", "texture near (16x16)", "camera+texture", "mode7 far", "mode7 near",
@@ -359,11 +361,16 @@ void _main(void)
     if (!Init(&g)) return;
     if (scenario == 1) BenchScene(&g.world, 8, far_x, far_y, 140, 80);
     if (scenario == 2) { n = 160; throttle = 1; }
+    if (scenario == 5) { n = 240; throttle = 1; BENCH_DARK_FIRST(DARK_FIRST); }
     for (i = 0; i < n; i++) {
+        unsigned long c0 = BENCH_CYCLES;
+        /* scenario 5: a drive with turns, a screen and the frame's cycles per frame (a movie) */
+        short turn = scenario == 5 ? (i >= 50 && i < 110 ? 1 : i >= 150 && i < 200 ? -1 : 0) : 0;
         BZ(Z_FRAME);
-        BZ(Z_SHIP); DriveShip(&g, 0, throttle); EZ(Z_SHIP);
+        BZ(Z_SHIP); DriveShip(&g, turn, throttle); EZ(Z_SHIP);
         Frame(&g, planes[0], planes[1]);
         EZ(Z_FRAME);
+        if (scenario == 5) { BENCH_VALUE(BENCH_CYCLES - c0); BENCH_SHOT(g.vscreen); }
     }
     BENCH_DARK_FIRST(DARK_FIRST);
     BENCH_SHOT(g.vscreen);
