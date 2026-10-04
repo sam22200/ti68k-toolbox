@@ -69,8 +69,10 @@ What a TI-89 port of a DMG game depends on. Hardware numbers are the documented 
   2000-3FFF, then calls into 4000-7FFF). Battery RAM = high scores or saves.
 - Header: title 0134-0143, CGB flag 0143 (80 compatible, C0 CGB only), cartridge type 0147,
   ROM size 0148 (32 KB << n), RAM size 0149, header checksum 014D (verified by
-  `gbextract.py`). CGB-only games use colour palettes, VRAM bank 1 and double speed: out of
-  this skill's scope.
+  `gbextract.py`). CGB-only games use colour palettes, VRAM bank 1 (BG attributes), WRAM
+  banks (FF70) and double speed: the big-game track (`big-game.md` §4, verified on MGS).
+- MBC5: ROM bank number in 2000-2FFF (low 8 bits) and 3000 (bit 8), RAM bank in 4000. Ghidra +
+  GhidraBoy analyse bank 0 only: `scripts/gbdis.py` reads the other banks.
 
 ## 5. Interrupts, timer, sound
 

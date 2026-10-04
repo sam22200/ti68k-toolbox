@@ -19,10 +19,15 @@ data and a default. Rounds follow the tree. Record the answers in `games/<name>/
    assets may be committed with attribution.
 3. **Fidelity.** (a) Exact logic: every gameplay variable bit-equal to the ROM's trace (the
    default when the logic is small: one cartridge of game code, integer arithmetic), (b)
-   behaviour-equal (same feel, own code, tests on measured numbers only), (c) a remake.
+   **our own engine, behaviour-equal** (same numbers and feel, own code, tests on measured
+   numbers only: **the default for a big game**, MBC banks, CGB only, many level types;
+   `big-game.md` §1 gives the signs; say what (a) would cost, e.g. "2 MB of banked code"),
+   (c) a remake.
 4. **Scope.** All levels or a first slice (one level, one world) to finish end to end before
    the rest; title, high scores, attract mode, game over, ending. Default: one level end to
-   end, then the rest with the same engine.
+   end, then the rest with the same engine. A big game: propose the **first milestone** (one
+   level or mission started directly by the injection door, no menus) and the roadmap after
+   it (`ROADMAP.md`, `big-game.md` §2); the answer fixes milestone 1 only.
 
 ## Round 2: the machine (needs 3)
 
