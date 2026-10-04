@@ -18,7 +18,8 @@ int sw_load_state(const char *path);
 u32 sw_parse_keys(const char *s);      // "UP A 5" -> K_UP | K_A | K_DIGIT(5)
 
 // Input script: lines "<frame> <keys...>", the keys stay held from that frame to the next line.
-typedef struct { u16 n, pos; u16 frame[256]; u32 keys[256]; } SwScript;
+#define SW_SCRIPT_MAX 32768
+typedef struct { u16 n, pos; u16 frame[SW_SCRIPT_MAX]; u32 keys[SW_SCRIPT_MAX]; } SwScript;
 int sw_load_script(SwScript *s, const char *path);
 u32 sw_script_keys(SwScript *s, u16 frame);
 

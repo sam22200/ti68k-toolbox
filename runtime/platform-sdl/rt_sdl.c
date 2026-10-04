@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     int headless = 0, scale = 4, k, shots = 0, paused = 0, step1 = 0;
     u16 scenario = 0;
     char statef[256];
-    SwScript script;
+    static SwScript script;             // 192 KB: not on the stack
     SDL_Window *win = 0;
     SDL_Renderer *ren = 0;
     SDL_Texture *tex = 0;

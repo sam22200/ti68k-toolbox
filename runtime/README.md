@@ -46,8 +46,9 @@ void game_render(void);      // draw the whole frame
 - `rt_file(name, &size)`: big read-only data outside the program (64 KB per variable): on the TI
   the variable NAME (OTH, `ttbin2oth -89 dat NAME.be.bin NAME`, read in place, archived or
   locked in RAM), on the PC the file `NAME.bin` in the host byte order. Returns RT_NULL when
-  missing. `draw_text` writes through `rt_light`/`rt_dark` on both targets, so a game can point
-  them at its own plane-format buffer to render text once (FFA's dialogue box).
+  missing. Every `draw_*` writes through `rt_light`/`rt_dark` on both targets, so a game can
+  point them at its own plane-format buffer (`RT_PSIZE` bytes each, even address) to render
+  once (FFA's dialogue box, Desolate's room background).
 - `rt_load(name, data, size)` / `rt_save(name, data, size)`: a game's save. PC: `NAME.sav` at
   once. TI: the OTH variable NAME ("sav"), written **when the program exits**, after the
   grayscale teardown, then archived (c-patterns §10: SymAdd and Flash writes may need AMS
@@ -69,7 +70,7 @@ include ../../runtime/rt.mk
 2. **PC window** (`make pc && ./NAME_pc`). Options: `--scenario N`, `--load F` / `--save F`
    (raw state), `--keys F` (input script, lines `<frame> <keys...>` held until the next line,
    e.g. `0 RIGHT` / `30 RIGHT A` / `60`), `--frames N`, `--headless`, `--shot F.png`, `--seed N`,
-   `--scale N`. In the window: F2 save state, F3 load, F12 screenshot, Tab 8× speed, P pause,
+   `--scale N` (scripts up to 32,768 lines). In the window: F2 save state, F3 load, F12 screenshot, Tab 8× speed, P pause,
    O single step. `--headless --keys k.txt --frames 90 --shot s.png` renders without a window.
 3. **Calculator last of all** (`make ti`, then `ti-run NAME.89z` or type `NAME(3)` for scenario 3),
    on the Titanium, once everything passes without UI (the emulator is slow: screenshots); the
