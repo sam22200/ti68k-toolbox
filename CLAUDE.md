@@ -117,8 +117,10 @@ that kind of task.
   to bit-exact 16.16 C (`assets/p8num.h`) diffed against the traces, native rendering.
 - `ti-port-gb`: port a Game Boy game from its ROM (Bubble Ghost…): decompiled with Ghidra +
   GhidraBoy (headless, pseudo-C per function), run headless under PyBoy for RAM traces and
-  VRAM dumps, `/grilling` on the port decisions, logic translated to C bit-exact with the
-  traces, native rendering. ROMs in `roms/gb/` (local).
+  VRAM dumps, `/grilling` on the port decisions, every routine translated to C on a flat copy
+  of the GB memory (protothreads for the waits, the ROM itself as the data file), traces
+  comparing whole RAM regions, a generic VRAM/OAM renderer; skeleton in its `assets/`. ROMs
+  in `roms/gb/` (local).
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch

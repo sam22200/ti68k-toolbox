@@ -19,28 +19,29 @@ same variables as the game, checked frame by frame against `gbtrace.py`.
 - Confirm each meaning with an experiment: `--poke` the variable and watch the screen
   (`--shot`), or hold a key and `--trace` the range with `--diff`.
 
-## 2. Two kinds of state
+## 2. Memory: the GB's own
 
-- **Gameplay state**: what changes what happens next. Exact: same width (`u8`, `u16`), same
-  wrap-around, same update order, printed in the traces.
-- **Video state**: OAM shadow, VRAM writes, tile animation counters, palette fades. Rebuilt by
-  `game_render()` from the gameplay state; not traced (or traced only to check a sprite's
-  screen position once).
-- A variable written by both (an animation frame that also gates a hit box): gameplay.
+- The whole game runs on a flat copy of the GB memory (`assets/gb.h`): `W8(0xC0AC)`,
+  `W16`, `H8`, `R8` (the ROM, the data file), `rd`/`wr` for pointers held in RAM. Every
+  variable keeps its address, every table its layout: a routine that copies a 10-byte record
+  to a work area, steps a script pointer into ROM or indexes `(&DAT_c0b4)[i]` is translated
+  as it is, and the traces compare whole regions instead of a chosen list.
+- `vars.h` gives the `.sym` names as macros (`#define hall_id W8(0xC0AC)`): the C reads like
+  the spec.
+- A slice ported on a C struct (Bubble Ghost's first hall) works too, but every table
+  layout, pointer and stale byte becomes a design decision; the flat memory removed all of
+  them and made the full game a translation job.
 
 ## 3. Program shape
 
 | ROM | Port |
 |---|---|
-| init block (WRAM clears, initial values) | `game_init()`: one `memset` of the state struct + the ROM's initial values |
-| the per-level setup (`play_hall` prologue: load map, place objects) | `level_start(n)` |
-| the per-frame calls, in order | `game_update()`, the same calls in the same order |
-| VBlank handler (OAM DMA, scroll registers, music tick) | nothing / `game_render()` / dropped |
-| `pre.state` + `--poke` | `game_scenario(n)` |
-
-All gameplay variables in one POD struct, named as in the `.sym` (one field per RAM
-variable or table; a comment with its GB address). Keep the GB's memory layout only where the
-code indexes across variables (`(&DAT_c0b4)[i]`: a table).
+| a routine | `r_XXXX()` (its address), registers in = parameters, registers the caller reads after the call = return value |
+| a routine that waits for VBlanks (`HALT` loops, 0390-like waits) | a protothread `u8 r_XXXX(void)`: `PT_CALL` for blocking calls, `PT_WAIT1` for one VBlank, statics for the locals that cross a wait |
+| the VBlank interrupt | `r_033a()` run at the start of every `gb_vblank()`: job flags, callbacks set by the game, the OAM DMA into the renderer's copy |
+| power-on (`entry`) | the main protothread; `game_update` runs two VBlanks per 30 fps frame |
+| a level start + pokes | the door: the ROM's memory dumped there (tests), or the game's own start with the pokes (`game_scenario` on the TI) |
+| sound driver | not translated: its request bytes kept, its RAM out of the comparison |
 
 ## 4. Translation patterns
 
@@ -79,10 +80,10 @@ code indexes across variables (`(&DAT_c0b4)[i]`: a table).
 
 ## 6. The trace test (C side)
 
-- `test_<name>.c` loads the same key script (`sw_load_script`, `sw_script_keys`), maps the
-  keys as `gbtrace.py --map` (A=a, B=b, C=start, D=select), steps one GB logic frame per
-  script frame (not `game_update()`, which runs two at 30 fps) and prints `"<frame>
-  addr=hex ..."` with the same names and widths as `--trace`.
+- `test_<name>.c` (`assets/test_game.c`) loads the door memory, replays the key script,
+  maps the keys as `gbtrace.py --map` (A=a, B=b, C=start, D=select) and prints `"<frame>
+  addr=hex ..."` from a hook at the sample point (0283 or the key read), the same names and
+  widths as `--trace`, then a Fletcher-16 per RAM region (`LO-HI:h`).
 - The reference comes from `gbtrace.py ROM --load pre.state --boot-keys A --poke ...
   --poke-at <level start> --logic <after the update> --stall N --keys K --trace <vars>`: frame
   0 is the first logic frame of the level on both sides, whatever the loading takes.

@@ -123,6 +123,19 @@ What a TI-89 port of a DMG game depends on. Hardware numbers are the documented 
 
 ## 8. Pitfalls
 
+- **Lag frames**: when a frame's logic overruns the VBlank period, the interrupt fires in
+  the middle of it (the ISR clears its job flags and sets its "VBlank done" byte early). A
+  port has no CPU time to match: leave those bytes out of the comparison (Bubble Ghost:
+  C0E7, FF91; one lag in 1,500 frames of hall 1).
+- While the LCD is off (loading), the VBlank interrupt does not fire: games enable the timer
+  interrupt then (IE) and their waits poll a counter the timer handler increments; the
+  VBlank jobs and the OAM DMA do not run. The port's VBlank step runs the handler IE allows.
+- OAM DMA outside the VBlank: some routines call the DMA directly (Bubble Ghost 0523 after
+  clearing the shadow): the screen then shows the cleared OAM. Translate it as a DMA.
+- The DMG shows at most 10 sprites per line, the first by OAM index (sprites at x = 0 count).
+- RAM the port never matches: the sound driver's (Bubble Ghost DE60-DFFF), the CPU stack
+  (from SP down: FFD0-FFFE), the VBlank counter (depends on loading times).
+
 - A key pressed for exactly the frames the game ignores (title fades, transitions) does
   nothing: the boot script needs waits (Bubble Ghost: Start at 400, 600, 800, A at 1,000).
 - Input is read once per frame in the VBlank or the loop: a 1-frame press can be missed if
