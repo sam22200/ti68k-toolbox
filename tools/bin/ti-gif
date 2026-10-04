@@ -1,0 +1,17 @@
+#!/bin/sh
+# Animated GIF of the TiEmu LCD: ti-gif OUT.gif [SECONDS] [FPS]   (default 10 s at 15 fps, x2)
+# Records the LCD area of the window with ffmpeg x11grab while you (or ti-key) play; run it in
+# the background: `ti-gif out.gif 20 & ti-key ...; wait`. The window must stay uncovered.
+OUT=$1; SEC=${2:-10}; FPS=${3:-15}
+[ -n "$OUT" ] || { echo "usage: ti-gif OUT.gif [SECONDS] [FPS]" >&2; exit 2; }
+W=$(xdotool search --name '^TiEmu \(' | head -1)
+[ -n "$W" ] || { echo "ti-gif: TiEmu window not found" >&2; exit 1; }
+eval "$(xwininfo -id "$W" | sed -n 's/.*Absolute upper-left X: *\(-*[0-9]*\)/X=\1/p; s/.*Absolute upper-left Y: *\(-*[0-9]*\)/Y=\1/p')"
+# the LCD of both skins (220x492 window) sits at (27,42), 166x108 with its border
+TMP=$OUT.tmp.mp4
+ffmpeg -loglevel error -y -f x11grab -framerate "$FPS" -video_size 166x108 \
+  -i "$DISPLAY+$((X + 27)),$((Y + 42))" -t "$SEC" -c:v libx264rgb -crf 0 -preset ultrafast "$TMP" || exit 1
+# written to a temp name and renamed: ti-view never serves a half-written GIF
+ffmpeg -loglevel error -y -i "$TMP" -vf "scale=iw*2:ih*2:flags=neighbor,split[a][b];[a]palettegen=max_colors=16[p];[b][p]paletteuse=dither=none" \
+  -f gif "$OUT.part" && mv "$OUT.part" "$OUT"
+rm -f "$TMP"

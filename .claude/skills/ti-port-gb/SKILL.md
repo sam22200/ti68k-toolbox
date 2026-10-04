@@ -1,6 +1,6 @@
 ---
 name: ti-port-gb
-description: "Port a Game Boy (DMG, .gb; or a DMG-compatible .gbc) game to the TI-89 Titanium from its ROM through the Portable Game Runtime: read the header, decompile the ROM with Ghidra + GhidraBoy (pseudo-C and disassembly per function, headless), run the original ROM headless under PyBoy to record RAM traces frame by frame for key scripts and to dump VRAM tiles, maps and sprites, name the RAM variables and functions in a .sym file, grill the user on the port decisions (/grilling: 160x144 into 160x100, 59.7 Hz into ~30 fps, sprites and tiles, sound), then translate the game logic into fast C bit-exact with the traces, test on the PC (unit, trace, SDL), measure the TI binary under ti-cycles, the emulator last. Use it whenever the user wants to port, convert, \"porter\", decompile or remake a Game Boy / GB / DMG / Game Boy Color game or ROM for the calculator (Bubble Ghost, Tetris, Kirby, Zelda...), mentions a .gb file, roms/gb/, Ghidra or GhidraBoy for a game, even without saying \"Game Boy\"."
+description: "Port a Game Boy (DMG .gb, or Game Boy Color .gbc) game to the TI-89 Titanium from its ROM through the Portable Game Runtime: read the header, decompile the ROM with Ghidra + GhidraBoy (pseudo-C and disassembly per function, headless), run the original ROM headless under PyBoy to record RAM traces frame by frame for key scripts and to dump VRAM tiles, maps and sprites, name the RAM variables and functions in a .sym file, grill the user on the port decisions (/grilling: 160x144 into 160x100, 59.7 Hz into ~30 fps, sprites and tiles, sound), then translate the game logic into fast C bit-exact with the traces, test on the PC (unit, trace, SDL), measure the TI binary under ti-cycles, the emulator last. Big games (MBC banks, CGB only, several hours: Metal Gear Solid, Zelda, Pokemon) take the big-game track by default, confirmed with the user: our own engine with the behaviour measured on the ROM, a ROADMAP.md of milestones and a first small milestone (one level), no screen comparisons against the ROM. Use it whenever the user wants to port, convert, \"porter\", decompile or remake a Game Boy / GB / DMG / Game Boy Color game or ROM for the calculator (Bubble Ghost, Tetris, Kirby, Zelda...), mentions a .gb or .gbc file, roms/gb/, Ghidra or GhidraBoy for a game, even without saying \"Game Boy\"."
 ---
 
 # ti-port-gb (port a Game Boy game to the TI-89 from its ROM)
@@ -31,6 +31,15 @@ the user, English in the files). What changes with a Game Boy ROM:
    the TI: an interpreter costs ~20-50 68000 cycles per SM83 cycle, the GB does 70,224 per
    frame. `assets/` holds this skeleton (Bubble Ghost's, the whole game ported this way).
 
+**Two tracks, chosen in the grilling (question 3), the default by the game's size:**
+- **Small game** (32 KB ROM only, DMG, a few thousand instructions of logic: Bubble Ghost):
+  the 1:1 track below, every routine translated, bit-exact traces.
+- **Big game** (MBC banks, CGB only, many level types or hours of play: Metal Gear Solid):
+  **recommend our own engine** with the behaviour measured on the ROM (speeds, walls, patrols,
+  vision boxes, timelines), a `ROADMAP.md` of milestones and a small first milestone (one
+  level, no menus), confirmed with the user; `reference/big-game.md` replaces §4 and §7.
+  Steps 1-3 (ROM, understand, grill) and 5-9 stay the same.
+
 Constraints (`CLAUDE.md`): **1. performance**, **2. visibility** (white outline on the main
 sprites), Titanium only (the TI-89 HW2 for a release), **ASM only after asking**.
 
@@ -41,6 +50,8 @@ References (read when the step says so):
 - `reference/asm-to-c.md`: reading Ghidra's output, naming, translation patterns (flags and
   carries, BCD, jump tables, OAM shadow, VRAM writes, frame sync), the trace test.
 - `reference/grilling.md`: the decision tree to grill (defaults and the data each needs).
+- `reference/big-game.md`: the big-game track (when, the roadmap, measuring on the ROM: RAM
+  diffs, the code behind a variable, rule grids, timelines, sprites; CGB and MBC specifics).
 
 ## 0. Tools (once per machine)
 
@@ -62,7 +73,8 @@ ROMs live in `roms/gb/` (not in git: commercial).
   roms/gb/<rom>.gb sources/<name>_gb/x` → `info.json`: title, DMG/CGB, cartridge type (ROM
   only / MBC1/3/5: banks), sizes, checksums, a census (interrupt vectors used, writes to
   LCDC/STAT/LYC/SCX/SCY/WX/WY: raster effects and scrolling, sound registers). CGB-only
-  games (colour, double speed, 2 VRAM banks) are out of scope unless the user insists.
+  games (colour palettes, 2 VRAM banks, WRAM banks) go through the big-game track
+  (`reference/big-game.md` §4: rendering their VRAM, colours to greys).
 - **Decompile**: `.claude/skills/ti-port-gb/scripts/gbdecomp.sh roms/gb/<rom>.gb
   sources/<name>_gb/ghidra_out` → `decomp.c`, `disasm.s`, the Ghidra project (open it in the
   GUI to rename; a second run re-exports without reanalysis). Check: the function count, no
@@ -71,6 +83,10 @@ ROMs live in `roms/gb/` (not in git: commercial).
   table (a `jp hl` in `disasm.s`, the table address loaded just before) and its entry count,
   then rerun with them: `gbdecomp.sh ROM OUT 31d3:6 34c8:5 23df:18` (`TABLE:N` words, or a
   bare `ADDR`; `scripts/gb_funcs.py` makes them functions before the export).
+- **Banked ROMs** (MBC): GhidraBoy analyses bank 0 only (MGS: 48 functions of 2 MB). Read
+  banked code with `scripts/gbdis.py ROM BANK:ADDR N` and find the code that uses a variable
+  with `gbdis.py ROM --find fa LO HI` (loads; `ea` stores) plus PyBoy hooks on those sites
+  (`reference/big-game.md` §3).
 - **Run**: `scripts/gbtrace.py roms/gb/<rom>.gb --frames 1500 --keys start.txt --gif run.gif
   --every 4 --shot 1499:last.png`: boot, title, first level, headless. Find the key script
   that reaches play (`C` = Start by default) and **save a state on the title's last wait**
@@ -116,8 +132,13 @@ ROMs live in `roms/gb/` (not in git: commercial).
 
 `/grilling` on the port plan with `reference/grilling.md` as the tree; record the answers in
 `games/<name>/README.md` § Port decisions; no step 4 before the user confirms the summary.
+A big game: question 3 defaults to our own engine (say why and what 1:1 would cost), question
+4 to a first milestone, and `games/<name>/ROADMAP.md` is written before any C.
 
 ## 4. Engine and logic, against the traces
+
+(The 1:1 track. Big games: `reference/big-game.md` §5 instead: an `extract.py` from the local
+ROM, our engine, unit tests on the measured numbers, key scripts, TI = PC.)
 
 - `games/<name>/` from `assets/` (its `README.md` says what to adapt): `gb.h` (memory,
   protothreads), `flow.c` (ISR, waits, input, main thread, runtime hooks), `render.c`,
@@ -176,6 +197,9 @@ loads. Zones per part (`BENCH_NAME`/`BENCH_BEGIN`): maps, rows, sprites, sort, I
   cache. Invalidate the caches when LCDC's tile addressing or BGP changes, even when the game
   writes them with `IO()` directly. The 144 rows into 100: a play view (the playfield 1:1 +
   the port's HUD) and, per non-play screen, one band or two stitched (decided with the user).
+- **Compare few screens**: a handful per milestone at chosen frames (each scenario's first
+  frame, one per mechanic, a level change), not every sample: Bubble Ghost's 1,167 screens
+  cost much and found what a dozen would have. Big games: none against the ROM (§ big-game).
 - Check the screen **pixel by pixel** against PyBoy (`assets/screencmp.py`): the test binary
   renders at logic frame F from the door memory (`--shot`), PyBoy's screen is read **after**
   the tick of frame F (a hook runs while the PPU draws: its buffer mixes lines); both show the
@@ -189,7 +213,9 @@ loads. Zones per part (`BENCH_NAME`/`BENCH_BEGIN`): maps, rows, sprites, sort, I
 `make cycles`, `make xcheck`, then once on the Titanium: `ti-emu restart <name>.89z
 bgrom.89y`, wait ~8 s for the group to arrive, then type the call (`ti-run` types it before a
 two-file group is received; a held [2nd] from an earlier test garbles the typing: restart):
-one screenshot or printed numbers, the controls, a level change, ESC back to HOME. No X
+one screenshot or printed numbers, the controls, a level change, ESC back to HOME. A demo GIF:
+`ti-gif` in the background and the winning key script played by `ti-play` (held keys,
+diagonals; open loop: `reference/big-game.md` §5). No X
 display over SSH: the desktop session's `DISPLAY=:1` with its gdm `XAUTHORITY` works; Xvfb
 does not (no window manager: `xdotool windowactivate` fails).
 
@@ -240,4 +266,19 @@ below, then `/ti-commit`.
   GB shows an empty OAM for two frames), the 10-sprites-per-line limit (kept), and two
   parallel runs of the checker overwriting each other's PNGs (give each run its own files).
   1,164 of 1,167 screens identical; the 3 others differ by 2-14 pixels where the GB rewrites
-  BG tiles while its PPU draws (tearing: not reproduced, not wanted).
+  BG tiles while its PPU draws (tearing: not reproduced, not wanted). In hindsight a dozen
+  chosen screens would have found the same bugs: compare few screens.
+- **Metal Gear Solid** (`roms/gb/Metal_Gear_Solid_.gbc`, CGB only, MBC5 2 MB, Konami 2000;
+  first big-game track, 2026-10-04, `games/mgs/`, code committed, data local): the user chose
+  our own engine, milestone 1 = VR Sneaking Practice Lv.01 (`ROADMAP.md`: 8 milestones).
+  Ghidra saw 48 functions (bank 0 only); `gbdis.py` + hooks on `--find` sites found the goal
+  test (0C:4627) and the vision readers in minutes. Measured in one session: Snake's speeds,
+  turn timing, diagonal 2-of-3, collision box from four wall stops, the guard's whole timeline
+  (one 1,300-frame log), vision boxes on a 2-pixel grid. Trap: the vision grid stayed empty
+  until it turned out guards only see while on screen (the camera had to be walked up; poking
+  the camera byte is overwritten). Port: ~330 lines of C, 51 tiles + 65 sprite images (14 KB
+  data file), tests on the measured numbers + a winning and a losing key script, TI = PC by
+  `xcheck` and `tihash` (hash the fields, not the raw struct: the first try differed by byte
+  order), ~70k cycles per frame (19 %), one emulator run. No screen compared with the ROM.
+  The demo GIF in TiEmu (`ti-play` + `ti-gif`) failed once with a route timed to the frame and
+  passed with a route made of wall stops and slides (robust to ±10 % speed on the PC).

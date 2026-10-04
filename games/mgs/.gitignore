@@ -1,0 +1,9 @@
+# generated from the local ROM by tools/extract.py (commercial data: never committed)
+level.h
+gfx.h
+mgsdat.bin
+mgsdat.be.bin
+x/
+# builds and checks
+mgsh.89z
+*.hash
