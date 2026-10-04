@@ -186,7 +186,7 @@ that kind of task.
   atan2 demo; `timers/`: int-5 rate per start value; `gray/`: GrayDBuf; `keys/`: keyboard latch;
   `files/`: save-file round trips, manual and stdio; `dll/`: DLL loading per model; `errors/`: TRY/FINALLY
   and CPU exceptions; `bigprog/`: size limits, packing, data files read from archive; `heapcode/`: running code from the heap; `link/`: link timeouts;
-  `sprites/`: ExtGraph mirror routines; `tilemap/`: TileMap engine + pre-shifted sprites; `fonts/`: AMS fonts read in place; `hwsync/`: LCD sync bit and 16 kHz fine timer; `demoscene/`: ideas from the pouet.net TI-68k demos measured (voxel terrain, raster wobble), game-techniques §14; `render/`, `ai/`, `struct/`, `compress/`, `maps/`: the
+  `sprites/`: ExtGraph mirror routines; `tilemap/`: TileMap engine + pre-shifted sprites; `fonts/`: AMS fonts read in place; `hwsync/`: LCD sync bit and 16 kHz fine timer; `demoscene/`: ideas from the pouet.net TI-68k demos measured (voxel terrain, raster wobble; `gamefx.c`: bump-mapped torch, lake reflection, twister, TV static, plasma title as GIFs), game-techniques §14; `render/`, `ai/`, `struct/`, `compress/`, `maps/`: the
   measured ideas of game-techniques §13; `bench/m7row.s`: C-callable asm example). `sources/`: old reference sources.
 - `tools/m68kbench/`: `ti-cycles` sources, `bench.h` markers, self-test. `docs/INSTALL.md`: toolchain install (Ubuntu, macOS).
 - `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-gif ti-play ti-table ti-view`, `ti-cycles` (host 68000 cycle counter, built from `tools/m68kbench/` with Musashi in `tools/musashi/`), `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
