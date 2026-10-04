@@ -69,8 +69,17 @@ ROMs live in `roms/gb/` (not in git: commercial).
   bare `ADDR`; `scripts/gb_funcs.py` makes them functions before the export).
 - **Run**: `scripts/gbtrace.py roms/gb/<rom>.gb --frames 1500 --keys start.txt --gif run.gif
   --every 4 --shot 1499:last.png`: boot, title, first level, headless. Find the key script
-  that reaches play (`C` = Start by default) and **save a state just before a level starts**
-  (`--save pre.state`): the injection door of the reference.
+  that reaches play (`C` = Start by default) and **save a state on the title's last wait**
+  (`--save pre.state`, made by the game's Makefile from a boot key script).
+- **The injection door of the reference**: `--load pre.state --boot-keys A --poke
+  <level vars> --poke-at <level start>`: the keys that leave the title are held until the CPU
+  reaches the routine that starts a level, then the pokes land (pokes made earlier are
+  overwritten by the game's own init) and the scenario's script starts.
+- **Count logic frames, not VBlanks**: `--logic <addr>` (an address reached once per logic
+  frame, after the update) numbers frames, keys and samples there. Loading, fades, intros
+  and score counts then take no frame, so the C port's update matches one to one and the
+  traces stay aligned across level changes. `--stall N` ends a run that stops producing
+  logic frames (game over) with a `# stalled` line.
 - Keep everything in `sources/<name>_gb/` (not in git). Note title, year, publisher,
   licence in `games/<name>/README.md`: a commercial ROM and everything generated from it
   (tiles, maps, traces with its data) stay local; only our code and spec are committed.
@@ -117,7 +126,11 @@ ROMs live in `roms/gb/` (not in git: commercial).
   matching `--poke`. Both listed in the README.
 - Check: `make test`, as `ti-port-pico8` §4: trace tests per key script (first divergent
   frame and variable printed), seeded random key scripts, a coverage gate on the mechanics,
-  a mutation check per mechanic, unit tests for what the traces do not see.
+  a mutation check per mechanic, unit tests for what the traces do not see. Trace every
+  gameplay variable plus a Fletcher-16 of the big tables (`--trace LO-HI:h`: a collision
+  mask in one field); the test binary prints the `--trace` list itself (`--vars`), so the C
+  table is the only list. A script that leaves the slice ends in a level the port does not
+  have yet: check hall, lives and score on that frame and stop, as a success.
 
 ## 5. PC for real
 
@@ -138,7 +151,15 @@ steps per frame if that was decided.
   level pre-rendered or the metatile set, the white outline on the main sprites
   (`ti68k-c-patterns.md` § sprites), the HUD re-laid out as decided. Generated data from a
   commercial ROM stays local (`gfx.h` in `.gitignore`, built by `make` from the ROM).
-- Compare 2 to 4 variants on the same headless shot, keep the winner; the traces still pass.
+- When the art is the ROM's own (no redraw decided), check the screen **pixel by pixel**
+  against PyBoy (a game tool like Bubble Ghost's `tools/screencmp.py`): the PC's headless shot
+  after N runtime frames against `gbtrace --logic --shot 2N` (its picture shows the sprites
+  and BG of logic frame 2N-1, the port's last), the playfield as 4 grey ranks. Key scripts are
+  read as runtime frames by the PC: give PyBoy the same script with doubled frame numbers.
+  What it caught: DMG sprite priority is per 8-pixel OAM entry (smaller x in front, then the
+  lower index), so compose 8-wide columns; a `u8` x wrapping at the left edge; the blow frame.
+- Otherwise compare 2 to 4 variants on the same headless shot, keep the winner; the traces
+  still pass.
 
 ## 8. TI again, then the emulator once
 
@@ -158,6 +179,13 @@ below, then `/ti-commit`.
   Infogrames 1990; first test of this skill, 2026-10-03): GhidraBoy decompiles 143 functions,
   the hall loop (`0223`) and the next-hall rule (`02e9`) read directly; the ghost, bubble and
   hazard handlers sat behind three jump tables (31D3, 34C8, 23DF): 180 functions with them.
+  Slice 1 (hall 1, `games/bubble_ghost/`, local): 15 scripts / 14,672 logic frames bit-exact
+  (47 variables, 6 pistons, the mask hash), 13 mutations caught, TI = PC by state hash, 287
+  screens identical to the ROM's; ~14k cycles of logic per frame (two GB frames) + ~72k of
+  rendering. BGP E4 made the BG free: a GB tile row's two bytes are the light and dark plane
+  bytes. The traces caught a register clobber the pseudo-C hides (`blow_bubble` leaves E = 2
+  or 3, so the caller's timer test sees that) and the A held from the title at frame 0:
+  read the disassembly, not Ghidra's C, for what a callee leaves in registers.
   Logic once per VBlank, never skipped, no RNG (traces fully deterministic); the bubble in
   13.3 fixed point; collision on a 1-bit pixel mask in WRAM (C300, 20 bytes × 96 rows). Boot to hall 1 headless
   in 1,400 frames (Start at 400, 600, 800, A at 1,000); `pre.state` saved at frame 995 + poke

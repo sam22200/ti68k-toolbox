@@ -185,7 +185,9 @@ that kind of task.
 - `tools/tiemu/{89t,89,89u}/`: TiEmu profiles (config, image, `.sav` state; absolute paths, do not move).
 - `ti89decode.py`: TI-Basic file decoder (`ffa_en/`: the TI-Basic game it was written for).
 - Local only, not in git (`.gitignore`, see `README.md`): `games/ffa_ct/` (FFA with Chrono Trigger
-  sprites, an art test: `.git/info/exclude`, state in its `PROGRESS.md`), `sources/`, `ffa_en/`, third-party and
+  sprites, an art test: `.git/info/exclude`, state in its `PROGRESS.md`), `games/bubble_ghost/`
+  (Game Boy Bubble Ghost ported with `ti-port-gb`, commercial: `.git/info/exclude`, state in its
+  `README.md`), `sources/`, `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
   `patches`, `musashi`, `shrinko8`, `z8lua`, `ghidra`), `roms/` (commercial ROMs), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
