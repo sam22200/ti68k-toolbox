@@ -138,6 +138,7 @@ def main():
                 gb.memory[k] = v
             pending.append(lambda: [gb.button_release(b) for b in boot])
             pending.append(lambda: set_keys(0))
+            st['poked'] = 1
             done.append(1)
 
     st = {'held': set(), 'si': 0, 'prev': None, 'frame': 0}
@@ -192,6 +193,8 @@ def main():
 
     if a.logic:
         def on_logic(_):
+            if a.poke_at and not st.get('poked'):   # the scenario starts at --poke-at
+                return
             fr = st['frame']
             if fr < a.frames:
                 sample(fr)
