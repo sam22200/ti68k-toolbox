@@ -19,6 +19,8 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 | `ti-send file…` | fallback only: types the path into TiEmu's file chooser (slow, needs HOME) |
 | `ti-key [--hold S] TOKEN…` | keys: `ENTER ESC HOME CLEAR 2ND UP…`, or text `'hello()'` |
 | `ti-shot out.png [--lcd]` | screenshot; `--lcd` = screen only, enlarged |
+| `ti-gif out.gif [SEC] [FPS]` | animated GIF of the LCD (ffmpeg x11grab, x2, default 10 s at 15 fps); run it with `&` before the `ti-key` sequence, then `wait`; seen in `ti-view` |
+| `ti-play keys/x.txt [FPS]` | plays a runtime key script (`<frame> <keys>` lines) in real time through the PC keyboard: several keys held at once (diagonals), which `ti-key`'s clicks cannot; start it right after `ti-key ENTER`. Open loop: end each move against a wall, check the script on the PC with its timeline scaled ±10 % |
 
 **Not everything needs the emulator.** TiEmu 3.04 (Ubuntu) has no command line control, no D-Bus
 interface and no GDB, and exports none of its internals: memory and registers are only in its GUI

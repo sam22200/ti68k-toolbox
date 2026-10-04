@@ -40,7 +40,9 @@ ti-cc -o name src.c             # build → name.89z (skill ti89-c-dev)
 ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 HW2 AMSpatch, 89u unpatched)
 ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
-ti-view                         # PNG/GIF captures on the LAN, newest first: http://<PC IP>:8000 (iPad Safari)
+ti-gif /path/x.gif 20 &         # animated GIF of the LCD (20 s) while ti-key plays
+ti-play keys/win.txt            # a runtime key script played in TiEmu in real time (held keys, diagonals)
+ti-view                         # PNG/GIF captures on the LAN, newest first: http://<PC IP>:8000 (iPad Safari, /?only=gif)
 ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycles per zone, screen as PNG
 make xcheck                     # runtime game: TI binary under ti-cycles = PC headless, per scenario
 ```
@@ -119,8 +121,10 @@ that kind of task.
   GhidraBoy (headless, pseudo-C per function), run headless under PyBoy for RAM traces and
   VRAM dumps, `/grilling` on the port decisions, every routine translated to C on a flat copy
   of the GB memory (protothreads for the waits, the ROM itself as the data file), traces
-  comparing whole RAM regions, a generic VRAM/OAM renderer; skeleton in its `assets/`. ROMs
-  in `roms/gb/` (local).
+  comparing whole RAM regions, a generic VRAM/OAM renderer; skeleton in its `assets/`. Big
+  games (MBC, CGB: Metal Gear Solid…) take its big-game track by default: our own engine with
+  the behaviour measured on the ROM, a `ROADMAP.md` of milestones, few screen comparisons
+  (`reference/big-game.md`). ROMs in `roms/gb/` (local).
 - `ti-port-ti83`: port a TI-83/83+/84+ asm game (Desolate…): program file read and its load
   address scored, Ghidra's Z80 processor (headless), the original run headless without a TI
   ROM (`ti83run.py`: Z80 core, LCD, keypad, interrupts, grey, the OS and shell routines in
@@ -172,7 +176,7 @@ that kind of task.
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua; `mgs/`: Metal Gear Solid (GBC) on our own engine with `ti-port-gb`'s big-game track, milestone 1 = VR Sneaking Lv.01, data generated from the local ROM, see its `ROADMAP.md`)
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
@@ -185,7 +189,7 @@ that kind of task.
   `sprites/`: ExtGraph mirror routines; `tilemap/`: TileMap engine + pre-shifted sprites; `fonts/`: AMS fonts read in place; `hwsync/`: LCD sync bit and 16 kHz fine timer; `render/`, `ai/`, `struct/`, `compress/`, `maps/`: the
   measured ideas of game-techniques §13; `bench/m7row.s`: C-callable asm example). `sources/`: old reference sources.
 - `tools/m68kbench/`: `ti-cycles` sources, `bench.h` markers, self-test. `docs/INSTALL.md`: toolchain install (Ubuntu, macOS).
-- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-table ti-view`, `ti-cycles` (host 68000 cycle counter, built from `tools/m68kbench/` with Musashi in `tools/musashi/`), `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
+- `tools/bin/`: `ti-cc ti-emu ti-run ti-send ti-group ti-key ti-shot ti-gif ti-play ti-table ti-view`, `ti-cycles` (host 68000 cycle counter, built from `tools/m68kbench/` with Musashi in `tools/musashi/`), `zx0`/`dzx0` (host ZX0 v2 packer and unpacker). `tools/pyenv/`: Python venv
   (numpy, scipy, pillow) for asset pipelines.
 - `tools/gcc4ti-bin/`: installed GCC4TI (HTML docs in `doc/html/`); `tools/build-gcc4ti.sh`
   rebuilds it in Docker (GCC 4.1.2 does not build with the host gcc).
