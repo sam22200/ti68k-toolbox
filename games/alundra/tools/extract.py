@@ -8,12 +8,16 @@ Runs the local disc headless (ti-port-ps1 psxrun.py) from a save state on the sh
   vote per target pixel over the source area, its 16 colours mapped to 4 greys, outlined in white;
 - the scenery: four 16 x 16 cells of a screen of the village of Inoa (grass, the stones of a
   retaining wall, cobbles), two greys each by a luminance percentile.
+- the village of Inoa (milestone 9): its height map read from RAM, resampled to TI tiles (a
+  level = 16 px of the game), stairs, walls; its image pasted from the game's screens, the
+  player and the NPCs removed, scaled, 4 greys: alvil0.bin, alvil1.bin (the TI data files).
 
 Writes gfx.h (C arrays, ExtGraph sprite layout) and review sheets in x/. Commercial data:
 gfx.h and x/ stay local (.gitignore); this script is what the repository keeps.
 
-usage: tools/extract.py DISC.cue DECK.state INOA.state   (RE_NOTES.md § Tools: the ship's deck
-       for the poses, the village of Inoa reached from a memory card save for the scenery)
+usage: tools/extract.py DISC.cue DECK.state INOA.state [N/D]   (RE_NOTES.md § Tools: the ship's
+       deck for the poses, the village of Inoa reached from a memory card save for the scenery;
+       N/D the game's scale on the TI, default 22/42: everything else follows from it)
 """
 import os, sys, struct
 import numpy as np
@@ -25,12 +29,17 @@ import psxrun
 
 CLUT, TPAGE = (192, 497), (320, 256)          # the player's palette and texture page (4-bit)
 SHADOW = (448, 256, 152, 88, 24, 16)          # his shadow: page x, y, u, v, w, h (4-bit, semi-transparent)
-# the shadow's sizes: on the ground (24 x 16 scaled) and high in a jump (the game: 22 x 14 at the apex)
-SHADOW_SIZES = ((13, 8), (12, 7))
-SCALE = 22 / 42                                # 42 px tall standing -> 22 (the user's size B)
-SW, SH, AY = 16, 25, 23                        # sprite 16 x 25, feet on row 23
-WW, WX = 32, 16                                # scaled first into 32 columns, feet at column 16,
+# the scale: 22/42 = Alundra 42 px tall standing -> 22 (the user's size B); a parameter (Makefile
+# SCALE): the sprite, the shadow, the speeds and the levels all follow from it
+SCALE_ND = tuple(int(v) for v in (sys.argv[4] if len(sys.argv) > 4 else '22/42').split('/'))
+SCALE = SCALE_ND[0] / SCALE_ND[1]
+HEIGHT = round(42 * SCALE)                     # standing height on the TI (22)
+SW = 16 if SCALE <= 0.6 else 32                # sprite width (ExtGraph: 16 or 32)
+SH, AY = HEIGHT + 3, HEIGHT + 1                # sprite 16 x 25, feet on row 23
+WW, WX = 2 * SW, SW                            # scaled first into 32 columns, feet at column 16,
                                                # then cut to the 16 around the pose (offset kept)
+# the shadow's sizes: on the ground (24 x 16 scaled) and high in a jump (the game: 22 x 14 at the apex)
+SHADOW_SIZES = ((round(24 * SCALE), round(16 * SCALE)), (round(22 * SCALE), round(14 * SCALE)))
 IDLE = (21, 5, 2)                              # breathing: stand, in, out (steps at 32 fps; the
                                                # game: 40, 10, 4 frames at 60 Hz)
 # palette index -> grey (0 white .. 3 black): gold hair and skin light, blues and browns dark
@@ -41,7 +50,23 @@ DIRS = {'down': 'DOWN', 'up': 'UP', 'right': 'RIGHT'}
 # screen: INOA.state, DOWN+LEFT held 150 frames (a grass terrace above a stone retaining wall)
 CELLS = {'floor': ((6, 4), 25), 'face': ((5, 12), 35), 'walltop': ((11, 11), 35), 'wallface': ((14, 11), 35)}
 VILLAGE_WALK = 150
-
+# the village of Inoa (milestone 9): the game's own image of it on the TI, the collision from its
+# height map (RE_NOTES.md § Addresses: pointer at 801ac6c4, cells of 24 x 16 px, the height in
+# 16 px units in byte 3, the slope type in byte 2, flags 0x41 = wall) resampled to TI tiles of
+# 16 / SCALE px of the game (30.5 at 22/42), the most common cell under each; a level = 16 px
+# of the game, as in the game (Experiment 11)
+MAP_PTR, MAP_COL = 0x801ac6c4, 0x80137990
+V_X0, V_X1, V_ROW0, V_ROW1 = 0, 1248, 11, 57   # the village: x px, map rows (outside = walls)
+V_BASE = 1                                     # the lowest ground (level 0), 16-px units
+V_MAJOR = 20                                   # tiles a height needs to be a terrace
+V_START = (732, 424)                           # the player in INOA.state (leaving the house)
+# the village's image: the player teleported over a grid (V_GRID), the other objects (NPCs)
+# moved out of the map, each settled screen pasted where its camera is (the player's position
+# minus his feet on screen, read from the GPU packets), in (x, y - z + V_OY); several screens
+# per pixel, the median kept (the player and what moves vanish)
+V_GRID, V_OY, V_K = ((60, 1248, 110), (150, 960, 70)), 400, 6
+V_PCT = (20, 50, 82)                           # 4 greys: luminance percentiles
+OBJS, OBJ_SIZE = 0x801ac6f8, 0x294             # the objects (0 = the player): +0x114 x
 
 def sxy(v):
     x, y = v & 0xffff, v >> 16
@@ -189,6 +214,196 @@ def cell(screen, c, pct):
     return (lum < np.percentile(lum, pct)).astype(int)       # 1 = line, 0 = base
 
 
+def sc(v):
+    """alundra.h SC(): a size set at the reference scale 22/42, at SCALE"""
+    n, d = SCALE_ND
+    return (v * 42 * n + d * 11) // (d * 22)
+
+
+def village_image(psx, state):
+    """the village as the game draws it, without the player or the NPCs (V_GRID, median)"""
+    H, W = 1400, 1300
+    samp = np.zeros((H, W, V_K, 3), np.uint8)
+    cnt = np.zeros((H, W), np.uint8)
+
+    def step():
+        for k in range(1, 64):                 # every other object out of the map
+            o = OBJS + k * OBJ_SIZE
+            if psx.read(o + 0x114, 4):
+                psx.write(o + 0x114, 3000 << 16, 4)
+        psx.run()
+
+    def cam():
+        px, py, pz = (psx.read(a, 4) / 65536 for a in (0x801ac80c, 0x801ac810, 0x801ac814))
+        q = player_quads(bytes(psx.ram))
+        if len(q) != 2:
+            return None
+        f = []
+        for b in q:
+            legs = max(b, key=lambda t: max(v for _, v in t[0]))
+            f.append(((legs[0][0][0] + legs[0][1][0]) / 2, max(v for _, v in legs[0])))
+        if f[0] != f[1]:                       # both packet buffers: the player at rest
+            return None
+        return int(round(px - f[0][0])), int(round(py - pz - f[0][1])) + V_OY
+    for y in range(*V_GRID[1]):
+        for x in range(*V_GRID[0]):
+            psx.load(state); psx.run()
+            psx.write(0x801ac80c, x << 16, 4)
+            psx.write(0x801ac810, y << 16, 4)
+            psx.write(0x801ac814, 0x100 << 16, 4)
+            for _ in range(100):
+                step()
+            c1 = cam(); step(); c2 = cam(); step(); c3 = cam()
+            if not c1 or c1 != c2 or c2 != c3:    # the camera still moving: skipped
+                continue
+            img = np.array(psx.image().convert('RGB'))[40:232, 8:312]   # the HUD left out
+            ys, xs = c3[1] + 40, c3[0] + 8
+            Y0, X0 = max(0, ys), max(0, xs)
+            Y1, X1 = min(H, ys + img.shape[0]), min(W, xs + img.shape[1])
+            if Y1 <= Y0 or X1 <= X0:
+                continue
+            sub = img[Y0 - ys:Y1 - ys, X0 - xs:X1 - xs]
+            c = cnt[Y0:Y1, X0:X1]
+            yy, xx = np.nonzero(c < V_K)
+            samp[Y0 + yy, X0 + xx, c[yy, xx]] = sub[yy, xx]
+            c[yy, xx] += 1
+    med = np.zeros((H, W, 3), np.uint8)
+    for k in range(1, V_K + 1):
+        m = cnt == k
+        if m.any():
+            med[m] = np.median(samp[m][:, :k], axis=1).astype(np.uint8)
+    return med
+
+
+def village_tiles(psx):
+    """the village as TI tiles: level (0-15) | 0x80 wall | 0x40 stair, a level = 16 px of the
+    game (alundra.h § A tile)"""
+    m = psx.read(MAP_PTR, 4)
+    tile = 16 / SCALE
+    w, h = int(np.ceil((V_X1 - V_X0) / tile)), int(np.ceil((V_ROW1 + 1 - V_ROW0) * 16 / tile))
+    cache = {}
+
+    def cell(x, y):
+        c, r = psx.read(MAP_COL + 2 * x, 2), y >> 4
+        if (c, r) not in cache:
+            a = m + 0x604 + c * 8 + r * 0x1a0
+            f, t, ht = psx.read(a, 2), psx.read(a + 2), psx.read(a + 3)
+            cache[c, r] = 'W' if f & 0x41 or ht < V_BASE or not V_ROW0 <= r <= V_ROW1 else \
+                ('S', ht) if t & 3 else ht
+        return cache[c, r]
+    grid = []
+    for j in range(h):
+        row = []
+        for i in range(w):
+            count = {}
+            for sy in range(8):
+                for sx in range(8):
+                    x = int(V_X0 + (i + (sx + .5) / 8) * tile)
+                    y = int(V_ROW0 * 16 + (j + (sy + .5) / 8) * tile)
+                    k = cell(x, y) if x < V_X1 else 'W'
+                    count[k] = count.get(k, 0) + 1
+            row.append(max(count, key=count.get))
+        grid.append(row)
+    out = [[0x80 | 3] * w for _ in range(h)]
+    for j in range(1, h - 1):                  # the exits closed: walls all round
+        for i in range(1, w - 1):
+            v = grid[j][i]
+            if isinstance(v, int):
+                out[j][i] = min(15, v - V_BASE)
+            elif v != 'W':
+                out[j][i] = 0x40 | min(15, v[1] - V_BASE)
+    # terraces: the heights under V_MAJOR tiles or more; a rarer height one level above a
+    # terrace is an object on it (benches, crates), higher it is a roof: a wall
+    n = {}
+    for v in (v for r in out for v in r if not v & 0xc0):
+        n[v] = n.get(v, 0) + 1
+    major = sorted(v for v, k in n.items() if k >= V_MAJOR)
+    for j in range(h):
+        for i in range(w):
+            v = out[j][i]
+            if not v & 0xc0 and v not in major:
+                below = [a for a in major if a <= v]
+                if not below or v - below[-1] > 1:
+                    out[j][i] = 0x80 | v
+    # stairs join two terraces (walked up and down); any other group of slope tiles is a
+    # sloped roof (the houses): walls
+    seen = set()
+    for j in range(h):
+        for i in range(w):
+            if not out[j][i] & 0x40 or (i, j) in seen:
+                continue
+            group, todo, floors = [], [(i, j)], set()
+            seen.add((i, j))
+            while todo:
+                a, b = todo.pop()
+                group.append((a, b))
+                for c, d in ((a - 1, b), (a + 1, b), (a, b - 1), (a, b + 1)):
+                    if out[d][c] & 0x80:
+                        continue
+                    if out[d][c] & 0x40:
+                        if (c, d) not in seen:
+                            seen.add((c, d))
+                            todo.append((c, d))
+                    else:
+                        floors.add(out[d][c])
+            if len(floors & set(major)) < 2:
+                for a, b in group:
+                    out[b][a] = 0x80 | min(15, (out[b][a] & 15) + 1)
+    # walls: their level is the height drawn (the image's own), at least 3 above the floor near
+    for j in range(h):
+        for i in range(w):
+            if out[j][i] & 0x80:
+                v = grid[j][i]
+                near = [out[b][a] & 15 for a, b in ((i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1))
+                        if 0 <= a < w and 0 <= b < h and not out[b][a] & 0x80]
+                hv = v[1] if isinstance(v, tuple) else v if isinstance(v, int) else 0
+                out[j][i] = 0x80 | min(15, max(hv - V_BASE, (max(near) if near else 0) + 3))
+    sx, sy = round((V_START[0] - V_X0) * SCALE), round((V_START[1] - V_ROW0 * 16) * SCALE)
+    i, j = min(((i, j) for j in range(h) for i in range(w) if not out[j][i] & 0xc0),
+               key=lambda p: (p[0] * 16 + 8 - sx) ** 2 + (p[1] * 16 + 8 - sy) ** 2)
+    return out, (i * 16 + 8, j * 16 + 8)
+
+
+def level_px(h):
+    """alundra.h LEVEL_PX(): screen px of h levels"""
+    return (h * sc(134)) >> 4
+
+
+def village_picture(canvas, tiles):
+    """the image on the TI: the village's image scaled by SCALE (an area average), 4 greys
+    (luminance percentiles; the grass, olive, a light grey with its darkest spots), as two
+    planes (light, dark: 1 bit per pixel, MSB left); row 0 of the tiles at image row `top`"""
+    from scipy import ndimage
+    h, w = len(tiles), len(tiles[0])
+    top = max(0, max(level_px(v & 15) - j * 16 for j, r in enumerate(tiles) for v in r
+                     if not v & 0x80)) + HEIGHT + 4
+    iw, ih = w * 16, top + h * 16
+    small = np.array(Image.fromarray(canvas).resize(
+        (round(canvas.shape[1] * SCALE), round(canvas.shape[0] * SCALE)), Image.BOX)).astype(float)
+    # TI image row v = top + (y - z - V_ROW0 * 16) * SCALE: canvas row (y - z + V_OY)
+    off = round((V_ROW0 * 16 + V_OY) * SCALE) - top
+    rgb = np.zeros((ih, iw, 3))
+    for v in range(ih):
+        r = v + off
+        if 0 <= r < small.shape[0]:
+            n = min(iw, small.shape[1])
+            rgb[v, :n] = small[r, :n]
+    L = rgb @ [0.299, 0.587, 0.114]
+    valid = L > 3
+    t = [np.percentile(L[valid], q) for q in V_PCT]
+    q = 3 - np.digitize(L, t)                   # 0 white .. 3 black
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    grass = ndimage.binary_opening((g >= r * 0.95) & (b < g * 0.7) & (L > t[0]) & (L < t[2]))
+    mean = ndimage.uniform_filter(L, 7)
+    q[grass] = np.where(L[grass] < mean[grass] - 14, 2, 1)
+    q[~valid] = 0
+    planes = []
+    for bit in (1, 2):                          # light = grey & 1, dark = grey >> 1
+        p = ((q & bit) != 0).astype(np.uint8)
+        planes.append(np.packbits(p, axis=1).tobytes())
+    return planes, top, iw // 8, ih, q
+
+
 def main():
     disc, state, village = sys.argv[1], sys.argv[2], sys.argv[3]
     out = os.fdopen(os.dup(1), 'w', buffering=1)
@@ -217,6 +432,15 @@ def main():
         cut = [window(im) for im in ims]
         imgs[d] = [c for c, _ in cut]
         ox[d] = [o for _, o in cut]
+    canvas = village_image(psx, village)
+    os.makedirs('x', exist_ok=True)
+    Image.fromarray(canvas).save('x/village_full.png')
+    psx.load(village); psx.run()
+    vil, vstart = village_tiles(psx)
+    planes, vtop, viwb, vih, vq = village_picture(canvas, vil)
+    for k, pl in enumerate(planes):            # the TI data variables (Makefile: .89y)
+        open('alvil%d.bin' % k, 'wb').write(pl + bytes(2))   # (the view copy reads a word past a row)
+    Image.fromarray(np.array([255, 170, 85, 0], np.uint8)[vq]).save('x/village_ti.png')
     psx.load(village)
     psx.pressed = 1 << psxrun.PAD['DOWN'] | 1 << psxrun.PAD['LEFT']
     for _ in range(VILLAGE_WALK + 2):
@@ -232,15 +456,18 @@ def main():
     Image.fromarray(screen).save('x/village.png')
     with open('gfx.h', 'w') as f:
         f.write('// Generated by tools/extract.py from the local disc: do not edit, do not commit.\n')
+        f.write('#ifndef GFX_H\n#define GFX_H\n')
+        f.write('#define SCALE_N %d\n#define SCALE_D %d   // the scale on the TI\n' % SCALE_ND)
         f.write('#define HERO_SW %d\n#define HERO_SH %d\n#define HERO_AY %d\n' % (SW, SH, AY))
+        f.write('typedef u%d hero_row;\n' % SW)
         f.write('#define HERO_FRAMES %d  // per direction: stand, walk x 6, jump (take-off, air), breathing x 2\n' % len(imgs['down']))
         f.write('#define IDLE_STAND %d\n#define IDLE_IN %d\n#define IDLE_OUT %d\n' % IDLE)
         f.write('// directions: 0 down, 1 up, 2 left, 3 right\n')
-        f.write('static const u16 hero_gfx[4][%d][3][%d] = {\n' % (len(imgs['down']), SH))
+        f.write('static const hero_row hero_gfx[4][%d][3][%d] = {\n' % (len(imgs['down']), SH))
         for d in order:
             f.write('  {\n')
             for im in imgs[d]:
-                f.write('    {%s},\n' % ', '.join('{%s}' % ','.join('0x%04x' % v for v in r) for r in sprite_rows(im, SW)))
+                f.write('    {%s},\n' % ', '.join('{%s}' % ','.join('0x%x' % v for v in r) for r in sprite_rows(im, SW)))
             f.write('  },\n')
         f.write('};\n')
         f.write('// x of each image left column relative to the feet: the game own placement\n')
@@ -257,6 +484,17 @@ def main():
             f.write('static const u8 tex_%s[16][2] = {' % name)
             f.write(','.join('{0x%02x,0x%02x}' % tuple(int(''.join(map(str, r[k:k + 8])), 2) for k in (0, 8)) for r in t))
             f.write('};\n')
+        f.write('// the village of Inoa: %d x %d tiles, level | 0x80 wall | 0x40 stair; its image in\n'
+                '// alvil0.bin (light) and alvil1.bin (dark): %d bytes x %d rows, tile row 0 at row %d\n'
+                % (len(vil[0]), len(vil), viwb, vih, vtop))
+        f.write('#define VILLAGE_W %d\n#define VILLAGE_H %d\n#define VILLAGE_TOP %d\n' % (len(vil[0]), len(vil), vtop))
+        f.write('#define VILLAGE_IWB %d\n#define VILLAGE_IH %d\n' % (viwb, vih))
+        f.write('#define VILLAGE_SX %d\n#define VILLAGE_SY %d\n' % vstart)
+        f.write('static const u8 village[%d] = {\n%s};\n' % (len(vil) * len(vil[0]), ''.join(
+                '  %s,\n' % ','.join('0x%02x' % v for v in r) for r in vil)))
+        f.write('#endif\n')
+    out.write(''.join(''.join('#' if v & 0x80 else '/' if v & 0x40 else '%x' % v for v in r) + '\n' for r in vil))
+    out.write('village: top %d, image %d x %d, start %s\n' % (vtop, viwb * 8, vih, vstart))
     out.write('gfx.h: %d hero images, %d textures\n' % (4 * len(imgs['down']), len(CELLS)))
 
 
