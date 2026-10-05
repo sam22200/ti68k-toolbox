@@ -674,6 +674,17 @@ link-port sound.
 | **Raster wobble**, vertical (Der Rechner), `wobble.c`: each screen row copied from `y + sin[(4y + t)] >> 4` | **55k** per frame vs 37k for a plain copy of the picture (~180 cycles per row for the table read and clamp) | **NEW, use it**: heat haze, underwater, a hit or teleport warp, on a picture or on the finished frame copied through a row table |
 | Raster wobble, horizontal: each row shifted by −8..7 pixels (long shifts) | **195k** per frame in C | Only for a band of rows or a short effect |
 
+**Game uses, measured** (`experiments/demoscene/gamefx.c`, one effect per `--arg N`, 240-frame
+movies, `gamefx.gif` / `torch_yaronet.gif` made by `movie.py`; C, -Os)
+
+| Effect | Per frame | Notes |
+|---|---|---|
+| **Torch, bump-mapped** (jsseffec's bump on a window): brick wall + carved "YARONET", lit disc of radius 34 around a moving flame, the room black | **314k** (~35 fps alone); radius 30 without the carved-letter darkening 239k | Per pixel a precomputed byte offset (−gradient, + 2 for the checkerboard parity) into a 120×102 light table of longs (even/odd pixel words, 7 levels dithered); each word is light bit ‖ dark bit << 8, so `acc = 2 acc + entry` over 8 pixels gives both plane bytes. Only the disc's bytes are drawn (~600), only the old disc minus the new one is cleared (25k). C: ~340 cycles per 8 pixels (asm ~2× faster, not written). Readability needs albedo, not only bump: the letters' inside one grey darker (`l ^ (m & ~k)`, `k \| (l & m)` with a letter mask, only on letter rows). **Bug met**: the table row offset `(row · LW + x) << 2` overflows TIGCC's 16-bit `int`: cast to `long`. For a game: radius ~24 (~half), or redraw at 15 fps |
+| **Lake reflection**: rows 60–99 = rows 59–20 mirrored, each shifted by a per-row sine growing towards the viewer, one grey darker (`l' = ~l \| d`, `d' = l \| d`) | **117k** for 40 rows | The shift (wobble.c's `shift_row`) is the cost: ~2.9k per row. A water band under a scene |
+| **Twister pillars**: a pillar row depends only on its angle, so 256 rows × 2 wall parities are precomputed (4 KB); per row one table read and two long writes | **76k** for 3 full-height pillars (593k computing the faces per row) | Faces shaded by width + alternate tones, black edges. Temple pillars, screws, ropes |
+| **TV static / CRT off**: 250 xorshift longs per frame (25 noise rows reused at a random row offset), rolling band, tune-in, vertical squeeze then a shrinking line | **110k** full static, 31–135k | Transitions, hit or death effect |
+| **Plasma title**: 80×50 cells, level = `ax[x] + by[y] + dg[x + y]` (0..14), two cells = one byte index, one long table read = 4 pixels × both planes × both Bayer row parities | **294k** (~37 fps) + the title with a white outline 24k | Per-frame pair arrays from pre-shifted sine level tables (22k). `short` indexes: an unsigned one costs `and.l #65535` + `add.l #table` per read. Title or menu screen |
+
 `experiments/demoscene/sidebyside.py` turns two such runs (per frame: `BENCH_VALUE` of its cycles, then
 `BENCH_SHOT`) into a side-by-side GIF at calculator speed: voxel C vs asm (`voxel.c -DMOVIE=240`,
 `experiments/demoscene/voxel_c_vs_asm.gif`), Mode 7 original vs optimised (bench scenario 5,
@@ -691,11 +702,11 @@ link-port sound.
 | Outlines drawn right after each face, faces in painter's order (Trip) | one line per edge | **NEW**: hidden lines vanish for free and low-poly objects get the outline of our visibility rule |
 | Short spans (≤ 7 pixels) dispatched by (length, x & 3) to straight-line code; edges stepped with `add.w`/`addx.w`, 2 rows per loop (NICCC89) | 98–270 cycles per row vs ~400 in our Mode 7 3D filler (§8) | Candidate for the flat filler (asm) |
 | Sphere by lookup map (Trip/HSL planet): 64×64 words (u, v, shade), rotation = `u + t` | 280 cycles per pixel as written (11 fps), ~45 optimised | Low: a game uses pre-rendered frames (16 angles of a 32×32 grey sprite = 4 KB, one blit). The map only if the texture changes at run time |
-| Bump mapping 80×49 cells (jsseffec): `light[pos + (h[x] − h[x+1]) + (h[x] − h[x+384]) << 7]` | ~530k + conversion | Too costly full screen; a 32×32 torch would be ~1/5 |
+| Bump mapping 80×49 cells (jsseffec): `light[pos + (h[x] − h[x+1]) + (h[x] − h[x+384]) << 7]` | ~530k + conversion | Too costly full screen; a torch window: **measured** above (gamefx 1) |
 | Feedback blur trails (jsseffec bobs): 80×50 intensity buffer, zoom passes, decay table | ~270–370k (estimate) | Low for games |
 | Pseudo-3D road (Trip) | ~220–250k: 3 `divs` per row and overdraw | **Worse** than ours (155k, §13). Take its tricks: curve = `sin(z + t) − sin(t)` (no accumulator, no drift), stripes and dashes from bits of z, a clip window that widens as the intro transition |
-| Twister (Der Rechner): 4 edges `x_i = tab[(y/2 + angle + 64i) & 255]`, face visible iff `x_{i+1} > x_i` | the demo plots with `bset` (~155 cycles per pixel); spans would be ~10× faster | Good edge maths for pillars, ropes, screws |
-| Point-mirrored noise (TV Noise): generate half the screen, write each byte twice | ~450k with `rand()` | With xorshift (performance §4) ~8× cheaper: TV static, hit flash |
+| Twister (Der Rechner): 4 edges `x_i = tab[(y/2 + angle + 64i) & 255]`, face visible iff `x_{i+1} > x_i` | the demo plots with `bset` (~155 cycles per pixel); spans would be ~10× faster | Good edge maths for pillars, ropes, screws; **measured** above with one table row per angle (gamefx 3) |
+| Point-mirrored noise (TV Noise): generate half the screen, write each byte twice | ~450k with `rand()` | With xorshift (performance §4) ~8× cheaper: TV static, hit flash; **measured** above (gamefx 4) |
 | Small tricks: contrast fades with `OSContrastUp`/`Dn` (Revenge; restore the contrast at exit, not tested on hardware); fused scroll-and-OR text ticker, ~11k per frame (Revenge); point-set morph by ±1 per coordinate per frame (Revenge); one rotated shape drawn per frame and shared by many bobs (alchimie7); procedural texture `(u & v) >> 8` with no memory (alchimie7's Sierpinski rotozoom) | cheap | Title screens, menus, transitions |
 
 **Rejected or dangerous**

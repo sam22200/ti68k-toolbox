@@ -28,11 +28,8 @@ def load(d, skip):
 
 def panel(img, width):
     v = img.crop((0, 0, width, 100))
-    # the PNG's 4 levels (white..black) -> GREYS
-    levels = sorted(set(v.getdata()), reverse=True)
-    lut = {l: GREYS[min(i, 3)] for i, l in enumerate(levels)} if len(levels) <= 4 else None
-    if lut:
-        v = v.point(lambda p: lut.get(p, p))
+    # the PNG's levels 255, 170, 85, 0 (white..black) -> GREYS
+    v = v.point(lambda p: GREYS[min(3, (255 - p + 42) // 85)])
     return v.resize((width * SCALE, 100 * SCALE), Image.NEAREST)
 
 
@@ -81,4 +78,5 @@ def main():
     print(out, n, 'frames, %.1f s' % total)
 
 
-main()
+if __name__ == '__main__':
+    main()
