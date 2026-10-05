@@ -8,7 +8,7 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 | Path | What |
 |---|---|
 | `runtime/` | **Portable Game Runtime**: one C engine, PC (SDL2) and TI backends, unit tests, PC/TI cross-check ([README](runtime/README.md)) |
-| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported), `life/` (Game of Life on the runtime, glider), `flappy/` (Flappy Bird ported from sdlbird), `ffa/` (Final Fantasy Alternative remade from TI-Basic, in progress), `mode7/` (Mode 7 demo decompiled and optimised, [OPTIMISATIONS](games/mode7/OPTIMISATIONS.md)), `celeste/` (Celeste Classic ported from the PICO-8 cart, room 0, bit-exact with the cart), `mgs/` (Metal Gear Solid GBC, VR Sneaking Lv.01 on our own engine, [ROADMAP](games/mgs/ROADMAP.md)) |
+| `games/` | `campfire/` (Chrono Trigger camp-fire scene, TileMap + ZX0), `puzzle_bobble/` (ported), `life/` (Game of Life on the runtime, glider), `flappy/` (Flappy Bird ported from sdlbird), `ffa/` (Final Fantasy Alternative remade from TI-Basic, in progress), `mode7/` (Mode 7 demo decompiled and optimised, [OPTIMISATIONS](games/mode7/OPTIMISATIONS.md)), `celeste/` (Celeste Classic ported from the PICO-8 cart, room 0, bit-exact with the cart), `mgs/` (Metal Gear Solid GBC, VR Sneaking Lv.01 on our own engine, [ROADMAP](games/mgs/ROADMAP.md)), `alundra/` (Alundra PS1's jumps and terrain heights in one room, our own engine, art generated from the local disc) |
 | `lib/` | shared code: ZX0/LZ4 decoders in 68000 asm, ZX0 packer |
 | `experiments/` | small measured tests (hardware, timers, keyboard, graphics, benchmarks) |
 | `hello/` | reference Hello World |
