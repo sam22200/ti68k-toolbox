@@ -131,6 +131,12 @@ that kind of task.
   Python) for reference screens and dumps, analysis split between sub-agents, `/grilling`,
   the logic rewritten routine by routine in C, light tests (one per mechanic, a bot-played
   walkthrough, TI = PC by `xcheck`). Programs in `roms/ti83/` (local).
+- `ti-port-ps1`: study a PlayStation game and rebuild one of its mechanics small (Alundra's
+  jumps and terrain heights in one room): disc read (`psxiso.py`), Ghidra's built-in MIPS on
+  the executable or a RAM dump, the disc run headless (`psxrun.py`: pcsx_rearmed libretro
+  core, HLE BIOS, traces, RAM diffs, states), `/grilling` first, `RE_NOTES.md` with every
+  finding labelled OBSERVED / INTERPRETATION / TARGET, a behavioural model (never a
+  translation), milestones on the runtime. Discs in `roms/ps1/` (local).
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
@@ -176,7 +182,7 @@ that kind of task.
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua; `mgs/`: Metal Gear Solid (GBC) on our own engine with `ti-port-gb`'s big-game track, milestone 1 = VR Sneaking Lv.01, data generated from the local ROM, see its `ROADMAP.md`)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua; `mgs/`: Metal Gear Solid (GBC) on our own engine with `ti-port-gb`'s big-game track, milestone 1 = VR Sneaking Lv.01, data generated from the local ROM, see its `ROADMAP.md`; `alundra/`: Alundra (PS1) traversal, one room (jumps, heights, ledges, depth) on our own engine with `ti-port-ps1`, art generated from the local disc by `tools/extract.py`, see its `README.md`)
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
@@ -203,7 +209,7 @@ that kind of task.
   readme forbids redistribution: `.git/info/exclude`, state in its `README.md`), `sources/`,
   `ffa_en/`, third-party and
   generated tools (`tools/gcc4ti*`, `extgraph`, `rom`, `tiemu`, `pyenv`, `sdl2`, `tarballs`,
-  `patches`, `musashi`, `shrinko8`, `z8lua`, `ghidra`), `roms/` (commercial ROMs, TI-83 programs), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
+  `patches`, `musashi`, `shrinko8`, `z8lua`, `ghidra`, `pcsx_rearmed`), `roms/` (commercial ROMs, TI-83 programs), `tools/bin/zx0`/`dzx0`/`ti-cycles` (host builds), `runtime/platform-sw/amsfont.h` (extracted
   from the TI OS by `make`), build outputs.
 - `docs/resources.md`: tutorials, game sources, sites, sprite/tileset/map sites for assets.
 
