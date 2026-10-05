@@ -26,6 +26,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '../../../.claude/skills/ti-port-ps1/scripts'))
 import psxrun
+import psxgpu
 
 CLUT, TPAGE = (192, 497), (320, 256)          # the player's palette and texture page (4-bit)
 SHADOW = (448, 256, 152, 88, 24, 16)          # his shadow: page x, y, u, v, w, h (4-bit, semi-transparent)
@@ -58,15 +59,17 @@ VILLAGE_WALK = 150
 MAP_PTR, MAP_COL = 0x801ac6c4, 0x80137990
 V_X0, V_X1, V_ROW0, V_ROW1 = 0, 1248, 11, 57   # the village: x px, map rows (outside = walls)
 V_BASE = 1                                     # the lowest ground (level 0), 16-px units
-V_MAJOR = 20                                   # tiles a height needs to be a terrace
-V_START = (732, 424)                           # the player in INOA.state (leaving the house)
+V_START = (732, 424, 10)                       # the player in INOA.state (leaving the house): x, y, height
 # the village's image: the player teleported over a grid (V_GRID), the other objects (NPCs)
 # moved out of the map, each settled screen pasted where its camera is (the player's position
 # minus his feet on screen, read from the GPU packets), in (x, y - z + V_OY); several screens
 # per pixel, the median kept (the player and what moves vanish)
 V_GRID, V_OY, V_K = ((60, 1248, 110), (150, 960, 70)), 400, 6
-V_PCT = (20, 50, 82)                           # 4 greys: luminance percentiles
+V_FILL, V_TRIES = 40, ((0, 40), (0, 120), (0, 200), (-60, 120), (60, 120), (0, -40))
+V_PCT = (18, 45, 72)                           # 4 greys: luminance percentiles (the grass apart)
+V_PAVE = 95                                    # paving: grey and brighter than this on average
 OBJS, OBJ_SIZE = 0x801ac6f8, 0x294             # the objects (0 = the player): +0x114 x
+OT_N = 1100                                    # ordering-table entries (964 used, 16 per map row)
 
 def sxy(v):
     x, y = v & 0xffff, v >> 16
@@ -220,10 +223,30 @@ def sc(v):
     return (v * 42 * n + d * 11) // (d * 22)
 
 
+def depth_rows(psx):
+    """per screen pixel, the map row (16 px) of the scenery drawn on top in the frame just run
+    (the GPU log, psxgpu.py: its ordering-table entry = 16 x row + 5 or 6; the player's is 16 x
+    his row + 10, so whatever a row in front of his draws hides him), -1 where nothing is; the
+    player and what is semi-transparent (shadows) left out"""
+    prims = psxgpu.parse(*psxgpu.frame_log(psx))
+    ots = [p['addr'] for p in prims if p['kind'] == 'ot' and p['addr'] < 0x1f0000]
+    if not ots:
+        return None
+    base = min(ots)
+    vram = np.frombuffer(bytes(psx.vram), '<u2').reshape(512, 1024)
+    clut = (CLUT[1] << 6) | (CLUT[0] >> 4)
+    _, own = psxgpu.replay(prims, vram, psxgpu.area(prims),
+                           skip=lambda p: p['semi'] or (p['kind'] == 'poly' and p['clut'] == clut))
+    ok = (own >= base) & (own < base + 4 * OT_N)
+    return np.where(ok, ((own - base) >> 2) >> 4, -1)
+
+
 def village_image(psx, state):
-    """the village as the game draws it, without the player or the NPCs (V_GRID, median)"""
+    """the village as the game draws it, without the player or the NPCs (V_GRID, median), and
+    the map row of what each pixel shows (depth_rows, the median too)"""
     H, W = 1400, 1300
     samp = np.zeros((H, W, V_K, 3), np.uint8)
+    ksamp = np.zeros((H, W, V_K), np.int16)
     cnt = np.zeros((H, W), np.uint8)
 
     def step():
@@ -245,38 +268,60 @@ def village_image(psx, state):
         if f[0] != f[1]:                       # both packet buffers: the player at rest
             return None
         return int(round(px - f[0][0])), int(round(py - pz - f[0][1])) + V_OY
+    def shot(x, y):
+        """the player dropped at (x, y): the settled screen pasted; False if none"""
+        psx.load(state); psx.run()
+        psx.write(0x801ac80c, x << 16, 4)
+        psx.write(0x801ac810, y << 16, 4)
+        psx.write(0x801ac814, 0x100 << 16, 4)
+        for _ in range(100):
+            step()
+        c1 = cam(); step(); c2 = cam()
+        psx.lib.retro_tiport_gplog_reset()
+        step(); c3 = cam()
+        if not c1 or c1 != c2 or c2 != c3:     # the camera still moving: skipped
+            return False
+        rows = depth_rows(psx)
+        if rows is None:
+            return False
+        img = np.array(psx.image().convert('RGB'))[40:232, 8:312]   # the HUD left out
+        rows = rows[40:232, 8:312]
+        ys, xs = c3[1] + 40, c3[0] + 8
+        Y0, X0 = max(0, ys), max(0, xs)
+        Y1, X1 = min(H, ys + img.shape[0]), min(W, xs + img.shape[1])
+        if Y1 <= Y0 or X1 <= X0:
+            return False
+        sub = img[Y0 - ys:Y1 - ys, X0 - xs:X1 - xs]
+        c = cnt[Y0:Y1, X0:X1]
+        yy, xx = np.nonzero(c < V_K)
+        samp[Y0 + yy, X0 + xx, c[yy, xx]] = sub[yy, xx]
+        ksamp[Y0 + yy, X0 + xx, c[yy, xx]] = rows[Y0 - ys:Y1 - ys, X0 - xs:X1 - xs][yy, xx]
+        c[yy, xx] += 1
+        return True
     for y in range(*V_GRID[1]):
         for x in range(*V_GRID[0]):
-            psx.load(state); psx.run()
-            psx.write(0x801ac80c, x << 16, 4)
-            psx.write(0x801ac810, y << 16, 4)
-            psx.write(0x801ac814, 0x100 << 16, 4)
-            for _ in range(100):
-                step()
-            c1 = cam(); step(); c2 = cam(); step(); c3 = cam()
-            if not c1 or c1 != c2 or c2 != c3:    # the camera still moving: skipped
-                continue
-            img = np.array(psx.image().convert('RGB'))[40:232, 8:312]   # the HUD left out
-            ys, xs = c3[1] + 40, c3[0] + 8
-            Y0, X0 = max(0, ys), max(0, xs)
-            Y1, X1 = min(H, ys + img.shape[0]), min(W, xs + img.shape[1])
-            if Y1 <= Y0 or X1 <= X0:
-                continue
-            sub = img[Y0 - ys:Y1 - ys, X0 - xs:X1 - xs]
-            c = cnt[Y0:Y1, X0:X1]
-            yy, xx = np.nonzero(c < V_K)
-            samp[Y0 + yy, X0 + xx, c[yy, xx]] = sub[yy, xx]
-            c[yy, xx] += 1
+            shot(x, y)
+    # the holes (a drop into a wall, a camera still moving): points of the village not seen
+    # yet, each tried from players around it (the camera shows him about 120 px from the top)
+    Ys = np.nonzero(cnt.any(1))[0]
+    for Y in range(Ys[0] + 20, Ys[-1], V_FILL):
+        for X in range(16, V_X1 - 8, V_FILL):
+            for dx, dy in V_TRIES:
+                if cnt[Y, X]:
+                    break
+                shot(min(V_X1 - 12, max(12, X + dx)), Y - V_OY + dy)
     med = np.zeros((H, W, 3), np.uint8)
+    key = np.full((H, W), -1, np.int16)
     for k in range(1, V_K + 1):
         m = cnt == k
         if m.any():
             med[m] = np.median(samp[m][:, :k], axis=1).astype(np.uint8)
-    return med
+            key[m] = np.median(ksamp[m][:, :k], axis=1).astype(np.int16)
+    return med, key
 
 
 def village_tiles(psx):
-    """the village as TI tiles: level (0-15) | 0x80 wall | 0x40 stair, a level = 16 px of the
+    """the village as TI tiles: level (0-63) | 0x80 wall | 0x40 stair, a level = 16 px of the
     game (alundra.h § A tile)"""
     m = psx.read(MAP_PTR, 4)
     tile = 16 / SCALE
@@ -308,58 +353,24 @@ def village_tiles(psx):
     for j in range(1, h - 1):                  # the exits closed: walls all round
         for i in range(1, w - 1):
             v = grid[j][i]
+            # every cell the game does not flag is a floor at its own height, the houses'
+            # roofs too (OBSERVED: dropped on one, the player stands and walks on it); its
+            # slope cells (stairs, roofs) let the feet follow the floor
             if isinstance(v, int):
-                out[j][i] = min(15, v - V_BASE)
+                out[j][i] = min(63, v - V_BASE)
             elif v != 'W':
-                out[j][i] = 0x40 | min(15, v[1] - V_BASE)
-    # terraces: the heights under V_MAJOR tiles or more; a rarer height one level above a
-    # terrace is an object on it (benches, crates), higher it is a roof: a wall
-    n = {}
-    for v in (v for r in out for v in r if not v & 0xc0):
-        n[v] = n.get(v, 0) + 1
-    major = sorted(v for v, k in n.items() if k >= V_MAJOR)
-    for j in range(h):
-        for i in range(w):
-            v = out[j][i]
-            if not v & 0xc0 and v not in major:
-                below = [a for a in major if a <= v]
-                if not below or v - below[-1] > 1:
-                    out[j][i] = 0x80 | v
-    # stairs join two terraces (walked up and down); any other group of slope tiles is a
-    # sloped roof (the houses): walls
-    seen = set()
-    for j in range(h):
-        for i in range(w):
-            if not out[j][i] & 0x40 or (i, j) in seen:
-                continue
-            group, todo, floors = [], [(i, j)], set()
-            seen.add((i, j))
-            while todo:
-                a, b = todo.pop()
-                group.append((a, b))
-                for c, d in ((a - 1, b), (a + 1, b), (a, b - 1), (a, b + 1)):
-                    if out[d][c] & 0x80:
-                        continue
-                    if out[d][c] & 0x40:
-                        if (c, d) not in seen:
-                            seen.add((c, d))
-                            todo.append((c, d))
-                    else:
-                        floors.add(out[d][c])
-            if len(floors & set(major)) < 2:
-                for a, b in group:
-                    out[b][a] = 0x80 | min(15, (out[b][a] & 15) + 1)
+                out[j][i] = 0x40 | min(63, v[1] - V_BASE)
     # walls: their level is the height drawn (the image's own), at least 3 above the floor near
     for j in range(h):
         for i in range(w):
             if out[j][i] & 0x80:
                 v = grid[j][i]
-                near = [out[b][a] & 15 for a, b in ((i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1))
+                near = [out[b][a] & 63 for a, b in ((i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1))
                         if 0 <= a < w and 0 <= b < h and not out[b][a] & 0x80]
                 hv = v[1] if isinstance(v, tuple) else v if isinstance(v, int) else 0
-                out[j][i] = 0x80 | min(15, max(hv - V_BASE, (max(near) if near else 0) + 3))
+                out[j][i] = 0x80 | min(63, max(hv - V_BASE, (max(near) if near else 0) + 3))
     sx, sy = round((V_START[0] - V_X0) * SCALE), round((V_START[1] - V_ROW0 * 16) * SCALE)
-    i, j = min(((i, j) for j in range(h) for i in range(w) if not out[j][i] & 0xc0),
+    i, j = min(((i, j) for j in range(h) for i in range(w) if out[j][i] == V_START[2] - V_BASE),
                key=lambda p: (p[0] * 16 + 8 - sx) ** 2 + (p[1] * 16 + 8 - sy) ** 2)
     return out, (i * 16 + 8, j * 16 + 8)
 
@@ -369,19 +380,26 @@ def level_px(h):
     return (h * sc(134)) >> 4
 
 
-def village_picture(canvas, tiles):
+def picture_top(tiles):
+    """the image row of tile row 0: room above for the highest floor and a player on it"""
+    return max(0, max(level_px(v & 63) - j * 16 for j, r in enumerate(tiles) for v in r
+                      if not v & 0x80)) + HEIGHT + 4
+
+
+def village_picture(canvas, tiles, top, floor):
     """the image on the TI: the village's image scaled by SCALE (an area average), 4 greys
-    (luminance percentiles; the grass, olive, a light grey with its darkest spots), as two
-    planes (light, dark: 1 bit per pixel, MSB left); row 0 of the tiles at image row `top`"""
+    (luminance percentiles; the grass a flat light grey, the paving white, lone pixels gone,
+    for the TI's low-contrast LCD), as two
+    planes (light, dark: 1 bit per pixel, MSB left); row 0 of the tiles at image row `top`;
+    floor: the pixels showing a terrace's floor (terrace_floor: only they may be paving)"""
     from scipy import ndimage
     h, w = len(tiles), len(tiles[0])
-    top = max(0, max(level_px(v & 15) - j * 16 for j, r in enumerate(tiles) for v in r
-                     if not v & 0x80)) + HEIGHT + 4
     iw, ih = w * 16, top + h * 16
     small = np.array(Image.fromarray(canvas).resize(
         (round(canvas.shape[1] * SCALE), round(canvas.shape[0] * SCALE)), Image.BOX)).astype(float)
-    # TI image row v = top + (y - z - V_ROW0 * 16) * SCALE: canvas row (y - z + V_OY)
-    off = round((V_ROW0 * 16 + V_OY) * SCALE) - top
+    # TI image row v = top + (y - z - V_ROW0 * 16) * SCALE, z the TI's (level 0 = the game's
+    # height V_BASE): canvas row (y - z - V_BASE * 16 + V_OY)
+    off = round(((V_ROW0 - V_BASE) * 16 + V_OY) * SCALE) - top
     rgb = np.zeros((ih, iw, 3))
     for v in range(ih):
         r = v + off
@@ -390,18 +408,87 @@ def village_picture(canvas, tiles):
             rgb[v, :n] = small[r, :n]
     L = rgb @ [0.299, 0.587, 0.114]
     valid = L > 3
-    t = [np.percentile(L[valid], q) for q in V_PCT]
-    q = 3 - np.digitize(L, t)                   # 0 white .. 3 black
+    # the grass (olive, saturated, dark, smooth; its shadows too) one flat light grey: the
+    # hero (dark, white outline) reads on it; foliage is greener, lighter and textured
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    grass = ndimage.binary_opening((g >= r * 0.95) & (b < g * 0.7) & (L > t[0]) & (L < t[2]))
-    mean = ndimage.uniform_filter(L, 7)
-    q[grass] = np.where(L[grass] < mean[grass] - 14, 2, 1)
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    lt = (mx + mn) / 510
+    sat = (mx - mn) / np.maximum(np.where(lt < 0.5, mx + mn, 510 - mx - mn), 1)
+    hue = np.degrees(np.arctan2(np.sqrt(3) * (g - b), 2 * r - g - b)) % 360
+    sd = np.sqrt(np.maximum(ndimage.uniform_filter(L * L, 5) - ndimage.uniform_filter(L, 5) ** 2, 0))
+    grass = (hue > 38) & (hue < 62) & (sat > 0.4) & (lt < 0.3) & (sd < 14)
+    grass = ndimage.binary_opening(ndimage.binary_closing(grass, iterations=2), iterations=2)
+    t = [np.percentile(L[valid & ~grass], q) for q in V_PCT]
+    q = 3 - np.digitize(L, t)                   # 0 white .. 3 black
+    q[grass] = 1
+    # the paving (grey, bright on average, on a terrace's floor: not the slate roofs) white,
+    # its joints light grey where clearly darker
+    pave = floor & ~grass & (sat < 0.3) & (ndimage.uniform_filter(L, 5) > V_PAVE)
+    q[pave] = np.where(L[pave] < ndimage.uniform_filter(L, 7)[pave] - 22, 1, 0)
+    # lone pixels (no neighbour of the same grey) take the commonest grey around
+    same = sum((np.roll(np.roll(q, dy, 0), dx, 1) == q).astype(int)
+               for dy in (-1, 0, 1) for dx in (-1, 0, 1)) - 1
+    best, bc = np.zeros(q.shape, int), np.full(q.shape, -1.)
+    for k in range(4):
+        c = ndimage.uniform_filter((q == k).astype(float), 3)
+        best[c > bc], bc[c > bc] = k, c[c > bc]
+    q = np.where(same <= 1, best, q)
     q[~valid] = 0
     planes = []
     for bit in (1, 2):                          # light = grey & 1, dark = grey >> 1
         p = ((q & bit) != 0).astype(np.uint8)
         planes.append(np.packbits(p, axis=1).tobytes())
     return planes, top, iw // 8, ih, q
+
+
+def ti_rows(key, top, iwb, ih):
+    """the map row of what each TI image pixel shows (-1: nothing), sampled at its centre"""
+    off = round(((V_ROW0 - V_BASE) * 16 + V_OY) * SCALE) - top
+    vv, uu = np.mgrid[0:ih, 0:iwb * 8]
+    ys = np.clip(((vv + off + 0.5) / SCALE).astype(int), 0, key.shape[0] - 1)
+    xs = np.clip(((uu + 0.5) / SCALE).astype(int), 0, key.shape[1] - 1)
+    return key[ys, xs].astype(int)
+
+
+def terrace_floor(psx, rows):
+    """per TI image pixel: whether what it shows is a terrace's flat floor (an unflagged flat
+    map cell at one of the common heights: not a roof, a wall or an object), from its map row
+    and its x"""
+    m = psx.read(MAP_PTR, 4)
+    col = np.array([psx.read(MAP_COL + 2 * x, 2) for x in range(V_X1)])
+    cells = {}
+    for c in set(col.tolist()):
+        for r in range(V_ROW0, V_ROW1 + 1):
+            a = m + 0x604 + c * 8 + r * 0x1a0
+            cells[c, r] = (psx.read(a, 2) & 0x41, psx.read(a + 2) & 3, psx.read(a + 3))
+    flat = [h for (f, t, h) in (cells[c, r] for c in col.tolist() for r in range(V_ROW0, V_ROW1 + 1))
+            if not f and not t and h >= V_BASE]
+    n = np.bincount(flat)
+    terr = set(np.nonzero(n >= len(flat) * 0.05)[0].tolist())
+    ih, iw = rows.shape
+    xs = np.minimum(((np.arange(iw) + 0.5) / SCALE).astype(int), V_X1 - 1)
+    out = np.zeros(rows.shape, bool)
+    for v in range(ih):
+        for u in range(iw):
+            k = rows[v, u]
+            if V_ROW0 <= k <= V_ROW1:
+                f, t, h = cells[int(col[xs[u]]), int(k)]
+                out[v, u] = not f and not t and h in terr
+    return out
+
+
+def village_depth(rows, iwb, ih):
+    """what hides the player, per image byte (8 pixels): a threshold T (the player is behind
+    when his y / 2 < T, TI px) and the mask of its pixels (MSB left). A pixel of map row k
+    hides him when his row (his y / 16 rounded, the game's) is above k: y < 16 k - 8; a byte
+    keeps its frontmost row (its other pixels never hide); sampled at each TI pixel's centre"""
+    k = rows
+    T = np.where(k >= 0, np.round((16 * k - 8 - V_ROW0 * 16) * SCALE / 2), 0).clip(0, 255).astype(int)
+    tb = T.reshape(ih, iwb, 8)
+    tmax = tb.max(2)
+    bits = (tb == tmax[..., None]) & (tmax[..., None] > 0)
+    mask = np.packbits(bits.reshape(ih, iwb * 8).astype(np.uint8), axis=1)
+    return tmax.astype(np.uint8).tobytes(), mask.tobytes(), T
 
 
 def main():
@@ -432,14 +519,24 @@ def main():
         cut = [window(im) for im in ims]
         imgs[d] = [c for c, _ in cut]
         ox[d] = [o for _, o in cut]
-    canvas = village_image(psx, village)
     os.makedirs('x', exist_ok=True)
-    Image.fromarray(canvas).save('x/village_full.png')
+    if os.environ.get('REUSE') and os.path.exists('x/village_key.npy'):   # the last capture
+        canvas = np.array(Image.open('x/village_full.png').convert('RGB'))
+        vkey = np.load('x/village_key.npy')
+    else:
+        canvas, vkey = village_image(psx, village)
+        Image.fromarray(canvas).save('x/village_full.png')
+        np.save('x/village_key.npy', vkey)
     psx.load(village); psx.run()
     vil, vstart = village_tiles(psx)
-    planes, vtop, viwb, vih, vq = village_picture(canvas, vil)
-    for k, pl in enumerate(planes):            # the TI data variables (Makefile: .89y)
+    vtop = picture_top(vil)
+    viwb, vih = len(vil[0]) * 2, vtop + len(vil) * 16
+    rows = ti_rows(vkey, vtop, viwb, vih)
+    planes, vtop, viwb, vih, vq = village_picture(canvas, vil, vtop, terrace_floor(psx, rows))
+    dkey, dmask, dT = village_depth(rows, viwb, vih)
+    for k, pl in enumerate(planes + [dkey, dmask]):   # the TI data variables (Makefile: .89y)
         open('alvil%d.bin' % k, 'wb').write(pl + bytes(2))   # (the view copy reads a word past a row)
+    Image.fromarray((dT * 255 // max(1, dT.max())).astype(np.uint8)).save('x/village_depth.png')
     Image.fromarray(np.array([255, 170, 85, 0], np.uint8)[vq]).save('x/village_ti.png')
     psx.load(village)
     psx.pressed = 1 << psxrun.PAD['DOWN'] | 1 << psxrun.PAD['LEFT']

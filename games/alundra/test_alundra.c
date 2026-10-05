@@ -485,6 +485,32 @@ static void test_village(void)
     CHECKV(al_camy, 0);
 }
 
+// The houses' roofs are floors (the game: dropped on one, the player stands and walks on it):
+// the roof of the house next to the start (level 14, its eaves at 9) is walked on, shows the
+// player whole, cannot be walked onto from the road (+5) and is walked off (a fall to 9)
+static void test_roof(void)
+{
+    int n, all;
+    sw_init(7);
+    st.x = (26 * 16 + 8) * SUB;                     // tile (26, 7), on the ridge
+    st.y = (7 * 16 + 8) * SUB;
+    st.z = al_floor(st.x, st.y);
+    CHECKV(st.z, 14 * LEVEL_Z);
+    CHECK(al_free(st.x, st.y, st.z));
+    steps(K_DOWN, 12);                              // along the roof (tiles 26, 7-8)
+    CHECKV(st.z, 14 * LEVEL_Z);
+    CHECK(st.grounded);
+    sw_step(0);
+    n = hero_shown(&all);                           // on top: nothing of the house hides him
+    CHECKV(n, all);
+    steps(K_UP, 40);                                // off its back onto the road (row 5, level 9)
+    CHECKV(st.z, 9 * LEVEL_Z);
+    CHECK(st.grounded);
+    steps(K_DOWN, 40);                              // the road to the roof: +5, blocked
+    CHECKV(st.z, 9 * LEVEL_Z);
+    CHECK(st.y / SUB < 6 * 16 + 8);
+}
+
 int main(int argc, char **argv)
 {
     if (argc > 3 && !strcmp(argv[1], "--play")) {   // --play KEYS N [SCENARIO]: position every step
@@ -524,6 +550,7 @@ int main(int argc, char **argv)
     test_shadow();
     test_hidden_behind();
     test_village();
+    test_roof();
     printf(fails ? "%d FAILED\n" : "alundra: all tests pass\n", fails);
     return fails != 0;
 }

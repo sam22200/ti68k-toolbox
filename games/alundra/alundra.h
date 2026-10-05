@@ -29,23 +29,27 @@
 // game's image and the collision agree on every terrace
 #define LEVEL_Z SC(134)                 // 1/16 px per level
 #define LEVEL_PX(h) ((s16)(((h) * LEVEL_Z) >> 4))   // screen px of h levels
-// A tile: its level (0-15) in the low bits; a wall (never walkable; the level is the height of
+// A tile: its level (0-63) in the low bits; a wall (never walkable; the level is the height of
 // its top); a stair (on foot, the feet follow the floor up or down two levels: Alundra's
 // ramps, ~2 levels per tile)
 #define T_WALL 0x80
 #define T_STAIR 0x40
-#define LV(t) ((t) & 15)
+#define LV(t) ((t) & 63)
 #define WALL (T_WALL | 3)               // the test room's walls, drawn 3 levels high
 #define ROOM_Y 4                        // the test room's top: screen y of its row 0 (100 - 96)
 
 // A world: its tiles and its image (two planes, 1 bit per pixel, MSB left, iwb bytes per row):
 // the test room's drawn by its tiles (tools/bake.c → world.h), the village's the game's own
-// (tools/extract.py → the data files alvil0, alvil1); tile row 0 at image row `top`
+// (tools/extract.py → the data files alvil0, alvil1); tile row 0 at image row `top`. What
+// hides the player, per image byte: a threshold (he is behind it when his y / 2, screen px, is
+// below it: the rows in front of his, Alundra's draw order) and the mask of its pixels
+// (alvil2, alvil3)
 typedef struct {
     const u8 *cell;                     // w x h tiles, row-major
     u8 w, h;
     u8 top;
     const u8 *img[2];                   // light, dark
+    const u8 *depth[2];                 // threshold, mask
     u16 iwb, ih;
 } World;
 
