@@ -64,3 +64,5 @@ __pycache__/
 # Game Boy ports: Ghidra + GhidraBoy (tools/ghidra), commercial ROMs (roms/)
 /tools/ghidra/
 /roms/
+# PS1 studies: the pcsx_rearmed libretro core (github.com/libretro/pcsx_rearmed)
+/tools/pcsx_rearmed/
