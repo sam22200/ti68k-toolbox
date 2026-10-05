@@ -311,6 +311,29 @@ light grey → black), on a dark floor it is a black ellipse with a light-grey r
    scenery (fountain, lamps) stays. The top rows of the map are seen only in the HUD's rows:
    the image is not reliable there (behind the closing walls).
 
+12. Roofs (2026-10-05, the user: "les toits sont praticables"), `inoa.state`. OBSERVED: the
+   house east of the start has unflagged cells of heights 15-17 over rows 23-31 (x 776-847),
+   slope cells among them; the player poked to (800, 440) at z 300 lands at z 240 (15 units),
+   walks up and down on it at that height, walks off its side and falls to 160 (the ground,
+   10 units), and walking back is blocked by its height. INTERPRETATION: a roof is a floor;
+   only flagged cells (0x41) are solid, whatever their look. TARGET: every unflagged cell a
+   floor at its height (slopes as stairs), flagged cells walls (milestone 10).
+
+13. Draw order and depth (2026-10-05), the GPU commands logged as the GPU runs them
+   (`pcsx_vram.patch`, `psxgpu.py`). OBSERVED: each frame redraws the whole screen, ~400
+   primitives: the scenery as 24 × 16 sprites (GP0 0x65, 4-bit) and the objects as quads,
+   all through one ordering table of 964 entries (two buffers, at 0x80131388 and 0x801322f8);
+   the scenery of map row r sits at entry 16 r + 5 or 6, the player's quads at 16 R + 10 with
+   R his map row (his y / 16, rounded within a few px depending on the direction of travel;
+   z plays no part: a jump keeps the entry). Semi-transparent sprites are the shadows. The
+   frame redrawn from the log matches the screen at 88 % of its pixels (the rest: the
+   semi-transparent shadows, the HUD). INTERPRETATION: painter's order by map row, the
+   player after his own row and before the next. TARGET: per pixel of the pasted image, the
+   map row of the frontmost opaque scenery texel; the player hidden there when that row is
+   in front of his (his y / 16 rounded), stored per byte (milestone 10). Also OBSERVED: the
+   image was pasted in (y − z) with the game's absolute z, while the TI's level 0 is the
+   game's height 1: the picture sat 16 game px (8 TI px) too high against the player.
+
 ## Open questions
 
 - (Done 2026-10-04: diagonal speed, depth order.)
@@ -318,4 +341,4 @@ light grey → black), on a dark floor it is a black ellipse with a light-grey r
   drawn blocks (not needed: our room is designed for 16 × 16).
 - Diagonal speed; terminal fall speed; landing on a ledge edge (does a corner on the higher
   cell count?).
-- Depth: how the sprite is sorted against raised blocks (draw order with y and z).
+- (Done 2026-10-05, Experiment 13: depth = map row, z plays no part.)
