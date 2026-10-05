@@ -1,42 +1,64 @@
-diff --git a/frontend/libretro.c b/frontend/libretro.c
-index 9dd3502..77ce133 100644
---- a/frontend/libretro.c
-+++ b/frontend/libretro.c
-@@ -2221,10 +2221,14 @@ unsigned retro_get_region(void)
-    return is_pal_mode ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
- }
- 
-+extern void *pcsx_vram(void);   /* ti-port-ps1 */
-+
- void *retro_get_memory_data(unsigned id)
- {
-    switch (id)
-    {
-+   case RETRO_MEMORY_VIDEO_RAM:
-+      return pcsx_vram();
-    case RETRO_MEMORY_SYSTEM_RAM:
-       return psxRegs.ptrs.psxM;
-    case RETRO_MEMORY_SAVE_RAM:
-@@ -2238,6 +2242,8 @@ size_t retro_get_memory_size(unsigned id)
- {
-    switch (id)
-    {
-+   case RETRO_MEMORY_VIDEO_RAM:
-+      return 1024 * 512 * 2;
-    case RETRO_MEMORY_SYSTEM_RAM:
-       return 0x200000;
-    case RETRO_MEMORY_SAVE_RAM:
-diff --git a/plugins/gpulib/gpu.c b/plugins/gpulib/gpu.c
-index f04e3a5..53a5c8d 100644
---- a/plugins/gpulib/gpu.c
-+++ b/plugins/gpulib/gpu.c
-@@ -28,6 +28,9 @@
- 
- struct psx_gpu gpu;
- 
-+/* ti-port-ps1: the 1 MB VRAM for retro_get_memory_data(RETRO_MEMORY_VIDEO_RAM) */
-+void *pcsx_vram(void) { return gpu.vram; }
-+
- static noinline int do_cmd_buffer(struct psx_gpu *gpu, uint32_t *data, int count,
-     int *cycles_sum, int *cycles_last);
- static noinline void finish_vram_transfer(struct psx_gpu *gpu, int is_read, int is_async);
+frontend/libretro.c  |  6 ++++++
+ plugins/gpulib/gpu.c | 21 +++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+--- Changes ---
+
+frontend/libretro.c
+  @@ -2221,10 +2221,14 @@ unsigned retro_get_region(void)
+  +extern void *pcsx_vram(void);   /* ti-port-ps1 */
+  +
+   void *retro_get_memory_data(unsigned id)
+   {
+      switch (id)
+      {
+  +   case RETRO_MEMORY_VIDEO_RAM:
+  +      return pcsx_vram();
+      case RETRO_MEMORY_SYSTEM_RAM:
+         return psxRegs.ptrs.psxM;
+      case RETRO_MEMORY_SAVE_RAM:
+  @@ -2238,6 +2242,8 @@ size_t retro_get_memory_size(unsigned id)
+  +   case RETRO_MEMORY_VIDEO_RAM:
+  +      return 1024 * 512 * 2;
+      case RETRO_MEMORY_SYSTEM_RAM:
+         return 0x200000;
+      case RETRO_MEMORY_SAVE_RAM:
+  +6 -0
+
+plugins/gpulib/gpu.c
+  @@ -28,6 +28,20 @@
+  +/* ti-port-ps1: the 1 MB VRAM for retro_get_memory_data(RETRO_MEMORY_VIDEO_RAM) */
+  +void *pcsx_vram(void) { return gpu.vram; }
+  +
+  +/* ti-port-ps1: a log of the GP0 words executed, in order, each with the RAM address of its
+  +   DMA chain packet (0xffffffff outside a chain): the game's real draw order */
+  +#define GPLOG_CAP (1 << 20)
+  +static uint32_t gplog_w[GPLOG_CAP], gplog_a[GPLOG_CAP];
+  +static int gplog_n;
+  +static uint32_t gplog_cur = 0xffffffff;
+  +uint32_t *retro_tiport_gplog_words(void) { return gplog_w; }
+  +uint32_t *retro_tiport_gplog_addrs(void) { return gplog_a; }
+  +int retro_tiport_gplog_count(void) { return gplog_n; }
+  +void retro_tiport_gplog_reset(void) { gplog_n = 0; }
+  +
+   static noinline int do_cmd_buffer(struct psx_gpu *gpu, uint32_t *data, int count,
+       int *cycles_sum, int *cycles_last);
+   static noinline void finish_vram_transfer(struct psx_gpu *gpu, int is_read, int is_async);
+  @@ -827,6 +841,8 @@ breakloop:
+  +  { int i; for (i = 0; i < count && gplog_n < GPLOG_CAP; i++, gplog_n++) {
+  +      gplog_w[gplog_n] = LE32TOH(data[i]); gplog_a[gplog_n] = gplog_cur; } }
+     int cmd, pos;
+     uint32_t old_e3 = gpu->ex_regs[3];
+     int vram_dirty = 0;
+  @@ -993,8 +1009,13 @@ long GPUdmaChain(uint32_t *rambase, uint32_t start_addr,
+  +    if (!len && gplog_n < GPLOG_CAP) {   /* an empty ordering-table entry: its address */
+  +      gplog_w[gplog_n] = 0; gplog_a[gplog_n++] = 0x80000000u | (uint32_t)(list - rambase) * 4;
+  +    }
+       if (len) {
+  +      gplog_cur = (uint32_t)(list - rambase) * 4;
+         left = do_cmd_buffer(&gpu, list + 1, len, &cpu_cycles_sum, &cpu_cycles_last);
+  +      gplog_cur = 0xffffffff;
+         if (left) {
+           memcpy(gpu.cmd_buffer, list + 1 + len - left, left * 4);
+           gpu.cmd_len = left;
+  +21 -0

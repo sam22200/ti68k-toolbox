@@ -32,16 +32,17 @@ static const u8 room_test[6][10] = {
 };
 
 // The village of Inoa (milestone 9, gfx.h): the game's height map resampled (a level = 16 px
-// of the game), stairs, the exits and the doors walled; its image is the game's (the data
-// files alvil0, alvil1: tools/extract.py)
+// of the game), roofs and stairs walked on, the exits and the doors walled; its image and its
+// depth are the game's (the data files alvil0-3: tools/extract.py)
 #ifdef BAKE
 #define TEST_IWB 20
 #define TEST_IH 100
-static const u8 test_img[2][2];
+static const u8 test_img[2][2], test_depth[2][2];
 #endif
 World worlds[] = {
-    { room_test[0], 10, 6, ROOM_Y, { test_img[0], test_img[1] }, TEST_IWB, TEST_IH },
-    { village, VILLAGE_W, VILLAGE_H, VILLAGE_TOP, { 0, 0 }, VILLAGE_IWB, VILLAGE_IH },
+    { room_test[0], 10, 6, ROOM_Y, { test_img[0], test_img[1] }, { test_depth[0], test_depth[1] },
+      TEST_IWB, TEST_IH },
+    { village, VILLAGE_W, VILLAGE_H, VILLAGE_TOP, { 0, 0 }, { 0, 0 }, VILLAGE_IWB, VILLAGE_IH },
 };
 const World *world = &worlds[W_TEST];
 s16 al_camx, al_camy;
@@ -90,10 +91,12 @@ static u8 on_stair(void)                // a stair under the foot box or a step 
 
 void al_world(u8 n)
 {
-    if (n == W_VILLAGE && !worlds[n].img[0]) {     // the image read in place (archived on the TI)
+    if (n == W_VILLAGE && !worlds[n].img[0]) {     // read in place (archived on the TI)
         worlds[n].img[0] = rt_file("alvil0", RT_NULL);
         worlds[n].img[1] = rt_file("alvil1", RT_NULL);
-        if (!worlds[n].img[0] || !worlds[n].img[1]) {
+        worlds[n].depth[0] = rt_file("alvil2", RT_NULL);
+        worlds[n].depth[1] = rt_file("alvil3", RT_NULL);
+        if (!worlds[n].img[0] || !worlds[n].img[1] || !worlds[n].depth[0] || !worlds[n].depth[1]) {
             worlds[n].img[0] = RT_NULL;
             n = W_TEST;
         }
@@ -337,7 +340,7 @@ static void band(u8 t, s16 x, s16 y, s16 h)   // h rows of a texture, 32 at a ti
 // A tile: its top face raised by its height, the front face down to the tile in front.
 // (ox, oy): the screen position of tile (0, 0)'s ground
 
-static void draw_tile(u8 tx, u8 ty, s16 ox, s16 oy)
+void al_draw_tile(u8 tx, u8 ty, s16 ox, s16 oy)
 {
     const u8 *c = world->cell + (u16)ty * world->w + tx;
     u8 t = *c, h = LV(t);
@@ -359,7 +362,7 @@ void al_draw_world(s16 ox, s16 oy)      // every tile, back to front (tools/bake
 {
     u8 tx, ty;
     for (ty = 0; ty < world->h; ty++)
-        for (tx = 0; tx < world->w; tx++) draw_tile(tx, ty, ox, oy);
+        for (tx = 0; tx < world->w; tx++) al_draw_tile(tx, ty, ox, oy);
 }
 
 #ifndef BAKE
@@ -487,30 +490,40 @@ static void blit_plane(u8 *dst, const u8 *src, u16 iwb, s16 cx, s16 cy)
 }
 #endif
 
-// The image's pixels back over a screen rectangle [x0, x1) x [y0, y1) (clipped): what stands in
-// front of the player hides him
-static void restore(s16 x0, s16 y0, s16 x1, s16 y1)
+// The image's pixels back over the player's rectangle [x0, x1) x [y0, y1) (clipped) where
+// what they show stands in front of him: the world's depth (a threshold per image byte: in
+// front when hy, his y / 2, is below it; the mask of its pixels), shifted like the view
+static void cover(s16 x0, s16 y0, s16 x1, s16 y1, u8 hy)
 {
-    u8 p;
+    const u8 *dk = world->depth[0], *dm = world->depth[1];
+    const u8 *il = world->img[0], *id = world->img[1];
+    u8 *pl = (u8 *)rt_light, *pd = (u8 *)rt_dark;
+    u16 X, i;
+    s16 y, b;
+    u8 sh;
     if (x0 < 0) x0 = 0;
     if (y0 < 0) y0 = 0;
     if (x1 > RT_W) x1 = RT_W;
     if (y1 > RT_H) y1 = RT_H;
     if (x0 >= x1 || y0 >= y1) return;
-    for (p = 0; p < 2; p++) {
-        u8 *plane = p ? (u8 *)rt_dark : (u8 *)rt_light;
-        const u8 *img = world->img[p];
-        s16 y, b;
-        for (y = y0; y < y1; y++) {
-            const u8 *row = img + (u16)(y + al_camy) * world->iwb;
-            u8 *d = plane + y * RT_PBYTES;
-            for (b = x0 >> 3; b <= (x1 - 1) >> 3; b++) {
-                s16 lo = b << 3 < x0 ? x0 - (b << 3) : 0, hi = (b << 3) + 8 > x1 ? x1 - (b << 3) : 8;
-                u8 m = (u8)(0xff >> lo) & (u8)(0xff << (8 - hi));
-                u16 X = (u16)((b << 3) + al_camx);
-                const u8 *s = row + (X >> 3);
-                u8 sh = X & 7, v = sh ? (u8)(s[0] << sh | s[1] >> (8 - sh)) : s[0];
-                d[b] = (d[b] & ~m) | (v & m);
+    sh = (u8)((u16)al_camx & 7);
+    for (y = y0; y < y1; y++) {
+        u16 row = (u16)(y + al_camy) * world->iwb;
+        u16 o = (u16)y * RT_PBYTES;
+        for (b = x0 >> 3; b <= (x1 - 1) >> 3; b++) {
+            u8 m, clip = 0xff;
+            X = (u16)((b << 3) + al_camx);
+            i = row + (X >> 3);
+            m = hy < dk[i] ? dm[i] : 0;
+            if (sh) m = (u8)(m << sh | (hy < dk[i + 1] ? dm[i + 1] : 0) >> (8 - sh));
+            if (b << 3 < x0) clip = (u8)(0xff >> (x0 - (b << 3)));
+            if ((b << 3) + 8 > x1) clip &= (u8)(0xff << ((b << 3) + 8 - x1));
+            m &= clip;
+            if (m) {
+                u8 l = sh ? (u8)(il[i] << sh | il[i + 1] >> (8 - sh)) : il[i];
+                u8 d = sh ? (u8)(id[i] << sh | id[i + 1] >> (8 - sh)) : id[i];
+                pl[o + b] = (pl[o + b] & ~m) | (l & m);
+                pd[o + b] = (pd[o + b] & ~m) | (d & m);
             }
         }
     }
@@ -518,16 +531,16 @@ static void restore(s16 x0, s16 y0, s16 x1, s16 y1)
 
 // The world's image is the background (the test room's drawn from its tiles, the village's the
 // game's own): the view copied from it, then the overlay's levels, the shadow, the player, and
-// the image again over the player where a tile of a row in front of his covers him (rows drawn
-// back to front: tiles in front hide him, Alundra). The camera keeps his feet at (80, 62),
-// inside the image.
+// the image again over the player where what it shows stands in front of him (the world's
+// depth: Alundra draws its map rows back to front, the player after his own). The camera keeps
+// his feet at (80, 62), inside the image.
 void game_render(void)
 {
     s16 px = st.x / SUB, py = st.y / SUB, pz = st.z / SUB;
     s16 cx = px - RT_W / 2, cy = world->top + py - pz - 62;
     s16 mx = (s16)(world->iwb << 3) - RT_W, my = (s16)world->ih - RT_H;
     s16 ox, oy, top, bot, sb, left, right;
-    u8 tx, ty, t0, t1;
+    u8 tx, ty;
     if (cx > mx) cx = mx;
     if (cx < 0) cx = 0;
     if (cy > my) cy = my;
@@ -563,21 +576,7 @@ void game_render(void)
     ZB(4); draw_shadow(ox, oy); ZE(4);
     ZB(5); draw_hero(ox, oy); ZE(5);
     ZB(6);
-    t0 = left - ox < 0 ? 0 : (u8)((left - ox) >> 4);   // the sprite's columns
-    t1 = (u8)((right - ox) >> 4);
-    for (tx = t0; tx <= t1 && tx < world->w; tx++) {   // per column: the tiles of the rows in
-        s16 x = ox + tx * TILE, y0 = RT_H, y1 = 0;      // front cover one span (each row's top
-        for (ty = (u8)(py >> 4) + 1; ty < world->h; ty++) {   // reaches the row before)
-            s16 g = oy + ty * TILE, ttop = g - LEVEL_PX(LV(world->cell[(u16)ty * world->w + tx]));
-            if (ttop < bot && g + TILE > top) {
-                if (ttop < y0) y0 = ttop;
-                y1 = g + TILE;
-            }
-        }
-        if (y0 < y1)
-            restore(x < left ? left : x, y0 < top ? top : y0,
-                    x + TILE > right + 1 ? right + 1 : x + TILE, y1 < bot ? y1 : bot);
-    }
+    cover(left, top, right + 1, bot, (u8)(py >> 1));   // what stands in front hides him
     ZE(6);
     ZB(7);
     if (st.debug) {

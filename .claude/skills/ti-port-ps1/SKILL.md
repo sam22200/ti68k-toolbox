@@ -26,7 +26,8 @@ play on the TI. The original guides the design; it never dictates the architectu
    `scripts/ramdiff.py` finds variables by comparing dumps, `scripts/psxgrid.py` measures a
    rule on a grid of teleported positions (floor heights, walls), `scripts/psxexplore.py`
    walks a room by breadth-first search over real moves (save states as nodes) to reach a
-   target or find the exits. `--memcard` loads a memory card saved by hand in any emulator.
+   target or find the exits, `scripts/psxgpu.py` gives a frame's real draw order (GPU log)
+   and redraws it with the depth of each pixel. `--memcard` loads a memory card saved by hand in any emulator.
    The running game is the oracle.
 4. **Behaviour, not code.** Every finding goes into `RE_NOTES.md` under one of three labels:
    **OBSERVED IN <GAME>** (measured or read), **LIKELY INTERPRETATION** (what it means),
@@ -58,7 +59,11 @@ References (read when the step says so):
   make -C tools/pcsx_rearmed -f Makefile.libretro -j20     # -> pcsx_rearmed_libretro.so
   ```
   Then expose the VRAM (libretro's `RETRO_MEMORY_VIDEO_RAM`, absent upstream) with our patch,
-  needed by `psxrun.py --vram` for the art:
+  needed by `psxrun.py --vram` for the art; the same patch logs every GP0 word the GPU
+  executes, in order, with its packet address and the empty ordering-table entries
+  (`retro_tiport_gplog_*`, read by `scripts/psxgpu.py`: a frame's real draw order, its
+  primitives parsed and drawn again with the ordering-table entry of what is on top of each
+  pixel):
   ```sh
   git -C tools/pcsx_rearmed apply ../../.claude/skills/ti-port-ps1/scripts/pcsx_vram.patch
   make -C tools/pcsx_rearmed -f Makefile.libretro -j20
@@ -263,6 +268,22 @@ only: nothing extracted from the disc).
   image is big (656 × 494 × 2 planes: two 40 KB data files, read in place); the view is copied
   from it each frame shifted to any pixel (~150k cycles in C), and the image again over the
   player where tiles in front cover him (one span per tile column).
+  **Depth from the game's own draw order** (Alundra milestone 10, 2026-10-05): the GPU packets
+  left in RAM are a mid-frame mess (two buffers, half-linked chains); log what the GPU really
+  executes instead (`psxgpu.py`). Alundra redraws everything every frame through one ordering
+  table whose entry is 16 × the map row + 5 or 6 for the scenery and + 10 for the player (z
+  plays no part): each pixel's entry, stitched like the colours, says which map row drew it,
+  and the player is behind what a row in front of his drew. Stored per image byte (the
+  frontmost row as a threshold + the mask of its pixels: two more data files), the cover is
+  exact to the pixel (trees, fences, house corners) for ~40k cycles. Check the image and the
+  collision share their z origin: a game height of 1 unit for the TI's level 0 shifted the
+  whole picture half a tile against the player. Hole-fill the pasted image (teleports that
+  land in a wall or never settle leave gaps): try points around each one not seen yet.
+  For the TI's LCD, flatten the commonest ground (the grass by hue, saturation and a low local
+  deviation: foliage is greener, lighter and textured) to one light grey, make the paving
+  white only where the depth says a terrace floor drew it (not the slate roofs), and drop
+  lone pixels. **Roofs**: check the game before walling what looks solid (Alundra: a roof is
+  an unflagged cell, the player dropped on it stands and walks there).
   A first version (milestone 9 before) drew the world once with the game's own tile drawing
   (`games/alundra/tools/bake.c`, `-DBAKE`), cut into 16 × 16 tiles for `draw_tilemap`: the
   same pixels, ~80k cycles for the view, but only for a world drawn from tiles.

@@ -18,13 +18,15 @@ gfx.h: tools/extract.py Makefile
 	@test -f $(STATE) -a -f $(VILLAGE) || { echo "missing the deck or village state (RE_NOTES.md § Tools)"; exit 1; }
 	$(PY) tools/extract.py $(DISC) $(STATE) $(VILLAGE) $(strip $(SCALE)) 2>/dev/null
 # world.h: the test room's image, drawn once by the game's own code (PC renderer, tools/bake.c);
-# from gfx.h, so local too. The village's image: alvil0/1.bin (PC) and .89y (TI data variables:
-# send them with alundra.89z, archived), made by tools/extract.py
-alvil0.bin alvil1.bin: gfx.h
+# from gfx.h, so local too. The village's image (alvil0/1: light, dark) and what hides the
+# player (alvil2/3: depth threshold, mask): .bin (PC) and .89y (TI data variables: send them
+# with alundra.89z, archived), made by tools/extract.py
+VIL := alvil0 alvil1 alvil2 alvil3
+$(VIL:=.bin): gfx.h
 %.89y: %.bin
 	$(TI)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat $< $*
-ti cycles: alvil0.89y alvil1.89y
-TI_FILES := alvil0.89y alvil1.89y
+ti cycles: $(VIL:=.89y)
+TI_FILES := $(VIL:=.89y)
 world.h: gfx.h alundra.c alundra.h tools/bake.c
 	@mkdir -p x
 	$(CC) $(PC_CFLAGS) -DBAKE -o x/bake alundra.c tools/bake.c $(RT_CORE) $(RT_SW)
