@@ -147,7 +147,11 @@ measured (the psxrun command).
   grey pairs chosen per surface in the game.
 - **A purpose-built test room**, designed to exercise every rule (open ground, each height,
   a reachable ledge, an unreachable one, a drop, corners, narrow passages), not an imported
-  original room. An approximation of an original room is an optional last milestone.
+  original room. An approximation of an original room is an optional last milestone:
+  read the game's height map from RAM (its cell size, height unit and wall flags found in
+  the floor code), resample a screen-sized window to the target tiles in the build tool
+  (the most common cell per tile; Alundra: `games/alundra/tools/extract.py` `room_levels`),
+  and expect to compress: real rooms are rarely built like a test room.
 - **Render budget from the first milestone**: a room of raised blocks drawn as rectangles
   every frame cost 381k cycles on the TI (Alundra milestone 3, over the ~360k budget); the room
   is static, so compose it once into a background (`rt_light`/`rt_dark` pointed at two
@@ -234,3 +238,34 @@ only: nothing extracted from the disc).
   84k → 36k cycles; prove it with a frame-by-frame checksum test against the full copy.
   TiEmu needs an X display: a session without one (no `/tmp/.X11-unix/X0`) cannot do the
   emulator step; leave it for the user's desktop.
+- **Original rooms are not test rooms** (Alundra milestone 8, 2026-10-04): the village and the
+  ship have no +1 steps, only terraces 3-4 units apart joined by stairs (ramps); the +1 jump
+  serves objects and puzzles. A 3-level engine without ramps can only compress them (terrace
+  2, stairs 1, ground 0: the retaining wall stays unclimbable, the stairs become jumps): find
+  that out from the map before promising a faithful room, and ask which compromise. Keep the
+  highest level out of the screen's first rows (a level-2 tile in row 0-1 puts a 25-px player
+  above the top of a 100-row screen).
+- **A whole original area** (Alundra milestone 9, 2026-10-04): resample the game's height map
+  in the build tool, then sort its values by how many tiles hold them (terraces) before
+  mapping them to levels: the rare heights are objects or roofs. Height maps mix the solid
+  and the walkable (Alundra: roofs and stairs are both slope cells; a stair joins two
+  terraces, a roof does not). For the look, paste the game's screens into one image of the
+  area (teleport over a grid, each screen placed by its camera = the player's position minus
+  his feet on screen, read from the GPU packets) and classify or cut textures from it.
+  **To look like the game, show the game's own image** (Alundra's village, 2026-10-05):
+  textured blocks on a simplified map never did. Paste the screens (keep only those where the
+  player's pose is the same in both GPU packet buffers and the camera has not moved for a few
+  frames; move the other objects out of the map each frame: the NPCs vanish), take the
+  median of several screens per pixel (the player vanishes), scale by the sprite's scale
+  (area average), 4 greys by luminance percentiles, smooth only the noisy material (grass).
+  Then the collision must use the game's true heights (a level = the game's unit × scale,
+  kept exact in 1/16 px), or the image and the floor disagree on the high terraces. The
+  image is big (656 × 494 × 2 planes: two 40 KB data files, read in place); the view is copied
+  from it each frame shifted to any pixel (~150k cycles in C), and the image again over the
+  player where tiles in front cover him (one span per tile column).
+  A first version (milestone 9 before) drew the world once with the game's own tile drawing
+  (`games/alundra/tools/bake.c`, `-DBAKE`), cut into 16 × 16 tiles for `draw_tilemap`: the
+  same pixels, ~80k cycles for the view, but only for a world drawn from tiles.
+- **Scale as a parameter**: keep every size and speed in one macro of the reference scale
+  (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
+  only the TI binary differed, caught by `make xcheck`).

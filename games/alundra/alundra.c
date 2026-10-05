@@ -1,9 +1,13 @@
-// Alundra-style traversal: a rectangle that walks in 8 directions and jumps, with constant
-// gravity, over a room of tile heights, and a debug overlay (RE_NOTES.md § Behaviour, § Numbers).
+// Alundra-style traversal: a player who walks in 8 directions and jumps, with constant gravity,
+// over a world of tile heights (a test room, the village of Inoa) with stairs, a camera that
+// follows, and a debug overlay (RE_NOTES.md § Behaviour, § Numbers).
 #include "alundra.h"
-#include "gfx.h"                       // the disc's art (tools/extract.py, local)
-#ifdef RT_CYCLES                        // render zones under ti-cycles (3 copy, 4 shadow, 5 hero,
-#include "../../tools/m68kbench/bench.h" // 6 tiles in front, 7 overlay)
+#ifndef BAKE
+#include "world.h"                      // the worlds drawn into 16 x 16 tiles (tools/bake.c, local)
+#endif
+
+#ifdef RT_CYCLES                        // render zones under ti-cycles (3 view copy, 4 shadow,
+#include "../../tools/m68kbench/bench.h" // 5 hero, 6 tiles in front, 7 overlay)
 #define ZB(n) BENCH_BEGIN(n)
 #define ZE(n) BENCH_END(n)
 #else
@@ -12,57 +16,97 @@
 #endif
 
 State st;
-static void make_textures(void);
 static u8 pop8[256];
-extern u8 bg_debug;
 
 // The test room (RE_NOTES.md § Decisions): open ground (0), a platform at 1 and one at 2,
 // reachable ledges 0->1 and 1->2, an unreachable one 0->2 (row 3 -> row 2, columns 7-8), drops,
 // a one-tile corridor (column 1, rows 3-4), a pillar at 2, walls and corners.
-const u8 room[MAP_H][MAP_W] = {
-    { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 },
-    { 3, 0, 0, 0, 1, 1, 2, 2, 2, 3 },
-    { 3, 0, 0, 0, 1, 1, 2, 2, 2, 3 },
-    { 3, 0, 3, 0, 0, 1, 1, 0, 0, 3 },
-    { 3, 0, 3, 0, 0, 0, 0, 0, 0, 3 },
-    { 3, 0, 0, 0, 3, 0, 0, 2, 0, 3 },
+#define W_ WALL
+static const u8 room_test[6][10] = {
+    { W_, W_, W_, W_, W_, W_, W_, W_, W_, W_ },
+    { W_, 0, 0, 0, 1, 1, 2, 2, 2, W_ },
+    { W_, 0, 0, 0, 1, 1, 2, 2, 2, W_ },
+    { W_, 0, W_, 0, 0, 1, 1, 0, 0, W_ },
+    { W_, 0, W_, 0, 0, 0, 0, 0, 0, W_ },
+    { W_, 0, 0, 0, W_, 0, 0, 2, 0, W_ },
 };
+
+// The village of Inoa (milestone 9, gfx.h): the game's height map resampled (a level = 16 px
+// of the game), stairs, the exits and the doors walled; its image is the game's (the data
+// files alvil0, alvil1: tools/extract.py)
+#ifdef BAKE
+#define TEST_IWB 20
+#define TEST_IH 100
+static const u8 test_img[2][2];
+#endif
+World worlds[] = {
+    { room_test[0], 10, 6, ROOM_Y, { test_img[0], test_img[1] }, TEST_IWB, TEST_IH },
+    { village, VILLAGE_W, VILLAGE_H, VILLAGE_TOP, { 0, 0 }, VILLAGE_IWB, VILLAGE_IH },
+};
+const World *world = &worlds[W_TEST];
+s16 al_camx, al_camy;
 
 u8 al_tile(s16 px, s16 py)
 {
-    if (px < 0 || py < 0 || px >= ROOM_W || py >= ROOM_H) return WALL;
-    return room[(u16)py >> 4][(u16)px >> 4];
+    if (px < 0 || py < 0) return WALL;
+    px >>= 4;
+    py >>= 4;
+    if (px >= world->w || py >= world->h) return WALL;
+    return world->cell[(u16)py * world->w + (u16)px];
 }
 
 // Alundra samples the floor at the four corners of the box and keeps the highest
 s16 al_floor(u16 x, u16 y)
 {
     s16 l = x / SUB - FOOT_W / 2, r = l + FOOT_W - 1, t = y / SUB - FOOT_D / 2, b = t + FOOT_D - 1;
-    u8 h = al_tile(l, t), k;
-    if ((k = al_tile(r, t)) > h) h = k;
-    if ((k = al_tile(l, b)) > h) h = k;
-    if ((k = al_tile(r, b)) > h) h = k;
-    return h * LEVEL * SUB;
+    u8 h = LV(al_tile(l, t)), k;
+    if ((k = LV(al_tile(r, t))) > h) h = k;
+    if ((k = LV(al_tile(l, b))) > h) h = k;
+    if ((k = LV(al_tile(r, b))) > h) h = k;
+    return h * LEVEL_Z;
 }
 
 // Alundra blocks a corner on a wall or a floor above the feet (a ledge is a wall until the feet
-// are higher than its top); a floor at the feet' level is walkable. Bits: 1 left-back,
-// 2 right-back, 4 left-front, 8 right-front (back = smaller y).
+// are higher than its top); a floor at the feet' level is walkable; on foot, with a stair under
+// the box, one level up is walkable too (stairs). Bits: 1 left-back, 2 right-back, 4 left-front,
+// 8 right-front (back = smaller y).
 u8 al_block(u16 x, u16 y, s16 z)
 {
     s16 l = x / SUB - FOOT_W / 2, r = l + FOOT_W - 1, t = y / SUB - FOOT_D / 2, b = t + FOOT_D - 1;
     u8 c[4], k, m = 0;
     c[0] = al_tile(l, t); c[1] = al_tile(r, t); c[2] = al_tile(l, b); c[3] = al_tile(r, b);
+    if (st.grounded && ((c[0] | c[1] | c[2] | c[3]) & T_STAIR)) z += 2 * LEVEL_Z;
     for (k = 0; k < 4; k++)
-        if (c[k] == WALL || c[k] * LEVEL * SUB > z) m |= 1 << k;
+        if ((c[k] & T_WALL) || LV(c[k]) * LEVEL_Z > z) m |= 1 << k;
     return m;
 }
 
-void al_start(void)
+static u8 on_stair(void)                // a stair under the foot box or a step away (just left)
 {
-    st.x = 24 * SUB;                    // open ground, column 1 row 2 (nothing tall in front)
-    st.y = 40 * SUB;
-    st.z = 0;
+    s16 l = st.x / SUB - FOOT_W / 2 - SC(4), r = l + FOOT_W - 1 + 2 * SC(4);
+    s16 t = st.y / SUB - FOOT_D / 2 - SC(4), b = t + FOOT_D - 1 + 2 * SC(4);
+    return (al_tile(l, t) | al_tile(r, t) | al_tile(l, b) | al_tile(r, b)) & T_STAIR;
+}
+
+void al_world(u8 n)
+{
+    if (n == W_VILLAGE && !worlds[n].img[0]) {     // the image read in place (archived on the TI)
+        worlds[n].img[0] = rt_file("alvil0", RT_NULL);
+        worlds[n].img[1] = rt_file("alvil1", RT_NULL);
+        if (!worlds[n].img[0] || !worlds[n].img[1]) {
+            worlds[n].img[0] = RT_NULL;
+            n = W_TEST;
+        }
+    }
+    world = &worlds[n];
+    if (n == W_TEST) {
+        st.x = 24 * SUB;                // open ground, column 1 row 2 (nothing tall in front)
+        st.y = 40 * SUB;
+    } else {
+        st.x = VILLAGE_SX * SUB;        // in front of the house Alundra leaves (inoa.state)
+        st.y = VILLAGE_SY * SUB;
+    }
+    st.z = al_floor(st.x, st.y);
     st.vz = 0;
     st.grounded = 1;
     st.a_held = 0;
@@ -71,6 +115,8 @@ void al_start(void)
     st.anim = 0;
     st.idle = 0;
 }
+
+void al_start(void) { al_world(W_TEST); }
 
 // One axis of a move, pixel by pixel when blocked, so the box stops flush against the edge
 // (Alundra halves the step); returns 0 when it could not move at all
@@ -124,12 +170,15 @@ static void move(u32 keys)
 }
 
 // Vertical step (Alundra: z += vz, vz -= gravity; land when the arc reaches the floor, which
-// is the highest tile under the foot box; walking off a ledge starts a fall)
+// is the highest tile under the foot box; walking off a ledge starts a fall). On stairs the
+// feet follow the floor one level up or down, no fall (Alundra's ramps hold the player)
 static void vertical(void)
 {
     s16 floor = al_floor(st.x, st.y);
     if (st.grounded) {
-        if (floor >= st.z) return;
+        if (floor == st.z) return;
+        if (on_stair() && (floor > st.z || st.z - floor <= 2 * LEVEL_Z)) { st.z = floor; return; }
+        if (floor > st.z) return;
         st.grounded = 0;
         st.vz = 0;
     }
@@ -185,6 +234,8 @@ u32 al_hash(void)
 }
 
 // ---------------------------------------------------------------- runtime hooks
+static void make_textures(void);
+
 void game_init(void)
 {
     st.debug = 1;
@@ -195,13 +246,13 @@ void game_init(void)
         u16 i;
         for (i = 1; i < 256; i++) pop8[i] = (u8)((i & 1) + pop8[i >> 1]);
     }
-    bg_debug = 0xff;                    // compose again, every plane copied in full once
     al_start();
 }
 
 // 0 the room's start (open ground); 1 in the air at the top of a jump; 2 in front of the
 // 0->1 ledge; 3 on the level-2 platform at its front edge (the drop); 4 in the corridor;
-// 5 below the unreachable 0->2 ledge; 6 above the corridor, misaligned (a corner to round)
+// 5 below the unreachable 0->2 ledge; 6 above the corridor, misaligned (a corner to round);
+// the village of Inoa (gfx.h): 7 in front of the house Alundra leaves
 static void place(u8 px, u8 py)
 {
     st.x = px * SUB;
@@ -218,6 +269,7 @@ void game_scenario(u16 n)
     if (n == 4) place(24, 60);
     if (n == 5) place(128, 56);
     if (n == 6) place(30, 40);
+    if (n == 7) al_world(W_VILLAGE);
 }
 
 u8 game_update(void)
@@ -231,17 +283,11 @@ u8 game_update(void)
     return 1;
 }
 
-// ---------------------------------------------------------------- drawing (debug rendering)
-static void num(char *p, u16 v)        // 3 digits, no sprintf on the TI
-{
-    p[0] = '0' + v / 100 % 10;
-    p[1] = '0' + v / 10 % 10;
-    p[2] = '0' + v % 10;
-}
-
-// Textures from the disc's deck (gfx.h: 1 = line, 0 = base) made into opaque 16-wide sprites
-// with two greys each, once: tops per level, the front face (32 rows, cut to the band height),
-// the walls' top and front
+// ---------------------------------------------------------------- drawing
+// Textures from the disc's village (gfx.h: 1 = line, 0 = base) made into opaque 16-wide
+// sprites with two greys each, once: tops per level (three, by level % 3: neighbouring levels
+// always differ), the front face (32 rows, cut to the band height), the walls' top and front
+// (the test room; the village is the game's own image)
 enum { T_TOP0, T_TOP1, T_TOP2, T_FACE, T_WALLTOP, T_WALLFACE, T_N };
 static u16 tex[T_N][2][32];             // light, dark rows
 static RtSprite tspr[T_N];
@@ -272,43 +318,51 @@ static void make_textures(void)
 {
     make_tex(T_TOP0, tex_floor, C_LGRAY, C_DGRAY, 0);
     make_tex(T_TOP1, tex_floor, C_WHITE, C_LGRAY, 0);
-    make_tex(T_TOP2, tex_floor, C_WHITE, C_LGRAY, 1);   // framed: the highest level
+    make_tex(T_TOP2, tex_floor, C_WHITE, C_LGRAY, 1);   // framed
     make_tex(T_FACE, tex_face, C_DGRAY, C_BLACK, 0);
     make_tex(T_WALLTOP, tex_walltop, C_DGRAY, C_BLACK, 0);
     make_tex(T_WALLFACE, tex_wallface, C_BLACK, C_DGRAY, 0);
+
 }
 
-static void band(u8 t, s16 x, s16 y, u8 h)    // the first h rows of a texture
+static void band(u8 t, s16 x, s16 y, s16 h)   // h rows of a texture, 32 at a time
 {
     RtSprite s = tspr[t];
-    s.h = h;
-    draw_sprite(x, y, &s);
+    for (; h > 0; h -= 32, y += 32) {
+        s.h = h > 32 ? 32 : h;
+        draw_sprite(x, y, &s);
+    }
 }
 
-// A tile: its top face raised by its height, the front face down to the tile in front
-static void draw_tile(u8 tx, u8 ty)
+// A tile: its top face raised by its height, the front face down to the tile in front.
+// (ox, oy): the screen position of tile (0, 0)'s ground
+
+static void draw_tile(u8 tx, u8 ty, s16 ox, s16 oy)
 {
-    u8 h = room[ty][tx];
-    u8 hf = ty + 1 < MAP_H ? room[ty + 1][tx] : 0;
-    s16 x = tx * TILE, top = ROOM_Y + ty * TILE - h * LEVEL;
-    if (h == WALL) {
+    const u8 *c = world->cell + (u16)ty * world->w + tx;
+    u8 t = *c, h = LV(t);
+    u8 f = ty + 1 < world->h ? c[world->w] : 0, hf = LV(f);
+    s16 x = ox + tx * TILE, top = oy + ty * TILE - LEVEL_PX(h), face = LEVEL_PX(h) - LEVEL_PX(hf);
+    if (t & T_WALL) {
         draw_sprite(x, top, &tspr[T_WALLTOP]);
-        if (hf < h) band(T_WALLFACE, x, top + TILE, (h - hf) * LEVEL);
+        if (hf < h) band(T_WALLFACE, x, top + TILE, face);
         return;
     }
-    draw_sprite(x, top, &tspr[T_TOP0 + h]);
-    if (hf < h && hf != WALL) {
-        band(T_FACE, x, top + TILE, (h - hf) * LEVEL);
-        draw_rect(x, top + TILE + (h - hf) * LEVEL - 1, TILE, 1, C_BLACK);
-    }
-    if (st.debug) {
-        static char d[2] = "0";
-        d[0] = '0' + h;
-        draw_rect(x + 5, top + 4, 5, 7, C_WHITE);
-        draw_text(x + 6, top + 5, d, F_SMALL, C_BLACK);
+    draw_sprite(x, top, &tspr[T_TOP0 + h % 3]);
+    if (hf < h && !(f & T_WALL)) {
+        band(T_FACE, x, top + TILE, face);
+        draw_rect(x, top + TILE + face - 1, TILE, 1, C_BLACK);
     }
 }
 
+void al_draw_world(s16 ox, s16 oy)      // every tile, back to front (tools/bake.c)
+{
+    u8 tx, ty;
+    for (ty = 0; ty < world->h; ty++)
+        for (tx = 0; tx < world->w; tx++) draw_tile(tx, ty, ox, oy);
+}
+
+#ifndef BAKE
 // The shadow (Alundra: a semi-transparent ellipse, always under the player, on the floor during
 // a jump, a little smaller high up), made to stand out on any floor: the greys under its mask
 // are measured first; on a light floor (mean under 1.5) every pixel goes two greys darker (white
@@ -322,6 +376,7 @@ static void darken(s16 x, s16 y, const u16 *rows, u8 h, u8 n)   // n: pixels in 
     u8 sh = x & 7, r;
     u16 sum = 0, off = (u16)y * RT_PBYTES + ((u16)x >> 3);
     u8 *l, *d;
+    if (x < 0 || y < 0) return;                     // (never in a room: walls all round)
     for (r = 0, l = (u8 *)rt_light + off, d = (u8 *)rt_dark + off; r < h;
          r++, l += RT_PBYTES, d += RT_PBYTES) {      // measure: the greys under the mask
         u16 v = rows[r];
@@ -351,24 +406,24 @@ static void darken(s16 x, s16 y, const u16 *rows, u8 h, u8 n)   // n: pixels in 
         }
 }
 
-static s16 shadow_y(void)               // screen row of the shadow's centre: the floor under the feet
+static s16 shadow_y(s16 oy)             // screen row of the shadow's centre: the floor under the feet
 {
-    return ROOM_Y + st.y / SUB - al_floor(st.x, st.y) / SUB - SHADOW_DY;
+    return oy + st.y / SUB - al_floor(st.x, st.y) / SUB - SHADOW_DY;
 }
 
-static void draw_shadow(void)
+static void draw_shadow(s16 ox, s16 oy)
 {
-    s16 px = st.x / SUB, sy = shadow_y();
-    if (st.z - al_floor(st.x, st.y) < LEVEL * SUB)
+    s16 px = ox + st.x / SUB, sy = shadow_y(oy);
+    if (st.z - al_floor(st.x, st.y) < LEVEL_Z)
         darken(px - SHADOW0_W / 2, sy - SHADOW0_H / 2, shadow0, SHADOW0_H, SHADOW0_N);
     else
         darken(px - SHADOW1_W / 2, sy - SHADOW1_H / 2, shadow1, SHADOW1_H, SHADOW1_N);
 }
 
-static void draw_hero(void)
+static void draw_hero(s16 ox, s16 oy)
 {
-    s16 px = st.x / SUB, py = ROOM_Y + st.y / SUB, pz = st.z / SUB;
-    const u16 (*g)[HERO_SH] = hero_gfx[st.dir][al_frame()];
+    s16 px = ox + st.x / SUB, py = oy + st.y / SUB, pz = st.z / SUB;
+    const hero_row (*g)[HERO_SH] = hero_gfx[st.dir][al_frame()];
     RtSprite s;
     s.w = HERO_SW;
     s.h = HERO_SH;
@@ -378,105 +433,151 @@ static void draw_hero(void)
     draw_sprite(px + hero_ox[st.dir][al_frame()], py - pz - HERO_AY, &s);
 }
 
-static u32 bgw[2][RT_PSIZE / 4];        // light, dark: the room drawn once (u32: even
-#define bg ((u8 (*)[RT_PSIZE])bgw)     // addresses for the long copies, as games/desolate)
-u8 bg_debug = 0xff;                     // the overlay state bg was composed with
-
-static void compose(void)
+static void num(char *p, u16 v)        // 3 digits, no sprintf on the TI
 {
-    void *l = rt_light, *d = rt_dark;
-    u8 tx, ty;
-    rt_light = bg[0]; rt_dark = bg[1];
-    draw_clear();
-    for (ty = 0; ty < MAP_H; ty++)
-        for (tx = 0; tx < MAP_W; tx++) draw_tile(tx, ty);
-    rt_light = l; rt_dark = d;
-    bg_debug = st.debug;
+    p[0] = '0' + v / 100 % 10;
+    p[1] = '0' + v / 10 % 10;
+    p[2] = '0' + v % 10;
 }
 
-static void copy_bg(void)               // the 100 visible rows of both planes
+static void digit(u8 t, s16 x, s16 top)  // the overlay's level on a top face
 {
-    u8 i;
-    for (i = 0; i < 2; i++) {
-        const u32 *s = bgw[i];
-        u32 *t = (u32 *)(i ? rt_dark : rt_light);
-        u8 n;
-        for (n = 0; n < 100 * RT_PBYTES / 4 / 25; n++) {
-            t[0] = s[0]; t[1] = s[1]; t[2] = s[2]; t[3] = s[3]; t[4] = s[4];
-            t[5] = s[5]; t[6] = s[6]; t[7] = s[7]; t[8] = s[8]; t[9] = s[9];
-            t[10] = s[10]; t[11] = s[11]; t[12] = s[12]; t[13] = s[13]; t[14] = s[14];
-            t[15] = s[15]; t[16] = s[16]; t[17] = s[17]; t[18] = s[18]; t[19] = s[19];
-            t[20] = s[20]; t[21] = s[21]; t[22] = s[22]; t[23] = s[23]; t[24] = s[24];
-            s += 25; t += 25;
+    static char d[2] = "0";
+    u8 h = LV(t);
+    d[0] = h < 10 ? '0' + h : 'A' - 10 + h;
+    draw_rect(x + 5, top + 4, 5, 7, C_WHITE);
+    draw_text(x + 6, top + 5, d, F_SMALL, C_BLACK);
+}
+
+// The view: 100 rows of 160 px from the world's image at (cx, cy), shifted to any pixel: per
+// row, ten words, each from the two image words under it (even addresses: iwb is even), by the
+// shorter shift (left by sh then the high word, or right by 16 - sh: 8 bits at most)
+#ifdef __m68k__
+#define W10(op) op op op op op op op op op op
+static void blit_plane(u8 *dst, const u8 *src, u16 iwb, s16 cx, s16 cy)
+{
+    const u8 *row = src + (u16)cy * iwb + (((u16)cx >> 4) << 1);
+    u16 sh = cx & 15, rs = 16 - sh;
+    u8 r;
+    for (r = 0; r < RT_H; r++, row += iwb, dst += RT_PBYTES) {
+        const u16 *s = (const u16 *)row;
+        u16 *d = (u16 *)dst;
+        u32 acc;
+        if (!sh) { W10(*d++ = *s++;) }
+        else if (sh <= 8) { acc = *s++; W10(acc = (acc << 16) | *s++; *d++ = (u16)((acc << sh) >> 16);) }
+        else { acc = *s++; W10(acc = (acc << 16) | *s++; *d++ = (u16)(acc >> rs);) }
+    }
+}
+#else
+static void blit_plane(u8 *dst, const u8 *src, u16 iwb, s16 cx, s16 cy)
+{
+    const u8 *row = src + (u16)cy * iwb + (((u16)cx >> 4) << 1);
+    u8 sh = cx & 15, r, k;
+    for (r = 0; r < RT_H; r++, row += iwb, dst += RT_PBYTES) {
+        const u8 *s = row;
+        u8 *d = dst;
+        u32 acc = (u16)(s[0] << 8 | s[1]);
+        for (k = 0; k < 10; k++, d += 2) {
+            s += 2;
+            acc = (acc << 16) | (u16)(s[0] << 8 | s[1]);
+            d[0] = (u8)(acc >> (24 - sh));
+            d[1] = (u8)(acc >> (16 - sh));
+        }
+    }
+}
+#endif
+
+// The image's pixels back over a screen rectangle [x0, x1) x [y0, y1) (clipped): what stands in
+// front of the player hides him
+static void restore(s16 x0, s16 y0, s16 x1, s16 y1)
+{
+    u8 p;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > RT_W) x1 = RT_W;
+    if (y1 > RT_H) y1 = RT_H;
+    if (x0 >= x1 || y0 >= y1) return;
+    for (p = 0; p < 2; p++) {
+        u8 *plane = p ? (u8 *)rt_dark : (u8 *)rt_light;
+        const u8 *img = world->img[p];
+        s16 y, b;
+        for (y = y0; y < y1; y++) {
+            const u8 *row = img + (u16)(y + al_camy) * world->iwb;
+            u8 *d = plane + y * RT_PBYTES;
+            for (b = x0 >> 3; b <= (x1 - 1) >> 3; b++) {
+                s16 lo = b << 3 < x0 ? x0 - (b << 3) : 0, hi = (b << 3) + 8 > x1 ? x1 - (b << 3) : 8;
+                u8 m = (u8)(0xff >> lo) & (u8)(0xff << (8 - hi));
+                u16 X = (u16)((b << 3) + al_camx);
+                const u8 *s = row + (X >> 3);
+                u8 sh = X & 7, v = sh ? (u8)(s[0] << sh | s[1] >> (8 - sh)) : s[0];
+                d[b] = (d[b] & ~m) | (v & m);
+            }
         }
     }
 }
 
-// The rectangle the player and the shadow covered in each hidden plane (two alternate on the TI):
-// the next frame drawn into that plane restores only it from the background, not the whole room
-typedef struct { const void *plane; u8 bx0, bx1, y0, y1; } Dirty;
-static Dirty dirty[2];
-static u8 dirty_next;
-u8 al_full_copy;                        // tests: copy the whole background every frame
-
-static void restore(const Dirty *k)
-{
-    u16 o = (u16)k->y0 * RT_PBYTES + k->bx0;
-    const u8 *s0 = bg[0] + o, *s1 = bg[1] + o;
-    u8 *l = (u8 *)rt_light + o, *d = (u8 *)rt_dark + o;
-    u8 y = k->y1 - k->y0, n = k->bx1 - k->bx0 + 1, b;
-    for (; y; y--, s0 += RT_PBYTES, s1 += RT_PBYTES, l += RT_PBYTES, d += RT_PBYTES)
-        for (b = 0; b < n; b++) {
-            l[b] = s0[b];
-            d[b] = s1[b];
-        }
-}
-
-// The room is static: copy it, draw the player, then redraw only the tiles in front of the
-// player's row that overlap it (rows drawn back to front: tiles in front hide it, Alundra)
+// The world's image is the background (the test room's drawn from its tiles, the village's the
+// game's own): the view copied from it, then the overlay's levels, the shadow, the player, and
+// the image again over the player where a tile of a row in front of his covers him (rows drawn
+// back to front: tiles in front hide him, Alundra). The camera keeps his feet at (80, 62),
+// inside the image.
 void game_render(void)
 {
     s16 px = st.x / SUB, py = st.y / SUB, pz = st.z / SUB;
-    s16 top = ROOM_Y + py - pz - HERO_AY;           // the player's sprite and shadow rectangle
-    s16 bot = top + HERO_SH, sb = shadow_y() + SHADOW0_H / 2;
+    s16 cx = px - RT_W / 2, cy = world->top + py - pz - 62;
+    s16 mx = (s16)(world->iwb << 3) - RT_W, my = (s16)world->ih - RT_H;
+    s16 ox, oy, top, bot, sb, left, right;
     u8 tx, ty, t0, t1;
+    if (cx > mx) cx = mx;
+    if (cx < 0) cx = 0;
+    if (cy > my) cy = my;
+    if (cy < 0) cy = 0;
+    al_camx = cx;
+    al_camy = cy;
+    ox = -cx;
+    oy = world->top - cy;
+    top = oy + py - pz - HERO_AY;                   // the player's sprite and shadow rectangle
+    bot = top + HERO_SH;
+    sb = shadow_y(oy) + SHADOW0_H / 2;
     if (sb > bot) bot = sb;
-    s16 left = px + hero_ox[st.dir][al_frame()], right = left + HERO_SW - 1;
-    Dirty *k = 0;
-    if (bg_debug != st.debug) {
-        compose();
-        dirty[0].plane = dirty[1].plane = 0;
-    }
+    left = ox + px + hero_ox[st.dir][al_frame()];
+    right = left + HERO_SW - 1;
     ZB(3);
-    if (!al_full_copy) {
-        if (dirty[0].plane == rt_light) k = &dirty[0];
-        else if (dirty[1].plane == rt_light) k = &dirty[1];
+    blit_plane(rt_light, world->img[0], world->iwb, cx, cy);
+    blit_plane(rt_dark, world->img[1], world->iwb, cx, cy);
+    if (st.debug) {                                 // the overlay's levels, visible floor tiles
+        s16 r0 = (cy - world->top) >> 4, r1 = r0 + 7 + LEVEL_PX(15) / 16;
+        if (r0 < 0) r0 = 0;
+        if (r1 > world->h - 1) r1 = world->h - 1;
+        for (ty = (u8)r0; ty <= (u8)r1; ty++)
+            for (tx = (u8)(cx >> 4); tx < world->w && tx <= (u8)((cx + RT_W - 1) >> 4); tx++) {
+                const u8 *c = world->cell + (u16)ty * world->w + tx;
+                s16 y = oy + ty * TILE - LEVEL_PX(LV(*c));
+                u8 k, hidden = 0;
+                for (k = 1; k <= 2 && ty + k < world->h; k++)   // a tile in front over the digit
+                    hidden |= oy + (ty + k) * TILE - LEVEL_PX(LV(c[k * world->w])) < y + 11;
+                if (!(*c & T_WALL) && !hidden) digit(*c, ox + tx * TILE, y);
+            }
     }
-    if (k) restore(k);
-    else {
-        copy_bg();
-        k = &dirty[dirty_next];
-        dirty_next ^= 1;
-        k->plane = rt_light;
-    }
-    if (px - 7 < left) left = px - 7;               // the shadow's columns
-    if (px + 7 > right) right = px + 7;
-    k->bx0 = (u8)(left >> 3);
-    k->bx1 = (u8)(right >> 3);
-    k->y0 = (u8)(top < 0 ? 0 : top);
-    k->y1 = (u8)(bot > 100 ? 100 : bot);
     ZE(3);
-    ZB(4); draw_shadow(); ZE(4);
-    ZB(5); draw_hero(); ZE(5);
+    ZB(4); draw_shadow(ox, oy); ZE(4);
+    ZB(5); draw_hero(ox, oy); ZE(5);
     ZB(6);
-    t0 = (u8)((px + hero_ox[st.dir][al_frame()]) >> 4);
-    t1 = (u8)((px + hero_ox[st.dir][al_frame()] + HERO_SW - 1) >> 4);
-    for (ty = (u8)(py >> 4) + 1; ty < MAP_H; ty++)
-        for (tx = t0; tx <= t1 && tx < MAP_W; tx++) {
-            u8 h = room[ty][tx];
-            s16 ttop = ROOM_Y + ty * TILE - h * LEVEL;
-            if (ttop < bot && ttop + TILE + h * LEVEL > top) draw_tile(tx, ty);
+    t0 = left - ox < 0 ? 0 : (u8)((left - ox) >> 4);   // the sprite's columns
+    t1 = (u8)((right - ox) >> 4);
+    for (tx = t0; tx <= t1 && tx < world->w; tx++) {   // per column: the tiles of the rows in
+        s16 x = ox + tx * TILE, y0 = RT_H, y1 = 0;      // front cover one span (each row's top
+        for (ty = (u8)(py >> 4) + 1; ty < world->h; ty++) {   // reaches the row before)
+            s16 g = oy + ty * TILE, ttop = g - LEVEL_PX(LV(world->cell[(u16)ty * world->w + tx]));
+            if (ttop < bot && g + TILE > top) {
+                if (ttop < y0) y0 = ttop;
+                y1 = g + TILE;
+            }
         }
+        if (y0 < y1)
+            restore(x < left ? left : x, y0 < top ? top : y0,
+                    x + TILE > right + 1 ? right + 1 : x + TILE, y1 < bot ? y1 : bot);
+    }
     ZE(6);
     ZB(7);
     if (st.debug) {
@@ -485,8 +586,11 @@ void game_render(void)
         num(line + 6, py);
         num(line + 11, pz);
         line[15] = st.grounded ? 'G' : 'A';
-        draw_rect(0, 0, ROOM_W, 7, C_WHITE);
+        draw_rect(0, 0, RT_W, 7, C_WHITE);
         draw_text(1, 1, line, F_SMALL, C_BLACK);
     }
     ZE(7);
 }
+#else
+void game_render(void) { }
+#endif

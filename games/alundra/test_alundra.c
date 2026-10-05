@@ -2,7 +2,7 @@
 // height map (floor under the foot box, landing, falling), then the screen.
 //   ./alundra_test            every test
 //   ./alundra_test --trace    z per step of a standing jump
-//   ./alundra_test --play KEYS N   the position per step of a key script
+//   ./alundra_test --play KEYS N [SCENARIO]   the position per step of a key script
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -50,7 +50,7 @@ static void test_jump(void)
         al_step(K_A);                               // held: no second jump
     }
     CHECKV(apex, 222);                              // 13.9 px: between 1 and 2 levels of 8 px
-    CHECK(apex > LEVEL * SUB && apex < 2 * LEVEL * SUB);
+    CHECK(apex > LEVEL_Z && apex < 2 * LEVEL_Z);
     CHECKV(n, 12);                                  // 12 steps = 0.375 s (Alundra 0.35 s)
     CHECKV(st.z, 0);
     CHECKV(st.vz, 0);
@@ -88,11 +88,11 @@ static void test_fall_speed(void)
 static void test_floor(void)
 {
     CHECKV(al_floor(40 * SUB, 28 * SUB), 0);        // open ground
-    CHECKV(al_floor(72 * SUB, 28 * SUB), LEVEL * SUB);           // level 1 (columns 4-5)
-    CHECKV(al_floor(120 * SUB, 28 * SUB), 2 * LEVEL * SUB);      // level 2 (columns 6-8)
-    CHECKV(al_floor(66 * SUB, 28 * SUB), LEVEL * SUB);   // box 61..70 straddles 0|1: the highest
+    CHECKV(al_floor(72 * SUB, 28 * SUB), LEVEL_Z);           // level 1 (columns 4-5)
+    CHECKV(al_floor(120 * SUB, 28 * SUB), 2 * LEVEL_Z);      // level 2 (columns 6-8)
+    CHECKV(al_floor(66 * SUB, 28 * SUB), LEVEL_Z);   // box 61..70 straddles 0|1: the highest
     CHECKV(al_floor(58 * SUB, 28 * SUB), 0);        // box 53..62: all on 0
-    CHECKV(al_floor(120 * SUB, 46 * SUB), 2 * LEVEL * SUB);  // box rows 42..49 straddles 2|0
+    CHECKV(al_floor(120 * SUB, 46 * SUB), 2 * LEVEL_Z);  // box rows 42..49 straddles 2|0
     CHECKV(al_floor(120 * SUB, 54 * SUB), 0);       // box 50..57: below the platform
     CHECKV(al_tile(-1, 10), WALL);                  // outside the room = wall
 }
@@ -100,26 +100,26 @@ static void test_floor(void)
 static void test_land_on_heights(void)
 {
     at(72, 28);                                     // standing on level 1
-    CHECKV(st.z, LEVEL * SUB);
+    CHECKV(st.z, LEVEL_Z);
     st.grounded = 0; st.z = 40 * SUB; st.vz = 0;   // dropped above level 1: lands on it
     steps(0, 20);
     CHECK(st.grounded);
-    CHECKV(st.z, LEVEL * SUB);
+    CHECKV(st.z, LEVEL_Z);
     at(120, 28);
     al_step(K_A);                                   // a jump on level 2 lands back on level 2
     steps(0, 20);
     CHECK(st.grounded);
-    CHECKV(st.z, 2 * LEVEL * SUB);
+    CHECKV(st.z, 2 * LEVEL_Z);
 }
 
 static void test_walk_off(void)
 {
     int n;
     at(120, 40);                                    // level 2, front edge (box rows 36..43)
-    CHECKV(st.z, 2 * LEVEL * SUB);
+    CHECKV(st.z, 2 * LEVEL_Z);
     al_step(K_DOWN);                                // box 39..46: still partly over the platform
     CHECK(st.grounded);
-    CHECKV(st.z, 2 * LEVEL * SUB);
+    CHECKV(st.z, 2 * LEVEL_Z);
     for (n = 0; n < 10 && st.grounded; n++) al_step(K_DOWN);
     CHECK(!st.grounded);                            // the whole box past the edge: falling
     CHECK(st.y / SUB - FOOT_D / 2 >= 48);
@@ -143,17 +143,17 @@ static void test_ledges(void)
     CHECKV(st.x / SUB, 59);
     CHECKV(st.z, 0);
     at(56, 24); hold(K_RIGHT, 2, 0);
-    CHECKV(st.x / SUB, 59);                         // blocked while the feet are below 8 px
-    hold(K_RIGHT, 1, -1);
+    CHECKV(st.x / SUB, 59);                         // blocked while the feet are below 8.4 px
+    hold(K_RIGHT, 2, -1);
     CHECK(st.x / SUB > 59);                         // the feet above the ledge: it moves on
     hold(K_RIGHT, 13, -1);
     CHECK(st.grounded);
-    CHECKV(st.z, LEVEL * SUB);                      // landed on level 1
+    CHECKV(st.z, LEVEL_Z);                          // landed on level 1
     CHECKV(st.x / SUB, 91);                         // and stopped by the +1 step to level 2
     // +1 -> +2 by a jump
     at(84, 24); hold(K_RIGHT, 12, 0);
     CHECK(st.grounded);
-    CHECKV(st.z, 2 * LEVEL * SUB);
+    CHECKV(st.z, 2 * LEVEL_Z);
     // 0 -> +2 unreachable (column 8: row 3 at 0, row 2 at 2), walking and jumping
     at(128, 56); hold(K_UP, 8, -1);
     CHECKV(st.y / SUB, 52);
@@ -229,7 +229,7 @@ static void test_air_collision(void)
     CHECK(st.grounded);
     // the same jump started closer reaches it on the way up and lands on it
     at(44, 24); hold(K_RIGHT, 16, 0);
-    CHECKV(st.z, LEVEL * SUB);
+    CHECKV(st.z, LEVEL_Z);
     // a fall from level 2 along the wall in column 9: x stays flush the whole way down
     at(139, 40);
     for (n = 0; n < 20; n++) {
@@ -266,13 +266,13 @@ static void test_route(void)
 }
 
 // ---------------------------------------------------------------- the screen
-#include "gfx.h"
+
 
 // the player's sprite pixel (sprite coordinates): its grey, or -1 where it is transparent
 static int hero_px(int c, int r)
 {
-    const u16 (*g)[HERO_SH] = hero_gfx[st.dir][al_frame()];
-    u16 b = 0x8000 >> c;
+    const hero_row (*g)[HERO_SH] = hero_gfx[st.dir][al_frame()];
+    hero_row b = (hero_row)1 << (HERO_SW - 1 - c);
     if (g[2][r] & b) return -1;
     return ((g[0][r] & b) ? 1 : 0) | ((g[1][r] & b) ? 2 : 0);
 }
@@ -280,7 +280,8 @@ static int hero_px(int c, int r)
 // how many of the sprite's opaque pixels are on screen as drawn (the player not hidden)
 static int hero_shown(int *opaque)
 {
-    int sx = st.x / SUB + hero_ox[st.dir][al_frame()], sy = ROOM_Y + st.y / SUB - st.z / SUB - HERO_AY, c, r, n = 0;
+    int sx = st.x / SUB - al_camx + hero_ox[st.dir][al_frame()], c, r, n = 0;
+    int sy = world->top - al_camy + st.y / SUB - st.z / SUB - HERO_AY;
     *opaque = 0;
     for (r = 0; r < HERO_SH; r++)
         for (c = 0; c < HERO_SW; c++) {
@@ -305,11 +306,11 @@ static void test_screen(void)
     CHECKV(n, all);                                 // the whole sprite (white outline included)
     sw_step(K_C);                                   // overlay off: the textures alone
     CHECK(grey_in(50, ROOM_Y + 30, C_LGRAY, C_DGRAY));      // open ground (level 0)
-    CHECK(grey_in(66, ROOM_Y + 18 - LEVEL, C_WHITE, C_LGRAY));  // level 1 top, raised 8 px
+    CHECK(grey_in(66, ROOM_Y + 18 - LEVEL_PX(1), C_WHITE, C_LGRAY));  // level 1 top, raised 8 px
     for (n = 44; n < 51; n++) CHECK(grey_in(66, n, C_DGRAY, C_BLACK));  // its front face
     CHECKV(sw_level(66, 51), C_BLACK);              // ending on a black line
     CHECK(grey_in(66, 52, C_LGRAY, C_DGRAY));       // then the ground of row 3
-    CHECKV(sw_level(96, ROOM_Y + 16 - 2 * LEVEL), C_LGRAY);     // level 2: framed top
+    CHECKV(sw_level(96, ROOM_Y + 16 - LEVEL_PX(2)), C_LGRAY);  // level 2: framed top
     CHECK(grey_in(40, 35, C_DGRAY, C_BLACK));       // the wall at column 2: top faces
     CHECK(grey_in(40, 62, C_BLACK, C_DGRAY));       // and its front face below row 4
     sw_init(1);                                     // in the air
@@ -336,7 +337,7 @@ static int shadow_ok(const u16 *mask, int w, int h)
     static u8 ref[RT_PH][RT_PW];
     State keep = st;
     int x0, y0, sx, sy, c, r, n = 0, all = 0, sum = 0, dark;
-    st.x = 136 * SUB; st.y = 20 * SUB; st.z = 2 * LEVEL * SUB;  // far away: the background
+    st.x = 136 * SUB; st.y = 20 * SUB; st.z = 2 * LEVEL_Z;  // far away: the background
     st.grounded = 1;
     sw_step(0);
     for (r = 0; r < RT_PH; r++)
@@ -375,30 +376,8 @@ static void test_shadow(void)
     // low in a jump: the big one; on level 1 it lies on the platform, not on the ground
     at(56, 24); hold(K_RIGHT, 9, 0);
     CHECK(!st.grounded);
-    CHECKV(al_floor(st.x, st.y), LEVEL * SUB);
+    CHECKV(al_floor(st.x, st.y), LEVEL_Z);
     CHECK(shadow_ok(shadow0, SHADOW0_W, SHADOW0_H) > 10);
-}
-
-// Restoring only the player's last rectangle draws the same screens as copying the whole
-// background each frame: the route, frame by frame
-extern u8 al_full_copy;
-static void test_dirty(void)
-{
-    static SwScript sc;
-    static u16 sum[200];
-    u16 f;
-    int diff = 0;
-    for (al_full_copy = 0; al_full_copy < 2; al_full_copy++) {
-        sw_load_script(&sc, "keys/route.txt");    // (a script is read once: load it per run)
-        sw_init(0);
-        for (f = 0; f < 200; f++) {
-            sw_step(sw_script_keys(&sc, f) | (f == 100 ? K_C : 0));   // the overlay off midway
-            if (!al_full_copy) sum[f] = sw_checksum();
-            else diff += sum[f] != sw_checksum();
-        }
-    }
-    al_full_copy = 0;
-    CHECKV(diff, 0);
 }
 
 static void test_animation(void)
@@ -436,20 +415,20 @@ static void test_animation(void)
 
 static void test_hidden_behind(void)
 {
-    // the wall at column 4 row 5 (3 levels): top face on screen rows 60..75, front face below;
+    // the wall at column 4 row 5 (3 levels): top face on screen rows 59..74, front face below;
     // a player in row 4 right behind it (feet y 78) is hidden by it: the wall's pixels are the
     // same as without the player
     static u8 ref[16][36];
-    int x, y, diff = 0, n, all;
+    int x, y, diff = 0, n, all, w0 = ROOM_Y + 5 * TILE - LEVEL_PX(3);
     sw_init(0);
     st.x = 24 * SUB; st.y = 40 * SUB;
     sw_step(0);
     for (y = 0; y < 36; y++)
-        for (x = 0; x < 16; x++) ref[x][y] = sw_level(64 + x, 60 + y);
+        for (x = 0; x < 16; x++) ref[x][y] = sw_level(64 + x, w0 + y);
     st.x = 72 * SUB; st.y = 78 * SUB; st.z = 0;
     sw_step(0);
     for (y = 0; y < 36; y++)
-        for (x = 0; x < 16; x++) diff += ref[x][y] != sw_level(64 + x, 60 + y);
+        for (x = 0; x < 16; x++) diff += ref[x][y] != sw_level(64 + x, w0 + y);
     CHECKV(diff, 0);
     n = hero_shown(&all);
     CHECK(n > 0 && n < all / 2);                    // only the head shows above the wall
@@ -459,13 +438,60 @@ static void test_hidden_behind(void)
     CHECKV(n, all);
 }
 
+// ---------------------------------------------------------------- milestone 9: the village
+// The whole village of Inoa (gfx.h, tools/extract.py), the game's image, the camera following.
+// keys/village.txt from the start (scenario 7, the doorstep of the house Alundra leaves, level
+// 9 = the game's 10 units): down the road, left, down the stairs (9 -> 8 -> 6) walking, then
+// down a second flight (6 -> 4 -> 2), off a retaining wall (2 -> 0, a fall), and right along
+// the lower street to a house
+static void test_village(void)
+{
+    static SwScript sc;
+    static const struct { u16 f; u16 x, y; u8 z; } C[] = {
+        { 105, 233, 210, 75 }, { 115, 219, 217, 67 }, { 130, 183, 217, 50 }, { 170, 181, 280, 16 },
+        { 185, 181, 300, 0 }, { 259, 299, 300, 0 } };
+    u16 f;
+    u8 c = 0, air = 0;
+    int n, all;
+    CHECKV(sw_load_script(&sc, "keys/village.txt"), 0);
+    sw_init(7);
+    CHECK(world == &worlds[W_VILLAGE]);
+    CHECK(st.grounded);
+    CHECKV(st.z, 9 * LEVEL_Z);                 // the upper road (the game's 10 units)
+    CHECK(al_free(st.x, st.y, st.z));
+    for (f = 0; f < 260; f++) {
+        sw_step(sw_script_keys(&sc, f));
+        if (f < 177) air += !st.grounded;          // stairs walked: never in the air (the fall: 177)
+        if (c < sizeof C / sizeof C[0] && f == C[c].f) {
+            CHECKV(st.x / SUB, C[c].x);
+            CHECKV(st.y / SUB, C[c].y);
+            CHECKV(st.z / SUB, C[c].z);
+            c++;
+        }
+        if (f == 225) {                             // the lower street: scrolled, the player
+            CHECK(al_camx > 0 && al_camy > 0);      // wholly in view
+            n = hero_shown(&all);
+            CHECKV(n, all);
+        }
+    }
+    CHECKV(c, sizeof C / sizeof C[0]);
+    CHECKV(air, 0);
+    n = hero_shown(&all);                           // at the end, behind a house: hidden
+    CHECK(n < all / 2);
+    al_start();                                     // back to the test room within the run
+    sw_step(0);
+    CHECK(world == &worlds[W_TEST]);
+    CHECKV(al_camx, 0);
+    CHECKV(al_camy, 0);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc > 3 && !strcmp(argv[1], "--play")) {   // --play KEYS N: position every step
+    if (argc > 3 && !strcmp(argv[1], "--play")) {   // --play KEYS N [SCENARIO]: position every step
         static SwScript sc;
         int f;
         if (sw_load_script(&sc, argv[2])) return 1;
-        sw_init(0);
+        sw_init(argc > 4 ? atoi(argv[4]) : 0);
         for (f = 0; f < atoi(argv[3]); f++) {
             sw_step(sw_script_keys(&sc, f));
             printf("%3d x%3d y%3d z%2d %c\n", f, st.x / SUB, st.y / SUB, st.z / SUB, st.grounded ? 'G' : 'A');
@@ -495,9 +521,9 @@ int main(int argc, char **argv)
     test_route();
     test_screen();
     test_animation();
-    test_dirty();
     test_shadow();
     test_hidden_behind();
+    test_village();
     printf(fails ? "%d FAILED\n" : "alundra: all tests pass\n", fails);
     return fails != 0;
 }

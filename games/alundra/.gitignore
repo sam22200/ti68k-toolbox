@@ -1,3 +1,7 @@
-# generated from the local disc by tools/extract.py (commercial data: never committed)
+# generated from the local disc by tools/extract.py and tools/bake.c (commercial data: never committed): the
+# village image (*.bin, *.89y)
 gfx.h
 x/
+world.h
+*.bin
+*.89y
