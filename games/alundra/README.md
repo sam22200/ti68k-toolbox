@@ -1,17 +1,24 @@
 # Alundra-style traversal (TI-89)
 
-A tiny traversal engine for the TI-89 Titanium: one room, a player who walks in 8 directions,
-jumps, and climbs or drops between terrain heights, with readable depth. Its rules were
-studied in Alundra (PS1, Matrix Software / Working Designs 1997) with the `ti-port-ps1`
-skill: `RE_NOTES.md` (findings labelled OBSERVED / INTERPRETATION / TARGET, the measured
-numbers and how each was obtained), `alundra.sym` (RAM and code addresses). Not a port: no
-code or data from the disc. The art is the disc's (decided): `tools/extract.py` runs the
-local disc headless and generates `gfx.h` (Alundra's poses and four scenery textures); the
-disc, `gfx.h`, `x/` and everything extracted stay local (`roms/ps1/`, `sources/alundra_ps1/`,
-`.gitignore`).
+A tiny traversal engine for the TI-89 Titanium: a player who walks in 8 directions, jumps,
+climbs or drops between terrain heights and walks up and down stairs, with readable depth, in
+a test room and in the whole village of Inoa, scrolling. Its rules were studied in Alundra
+(PS1, Matrix Software / Working Designs 1997) with the `ti-port-ps1` skill: `RE_NOTES.md`
+(findings labelled OBSERVED / INTERPRETATION / TARGET, the measured numbers and how each was
+obtained), `alundra.sym` (RAM and code addresses). Not a port: no code from the disc. The art
+and the village are the disc's (decided): `tools/extract.py` runs the local disc headless and
+generates `gfx.h` (Alundra's poses, the scenery textures, the village's tiles); `tools/bake.c`
+draws the test room once with the game's own drawing code (`world.h`); the village's image
+is the game's, pasted from its screens (`alvil0`/`alvil1`, data files). The disc, `gfx.h`,
+`world.h`, the data files, `x/` and everything extracted stay local (`roms/ps1/`,
+`sources/alundra_ps1/`, `.gitignore`).
+
+The scale is a parameter: `make SCALE=N/D` (default 22/42, Alundra's 42 px → 22) regenerates
+the sprite, the shadow and the village, and every size and speed in `alundra.h` follows it
+(`SC()`, the numbers set at 22/42; the tests' positions assume 22/42).
 
 ```sh
-make test                      # gfx.h from the local disc the first time, then the unit tests
+make test                      # gfx.h and world.h from the local disc the first time, then the unit tests
 make pc && ./alundra_pc        # PC window: arrows, [2nd] = Ctrl/Space/Z jump, C debug overlay
 make cycles xcheck             # the TI binary under ti-cycles, TI = PC per scenario
 make ti                        # alundra.89z
@@ -28,6 +35,8 @@ make ti                        # alundra.89z
 | 5 | Collision: walls, corners, obstacles, during ascent and descent; the test room complete | done 2026-10-04 |
 | 6 | 16 × 16 presentation: tiles, the 14 × 20 player with outline, shadow, depth order | done 2026-10-04 |
 | 7 | TI-oriented: data sizes, cycles per frame, xcheck, the emulator once | done 2026-10-04 but the emulator run (no X display in the session) |
+| 8 | (Optional) an approximation of an original room: the well at the foot of the stairs, village of Inoa | done 2026-10-04, replaced by 9 |
+| 9 | The whole village of Inoa (no interiors, exits closed, no NPCs), scrolling, stairs, the game's own image | done 2026-10-05 |
 
 Milestone 2 numbers (speeds since changed, see milestone 6): 3 px per step at 32 fps (2.25 per axis on diagonals), jump apex 13.9 px
 in 12 steps (gravity 14/16 px), falls capped at 8 px per step; update ~760 cycles, render
@@ -88,3 +97,43 @@ is still to do: `ti-emu start; ti-run alundra.89z; ti-play keys/route.txt`, one 
 Scenarios: 0 the room's start (open ground), 1 in the air at the top of a jump, 2 in front of
 the 0→1 ledge, 3 on the level-2 platform's front edge, 4 in the corridor, 5 below the
 unreachable 0→2 ledge, 6 above the corridor, misaligned (a corner to round).
+7 the village of Inoa, on the doorstep of the house Alundra leaves (on the TI: `alundra(7)`,
+with `alvil0.89y` and `alvil1.89y` sent and archived).
+
+Milestone 8 (replaced by 9, never committed): one screen of Inoa, the well at the foot of the
+stairs, compressed to the three levels of the time, its stairs climbed by two +1 jumps.
+
+Milestone 9: the whole village of Inoa, the interiors left out, its exits closed, no NPCs
+(decided with the user), drawn with **the game's own image** so that its houses, roofs, doors,
+windows, trees, bushes, the fountain, the well, the stairs, the stone walls and the grass read
+as in the game (a first version with textured blocks on compressed terraces did not).
+- The image: the player teleported over a grid (`tools/extract.py` `village_image`), every
+  other object moved out of the map (the NPCs), each screen kept once the player and the camera
+  are at rest and pasted where its camera is (the player's position minus his feet on screen,
+  from the GPU packets), the median of up to 6 screens per pixel (the player vanishes); scaled
+  by 0.524 (an area average), 4 greys by luminance percentiles, the grass (olive) a light grey
+  with its darkest spots. 656 × 494 px, two planes: the data files `alvil0`, `alvil1` (40.6 KB
+  each, archived on the TI, read in place; `alvil0.bin`/`alvil1.bin` on the PC).
+- The collision: the game's height map at 41 × 25 TI tiles (a tile = 30.5 px of the game, the
+  most common cell), **a level = 16 px of the game** (8.375 screen px, `LEVEL_Z` = 134 in
+  1/16 px: the image and the collision agree on every terrace; the jump clears +1, not +2, as
+  in the game). Terraces (heights under 20 tiles or more) at levels 0, 2, 6, 9, 12; a rarer
+  height one level above a terrace is an object (jumpable), higher a roof (a wall). Stairs:
+  slope cells joining two terraces, walked up and down (a stair under the box lets the feet
+  follow two levels: ~2 per tile on the game's ramps); other slopes are roofs. Walls: the
+  game's flags, roofs, the closed exits. Tiles: level | 0x80 wall | 0x40 stair.
+- Drawing: each world has an image (the test room's drawn once from its tiles by
+  `tools/bake.c`, the village's the game's); every frame the view is copied from it, shifted
+  to any pixel (ten words per row, the shorter shift), then the overlay's levels, the shadow,
+  the player, and the image again over the player where the tiles of the rows in front cover
+  him (one span per tile column). The camera keeps the feet at (80, 62), inside the image.
+- The scale is still a parameter; the test room changed a little (walls 25 px: 3 × 8.375).
+Tests: `test_village` (`keys/village.txt` from scenario 7: down the road, a flight of stairs
+walked down 9 → 8 → 6, a second one 6 → 4 → 2, never in the air, off a retaining wall, along
+the lower street behind a house that hides the player; 6 checkpoints, the camera scrolled, the
+player whole on screen), the world switch. TI = PC (`make xcheck` with the data files) on
+scenarios 0-7 and the three key scripts (village E434, 260 frames; route 20BE; corners ED58).
+Village: render ~200k cycles per frame without the overlay (the view copy 149k, shadow 11k,
+player 8k, the image over the player 29k), update ~5.4k: ~205k of the ~360k budget; the
+view copy is the cost (~60 cycles per word in C, ~40 in asm: not written, to ask).
+`alundra.89z` 22,879 bytes plus the two data files (the Titanium only).

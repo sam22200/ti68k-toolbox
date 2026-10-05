@@ -40,6 +40,18 @@ game), **INTERPRETATION** (what it likely means), **TARGET** (what we build).
   across, 1.625 in depth (the game's 2/3), continuous in 1/16 px as before. The jump (apex
   13.9 px, 27.5 × 0.524 = 14.4) and a level (8 px, 16 × 0.524 = 8.4) already were at that scale.
   Shadow: always very visible (user): adaptive, see § Behaviour, Art.
+- Milestone 8 (user, 2026-10-04): an approximation of the village of Inoa, its terraces
+  compressed to 3 levels (Experiment 10): upper terrace 2, stairs 1, ground 0, walls; the
+  retaining wall stays a 2-level wall, the stairs become two +1 jumps; the engine unchanged.
+- Milestone 9 (user, 2026-10-04): the whole village of Inoa, no interiors, the exits closed, no
+  NPCs; the scale a parameter (Makefile `SCALE`, default 22/42); the terraces compressed to two
+  levels each (levels 0-15 now); real stairs (walked one level up or down); smooth scrolling
+  (the TileMap engine on tiles baked from the game's own drawing); walls first as blocks, then
+  textured by kind (stone, roof, tree). Experiment 11.
+- Milestone 9, revised (user, 2026-10-05: "it must look like the village"): the game's own
+  image of the village as the background, so **the true heights** again (a level = 16 px of
+  the game, 8.375 screen px: the image and the collision agree), terraces two to four levels
+  apart as in the game; stairs walked two levels per tile.
 - Milestone 2 (2026-10-04): constant integer gravity in 1/16 px instead of a jump table: two
   additions per step like a table, and falls of any height come for free (Alundra's own
   model). Positions in 1/16 px (u16 x, y; s16 z, vz).
@@ -268,6 +280,36 @@ light grey → black), on a dark floor it is a black ellipse with a light-grey r
    y -0.5 per frame to 903.6, then on left. The whole row blocked (y 920, box in row 57
    only): stop at 418, no nudge. A poked y freezes the player here too: reach the position
    by walking (`psxrun.py --keys`), poke only the map.
+
+10. The village's terrain (2026-10-04), the map read from `inoa.state` (§ Addresses). OBSERVED:
+   heights 1, 3, 7, 10, 13 (×16 px): terraces 3-4 units apart with stone retaining walls,
+   joined by stairs (cells of slope type 1-3); no +1 steps except small objects (barrels,
+   benches at +1, poles at +4); houses, trees and the well are wall cells (flags 0x41). The
+   ship's deck is the same (8 and 5, ramps between). The screen below the upper terrace
+   (player at 400, 631): the stairs down to the well, the tree on the left, a house on the
+   right. INTERPRETATION: Alundra's +1 jump is for objects and puzzles, the town is built of
+   terraces and stairs. TARGET: the window at (248, 509) world px, 10 × 6 tiles of 30.5 px,
+   the most common cell per tile; 10-9 → 2, 8-6 → 1, 5 and below → 0, walls and above 10 →
+   WALL; the two back rows forced to walls (the screen's top).
+
+11. The whole village (2026-10-04), `inoa.state`. OBSERVED: the map rows 11-57 are the village
+   (rows above: height 0, nothing; below: other data), 52 columns of 24 px. Per TI tile
+   (41 × 25 at 22/42): heights 1 (198 tiles), 3 (113), 7 (28), 10 (200), 13 (48) are the
+   terraces; 11 (7 tiles, benches and crates on the 10 terrace); 15-18 and most slope cells
+   above the terraces are **roofs**: a house is wall cells (flags 0x41) for its walls and
+   slope or flat cells 5-18 for its roof, not flagged; slopes between two terraces are stairs.
+   The camera follows the player at a fixed offset: a screen's camera is (x − feet x,
+   y − z − feet y), the feet read from the player's GPU packets, so screens taken over a
+   grid of teleports paste into one image of the village in (x, y − z). INTERPRETATION: a
+   flagged cell is anything solid (houses, trees, fences, retaining walls); roofs and stairs
+   share the slope cells and only the neighbours tell them apart. TARGET: the rules in the
+   README § Milestone 9. Capturing the image (2026-10-05): a teleport can leave the player in
+   the air or on a roof, and the camera still scrolling after 60 frames; a screen is kept
+   only when the player's pose is at the same place in both GPU packet buffers and the
+   camera has not moved for 3 frames (100 frames of settling). The NPCs: every object but the
+   player (the array at `801ac6f8`, x at +0x114) moved to x 3000 each frame: they vanish, the
+   scenery (fountain, lamps) stays. The top rows of the map are seen only in the HUD's rows:
+   the image is not reliable there (behind the closing walls).
 
 ## Open questions
 
