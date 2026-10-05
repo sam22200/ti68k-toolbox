@@ -1,0 +1,19 @@
+; Alundra (USA Rev 1) main RAM, field mode, the ship prologue. ADDR name (psxrun.py --sym)
+801ac7e4 vz        ; 16.16 signed, px/frame up; jump = +5.0, gravity -0.5/frame, rest = -0.5
+801ac80c x         ; 16.16, master (pokes stick here)
+801ac810 y         ; 16.16, master
+801ac814 z         ; 16.16, height of the feet in world px; at rest = floor (+ 0x0001 flag in the low byte)
+801ac830 floor     ; 16.16, ground height under the player
+801ac850 floor_c0  ; 16.16 x4 (850, 854, 858, 85c): ground heights sampled at 4 points (box corners?)
+801339a0 x_copy    ; 16.16, copy of x in a second struct (display side), rewritten every frame
+801339a4 y_copy
+801339aa floor_copy ; 16-bit
+801339ac z_copy    ; 16-bit, z rounded
+80133a00 anim      ; 0x202 ground, 0x101 rising/apex part of the jump
+801ac6f8 player     ; object 0 of 64 (0x294 bytes each)
+801ac6c4 map_ptr    ; cell = map + 0x604 + col*8 + row*0x1a0 (24 x 16 px cells, height byte 3)
+80137990 x_to_col   ; short per pixel: x -> map column (24 px)
+8003797c floor_sample ; code: max floor of the 4 box corners
+80037eb8 vertical_step ; code: land when z + vz <= floor
+80038008 move_resolve  ; code: horizontal step, ground snap < 3 px, halving, corner slide
+80037d4c wall_test     ; code: corner blocks if flag 0x01/0x40 or floor >= feet z
