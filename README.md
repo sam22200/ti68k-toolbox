@@ -18,6 +18,13 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 
 **Install**: [docs/INSTALL.md](docs/INSTALL.md) (Ubuntu / Linux, macOS).
 
+[Sonic 1 traversal prototype](games/sonic/README.md): the first 4.8 Mega Drive
+view widths of Green Hill, half scale, C physics and real collision terrain,
+rigid bridge, rings, three enemy types and damage, with PC/TI checks.
+ROM scenery and animated actors in four greys, with white outlines. The original
+ROM runs headless through [the MD tooling](tools/md/README.md).
+The reusable method is [ti-port-md](.claude/skills/ti-port-md/SKILL.md).
+
 ## Quick start (runtime game)
 
 ```sh
@@ -52,6 +59,10 @@ Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
   `make -C tools/m68kbench` then builds `tools/bin/ti-cycles`.
 - `runtime/platform-sw/amsfont.h`: AMS fonts, extracted from `tools/rom/` by `make`.
 - `sources/`, `ffa_en/`: third-party reference sources and TI-Basic programs.
+- `sources/md_core/`, `sources/sonic1_md/`, `roms/md/`: pinned Genesis Plus GX
+  reference core, original Sonic ROM, states and measurements. Sonic terrain,
+  collision profiles and graphics generated into `games/sonic/sonterr*` / `sonart*`
+  remain ignored, as do reference headers and captures.
 - `tools/ghidra/`, `roms/`: Ghidra 11.4.2 with the GhidraBoy extension and the Game Boy ROMs
   for `ti-port-gb` (install steps in its `SKILL.md`; PyBoy goes into `tools/pyenv`), the TI-83
   programs for `ti-port-ti83` (`roms/ti83/`; the `z80` and `z80dis` packages go into `tools/pyenv`).

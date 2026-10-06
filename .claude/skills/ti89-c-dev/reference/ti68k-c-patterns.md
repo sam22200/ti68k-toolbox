@@ -594,6 +594,11 @@ carries a custom extension of up to 4 characters just before it. Data files are 
 save; they survive archiving, unlike data stored in the program (§1).
 
 Layout: `[size.w][data][0]["ext"][0][OTH_TAG]`, where the size word counts the bytes after it.
+Runtime detail checked with `ti-cycles` (Sonic data, 2026-10-05): TI `rt_file`
+reports that AMS size, including the extension/tag trailer; the PC reports the
+raw `.bin` length. A 23,046-byte payload with extension `dat` reports 23,052
+on TI. Validate a declared payload end with `end <= size`, plus magic and
+internal offsets; exact equality with the raw payload length rejects valid TI data.
 **Verified** round trip on HW2 and HW3 (`experiments/files/savetest.c`), including the archived case:
 
 ```c
