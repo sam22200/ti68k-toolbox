@@ -1,0 +1,3 @@
+# Standing jump, held throughout the ascent, from the GHZ1 start state.
+0 C
+30

@@ -19,7 +19,7 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 | `ti-send file…` | fallback only: types the path into TiEmu's file chooser (slow, needs HOME) |
 | `ti-key [--hold S] TOKEN…` | keys: `ENTER ESC HOME CLEAR 2ND UP…`, or text `'hello()'` |
 | `ti-shot out.png [--lcd]` | screenshot; `--lcd` = screen only, enlarged |
-| `ti-gif out.gif [SEC] [FPS]` | animated GIF of the LCD (ffmpeg x11grab, x2, default 10 s at 15 fps); run it with `&` before the `ti-key` sequence, then `wait`; seen in `ti-view` |
+| `ti-gif out.gif [SEC] [FPS]` | animated GIF of the LCD (ffmpeg x11grab, x2, default 10 s at 15 fps); default-skin LCD coordinates scale with the window; run it with `&` before the `ti-key` sequence, then `wait`; seen in `ti-view` |
 | `ti-play keys/x.txt [FPS]` | plays a runtime key script (`<frame> <keys>` lines) in real time through the PC keyboard: several keys held at once (diagonals), which `ti-key`'s clicks cannot; start it right after `ti-key ENTER`. Open loop: end each move against a wall, check the script on the PC with its timeline scaled ±10 % |
 
 **Not everything needs the emulator.** TiEmu 3.04 (Ubuntu) has no command line control, no D-Bus
@@ -47,6 +47,18 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 
 ## Known pitfalls
 
+- **End a held-key demo explicitly** (Sonic, Titanium, 2026-10-05): `ti-play`
+  releases all keys at the last script event, including the keys named on that
+  event. To continue holding RIGHT after frame128 until frame250, append
+  `250` with no keys. Headless scripts keep their final state instead: the
+  same short file can win headlessly but stop early in a real-time demo.
+- **Verify the captured game and LCD**: a running TiEmu process can be at HOME,
+  and ENTER alone does not guarantee gameplay. On a requested relaunch use
+  `ti-run` with all data files. `ti-gif` now scales the default skin's native
+  LCD rectangle to the actual window; the previous fixed 166x108 crop showed
+  the casing and cut off the LCD on a resized 464x1037 Titanium window.
+  Custom skins need their own rectangle. Review a few GIF frames and observe
+  the endpoint before reporting a winning replay; timing can drift.
 - **Games that read the keyboard with `_rowread`** miss short presses → `--hold 0.3` (or 0.5).
 - **CLEAR during a game** can switch the calculator off (Puzzle Bobble calls `off()`):
   blank screen → `ti-key --hold 0.3 ON`.

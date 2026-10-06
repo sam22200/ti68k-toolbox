@@ -6,11 +6,21 @@ OUT=$1; SEC=${2:-10}; FPS=${3:-15}
 [ -n "$OUT" ] || { echo "usage: ti-gif OUT.gif [SECONDS] [FPS]" >&2; exit 2; }
 W=$(xdotool search --name '^TiEmu \(' | head -1)
 [ -n "$W" ] || { echo "ti-gif: TiEmu window not found" >&2; exit 1; }
-eval "$(xwininfo -id "$W" | sed -n 's/.*Absolute upper-left X: *\(-*[0-9]*\)/X=\1/p; s/.*Absolute upper-left Y: *\(-*[0-9]*\)/Y=\1/p')"
-# the LCD of both skins (220x492 window) sits at (27,42), 166x108 with its border
+eval "$(xwininfo -id "$W" | sed -n 's/.*Absolute upper-left X: *\(-*[0-9]*\)/TI_GIF_X=\1/p; s/.*Absolute upper-left Y: *\(-*[0-9]*\)/TI_GIF_Y=\1/p; s/^ *Width: *\([0-9]*\)/TI_GIF_W=\1/p; s/^ *Height: *\([0-9]*\)/TI_GIF_H=\1/p')"
+# Native LCD rectangles read from the Docker image's default .skn headers.
+# Scale both endpoints: the calculator window may have been resized by the user.
+case "$(xdotool getwindowname "$W")" in
+  'TiEmu (TI89t)') TI_GIF_BW=440; TI_GIF_BH=984; TI_GIF_L=63; TI_GIF_T=94; TI_GIF_R=379; TI_GIF_B=294 ;;
+  'TiEmu (TI89)') TI_GIF_BW=443; TI_GIF_BH=1006; TI_GIF_L=60; TI_GIF_T=104; TI_GIF_R=379; TI_GIF_B=304 ;;
+  *) echo "ti-gif: unsupported skin/model" >&2; exit 1 ;;
+esac
+TI_GIF_LEFT=$((TI_GIF_L * TI_GIF_W / TI_GIF_BW))
+TI_GIF_TOP=$((TI_GIF_T * TI_GIF_H / TI_GIF_BH))
+TI_GIF_WIDTH=$(((TI_GIF_R * TI_GIF_W + TI_GIF_BW - 1) / TI_GIF_BW - TI_GIF_LEFT))
+TI_GIF_HEIGHT=$(((TI_GIF_B * TI_GIF_H + TI_GIF_BH - 1) / TI_GIF_BH - TI_GIF_TOP))
 TMP=$OUT.tmp.mp4
-ffmpeg -loglevel error -y -f x11grab -framerate "$FPS" -video_size 166x108 \
-  -i "$DISPLAY+$((X + 27)),$((Y + 42))" -t "$SEC" -c:v libx264rgb -crf 0 -preset ultrafast "$TMP" || exit 1
+ffmpeg -loglevel error -y -f x11grab -framerate "$FPS" -video_size "${TI_GIF_WIDTH}x${TI_GIF_HEIGHT}" \
+  -i "$DISPLAY+$((TI_GIF_X + TI_GIF_LEFT)),$((TI_GIF_Y + TI_GIF_TOP))" -t "$SEC" -c:v libx264rgb -crf 0 -preset ultrafast "$TMP" || exit 1
 # written to a temp name and renamed: ti-view never serves a half-written GIF
 ffmpeg -loglevel error -y -i "$TMP" -vf "scale=iw*2:ih*2:flags=neighbor,split[a][b];[a]palettegen=max_colors=16[p];[b][p]paletteuse=dither=none" \
   -f gif "$OUT.part" && mv "$OUT.part" "$OUT"

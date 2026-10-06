@@ -1,0 +1,11 @@
+# Play the measured route and hold its final RIGHT until the endpoint.
+# ti-play releases held keys when its last event has been processed.
+0 RIGHT
+45 RIGHT A
+65 RIGHT
+90 DOWN
+91 RIGHT
+105 RIGHT A
+128 RIGHT
+250
+280
