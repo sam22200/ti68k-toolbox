@@ -1,0 +1,5 @@
+# Relative to the reproducible GHZ1 start state, MD buttons.
+0 RIGHT
+20
+40 LEFT
+50

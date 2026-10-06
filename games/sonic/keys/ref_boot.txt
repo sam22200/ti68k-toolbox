@@ -1,0 +1,4 @@
+# MD pad script. A held button lasts until the next line.
+0
+600 START
+602
