@@ -29,7 +29,15 @@ static volatile u16 ticks;
 static u16 bench_upd, bench_rnd;
 #endif
 DEFINE_INT_HANDLER(tick_handler) { ticks++; }
-u16 rt_ticks(void) { return ticks; }
+u16 rt_ticks(void)
+{
+#ifdef RT_CYCLES
+    /* Match platform-sw's deterministic clock: no interrupt runs here. */
+    return (u16)(((u32)rt_frame * RT_FRAME_TICKS2) >> 1);
+#else
+    return ticks;
+#endif
+}
 
 #ifndef RT_CYCLES
 // TI-89 matrix (c-patterns §5): row 0 = up left down right 2nd shift diamond alpha = K_UP..K_D;
