@@ -1,0 +1,5 @@
+0 LEFT B
+1 LEFT
+6 LEFT B
+7 LEFT
+22
