@@ -1,0 +1,2 @@
+0 LEFT A
+12 LEFT

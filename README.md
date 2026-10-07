@@ -25,6 +25,24 @@ ROM scenery and animated actors in four greys, with white outlines. The original
 ROM runs headless through [the MD tooling](tools/md/README.md).
 The reusable method is [ti-port-md](.claude/skills/ti-port-md/SKILL.md).
 
+[Yoshi's Island interaction prototype](games/yoshi/README.md): a playable traversal
+of five original level 1-1 view widths at half scale, using actual collision
+terrain. Movement and collision probes match the PAL original on PC/TI;
+the full native replay is cross-checked and profiled per frame. Tongue, Shy Guy
+capture/swallow/spit and an egg reserve work. ROM scenery and animated
+Yoshi/Baby Mario, Shy Guys and eggs use four greys and white outlines;
+contact damage, the crying Baby Mario bubble, rescue and a ten-second
+countdown work. Coins rotate and collect, eggs follow the player and can be
+aimed/thrown; resting and tongue-capture animations are present. The reusable method is
+[ti-port-snes](.claude/skills/ti-port-snes/SKILL.md).
+
+[Mega Man X opening section](games/megamanx/README.md): a second SNES
+experiment, with running, short/held jumps, wall slide/kick, three buster
+strengths, roller combat and contact damage. Original scenery and animated
+actors are reduced to four greys with white outlines. Source mechanics,
+complete PC/TI states/screens and individual frame costs are checked;
+reusable ROM layout and animation-anchor findings extend `ti-port-snes`.
+
 ## Quick start (runtime game)
 
 ```sh
@@ -63,6 +81,10 @@ Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
   reference core, original Sonic ROM, states and measurements. Sonic terrain,
   collision profiles and graphics generated into `games/sonic/sonterr*` / `sonart*`
   remain ignored, as do reference headers and captures.
+- `sources/snes_core/`, `sources/yoshi_snes/`, `sources/yoshi_disasm/`,
+  `roms/snes/`: pinned Snes9x, local original traces/states/PPU captures,
+  reading aids and SNES ROMs. `sources/megamanx_snes/` holds the second
+  experiment; both games' generated trace fixtures and art remain ignored.
 - `tools/ghidra/`, `roms/`: Ghidra 11.4.2 with the GhidraBoy extension and the Game Boy ROMs
   for `ti-port-gb` (install steps in its `SKILL.md`; PyBoy goes into `tools/pyenv`), the TI-83
   programs for `ti-port-ti83` (`roms/ti83/`; the `z80` and `z80dis` packages go into `tools/pyenv`).

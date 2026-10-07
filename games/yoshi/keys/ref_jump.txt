@@ -1,0 +1,3 @@
+# Original SNES B, sampled from the natural level 1-1 reference door.
+0 B
+35

@@ -1,0 +1,8 @@
+generated/
+x/
+*.bin
+*.s
+*.89z
+*.89y
+*_pc
+*_test

@@ -1,0 +1,7 @@
+# After the documented tutorial X injection; B also selects 1-1 on the map.
+0 RIGHT B
+119 RIGHT
+120 RIGHT B
+239 RIGHT
+240 RIGHT B
+359

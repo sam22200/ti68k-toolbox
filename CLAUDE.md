@@ -136,6 +136,18 @@ that kind of task.
   portable C through grilling and milestones (Sonic 1 GHZ1, half scale).
   ROM art is extracted offline; performance is checked per TI frame, including
   dense particle spills. ROMs in `roms/md/` (local).
+- `ti-port-snes`: the same measured, bounded approach for SNES ROMs through
+  `tools/snes/` (pinned Snes9x, WRAM/cartridge RAM, PPU and video snapshots).
+  First experiment: Yoshi's Island PAL, level 1-1 over five original view widths;
+  portable movement and real-terrain traversal, original collision traces and
+  complete PC/TI replay/cycle checks; tongue/capture/egg reserve and ROM
+  scenery/animated actors, contact damage, crying Baby Mario bubble, rescue
+  and ten-second countdown work; animated coins, idle poses, following eggs
+  and aimed throws work.
+  Second experiment: Mega Man X USA's opening Highway section, running,
+  short/held jumps, wall slide/kick, shots/charge, roller/contact damage and
+  outlined ROM animations; original mechanics and native PC/TI replays checked.
+  Super FX is a reference dependency; ROMs in `roms/snes/` remain local.
 - `ti-port-ps1`: study a PlayStation game and rebuild one of its mechanics small (Alundra's
   jumps and terrain heights in one room): disc read (`psxiso.py`), Ghidra's built-in MIPS on
   the executable or a RAM dump, the disc run headless (`psxrun.py`: pcsx_rearmed libretro
