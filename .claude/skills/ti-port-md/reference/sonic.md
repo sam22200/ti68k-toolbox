@@ -2,6 +2,8 @@
 
 Read for a Sonic study or an analogous MD extraction. These are findings for
 the pinned ROM, not a generic format contract for other games.
+GHZ1, half scale and the 4.8-view endpoint below are this project's agreed
+choices; they do not prescribe a level or screen count for another port.
 
 ROM: local `roms/md/Sonic_1.md`, 524,288 bytes, SHA256
 `46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6`.

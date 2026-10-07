@@ -76,7 +76,9 @@ include ../../runtime/rt.mk
    on the Titanium, once everything passes without UI (the emulator is slow: screenshots); the
    TI-89 HW2 only for a release.
 4. **The TI binary without the emulator**: `make cycles` builds `NAMEc.89z` (`-DRT_CYCLES`: no
-   grayscale, interrupts or keyboard), which `tools/bin/ti-cycles` runs on the PC with datasheet
+   grayscale, interrupts or keyboard). Its `rt_ticks()` advances deterministically
+   with the same virtual256Hz clock as the PC, including16-bit wrap.
+   `tools/bin/ti-cycles` runs the binary on the PC with datasheet
    cycles per update and render, `--keys`/`--frames` as the PC, data files with `--file`, saves
    written with `--save-dir`. `make xcheck XCHECK="0 1 2" FRAMES=100 KEYS=k.txt` compares its
    screen checksum with the PC `--headless` run, scenario by scenario. In the emulator, `make bench` builds `NAMEb.89z`; `NAMEb(S)` runs

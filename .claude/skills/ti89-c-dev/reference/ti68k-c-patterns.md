@@ -96,6 +96,11 @@ void _main(void) { ... }      // entry point, NOT main()
   Byte pairs promote to that `int`: `(u32)(hi << 8 | lo)` is **negative** for `hi >= 0x80` and
   sign-extends (0xFFFFxxxx); write `(u32)(u16)(hi << 8 | lo)`. Code that passes every PC test
   breaks there (Desolate's 12-px blitter: caught by `make xcheck`, TI ≠ PC checksum).
+- Portable bitmaps: `unsigned long` is32 bits on TI but64 bits on an LP64 PC.
+  Truncate an intermediate before a following right shift: write
+  `(u32)(0xffffffffUL << n) >> 1`, not `(0xffffffffUL << n) >> 1`.
+  **Headless PC/TI checked:** Yoshi's outlined tongue differed by one black
+  pixel on each row until this cast;1031 LCD checksums then agreed.
 - No FPU: avoid `float` in the game loop. Use fixed point (§6) and precomputed tables.
   `sqrt`/`atan2` are fine once at init (Puzzle Bobble's `calc()`).
 

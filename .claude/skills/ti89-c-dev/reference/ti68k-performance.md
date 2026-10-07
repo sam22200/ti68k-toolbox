@@ -343,6 +343,15 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   y ≤ 112: use a guard band). Worth it for many copies of a few sprites (bullets, particles,
   shmup enemies) over a background you redraw anyway; the saved work is exactly the shifts that
   TiEmu undercounts, so the real gain is larger than TiEmu shows.
+  **Headless verified, masked alternative (Yoshi coins/eggs):** for repeated8px
+  sprites, bake all16 sub-word positions as interleaved32-bit light/dark/mask
+  rows. A C blit writes `(destination & mask) | pixels` to aligned word-based
+  addresses; transparent padding preserves neighboring art. Use the ordinary
+  ExtGraph path for partially clipped sprites. Five10-row poses padded to16
+  rows cost15360 external bank bytes. Pixel checks match PC across all scroll
+  offsets; this plus coin X bins and pointer loops reduced the full dense
+  scene from226950 to209572 datasheet cycles. That is a combined-game result,
+  not an isolated primitive speedup; hardware grayscale is excluded.
 - **Big destructible bitmap worlds** (Worms68k): store each plane **column-major** in 32-pixel
   strips (`buf[(x >> 5) * H + y]`, bit `31 - (x & 31)`): a strip is a valid ExtGraph 32-wide sprite,
   so the visible window is ~6 `ClipSprite32_OR_R` calls per plane, clipped for free
@@ -441,6 +450,20 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   division and the loop forms above.
 
 ## 10. How to measure
+
+- **Clock-dependent runtime checks (headless verified, Yoshi damage):**
+  `RT_CYCLES` has no interrupt clock. Its `rt_ticks()` must use the PC virtual
+  clock, `((u32)rt_frame * RT_FRAME_TICKS2) >> 1`, with16-bit wrap. Reading the
+  hardware tick global freezes countdowns while movement/screen-only probes
+  can still pass. Compare timer fields and expiry boundaries PC/TI.
+- **Static image windows (datasheet-cycle measured, Yoshi):** dispatch the
+  horizontal shift once per plane instead of calling a row helper100 times.
+  An overlapping32-bit read needs only even alignment on MC68000. At offset7,
+  shifting right9 and taking the low word beats left7 followed by clearing/
+  swapping. Pre-render tiny HUD panels and group tear pixels into one masked
+  sprite. Five actors, six eggs, detached baby and HUD peak202398 cycles,
+  below210000; pixel-equivalent TileMap cold/cache refresh peaked253604.
+  These are compiled headless measurements, not TiEmu hardware verification.
 
 0. **First choice: `tools/bin/ti-cycles`** (**verified**, `tools/m68kbench/test/cyctest.c`: `nop`
    4, `lsl.l #8` 24, `lsl.w #7` 20, `movem.l` of 10 registers 92, `mulu.w #$FFFF` 70 (+4 for the

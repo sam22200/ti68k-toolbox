@@ -1,6 +1,6 @@
 ---
 name: ti-port-md
-description: "Study a Mega Drive / Genesis ROM and rebuild a bounded playable slice for the TI-89 in portable C: headless original traces, RAM/VDP extraction, milestone decisions, native graphics and measured TI costs. Use for Mega Drive-to-TI ports or studies, including ROMs in roms/md/."
+description: "Study a Mega Drive / Genesis ROM and port the user's chosen scope to the TI-89 in portable C: headless original traces, RAM/VDP extraction, grilling, milestone decisions, native graphics and measured TI costs. Use for Mega Drive-to-TI ports or studies, including ROMs in roms/md/."
 ---
 
 # Mega Drive to TI-89: measured behavior, small milestones
@@ -10,11 +10,20 @@ engine on the Portable Game Runtime, then add the original graphics. Read
 `../ti-port-gb/reference/big-game.md` for the behavioral-study method and
 `../ti89-c-dev/SKILL.md` before non-trivial C. `games/sonic/` is the working
 example; its local ROM and generated data are not distributed.
+Its GHZ1 section and screen count are project choices, not skill defaults.
 
 ## Decisions before implementation
 
-Apply `/grilling` to choices that affect this port. Reuse already confirmed
-answers instead of repeating questions. Establish:
+The user chooses the scope: a mechanic, room, section, level or full game.
+Do not prescribe level one, five screens or another fixed limit. Divide the
+chosen scope into measured, playable milestones without changing that scope.
+
+Apply `/grilling` to choices that affect this port. Distinguish confirmed
+answers from provisional assumptions, and ask concise, concrete questions
+about unresolved choices before dependent implementation. Reuse confirmed
+answers instead of repeating questions; skip grilling only when the relevant
+answers are already established, and document why. Continue independent
+reference work while choices are pending. Establish:
 
 - The playable slice and its endpoint; whether "screens" means original or
   calculator views. Start directly at gameplay if menus are outside the slice.
@@ -24,8 +33,8 @@ answers instead of repeating questions. Establish:
 
 Write `ROADMAP.md`, with a playable acceptance criterion for each milestone,
 and keep findings in `RE_NOTES.md` as OBSERVED / INTERPRETATION / TARGET.
-Complete the requested milestone before studying further content. Do not turn
-a first-level experiment into a full-game port.
+Complete the requested milestone before studying further content. Do not
+silently expand or reduce the user's requested scope.
 
 Both machines use a 68000. This helps inspect arithmetic and may make reuse of
 a genuinely isolated routine simpler than rewriting it. It does not relocate
