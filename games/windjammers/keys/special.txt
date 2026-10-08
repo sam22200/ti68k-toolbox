@@ -1,0 +1,6 @@
+# Perfect lift, automatic charge, fresh A after airborne recapture.
+0
+8 A
+9
+57 A
+58

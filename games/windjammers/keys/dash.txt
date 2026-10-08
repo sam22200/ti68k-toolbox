@@ -1,0 +1,10 @@
+# Direction+A without the disc; release then change direction for another dash.
+0
+2 RIGHT A
+3
+15 DOWN RIGHT A
+16
+30 UP LEFT A
+31
+45 UP A
+46

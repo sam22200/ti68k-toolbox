@@ -1,0 +1,2 @@
+# No input: automatic possession controls.
+0
