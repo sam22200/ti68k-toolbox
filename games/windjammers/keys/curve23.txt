@@ -1,0 +1,4 @@
+0 UP
+1 UP RIGHT
+2 RIGHT A
+3

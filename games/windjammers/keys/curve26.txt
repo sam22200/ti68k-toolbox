@@ -1,0 +1,4 @@
+0 DOWN
+1 DOWN LEFT
+2 LEFT A
+3

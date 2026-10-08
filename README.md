@@ -43,6 +43,41 @@ actors are reduced to four greys with white outlines. Source mechanics,
 complete PC/TI states/screens and individual frame costs are checked;
 reusable ROM layout and animation-anchor findings extend `ti-port-snes`.
 
+[Neo Geo porting skill](.claude/skills/ti-port-neogeo/SKILL.md): the same
+measured approach for MVS/AES cartridges, using local Windjammers files as
+the first preparation case. [Reference preparation](tools/neogeo/README.md)
+verifies the eleven chips and exports canonical archive/program inputs.
+The pinned FBNeo headless runner passes original boot, native input,
+CPU-bus and 120-frame deterministic replay checks with the local BIOS.
+The first-service door, both characters' walking and ordinary disc trajectories
+pass 1882 reference replay frames. A separate 1390-frame rules check validates
+exact wall contact positions, neutral contact boxes/catch classification,
+Beach points and both losing players' next service.
+[Windjammers native prototype](games/windjammers/README.md) now provides a
+playable Beach training court with outlined animated ROM actors and measured
+ordinary captures/recoil (660 complete action steps), automatic possession
+releases and delayed return strength (4058 additional original fixture steps).
+Timed stationary lifts, complete charging/recapture and powerful immediate
+returns add 6704 equality steps across 78 original input trials, including
+high-speed captures. Lobs, charged character specials, airborne rebounds and
+counter-return windows add 8573 bounded fixture steps across 62 twice-replayed
+trials. Normal lob targets condition the native jitter; full RNG and goal
+celebrations remain adapted. Directional arc throws, curved-wall transitions
+and immediate/settled returns add 17764 equality steps across 180 twice-replayed
+trials. Dash movement adds 816 motion steps from 48 twice-replayed trials.
+Larger outlined discs, fixed lob targets and explicit charge cues improve
+action readability. Powerful throws and charged specials have distinct fading
+flight trails, with sparks for specials. Twenty-nine scenarios pass 7380
+PC/TI state-hash samples, 30 final screens and six active-effect screen checks,
+including the central
+30-second countdown reaching zero. Compact two-digit scores, centered numbered
+3/5/3 bands and an outlined net without shadow use the full LCD, on plain white
+sand without decorative marks.
+Scenery decoding matches 41,344 original RGB scene pixels. Original actor decoding
+matches 1,329,378 RGB pixels across 1256 scenes, with TI frame costs below
+360k cycles. Moving/action-pose contacts, rear flight and selected remaining
+scenery follow.
+
 ## Quick start (runtime game)
 
 ```sh
@@ -85,6 +120,10 @@ Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
   `roms/snes/`: pinned Snes9x, local original traces/states/PPU captures,
   reading aids and SNES ROMs. `sources/megamanx_snes/` holds the second
   experiment; both games' generated trace fixtures and art remain ignored.
+- `roms/neogeo/`, `sources/neogeo_core/`, `sources/windjammers_neogeo/`,
+  `sources/neogeo_reference/`:
+  local cartridge/BIOS files, prepared Windjammers inputs and third-party
+  driver sources used as reading aids. No original ROM data is distributed.
 - `tools/ghidra/`, `roms/`: Ghidra 11.4.2 with the GhidraBoy extension and the Game Boy ROMs
   for `ti-port-gb` (install steps in its `SKILL.md`; PyBoy goes into `tools/pyenv`), the TI-83
   programs for `ti-port-ti83` (`roms/ti83/`; the `z80` and `z80dis` packages go into `tools/pyenv`).

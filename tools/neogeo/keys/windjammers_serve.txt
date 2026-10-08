@@ -1,0 +1,19 @@
+# Cold boot, default MVS Asia/Europe v6 BIOS, fresh NVRAM/card.
+# Frame 0 = first retro_run, sampled AFTER the frame.
+# Two humans, H. Mita (P1), B. Yoo (P2), Beach. Reference case only.
+2400 COIN P2:COIN
+2402
+2811 START
+2831
+# Skip instructions, choose 1P vs 2P, confirm characters and Beach.
+2961 A
+2981
+3031 DOWN
+3041
+3061 A
+3081
+3161 A P2:A
+3181
+3401 A P2:A
+3421
+# Run 4351 frames; post-frame 4350 is the first-service probe door.

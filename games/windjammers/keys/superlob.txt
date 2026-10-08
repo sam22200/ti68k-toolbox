@@ -1,0 +1,6 @@
+# Perfect lift and charged B; doors21/22 move the defender away for a bounce.
+0
+8 A
+9
+57 B
+58
