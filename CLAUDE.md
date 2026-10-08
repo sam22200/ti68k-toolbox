@@ -148,6 +148,44 @@ that kind of task.
   short/held jumps, wall slide/kick, shots/charge, roller/contact damage and
   outlined ROM animations; original mechanics and native PC/TI replays checked.
   Super FX is a reference dependency; ROMs in `roms/snes/` remain local.
+- `ti-port-neogeo`: the same measured, bounded approach for Neo Geo MVS/AES
+  cartridge sets. First preparation case: Windjammers in
+  `roms/neogeo/wjammers/`; `tools/neogeo/` checks chip identities, stages a
+  lossless reference ZIP and exports the big-endian 68000 program image.
+  The pinned FBNeo headless runner now builds, with two-player scripts,
+  RAM/VRAM/palette/status exports and replay checks. Original cold boot,
+  native inputs, CPU-bus pokes and 120 exact replay frames pass with the
+  local BIOS. A two-human Beach serve door, both characters' walking/clamps
+  and ordinary disc trajectories pass 1882 replay frames. Exact ordinary wall
+  positions, neutral contact boxes/catch classification, Beach points and
+  both losing players' next serve pass another 1390 replay frames. The native
+  Beach training engine in `games/windjammers/` now runs on the Portable Game
+  Runtime: measured neutral movement/ordinary shots/walls/contacts/points,
+  ordinary captures/recoil checked through 660 complete action steps, animated
+  outlined ROM actors, adapted deflection/service/AI and a full-LCD native court
+  with compact two-digit scores, a central countdown, centered numbered 3/5/3
+  bands and an outlined net without shadow on plain white sand. Reference scenery decoding
+  matches 41,344 original RGB pixels.
+  M2b1 adds possession-dependent ordinary strength and automatic releases
+  (4058 native fixture steps, 29 trials/7140 exact original replay frames).
+  M2b2 adds timed stationary lifts, complete charging/recapture and powerful
+  immediate returns (6704 equality steps, 78 trials/10920 original replay
+  frames), including high-speed catches. Failed-preparation block flight
+  remains adapted. M3a adds lobs, charged Mita/Yoo specials, airborne rebounds
+  and counter windows (8573 bounded steps, 62 twice-replayed original trials).
+  Normal-lob jitter is conditioned on original targets. M3b adds directional
+  arcs, curved flights/wall transitions and immediate/settled returns
+  (17764 equality steps, 180 twice-replayed no-write trials).
+  M3c adds dash motion (48 twice-replayed no-write trials, 816 equality steps),
+  a larger disc, fixed lob targets and explicit charge guidance. Twenty-nine
+  PC/TI scenarios plus a replay through clock zero pass 7380 state hashes
+  and 30 final screens. Powerful/special flight trails add fading afterimages
+  and sparks, with six active-effect PC/TI screen comparisons. Actor planes
+  are read in place from wjart.89y.
+  Original RGB actor
+  decoding matches 1,329,378 pixels across 1256 scenes; peak game frame is
+  under the 360k budget (current measurements in the game README). Moving/other action-pose contacts, rear flight and
+  remaining Beach/FIX scenery within the requested plain-floor style remain next.
 - `ti-port-ps1`: study a PlayStation game and rebuild one of its mechanics small (Alundra's
   jumps and terrain heights in one room): disc read (`psxiso.py`), Ghidra's built-in MIPS on
   the executable or a RAM dump, the disc run headless (`psxrun.py`: pcsx_rearmed libretro
