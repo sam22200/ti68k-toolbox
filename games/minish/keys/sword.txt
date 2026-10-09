@@ -1,0 +1,19 @@
+# ordinary hold, movement through cuts, fresh presses and reset
+0 A
+1
+10 UP
+23
+24 A
+25
+34 UP
+47
+48 A
+49
+60 RIGHT
+69 A RIGHT
+70 RIGHT
+74 A LEFT
+75 LEFT
+89
+90 A
+110

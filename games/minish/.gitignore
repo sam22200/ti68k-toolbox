@@ -1,0 +1,21 @@
+# Generated commercial ROM data and reference fixtures remain local.
+mindat*.bin
+miscen*.bin
+michar*.bin
+mizscene*.bin
+mizactor*.bin
+miact*.bin
+mizact*.bin
+generated.h
+actions_generated.h
+zoom_generated.h
+mifight*.bin
+mizfight*.bin
+combat_generated.h
+hud_generated.h
+effects_generated.h
+mifx*.bin
+mizfx*.bin
+fixtures/
+captures/
+*.hash

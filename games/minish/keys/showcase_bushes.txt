@@ -1,0 +1,27 @@
+# Showcase from door 140: cut into the bush bed, roll through the cleared earth.
+0 A
+1
+16 UP
+28
+30 A
+31
+46 RIGHT
+50 A RIGHT
+51
+66 RIGHT
+78
+80 A
+81
+96 LEFT B
+97 LEFT
+112
+114 DOWN
+120 A DOWN
+121
+136 DOWN
+146
+148 A
+149
+164 RIGHT B
+165 RIGHT
+180
