@@ -57,6 +57,13 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 - **Large data banks must be archived** before the run: ~150 KB of banks left in RAM made
   the TileMap and GrayDBuf allocations fail (no scenery, HOME showing through every other
   frame). `Archive a,b,c` at HOME after the boot transfer (wait ~20 s for it), then run.
+  **More banks than free RAM** (Minish, Titanium, 2026-10-09: 247 KB of banks): set the
+  variable attribute byte (offset 0x3C+13 of a single-variable file) to 3 in scratch copies;
+  AMS then stores them straight into the archive, and one boot `-send` group carries the
+  program and every bank (verified: all received, game ran from them).
+- **Never use the GTK file chooser** (`ti-send`, `ti-emu save`) before typing on Xvfb: after
+  it, TiEmu's alpha handling inverted (`minish()` typed as `596938bc`, letters as digits) and
+  neither ALPHA clicks nor modifier releases fixed it; only a restart did.
 - **Open-loop timing**: measure a key script's tolerance on the PC with its events shifted
   ±40 frames as well as scaled ±5 %; the run started ~0.2 s after `ti-key ENTER` returned.
   Prefer scripts whose first events need no precise timing (let enemies come to the player).

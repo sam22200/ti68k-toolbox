@@ -176,9 +176,9 @@ that kind of task.
   earth, Octorok death puffs, original knockback poses and a four-phase damage
   flash: 2.35M oracle pixels per scale; 10002/10038 PC/TI hashes and 715/751
   screens, peaks under 359k/345k cycles; ran in TiEmu from archived banks.
-  An additional `minishz` build uses 70% visual scale with shared source
-  mechanics: 1.312M oracle pixels, 3642 PC/TI hashes and 92 screens pass;
-  peak is under 307k cycles. The original-scale build remains.
+  The game now runs only at 70% visual scale (the 1:1 build was retired
+  after M5 as too zoomed in): 10920 PC/TI hashes and 752 screens pass,
+  peak under 344k cycles; one continuous TiEmu playthrough GIF.
   ROMs in `roms/gba/` remain local.
 - `ti-port-neogeo`: the same measured, bounded approach for Neo Geo MVS/AES
   cartridge sets. First preparation case: Windjammers in

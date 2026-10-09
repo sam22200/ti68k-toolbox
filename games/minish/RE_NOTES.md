@@ -202,6 +202,10 @@ destructibles, story interactions or new room transitions are claimed.
 
 ## Additional 70% view
 
+UPDATE (after M5): the user retired the 1:1 build. The 70% view below is now
+the only build, named `minish`; 1:1 figures elsewhere in these notes are
+historical.
+
 TARGET / ADAPTATION: the user requested an additional version zoomed out by
 about 30%. `minishz` uses 7/10 visual scale while the source-space engine,
 720x320 scope, movement clock and collision probes stay shared with `minish`.
