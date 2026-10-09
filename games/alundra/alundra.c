@@ -456,20 +456,19 @@ static void digit(u8 t, s16 x, s16 top)  // the overlay's level on a top face
 // row, ten words, each from the two image words under it (even addresses: iwb is even), by the
 // shorter shift (left by sh then the high word, or right by 16 - sh: 8 bits at most)
 #ifdef __m68k__
-#define W10(op) op op op op op op op op op op
+#define W10(op) op(0) op(2) op(4) op(6) op(8) op(10) op(12) op(14) op(16) op(18)
+#define BLIT_COPY(k) ((u16 *)dst)[(k) / 2] = ((const u16 *)row)[(k) / 2];
+#define BLIT_LEFT(k) ((u16 *)dst)[(k) / 2] = (u16)((*(const u32 *)(row + (k)) << sh) >> 16);
+#define BLIT_RIGHT(k) ((u16 *)dst)[(k) / 2] = (u16)(*(const u32 *)(row + (k)) >> rs);
 static void blit_plane(u8 *dst, const u8 *src, u16 iwb, s16 cx, s16 cy)
 {
     const u8 *row = src + (u16)cy * iwb + (((u16)cx >> 4) << 1);
     u16 sh = cx & 15, rs = 16 - sh;
     u8 r;
-    for (r = 0; r < RT_H; r++, row += iwb, dst += RT_PBYTES) {
-        const u16 *s = (const u16 *)row;
-        u16 *d = (u16 *)dst;
-        u32 acc;
-        if (!sh) { W10(*d++ = *s++;) }
-        else if (sh <= 8) { acc = *s++; W10(acc = (acc << 16) | *s++; *d++ = (u16)((acc << sh) >> 16);) }
-        else { acc = *s++; W10(acc = (acc << 16) | *s++; *d++ = (u16)(acc >> rs);) }
-    }
+    // one long read per word (the word under it, then the next one), shifted once
+    if (!sh) for (r = 0; r < RT_H; r++, row += iwb, dst += RT_PBYTES) { W10(BLIT_COPY) }
+    else if (sh <= 8) for (r = 0; r < RT_H; r++, row += iwb, dst += RT_PBYTES) { W10(BLIT_LEFT) }
+    else for (r = 0; r < RT_H; r++, row += iwb, dst += RT_PBYTES) { W10(BLIT_RIGHT) }
 }
 #else
 static void blit_plane(u8 *dst, const u8 *src, u16 iwb, s16 cx, s16 cy)
