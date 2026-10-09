@@ -41,14 +41,15 @@ u16 rt_ticks(void)
 
 #ifndef RT_CYCLES
 // TI-89 matrix (c-patterns §5): row 0 = up left down right 2nd shift diamond alpha = K_UP..K_D;
-// ENTER row 1 b0, ESC row 6 b0; digits in rows 4, 3, 2 (columns 1-4-7, 2-5-8, 3-6-9) bits 1-3.
+// ENTER row 1 b0, F5 row 1 b7, F1 row 5 b7, ESC row 6 b0; digits in rows 4, 3, 2 (columns 1-4-7, 2-5-8, 3-6-9) bits 1-3.
 static u32 read_keys(void)
 {
     static const u16 spread[8] = { 0, 1, 8, 9, 64, 65, 72, 73 };   // bits 0 1 2 -> 0 3 6
     u16 r0 = _rowread(~1), r1 = _rowread(~2), r2 = _rowread(~4), r3 = _rowread(~8),
-        r4 = _rowread(~16), r6 = _rowread(~64);
+        r4 = _rowread(~16), r5 = _rowread(~32), r6 = _rowread(~64);
     u16 pad = spread[(r4 >> 1) & 7] | spread[(r3 >> 1) & 7] << 1 | spread[(r2 >> 1) & 7] << 2;
-    return (r0 & 0xFF) | (r1 & 1) << 8 | (r6 & 1) << 9 | (u32)pad << 16;
+    return (r0 & 0xFF) | (r1 & 1) << 8 | (r6 & 1) << 9 | (r5 & 0x80) << 3 | (r1 & 0x80) << 4
+           | (u32)pad << 16;
 }
 #endif
 

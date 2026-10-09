@@ -9,14 +9,14 @@ Usage: ti-play SCRIPT [FPS]        (FPS of the game, default 30.1; start it righ
 Open loop: TiEmu's speed drifts against the wall clock, so a script for the emulator should end
 its moves against walls (time-insensitive) and be checked on the PC with its timeline scaled by
 +-10 % (MGS keys/win.txt). Keys: UP DOWN LEFT RIGHT (verified: tools/tiemu-keyfix.c maps the
-PC arrows), ENTER, ESC; A = [2nd] (AltGr) and B = [shift] are the keyfix's mappings.
+PC arrows), ENTER, ESC, F1, F5 (the PC's, as ti-key); A = [2nd] (AltGr) and B = [shift] are the keyfix's mappings.
 """
 import subprocess
 import sys
 import time
 
 KEYCODES = {'UP': 111, 'DOWN': 116, 'LEFT': 113, 'RIGHT': 114, 'ENTER': 36, 'ESC': 9,
-            'A': 108, 'B': 50}
+            'A': 108, 'B': 50, 'F1': 67, 'F5': 71}
 
 
 def xdo(*args):

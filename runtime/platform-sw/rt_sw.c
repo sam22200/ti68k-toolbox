@@ -315,6 +315,7 @@ u32 sw_parse_keys(const char *s)
     static const struct { const char *n; u32 k; } names[] = {
         { "UP", K_UP }, { "LEFT", K_LEFT }, { "DOWN", K_DOWN }, { "RIGHT", K_RIGHT }, { "A", K_A },
         { "B", K_B }, { "C", K_C }, { "D", K_D }, { "ENTER", K_ENTER }, { "ESC", K_ESC },
+        { "F1", K_F1 }, { "F5", K_F5 },
     };
     u32 keys = 0;
     char w[16];

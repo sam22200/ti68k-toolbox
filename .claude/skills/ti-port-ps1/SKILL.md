@@ -1,6 +1,6 @@
 ---
 name: ti-port-ps1
-description: "Study a PlayStation 1 (PS1 / PSX) game from its disc image and rebuild a small, TI-89-sized interpretation of one of its mechanics through the Portable Game Runtime (first target: Alundra's movement, jumps and terrain heights in one room): read the .cue/.bin (ISO 9660, SYSTEM.CNF, PS-X EXE header), decompile the executable or a RAM dump with Ghidra's built-in MIPS processor (headless), run the disc headless on the PC (pcsx_rearmed libretro core driven from Python, HLE BIOS, no Sony BIOS) for RAM traces, RAM diffs, save states and screenshots, grill the user on the experiment first (/grilling), keep RE_NOTES.md with every finding labelled OBSERVED / INTERPRETATION / TARGET, derive a behavioural model (never translate MIPS functions), then build it in milestones: simulation on the PC with unit tests, a purpose-built test room, 16x16 presentation, TI under ti-cycles, the emulator last. Use it whenever the user wants to port, remake, study, reverse-engineer, decompile or \"porter\" a PlayStation / PS1 / PSX game or a mechanic from one for the calculator, mentions a .cue/.bin/.iso PS1 image, roms/ps1/, SLUS/SCUS/SCES executables, PCSX, DuckStation or Alundra, even without saying \"PlayStation\"."
+description: "Study a PlayStation 1 (PS1 / PSX) game from its disc image and rebuild a small, TI-89-sized interpretation of one of its mechanics through the Portable Game Runtime (first target: Alundra's movement, jumps and terrain heights in one room; second: Final Fantasy Tactics' Gariland battle map as an isometric engine with four camera orientations and occlusion): read the .cue/.bin (ISO 9660, SYSTEM.CNF, PS-X EXE header, level data files in a documented format), decompile the executable or a RAM dump with Ghidra's built-in MIPS processor (headless), run the disc headless on the PC (pcsx_rearmed libretro core driven from Python, HLE BIOS, no Sony BIOS) for RAM traces, RAM diffs, save states and screenshots, grill the user on the experiment first (/grilling), keep RE_NOTES.md with every finding labelled OBSERVED / INTERPRETATION / TARGET, derive a behavioural model (never translate MIPS functions), then build it in milestones: simulation on the PC with unit tests, a purpose-built test room, 16x16 presentation, TI under ti-cycles, the emulator last. Use it whenever the user wants to port, remake, study, reverse-engineer, decompile or \"porter\" a PlayStation / PS1 / PSX game or a mechanic from one for the calculator, mentions a .cue/.bin/.iso PS1 image, roms/ps1/, SLUS/SCUS/SCES executables, PCSX, DuckStation, Alundra, Final Fantasy Tactics or an isometric / tactics map, even without saying \"PlayStation\"."
 ---
 
 # ti-port-ps1 (study a PS1 game, rebuild one of its mechanics on the TI-89)
@@ -90,6 +90,11 @@ $P $S/psxrun.py roms/ps1/<game>/<game>.cue --frames 2700 --keys boot.txt \
   them with the script; never keep a hand-made state whose origin is unknown).
 - Take a few screenshots of candidate places for the mechanic (rooms with heights, ledges):
   they are data for the grilling.
+- **When the levels are plain data in a documented format** (FFT's battle maps: height,
+  slope, surface and flags per tile, `reference/ps1-facts.md`), read them straight from the
+  disc with `--file` and a parser in the game's `tools/extract.py`, check each field on the
+  map at hand, and skip booting the game: FFT's Gariland is behind the prologue, and the
+  terrain file answered every question the milestone had.
 
 ## 2. Grill (before any study)
 
@@ -98,7 +103,11 @@ faithful, the target controls, heights, collision resolution, sprite size, scrol
 room, and **where the art comes from** (the disc's own graphics converted, or placeholders /
 our own drawing: ask it explicitly, Alundra's user wanted the disc's art although the engine is
 not a port). Questions are technical and specific to the mechanic, each with a default; challenge any
-request that grows the scope and propose the smallest useful alternative. Record the agreed
+request that grows the scope and propose the smallest useful alternative. **A visual choice
+(tile size, sprite scale, view) is answered with pictures, not words**: render the candidates
+on the real data with units at scale (a Python mock-up of the 160 x 100 screen and of the whole
+map with the screen outlined, a few minutes) and let the user pick; FFT's user turned down
+three tile sizes in words, then chose among three PNGs. Record the agreed
 constraints in `games/<name>/RE_NOTES.md` § Decisions (and a short summary to the user), then
 go on. The grilling must not grow the project.
 
@@ -287,6 +296,48 @@ only: nothing extracted from the disc).
   A first version (milestone 9 before) drew the world once with the game's own tile drawing
   (`games/alundra/tools/bake.c`, `-DBAKE`), cut into 16 × 16 tiles for `draw_tilemap`: the
   same pixels, ~80k cycles for the view, but only for a world drawn from tiles.
+- **Final Fantasy Tactics** (`roms/ps1/Final Fantasy Tactics (USA)/`, SCUS-94221, 2026-10-09;
+  `games/fft/`): a tech demo of the Gariland battle map, not a mechanic of the player. The
+  study was the terrain file alone (MAP022, 10 x 15 tiles, heights 0-10, slopes, canals,
+  sloped roofs), extracted at build time; the user asked for the real map but our own art.
+  Grilling by pictures: three tile sizes rendered on the real map with units (24 x 12 picked,
+  1 h = 6 px, FFT's own height ratio). Engine: world tiles turned into view tiles and corner
+  heights renumbered per orientation (units and rules stay in world coordinates, so a turn
+  cannot move anything); each view composed once back to front by diagonal into its own
+  320 x 218 scene (the four at the first frame, 1.6 s, 70 KB; a one-buffer fallback);
+  per frame the camera window copied (131k) and the units drawn through **cover masks** (the
+  front tiles' masks in the sprite box, made once per position: 44k for three units instead
+  of ~400k redrawing the front tiles each frame); the turn as three flat-polygon frames at
+  half resolution (2.1 M each: polygon rows cost ~600 cycles in C, the limit of this design).
+  Every hidden-unit claim was a number before a picture: the test counts the unit's visible
+  pixels (frame with it minus frame without it) per view, and `fft_test --find` lists the
+  tiles hidden in one view and seen in another to place the demo's thief. Static arrays
+  count against the 24 KB program limit (`-mno-bss`): allocate the work buffers.
+  The runtime gained `K_F1` / `K_F5` (TI, SDL, key scripts, `ti-cycles`, `ti-play`).
+  Emulator: `ti-run` typed `fft()` correctly on Xvfb where `ti-key` scrambled it (`fftbc`); the first frame's composition shifts an open-loop `ti-play` script
+  by ~50 frames and keys pressed during a turn are dropped: leave wide gaps.
+  **Show the game's own textures before settling on drawn art.** Asked why our roofs were
+  striped, we drew three roof variants, then the user asked for the real textures: the map's
+  mesh (vertices, UVs, palettes, a 256 x 1024 4-bit texture, all in the same map files)
+  drawn with a numpy depth buffer in our projection, 4x supersampled, 4 greys by luminance
+  percentiles of the whole map, set next to our version at the same camera
+  (`x/real_vs_ours.png`). Speckled as it is, the user preferred it at once. It became the
+  scenery: four views made on the PC (1.5 s), each a data file of the scene's two planes plus
+  its **depth per image byte in two layers** (the two frontmost tile diagonals and their
+  pixel masks; one layer missed a house behind its neighbour in the same byte, two are exact
+  for 97.5 % of the bytes), archived and read in place. Cover masks and reach rings come from
+  that depth; the calculator composes nothing: program 24.0 → 16.7 KB, RAM 70 → 17 KB, start
+  1.6 s → none, walking frame 370k → 237k, selection 3.8 M → 0.56 M. A view drawn offline
+  with its depth beats a scene composed on the calculator whenever the scenery is static.
+  209 KB of archive was too much for the user: tiles deduplicated did not factor (FFT paints
+  every face: 616 of 686 tile sprites unique, 601 with 180-degree / mirror flips; 0 and 180
+  degrees see opposite walls), ZX0 did: 52 KB → 9-10 KB per view (image 5.5 KB, depth 4.3),
+  38.9 KB in all, one view unpacked into RAM per turn with `zx0_asm` (41 cycles per byte,
+  0.18 s), screens unchanged. Measure the packer on the real data before designing a
+  dictionary.
+  Data files bigger than the free RAM go straight to the archive at the transfer
+  (attribute byte 3); `ti-run`'s typed command was lost while 209 KB were still arriving:
+  type it again once the transfer is over.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).

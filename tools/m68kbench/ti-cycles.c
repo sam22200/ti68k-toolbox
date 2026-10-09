@@ -247,6 +247,7 @@ static int load_script(const char *path)
     static const struct { const char *n; uint32_t k; } names[] = {
         { "UP", 1 }, { "LEFT", 2 }, { "DOWN", 4 }, { "RIGHT", 8 }, { "A", 0x10 }, { "B", 0x20 },
         { "C", 0x40 }, { "D", 0x80 }, { "ENTER", 0x100 }, { "ESC", 0x200 },
+        { "F1", 0x400 }, { "F5", 0x800 },
     };
     FILE *f = fopen(path, "r");
     char line[256], w[16];
