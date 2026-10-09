@@ -16,11 +16,7 @@ static const u8 walks[4]={30,60,60,90};
 u8 minish_combat_init(void)
 {
     u16 size;
-#ifdef MINISH_ZOOM
     pixels=(const u32 *)rt_file("mizfight",&size);
-#else
-    pixels=(const u32 *)rt_file("mifight",&size);
-#endif
     return pixels && size>=FIGHT_SIZE && size<=FIGHT_SIZE+6;
 }
 
@@ -205,33 +201,18 @@ void minish_draw_enemies(u8 front)
     for (i=0;i<2;i++) {
         const MinishEnemy *e=&st.enemies[i];
         const s16 *m;
-#ifdef MINISH_ZOOM
         const u16 *p;
-#else
-        const u32 *p;
-#endif
         s16 x,y;
         RtSprite s;
         if ((!e->hp && !e->recoil && !e->fade) || (((e->y>>8)>=(st.y>>8))!=front)) continue;
         if (!e->hp && !e->recoil) {minish_draw_death(e);continue;}
         if (!e->hp && (st.ticks&2)) continue;
         m=enemy_art[e->display_pose];
-#ifdef MINISH_ZOOM
         p=(const u16 *)pixels+m[0];
-#else
-        p=pixels+m[0];
-#endif
-#ifdef MINISH_ZOOM
         x=minish_scaled(e->x>>8)-st.camx+m[1];y=minish_scaled(e->y>>8)-st.camy+m[2];
-#else
-        x=(e->x>>8)-st.camx+m[1];y=(e->y>>8)-st.camy+m[2];
-#endif
         if (x>=RT_W || x+m[3]<=0 || y>=RT_H || y+m[4]<=0) continue;
         s.w=m[3];s.h=m[4];s.light=p;s.dark=p+s.h;s.mask=p+(s.h<<1);
-#ifndef MINISH_ZOOM
-        s.w=32;
-#endif
-#if defined(__m68k__) && defined(MINISH_ZOOM)
+#ifdef __m68k__
         {s16 aligned=x&~15;
          if (aligned>=0 && aligned<=RT_W-32 && y>=0 && y+s.h<=RT_H) {
              const u32 *q=(const u32 *)((const u8 *)pixels+enemy_shift[e->display_pose]);
@@ -252,12 +233,8 @@ void minish_draw_enemies(u8 front)
     for (i=0;i<4;i++) if (st.rocks[i].life) {
         s16 x,y;
         RtSprite s;
-#ifdef MINISH_ZOOM
         x=minish_scaled(st.rocks[i].x>>8)-st.camx-4;
         y=minish_scaled(st.rocks[i].y>>8)-st.camy-6;
-#else
-        x=(st.rocks[i].x>>8)-st.camx-4;y=(st.rocks[i].y>>8)-st.camy-7;
-#endif
         s.w=8;s.h=8;s.light=rock_light;s.dark=rock_dark;s.mask=rock_mask;
 #ifdef __m68k__
         {s16 aligned=x&~15;
@@ -310,11 +287,7 @@ void minish_draw_hurt(u8 pose,u8 cover)
     const s16 *m=hurt_art[pose];
     const u32 *p=(const u32 *)((const u8 *)pixels+HURT_BASE)+m[0];
     s16 x,y;u16 part,h=m[3];RtSprite s;
-#ifdef MINISH_ZOOM
     x=minish_scaled(st.x>>8)-st.camx+m[1];y=minish_scaled(st.y>>8)-st.camy+m[2];
-#else
-    x=(st.x>>8)-st.camx+m[1];y=(st.y>>8)-st.camy+m[2];
-#endif
     s.w=32;s.h=h;
     for (part=0;part<m[4];part++,p+=h*3) {
         s.light=p;s.dark=p+h;s.mask=p+(h<<1);
@@ -344,19 +317,4 @@ void minish_draw_health(void)
         draw_text(52,42,"GAME OVER",F_SMALL,C_BLACK);
         draw_text(42,53,"ENTER: RETRY",F_SMALL,C_BLACK);
     }
-}
-
-void minish_draw_label(void)
-{
-#ifdef __m68k__
-    u16 r;u8 *l=(u8 *)rt_light,*d=(u8 *)rt_dark;
-    for (r=0;r<8;r++,l+=RT_PBYTES,d+=RT_PBYTES) {
-        *(u32 *)l=*(u32 *)d=label_rows[0][r];
-        *(u32 *)(l+4)=*(u32 *)(d+4)=label_rows[1][r];
-        l[8]&=0x3f;d[8]&=0x3f;
-    }
-#else
-    draw_rect(0,0,66,8,C_WHITE);
-    draw_text(2,1,"MINISH WOODS",F_SMALL,C_BLACK);
-#endif
 }

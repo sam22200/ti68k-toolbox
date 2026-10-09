@@ -13,9 +13,10 @@ is an isolated clearing, retained as a scenario. M2 replaces M1's collision
 visualization and placeholder with original scenery and outlined animated
 Link. ENTER resets the entrance, ESC exits.
 
-The user additionally requested a version zoomed out by about 30%. This is
-the separate `minishz` build at 70% visual scale, keeping the same source
-geometry and opening scope alongside `minish`.
+The user additionally requested a version zoomed out by about 30%: a 70%
+visual scale keeping the same source geometry and opening scope. After M5 the
+user retired the 1:1 build as too zoomed in; `minish` is now the 70% game
+only, and later milestones are built and checked at that scale alone.
 
 | Milestone | Acceptance | Status |
 |---|---|---|
@@ -26,6 +27,7 @@ geometry and opening scope alongside `minish`.
 | M3: sword and bushes | A/2nd swings the ordinary sword; measured action timing and tile samples, original attack poses, cutting real bushes changes art and collision, reset restores the forest; both scales checked below 360k cycles | Complete: 40 poses, 1947 source steps covering all 53 bush cells, 672k additional oracle pixels per build; 4639/4675 native hashes, 216/252 screens; peak 326918/331056 cycles |
 | M4: first enemy encounters | Original opening Octoroks, sword hits, movement/projectiles, contact damage, knockback and hearts on both scales; reset and PC/TI equality below 360k cycles | Complete: 20 source trials / 608 checked updates, 20 enemy poses and 960k oracle pixels per scale; 7521/7557 native hashes, 346/382 screens; peaks 359248/348320 cycles; both enemies defeated by the native demo. HUD polish removes the heart panel; nearby targeting and larger round balls make shots visible. |
 | M5: roll and destruction effects | Measured directional roll with terrain collision, original roll poses, bush-cut animation and persistent readable earth, enemy death animation; both scales, save/reset, PC/TI equality and dense-effect frame budget | Complete: 330 source roll updates, 49 poses and 2352000 oracle pixels per scale; original knockback poses and a four-phase damage flash; 10002/10038 native hashes, 715/751 screens; peaks 358736/344834 cycles; ran in TiEmu. B (Shift/X) maps the original R roll. |
+| Single 70% build | Retire the 1:1 build, keep one 70% `minish` with all fixtures and PC/TI checks; static HUD label removed | Complete: 10920 native hashes, 752 screens; peak 343346 cycles; one continuous TiEmu playthrough (`keys/final.txt`) |
 | Additional actions | Other destructibles, water/pit actions and story interactions as measured playable milestones | Later milestones |
 
 The minimal source study save is not an assertion that the original story

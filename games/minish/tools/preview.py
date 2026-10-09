@@ -14,22 +14,20 @@ ROOT=GAME.parents[1]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--zoom',action='store_true')
     parser.add_argument('--sword',action='store_true')
     parser.add_argument('--combat',action='store_true')
     parser.add_argument('--shots',action='store_true')
     parser.add_argument('--effects',action='store_true')
     parser.add_argument('--showcase',action='store_true',help='walk, bushes and rolls, combat, rolls in one GIF')
     args=parser.parse_args()
-    if args.showcase:return showcase(args.zoom)
-    out=GAME/'captures'/('zoom' if args.zoom else '')
+    if args.showcase:return showcase()
+    out=GAME/'captures'
     out.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='minish-preview-') as tmp:
         tmp=Path(tmp);so=tmp/'preview.so'
-        sources=[GAME/'minish.c',GAME/'actions.c',GAME/'combat.c',GAME/'effects.c',ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c']
-        if args.zoom:sources.append(GAME/'render_zoom.c')
+        sources=[GAME/'minish.c',GAME/'actions.c',GAME/'combat.c',GAME/'effects.c',GAME/'render_zoom.c',ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c']
         subprocess.run(['cc','-std=gnu99','-O1','-shared','-fPIC','-DRT_FRAME_TICKS2=17',
-                        *(['-DMINISH_ZOOM'] if args.zoom else []),'-o',str(so),*map(str,sources)],check=True)
+                        '-o',str(so),*map(str,sources)],check=True)
         os.chdir(GAME)
         lib=C.CDLL(str(so));lib.sw_init.argtypes=[C.c_uint16]
         lib.sw_step.argtypes=[C.c_uint32]
@@ -64,16 +62,6 @@ def main():
                 with Image.open(png) as im:
                     frames.append(im.convert('RGB').quantize(palette=palette,dither=Image.Dither.NONE))
         frames[0].save(out/(prefix+'.gif'),save_all=True,append_images=frames[1:],duration=66,loop=0,optimize=False)
-    # Keep both LCDs at the same display magnification for a fair comparison.
-    normal=GAME/'captures'/start
-    zoom=GAME/'captures/zoom'/start
-    if normal.exists() and zoom.exists():
-        comparison=Image.new('RGB',(976,328),'white');draw=ImageDraw.Draw(comparison)
-        font=ImageFont.load_default(size=16)
-        for x,label,path in ((4,'100%',normal),(492,'70%',zoom)):
-            draw.text((x,4),label,font=font,fill='black')
-            with Image.open(path) as im:comparison.paste(im.resize((480,300),Image.Resampling.NEAREST),(x,24))
-        comparison.save(GAME/'captures/zoom'/(prefix+'_comparison.png' if args.effects or args.shots or args.combat or args.sword else 'comparison.png'))
     print('Native preview:',out/(prefix+'.gif'))
 
 
@@ -83,16 +71,15 @@ SHOWCASE=[('Minish Woods',0,'keys/opening.txt',280),
           ('Roll',430,'keys/roll.txt',120)]
 
 
-def showcase(zoom):
+def showcase():
     """Chain continuous headless runs, a caption band under the 3x LCD."""
-    out=GAME/'captures'/('zoom' if zoom else '')
+    out=GAME/'captures'
     out.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='minish-showcase-') as tmp:
         tmp=Path(tmp);so=tmp/'preview.so'
-        sources=[GAME/'minish.c',GAME/'actions.c',GAME/'combat.c',GAME/'effects.c',ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c']
-        if zoom:sources.append(GAME/'render_zoom.c')
+        sources=[GAME/'minish.c',GAME/'actions.c',GAME/'combat.c',GAME/'effects.c',GAME/'render_zoom.c',ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c']
         subprocess.run(['cc','-std=gnu99','-O1','-shared','-fPIC','-DRT_FRAME_TICKS2=17',
-                        *(['-DMINISH_ZOOM'] if zoom else []),'-o',str(so),*map(str,sources)],check=True)
+                        '-o',str(so),*map(str,sources)],check=True)
         os.chdir(GAME)
         lib=C.CDLL(str(so));lib.sw_init.argtypes=[C.c_uint16]
         lib.sw_step.argtypes=[C.c_uint32]

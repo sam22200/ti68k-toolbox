@@ -16,8 +16,8 @@ code or video snapshots.
 forest assets, a reproducible original Minish Woods study door, measured
 walking/partial collisions/slopes and a 720x320 opening on the runtime.
 M2 checks original scenery, 44 outlined Link poses and canopy occlusion
-against source RGB pixels and PC/TI screens; `minishz` provides an additional
-70% view with the same source mechanics. M3 measures ordinary sword timing,
+against source RGB pixels and PC/TI screens; a 70% view keeps the same source
+mechanics (since M5 the only build: the 1:1 one was retired as too zoomed in). M3 measures ordinary sword timing,
 input-edge restarts, facing changes and three tile samples; 40 attack poses
 and cutting all 53 bush cells pass original fixtures and PC/TI checks in both
 views. M4 adds the two opening Octoroks, shots, sword kills, contact/shot damage,

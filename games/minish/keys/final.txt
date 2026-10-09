@@ -1,0 +1,92 @@
+# One continuous game from minish() (no door): an Octorok contact and knockback,
+# both Octoroks killed, the central bushes cut, two rolls, then east past the
+# exploration flag. Wall/bush anchors keep it valid for start delays 0..20 frames.
+0
+10 RIGHT
+18 DOWN
+36
+38 DOWN A
+39
+47 DOWN A
+48
+56 DOWN A
+57
+65 DOWN A
+66
+74 DOWN A
+75
+83 DOWN A
+84
+92 DOWN A
+93
+101 DOWN A
+102
+110 DOWN A
+111
+119 DOWN A
+120
+128 DOWN A
+129
+137 DOWN A
+138
+146 DOWN A
+147
+155 DOWN A
+156
+162 DOWN
+168 RIGHT
+188 UP
+224
+226 UP A
+227
+235 UP A
+236
+244 UP A
+245
+253 UP A
+254
+262 UP A
+263
+296 DOWN
+332 RIGHT
+366 DOWN
+441 UP
+455 RIGHT
+481 UP
+536
+538 LEFT A
+539
+549 LEFT
+555
+556 LEFT A
+557
+567 LEFT
+587
+588 RIGHT B
+589 RIGHT
+603
+608 DOWN A
+609
+619 DOWN
+625
+626 DOWN A
+627
+637 DOWN
+643
+644 LEFT A
+645
+655 RIGHT A
+656
+666 UP
+678
+679 LEFT B
+680 LEFT
+694
+699 LEFT
+711
+712 RIGHT
+802 UP
+812 RIGHT
+862 UP
+864
+882

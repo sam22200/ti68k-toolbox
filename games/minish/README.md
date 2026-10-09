@@ -3,8 +3,8 @@
 M5 is playable on the Portable Game Runtime: walking through original terrain,
 cardinal/diagonal movement, partial metatile collisions, corner slides, slope
 speed changes and a scrolling camera, with original scenery and animated Link
-in four greys. Provisional scope: 720x320 original pixels, 1:1 geometry viewed
-through the TI's 160x100 screen. Forty-four extracted poses have a white
+in four greys. Scope: the 720x320 original opening, drawn at **70% scale**
+(504x224 displayed pixels) through the TI's 160x100 screen. Forty-four extracted poses have a white
 outline; tree canopies cover Link where the original foreground does. Ordinary
 sword swings now cut the 53 bush cells, changing their scenery and collision;
 walking through newly cleared paths works. Forty additional poses show Link
@@ -16,33 +16,18 @@ ENTER restores bushes, enemies and health. M5 adds Link's original roll
 (B: Shift/X on the PC, Shift on the TI), the original leaf burst when a bush or
 grass is cut, a lighter earth texture that stays readable where bushes were, and
 the original fading death puff for Octoroks. Other objects, water/pit actions and
-room transitions remain later work. [Showcase](captures/showcase.gif)
-([70%](captures/zoom/showcase.gif), `tools/preview.py --showcase [--zoom]`),
-[combat replay](captures/combat.gif),
+room transitions remain later work. [TiEmu playthrough](captures/tiemu/final.gif) (`keys/final.txt` from `minish()`)
+(one continuous game on the Titanium), [showcase](captures/showcase.gif)
+(`tools/preview.py --showcase`), [combat replay](captures/combat.gif),
 [sword replay](captures/sword.gif) and [opening replay](captures/opening.gif).
 
-A separate `minishz` build shows the same opening at **70% scale**, as
-requested: scenery and Link are about 30% smaller, with about 43% more
-source terrain visible along each axis. The normal `minish` build is retained.
-[Side-by-side entrance](captures/zoom/comparison.png) and
-[70% opening replay](captures/zoom/opening.gif).
-[70% sword replay](captures/zoom/sword.gif).
-[70% combat replay](captures/zoom/combat.gif) and
-[combat scale comparison](captures/zoom/combat_comparison.png).
-
-```sh
-make -C games/minish zoom      # builds and checks minishz_pc and minishz.89z
-make -C games/minish ZOOM=1 NAME=minishz preview  # headless GIF
-cd games/minish
-./minishz_pc
-```
-
-On the calculator, send `minishz.89z`, `mindat.89y`, `mizscene.89y`,
-`mizactor.89y`, `mizact.89y` and `mizfight.89y`, archive the five banks, then run `minishz()`.
-`minishz(140)` starts beside bushes for a quick sword demonstration. Controls and
-the normal scenario doors are the same. Zoom-only doors 64..95 inspect all
-horizontal camera shift phases; 96..99 inspect clipping at the slice corners.
-These are rendering probes, not additional walkable entrances.
+Scenery and Link are about 30% smaller than the original, with about 43% more
+source terrain visible along each axis. Up to M5 a second build drew the same
+game at 1:1; it was retired after M5 (too zoomed in on the 160x100 LCD), so
+only the 70% game is built and checked now. Figures quoted below for "100%"
+are historical. Doors 64..95 inspect all horizontal camera shift phases;
+96..99 inspect clipping at the slice corners. These are rendering probes, not
+additional walkable entrances.
 
 The source-space movement/collision model is shared. Graphics and silhouette
 reduction run offline; the one-pixel white outline is added after shrinking
@@ -55,8 +40,8 @@ and 48908 enemy bytes, including sixteen offline shifts for each enemy pose.
 The action bank also holds deduplicated pre-shifted bush XOR patches; the
 render loop needs no mutable world bitmap or additional heap buffer.
 
-Both builds pass all 6310 original walking steps, 400 animation steps and
-96 actor-depth steps. The zoom build adds **1312000 independent oracle pixel
+The game passes all 6310 original walking steps, 400 animation steps and
+96 actor-depth steps, plus **1312000 independent oracle pixel
 checks**, covering every walking pose, both canopy depths, all camera shift
 phases and all four edges. M3 adds **672000 sword/changed-scenery oracle pixels
 per build**, 68 original action trials and **1947 exact source steps**, covering
@@ -93,8 +78,6 @@ Program payloads are 20063/20759 bytes; the five archived banks total
 84956/175202 bytes, respectively.
 Static HUD rows, pre-shifted rocks and enemy art, and cropped canopy restoration
 keep these cases within budget. No shared runtime or hardware path changed.
-Build the two variants sequentially: GCC4TI writes shared temporary assembly
-files beside each source.
 
 M5 checks **330 original roll updates** (direction lock, per-update speed and
 terrain collision) and **2352000 roll/effect oracle pixels** per scale for 49
@@ -118,6 +101,12 @@ program payloads at 22873 / 23609 bytes; the six archived banks total
 153636 / 246534 bytes. Ran in TiEmu (Titanium) from the six archived banks:
 [TiEmu replay](captures/tiemu/showcase.gif) (`keys/tiemu.txt` from door
 `(432)`: three contacts, a sword kill and four rolls).
+
+Current state (70% only, static "MINISH WOODS" label removed from the HUD):
+complete PC/TI checks cover **10920 hashes / 752 screens** (including the
+882-frame `keys/final.txt` playthrough), peak
+**343346 cycles** per instrumented frame; `minish.89z` is 23559 bytes and the
+six archived banks total 246534 bytes.
 
 The enemy study door adds only the original `TABIDACHI` flag before the original
 room loader, separately from `woods.state`; this is controlled preparation,
@@ -144,6 +133,7 @@ make -C tools/gba core
 make -C games/minish reference  # cold original door; generates woods.state
 make -C games/minish test      # PC mechanics against original frame fixtures
 make -C games/minish pc ti     # minish_pc, minish.89z and six data banks
+make -C games/minish preview   # headless opening GIF (--sword/--combat/--showcase via tools/preview.py)
 make -C games/minish cycles tihash  # headless TI costs, state/screen equality
 cd games/minish
 ./minish_pc                    # arrows; SPACE/Z/Ctrl sword; ENTER resets; ESC exits
@@ -151,8 +141,9 @@ cd games/minish
 ./minish_pc --headless --keys keys/opening.txt --frames 400 --shot captures/opening.png
 ```
 
-Send `minish.89z`, `mindat.89y`, `miscen.89y`, `michar.89y`, `miact.89y`,
-`mifight.89y` and `mifx.89y`, archive the six banks, and run `minish()`.
+Send `minish.89z`, `mindat.89y`, `mizscene.89y`, `mizactor.89y`, `mizact.89y`,
+`mizfight.89y` and `mizfx.89y`, archive the six banks, and run `minish()`.
+`minish(140)` starts beside bushes for a quick sword demonstration.
 Arrows walk, 2nd swings the sword, Shift rolls, ENTER resets, ESC exits. Scenario doors: `(1)` isolated clearing,
 `(2)` first tree contact, `(3)` second view, `(4)` eastern opening, `(5)`
 endpoint, `(6)` partial tree corner, `(7)` canopy occlusion and `(8)` the same
@@ -167,7 +158,7 @@ Door 9 preserves the enemy-free walking study. Door 256 starts the combat demo,
 enemies/four rocks on cleared beds. Doors 300..359 freeze twenty enemy poses
 at three depths; 360..407 inspect actor/rock clipping. Door 420 checks an
 ordinary walk-to-spit transition aimed at Link, flight and projectile damage;
-`tools/preview.py --shots [--zoom]` records it without a window.
+`tools/preview.py --shots` records it without a window.
 The PC accepts the same
 numbers through `--scenario N`.
 PC state files use runtime F2/F3 or `--save/--load` support. No new hardware
@@ -228,11 +219,11 @@ these scripts needs the decompilation checkout. Reading aids remain under
 ignored `sources/minish_tmc/`.
 `tools/actions.py` regenerates the action trials and banks; `--pack-only`
 rebuilds banks from verified local raw poses. `tools/action_oracle.py` prepares
-independent unpacked expectations. `tools/preview.py --zoom --sword` exports a
+independent unpacked expectations. `tools/preview.py --sword` exports a
 native GIF without an SDL window or emulator.
 `tools/combat.py --door --measure` regenerates the separate combat study door,
 reference trials and both enemy banks. `tools/combat_oracle.py` supplies the
-independent pixel expectations; `tools/preview.py --zoom --combat` captures the
+independent pixel expectations; `tools/preview.py --combat` captures the
 native fight.
 
 ROM-derived banks, states, snapshots and fixtures stay local and ignored.

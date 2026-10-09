@@ -7,11 +7,7 @@ static const u32 *art;
 u8 minish_effects_init(void)
 {
     u16 size;
-#ifdef MINISH_ZOOM
     art=(const u32 *)rt_file("mizfx",&size);
-#else
-    art=(const u32 *)rt_file("mifx",&size);
-#endif
     return art && size>=FX_SIZE && size<=FX_SIZE+6;
 }
 
@@ -92,11 +88,7 @@ void minish_draw_fx(u8 pose,u16 wx,u16 wy,u8 cover)
     const u32 *p=art+m[0];
     s16 x,y;u16 part,h=m[3];RtSprite sprite;
     if (!h) return;
-#ifdef MINISH_ZOOM
     x=minish_scaled(wx)-st.camx+m[1];y=minish_scaled(wy)-st.camy+m[2];
-#else
-    x=wx-st.camx+m[1];y=wy-st.camy+m[2];
-#endif
     if (x>=RT_W || x+m[5]<=0 || y>=RT_H || y+(s16)h<=0) return;
 #ifdef __m68k__
     {s16 aligned=x&~15;

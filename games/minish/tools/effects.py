@@ -183,9 +183,8 @@ def write_fixtures(data):
             for k,x,y,active,speed,hurt,p in t['steps']:f.write(f'{k} {x} {y} {active}\n')
 
 
-def packed(rgba,zoom):
-    anchor=(32,48)
-    if zoom:rgba=np.asarray(Image.fromarray(rgba).resize((45,45),Image.Resampling.NEAREST));anchor=(23,34)
+def packed(rgba):
+    rgba=np.asarray(Image.fromarray(rgba).resize((45,45),Image.Resampling.NEAREST));anchor=(23,34)
     mask=np.pad(rgba[:,:,3]!=0,1);halo=mask.copy()
     for dy in (-1,0,1):
         for dx in (-1,0,1):halo[1:-1,1:-1]|=mask[1+dy:mask.shape[0]-1+dy,1+dx:mask.shape[1]-1+dx]
@@ -213,35 +212,33 @@ def pack(data,actors):
         header+=array(name,typ,data[key])
     for name,seq in zip(('bush_fx','grass_fx','death_fx'),data['effects']):
         header+=f'#define {name.upper()}_LEN {len(seq)}\n'+array(name,'u8',seq)
-    for zoom in (False,True):
-        words=[];meta=[];shift=[];packed_poses=[]
-        for rgba in actors:
-            m,p=packed(rgba,zoom);meta.append([len(words),*m]);words+=p;packed_poses.append(p)
-        base=len(words)*4;shift_offsets=[65535]*len(actors);spans=[1 if m[5]<=17 else 2 for m in meta]
-        # Prioritize frequently displayed narrow poses. Fast aligned masked
-        # rows fit entirely in32 bits; wide/clipped poses use ExtGraph.
-        weights={i:sum(s.count(i) for s in data['roll']+data['effects']) for i in range(len(actors))}
-        for i in sorted(range(len(actors)),key=lambda i:weights[i],reverse=True):
-            _,x,y,h,parts,w=meta[i];p=packed_poses[i]
-            span=spans[i]
-            if not h or w>32 or base+(len(shift)+h*48*span)*4>65516:continue
-            shift_offsets[i]=base+len(shift)*4
-            for n in range(16):
-                for row in range(h):
-                    shift.extend([p[row]>>n,p[row+h]>>n,(~((~p[row+h*2]&0xffffffff)>>n))&0xffffffff])
-                    if span==2:
-                        shift.extend([(p[row]<<(32-n))&0xffffffff if n else 0,
-                                      (p[row+h]<<(32-n))&0xffffffff if n else 0,
-                                      (~((~p[row+h*2]<<(32-n))&0xffffffff))&0xffffffff if n else 0xffffffff])
-        header+='#ifdef MINISH_ZOOM\n' if zoom else '#ifndef MINISH_ZOOM\n'
-        header+=f'#define FX_SIZE {(len(words)+len(shift))*4}\n'
-        header+=array('fx_art','s16',meta)+array('fx_shift','u16',shift_offsets)+array('fx_span','u8',spans)+'#endif\n'
-        bank='mizfx' if zoom else 'mifx'
-        for order,suffix in (('<',''),('>','.be')):
-            payload=struct.pack(order+f'{len(words)+len(shift)}I',*(words+shift))
-            assert len(payload)<65518
-            (GAME/f'{bank}{suffix}.bin').write_bytes(payload)
-        print('Effects bank',bank,len(payload),'bytes;',sum(s!=65535 for s in shift_offsets),'fast poses')
+    words=[];meta=[];shift=[];packed_poses=[]
+    for rgba in actors:
+        m,p=packed(rgba);meta.append([len(words),*m]);words+=p;packed_poses.append(p)
+    base=len(words)*4;shift_offsets=[65535]*len(actors);spans=[1 if m[5]<=17 else 2 for m in meta]
+    # Prioritize frequently displayed narrow poses. Fast aligned masked
+    # rows fit entirely in32 bits; wide/clipped poses use ExtGraph.
+    weights={i:sum(s.count(i) for s in data['roll']+data['effects']) for i in range(len(actors))}
+    for i in sorted(range(len(actors)),key=lambda i:weights[i],reverse=True):
+        _,x,y,h,parts,w=meta[i];p=packed_poses[i]
+        span=spans[i]
+        if not h or w>32 or base+(len(shift)+h*48*span)*4>65516:continue
+        shift_offsets[i]=base+len(shift)*4
+        for n in range(16):
+            for row in range(h):
+                shift.extend([p[row]>>n,p[row+h]>>n,(~((~p[row+h*2]&0xffffffff)>>n))&0xffffffff])
+                if span==2:
+                    shift.extend([(p[row]<<(32-n))&0xffffffff if n else 0,
+                                  (p[row+h]<<(32-n))&0xffffffff if n else 0,
+                                  (~((~p[row+h*2]<<(32-n))&0xffffffff))&0xffffffff if n else 0xffffffff])
+    header+=f'#define FX_SIZE {(len(words)+len(shift))*4}\n'
+    header+=array('fx_art','s16',meta)+array('fx_shift','u16',shift_offsets)+array('fx_span','u8',spans)
+    bank='mizfx'
+    for order,suffix in (('<',''),('>','.be')):
+        payload=struct.pack(order+f'{len(words)+len(shift)}I',*(words+shift))
+        assert len(payload)<65518
+        (GAME/f'{bank}{suffix}.bin').write_bytes(payload)
+    print('Effects bank',bank,len(payload),'bytes;',sum(s!=65535 for s in shift_offsets),'fast poses')
     (GAME/'effects_generated.h').write_text(header)
 
 

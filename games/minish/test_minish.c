@@ -9,11 +9,7 @@ static int failures;
 
 static void combat_pixels(void)
 {
-#ifdef MINISH_ZOOM
-    FILE *f=fopen("fixtures/combat_pixels_zoom.bin","rb");
-#else
     FILE *f=fopen("fixtures/combat_pixels.bin","rb");
-#endif
     unsigned n,t,x,y,bad=0;
     CHECK(f!=NULL);if (!f) return;
     n=fgetc(f);n|=fgetc(f)<<8;
@@ -21,7 +17,7 @@ static void combat_pixels(void)
         unsigned scenario=fgetc(f);scenario|=fgetc(f)<<8;sw_init(scenario);CHECK(sw_step(0));
         for (y=0;y<RT_H;y++) for (x=0;x<RT_W;x++) {
             unsigned expected=fgetc(f);
-            if (!(y<8 && (x<66 || x>=128)) && sw_level(x,y)!=expected) {
+            if (!(y<8 && x>=128) && sw_level(x,y)!=expected) {
                 if (bad++<3) printf("combat pixel scenario%u %u,%u %u/%u\n",scenario,x,y,sw_level(x,y),expected);
             }
         }
@@ -32,11 +28,7 @@ static void combat_pixels(void)
 
 static void effects_pixels(void)
 {
-#ifdef MINISH_ZOOM
-    FILE *f=fopen("fixtures/effects_pixels_zoom.bin","rb");
-#else
     FILE *f=fopen("fixtures/effects_pixels.bin","rb");
-#endif
     unsigned n,t,x,y,bad=0;
     CHECK(f!=NULL);if (!f) return;
     n=fgetc(f);n|=fgetc(f)<<8;
@@ -44,7 +36,7 @@ static void effects_pixels(void)
         unsigned scenario=fgetc(f);scenario|=fgetc(f)<<8;sw_init(scenario);CHECK(sw_step(0));
         for (y=0;y<RT_H;y++) for (x=0;x<RT_W;x++) {
             unsigned expected=fgetc(f);
-            if (!(y<8 && x<66) && sw_level(x,y)!=expected) {
+            if (!(y<8 && x>=128) && sw_level(x,y)!=expected) {
                 if (bad++<3) printf("Effect pixel scenario%u %u,%u %u/%u\n",scenario,x,y,sw_level(x,y),expected);
             }
         }
@@ -193,11 +185,7 @@ static void combat_fixtures(void)
 
 static void action_pixels(void)
 {
-#ifdef MINISH_ZOOM
-    FILE *f=fopen("fixtures/action_pixels_zoom.bin","rb");
-#else
     FILE *f=fopen("fixtures/action_pixels.bin","rb");
-#endif
     unsigned n,t,x,y,bad=0,pixels=0;
     CHECK(f!=NULL);if (!f) return;
     n=fgetc(f);n|=fgetc(f)<<8;
@@ -207,7 +195,7 @@ static void action_pixels(void)
         for (y=0;y<RT_H;y++) for (x=0;x<RT_W;x++) {
             unsigned expected=fgetc(f);
             /* HUD/endpoint are independently cross-checked on PC and TI. */
-            if (!(y<8 && x<66) && sw_level(x,y)!=expected) {
+            if (!(y<8 && x>=128) && sw_level(x,y)!=expected) {
                 if (!bad) printf("action oracle scenario %u pixel %u,%u: %u/%u\n",scenario,x,y,sw_level(x,y),expected);
                 bad++;
             }
@@ -318,27 +306,6 @@ static void animation_fixtures(void)
     printf("original animation fixtures: %u displayed poses\n",steps);
 }
 
-#ifndef MINISH_ZOOM
-static void occlusion_fixtures(void)
-{
-    unsigned scenario,n,i,probes=0;
-    for (scenario=7;scenario<=8;scenario++) {
-        FILE *f=fopen("fixtures/occlusion.txt","r");
-        CHECK(f != NULL); if (!f) return;
-        CHECK(fscanf(f,"%u",&n)==1);
-        sw_init(scenario); CHECK(sw_step(0));
-        CHECK(st.x==246*256L && st.y==160*256L);
-        for (i=0;i<n;i++) {
-            unsigned x,y,foreground,actor;
-            CHECK(fscanf(f,"%u %u %u %u",&x,&y,&foreground,&actor)==4);
-            CHECK(sw_level(x-st.camx,y-st.camy)==(scenario==7 ? foreground : actor));
-            probes++;
-        }
-        fclose(f);
-    }
-    printf("original canopy occlusion: %u native pixel checks\n",probes);
-}
-#else
 static unsigned word_le(FILE *f)
 {
     unsigned lo=fgetc(f),hi=fgetc(f);
@@ -367,7 +334,6 @@ static void zoom_fixtures(void)
     CHECK(!bad);CHECK(fgetc(f)==EOF);fclose(f);
     printf("70-percent scene/actor oracle: %u pixels, %u differences\n",pixels,bad);
 }
-#endif
 
 static void depth_fixtures(void)
 {
@@ -407,11 +373,7 @@ int main(int argc, char **argv)
     animation_fixtures();
     action_fixtures();
     action_pixels();
-#ifdef MINISH_ZOOM
     zoom_fixtures();
-#else
-    occlusion_fixtures();
-#endif
     depth_fixtures();
     combat_fixtures();
     combat_pixels();

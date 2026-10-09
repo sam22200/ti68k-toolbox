@@ -2,9 +2,7 @@
  * Two source steps per draw; all decoding and palette reduction are offline. */
 #include "minish.h"
 #include "generated.h"
-#ifdef MINISH_ZOOM
 #include "zoom_generated.h"
-#endif
 #ifdef STATE_HASH
 #include "../../tools/m68kbench/bench.h"
 static u32 frame_begin;
@@ -13,12 +11,6 @@ static u32 frame_begin;
 MinishState st;
 static const u8 *collision, *shape_map, *acts;
 static const u16 *masks;
-#ifndef MINISH_ZOOM
-static const u8 *fg_map;
-static const u16 *fg_tiles;
-static const u32 *actor_pixels;
-static RtTilemap tm;
-#endif
 static const u16 direction_masks[8] = {
     0x0006, 0x6006, 0x6000, 0x6060, 0x0060, 0x0660, 0x0600, 0x0606
 };
@@ -127,17 +119,10 @@ static void resolve(u16 x, u16 y, u8 side)
 
 static void camera(void)
 {
-#ifdef MINISH_ZOOM
     s16 x = minish_scaled(st.x>>8)-RT_W/2;
     s16 y = minish_scaled(st.y>>8)-RT_H/2-8;
     st.camx = x < 0 ? 0 : x > ZOOM_W-RT_W ? ZOOM_W-RT_W : x;
     st.camy = y < 0 ? 0 : y > ZOOM_H-RT_H ? ZOOM_H-RT_H : y;
-#else
-    s16 x = (u16)(st.x >> 8) - RT_W/2;
-    s16 y = (u16)(st.y >> 8) - RT_H/2 - 8;
-    st.camx = x < 0 ? 0 : x > WOODS_W-RT_W ? WOODS_W-RT_W : x;
-    st.camy = y < 0 ? 0 : y > WOODS_H-RT_H ? WOODS_H-RT_H : y;
-#endif
 }
 
 void minish_place(u16 x, u16 y)
@@ -252,38 +237,18 @@ void game_init(void)
 {
     u16 size;
     const u8 *bank;
-#ifdef MINISH_ZOOM
     u8 zoom_ready;
-#endif
     st.ready = 0;
 #ifdef STATE_HASH
     frame_begin = 0;
 #endif
     collision = shape_map = acts = RT_NULL; masks = RT_NULL;
-#ifdef MINISH_ZOOM
     zoom_ready = minish_zoom_init();
-#endif
-#ifndef MINISH_ZOOM
-    fg_map = RT_NULL; fg_tiles = RT_NULL; actor_pixels = RT_NULL;
-    tm.map = RT_NULL; tm.tiles = RT_NULL; tm.w = 64; tm.h = 32; tm.ntiles = SCENE_TILES;
-#endif
     bank = rt_file("mindat", &size);
     if (bank && size >= 9984 && size <= 9990) {
         collision = bank; masks = (const u16 *)(bank+2048);
         shape_map = bank+3328; acts = bank+7936;
-#ifdef MINISH_ZOOM
         st.ready = zoom_ready;
-#else
-        bank = rt_file("miscen",&size);
-        if (bank && size >= SCENE_SIZE && size <= SCENE_SIZE+6) {
-            tm.map = bank; tm.tiles = (const u16 *)(bank+2048);
-            fg_map = bank+SCENE_FG_MAP; fg_tiles = (const u16 *)(bank+SCENE_FG_TILES);
-            bank = rt_file("michar",&size);
-            if (bank && size >= CHAR_SIZE && size <= CHAR_SIZE+6) {
-                actor_pixels = (const u32 *)bank; st.ready = 1;
-            }
-        }
-#endif
     }
     st.ready = st.ready && minish_actions_init() && minish_combat_init() && minish_effects_init();
     rt_state = &st; rt_state_size = sizeof(st);
@@ -299,11 +264,7 @@ void game_scenario(u16 n)
         st.pose=st.display_pose=84+minish_fx_preview_pose(i<128 ? i>>5 : 2);
         if (i<128) st.camx-=i&31;
         else {
-#ifdef MINISH_ZOOM
             st.camx=minish_scaled(320);
-#else
-            st.camx=320;
-#endif
             st.camx-=i>=160 ? RT_W-16+(s16)(i&31) : 16-(s16)(i&31);
         }
         return;
@@ -409,7 +370,6 @@ void game_scenario(u16 n)
         }
         return;
     }
-#ifdef MINISH_ZOOM
     if (n>=64 && n<100) {
         static const u16 corner_x[4]={8,712,8,712};
         static const u16 corner_y[4]={12,12,316,316};
@@ -418,7 +378,6 @@ void game_scenario(u16 n)
         st.preview=1;
         return;
     }
-#endif
     if (n >= 16 && n < 16+CHAR_POSES) {
         minish_place(248,136);
         st.preview = 1; st.pose = st.display_pose = n-16;
@@ -484,78 +443,20 @@ u8 game_update(void)
     return 1;
 }
 
-#ifndef MINISH_ZOOM
-void minish_canopy(s16 x,s16 y,u16 w,u16 h)
-{
-    s16 tx,ty,firstx=(x+st.camx)>>4,firsty=(y+st.camy)>>4;
-    s16 lastx=(x+st.camx+w-1)>>4,lasty=(y+st.camy+h-1)>>4;
-    RtSprite foreground;
-    foreground.w=16;
-    for (ty=firsty;ty<=lasty;ty++) for (tx=firstx;tx<=lastx;tx++) {
-        u16 id;const u16 *t;s16 top=(ty<<4)-st.camy,start,end;
-        if ((u16)tx>=45 || (u16)ty>=20) continue;
-        id=fg_map[((u16)ty<<6)|(u16)tx];if (!id) continue;
-        t=fg_tiles+((id<<5)+(id<<4));
-        start=y>top ? y-top : 0;end=y+(s16)h<top+16 ? y+(s16)h-top : 16;
-        if (top+start<0) start=-top;
-        if (top+end>RT_H) end=RT_H-top;
-        if (end<=start) continue;
-        foreground.h=end-start;
-        foreground.light=t+start;foreground.dark=t+16+start;foreground.mask=t+32+start;
-        draw_sprite((tx<<4)-st.camx,top+start,&foreground);
-    }
-}
-#endif
 
 void game_render(void)
 {
     s16 x, y;
-#ifndef MINISH_ZOOM
-    const u32 *p;
-    RtSprite actor;
-    u16 actor_w=32,actor_h=40;
-#endif
     if (!st.ready) {
         draw_clear(); draw_text(10,28,"Send data banks",F_MEDIUM,C_BLACK);
-#ifdef MINISH_ZOOM
         draw_text(10,42,"mindat mizscene mizactor",F_SMALL,C_BLACK);
         draw_text(10,54,"mizact mizfight mizfx",F_SMALL,C_BLACK);
-#else
-        draw_text(10,42,"mindat miscen michar",F_SMALL,C_BLACK);
-        draw_text(10,54,"miact mifight mifx",F_SMALL,C_BLACK);
-#endif
         return;
     }
-#ifdef MINISH_ZOOM
     minish_zoom_render();
-#else
-    draw_tilemap(&tm,st.camx,st.camy);
-    minish_draw_cuts();
-    minish_draw_effects(0);
-    minish_draw_enemies(0);
-    x = (st.x >> 8)-st.camx-16; y = (st.y >> 8)-st.camy-32;
-    minish_flash_begin();
-    if (st.display_pose>=MINISH_HURT) {minish_draw_hurt(st.display_pose-MINISH_HURT,st.display_cover);actor_w=0;}
-    else if (st.display_pose>=84) {minish_draw_fx(st.display_pose-84,st.x>>8,st.y>>8,st.display_cover);actor_w=0;}
-    else if (st.display_pose>=44) minish_draw_sword(&x,&y,&actor_w,&actor_h);
-    else {
-    p = actor_pixels+((u16)(st.display_pose<<7)-(u16)(st.display_pose<<3));
-    actor.w = 32; actor.h = 40; actor.light = p; actor.dark = p+40; actor.mask = p+80;
-    minish_link_sprite(x,y,&actor);
-    }
-    minish_flash=0;
-    if (st.display_cover && actor_w) minish_canopy(x,y,actor_w,actor_h);
-    minish_draw_enemies(1);
-    minish_draw_effects(1);
-#endif
-    minish_draw_label();
     minish_draw_health();
     /* The endpoint is a native exploration marker, not a ROM quest object. */
-#ifdef MINISH_ZOOM
     x = minish_scaled(692)-st.camx; y = minish_scaled(136)-st.camy;
-#else
-    x = 692-st.camx; y = 136-st.camy;
-#endif
     if (x >= 2 && x < RT_W-8 && y >= 12 && y < RT_H-8) {
         draw_rect(x-1,y-11,3,12,C_WHITE);
         draw_rect(x,y-10,1,10,C_BLACK);

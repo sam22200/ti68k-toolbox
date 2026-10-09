@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Precompose the LCD label, outlined hearts and readable projectile glyph."""
-import re
+"""Precompose the outlined hearts and readable projectile glyph."""
 from pathlib import Path
 GAME=Path(__file__).resolve().parents[1]
 # Six-pixel round body plus a one-pixel outline: stays readable at 70% too.
@@ -26,16 +25,7 @@ def rock_shift():
 
 
 def main():
-    font=(GAME.parents[1]/'runtime/platform-sw/amsfont.h').read_text().split('ams_f4x6[1536] = {')[1].split('}')[0]
-    data=list(map(int,re.findall(r'\d+',font)));rows=[[0]*8 for _ in range(2)];x=2
-    for char in 'MINISH WOODS':
-        advance,*glyph=data[ord(char)*6:ord(char)*6+6]
-        for y,row in enumerate(glyph,1):
-            for b in range(8):
-                if row&(128>>b):
-                    px=x+b;assert px<64;rows[px//32][y]|=1<<(31-(px&31))
-        x+=advance
-    header='/* Local AMS font; identical static label, precomposed offline. */\nstatic const u32 label_rows[2][8]={'+','.join('{'+','.join(str(v)+'UL' for v in r)+'}' for r in rows)+'};\n'
+    header='/* Native HUD hearts and projectile glyph, precomposed offline. */\n'
     def array(name, rows):
         return 'static const u32 '+name+f'[{len(rows)}][{len(rows[0])}]={{'+','.join('{'+','.join(str(v)+'UL' for v in row)+'}' for row in rows)+'};\n'
 

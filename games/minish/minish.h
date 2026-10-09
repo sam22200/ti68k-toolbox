@@ -49,7 +49,6 @@ u8 minish_combat_before(u16 keys);
 void minish_combat_step(void);
 void minish_draw_enemies(u8 front);
 void minish_draw_health(void);
-void minish_draw_label(void);
 u8 minish_effects_init(void);
 void minish_effects_reset(void);
 void minish_effects_step(void);
@@ -68,9 +67,7 @@ extern u8 minish_flash;       /* 0, or the damage flash drawn on Link */
 void minish_flash_begin(void);
 void minish_link_sprite(s16 x,s16 y,const RtSprite *s);
 void minish_draw_hurt(u8 pose,u8 cover);
-#ifdef MINISH_ZOOM
 u16 minish_scaled(u16 x);
 u8 minish_zoom_init(void);
 void minish_zoom_render(void);
-#endif
 #endif
