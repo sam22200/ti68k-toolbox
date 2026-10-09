@@ -547,3 +547,34 @@ mapping), bulk copies not covered by ExtGraph.
   All 53 bushes cut, every attack pose and 32 camera offsets were checked;
   PC/TI screens agree. These are datasheet-cycle measurements, not a TiEmu
   hardware timing claim; no new assembly was authored.
+
+### Isometric scenes and polygon rows in C (measured with ti-cycles, FFT Gariland, 2026-10-09)
+
+- **A polygon row costs ~550-650 cycles in C** (two planes, 16-bit words, masks from a table,
+  pattern rows prepared once), whatever its width up to ~48 px: the per-row bookkeeping
+  dominates, not the pixels. Add ~2k per polygon for its edges (`divs32_16` per edge, no
+  `__divsi3`; a 32 x 16 product such as `dx * (y0 - ya)` silently became `__mulsi3`: use
+  `muls16`) and ~2k more if the 8 pattern rows are rotated or doubled per call: store them as
+  doubled 16-bit rows. A rotation frame of a 10 x 15 isometric map (~200 flat polygons) costs
+  2.1 M cycles even at half resolution (80 x 50, doubled with a 256-entry table: 100k).
+- A masked 24-column, 12-row sprite (3 RMW words per plane and row, clipped) costs ~7k; a
+  10 x 15 map with walls composed into a 320 x 218 scene costs 4.7 M (0.4 s): compose static
+  views once (one buffer per camera orientation, 17 KB each) and copy the camera's window per
+  frame (any pixel offset, 32-bit reads shifted: 131k for 160 x 100 x 2 planes).
+- **Occlusion of a few sprites by scenery in front**: draw the front tiles' *masks* into a small
+  bitmap the size of the sprite box (a "cover mask", 16 x 22) and draw the sprite with
+  `mask | cover` and its data `& ~cover` (ExtGraph's mask: `dest & mask | data`, data under a
+  transparent bit is still ORed). Made once per sprite position and view (~120-160k), reused
+  every frame for free: 44k per frame for three units against ~400k when the front tiles were
+  drawn again over each unit every frame.
+- **Static scenery drawn offline with its depth** (the scene's two planes plus, per image
+  byte, two layers of `(depth, pixel mask)`, read in place from an archived data file):
+  copying the view into the RAM scene buffer costs ~100k (52 KB file, 17 KB copied), a cover
+  mask from the depth bytes ~8k per 16 x 22 sprite each frame (no cache needed), and nothing
+  is composed on the calculator: the FFT demo's start went from 1.6 s to none, its walking
+  frame from 370k to 237k. Packed with ZX0 such a view shrinks 52 KB → 9-10 KB (the 4-grey
+  image of painted textures 17.4 → 5.5 KB, the depth layers 35 → 4.3 KB); `zx0_asm` unpacks
+  it in 2.2 M cycles (41 per output byte, ti-cycles), once per camera turn.
+- **`-mno-bss` puts every static array in the program file**: 5.6 KB of work buffers (spans,
+  half-resolution frame, sort keys) pushed the program over the TI-89's 24,576 bytes; one
+  `malloc` of a struct holding them (macros keep the names) brought it back under.

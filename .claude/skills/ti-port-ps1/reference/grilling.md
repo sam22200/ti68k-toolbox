@@ -56,6 +56,18 @@ Record the answers in `RE_NOTES.md` § Decisions, give the user a short summary,
 16. **Toolchain.** Default: C on the Portable Game Runtime (`runtime/`), PC first, TI last,
     grayscale; no asm.
 
+## Round for a view or rendering study (FFT's Gariland; adapt)
+
+17. **The map.** The game's own level data (extracted at build time, local) or a hand-made
+    one inspired by it (committed, builds without the disc)? Default: the game's, when its
+    format is documented and small.
+18. **Scale.** Answer with mock-ups: three tile sizes rendered on the real map with units at
+    scale, the screen outlined on the whole map; the user picks (FFT: 24 x 12, 1 h = 6 px).
+19. **Rotation / view changes.** Animated (polygon frames between the views, ~0.5 s) or
+    instantaneous? Default: animated, a few frames, with the composed view at the end.
+20. **Occlusion.** FFT's way (turn the camera to see behind) or fading roofs? Default: the
+    game's way; prove it with a count of the hidden unit's pixels per view.
+
 ## Milestones (Alundra; adapt per game)
 
 1. Behaviour: `RE_NOTES.md` § Behaviour and § Numbers for movement, jump, heights, ledges,

@@ -85,6 +85,25 @@ manual. Verified facts carry a date; the rest is the standard PS1 documentation
   ignore its functions (GPU packet building, CD reads, pad reading); their recognisable
   shapes (`syscall`, writes to 0x1F801xxx) mark the boundary of the game code.
 
+## Level data read straight from the disc (verified 2026-10-09 on Final Fantasy Tactics)
+
+Some games keep their levels as plain data files in a format the modding community has
+documented: read them with `psxiso.py --file` and a small parser, without running the game.
+Check every field on the map at hand (a neighbour's height, a flag on a known wall) before
+trusting the documentation. FFT (SCUS-94221): `MAP/MAPnnn.GNS` lists 20-byte resource
+records (type at +4: 0x1701 texture, 0x2E01 primary mesh, 0x3001 alternative mesh, 0x3101
+end; sector at +8, length at +12); the primary mesh's u32 at 0x68 points to the terrain:
+x and z counts, then 2 levels of z x x tiles of 8 bytes (surface & 0x3F, -, height,
+slope height & 0x1F | depth << 5, slope type = four 2-bit edges N S W E with N = +z and
+E = +x, -, flags: bit 6 can't walk, auto camera). `MAP022` is Magic City Gariland (10 x 15).
+The primary mesh itself (u32 at 0x40): four u16 counts (textured triangles, textured quads,
+untextured triangles, quads), the vertices (s16 x, y, z: a tile is 28, a height unit 12, up
+is -y), the textured polygons' normals, then 10 bytes per textured triangle (u, v, palette,
+-, u, v, page, -, u, v) and 12 per quad; quads split ABC + BDC. Texture record 0x1701: 256 x
+1024 at 4 bits (the page adds 256 to v); 16 palettes of 16 BGR555 colours at the u32 0x44,
+colour 0 transparent. Verified by drawing Gariland in four views (`games/fft/tools/extract.py`).
+Sources: FFHacktics, `github.com/adamrt/fft_toolkit` (`src/terrain.c`, `src/map.c`).
+
 ## The tools (verified 2026-10-04 on Alundra)
 
 - `psxiso.py`: ISO 9660 from a raw MODE2/2352 track (user data at offset 24 of each sector),

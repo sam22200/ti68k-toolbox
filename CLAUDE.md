@@ -223,7 +223,11 @@ that kind of task.
   the executable or a RAM dump, the disc run headless (`psxrun.py`: pcsx_rearmed libretro
   core, HLE BIOS, traces, RAM diffs, states), `/grilling` first, `RE_NOTES.md` with every
   finding labelled OBSERVED / INTERPRETATION / TARGET, a behavioural model (never a
-  translation), milestones on the runtime. Discs in `roms/ps1/` (local).
+  translation), milestones on the runtime. Discs in `roms/ps1/` (local). Second case: Final
+  Fantasy Tactics, the Gariland battle map read straight from the disc's terrain data and
+  textured mesh (no run needed), drawn per view on the PC in four greys with its depth (ZX0, 39 KB for four views), an
+  isometric engine with four camera orientations, an animated rotation and occlusion by cover
+  masks from that depth (`games/fft/`).
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
@@ -269,7 +273,7 @@ that kind of task.
 ## Layout
 
 - `hello/`: reference Hello World. `games/`: ported games (`puzzle_bobble/`) and our own
-  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua; `mgs/`: Metal Gear Solid (GBC) on our own engine with `ti-port-gb`'s big-game track, milestone 1 = VR Sneaking Lv.01, data generated from the local ROM, see its `ROADMAP.md`; `alundra/`: Alundra (PS1) traversal, a test room (jumps, heights, ledges, depth) and the whole village of Inoa (stairs, roofs, scrolling, the game's own image and depth in four data files) on our own engine with `ti-port-ps1`, art, image and map generated from the local disc by `tools/extract.py`, see its `README.md`)
+  (`campfire/`: Chrono Trigger camp-fire scene, TileMap + sprites, asset pipeline in `tools/extract.py`, data packed as ZX0 by `tools/pack.py`; `life/`: Game of Life on the runtime, glider start; `flappy/`: Flappy Bird ported from sdlbird with `ti-port-sdl`; `ffa/`: Final Fantasy Alternative remade from the TI-Basic `ffa_en/` with `ti-port-tibasic`, part I in progress, see its `PROGRESS.md`; `mode7/`: David Coz's Mode 7 demo, decompiled from its binary and optimised, benchmarked with `ti-cycles`, see its `OPTIMISATIONS.md`; `celeste/`: Celeste Classic ported from the PICO-8 cart with `ti-port-pico8`, room 0, its logic bit-exact with the cart run under z8lua; `mgs/`: Metal Gear Solid (GBC) on our own engine with `ti-port-gb`'s big-game track, milestone 1 = VR Sneaking Lv.01, data generated from the local ROM, see its `ROADMAP.md`; `alundra/`: Alundra (PS1) traversal, a test room (jumps, heights, ledges, depth) and the whole village of Inoa (stairs, roofs, scrolling, the game's own image and depth in four data files) on our own engine with `ti-port-ps1`, art, image and map generated from the local disc by `tools/extract.py`, see its `README.md`; `fft/`: Final Fantasy Tactics (PS1) Gariland tech demo with `ti-port-ps1`, the real battle map and its textures from the local disc (`tools/extract.py` -> `map.h`, four archived views with their depth) in four isometric orientations (F1/F5, animated turn), occlusion and Move/Jump, our own units, see its `README.md`)
 - `games/sonic/`: Sonic 1 (Mega Drive) traversal prototype: first 4.8 GHZ1 view
   widths, half scale, C on the runtime, measured original flat physics, real
   collision terrain, rigid bridge, rings, three enemy types, damage and ROM graphics
