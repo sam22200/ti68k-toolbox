@@ -303,7 +303,10 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
 static u8 reach_hi(u8 world) { return st.mode == M_TARGET && st.reach[world] != 0xFF; }
 
 // pixels of the scene in front of view diagonal depth inside a box (byte columns, rows):
-// restored from the view (a reach ring drawn behind a building)
+// restored from the view (a reach ring drawn behind a building), but for a pattern of them:
+// a hidden ring stays visible over the building, set apart from the seen ones
+static const u8 hide_pat[2] = { 0xCC, 0x33 };   // 2-pixel dashes (picked over the whole ring
+                                                // and a checkerboard)
 static void uncover(s16 x, s16 y, s16 w, s16 rows, u8 depth)
 {
     const u8 *vl = vbuf, *vd = vl + SC_PLANE, *t1 = vd + SC_PLANE, *m1 = t1 + SC_PLANE;
@@ -316,7 +319,7 @@ static void uncover(s16 x, s16 y, s16 w, s16 rows, u8 depth)
     for (r = 0; r < rows; r++) {
         u16 o = (u16)((y + r) * SC_BYTES + b0);
         for (b = b0; b <= b1; b++, o++) {
-            u8 m = (t1[o] > depth ? m1[o] : 0) | (t2[o] > depth ? m2[o] : 0);
+            u8 m = ((t1[o] > depth ? m1[o] : 0) | (t2[o] > depth ? m2[o] : 0)) & ~hide_pat[(y + r) & 1];
             if (!m) continue;
             scene_l[o] = (u8)((scene_l[o] & ~m) | (vl[o] & m));
             scene_d[o] = (u8)((scene_d[o] & ~m) | (vd[o] & m));
@@ -560,7 +563,7 @@ static u16 erode(const u16 *mk, u8 r)
 
 // a unit and its shadow, both through the cover mask cm (ExtGraph: dest = dest & mask | data,
 // mask 1 = transparent, so the data is cleared under the cover too), the unit's contour drawn
-// over the cover, an enemy's arrow above it; cm RT_NULL: the unit alone, uncovered (the
+// over the cover, an enemy's diamond above it; cm RT_NULL: the unit alone, uncovered (the
 // rotation frames)
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const u16 *cm)
 {
@@ -600,7 +603,7 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const u16 *cm)
     s.h = UNIT_SH;
     s.light = ml; s.dark = md; s.mask = mk;
     draw_sprite(sx - 8, sy - UNIT_FOOT, &s);
-    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: an arrow above enemies,
+    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
         s.h = FOE_H;                            // never covered (it shows a hidden one too)
         s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
         draw_sprite(sx - 8, sy - UNIT_FOOT - FOE_H + 1, &s);

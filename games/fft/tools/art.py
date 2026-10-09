@@ -7,7 +7,7 @@ The scenery is the game's own (tools/extract.py: the map's textured mesh drawn p
 and so are the units (tools/units.py -> units.h); this file holds the rest:
 - The units' shadow (ExtGraph sprite rows, mask bit 1 = transparent) and rev8, a byte with
   its bits reversed (the units' sprites mirrored, as FFT draws two of the four directions).
-- The cursor and the reach marker (24x12 diamonds); the arrow above enemies (team at a glance).
+- The cursor and the reach marker (24x12 diamonds); the diamond above enemies (team at a glance).
 - The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
   the views (extract.py, map.h).
 """
@@ -66,22 +66,25 @@ def overlay_hi():
 
 
 def cursor():
+    """The cursor: a thick black line (4 px per row) with a white one inside (the user's pick
+    of three: 1, 2 or 4 px per row)."""
     rows = diamond_rows()
     pix = [[None] * 24 for _ in range(12)]
     for y, (x0, x1) in enumerate(rows):
-        for x in (x0, x0 + 1, x1 - 2, x1 - 1):
-            pix[y][x] = 3 if x in (x0, x1 - 1) else 0
+        for x in [*range(x0, min(x0 + 6, x1)), *range(max(x1 - 6, x0), x1)]:
+            pix[y][x] = 3 if x < x0 + 4 or x >= x1 - 4 else 0   # 4 black, 2 white inside
     return pix
 
 
 FOE = """
-....000000000...
-....033333330...
+.......000......
+......00300.....
+.....0033300....
 .....0333330....
-......03330.....
-.......030......
-........0.......
-"""                                     # above an enemy's head: a black arrow, white border
+.....0033300....
+......00300.....
+.......000......
+"""                                     # above an enemy's head: a black diamond, white border
 
 SHADOW = """
 ....222222222.
