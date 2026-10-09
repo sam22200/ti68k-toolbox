@@ -1,7 +1,8 @@
 # Demo for TiEmu (ti-play, open loop) from fft(): Ramza selected and moved round a corner
-# (RIGHT RIGHT DOWN DOWN = world (7, 7) in the south view), then four turns with F5 and one
-# back with F1. Wide gaps: the first frame composes the four views (~1.6 s), selecting draws
-# the reach (~0.3 s), keys are ignored while a turn plays.
+# (RIGHT RIGHT DOWN DOWN = world (7, 7) in the south view), the cursor taken to the thief
+# hidden behind a house (1, 11: his contour and the enemy arrow over the roof), then four
+# turns with F5 round him and one back with F1. Wide gaps: the first frame composes the four
+# views (~1.6 s), selecting draws the reach (~0.3 s), keys are ignored while a turn plays.
 0
 90 A
 93
@@ -15,13 +16,33 @@
 208
 240 A
 243
-330 F5
-333
-405 F5
-408
-480 F5
-483
-555 F5
-558
-630 F1
-633
+300 LEFT
+303
+312 LEFT
+315
+324 LEFT
+327
+336 LEFT
+339
+348 LEFT
+351
+360 LEFT
+363
+372 DOWN
+375
+384 DOWN
+387
+396 DOWN
+399
+408 DOWN
+411
+470 F5
+473
+545 F5
+548
+620 F5
+623
+695 F5
+698
+770 F1
+773

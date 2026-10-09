@@ -13,7 +13,8 @@ IMPLEMENTATION** (what the TI does, and why).
   `map.h` (never committed); the art was ours at first (`tools/art.py`). After seeing the
   map's own textures rendered in 4 greys next to our drawing (`x/real_vs_ours.png`), the user
   chose the game's textures (2026-10-09): the scenery is now the mesh drawn on the PC
-  (`fftv0..3`, never committed); units, cursor and rotation frames stay ours.
+  (`fftv0..3`, never committed); units, cursor and rotation frames stay ours (the frames' shades are
+  measured on the views).
 - **Scale**: 24 x 12 tiles, one height unit = 6 px, units ~13 x 20 plus the outline. The user
   asked for FFT Advance's tile (32 x 16) reduced by 20-30 %; three candidates (26, 24 and
   22 px) were rendered on the real map with units (PNG mock-ups) and 24 x 12 chosen. The map
@@ -83,8 +84,27 @@ IMPLEMENTATION** (what the TI does, and why).
   unit; enemies block the path.
 - TARGET: BFS over walkable tiles, a step allowed when the standing heights differ by at most
   Jump (both ways), allies passable but not a destination; walking 4 frames per tile with a hop
-  on height changes. Units are our drawings (Ramza, Delita, a thief), 16 x 20 with a black
-  line and a white outline (visibility rule).
+  on height changes. Units were our drawings at first; since milestone 9 they are FFT's own
+  sprites (below).
+- OBSERVED (`BATTLE/*.SPR`, `TYPE1.SHP`, `TYPE1.SEQ`; formats from FFTPatcher's
+  ShishiSpriteEditor and TacticsTemplateG, read on GitHub, the numbers checked on this disc): a
+  sprite file is 16 palettes then a 256-wide 4-bit sheet (288 raw rows, then a compressed
+  part); a frame is up to 8 tiles of the sheet placed from the unit's anchor (near the feet);
+  frames 9-13 face the camera looking down-left, 14-18 face away looking up-left, 3 tiles each
+  (body and two arms). The battle idle marches in place (frames 11 10 9 10 11 12 13 12, 6 8 10
+  8 ticks), the walk uses the same frames faster (2 4 6 4). Ramza (RAMUZA, chapter 1), Delita
+  (DILY), Agrias (AGURI) and the thief (THIEF_M) all use TYPE1. The other two directions are
+  the same frames mirrored (exmateria-gambit-tactics' reading of BATTLE.BIN, not verified
+  here); the poses are ~14-23 x 37 pixels.
+- OBSERVED (a capture of Gariland sent by the user): a standing unit (hair to feet) is ~235 px
+  where a canal one tile wide spans ~130 px of height, i.e. ~0.9 of a tile's width; the faces
+  show two eyes drawn in the outline's colour (colour 1) inside the skin.
+- OBSERVED: the canal tiles have surface type 0x0E (MAP022.9); FFT animates its water.
+  TARGET: the views stay still; glints slide on the visible water pixels (README).
+- TARGET: the same 10 frames per unit scaled 0.6 to 16 x 26 (0.5, the first choice, made a
+  unit 0.75 of our 24-px tile), each eye placed on its own (1 x 2 black at the centre of its
+  group of colour-1 pixels in the face, a pixel apart) on a face one grey lighter, FFT's idle and walk timings at ~30 frames per second, the mirroring at draw
+  time (a 256-byte table), a world facing per unit, turned with the camera.
 
 ## Numbers
 
@@ -92,5 +112,6 @@ IMPLEMENTATION** (what the TI does, and why).
 |---|---|---|---|
 | map | 10 x 15 tiles, h 0-10 | same | `extract.py` (MAP022.9 terrain) |
 | tile / height unit | 28 / 12 world units | 24 x 12 px / 6 px | ratio kept (6.3 px) |
+| unit height | ~0.9 tile width (capture) | ~22 px of 24 (scale 0.6) | capture, `units.py` |
 | Move / Jump | 4 / 3 (squire) | 4 / 3 | game data, not measured |
 | rotation | ~0.5 s, smooth | 3 frames, 0.54 s | ti-cycles |

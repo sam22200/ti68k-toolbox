@@ -111,6 +111,8 @@ static void test_reach(void)
 
 // ---------------------------------------------------------------- milestone 3-4: occlusion
 // pixels of unit i that show on screen: the frame with it against the frame without it
+static int mid;                                           // of those, in a mid grey (not the contour)
+
 static int shown(u8 i)
 {
     static u8 with[RT_H][RT_W];
@@ -122,7 +124,10 @@ static int shown(u8 i)
     st = save;
     st.unit[i].x = 200;                                   // out of the map: not drawn
     sw_step(0);
-    for (y = 0; y < RT_H - 8; y++) for (x = 0; x < RT_W; x++) n += with[y][x] != sw_level(x, y);
+    mid = 0;
+    for (y = 0; y < RT_H - 8; y++)
+        for (x = 0; x < RT_W; x++)
+            if (with[y][x] != sw_level(x, y)) { n++; mid += with[y][x] == 1 || with[y][x] == 2; }
     st = save;
     st.unit[i].x = ux;
     return n;
@@ -160,19 +165,33 @@ static void find_spots(void)
 
 static void test_occlusion(void)
 {
-    int s[4];
+    int s[4], m[4], inside;
     u8 r;
     sw_init(1);                                           // the thief behind the house
     for (r = 0; r < 4; r++) {
         at_view(r, st.unit[2].x, st.unit[2].z);
-        s[r] = shown(2);
+        s[r] = shown(2); m[r] = mid;
     }
-    printf("occlusion: shown %d %d %d %d\n", s[0], s[1], s[2], s[3]);
-    alone = s[0];
-    for (r = 1; r < 4; r++) if (s[r] > alone) alone = s[r];
-    CHECK(alone > 150);                                   // ~190 pixels with the outline
-    CHECK(s[0] < alone / 20);                             // hidden from the south...
-    CHECK(s[1] > alone * 9 / 10);                         // ...seen once turned with F5
+    printf("occlusion: shown %d %d %d %d, mid greys %d %d %d %d\n", s[0], s[1], s[2], s[3],
+           m[0], m[1], m[2], m[3]);
+    alone = s[0]; inside = m[0];
+    for (r = 1; r < 4; r++) { if (s[r] > alone) alone = s[r]; if (m[r] > inside) inside = m[r]; }
+    CHECK(alone > 80);                                    // ~100 pixels with the outline
+    CHECK(m[0] * 5 < inside);                             // hidden from the south...
+    CHECK(s[0] > alone / 3);                              // ...but its contour drawn over the house
+    CHECK(s[1] > alone * 9 / 10);                         // seen once turned with F5
+}
+
+// the arrow above enemies: the thief seen (west view) shows ~30 pixels more than as an ally
+static void test_team(void)
+{
+    int foe, ally;
+    sw_init(2);
+    foe = shown(2);
+    st.unit[2].team = TEAM_PLAYER;
+    ally = shown(2);
+    printf("team: enemy %d pixels, ally %d\n", foe, ally);
+    CHECK(foe - ally >= 20 && foe - ally <= 40);
 }
 
 // ---------------------------------------------------------------- rotation and walking by keys
@@ -218,6 +237,7 @@ static void test_walk_keys(void)
     CHECKV(st.mode, M_BROWSE);
     CHECK(st.unit[0].x == 7 && st.unit[0].z == 7);
     CHECK(st.cx == 7 && st.cz == 7);
+    CHECKV(st.unit[0].face, 2);                           // facing its last step: (7, 6) -> (7, 7), +z
     // after a turn the arrows follow the view: at r 1, view +v is world +x
     press(K_F5); steps(0, TURN_FRAMES);
     press(K_DOWN);
@@ -249,6 +269,7 @@ int main(int argc, char **argv)
     test_heights();
     test_reach();
     test_occlusion();
+    test_team();
     test_turn_keys();
     test_walk_keys();
     shots();

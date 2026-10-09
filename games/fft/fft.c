@@ -5,7 +5,8 @@
 // unpacked (during the turn that reaches it) and copied into a buffer larger than the screen
 // (the reach rings are drawn there); every frame copies the camera's window and draws the
 // units through a cover mask made from that depth.
-// The rotation itself is animated with flat polygons projected at intermediate angles.
+// The rotation itself is animated with polygons projected at intermediate angles, each face in
+// the mean grey of its pixels in the views (map.h).
 #include "fft.h"
 #include <stdlib.h>
 #include <string.h>
@@ -95,19 +96,23 @@ u8 scene_rot;
 // diagonal and their mask (SC_PLANE each)
 #define VIEW_BYTES (6UL * SC_PLANE)          // 52,320: above a 16-bit int
 static const u8 *views[4];
+static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static u8 *vbuf, vbuf_rot;
 
 // Work memory, allocated with the scene (globals and statics are stored in the program file
 // on the TI: -mno-bss, and the TI-89 refuses programs above 24 KB)
 #define TW (RT_W / 2)                   // the rotation frames: half resolution
 #define TH (RT_H / 2)
-#define COVER_H (UNIT_SH + 2)
+#define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
+#define GLINTS 250                      // glints per phase at most
 typedef struct {
     s16 span_l[TH + 8], span_r[TH + 8];
     u8 queue[MAP_W * MAP_H], from[MAP_W * MAP_H];
     u8 half[2][TW / 8 * TH];
     u16 dbl[256];                       // byte -> its bits doubled
     u8 order[MAP_W * MAP_H], count[256];
+    struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
+    u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
 } Work;
 static Work *W;
@@ -331,11 +336,63 @@ static void unpack_view(u8 rot)
     vbuf_rot = rot;
 }
 
+// is scene pixel (x, y) in front of everything nearer than view diagonal depth (not covered)?
+static u8 seen(s16 x, s16 y, u8 depth)
+{
+    const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+    u16 o = (u16)(y * SC_BYTES + (x >> 3));
+    u8 b = (u8)(0x80 >> (x & 7));
+    return !((t1[o] > depth && m1[o] & b) || (t2[o] > depth && m2[o] & b));
+}
+
+// The water's glints of orientation rot: 2-pixel dashes on a lattice of the scene's pixels
+// (every other row, one even column in 8, staggered by row) that slides 2 px right each phase
+// (a current), on the water tiles' tops where the view shows them (not under a bank or a roof)
+static void make_glints(u8 rot)
+{
+    u8 i;
+    memset(W->glints, 0, sizeof W->glints);
+    for (i = 0; i < MAP_W * MAP_H; i++) {
+        s16 u, v, x, y, r, px;
+        if (!map_tiles[i].water) continue;
+        view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
+        x = scene_x(rot, u, v) - HW; y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
+        for (r = 1; r < 11; r++) {
+            s16 py = y + r, k = r < 6 ? r : 11 - r;
+            if ((py & 1) || (u16)py >= SC_H) continue;
+            for (px = (x + 10 - 2 * k + 1) & ~1; px + 1 < x + 14 + 2 * k; px += 2) {
+                u8 ph = (u8)(((px >> 1) + 3 * (py >> 1)) & 3), n;
+                if (px < 0 || px + 1 >= SC_W) continue;
+                n = W->glints[ph];
+                if (n >= GLINTS || !seen(px, py, (u8)(u + v)) || !seen(px + 1, py, (u8)(u + v))) continue;
+                W->glint[ph][n].x = px; W->glint[ph][n].y = py;
+                W->glints[ph] = (u8)(n + 1);
+            }
+        }
+    }
+}
+
+// this frame's glints on the screen, white (a phase every 8 frames)
+static void draw_glints(void)
+{
+    u8 ph = (u8)((st.tick >> 3) & 3), n = W->glints[ph], i;
+    for (i = 0; i < n; i++) {
+        s16 x = W->glint[ph][i].x - st.camx, y = W->glint[ph][i].y - st.camy, k;
+        if ((u16)y >= RT_H || x < 0 || x + 1 >= RT_W) continue;
+        for (k = x; k <= x + 1; k++) {
+            u16 o = (u16)(y * RT_PBYTES + (k >> 3));
+            u8 b = (u8)~(0x80 >> (k & 7));
+            ((u8 *)rt_light)[o] &= b; ((u8 *)rt_dark)[o] &= b;
+        }
+    }
+}
+
 static void ensure_scene(u8 rot)
 {
     u8 i;
     if (scene_rot == rot && scene_seq == hl_seq) return;
     unpack_view(rot);
+    if (scene_rot != rot) make_glints(rot);
     memcpy(scene_l, vbuf, 2 * SC_PLANE);
     scene_rot = rot; scene_seq = hl_seq;
     dst_scene();
@@ -344,7 +401,7 @@ static void ensure_scene(u8 rot)
         if (!reach_hi(i)) continue;
         view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
         x = scene_x(rot, u, v) - HW; y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
-        blit24(x, y, 12, hi_mask, hi_mask, hi_mask);
+        blit24(x, y, 12, hi_l, hi_d, hi_m);
         uncover(x, y, 24, 12, (u8)(u + v));
     }
 }
@@ -452,7 +509,7 @@ static Feet unit_feet(u8 rot, u8 i)
 static void cover(u16 *cm, s16 fx, s16 fy, u8 depth)
 {
     const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
-    s16 bx = fx - 8, by = fy - UNIT_SH + 1, b0 = bx >> 3, sh = 8 - (bx & 7), r, k;
+    s16 bx = fx - 8, by = fy - UNIT_FOOT, b0 = bx >> 3, sh = 8 - (bx & 7), r, k;
     for (r = 0; r < COVER_H; r++) {
         s16 y = by + r;
         u32 m = 0;
@@ -469,37 +526,85 @@ static void cover(u16 *cm, s16 fx, s16 fy, u8 depth)
     }
 }
 
-// a unit and its shadow, both through the cover mask (ExtGraph: dest = dest & mask | data,
-// mask 1 = transparent, so the data is cleared under the cover too)
-static void draw_unit_covered(s16 sx, s16 sy, u8 i, const u16 *cm)
+// FFT's battle idle (TYPE1.SEQ 6 / 7: frames 11 10 9 10 11 12 13 12 for 6 8 10 8 ticks at
+// 60 Hz) and walk (8 / 9: the same frames for 2 4 6 4 ticks), in our frames (~30 per second)
+static const u8 idle_seq[32] = { 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+    2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 3, 3, 3, 3 };
+static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 };
+
+// a unit's frame (units.h) seen from orientation rot: its facing turned into the view, front
+// frames looking down-left (+v), back ones up-left (-u), mirrored for +u and -v as in FFT
+static const u8 *unit_frame(u8 rot, u8 i, u8 *mirror)
+{
+    static const s8 fdx[4] = { 1, -1, 0, 0 }, fdz[4] = { 0, 0, 1, -1 };
+    const Unit *un = &st.unit[i];
+    s16 u0, v0, du, dv;
+    u8 t = (u8)(st.tick + 11 * i), k;                  // the units out of step
+    view_of(rot, 0, 0, &u0, &v0);
+    view_of(rot, fdx[un->face], fdz[un->face], &du, &dv);
+    du -= u0; dv -= v0;
+    k = st.mode == M_WALK && i == st.sel ? walk_seq[t & 15] : idle_seq[t & 31];
+    if (du < 0 || dv < 0) k += 5;
+    *mirror = du > 0 || dv < 0;
+    return ugfx + (u16)(un->gfx * UNIT_FRAMES + k) * (6 * UNIT_SH);
+}
+
+#define REV16(w) ((u16)(rev8[(u8)(w)] << 8 | rev8[(u16)(w) >> 8]))
+
+// the opaque pixels of row r (1 .. UNIT_SH - 2) of a sprite mask whose four neighbours are opaque
+static u16 erode(const u16 *mk, u8 r)
+{
+    u16 o = (u16)~mk[r];
+    return o & (u16)(o << 1) & (o >> 1) & (u16)~mk[r - 1] & (u16)~mk[r + 1];
+}
+
+// a unit and its shadow, both through the cover mask cm (ExtGraph: dest = dest & mask | data,
+// mask 1 = transparent, so the data is cleared under the cover too), the unit's contour drawn
+// over the cover, an enemy's arrow above it; cm RT_NULL: the unit alone, uncovered (the
+// rotation frames)
+static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const u16 *cm)
 {
     RtSprite s;
-    u16 mk[COVER_H], ml[COVER_H], md[COVER_H];
-    const u16 *g = unit_gfx[st.unit[i].gfx][0];
-    u8 r;
-    for (r = 0; r < 3; r++) {
-        u16 c = cm[UNIT_SH - 2 + r];
-        mk[r] = shadow_gfx[2][r] | c; ml[r] = shadow_gfx[0][r] & ~c; md[r] = shadow_gfx[1][r] & ~c;
+    u16 mk[COVER_H], ml[COVER_H], md[COVER_H], any = 0;
+    u8 r, mir;
+    const u8 *g = unit_frame(rot, i, &mir);
+    s.w = 16;
+    if (cm) {
+        for (r = 0; r < 3; r++) {
+            u16 c = cm[UNIT_FOOT - 1 + r];
+            mk[r] = shadow_gfx[2][r] | c; ml[r] = shadow_gfx[0][r] & ~c; md[r] = shadow_gfx[1][r] & ~c;
+        }
+        s.h = 3;
+        s.light = ml; s.dark = md; s.mask = mk;
+        draw_sprite(sx - 8, sy - 1, &s);
     }
-    s.w = 16; s.h = 3;
-    s.light = ml; s.dark = md; s.mask = mk;
-    draw_sprite(sx - 8, sy - 1, &s);
     for (r = 0; r < UNIT_SH; r++) {
-        u16 c = cm[r];
-        mk[r] = g[2 * UNIT_SH + r] | c; ml[r] = g[r] & ~c; md[r] = g[UNIT_SH + r] & ~c;
+        u16 l = RD16(g, r), d = RD16(g, UNIT_SH + r), k = RD16(g, 2 * UNIT_SH + r);
+        if (mir) { l = REV16(l); d = REV16(d); k = REV16(k); }
+        mk[r] = k; ml[r] = l; md[r] = d;
+        if (cm) any |= cm[r];
+    }
+    if (any) {          // covered: only the contour stays (the white outline and the black
+        u8 r1 = UNIT_SH - 3;    // line inside it), the sprite eroded twice and taken away,
+        u16 a, b, c;            // on the covered rows only (rows 0, 1 and the last two: outline)
+        for (r = 2; r < r1 && !cm[r]; r++) ;
+        while (r1 > r && !cm[r1]) r1--;
+        a = erode(mk, r - 1); b = erode(mk, r);
+        for (; r <= r1; r++, a = b, b = c) {
+            u16 h;
+            c = erode(mk, r + 1);       // before mk[r] changes (it reads rows r .. r + 2)
+            h = cm[r] & b & (u16)(b << 1) & (b >> 1) & a & c;
+            mk[r] |= h; ml[r] &= ~h; md[r] &= ~h;
+        }
     }
     s.h = UNIT_SH;
     s.light = ml; s.dark = md; s.mask = mk;
-    draw_sprite(sx - 8, sy - UNIT_SH + 1, &s);
-}
-
-static void draw_unit(s16 sx, s16 sy, u8 i)
-{
-    RtSprite s;
-    const u16 *g = unit_gfx[st.unit[i].gfx][0];
-    s.w = 16; s.h = UNIT_SH;
-    s.light = g; s.dark = g + UNIT_SH; s.mask = g + 2 * UNIT_SH;
-    draw_sprite(sx - 8, sy - UNIT_SH + 1, &s);
+    draw_sprite(sx - 8, sy - UNIT_FOOT, &s);
+    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: an arrow above enemies,
+        s.h = FOE_H;                            // never covered (it shows a hidden one too)
+        s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
+        draw_sprite(sx - 8, sy - UNIT_FOOT - FOE_H + 1, &s);
+    }
 }
 
 // ---------------------------------------------------------------- the rotation animation
@@ -571,7 +676,7 @@ static void draw_turn(void)
             static const u8 mir[4][4] = { { 1, 0, 3, 2 }, { 1, 0, 3, 2 }, { 3, 2, 1, 0 }, { 3, 2, 1, 0 } };
             s16 facing = f == 0 ? S : f == 1 ? -S : f == 2 ? C : -C, lit;
             const Tile *nt;
-            u8 ha, hb, na = 0, nb = 0;
+            u8 ha, hb, na = 0, nb = 0, k;
             if (facing <= 0) continue;
             nt = tile_at(tx + fdx[f], tz + fdz[f]);
             ha = t->c[fa[f]]; hb = t->c[fb[f]];
@@ -582,10 +687,11 @@ static void draw_turn(void)
             px[2] = cx[fb[f]]; py[2] = cy[fb[f]] + (hb > nb ? (hb - nb) * (HU / 2) : 0);
             px[3] = cx[fa[f]]; py[3] = cy[fa[f]] + (ha > na ? (ha - na) * (HU / 2) : 0);
             lit = f == 0 ? C : f == 1 ? -C : f == 2 ? -S : S;      // normal's screen x < 0
-            lit = lit < 0;
-            fill_poly(px, py, 4, side_flat[t->side][!lit][0], side_flat[t->side][!lit][1]);
+            k = t->look[1 + f] + (lit >= 0);                       // the views' grey, one
+            if (k >= SHADES) k = SHADES - 1;                       // darker facing right
+            fill_poly(px, py, 4, turn_pat[k][0], turn_pat[k][1]);
         }
-        fill_poly(cx, cy, 4, top_flat[t->top][0], top_flat[t->top][1]);
+        fill_poly(cx, cy, 4, turn_pat[t->look[0]][0], turn_pat[t->look[0]][1]);
     }
     {                                                             // doubled onto the screen
         const u8 *hl = half[0], *hd = half[1];
@@ -605,7 +711,7 @@ static void draw_turn(void)
         if (un->x >= MAP_W) continue;
         sx = pvx + (s16)((muls16(x2, C) - muls16(z2, S)) >> 8);
         sy = pvy + (s16)((muls16(x2, S) + muls16(z2, C)) >> 9) - map_tiles[un->z * MAP_W + un->x].stand * (HU / 2);
-        draw_unit(sx, sy, (u8)i);
+        draw_unit_covered(sx, sy, st.rot, (u8)i, RT_NULL);
     }
 }
 
@@ -662,6 +768,7 @@ void game_init(void)
         name[4] = (char)('0' + i);
         views[i] = rt_file(name, RT_NULL);
     }
+    ugfx = rt_file("fftu", RT_NULL);
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB
         vbuf = malloc(VIEW_BYTES);
         sbuf = vbuf ? malloc(2 * SC_PLANE + sizeof(Work)) : RT_NULL;
@@ -688,9 +795,10 @@ void game_init(void)
     }
 }
 
-static void place(u8 i, u8 x, u8 z, u8 gfx, u8 team)
+static void place(u8 i, u8 x, u8 z, u8 gfx, u8 team, u8 face)
 {
     st.unit[i].x = x; st.unit[i].z = z; st.unit[i].gfx = gfx; st.unit[i].team = team;
+    st.unit[i].face = face;
 }
 
 void game_scenario(u16 n)
@@ -698,9 +806,10 @@ void game_scenario(u16 n)
     u8 i;
     for (i = 0; i < sizeof(st); i++) ((u8 *)&st)[i] = 0;
     if (!W) return;
-    place(0, 5, 5, UG_RAMZA, TEAM_PLAYER);
-    place(1, 7, 8, UG_DELITA, TEAM_PLAYER);
-    place(2, 1, 11, UG_THIEF, TEAM_ENEMY);       // behind a house from the south (fft_test --find)
+    place(0, 5, 5, UG_RAMZA, TEAM_PLAYER, 2);    // facing +z: the south camera
+    place(1, 7, 8, UG_DELITA, TEAM_PLAYER, 2);
+    place(2, 1, 11, UG_THIEF, TEAM_ENEMY, 3);    // behind a house from the south (fft_test --find)
+    place(3, 4, 5, UG_AGRIAS, TEAM_PLAYER, 2);
     st.cx = 5; st.cz = 5;
     if (n >= 1 && n <= 4) {                       // the thief behind a building, each view
         st.rot = (u8)(n - 1);
@@ -732,7 +841,8 @@ u8 game_update(void)
 {
     s16 tx, ty;
     u8 mode0 = st.mode;
-    if (!W || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
+    if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
+    st.tick++;
     if (st.turn) {                                 // rotating: nothing else moves the view
         if (++st.turn_t >= TURN_FRAMES) {          // done: the cursor stays where it was
             s16 u, v, px, py;
@@ -748,6 +858,8 @@ u8 game_update(void)
     else if (input_pressed(K_F1)) { st.turn = -1; st.turn_t = 0; }
 
     if (st.mode == M_WALK) {
+        const u8 *a = st.path[st.path_i], *b = st.path[st.path_i + 1];
+        st.unit[st.sel].face = b[0] > a[0] ? 0 : b[0] < a[0] ? 1 : b[1] > a[1] ? 2 : 3;
         if (++st.walk_t >= WALK_FRAMES) {
             st.walk_t = 0;
             st.path_i++;
@@ -814,7 +926,7 @@ static void draw_hud(void)
     char s[24];
     const char *name = "";
     u8 o = unit_at(st.cx, st.cz), h = map_tiles[st.cz * MAP_W + st.cx].stand, n = 0;
-    static const char *const names[UNIT_GFX_N] = { "Ramza", "Delita", "Thief" };
+    static const char *const names[UNIT_GFX_N] = { "Ramza", "Delita", "Agrias", "Thief" };
     static const char dirs[4] = { 'S', 'W', 'N', 'E' };
     if (o) name = names[st.unit[o - 1].gfx];
     s[n++] = dirs[st.rot]; s[n++] = ' '; s[n++] = 'h';
@@ -833,9 +945,9 @@ void game_render(void)
     u8 ord[NUNIT], i, j;
     Feet f[NUNIT];
     s16 u, v;
-    if (!W || !views[0] || !views[1] || !views[2] || !views[3]) {
+    if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) {
         draw_rect(0, 0, RT_W, RT_H, C_WHITE);
-        draw_text(4, 40, W ? "missing fftv0-fftv3" : "not enough memory (75 KB)", F_SMALL, C_BLACK);
+        draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (75 KB)", F_SMALL, C_BLACK);
         return;
     }
     if (st.turn) {                                 // the view it turns to, unpacked meanwhile
@@ -846,7 +958,7 @@ void game_render(void)
     ZB(6);
     ensure_scene(st.rot);
     ZE(6);
-    ZB(3); copy_view(); ZE(3);
+    ZB(3); copy_view(); draw_glints(); ZE(3);
     ZB(4);
     for (i = 0; i < NUNIT; i++) {                  // units back to front
         f[i] = unit_feet(st.rot, i);
@@ -858,7 +970,7 @@ void game_render(void)
         u16 cm[COVER_H];
         if (st.unit[k].x >= MAP_W) continue;
         cover(cm, f[k].x, f[k].y, f[k].depth);
-        draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, k, cm);
+        draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, cm);
     }
     ZE(4); ZB(5);
     // the cursor, above everything (blinking)
