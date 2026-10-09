@@ -43,6 +43,41 @@ actors are reduced to four greys with white outlines. Source mechanics,
 complete PC/TI states/screens and individual frame costs are checked;
 reusable ROM layout and animation-anchor findings extend `ti-port-snes`.
 
+[GBA porting skill](.claude/skills/ti-port-gba/SKILL.md): the same measured
+approach for Game Boy Advance ROMs, using a pinned headless mGBA core.
+[Reference tooling](tools/gba/README.md) checks cold boot, native inputs,
+RAM/video exports, cartridge save restoration and per-frame replay on the
+three local Advance Wars, Final Fantasy Tactics Advance and The Minish Cap
+ROMs. These validate instrumentation; game-specific mechanics and native
+playable milestones follow the user's chosen scope.
+[Minish Woods](games/minish/README.md) extracts nine ROM data
+streams without gameplay and directly loads the original forest from cold
+boot with an explicit study save. Walking, 56,816 decoded bytes against loaded
+RAM and three 120-frame forest replays pass. Its first native traversal walks
+the opening at provisional 1:1 scale, with real partial terrain collisions,
+corner slides, slopes and a tighter camera. M2 adds original scenery, 44
+outlined Link poses and canopy occlusion: 6310 original walking steps and
+400 displayed animation poses match; source art matches 16.8M RGB pixels.
+3606 PC/TI state hashes and 56 screens pass; peak frame cost is under 297k
+cycles. M3 adds ordinary sword swings, 40 attack poses and cutting all 53 bush
+cells with changed scenery/collision: 1947 source steps and 672k additional
+oracle pixels per build pass. M3 PC/TI checks cover 4639/4675 hashes and
+216/252 screens at 100%/70%, with peaks under 327k/332k cycles.
+An additional `minishz` build shows scenery and Link at 70% scale, preserving
+source mechanics: 1.312M oracle pixels, 3642 PC/TI state hashes and 92 screens
+pass; peak frame cost is under 307k cycles. The original-scale build remains.
+M4 adds the two opening Octoroks, ordinary shots, sword kills, contact/shot
+damage, recoil, hearts and retry in both views. Twenty original trials check
+608 targeted updates; twenty enemy poses add 960k oracle pixels per scale.
+Current PC/TI checks cover 7521/7557 hashes and 346/382 screens, with peaks
+under 360k/349k cycles. Hearts keep a one-pixel white outline, and nearby
+targeting with larger round balls makes ordinary shots visible.
+AI choices and projectile impact/expiry are native
+adaptations; original bouncing deflections, drops and later actions remain.
+M5 adds Link's original roll (330 source updates), leaf bursts, readable cut
+earth and fading Octorok deaths: 49 poses and 2.35M oracle pixels per scale;
+9990/10026 PC/TI hashes and 703/739 screens, peaks under 358k/344k cycles.
+
 [Neo Geo porting skill](.claude/skills/ti-port-neogeo/SKILL.md): the same
 measured approach for MVS/AES cartridges, using local Windjammers files as
 the first preparation case. [Reference preparation](tools/neogeo/README.md)
@@ -120,6 +155,9 @@ Third-party, copyrighted or generated files are kept out of git (`.gitignore`):
   `roms/snes/`: pinned Snes9x, local original traces/states/PPU captures,
   reading aids and SNES ROMs. `sources/megamanx_snes/` holds the second
   experiment; both games' generated trace fixtures and art remain ignored.
+- `sources/gba_core/`, `sources/gba_checks/`, `roms/gba/`: pinned mGBA,
+  local GBA ROMs and headless reference states, memory/video captures and
+  measurements. Extracted assets and source-trace fixtures remain ignored.
 - `roms/neogeo/`, `sources/neogeo_core/`, `sources/windjammers_neogeo/`,
   `sources/neogeo_reference/`:
   local cartridge/BIOS files, prepared Windjammers inputs and third-party

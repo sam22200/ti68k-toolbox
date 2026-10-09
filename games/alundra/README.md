@@ -165,3 +165,9 @@ update ~4.7k. `alundra.89z` 26.7 KB (the test room's depth, 4 KB: the Titanium o
 data files of 41.6 KB, archived. Ran in TiEmu (Titanium) from the four archived files; the
 GIF `x/village_roof.gif` is drawn from the PC's frames (TI = PC), TiEmu's rate drifting
 against an open-loop key script.
+
+View copy (2026-10-08): `blit_plane` reads one `long` per destination word at its even
+address and shifts it once, instead of rebuilding a 32-bit accumulator per word (the same
+change as the Minish 70% view, `ti68k-performance.md`). Village (`keys/village.txt`, 260
+frames): the view copy alone 149k → 110k cycles per frame (−26 %), so render ~166k without
+the overlay; same TI = PC checksums on scenarios 0-7 and the four key scripts.
