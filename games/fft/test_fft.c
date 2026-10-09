@@ -182,7 +182,7 @@ static void test_occlusion(void)
     CHECK(s[1] > alone * 9 / 10);                         // seen once turned with F5
 }
 
-// the arrow above enemies: the thief seen (west view) shows ~30 pixels more than as an ally
+// the diamond above enemies: the thief seen (west view) shows ~30 pixels more than as an ally
 static void test_team(void)
 {
     int foe, ally;
