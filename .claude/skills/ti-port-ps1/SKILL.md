@@ -338,6 +338,21 @@ only: nothing extracted from the disc).
   Data files bigger than the free RAM go straight to the archive at the transfer
   (attribute byte 3); `ti-run`'s typed command was lost while 209 KB were still arriving:
   type it again once the transfer is over.
+  **The game's own units** (FFT, 2026-10-09): battle sprites need no run: `BATTLE/<name>.SPR`
+  (16 palettes, a 256-wide 4-bit sheet) and the shared `TYPE1.SHP` (frames as up to 8 sheet
+  tiles placed from the feet) and `TYPE1.SEQ` (idle and walk timings); formats from
+  FFTPatcher / TacticsTemplateG, checked on the disc. FFT draws two directions and mirrors
+  them for the other two (a 256-byte bit-reverse table at draw time). Take the scale from a
+  capture of the game against a **geometric** ruler (a canal one tile wide: unit 0.9 of a tile
+  width), not textures (doors and windows gave 0-30 %): 0.6, not 0.5. A face 7 px wide loses
+  its eyes to any vote (FFT draws them in the outline's colour, 2-3 px apart): find each eye's
+  pixel group in the source and place it on its own, a skin pixel between. Hidden units: draw
+  only their contour over the building (the mask eroded twice on the covered rows, no
+  projection). Teams in 4 greys: an arrow above enemies read at a glance; outline variants
+  (inverted, dotted) needed a second look. Water: glints on the visible water pixels (the
+  view's depth), chosen once per view, ~13k cycles a frame. 6 KB of sprites put the program
+  at the TI-89's 24 KB limit: move them to an archived data file early (`RD16` reads them
+  big-endian on both targets).
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).
