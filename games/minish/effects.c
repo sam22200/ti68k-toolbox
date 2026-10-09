@@ -100,7 +100,7 @@ void minish_draw_fx(u8 pose,u16 wx,u16 wy,u8 cover)
     if (x>=RT_W || x+m[5]<=0 || y>=RT_H || y+(s16)h<=0) return;
 #ifdef __m68k__
     {s16 aligned=x&~15;
-     if (fx_shift[pose]!=65535 && x>=0 && x+m[5]<=RT_W && y>=0 && y+(s16)h<=RT_H) {
+     if (!minish_flash && fx_shift[pose]!=65535 && x>=0 && x+m[5]<=RT_W && y>=0 && y+(s16)h<=RT_H) {
          const u32 *q=(const u32 *)((const u8 *)art+fx_shift[pose]);
          u16 r,offset=((u16)y<<5)-((u16)y<<1)+((u16)aligned>>3);
          u8 *l=(u8 *)rt_light+offset,*d=(u8 *)rt_dark+offset;
@@ -117,7 +117,7 @@ void minish_draw_fx(u8 pose,u16 wx,u16 wy,u8 cover)
         sprite.w=32;sprite.h=h;
         for (part=0;part<m[4];part++,p+=h*3) {
             sprite.light=p;sprite.dark=p+h;sprite.mask=p+(h<<1);
-            draw_sprite(x+(part<<5),y,&sprite);
+            minish_link_sprite(x+(part<<5),y,&sprite);
         }
 #ifdef __m68k__
      }}

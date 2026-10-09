@@ -34,7 +34,7 @@ def main():
               (258,'keys/retry.txt',60),(258,'keys/idle.txt',12),(256,'keys/reset.txt',160)]
     cases += [(n,'keys/sword.txt',120) for n in range(260,272)]
     cases += [(n,'keys/idle.txt',1) for n in range(300,360)]
-    cases += [(n,'keys/idle.txt',1) for n in range(360,408)]
+    cases += [(n,'keys/idle.txt',1) for n in range(360,420)]
     cases += [(420,'keys/idle.txt',120),(420,'keys/idle.txt',14)]
     cases += [(430,'keys/roll.txt',120),(432,'keys/kill.txt',90)]
     cases += [(n,'keys/sword.txt',120) for n in range(440,456)]

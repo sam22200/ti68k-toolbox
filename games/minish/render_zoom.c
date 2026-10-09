@@ -155,16 +155,18 @@ void minish_zoom_render(void)
     minish_draw_cuts();
     minish_draw_effects(0);
     minish_draw_enemies(0);
-    if (st.encounters && st.iframes && (st.ticks&2)) {w=h=0;}
+    minish_flash_begin();
+    if (st.display_pose>=MINISH_HURT) {minish_draw_hurt(st.display_pose-MINISH_HURT,st.display_cover);w=0;}
     else if (st.display_pose>=84) {minish_draw_fx(st.display_pose-84,st.x>>8,st.y>>8,st.display_cover);w=0;}
     else if (st.display_pose>=44) minish_draw_sword(&x,&y,&w,&h);
     else {
     p=actors+((u16)(st.display_pose<<6)+(u16)(st.display_pose<<5));
     actor.w=actor.h=32;actor.light=p;actor.dark=p+32;actor.mask=p+64;
-    draw_sprite(x,y,&actor);
+    minish_link_sprite(x,y,&actor);
     { const u8 *b=zoom_actor_bounds[st.display_pose];
       x+=b[0];y+=b[1];w=b[2];h=b[3]; }
     }
+    minish_flash=0;
     if (st.display_cover && w) minish_canopy(x,y,w,h);
     minish_draw_enemies(1);
     minish_draw_effects(1);

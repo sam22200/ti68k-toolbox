@@ -1,0 +1,24 @@
+# TiEmu showcase from door 432: the Octorok walks into Link (knockback, damage flash), sword kill, rolls.
+0
+185 UP
+195 UP A
+196
+204 A
+205
+213 A
+214
+222 A
+223
+235 LEFT B
+236 LEFT
+250
+258 RIGHT B
+259 RIGHT
+273
+281 UP B
+282 UP
+296
+304 DOWN B
+305 DOWN
+319
+340

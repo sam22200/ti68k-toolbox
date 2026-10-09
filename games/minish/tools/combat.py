@@ -87,6 +87,8 @@ def measure():
                     else:poses[key]=canvas
                     seq.append(key)
                 timelines[(face,action)]=seq
+        hurt,hurt_seq,hurt_pixels=hurt_poses(g)
+        rgb_pixels+=hurt_pixels;replayed+=2*4*HURT_UPDATES
         keys=sorted(poses);ids={k:i for i,k in enumerate(keys)}
         # Native animation timelines are drawn from checked original updates.
         walk=[[ids[k] for k in timelines[(f,1)][:32]] for f in range(4)]
@@ -100,16 +102,55 @@ def measure():
                 assert sword,('no sword hitbox',face)
                 b=sword[0]['hitbox'];boxes.append([b[0] if b[0]<128 else b[0]-256,b[1] if b[1]<128 else b[1]-256,b[6],b[7]])
             attack_boxes.append(boxes)
-        np.savez_compressed(GAME/'fixtures/source_combat.npz',actors=np.stack([poses[k] for k in keys]))
-        pack(np.stack([poses[k] for k in keys]),walk,shoot,attack_boxes)
+        np.savez_compressed(GAME/'fixtures/source_combat.npz',actors=np.stack([poses[k] for k in keys]),hurt=hurt)
+        pack(np.stack([poses[k] for k in keys]),walk,shoot,attack_boxes,hurt,hurt_seq)
         data={'trials':trials,'source_replayed_frames':replayed,'source_rgb_pixels':rgb_pixels,
-              'pose_keys':keys,'walk':walk,'shoot':shoot,'sword_boxes':attack_boxes,
+              'pose_keys':keys,'walk':walk,'shoot':shoot,'sword_boxes':attack_boxes,'hurt':hurt_seq,
               'door_sha256':sha(DOOR.read_bytes()),'core':g.identity,
               'initial_phase_writes':'setup() only; no actor or terrain writes after trial starts'}
         (GAME/'fixtures/combat.json').write_text(json.dumps(data,indent=2)+'\n')
         write_fixtures(data)
         print('Combat:',len(trials),'trials',replayed,'replayed updates',rgb_pixels,'RGB pixels',len(poses),'poses')
     finally:g.close()
+
+HURT_UPDATES=7
+
+def hurt_poses(g):
+    """Link's knockback animation (24+facing) after an ordinary contact.
+
+    The source draws it with the damage palette (OBJ 15); the native flash is
+    separate, so the same OBJ tiles are decoded with Link's ordinary palette.
+    The completed video depicts the previous update's entity pose."""
+    from art import entity, composite
+    from effects import roll_pixels
+    poses=[];keys={};seqs=[];pixels=0
+    for face,(dx,dy) in enumerate(((0,-6),(6,0),(0,6),(-6,0))):
+        first=None
+        for repeat in range(2):
+            setup(g,320,184,face,1,200,320+dx,184+dy);g.write(PLAYER+20,face*2)
+            seq=[];images=[]
+            for i in range(HURT_UPDATES+1):
+                prev=entity(g);g.step([])
+                if i==0:continue
+                assert prev['pose'][0]==24+face,('hurt animation',face,i,prev['pose'])
+                snap=g.snapshot();rgb,_=composite(snap)
+                assert np.array_equal(rgb,np.asarray(g.image()));pixels+=240*160
+                oam=bytearray(snap['oam'])
+                for j in range(128):
+                    a2=struct.unpack_from('<H',oam,j*8+4)[0]
+                    if prev['tile']<=(a2&1023)<prev['tile']+32 and a2>>12==15:
+                        struct.pack_into('<H',oam,j*8+4,(a2&0x0fff)|(prev['palette']<<12))
+                images.append(roll_pixels({**snap,'oam':bytes(oam)},prev))
+                seq.append(tuple(prev['pose']))
+            current=(seq,[im.tobytes() for im in images])
+            if first is None:first=current
+            else:assert first==current,('hurt replay',face)
+        ids=[]
+        for key,im in zip(first[0],images):
+            if key not in keys:keys[key]=len(poses);poses.append(im)
+            ids.append(keys[key])
+        seqs.append(ids)
+    return np.stack(poses),seqs,pixels
 
 def write_fixtures(data):
     chosen=data['trials']
@@ -129,8 +170,11 @@ def write_fixtures(data):
                     *[v>>8 for v in e['xy']],s['health'],p['iframes'],p['recoil'],e['hp'],
                     flight,*([v>>8 for v in r['xy']] if r else [0,0]),r['timer'] if flight else 0]))+'\n')
 
-def pack(actors,walk,shoot,boxes):
+def pack(actors,walk,shoot,boxes,hurt,hurt_seq):
     from art import grayscale,sprite_words
+    from effects import packed
+    from hud import rock_shift
+    rock=rock_shift()
     def array(name,typ,rows):
         def braces(v):return '{'+','.join(braces(x) if isinstance(x,list) else str(x) for x in v)+'}'
         shape=[];v=rows
@@ -142,6 +186,7 @@ def pack(actors,walk,shoot,boxes):
     assert positions==[[328,56],[280,152]]
     header+=array('enemy_spawn','u16',positions)+array('enemy_walk','u8',walk)+array('enemy_shoot','u8',shoot)
     header+=array('sword_boxes','s8',boxes)
+    header+=f'#define HURT_POSES {len(hurt)}\n'+array('hurt_seq','u8',hurt_seq)
     for zoom in (False,True):
         words=[];meta=[]
         for rgba in actors:
@@ -158,6 +203,9 @@ def pack(actors,walk,shoot,boxes):
             l[:,:x1-x0]=level[y0:y1,x0:x1];m[:,:x1-x0]=expanded[y0:y1,x0:x1]
             meta.append([len(words),x0-ax-1,y0-ay-1,w,h]);words+=sprite_words(l,m,w)
         bank='mizfight' if zoom else 'mifight'
+        hurt_words=[];hurt_meta=[]
+        for rgba in hurt:
+            m,p=packed(rgba,zoom);hurt_meta.append([len(hurt_words),*m]);hurt_words+=p
         # Use uniform u32 rows for either width; shift 16-wide rows to high half.
         uniform=[]
         for offset,x,y,w,h in meta:
@@ -177,10 +225,16 @@ def pack(actors,walk,shoot,boxes):
                 payload=struct.pack(order+f'{len(words)}H',*words)
                 payload+=bytes(base_size-len(payload))+struct.pack(order+f'{len(shifted)}I',*shifted)
             else:payload=struct.pack(order+f'{len(uniform)}I',*uniform)
+            # Link's knockback poses follow, in the roll/effect layout.
+            payload+=bytes(-len(payload)&3);hurt_base=len(payload)
+            payload+=struct.pack(order+f'{len(hurt_words)}I',*hurt_words)
+            # The native projectile's sixteen pre-shifts, kept out of the program.
+            rock_base=len(payload);payload+=struct.pack(order+f'{len(rock)}I',*rock)
             assert len(payload)<65518
             (GAME/f'{bank}{suffix}.bin').write_bytes(payload)
         header+=('#ifdef MINISH_ZOOM\n' if zoom else '#ifndef MINISH_ZOOM\n')
-        header+=f'#define FIGHT_SIZE {len(payload)}\n'+array('enemy_art','s16',meta)
+        header+=f'#define FIGHT_SIZE {len(payload)}\n#define HURT_BASE {hurt_base}\n#define ROCK_BASE {rock_base}\n'+array('enemy_art','s16',meta)
+        header+=array('hurt_art','s16',hurt_meta)
         if zoom:header+=array('enemy_shift','u16',shift_offsets)
         header+='#endif\n'
     (GAME/'combat_generated.h').write_text(header)

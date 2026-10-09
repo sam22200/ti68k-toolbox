@@ -129,6 +129,6 @@ void minish_draw_sword(s16 *x,s16 *y,u16 *w,u16 *h)
     actor.w=32;actor.h=height;
     for (i=0;i<sword_parts[pose];i++,p+=height*3) {
         actor.light=p;actor.dark=p+height;actor.mask=p+(height<<1);
-        draw_sprite(*x+(i<<5),*y,&actor);
+        minish_link_sprite(*x+(i<<5),*y,&actor);
     }
 }

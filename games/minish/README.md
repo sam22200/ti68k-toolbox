@@ -10,7 +10,8 @@ sword swings now cut the 53 bush cells, changing their scenery and collision;
 walking through newly cleared paths works. Forty additional poses show Link
 with the sword, outlined together. The two opening Octoroks now wander, spit,
 take sword hits and cause contact/projectile damage. Three hearts, short recoil,
-invulnerability blinking and a native game-over/retry complete the encounter.
+the original knockback poses and damage flash, and a native game-over/retry
+complete the encounter.
 ENTER restores bushes, enemies and health. M5 adds Link's original roll
 (B: Shift/X on the PC, Shift on the TI), the original leaf burst when a bush or
 grass is cut, a lighter earth texture that stays readable where bushes were, and
@@ -101,12 +102,22 @@ extracted roll, leaf and death poses. Up to four leaf bursts run at once; the
 oldest is recycled. Doors `(430)` roll, `(432)` kill an Octorok, `(440..455)`
 four bursts at once over cleared beds, with both Octoroks dying from `(448)`,
 `(512+)` every effect pose and `(700..891)` clipped effect poses. Complete PC/TI
-checks: **9990 hashes / 703 screens** at 100% and **10026 hashes / 739
-screens** at 70%; peaks **357666 / 343636 cycles**. The 70% view copy reads
+checks: **10002 hashes / 715 screens** at 100% and **10038 hashes / 751
+screens** at 70%; peaks **358736 / 344834 cycles**. The 70% view copy reads
 one `long` per destination word and shifts it once (128k instead of 183k
 cycles for both planes), which brought the dense effect scenes under budget.
-Program payloads are 23603 / 24309 bytes; the six archived banks total
-149088 / 242826 bytes.
+
+Taking damage follows the original: Link plays its knockback animation (ten
+source poses, one per facing and recoil update, doors `(408..417)`) while he is
+pushed back, then stays visible during the thirty invulnerable updates. The
+source pulses Link's palette in four 4-update phases; on four greys the
+native body goes one step darker, black, black, then ordinary (doors `(418)`,
+`(419)`), always inside its white outline. The knockback poses and the
+projectile's sixteen pre-shifts live in `mifight`/`mizfight`, which keeps the
+program payloads at 22873 / 23609 bytes; the six archived banks total
+153636 / 246534 bytes. Ran in TiEmu (Titanium) from the six archived banks:
+[TiEmu replay](captures/tiemu/showcase.gif) (`keys/tiemu.txt` from door
+`(432)`: three contacts, a sword kill and four rolls).
 
 The enemy study door adds only the original `TABIDACHI` flag before the original
 room loader, separately from `woods.state`; this is controlled preparation,

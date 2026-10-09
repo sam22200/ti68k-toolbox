@@ -63,6 +63,11 @@ u8 minish_death_length(void);
 u8 minish_fx_pose_count(void);
 u8 minish_fx_preview_pose(u8 group);
 void minish_canopy(s16 x,s16 y,u16 w,u16 h);
+#define MINISH_HURT 140       /* display poses 140.. are Link's knockback */
+extern u8 minish_flash;       /* 0, or the damage flash drawn on Link */
+void minish_flash_begin(void);
+void minish_link_sprite(s16 x,s16 y,const RtSprite *s);
+void minish_draw_hurt(u8 pose,u8 cover);
 #ifdef MINISH_ZOOM
 u16 minish_scaled(u16 x);
 u8 minish_zoom_init(void);

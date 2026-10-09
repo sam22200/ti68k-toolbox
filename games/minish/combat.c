@@ -81,8 +81,10 @@ u8 minish_combat_before(u16 keys)
     if (!st.health) {st.moving=0;return 1;}
     if (!st.recoil) return 0;
     st.attack=st.roll=st.roll_guard=0;st.last_a=(keys&K_A)!=0;st.last_b=(keys&K_B)!=0;st.moving=0;
-    st.display_pose=st.pose;st.pose=idle_pose[st.anim_face];
+    st.display_pose=st.pose;
     if (!--st.recoil) return 1;
+    /* Source knockback animation 24+facing, then idle on the last update. */
+    st.pose=st.recoil>1 ? MINISH_HURT+hurt_seq[st.anim_face][8-st.recoil] : idle_pose[st.anim_face];
     x=st.x+knock_x[st.recoil_dir];y=st.y+knock_y[st.recoil_dir];
     if (free_body(x>>8,st.y>>8)) st.x=x;
     if (free_body(st.x>>8,y>>8)) st.y=y;
@@ -110,7 +112,7 @@ static void hurt(s16 x,s16 y)
     st.health=st.health<2 ? 0 : st.health-2;
     st.iframes=30;st.recoil=8;
     st.recoil_dir=direction((st.x>>8)-x,(st.y>>8)-y);
-    st.attack=st.roll=st.roll_guard=0;
+    st.attack=st.roll=st.roll_guard=0;st.pose=MINISH_HURT+hurt_seq[st.anim_face][0];
 }
 
 static void pause_enemy(MinishEnemy *e)
@@ -260,7 +262,7 @@ void minish_draw_enemies(u8 front)
 #ifdef __m68k__
         {s16 aligned=x&~15;
          if (aligned>=0 && aligned<=RT_W-32 && y>=0 && y<=RT_H-8) {
-             const u32 *p=rock_shift[(u16)x&15];u16 r;
+             const u32 *p=(const u32 *)((const u8 *)pixels+ROCK_BASE)+((u16)x&15)*24;u16 r;
              u16 offset=((u16)y<<5)-((u16)y<<1)+((u16)aligned>>3);
              u8 *l=(u8 *)rt_light+offset,*d=(u8 *)rt_dark+offset;
              for (r=0;r<8;r++,l+=RT_PBYTES,d+=RT_PBYTES,p+=3) {
@@ -273,6 +275,52 @@ void minish_draw_enemies(u8 front)
 #endif
         minish_canopy(x,y,8,8);
     }
+}
+
+/* The source damage palette pulses in four 4-update phases over the
+ * invulnerability: on four greys, darker / black body / black / ordinary.
+ * White outline pixels stay white; Link never disappears. */
+u8 minish_flash;
+
+void minish_flash_begin(void)
+{
+    static const u8 phases[4]={1,2,2,0};
+    minish_flash=st.encounters && st.iframes ? phases[((30-st.iframes)>>2)&3] : 0;
+}
+
+void minish_link_sprite(s16 x,s16 y,const RtSprite *s)
+{
+    u32 buf[128];
+    const u32 *l=s->light,*d=s->dark;
+    RtSprite t;
+    u16 r;
+    if (!minish_flash || s->h>64) {draw_sprite(x,y,s);return;}
+    /* Grey g = 2*dark+light: one step darker is (dark|light, dark),
+       black is (dark|light, dark|light); white (0,0) is unchanged. */
+    for (r=0;r<s->h;r++) {
+        u32 a=d[r]|l[r];
+        buf[r]=minish_flash==2 ? a : d[r];buf[64+r]=a;
+    }
+    t=*s;t.light=buf;t.dark=buf+64;
+    draw_sprite(x,y,&t);
+}
+
+void minish_draw_hurt(u8 pose,u8 cover)
+{
+    const s16 *m=hurt_art[pose];
+    const u32 *p=(const u32 *)((const u8 *)pixels+HURT_BASE)+m[0];
+    s16 x,y;u16 part,h=m[3];RtSprite s;
+#ifdef MINISH_ZOOM
+    x=minish_scaled(st.x>>8)-st.camx+m[1];y=minish_scaled(st.y>>8)-st.camy+m[2];
+#else
+    x=(st.x>>8)-st.camx+m[1];y=(st.y>>8)-st.camy+m[2];
+#endif
+    s.w=32;s.h=h;
+    for (part=0;part<m[4];part++,p+=h*3) {
+        s.light=p;s.dark=p+h;s.mask=p+(h<<1);
+        minish_link_sprite(x+(part<<5),y,&s);
+    }
+    if (cover) minish_canopy(x,y,m[5],h);
 }
 
 void minish_draw_health(void)

@@ -173,8 +173,9 @@ that kind of task.
   and larger round balls make shots visible. AI choices and rock impact/expiry are native adaptations;
   original bouncing deflections, drops and other actions remain next.
   M5 adds the original roll (330 source updates), leaf bursts, readable cut
-  earth and Octorok death puffs: 49 poses, 2.35M oracle pixels per scale;
-  9990/10026 PC/TI hashes and 703/739 screens, peaks under 358k/344k cycles.
+  earth, Octorok death puffs, original knockback poses and a four-phase damage
+  flash: 2.35M oracle pixels per scale; 10002/10038 PC/TI hashes and 715/751
+  screens, peaks under 359k/345k cycles; ran in TiEmu from archived banks.
   An additional `minishz` build uses 70% visual scale with shared source
   mechanics: 1.312M oracle pixels, 3642 PC/TI hashes and 92 screens pass;
   peak is under 307k cycles. The original-scale build remains.
