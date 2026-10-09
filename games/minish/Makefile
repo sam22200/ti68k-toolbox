@@ -82,7 +82,7 @@ tihash: $(NAME)_test $(TI_FILES) generated.h
 	$(TI)/tools/bin/ti-cc -o $(NAME)h -DRT_CYCLES -DSTATE_HASH $(CFLAGS_GAME) $(SRC) $(RT_CORE) $(RT)platform-ti68k/rt_ti.c $(TI)/tools/extgraph/lib/tilemap.a
 	$(PY) tools/check_native.py --name $(NAME) $(if $(ZOOM),--zoom)
 
-combat_generated.h mifight.bin mifight.be.bin mizfight.bin mizfight.be.bin fixtures/combat.json fixtures/combat.txt fixtures/source_combat.npz &: tools/combat.py $(REFERENCE_STATE)
+combat_generated.h mifight.bin mifight.be.bin mizfight.bin mizfight.be.bin fixtures/combat.json fixtures/combat.txt fixtures/source_combat.npz &: tools/combat.py $(REFERENCE_STATE) tools/effects.py tools/hud.py
 	$(PY) tools/combat.py --door --measure
 mifight.89y: mifight.be.bin
 	$(TI)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat mifight.be.bin mifight

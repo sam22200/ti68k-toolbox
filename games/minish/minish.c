@@ -335,6 +335,14 @@ void game_scenario(u16 n)
         }
         return;
     }
+    if (n>=408 && n<420) {
+        /* Knockback poses (408..417) and two damage-flash phases (418, 419). */
+        minish_place(280,184);minish_combat_start();st.preview=1;
+        st.enemies[0].hp=st.enemies[1].hp=0;
+        if (n<418) st.pose=st.display_pose=MINISH_HURT+n-408;
+        else st.iframes=n==418 ? 26 : 29;
+        return;
+    }
     if (n==420) {
         /* Real walk-to-spit AI transition, no forced projectile spawn. */
         minish_place(280,184);minish_combat_start();
@@ -526,14 +534,16 @@ void game_render(void)
     minish_draw_effects(0);
     minish_draw_enemies(0);
     x = (st.x >> 8)-st.camx-16; y = (st.y >> 8)-st.camy-32;
-    if (st.encounters && st.iframes && (st.ticks&2)) {actor_w=actor_h=0;}
+    minish_flash_begin();
+    if (st.display_pose>=MINISH_HURT) {minish_draw_hurt(st.display_pose-MINISH_HURT,st.display_cover);actor_w=0;}
     else if (st.display_pose>=84) {minish_draw_fx(st.display_pose-84,st.x>>8,st.y>>8,st.display_cover);actor_w=0;}
     else if (st.display_pose>=44) minish_draw_sword(&x,&y,&actor_w,&actor_h);
     else {
     p = actor_pixels+((u16)(st.display_pose<<7)-(u16)(st.display_pose<<3));
     actor.w = 32; actor.h = 40; actor.light = p; actor.dark = p+40; actor.mask = p+80;
-    draw_sprite(x,y,&actor);
+    minish_link_sprite(x,y,&actor);
     }
+    minish_flash=0;
     if (st.display_cover && actor_w) minish_canopy(x,y,actor_w,actor_h);
     minish_draw_enemies(1);
     minish_draw_effects(1);

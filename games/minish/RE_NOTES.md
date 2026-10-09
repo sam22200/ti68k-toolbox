@@ -392,8 +392,8 @@ eight directions, preserving measured cardinal/diagonal speeds; enemy contact
 push,32-way death angles, drops, source death effects and story persistence
 are deferred. Native death has12 recoil updates then20 blinking updates.
 Rocks disappear on wall/sword/player impact or48-update expiry. Falling,
-bouncing and reflected returns are deferred. Quarter-heart HUD, invulnerability
-blink using the existing idle pose and an ENTER retry are native presentation.
+bouncing and reflected returns are deferred. Quarter-heart HUD and an ENTER retry
+are native presentation; the knockback poses and flash are below.
 Hearts keep their quarter fills, a two-pixel grey highlight and a silhouette
 mask dilated by exactly one pixel; scenery remains outside that mask. HUD and
 projectile glyphs are generated independently of the ROM-derived combat bank.
@@ -418,3 +418,18 @@ intermediate/edge screen comparisons fix both rendering and the cycle spike.
 Precomposed static HUD rows, pre-shifted ordinary rocks, pre-shifted zoom enemy
 poses, and pointer/clip-mask reuse in canopy restoration keep dense encounters
 inside budget. No new assembly or hardware/runtime path was introduced.
+
+OBSERVED: after an ordinary contact the player plays animation 24+facing during
+the seven recoil updates, independent of the knockback direction: frame82
+(up) for all seven, frames79/80/81 (right, left mirrored) and76/77/78 (down)
+for three, three and one updates; the last recoil update returns to idle.
+From the contact, Link's OBJ attributes use palette15 for the thirty
+invulnerable updates and he is never hidden. Palette15 changes every four
+updates (first phase three updates): a saturated red/orange cycle whose
+luminance runs medium, darker, darkest, lightest. The knockback tiles are
+decoded with Link's ordinary palette6 (two identical replays per facing).
+
+ADAPTATION: the four-grey flash maps the phases to one step darker, black body,
+black body, ordinary; white outline pixels stay white. Phase timing is taken
+from the contact, as observed; whether the source cycle is global was not
+tested.
