@@ -31,7 +31,7 @@ make map.h        # once: reads MAP/MAP022 from roms/ps1/Final Fantasy Tactics (
                   # map.h and the four views fftv0.bin .. fftv3.bin, ZX0-packed (~2 min)
 make units.h      # once: the units' sprites from BATTLE/*.SPR and TYPE1.SHP (a second):
                   # units.h and the data file fftu.bin (6.2 KB, big-endian rows)
-make test         # headless tests (rotations, heights, reach, occlusion, team arrow, keys)
+make test         # headless tests (rotations, heights, reach, occlusion, team marker, keys)
 make pc           # SDL window: ./fft_pc   (F1 / F5 on the PC keyboard too)
 make ti           # fft.89z, fftu.89y and fftv0.89y .. fftv3.89y: send all six, archive the five
                   # data files (read in place), run fft()
@@ -66,6 +66,10 @@ game does not build. `art.h` is ours and committed (`make art.h` regenerates it 
   `lib/unpack68k.s` on the TI, 2.2 M cycles = 0.18 s; a C copy on the PC), during the first
   frame of the turn that reaches it, and copied into the 17 KB scene buffer when the
   orientation or the reach changes. Two allocations: AMS refuses blocks above ~64 KB.
+- **Reach rings** are drawn into that scene copy, then the pixels in front of their tile are
+  restored from the view but for 2-pixel dashes: a tile behind a house keeps a dashed ring
+  over it (the user's pick over the whole ring and a checkerboard, `x/bench_cases_cachees.png`,
+  local); no cost per frame. The cursor's line is 4 px per row (`x/bench_curseur.png`).
 - **Every frame**: the camera's 160 x 100
   window is copied from it at any pixel (32-bit shifted words), the units are drawn back to
   front through a **cover mask**: the pixels of their 16 x 26 box whose depth is greater than
@@ -108,8 +112,9 @@ game does not build. `art.h` is ours and committed (`make art.h` regenerates it 
   sliding 2 px right every 8 frames: a current. Only the positions the view shows (its depth:
   not under a bank or a roof) are kept, once per orientation (`make_glints`, ~100 per phase),
   and drawn on the screen after the view copy (~13k cycles). The views themselves stay still.
-- **Team at a glance.** Enemies have a black arrow with a white border above the head
-  (`foe_gfx`, `art.py`), never covered: a hidden enemy shows its contour and its arrow over
+- **Team at a glance.** Enemies have a black diamond with a white border above the head
+  (`foe_gfx`, `art.py`), never covered (the user's pick of eight shapes,
+  `x/bench_marqueurs_ennemis.png`, local): a hidden enemy shows its contour and its diamond over
   the building. Chosen over an inverted outline (black outside, white inside) and a dotted
   one, which need a second look (`x/choix_camps.png`, local); FFT itself tells the teams by
   palettes, which 4 greys cannot.
@@ -120,7 +125,7 @@ game does not build. `art.h` is ours and committed (`make art.h` regenerates it 
 
 | | cycles | at 12 MHz |
 |---|---|---|
-| ordinary frame (view copy and water glints 144k, four units with their cover masks, contours and the enemy arrow 153k, cursor + HUD 23k) | ~320k | 32 fps (frame-limited) |
+| ordinary frame (view copy and water glints 144k, four units with their cover masks, contours and the enemy diamond 153k, cursor + HUD 23k) | ~320k | 32 fps (frame-limited) |
 | walking frame | ~325k | 32 fps |
 | selecting a unit (view copied, reach rings drawn) | 0.56 M | 0.05 s |
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
