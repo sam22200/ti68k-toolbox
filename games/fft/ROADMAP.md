@@ -72,7 +72,7 @@ place); sprites added to `fftu` (attack, hit, KO, crystal poses: ~6 KB per unit,
 place). The program will grow past the TI-89's 24,576 bytes: Titanium first, the TI-89 kept
 with `-pack` (decided at milestone 13).
 
-13. **Decisions and the oracle.** `/grilling` on the scope (defaults: Gariland only, its own
+13. **Decisions and the oracle** (done: `RE_NOTES.md` § Battle decisions, `tools/oracle.py`). `/grilling` on the scope (defaults: Gariland only, its own
     units and positions, no story text but one line before and after, no job system or
     shops, the game's RNG replaced by ours, Brave / Faith / zodiac kept as hidden numbers,
     the TI-89 by `-pack`). The save state at Gariland's first turn; the battle unit struct
