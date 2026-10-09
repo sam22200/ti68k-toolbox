@@ -353,6 +353,15 @@ only: nothing extracted from the disc).
   view's depth), chosen once per view, ~13k cycles a frame. 6 KB of sprites put the program
   at the TI-89's 24 KB limit: move them to an archived data file early (`RD16` reads them
   big-endian on both targets).
+  **A story battle without playing the story** (milestone 13): the game picks its scenario
+  from script variables (`CURRENT_EVENT`, `NEXT_SCENARIO`), found by name in a community
+  decompilation (`adamrt/fft_decomp`, cloned in `sources/`); writing them every frame from
+  the new game's birthday screen until the game moves on loaded the scene before Gariland,
+  where the recruits join, and the battle followed (Orbonne skipped). The core is
+  deterministic: one script (`games/fft/tools/oracle.py`, 30 s) rebuilds the state at the
+  first player turn, RNG included; keep it a single process (a state saved and reloaded
+  between steps gave a slightly different battle). FFT USA confirms with CIRCLE. The AI
+  writes trial positions into the real unit records while thinking: trace between turns.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).

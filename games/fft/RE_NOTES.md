@@ -22,6 +22,30 @@ IMPLEMENTATION** (what the TI does, and why).
 - **Rotation animated** (polygon frames between the views), not instantaneous.
 - **4 greys**, Titanium first, the program kept under the TI-89's 24 KB.
 
+## Battle decisions (grilling, 2026-10-09, milestones 13-22)
+
+- Fidelity: stats, turn order, damage and hit chance as the game's, each number checked on the
+  running original. The AI as FFT's if it can be made fast enough; if an enemy turn costs more
+  than ~1 s on the TI, the numbers and a simplified version go to the user first.
+- Oracle: the original at Gariland's first turn, reached by poking RAM or a patched local copy
+  of the disc (the first battle loading Gariland's), else key scripts through the prologue.
+- Random numbers: ours; probabilities and mean damage checked over many trials.
+- Units: the disc's (ENTD 0x184, below): five enemies, Delita as an AI guest; the player's
+  Ramza and four recruits drawn as the game draws them (two Squires, two Chemists), names
+  from the game's lists. Random fields (Brave, Faith, zodiac, equipment, secondary skills)
+  drawn each battle by the game's rules (a fixed seed in tests).
+- Brave, Faith and zodiac active, shown in Status.
+- Deployment: fixed tiles in the deployment area first, FFT's placement screen later.
+- Dialogue: the disc's English text, optional (a setting); a box with a portrait (size picked
+  on a sheet of 24 and 32 px candidates).
+- EXP, JP and level ups earned during the battle, lost at the end; animations faster than the
+  game's but not hurried, a key to skip.
+- The current demo (Agrias, the thief) is replaced by the battle; its rotation, occlusion and
+  reach tests stay with the battle's units.
+- End: a results screen, then the battle again with new draws. [ESC] saves and quits, the next
+  run resumes. Keys: [2nd]/[ENTER] confirm, [ESC]/[shift] cancel, F1/F5 the camera, [F2] status
+  and turn order. Titanium, and the TI-89 through `-pack`.
+
 ## Tools
 
 - `psxiso.py ... sources/fft_ps1/disc` lists the files; `--file MAP/MAP022.GNS` (and the
@@ -32,6 +56,22 @@ IMPLEMENTATION** (what the TI does, and why).
 - Format references: the FFT modding community, `adamrt/fft_toolkit` (`src/map_record.c`,
   `src/terrain.c`, read on GitHub, not copied): map list (`MAP022` = Magic City Gariland), GNS
   records, the terrain block. Every field used was checked on this map (below).
+- **The battle oracle** (milestone 13): `tools/oracle.py DISC sources/fft_ps1/gariland_t1.state
+  trace.txt` runs the game headless (psxrun's core) from a new game to Ramza's first turn at
+  Gariland in 30 s and saves the core state (local, never committed); deterministic (two runs
+  give the same battle, RNG included). Gariland is reached without playing Orbonne: the script
+  variables `CURRENT_EVENT` (word 0x27) = 6 and `NEXT_SCENARIO` (0x64) = 1, written from frame
+  2000 until the game moves on, make the scenario loader start event 7 (the academy scene
+  where the recruits join), then event 9 is Gariland. Pad: CIRCLE confirms, CROSS cancels
+  (USA). Deployment by pad (UP / LEFT then CIRCLE places the selected unit, R1 selects the
+  next one) and by writing the deployment grid for the last two units.
+- **Code reading aid**: `adamrt/fft_decomp` (cloned in `sources/fft_decomp`, local), a
+  decompilation with named globals and functions: the scenario table and loader
+  (`attack_load_scenario_conditionals`), the script variables, the battle unit struct
+  (`include/fft/unit.h`), the deployment screen. Read to find addresses, never copied.
+- Disc readers written for milestone 13 (ENTD events, jobs, skill sets, sprite tables,
+  deployment records) are in the session scratchpad; milestone 14 moves what it needs into
+  `tools/`.
 
 ## Behaviour and data
 
@@ -105,6 +145,43 @@ IMPLEMENTATION** (what the TI does, and why).
   unit 0.75 of our 24-px tile), each eye placed on its own (1 x 2 black at the centre of its
   group of colour-1 pixels in the face, a pixel apart) on a face one grey lighter, FFT's idle and walk timings at ~30 frames per second, the mirroring at draw
   time (a 256-byte table), a world facing per unit, turned with the camera.
+
+### The battle (milestone 13, the oracle)
+
+- OBSERVED (disc, `EVENT/ATTACK.OUT` at 0x801cf938: 480 records of 0x18 bytes): the scenario
+  table. Events 1-2 Orbonne's chapel (map 62), 3-6 the Orbonne battle (map 56, ENTD 0x183),
+  7-8 the Military Academy (map 24, ENTD 0x188), **9-12 Gariland** (map 22, ENTD 0x184, squad
+  0x100, Ramza mandatory). Event 9 runs the battle's condition script 3.
+- OBSERVED (disc, `BATTLE/ENTD4.ENT` entry 4, event 0x184 "Gariland Fight"): six units.
+  Delita (sprite 04, his own Squire job 04, level 1, Sagittarius, guest: team byte 0x84, AI
+  controlled) at (8, 12); five enemies (team 0x90), level 1, Brave / Faith / zodiac /
+  names random (0xFE): Squire M with a Broad Sword at (6, 5), Squire M with a Dagger at
+  (1, 1), Squire M with a Dagger at (5, 4), Chemist M (Brave fixed 38) at (7, 4), Squire F
+  with a Dagger at (3, 3). War trophies: Mythril Knife, Phoenix Down, Potion. Squire skills
+  (set 05): Accumulate, Dash, Throw Stone, Heal; Chemist: Item (Potion, Phoenix Down...);
+  Delita's set 1C adds Wish, Ramza's 19 adds Yell. The male Chemist's sprite (ITEM_M.SPR)
+  uses `TYPE2.SHP` / `TYPE2.SEQ`, not TYPE1.
+- OBSERVED (run): a new game creates Ramza only; the academy scene adds six recruits (two
+  male and two female Squires, a male and a female Chemist, level 1, Brave and Faith 48-70)
+  and Delita in party slot 16. Gariland's deployment area (5 x 5 grid, row by row, 1 =
+  valid): `00000 / 00011 / 11111 / 10000 / 00000`, unit limit 5, Ramza mandatory.
+- OBSERVED (run, RAM `0x801908cc`, 21 units of 0x1C0 bytes, offsets from fft_decomp and all
+  checked against the screen and the party data): job +3, team +5, level +0x22, Brave
+  +0x24, Faith +0x26, HP / max +0x28 / +0x2A, MP / max +0x2C / +0x2E, PA +0x36, MA +0x37,
+  Speed +0x38, CT +0x39, Move +0x3A, Jump +0x3B, x +0x47, y +0x48. Enemies are units 0-5
+  (Delita 0), the player's 16-20. At level 1: Squires HP 34-44, MP 10-11, PA 3-4, MA 3-4,
+  Speed 6, Move 4; Chemists HP 35-38, Move 3; Ramza HP 52, MP 16, PA 5, MA 5, Move 5; Delita
+  HP 53, PA 6.
+- OBSERVED (run, `sources/fft_ps1/gariland_t1.txt`): every unit starts at CT 0 and gains its
+  Speed per clock tick, several ticks per frame; all have Speed 6, so all reach 102 on the
+  same tick and act in unit order (Delita, the five enemies, then Ramza: ties go to the lower
+  unit index). An acting unit's CT drops by 100 when its turn starts and gets 20 back for each
+  of Move and Act it did not use: Delita moved only (102 -> 22), enemy 1 moved and acted
+  (-> 2). LIKELY INTERPRETATION: FFT's known rule (CT - 100, - 80, - 60).
+- OBSERVED: the AI writes trial positions and HP into the real unit records while it thinks
+  (a trace shows units jumping between tiles for a frame): read the records between turns.
+- TARGET: milestone 14 rebuilds these units and stats from the disc and compares them with
+  this table; milestone 15 the CT clock against this trace.
 
 ## Numbers
 
