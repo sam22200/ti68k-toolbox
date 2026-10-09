@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Our own art for the FFT tech demo (no disc data) -> art.h (committed), and a preview PNG.
+"""Our own art for the FFT tech demo (no disc data) -> art.h (committed).
 
-usage: art.py art.h [preview.png]
+usage: art.py art.h
 Greys: 0 white, 1 light, 2 dark, 3 black (light plane = bit 0, dark plane = bit 1).
 The scenery is the game's own (tools/extract.py: the map's textured mesh drawn per view);
-this file holds what is drawn over it and the rotation frames:
-- Units: 16-wide ASCII sprites with a black outline drawn in, a white outline added here.
-- The cursor and the reach ring (24x12 diamonds).
-- Flat greys per material for the rotation frames (8x8 polygon patterns).
+and so are the units (tools/units.py -> units.h); this file holds the rest:
+- The units' shadow (ExtGraph sprite rows, mask bit 1 = transparent) and rev8, a byte with
+  its bits reversed (the units' sprites mirrored, as FFT draws two of the four directions).
+- The cursor and the reach marker (24x12 diamonds); the arrow above enemies (team at a glance).
+- The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
+  the views (extract.py, map.h).
 """
 import sys
-
-TOPS = ['GRASS', 'WATER', 'WOOD', 'STONE', 'ROOF', 'TREE', 'BOX', 'BRICK']
-SIDES = ['DIRT', 'STONE', 'WOOD', 'HOUSE', 'LEAF', 'BRICK']
 
 
 def diamond_rows():
@@ -45,13 +44,24 @@ def plane_rows(pix, w, h, x0=0):
 
 
 def overlay_hi():
+    """The reach marker on a 24x12 tile: a solid black line inset 3 px along the edges, a white
+    one outside it (inset 1-2 px), readable on light and dark floors alike (chosen among four:
+    the first dotted black line, the same solid, this one, dotted with a lightened inside)."""
     rows = diamond_rows()
     pix = [[None] * 24 for _ in range(12)]
     for y, (x0, x1) in enumerate(rows):
-        if 2 <= y <= 9:
-            for x in (x0 + 3, x0 + 4, x1 - 5, x1 - 4):
-                if x0 + 3 < x1 - 4 and (y + x // 2) % 2 == 0:
-                    pix[y][x] = 3
+        if not 2 <= y <= 9:
+            continue
+        for x in (x0 + 3, x0 + 4, x1 - 5, x1 - 4):
+            if x0 + 3 < x1 - 4:
+                pix[y][x] = 3
+        for x in (x0 + 1, x0 + 2, x1 - 3, x1 - 2):
+            if pix[y][x] is None:
+                pix[y][x] = 0
+    for y in (1, 10):                   # the white line's top and bottom rows
+        x0, x1 = rows[y]
+        for x in range(x0 + 1, x1 - 1):
+            pix[y][x] = 0
     return pix
 
 
@@ -64,92 +74,22 @@ def cursor():
     return pix
 
 
-# 16-wide units: '.' transparent, 0-3 greys. Feet on the last row. A white outline is added.
-UNITS = {
- 'RAMZA': """
-....3333333.....
-...311110113....
-..31101111113...
-..31111111113...
-..33111111133...
-..30300003033...
-..30030030003...
-...300000003....
-....3333333.....
-...322232223....
-..32223332223...
-..30223332203...
-..30322222303...
-...3322122333...
-....32222223....
-....32233223....
-....3223.3223...
-....3333.3333...
-""", 'DELITA': """
-....3333333.....
-...322232223....
-..32223222223...
-..32222222223...
-..33222222233...
-..30300003033...
-..30030030003...
-...300000003....
-....3333333.....
-...311131113....
-..31113331113...
-..30113331103...
-..30311111303...
-...3311211333...
-....31111113....
-....31133113....
-....3223.3223...
-....3333.3333...
-""", 'THIEF': """
-.....33333......
-....3222223.....
-...322222223....
-..32221111223...
-..32210000123...
-..32203003023...
-..32200000023...
-..32220000223...
-...333333333....
-...322111223....
-..32221112223...
-..30222122203...
-..30322222303...
-...3322322333...
-....32222223....
-....32233223....
-....3223.3223...
-....3333.3333...
-"""}
-
-
-def unit_sprite(text):
-    lines = [l for l in text.strip('\n').split('\n')]
-    h = len(lines) + 2
-    pix = [[None] * 16 for _ in range(h)]
-    for y, l in enumerate(lines):
-        for x, ch in enumerate(l):
-            if ch != '.':
-                pix[y + 1][x] = int(ch)
-    out = [r[:] for r in pix]
-    for y in range(h):
-        for x in range(16):
-            if pix[y][x] is None and any(0 <= y + dy < h and 0 <= x + dx < 16 and pix[y + dy][x + dx] is not None
-                                         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                out[y][x] = 0
-    return out[:-1] if all(v is None for v in out[-1]) else out
-
+FOE = """
+....000000000...
+....033333330...
+.....0333330....
+......03330.....
+.......030......
+........0.......
+"""                                     # above an enemy's head: a black arrow, white border
 
 SHADOW = """
 ....222222222.
 ...22222222222
 ....222222222.
-"""                                     # 16-wide frame aligned with the unit sprites
+"""                                     # 16 wide, the units' anchor at column 8
 
-# 8x8 polygon patterns: (top, left face, right face) per material, rows of (light, dark) bytes,
+# 8x8 polygon patterns (the rotation frames): rows of (light, dark) bytes,
 # written doubled as 16-bit words
 def pattern(f):
     L, D = [], []
@@ -167,63 +107,32 @@ def main():
     out = open(sys.argv[1], 'w')
     w = out.write
     w('// Generated by tools/art.py (our own art, committed). See that file for the layout.\n')
-    w('enum { %s, MT_N };\n' % ', '.join('MT_' + m for m in TOPS))
-    w('enum { %s, SD_N };\n' % ', '.join('SD_' + s for s in SIDES))
 
     def arr(name, rows, fmt='0x%08lXUL'):
         w('static const u32 %s[%d] = { %s };\n' % (name, len(rows), ', '.join(fmt % r for r in rows)))
 
     L, D, M = plane_rows(overlay_hi(), 24, 12)
-    arr('hi_mask', M)
+    arr('hi_l', L); arr('hi_d', D); arr('hi_m', M)
     L, D, M = plane_rows(cursor(), 24, 12)
     arr('cur_l', L); arr('cur_d', D); arr('cur_m', M)
-    # units: ExtGraph sprites (u16 rows, mask bit 1 = transparent)
-    names = list(UNITS)
-    w('enum { %s, UNIT_GFX_N };\n' % ', '.join('UG_' + n for n in names))
-    sprites = [unit_sprite(UNITS[n]) for n in names]
-    uh = len(sprites[0])
-    w('#define UNIT_SH %d\n' % uh)
-    w('static const u16 unit_gfx[UNIT_GFX_N][3][UNIT_SH] = {\n')
-    for sp in sprites:
-        L, D, M = plane_rows(sp, 16, uh)
-        w('    { { %s },\n      { %s },\n      { %s } },\n' % tuple(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M])))
-    w('};\n')
     sh = [[None if c == '.' else int(c) for c in l] for l in SHADOW.strip('\n').split('\n')]
     sh = [r + [None] * (16 - len(r)) for r in sh]
     L, D, M = plane_rows(sh, 16, len(sh))
+    w('static const u8 rev8[256] = { %s };\n' % ', '.join(str(int('{:08b}'.format(i)[::-1], 2)) for i in range(256)))
     w('static const u16 shadow_gfx[3][%d] = { { %s }, { %s }, { %s } };\n' % (len(sh), *(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M]))))
-    # rotation frames (half resolution): solid greys, a top always differs from its faces
-    solid = lambda g: pattern(lambda x, y: g)
-    TOPG = {'GRASS': 1, 'WATER': 2, 'WOOD': 0, 'STONE': 0, 'ROOF': 2, 'TREE': 3, 'BOX': 1, 'BRICK': 2}
-    SIDEG = {'DIRT': (2, 3), 'STONE': (1, 2), 'WOOD': (1, 2), 'HOUSE': (0, 1), 'LEAF': (2, 3), 'BRICK': (1, 3)}
-    w('static const u16 top_flat[MT_N][2][8] = {\n')
-    for m in TOPS:
-        L, D = solid(TOPG[m])
+    # rotation frames (half resolution): solid greys (checkerboards between two greys were
+    # tried: the user preferred solid faces)
+    foe = [[None if c == '.' else int(c) for c in l] for l in FOE.strip('\n').split('\n')]
+    L, D, M = plane_rows(foe, 16, len(foe))
+    w('#define FOE_H %d\n' % len(foe))
+    w('static const u16 foe_gfx[3][FOE_H] = { { %s }, { %s }, { %s } };\n' % tuple(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M])))
+    w('#define SHADES 4\n')
+    w('static const u16 turn_pat[SHADES][2][8] = {\n')
+    for k in range(4):
+        L, D = pattern(lambda x, y: k)
         w('    { { %s }, { %s } },\n' % (', '.join('0x%04X' % (v << 8 | v) for v in L), ', '.join('0x%04X' % (v << 8 | v) for v in D)))
     w('};\n')
-    w('static const u16 side_flat[SD_N][2][2][8] = {\n')
-    for s_ in SIDES:
-        w('    {\n')
-        for g in SIDEG[s_]:
-            L, D = solid(g)
-            w('      { { %s }, { %s } },\n' % (', '.join('0x%04X' % (v << 8 | v) for v in L), ', '.join('0x%04X' % (v << 8 | v) for v in D)))
-        w('    },\n')
-    w('};\n')
     out.close()
-    if len(sys.argv) > 2:
-        preview(sys.argv[2], sprites)
-
-
-def preview(path, sprites):
-    from PIL import Image
-    pal = [(0xD6, 0xDE, 0xC6), (0x9C, 0xA3, 0x8E), (0x5A, 0x60, 0x4F), (0x1C, 0x1F, 0x18)]
-    im = Image.new('RGB', (60, 24), (255, 0, 255))
-    for i, sp in enumerate(sprites):
-        for y, r in enumerate(sp):
-            for x, v in enumerate(r):
-                if v is not None:
-                    im.putpixel((2 + i * 18 + x, 2 + y), pal[v])
-    im.resize((im.width * 4, im.height * 4), Image.NEAREST).save(path)
 
 
 if __name__ == '__main__':

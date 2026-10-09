@@ -1,12 +1,14 @@
 // Final Fantasy Tactics, Magic City Gariland: an isometric tech demo on the Portable Game
 // Runtime (README.md). Our own engine; the battlefield's heights and its four pictures come
-// from the local disc (tools/extract.py -> map.h, fftv0..3), the units are ours (tools/art.py).
+// from the local disc (tools/extract.py -> map.h, fftv0..3), and so do the units (tools/units.py
+// -> units.h); the cursor, shadow and rotation greys are ours (tools/art.py).
 #ifndef FFT_H
 #define FFT_H
 #include "../../runtime/core/rt.h"
 
-typedef struct { u8 c[4]; u8 top, side, walk, stand; } Tile;   // map.h, extract.py
+typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py
 #include "art.h"
+#include "units.h"
 #include "map.h"
 
 // Projection (scene pixels): a tile is a 24x12 diamond, one height unit is 6 px.
@@ -21,7 +23,7 @@ typedef struct { u8 c[4]; u8 top, side, walk, stand; } Tile;   // map.h, extract
 #define SC_OY (HU * MAXH + 4)          // scene y of the top vertex of view tile (0, 0) at h 0
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane
 
-#define NUNIT 3
+#define NUNIT 4
 #define MOVE 4                         // FFT's squire: Move 4, Jump 3
 #define JUMP 3
 #define TURN_FRAMES 3                  // rotation animation: frames between two views
@@ -31,7 +33,7 @@ typedef struct { u8 c[4]; u8 top, side, walk, stand; } Tile;   // map.h, extract
 enum { M_BROWSE, M_TARGET, M_WALK };
 enum { TEAM_PLAYER, TEAM_ENEMY };
 
-typedef struct { u8 x, z, gfx, team; } Unit;
+typedef struct { u8 x, z, gfx, team, face; } Unit;   // face: world +x, -x, +z, -z
 
 typedef struct {
     u8 rot;                            // orientation 0..3 (F5 +1, F1 -1)
@@ -40,6 +42,7 @@ typedef struct {
     u8 cx, cz;                         // cursor, world tile
     u8 mode, sel;                      // M_*, selected unit
     u8 rep;                            // arrow key repeat
+    u8 tick;                           // the units' animation clock (frames)
     u8 path_n, path_i, walk_t;         // walking: path, current step, frame in the step
     u8 path[PATH_MAX][2];
     Unit unit[NUNIT];

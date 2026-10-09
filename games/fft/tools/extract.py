@@ -17,6 +17,8 @@ light plane, dark plane, then twice (the frontmost depth of each image byte, the
 one) a plane of depths (the view diagonal u + v of the tile the pixels belong to) and a plane
 of the masks of those pixels: a unit is behind them when its own diagonal is smaller (fft.c
 cover()). Two depths per byte are exact for 97.5 % of the bytes (Gariland, all views).
+The same pass gives each tile's top and four walls a shade for the rotation frames (map.h):
+the mean grey of its pixels over the four views, rounded.
 """
 import os, struct, sys
 import numpy as np
@@ -26,10 +28,6 @@ from psxiso import Disc, walk   # noqa: E402
 import zx0pack                  # noqa: E402
 
 MAP = 22                                         # Magic City Gariland
-# surface -> (top material, side material) of fft.h (MT_*, SD_*)
-SURF = {0x03: ('GRASS', 'DIRT'), 0x0E: ('WATER', 'STONE'), 0x14: ('WOOD', 'WOOD'),
-        0x15: ('STONE', 'STONE'), 0x16: ('ROOF', 'HOUSE'), 0x1E: ('TREE', 'LEAF'),
-        0x1F: ('BOX', 'WOOD'), 0x21: ('BRICK', 'BRICK'), 0x23: ('WOOD', 'WOOD')}
 
 
 def edge(sl, shift):
@@ -107,10 +105,12 @@ SC_W, SC_OY, BG = 320, 64, 40.0                 # fft.h: SC_BYTES * 8, SC_OY; ba
 
 
 def render(polys, tex, pal, rot, nx, nz, sc_h):
-    """One view at K x the TI's pixels: luminance (BG outside the map) and the view diagonal
-    of the tile each pixel belongs to (-1 outside)."""
+    """One view at K x the TI's pixels: luminance (BG outside the map), the view diagonal of
+    the tile each pixel belongs to (-1 outside) and its face: world tile * 5 + 0 top, 1 +x,
+    2 -x, 3 +z, 4 -z wall (-1 outside the grid)."""
     W, H = SC_W * K, sc_h * K
     lum = np.full((H, W), BG); diag = np.full((H, W), -1, np.int16); zb = np.full((H, W), -1e9)
+    face = np.full((H, W), -1, np.int16)
     lpal = (pal & 31) * .299 + (pal >> 5 & 31) * .587 + (pal >> 10 & 31) * .114
     lpal = lpal * 255 / 31
     vh = nx if rot & 1 else nz
@@ -126,7 +126,16 @@ def render(polys, tex, pal, rot, nx, nz, sc_h):
         if np.dot(n, cam) < 0: n = -n
         n = n / (np.linalg.norm(n) or 1)
         c = p3.mean(0) - .05 * n
-        td = int(np.floor(c[0])) + int(np.floor(c[1]))
+        ut, wt = int(np.floor(c[0])), int(np.floor(c[1]))
+        td = ut + wt
+        xt, zt = [(ut, wt), (wt, nz - 1 - ut), (nx - 1 - ut, nz - 1 - wt), (nx - 1 - wt, ut)][rot]
+        fc = -1
+        if 0 <= xt < nx and 0 <= zt < nz:
+            f = 0
+            if abs(n[2]) < .2:                         # a wall: its outward normal in the world
+                dx, dz = [(n[0], n[1]), (n[1], -n[0]), (-n[0], -n[1]), (-n[1], n[0])][rot]
+                f = (1 if dx > 0 else 2) if abs(dx) > abs(dz) else (3 if dz > 0 else 4)
+            fc = (zt * nx + xt) * 5 + f
         x0, x1 = max(int(np.floor(sx.min())), 0), min(int(np.ceil(sx.max())) + 1, W)
         y0, y1 = max(int(np.floor(sy.min())), 0), min(int(np.ceil(sy.max())) + 1, H)
         if x0 >= x1 or y0 >= y1:
@@ -151,7 +160,8 @@ def render(polys, tex, pal, rot, nx, nz, sc_h):
             m &= pal[pl][idx] != 0                     # colour 0: transparent
             col = lpal[pl][idx]
         zb[y0:y1, x0:x1][m] = D[m]; lum[y0:y1, x0:x1][m] = col[m]; diag[y0:y1, x0:x1][m] = td
-    return lum, diag
+        face[y0:y1, x0:x1][m] = fc
+    return lum, diag, face
 
 
 def views(disc, files, nx, nz, maxh, preview=None):
@@ -166,14 +176,18 @@ def views(disc, files, nx, nz, maxh, preview=None):
     polys = polygons(mesh)
     sc_h = 6 * (nx + nz) + 6 * maxh + 8                            # fft.h SC_H
     out, q = [], None
+    gsum, gcnt = np.zeros(nx * nz * 5), np.zeros(nx * nz * 5)
     for rot in range(4):
-        lum, diag = render(polys, tex, pal, rot, nx, nz, sc_h)
+        lum, diag, face = render(polys, tex, pal, rot, nx, nz, sc_h)
         small = lum.reshape(sc_h, K, SC_W, K).mean((1, 3))
         bg = (lum == BG).reshape(sc_h, K, SC_W, K).mean((1, 3)) > .5
         if q is None:                                              # the whole map, view 0
             q = np.percentile(small[~bg], [25, 55, 82])
         g = np.where(small > q[2], 0, np.where(small > q[1], 1, np.where(small > q[0], 2, 3)))
         g[bg] = 1
+        fc = face[K // 2::K, K // 2::K]                            # each face's mean grey
+        seen = (fc >= 0) & ~bg
+        gsum += np.bincount(fc[seen], g[seen], nx * nz * 5); gcnt += np.bincount(fc[seen], None, nx * nz * 5)
         d = diag[K // 2::K, K // 2::K]                             # each pixel's centre
         bits = 0x80 >> (np.arange(SC_W) & 7)
         def pack(a):
@@ -188,7 +202,14 @@ def views(disc, files, nx, nz, maxh, preview=None):
         if preview:
             from PIL import Image
             Image.fromarray(np.array([255, 170, 85, 0], np.uint8)[g]).save(preview.replace('.png', '%d.png' % rot))
-    return out
+    # shades of the rotation frames (art.py turn_pat): the mean grey rounded, 0..3; a face never
+    # seen takes its tile's seen walls, else its top
+    shade = np.where(gcnt > 0, np.rint(gsum / np.maximum(gcnt, 1)), -1).reshape(nx * nz, 5)
+    for t in shade:
+        walls = t[1:][t[1:] >= 0]
+        t[0] = t[0] if t[0] >= 0 else 3
+        t[1:][t[1:] < 0] = np.rint(walls.mean()) if len(walls) else t[0]
+    return out, shade.astype(int)
 
 
 def main():
@@ -201,27 +222,26 @@ def main():
     for i in range(nx * nz):
         b = mesh[p + 2 + 8 * i:p + 10 + 8 * i]
         surf, h, st, sl, flags = b[0] & 0x3F, b[2], b[3] & 0x1F, b[4], b[6]
-        top, side = SURF[surf]
         c = corners(h, st, sl if st else 0)
         walk_ok = not (flags & 0x40) and surf not in (0x1E, 0x21)   # trees, chimneys: blocks
-        tiles.append((c, top, side, walk_ok, 2 * h + (st if sl else 0)))
+        tiles.append((c, walk_ok, 2 * h + (st if sl else 0), int(surf == 0x0E)))   # 0x0E: water
+    maxh = max(max(c) for c, *_ in tiles)
+    raw, shade = views(disc, files, nx, nz, maxh, sys.argv[2] if len(sys.argv) > 2 else None)
     f = open('map.h', 'w')
     def print(*a):
         f.write(' '.join(a) + '\n')
     print('// Generated by tools/extract.py from the local FFT disc (MAP%03d, Magic City Gariland):' % MAP)
-    print('// never committed. Corners (x,z) (x+1,z) (x+1,z+1) (x,z+1) in height units, top and side')
-    print('// materials, walkable, standing height in half units.')
+    print('// never committed. Corners (x,z) (x+1,z) (x+1,z+1) (x,z+1) in height units, shades of the')
+    print('// top and the +x -x +z -z walls (turn_pat), walkable, standing height in half units, water.')
     print('#define MAP_W %d\n#define MAP_H %d' % (nx, nz))
     print('static const Tile map_tiles[MAP_W * MAP_H] = {')
     for z in range(nz):
-        row = tiles[z * nx:(z + 1) * nx]
-        print('    ' + ' '.join('{{%d,%d,%d,%d},MT_%s,SD_%s,%d,%d},' % (*c, t, s, w, st)
-                                 for c, t, s, w, st in row))
+        row = range(z * nx, (z + 1) * nx)
+        print('    ' + ' '.join('{{%d,%d,%d,%d},{%d,%d,%d,%d,%d},%d,%d,%d},' % (*tiles[i][0], *shade[i], *tiles[i][1:])
+                                 for i in row))
     print('};')
     f.close()
-    maxh = max(max(c) for c, *_ in tiles)
     from concurrent.futures import ThreadPoolExecutor             # the packer is slow: 4 at once
-    raw = views(disc, files, nx, nz, maxh, sys.argv[2] if len(sys.argv) > 2 else None)
     with ThreadPoolExecutor(4) as ex:
         for r, data in enumerate(ex.map(zx0pack.pack, raw)):
             open('fftv%d.bin' % r, 'wb').write(data)
