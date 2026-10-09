@@ -258,6 +258,24 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   100k instead of the real cost). Check the state with the same `--scenario N --frames BENCH
   --shot` on the PC first.
 
+- **Shifted full-view copy in C: one `long` read per destination word** (`ti-cycles`
+  datasheet counts, Minish 70% view, 160x100, two planes): rebuilding a 32-bit
+  accumulator per word (`acc = acc << 16 | *s++; *d++ = acc << sh >> 16`) cost 183k
+  cycles; reading `*(u32 *)(row + k)` at each word's even address and shifting it
+  once (`<< sh >> 16` for sh <= 8, `>> (16 - sh)` above) cost 128k (**-30%**,
+  ~64 cycles per word), unrolled over the ten words of a row. Same pixels. Alundra village
+  (stride `iwb`): 149k → 110k.
+- **Precompose static HUD text and aligned counters** (headless PC/TI verified,
+  Minish M4): the existing 66x8 label uses two aligned `long` row copies plus a
+  two-pixel masked clear, rather than shifting every AMS glyph on both planes.
+  Three hearts are thirteen precomputed 32x8 rows, also copied in place. With
+  pre-shifted rocks/bush deltas, the normal dense combat case drops from385638
+  to352332 datasheet cycles. This is a combined frame result, including state
+  hashes, not an isolated text-blitter measurement. At70%, sixteen pre-shifts
+  of twenty small enemy poses fit a48908-byte archived bank; shared clipped
+  fallbacks and pointer/clip-mask reuse in foreground restoration keep its
+  dense peak at342646 cycles. Hardware grayscale cost is excluded.
+
 - **Pixels**: `EXT_SETPIX`/`EXT_CLRPIX`/`EXT_XORPIX`/`EXT_GETPIX` (ExtGraph) are the fastest
   single-pixel writes (measured above). For lines and walks, step the address and mask instead of
   recomputing them: `EXT_PIXLEFT_AM`/`EXT_PIXRIGHT_AM` (`ror.b #1,m; bcc; addq #1,a`) and
@@ -511,3 +529,21 @@ mapping), bulk copies not covered by ExtGraph.
   rows); copied byte by byte into both planes at a byte-aligned x: the whole box 116k (the
   frame, the name tag and the copy). Frame 281k -> 218k. Draw static text once; place it on
   a byte boundary so it can be copied without shifts.
+
+### Sparse scenery mutations (measured with ti-cycles, Minish Woods M3)
+
+- For an immutable scene plus persistent changes, store XOR deltas between
+  original and replacement planes. Draw each changed patch once after the
+  base scene and before actors. An XOR sprite avoids masked read/merge work;
+  a restored state needs only its change flags, with no mutable world bitmap.
+- Discard unchanged rows offline and deduplicate identical patches. For the
+  70% forest view, sixteen pre-shifted 32-bit forms of the small deltas fit in
+  a 54964-byte archived bank together with action art. Word-aligned interior
+  drawing is two plain long XORs per row in C; clipped patches use ExtGraph.
+- Restore foreground over the actual outlined silhouette bounds, rather than
+  a padded 32/64-pixel sprite canvas. This matters when transparent margins
+  overlap dense canopy. The 70% dense replay fell from 391118 cycles with
+  masked patches to 331056 after XOR deltas, pre-shifts and tighter bounds.
+  All 53 bushes cut, every attack pose and 32 camera offsets were checked;
+  PC/TI screens agree. These are datasheet-cycle measurements, not a TiEmu
+  hardware timing claim; no new assembly was authored.

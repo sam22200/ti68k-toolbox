@@ -526,6 +526,16 @@ while (running) {
 
 ## 8. Collisions
 
+- **Signed viewport positions plus unsigned dimensions need explicit signed
+  sums** (headless PC/TI verified, Minish M4). On a16-bit TI `int`, signed
+  `short x` plus unsigned `short w` becomes unsigned; on the PC both promote
+  to signed32-bit `int`. For an entirely left-clipped rectangle, `x+w` can
+  therefore become a huge positive bound on the TI. Compute
+  `short right=x+(short)w`, reject empty clipped bounds, then convert to
+  unsigned row/byte indices. Include entirely offscreen rectangles in PC/TI
+  screen comparisons, not only partial clipping. This fixed a full-width
+  canopy restoration and a365688-cycle transient route frame.
+
 - Pixel-perfect, by reading a plane: AND the sprite with the screen bytes under it (Puzzle
   Bobble's `test_sprite`, reading 4 bytes per row with a 30-byte stride). It is exact, but it tests
   **everything** drawn in that plane (walls, lines, text). Keep a dedicated plane or buffer, or

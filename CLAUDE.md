@@ -148,6 +148,37 @@ that kind of task.
   short/held jumps, wall slide/kick, shots/charge, roller/contact damage and
   outlined ROM animations; original mechanics and native PC/TI replays checked.
   Super FX is a reference dependency; ROMs in `roms/snes/` remain local.
+- `ti-port-gba`: the same measured, bounded approach for Game Boy Advance ROMs
+  through `tools/gba/` (pinned mGBA, scripted inputs, EWRAM/IWRAM, video-memory
+  snapshots and provenance-checked states with cartridge saves). The initial
+  instrumentation checks pass on local Advance Wars, Final Fantasy Tactics
+  Advance and The Minish Cap ROMs; gameplay mechanics and a native port remain
+  game-specific work. `games/minish/` provides a direct original Minish
+  Woods study door: native walking, 56,816 offline-decoded map/metatile/type
+  bytes matched to loaded RAM, and three 120-frame forest replays pass.
+  Its first native traversal covers the 720x320 opening at provisional 1:1
+  scale: walking, partial collisions, corner slides, slope speeds and camera;
+  M2 adds original scenery, 44 outlined Link poses and canopy occlusion.
+  6310 original walking steps and 400 displayed poses match; source art
+  matches 16.8M RGB pixels. 3606 PC/TI hashes and 56 screens pass, peak
+  frame cost is under 297k cycles. M3 adds ordinary sword swings, 40 attack
+  poses and cutting all 53 bush cells: 1947 source steps and 672k additional
+  oracle pixels per build pass. M3 100%/70% PC/TI checks cover
+  4639/4675 hashes and 216/252 screens, with peaks under 327k/332k cycles.
+  M4 adds two opening Octoroks, ordinary shots, sword kills, contact/shot
+  damage, recoil, hearts and retry. Twenty original trials check608 targeted
+  updates; twenty enemy poses add960k oracle pixels per build. Current
+  100%/70% checks pass7521/7557 hashes and346/382 screens, with peaks under
+  360k/349k cycles. Hearts keep a one-pixel white outline; nearby targeting
+  and larger round balls make shots visible. AI choices and rock impact/expiry are native adaptations;
+  original bouncing deflections, drops and other actions remain next.
+  M5 adds the original roll (330 source updates), leaf bursts, readable cut
+  earth and Octorok death puffs: 49 poses, 2.35M oracle pixels per scale;
+  9990/10026 PC/TI hashes and 703/739 screens, peaks under 358k/344k cycles.
+  An additional `minishz` build uses 70% visual scale with shared source
+  mechanics: 1.312M oracle pixels, 3642 PC/TI hashes and 92 screens pass;
+  peak is under 307k cycles. The original-scale build remains.
+  ROMs in `roms/gba/` remain local.
 - `ti-port-neogeo`: the same measured, bounded approach for Neo Geo MVS/AES
   cartridge sets. First preparation case: Windjammers in
   `roms/neogeo/wjammers/`; `tools/neogeo/` checks chip identities, stages a
