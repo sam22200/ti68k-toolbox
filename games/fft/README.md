@@ -36,6 +36,8 @@ make pc           # SDL window: ./fft_pc   (F1 / F5 on the PC keyboard too)
 make ti           # fft.89z, fftu.89y and fftv0.89y .. fftv3.89y: send all six, archive the five
                   # data files (read in place), run fft()
 make xcheck       # the TI binary under ti-cycles = the PC, 8 scenarios
+../../tools/pyenv/bin/python tools/oracle.py DISC.cue ../../sources/fft_ps1/gariland_t1.state trace.txt
+                  # the original at Ramza's first Gariland turn (30 s, RE_NOTES.md)
 ```
 
 `map.h`, `units.h`, `fftu.bin` and the views are generated from the disc and never committed: without the disc the
