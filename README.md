@@ -75,8 +75,9 @@ targeting with larger round balls makes ordinary shots visible.
 AI choices and projectile impact/expiry are native
 adaptations; original bouncing deflections, drops and later actions remain.
 M5 adds Link's original roll (330 source updates), leaf bursts, readable cut
-earth and fading Octorok deaths: 49 poses and 2.35M oracle pixels per scale;
-9990/10026 PC/TI hashes and 703/739 screens, peaks under 358k/344k cycles.
+earth, fading Octorok deaths, the original knockback poses and a four-phase
+damage flash: 2.35M oracle pixels per scale; 10002/10038 PC/TI hashes and
+715/751 screens, peaks under 359k/345k cycles; ran in TiEmu.
 
 [Neo Geo porting skill](.claude/skills/ti-port-neogeo/SKILL.md): the same
 measured approach for MVS/AES cartridges, using local Windjammers files as

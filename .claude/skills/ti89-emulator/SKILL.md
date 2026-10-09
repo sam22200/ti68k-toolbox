@@ -47,6 +47,23 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 
 ## Known pitfalls
 
+- **Session without a desktop `DISPLAY`** (Minish, Titanium, 2026-10-08): do not drive the
+  user's live KDE display `:1` (TiEmu opens over their windows, `ti-play` keys follow the
+  focus, and its `fr` layout scrambled typed text: `minish(256)` arrived as `596938brmnc`).
+  Use `Xvfb :99 -ac` (layout `us`, typing exact), an empty file as `XAUTHORITY`, and, with no
+  window manager, an `xdotool` shim first on the PATH that turns `windowactivate` into
+  `windowfocus`. Never start a KDE window manager there (it broke the desktop's Alt+Tab).
+  Stop Xvfb by its PID.
+- **Large data banks must be archived** before the run: ~150 KB of banks left in RAM made
+  the TileMap and GrayDBuf allocations fail (no scenery, HOME showing through every other
+  frame). `Archive a,b,c` at HOME after the boot transfer (wait ~20 s for it), then run.
+- **Open-loop timing**: measure a key script's tolerance on the PC with its events shifted
+  ±40 frames as well as scaled ±5 %; the run started ~0.2 s after `ti-key ENTER` returned.
+  Prefer scripts whose first events need no precise timing (let enemies come to the player).
+- **Unexplained dark periods in `ti-gif` captures** (Minish, Titanium): the light-grey
+  scenery shows dark for ~0.3 s about twice per 14 s, at different moments each run,
+  including idle frames; `ti-cycles` screens of the same states are normal. Not resolved.
+
 - **End a held-key demo explicitly** (Sonic, Titanium, 2026-10-05): `ti-play`
   releases all keys at the last script event, including the keys named on that
   event. To continue holding RIGHT after frame128 until frame250, append
