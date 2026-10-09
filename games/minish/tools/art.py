@@ -6,12 +6,11 @@ All extracted and converted commercial data stays in ignored local banks.
 """
 import argparse
 import json
-import struct
 from pathlib import Path
 import numpy as np
 from PIL import Image
 from reference import (GBA, ROM, OUTPUT, PLAYER, ROOM, MAP_BOTTOM, MAP_TOP,
-                       ORIGIN_X, ORIGIN_Y, extract, raw, position, sha)
+                       ORIGIN_X, ORIGIN_Y, extract, raw, position)
 from traversal import GAME, place, BUTTONS
 from reference import digest
 
@@ -167,15 +166,6 @@ def grayscale(rgb,actor=False):
     return (3-np.digitize(lum,[70,170,215] if actor else [64,112,160])).astype(np.uint8)
 
 
-def tile_words(level):
-    """Native TileMap (dark,light) u16 row pairs."""
-    output = []
-    for row in level:
-        output.extend((sum(int(v>>1)<< (15-x) for x,v in enumerate(row)),
-                       sum(int(v&1)<< (15-x) for x,v in enumerate(row))))
-    return output
-
-
 def sprite_words(level,mask,width=16):
     output = []
     for bit in (0,1):
@@ -243,7 +233,6 @@ def extract_art():
         gba.load(OUTPUT/'woods.state'); gba.step([]); s = gba.snapshot(); validate(s)
         assets = extract(); (bottom,bm),(top,tm) = world_layers(s,assets)
         scene_rgb = palette(s['palette'])[np.where(tm,top,np.where(bm,bottom,0))]
-        top_rgb = palette(s['palette'])[top]
         # Prove ROM map/metatile composition against source video at route
         # checkpoints, using each frame's live graphics (animated environment).
         trial = json.loads((fixtures/'traversal.json').read_text())[-1]
@@ -292,9 +281,8 @@ def extract_art():
                 else:
                     assert recorded == (stream,idle,hashes), ('actor trial replay',face)
                     replay_frames+=len(hashes)
-        # An ordinary walkable foot position hides part of the head behind BG1.
-        # Record differing foreground/actor greys for independent native pixel
-        # checks, with foreground colors from the chosen static environment phase.
+        # An ordinary walkable foot position hides part of the head behind BG1;
+        # the 70% compositor oracle covers the native side of this occlusion.
         place(gba,246,160)
         for _ in range(80):gba.step([])
         previous=entity(gba);gba.step([])
@@ -305,17 +293,6 @@ def extract_art():
         sx=xx+previous['screen'][0]-16;sy=yy+previous['screen'][1]-32
         hidden=owner[sy,sx]==1
         assert int(hidden.sum())>=50, 'canopy study must hide a meaningful actor area'
-        actor_grey=grayscale(rgba[:,:,:3],True)
-        foreground_grey=grayscale(top_rgb)
-        probes=[]
-        for py,px in zip(yy[hidden],xx[hidden]):
-            wx,wy=246+int(px)-16,160+int(py)-32
-            fg,hero=int(foreground_grey[wy,wx]),int(actor_grey[py,px])
-            if fg!=hero:probes.append((wx,wy,fg,hero))
-        assert len(probes)>=20
-        with (fixtures/'occlusion.txt').open('w') as f:
-            f.write(f'{len(probes)}\n')
-            for probe in probes:f.write(' '.join(map(str,probe))+'\n')
         Image.fromarray(video).save(out/'source_canopy.png')
         # Slowing floor classes do not all share OBJ priority. Study the four
         # placements containing action 38 or 52, preserving source rendering.
@@ -348,50 +325,13 @@ def extract_art():
             for (ax,ay),key,stream in depth_trials:
                 f.write(f'{ax} {ay} {key} {len(stream)}\n')
                 f.write(' '.join(map(str,stream))+'\n')
-        # Generate a static environment phase, as explicitly allowed by M2.
-        level = grayscale(scene_rgb); top_level = grayscale(top_rgb)
-        scene_tiles=[]; scene_ids={}; fg_tiles=[]; fg_ids={}
-        scene_map=bytearray(64*32); fg_map=bytearray(64*32)
-        blank=np.zeros((16,16),np.uint8); blankmask=np.zeros((16,16),bool)
-        fg_ids[(blank.tobytes(),blankmask.tobytes())]=0
-        fg_tiles.append(sprite_words(blank,blankmask))
-        for y in range(20):
-            for x in range(45):
-                tile=level[y*16:y*16+16,x*16:x*16+16]
-                skey=tile.tobytes()
-                if skey not in scene_ids:
-                    scene_ids[skey]=len(scene_tiles);scene_tiles.append(tile_words(tile))
-                scene_map[y*64+x]=scene_ids[skey]
-                mask=tm[y*16:y*16+16,x*16:x*16+16]
-                fg=top_level[y*16:y*16+16,x*16:x*16+16].copy();fg[~mask]=0
-                fkey=(fg.tobytes(),mask.tobytes())
-                if fkey not in fg_ids:
-                    fg_ids[fkey]=len(fg_tiles);fg_tiles.append(sprite_words(fg,mask))
-                fg_map[y*64+x]=fg_ids[fkey]
-        assert len(scene_tiles)<=256 and len(fg_tiles)<=256
+        level = grayscale(scene_rgb)
         keys=sorted(poses); pose_ids={k:i for i,k in enumerate(keys)}
         # Unoutlined source pixels support other offline scales without trying
         # to recover the original silhouette from an already dilated mask.
         np.savez_compressed(fixtures/'source_art.npz',scene=scene_rgb,foreground=tm,
                             actors=np.stack([poses[k] for k in keys]),
                             rom_sha256=gba.identity['rom_sha256'])
-        char_words=[]
-        preview = Image.new('RGBA',(32*8,40*((len(keys)+7)//8)),(200,200,200,255))
-        for i,k in enumerate(keys):
-            rgba=poses[k]; mask=rgba[:,:,3]!=0
-            expanded=mask.copy()
-            for dy in (-1,0,1):
-                for dx in (-1,0,1):
-                    expanded[1:-1,1:-1] |= mask[1+dy:39+dy,1+dx:31+dx]
-            grey=grayscale(rgba[:,:,:3],True); grey[~mask]=0
-            char_words.extend(sprite_words(grey,expanded,32))
-            image=np.zeros((40,32,4),np.uint8);image[:,:,:3]=(255-grey*85)[:,:,None];image[:,:,3]=expanded*255
-            preview.alpha_composite(Image.fromarray(image),(i%8*32,i//8*40))
-        preview.save(out/'link_poses.png')
-        for order,suffix in (('<',''),('>','.be')):
-            data=scene_map+struct.pack(order+f'{len(scene_tiles)*32}H',*(v for tile in scene_tiles for v in tile))+fg_map+struct.pack(order+f'{len(fg_tiles)*48}H',*(v for tile in fg_tiles for v in tile))
-            (GAME/f'miscen{suffix}.bin').write_bytes(data)
-            (GAME/f'michar{suffix}.bin').write_bytes(struct.pack(order+f'{len(char_words)}I',*char_words))
         # Walking: capture one settled cycle after startup; every pose lasts 3
         # source updates. Identify the period rather than assuming frame count.
         walks=[]; periods=[]
@@ -410,11 +350,6 @@ def extract_art():
                 for sample in timelines[str(face)]:
                     f.write(str(pose_ids[tuple(sample['pose'])])+'\n')
         generated = f'''/* Generated from the exact local USA ROM and checked reference frames. */
-#define SCENE_TILES {len(scene_tiles)}
-#define SCENE_FG_MAP {2048+len(scene_tiles)*64}
-#define SCENE_FG_TILES {4096+len(scene_tiles)*64}
-#define SCENE_SIZE {len((GAME/'miscen.bin').read_bytes())}
-#define CHAR_SIZE {len((GAME/'michar.bin').read_bytes())}
 #define CHAR_POSES {len(keys)}
 #define WALK_POSES {periods[0]//3}
 static const u8 idle_pose[4] = {{{','.join(map(str,idle))}}};
@@ -425,19 +360,17 @@ static const u8 walk_pose[4][WALK_POSES] = {{
         (GAME/'generated.h').write_text(generated)
         Image.fromarray((255-level*85).astype(np.uint8)).save(out/'world_grey.png')
         metadata={'rom_sha256':gba.identity['rom_sha256'],'core':gba.identity,'checks':checked,
-                  'scene_tiles':len(scene_tiles),'foreground_tiles':len(fg_tiles),'actor_poses':len(keys),
+                  'actor_poses':len(keys),
                   'walk_period_source_updates':periods,'pose_keys':keys,'idle':idle,'walk':walks,
                   'actor_replay_frames':replay_frames,
                   'depth_replay_frames':depth_replay_frames,
-                  'occlusion':{'position':[246,160],'source_hidden_pixels':int(hidden.sum()),
-                               'native_pixel_probes':len(probes)},
+                  'occlusion':{'position':[246,160],'source_hidden_pixels':int(hidden.sum())},
                   'source_anchor':'previous entity and room camera; completed OAM/video lag one update',
                   'controlled_pose_trial':{'anchor':[320,184],'settle_frames':80,'walk_frames':100,
                       'pokes':'X/Y reset before each walking frame only'},
-                  'environment':'static palette and animated tile phase from the first neutral study frame',
-                  'banks':{n:sha((GAME/n).read_bytes()) for n in ('miscen.bin','miscen.be.bin','michar.bin','michar.be.bin')}}
+                  'environment':'static palette and animated tile phase from the first neutral study frame'}
         (fixtures/'art.json').write_text(json.dumps(metadata,indent=2)+'\n')
-        print('Art checks:',checked,'tiles',len(scene_tiles),'foreground',len(fg_tiles),'poses',len(keys),'periods',periods)
+        print('Art checks:',checked,'poses',len(keys),'periods',periods)
     finally:gba.close()
 
 

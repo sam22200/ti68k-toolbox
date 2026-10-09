@@ -187,56 +187,43 @@ def pack(actors,walk,shoot,boxes,hurt,hurt_seq):
     header+=array('enemy_spawn','u16',positions)+array('enemy_walk','u8',walk)+array('enemy_shoot','u8',shoot)
     header+=array('sword_boxes','s8',boxes)
     header+=f'#define HURT_POSES {len(hurt)}\n'+array('hurt_seq','u8',hurt_seq)
-    for zoom in (False,True):
-        words=[];meta=[]
-        for rgba in actors:
-            if zoom:rgba=np.asarray(Image.fromarray(rgba).resize((34,34),Image.Resampling.NEAREST));ax,ay=17,23
-            else:ax,ay=24,32
-            mask=rgba[:,:,3]!=0;level=grayscale(rgba[:,:,:3],True);level[~mask]=0
-            mask=np.pad(mask,1);level=np.pad(level,1);expanded=mask.copy()
-            for dy in (-1,0,1):
-                for dx in (-1,0,1):expanded[1:-1,1:-1]|=mask[1+dy:mask.shape[0]-1+dy,1+dx:mask.shape[1]-1+dx]
-            yy,xx=np.nonzero(expanded);x0,x1,y0,y1=int(xx.min()),int(xx.max()+1),int(yy.min()),int(yy.max()+1)
-            w=16 if x1-x0<=16 else 32;h=y1-y0
-            assert x1-x0<=32,('wide enemy',x1-x0)
-            l=np.zeros((h,w),np.uint8);m=np.zeros((h,w),bool)
-            l[:,:x1-x0]=level[y0:y1,x0:x1];m[:,:x1-x0]=expanded[y0:y1,x0:x1]
-            meta.append([len(words),x0-ax-1,y0-ay-1,w,h]);words+=sprite_words(l,m,w)
-        bank='mizfight' if zoom else 'mifight'
-        hurt_words=[];hurt_meta=[]
-        for rgba in hurt:
-            m,p=packed(rgba,zoom);hurt_meta.append([len(hurt_words),*m]);hurt_words+=p
-        # Use uniform u32 rows for either width; shift 16-wide rows to high half.
-        uniform=[]
-        for offset,x,y,w,h in meta:
-            uniform += [(v<<(32-w)) | (0xffff if w==16 and j>=2*h else 0)
-                        for j,v in enumerate(words[offset:offset+3*h])]
-        if zoom:
-            assert all(m[3]==16 for m in meta)
-            shifted=[];shift_offsets=[];base_size=(len(words)*2+3)&~3
-            for offset,x,y,w,h in meta:
-                shift_offsets.append(base_size+len(shifted)*4)
-                for shift in range(16):
-                    for row in range(h):
-                        l,d,m=words[offset+row],words[offset+h+row],words[offset+2*h+row]
-                        shifted += [(l<<16)>>shift,(d<<16)>>shift,(~(((~m&65535)<<16)>>shift))&0xffffffff]
-        for order,suffix in (('<',''),('>','.be')):
-            if zoom:
-                payload=struct.pack(order+f'{len(words)}H',*words)
-                payload+=bytes(base_size-len(payload))+struct.pack(order+f'{len(shifted)}I',*shifted)
-            else:payload=struct.pack(order+f'{len(uniform)}I',*uniform)
-            # Link's knockback poses follow, in the roll/effect layout.
-            payload+=bytes(-len(payload)&3);hurt_base=len(payload)
-            payload+=struct.pack(order+f'{len(hurt_words)}I',*hurt_words)
-            # The native projectile's sixteen pre-shifts, kept out of the program.
-            rock_base=len(payload);payload+=struct.pack(order+f'{len(rock)}I',*rock)
-            assert len(payload)<65518
-            (GAME/f'{bank}{suffix}.bin').write_bytes(payload)
-        header+=('#ifdef MINISH_ZOOM\n' if zoom else '#ifndef MINISH_ZOOM\n')
-        header+=f'#define FIGHT_SIZE {len(payload)}\n#define HURT_BASE {hurt_base}\n#define ROCK_BASE {rock_base}\n'+array('enemy_art','s16',meta)
-        header+=array('hurt_art','s16',hurt_meta)
-        if zoom:header+=array('enemy_shift','u16',shift_offsets)
-        header+='#endif\n'
+    words=[];meta=[]
+    for rgba in actors:
+        rgba=np.asarray(Image.fromarray(rgba).resize((34,34),Image.Resampling.NEAREST));ax,ay=17,23
+        mask=rgba[:,:,3]!=0;level=grayscale(rgba[:,:,:3],True);level[~mask]=0
+        mask=np.pad(mask,1);level=np.pad(level,1);expanded=mask.copy()
+        for dy in (-1,0,1):
+            for dx in (-1,0,1):expanded[1:-1,1:-1]|=mask[1+dy:mask.shape[0]-1+dy,1+dx:mask.shape[1]-1+dx]
+        yy,xx=np.nonzero(expanded);x0,x1,y0,y1=int(xx.min()),int(xx.max()+1),int(yy.min()),int(yy.max()+1)
+        w=16 if x1-x0<=16 else 32;h=y1-y0
+        assert x1-x0<=32,('wide enemy',x1-x0)
+        l=np.zeros((h,w),np.uint8);m=np.zeros((h,w),bool)
+        l[:,:x1-x0]=level[y0:y1,x0:x1];m[:,:x1-x0]=expanded[y0:y1,x0:x1]
+        meta.append([len(words),x0-ax-1,y0-ay-1,w,h]);words+=sprite_words(l,m,w)
+    hurt_words=[];hurt_meta=[]
+    for rgba in hurt:
+        m,p=packed(rgba);hurt_meta.append([len(hurt_words),*m]);hurt_words+=p
+    assert all(m[3]==16 for m in meta)
+    shifted=[];shift_offsets=[];base_size=(len(words)*2+3)&~3
+    for offset,x,y,w,h in meta:
+        shift_offsets.append(base_size+len(shifted)*4)
+        for shift in range(16):
+            for row in range(h):
+                l,d,m=words[offset+row],words[offset+h+row],words[offset+2*h+row]
+                shifted += [(l<<16)>>shift,(d<<16)>>shift,(~(((~m&65535)<<16)>>shift))&0xffffffff]
+    for order,suffix in (('<',''),('>','.be')):
+        payload=struct.pack(order+f'{len(words)}H',*words)
+        payload+=bytes(base_size-len(payload))+struct.pack(order+f'{len(shifted)}I',*shifted)
+        # Link's knockback poses follow, in the roll/effect layout.
+        payload+=bytes(-len(payload)&3);hurt_base=len(payload)
+        payload+=struct.pack(order+f'{len(hurt_words)}I',*hurt_words)
+        # The native projectile's sixteen pre-shifts, kept out of the program.
+        rock_base=len(payload);payload+=struct.pack(order+f'{len(rock)}I',*rock)
+        assert len(payload)<65518
+        (GAME/f'mizfight{suffix}.bin').write_bytes(payload)
+    header+=f'#define FIGHT_SIZE {len(payload)}\n#define HURT_BASE {hurt_base}\n#define ROCK_BASE {rock_base}\n'+array('enemy_art','s16',meta)
+    header+=array('hurt_art','s16',hurt_meta)
+    header+=array('enemy_shift','u16',shift_offsets)
     (GAME/'combat_generated.h').write_text(header)
 
 def entities(g):

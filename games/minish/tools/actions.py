@@ -46,12 +46,10 @@ def sword_pixels(snapshot, previous):
     return canvas
 
 
-def packed_actor(rgba, zoom):
-    anchor=(32,36)
-    if zoom:
-        rgba=np.asarray(Image.fromarray(rgba).resize((45,39),Image.Resampling.NEAREST))
-        # Resize the anchor with the same nearest-neighbour canvas convention.
-        anchor=(23,25)
+def packed_actor(rgba):
+    rgba=np.asarray(Image.fromarray(rgba).resize((45,39),Image.Resampling.NEAREST))
+    # Resize the anchor with the same nearest-neighbour canvas convention.
+    anchor=(23,25)
     mask=rgba[:,:,3]!=0
     padded=np.pad(mask,1)
     halo=padded.copy()
@@ -221,58 +219,51 @@ def pack(cut_cells,grid,raw_poses,patches,rom):
                           for face,ns in enumerate(samples) for n in ns])
     table('sword_dy','s8',[points[(n-1)*2+1] for ns in samples for n in ns])
     source_art=np.load(fixtures/'source_art.npz')
-    for zoom in (False,True):
-        bank=bytearray(grid);patch_words=[];patch_offsets=[];unique_patches={}
-        patch_x=[];patch_y=[];patch_h=[]
-        ix=(np.arange(504)*2+1)*10//14;iy=(np.arange(224)*2+1)*10//14
-        for x,y,old,new in cut_cells:
-            rgb=patches[new].copy()
-            fg=source_art['foreground'][y*16:y*16+16,x*16:x*16+16]
-            ground=ground_gray(rgb)
-            ground[fg]=grayscale(source_art['scene'][y*16:y*16+16,x*16:x*16+16])[fg]
-            if zoom:
-                sx,ex=np.searchsorted(ix,[x*16,x*16+16]);sy,ey=np.searchsorted(iy,[y*16,y*16+16])
-                ground=ground[(iy[sy:ey]-y*16)[:,None],ix[sx:ex]-x*16]
-            else:sx,sy=x*16,y*16
-            h,w=ground.shape;level=np.zeros((h,16),np.uint8);mask=np.zeros((h,16),bool)
-            level[:,:w]=ground;mask[:,:w]=True
-            original=(source_art['scene'][iy[sy:ey][:,None],ix[sx:ex]] if zoom else
-                      source_art['scene'][y*16:y*16+16,x*16:x*16+16])
-            # XOR changes only differing bits of the immutable base image.
-            # ExtGraph's two-plane XOR blitter avoids the mask read/merge.
-            level[:,:w]^=grayscale(original)
-            nonzero=np.nonzero(level)[0];first,last=int(nonzero.min()),int(nonzero.max())+1
-            level=level[first:last];mask=mask[first:last];sy+=first;h=last-first
-            key=(h,level.tobytes())
-            if key not in unique_patches:
-                unique_patches[key]=len(patch_words)
-                words=sprite_words(level,mask)
-                # Sixteen shifts are shared by identical patches in both
-                # builds. Dense combat needs the same cheap normal-scale path.
-                for shift in range(16):patch_words += [(v<<16)>>shift for v in words[:h*2]]
-            patch_offsets.append(unique_patches[key])
-            patch_x.append(int(sx));patch_y.append(int(sy));patch_h.append(h)
-        # Grid, normal u16 / zoom pre-shifted u32 patches, u32 actor rows.
-        po=2048;ao=po+len(patch_words)*4
-        if ao&3:ao+=2
-        actor_words=[];actor_offsets=[];actor_meta=[]
-        for rgba in raw_poses:
-            meta,words=packed_actor(rgba,zoom)
-            actor_offsets.append(len(actor_words));actor_words+=words;actor_meta.append(meta)
-        for order,suffix in (('<',''),('>','.be')):
-            data=bytes(bank)+struct.pack(order+f'{len(patch_words)}I',*patch_words)
-            data+=b'\0'*(ao-len(data));data+=struct.pack(order+f'{len(actor_words)}I',*actor_words)
-            assert len(data)<65518
-            (GAME/f'{"mizact" if zoom else "miact"}{suffix}.bin').write_bytes(data)
-        header+=['#ifdef MINISH_ZOOM' if zoom else '#ifndef MINISH_ZOOM',
-                 f'#define ACTION_SIZE {len(data)}',f'#define ACTION_PATCH_OFFSET {po}',f'#define ACTION_ACTOR_OFFSET {ao}']
-        table('cut_patch_offset','u16',patch_offsets);table('cut_draw_x','u16',patch_x);table('cut_draw_y','u16',patch_y)
-        table('cut_patch_h','u8',patch_h);table('sword_offset','u16',actor_offsets)
-        for i,name in enumerate(('sword_x','sword_y','sword_h','sword_parts','sword_width')):
-            table(name,'s8' if i<2 else 'u8',[v[i] for v in actor_meta])
-        header.append('#endif')
+    bank=bytearray(grid);patch_words=[];patch_offsets=[];unique_patches={}
+    patch_x=[];patch_y=[];patch_h=[]
+    ix=(np.arange(504)*2+1)*10//14;iy=(np.arange(224)*2+1)*10//14
+    for x,y,old,new in cut_cells:
+        rgb=patches[new].copy()
+        fg=source_art['foreground'][y*16:y*16+16,x*16:x*16+16]
+        ground=ground_gray(rgb)
+        ground[fg]=grayscale(source_art['scene'][y*16:y*16+16,x*16:x*16+16])[fg]
+        sx,ex=np.searchsorted(ix,[x*16,x*16+16]);sy,ey=np.searchsorted(iy,[y*16,y*16+16])
+        ground=ground[(iy[sy:ey]-y*16)[:,None],ix[sx:ex]-x*16]
+        h,w=ground.shape;level=np.zeros((h,16),np.uint8);mask=np.zeros((h,16),bool)
+        level[:,:w]=ground;mask[:,:w]=True
+        original=source_art['scene'][iy[sy:ey][:,None],ix[sx:ex]]
+        # XOR changes only differing bits of the immutable base image.
+        # ExtGraph's two-plane XOR blitter avoids the mask read/merge.
+        level[:,:w]^=grayscale(original)
+        nonzero=np.nonzero(level)[0];first,last=int(nonzero.min()),int(nonzero.max())+1
+        level=level[first:last];mask=mask[first:last];sy+=first;h=last-first
+        key=(h,level.tobytes())
+        if key not in unique_patches:
+            unique_patches[key]=len(patch_words)
+            words=sprite_words(level,mask)
+            # Sixteen pre-shifted copies shared by identical patches.
+            for shift in range(16):patch_words += [(v<<16)>>shift for v in words[:h*2]]
+        patch_offsets.append(unique_patches[key])
+        patch_x.append(int(sx));patch_y.append(int(sy));patch_h.append(h)
+    # Grid, pre-shifted u32 patches, u32 actor rows.
+    po=2048;ao=po+len(patch_words)*4
+    if ao&3:ao+=2
+    actor_words=[];actor_offsets=[];actor_meta=[]
+    for rgba in raw_poses:
+        meta,words=packed_actor(rgba)
+        actor_offsets.append(len(actor_words));actor_words+=words;actor_meta.append(meta)
+    for order,suffix in (('<',''),('>','.be')):
+        data=bytes(bank)+struct.pack(order+f'{len(patch_words)}I',*patch_words)
+        data+=b'\0'*(ao-len(data));data+=struct.pack(order+f'{len(actor_words)}I',*actor_words)
+        assert len(data)<65518
+        (GAME/f'mizact{suffix}.bin').write_bytes(data)
+    header+=[f'#define ACTION_SIZE {len(data)}',f'#define ACTION_PATCH_OFFSET {po}',f'#define ACTION_ACTOR_OFFSET {ao}']
+    table('cut_patch_offset','u16',patch_offsets);table('cut_draw_x','u16',patch_x);table('cut_draw_y','u16',patch_y)
+    table('cut_patch_h','u8',patch_h);table('sword_offset','u16',actor_offsets)
+    for i,name in enumerate(('sword_x','sword_y','sword_h','sword_parts','sword_width')):
+        table(name,'s8' if i<2 else 'u8',[v[i] for v in actor_meta])
     (GAME/'actions_generated.h').write_text('\n'.join(header)+'\n')
-    print('Packed normal/70% sword and bush banks')
+    print('Packed 70% sword and bush bank')
 
 
 if __name__=='__main__':main('--pack-only' in sys.argv)

@@ -14,11 +14,7 @@ u8 minish_actions_init(void)
     u16 size;
     const u8 *bank;
     cut_grid=RT_NULL;patch_pixels=RT_NULL;sword_pixels=RT_NULL;
-#ifdef MINISH_ZOOM
     bank=rt_file("mizact",&size);
-#else
-    bank=rt_file("miact",&size);
-#endif
     if (!bank || size<ACTION_SIZE || size>ACTION_SIZE+6) return 0;
     cut_grid=bank;
     patch_pixels=(const u32 *)(bank+ACTION_PATCH_OFFSET);
@@ -118,13 +114,8 @@ void minish_draw_sword(s16 *x,s16 *y,u16 *w,u16 *h)
     u16 pose=st.display_pose-44,i,height=sword_h[pose];
     const u32 *p=sword_pixels+sword_offset[pose];
     RtSprite actor;
-#ifdef MINISH_ZOOM
     *x=minish_scaled(st.x>>8)-st.camx+sword_x[pose];
     *y=minish_scaled(st.y>>8)-st.camy+sword_y[pose];
-#else
-    *x=(st.x>>8)-st.camx+sword_x[pose];
-    *y=(st.y>>8)-st.camy+sword_y[pose];
-#endif
     *w=sword_width[pose];*h=height;
     actor.w=32;actor.h=height;
     for (i=0;i<sword_parts[pose];i++,p+=height*3) {

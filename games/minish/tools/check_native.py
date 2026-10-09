@@ -18,9 +18,8 @@ def run(args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--name',default='minish')
-    parser.add_argument('--zoom',action='store_true')
     args=parser.parse_args()
-    out = GAME / 'captures' / ('zoom' if args.zoom else '')
+    out = GAME / 'captures'
     out.mkdir(parents=True,exist_ok=True)
     cases = [(n, 'keys/opening.txt', 400) for n in range(7)]
     cases += [(2, 'keys/walls.txt', 300), (0, 'keys/walls.txt', 300),
@@ -42,9 +41,9 @@ def main():
     cases += [(n,'keys/idle.txt',1) for n in range(512,512+3*fx_count)]
     cases += [(n,'keys/idle.txt',1) for n in range(700,892)]
     cases += [(0,'keys/opening.txt',n) for n in (190,192,196)]
-    if args.zoom:
-        cases += [(n, 'keys/idle.txt', 1) for n in range(64,100)]
-    banks=('mindat','mizscene','mizactor','mizact','mizfight','mizfx') if args.zoom else ('mindat','miscen','michar','miact','mifight','mifx')
+    cases += [(0,'keys/final.txt',882)]
+    cases += [(n, 'keys/idle.txt', 1) for n in range(64,100)]
+    banks=('mindat','mizscene','mizactor','mizact','mizfight','mizfx')
     files = [arg for name in banks for arg in ('--file',name+'.89y')]
     results = []
     for n, script, frames in cases:
