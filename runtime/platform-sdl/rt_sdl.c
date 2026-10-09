@@ -30,6 +30,8 @@ static u32 read_keyboard(void)
     if (k[SDL_SCANCODE_V]) keys |= K_D;
     if (k[SDL_SCANCODE_RETURN] || k[SDL_SCANCODE_KP_ENTER]) keys |= K_ENTER;
     if (k[SDL_SCANCODE_ESCAPE]) keys |= K_ESC;
+    if (k[SDL_SCANCODE_F1]) keys |= K_F1;
+    if (k[SDL_SCANCODE_F5]) keys |= K_F5;
     for (d = 1; d <= 9; d++)             // keypad, or the number row (AZERTY: same scancodes)
         if (k[SDL_SCANCODE_KP_1 + d - 1] || k[SDL_SCANCODE_1 + d - 1]) keys |= K_DIGIT(d);
     return keys;
