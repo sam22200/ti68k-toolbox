@@ -78,15 +78,23 @@ with `-pack` (decided at milestone 13).
     the TI-89 by `-pack`). The save state at Gariland's first turn; the battle unit struct
     found and documented (position, HP, MP, CT, speed, PA, MA, Brave, Faith, job, equipment,
     status, facing, team). Done: a trace of the original's first turns read back from RAM.
-14. **The battle's units.** Gariland's deployment from the disc (`ENTD` data: which units,
-    jobs, levels, equipment, zodiac, Brave / Faith, start tiles and facings), the player's
-    deployment tiles; their sprites from the disc (`units.py`: every job's sheet the battle
-    needs); stats computed from FFT's raw values and job multipliers (`fftd`). Done: every
-    unit's HP, MP, PA, MA, Speed, Move, Jump equal the original's RAM at the first turn.
-15. **Turn order.** FFT's clock: every tick each unit's CT += Speed, a unit acts at CT >= 100,
-    its CT after the turn depending on what it did (moved and acted, one of them, neither);
-    the order list in the HUD (the next units' faces or names); the camera to the active
-    unit. Done: the first 30 turns' order equal to the original's trace.
+14. **The battle's units** (done). Gariland's ENTD, the new game's Ramza and the academy's
+    recruits (`tools/battle.py` -> `battle.h`: a generated header while the data is small,
+    ~0.3 KB; the `fftd` file when the abilities come), their sprites (six sheets, the Chemists
+    from `TYPE2`, mirrored frames stored: `fftu` 18.7 KB), FFT's draw and stat formulas (raw
+    stats, growth, multipliers, equipment) at each battle with our RNG. All eleven units' HP,
+    MP, Speed, PA, MA, Move and Jump equal the original's at Ramza's first turn (`battle.py
+    --check`, and in C on its raw values: `make test`); per-unit Move / Jump in the reach.
+    Units off screen skipped, cover masks kept per unit, uncovered rows drawn straight from
+    the data file: the frame stays at 190-345k with eleven units (program 21,171 bytes).
+15. **Turn order** (done). FFT's clock read in the decompilation (every tick CT += Speed, the
+    highest CT >= 100 acts, a tie to the lower index, -100, +20 per unused Move / Act, at most
+    60; a KO unit's clock runs its death counter down) and checked on the original's first 46
+    turns (`oracle.py --turns`: the player's units handed to FFT's AI; every turn's unit and
+    every unit's CT equal, four KOs and a crystal included); the order in the HUD (FFT's AT
+    list, the next six turns, enemies on light grey); the cursor and the camera to the active
+    unit; enemies wait, a player's unit moves or waits ([diamond]). The HUD strips cached (a
+    40-turn battle stays under 356k a frame; program 22,935 bytes).
 16. **The turn and its menu.** Move / Act / Wait / Status, a move undone before acting, the
     facing chosen at Wait (the four directions shown on the tile), the active unit's panel
     (name, job, HP, MP, CT) and the cursor's target panel; a menu readable in 160 x 100 (a
