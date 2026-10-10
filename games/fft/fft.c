@@ -105,7 +105,14 @@ static u8 *vbuf, vbuf_rot;
 #define TH (RT_H / 2)
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
+#define HUD_ROWS 15                     // the turns strip (rows 0-7), the info strip (8-14)
+typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
+    s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
+    u8 depth, rot, r0, r1;
+    u16 cm[COVER_H];
+} Cover;
 typedef struct {
+    Cover cover[NUNIT];                 // per unit, for its feet, its depth and the view
     s16 span_l[TH + 8], span_r[TH + 8];
     u8 queue[MAP_W * MAP_H], from[MAP_W * MAP_H];
     u8 half[2][TW / 8 * TH];
@@ -114,6 +121,10 @@ typedef struct {
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
+    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // the HUD's two strips, drawn when they change
+    char hud_s[24];                     // what they show: the info line, the turns
+    u8 hud_t[ORDER_N], hud_w, hud_late; // (hud_w: the info strip's width in bytes)
+    u16 label[UNIT_GFX_N][5];           // the turns' labels (Ra, De, Sq, Ch), drawn once
 } Work;
 static Work *W;
 #define span_l (W->span_l)
@@ -126,6 +137,8 @@ static Work *W;
 #define key (W->key)
 #define gx (W->gx)
 #define gy (W->gy)
+#define HUD_L ((u8 *)W->hud[0])
+#define HUD_D ((u8 *)W->hud[1])
 
 // ---------------------------------------------------------------- the map in four orientations
 u8 view_w(u8 rot) { return rot & 1 ? MAP_H : MAP_W; }
@@ -175,6 +188,147 @@ u8 unit_at(s16 x, s16 z)
     for (i = 0; i < NUNIT; i++)
         if (st.unit[i].x == x && st.unit[i].z == z) return i + 1;
     return 0;
+}
+
+// ---------------------------------------------------------------- the battle's units
+// FFT's model (tools/battle.py, checked on the original at Ramza's first turn): raw stats of 24
+// bits drawn from the unit type's base and variance, grown per level, times the job's
+// multiplier; then the equipment. Once per battle: the 32-bit divisions do not matter.
+static u16 rand15(void) { return rt_rand() >> 1; }        // 0..32767, as the PS1's rand()
+
+void unit_stats(Unit *u)
+{
+    const Job *j = &jobs[u->job];
+    u16 s[5];
+    u8 i, k;
+    for (i = 0; i < 5; i++) {
+        u32 v = u->raw[i];
+        u8 g = j->growth[i] ? j->growth[i] : 1;
+        for (k = 2; k <= u->level; k++) v += v / (u16)(g + k - 1);
+        if (v > 0xFFFFFFUL) v = 0xFFFFFFUL;
+        v = v * j->mult[i] / 100 >> 14;
+        s[i] = v ? (u16)v : 1;
+    }
+    u->max_hp = s[0] > 999 ? 999 : s[0];
+    u->max_mp = s[1] > 999 ? 999 : s[1];
+    u->move = j->move; u->jump = j->jump;
+    for (i = 0; i < EQ_N; i++) {                   // helmet / armour HP and MP, item attributes
+        const Item *it;
+        if (u->eq[i] == 0xFF) continue;
+        it = &items[u->eq[i]];
+        u->max_hp += it->hp; u->max_mp += it->mp;
+        s[2] += it->sp; s[3] += it->pa; s[4] += it->ma;
+        u->move += it->move; u->jump += it->jump;
+    }
+    if (u->max_hp > 999) u->max_hp = 999;
+    if (u->max_mp > 999) u->max_mp = 999;
+    if (u->jump > 7) u->jump = 7;
+    u->sp = (u8)(s[2] > 50 ? 50 : s[2]);
+    u->pa = (u8)(s[3] > 99 ? 99 : s[3]);
+    u->ma = (u8)(s[4] > 99 ? 99 : s[4]);
+    u->hp = u->max_hp; u->mp = u->max_mp;
+}
+
+void battle_units(void)
+{
+    u8 i, k;
+    for (i = 0; i < NUNIT; i++) {
+        const UnitDef *d = &unit_defs[i];
+        Unit *u = &st.unit[i];
+        u16 day = d->day;
+        u->x = d->x; u->z = d->z; u->gfx = d->gfx; u->team = d->team; u->face = d->face;
+        u->job = d->job; u->level = d->level; u->ct = 0; u->dc = 3;
+        u->brave = d->brave ? d->brave : (u8)(45 + ((30UL * rand15()) >> 15));
+        u->faith = d->faith ? d->faith : (u8)(45 + ((30UL * rand15()) >> 15));
+        if (!day) day = (u16)(1 + ((365UL * rand15()) >> 15));
+        for (k = 0; k < 12 && day >= zodiac_days[k]; k++) ;
+        u->zodiac = (u8)((k + 9) % 12);
+        for (k = 0; k < 5; k++)
+            u->raw[k] = ((u32)gen_base[d->type][k] << 14) + (((u32)rand15() * gen_var[d->type][k]) >> 1);
+        for (k = 0; k < EQ_N; k++)                 // one of the two candidates (FFT: of n)
+            u->eq[k] = d->eq[k][d->eq[k][1] != 0xFF ? rand15() >> 14 : 0];
+        unit_stats(u);
+    }
+}
+
+// ---------------------------------------------------------------- turn order
+// FFT's clock (RE_NOTES.md § Turn order, checked on the original's turns): each tick every unit's
+// CT grows by its Speed (at most 254); a unit with CT >= 100 acts, the highest first, a tie to
+// the lowest index; its CT loses 100 when picked and gains 20 for each of Move and Act left
+// unused at the end, at most 60. A unit at 0 HP keeps its clock: each pick lowers its death
+// counter, then it turns into a crystal or a chest and its clock stops.
+u8 ct_next(void)
+{
+    for (;;) {
+        u8 i, best = 0xFF, max = 99;
+        Unit *u;
+        for (i = 0, u = st.unit; i < NUNIT; i++, u++)
+            if (u->dc != DC_GONE && u->ct > max) { max = u->ct; best = i; }
+        if (best == 0xFF) {                        // a tick
+            for (i = 0, u = st.unit; i < NUNIT; i++, u++)
+                if (u->dc != DC_GONE) { u16 c = u->ct + u->sp; u->ct = (u8)(c > 254 ? 254 : c); }
+            continue;
+        }
+        u = &st.unit[best];
+        u->ct = (u8)(max >= 200 ? max - 200 : max - 100);
+        if (u->hp) return best;
+        u->dc = u->dc ? u->dc - 1 : DC_GONE;
+    }
+}
+
+void ct_end(u8 who, u8 moved, u8 acted)
+{
+    u8 c = st.unit[who].ct;
+    if (!moved) c += 20;
+    if (!acted) c += 20;
+    st.unit[who].ct = c > 60 ? 60 : c;
+}
+
+// FFT's AT list: the active unit, then each living unit's next turns, its clock run alone
+// (no bonus at their end), sorted by tick then by the CT reached (the higher first), a tie in
+// unit order. At each turn change only (11 x ORDER_N divisions).
+void turn_order(void)
+{
+    u16 tk[ORDER_N];
+    u8 i, j, n = 1, t;
+    Unit *u;
+    st.turns[0] = st.act; tk[0] = 0;
+    for (i = 0, u = st.unit; i < NUNIT; i++, u++) {
+        u16 tick = 0, ct = u->ct;
+        if (!u->hp || u->dc == DC_GONE) continue;
+        for (t = 0; t < ORDER_N - 1; t++) {
+            u16 k;
+            if (ct < 100) {                        // the ticks to 100 at once
+                u16 k2 = (u16)((u16)(100 - ct + u->sp - 1) / u->sp);
+                tick += k2; ct += k2 * u->sp;
+            }
+            if (tick >= 256) break;
+            ct = ct >= 200 ? ct - 200 : ct - 100;
+            k = (u16)(tick << 8 | (100 - ct));
+            for (j = n; j > 1 && tk[j - 1] > k; j--)
+                if (j < ORDER_N) { tk[j] = tk[j - 1]; st.turns[j] = st.turns[j - 1]; }
+            if (j >= ORDER_N) break;               // later than every turn kept
+            tk[j] = k; st.turns[j] = i;
+            if (n < ORDER_N) n++;
+        }
+    }
+    for (; n < ORDER_N; n++) st.turns[n] = 0xFF;
+}
+
+// the next turn: the cursor and the camera go to its unit; enemies and the guest wait
+static void turn_start(void)
+{
+    st.act = ct_next();
+    st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
+    st.wait_t = st.unit[st.act].team == TEAM_PLAYER ? 0 : AI_WAIT;
+    turn_order();
+}
+
+static void turn_end(u8 moved, u8 acted)
+{
+    ct_end(st.act, moved, acted);
+    st.mode = M_BROWSE;
+    turn_start();
 }
 
 // ---------------------------------------------------------------- drawing targets
@@ -432,7 +586,7 @@ static void bfs(u8 who, u8 *from)
     while (qh < qt) {
         u8 c = queue[qh++], x = c % MAP_W, z = c / MAP_W, d;
         const Tile *t = &map_tiles[c];
-        if (st.reach[c] >= MOVE) continue;
+        if (st.reach[c] >= un->move) continue;
         for (d = 0; d < 4; d++) {
             s16 nx = x + dir_x[d], nz = z + dir_z[d];
             const Tile *n = tile_at(nx, nz);
@@ -442,9 +596,9 @@ static void bfs(u8 who, u8 *from)
             nc = (u8)(nz * MAP_W + nx);
             if (st.reach[nc] != 0xFF) continue;
             dh = (s16)n->stand - t->stand;
-            if (dh > 2 * JUMP || dh < -2 * JUMP) continue;
-            o = unit_at(nx, nz);
-            if (o && st.unit[o - 1].team != un->team) continue;     // enemies block, allies pass
+            if (dh > 2 * un->jump || dh < -2 * un->jump) continue;
+            o = unit_at(nx, nz);                                    // enemies block, allies pass
+            if (o && (st.unit[o - 1].team == TEAM_ENEMY) != (un->team == TEAM_ENEMY)) continue;
             st.reach[nc] = st.reach[c] + 1;
             if (from) from[nc] = c;
             queue[qt++] = nc;
@@ -508,7 +662,8 @@ static Feet unit_feet(u8 rot, u8 i)
 }
 
 // Cover mask of a unit: the pixels in front of it (the view's depth: diagonals greater than
-// its own) in its sprite's 16 x COVER_H box, one bit per pixel
+// its own) in its sprite's 16 x COVER_H box, one bit per pixel. Kept per unit (W->cover) and
+// made again only when its feet, its depth or the view change: a unit standing still costs nothing.
 static void cover(u16 *cm, s16 fx, s16 fy, u8 depth)
 {
     const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
@@ -536,8 +691,9 @@ static const u8 idle_seq[32] = { 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1,
 static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 };
 
 // a unit's frame (units.h) seen from orientation rot: its facing turned into the view, front
-// frames looking down-left (+v), back ones up-left (-u), mirrored for +u and -v as in FFT
-static const u8 *unit_frame(u8 rot, u8 i, u8 *mirror)
+// frames looking down-left (+v), back ones up-left (-u), mirrored for +u and -v as in FFT (the
+// mirrored frames are stored after the others)
+static const u8 *unit_frame(u8 rot, u8 i)
 {
     static const s8 fdx[4] = { 1, -1, 0, 0 }, fdz[4] = { 0, 0, 1, -1 };
     const Unit *un = &st.unit[i];
@@ -548,11 +704,9 @@ static const u8 *unit_frame(u8 rot, u8 i, u8 *mirror)
     du -= u0; dv -= v0;
     k = st.mode == M_WALK && i == st.sel ? walk_seq[t & 15] : idle_seq[t & 31];
     if (du < 0 || dv < 0) k += 5;
-    *mirror = du > 0 || dv < 0;
-    return ugfx + (u16)(un->gfx * UNIT_FRAMES + k) * (6 * UNIT_SH);
+    if (du > 0 || dv < 0) k += UNIT_FRAMES;
+    return ugfx + (u16)(un->gfx * (2 * UNIT_FRAMES) + k) * (6 * UNIT_SH);
 }
-
-#define REV16(w) ((u16)(rev8[(u8)(w)] << 8 | rev8[(u16)(w) >> 8]))
 
 // the opaque pixels of row r (1 .. UNIT_SH - 2) of a sprite mask whose four neighbours are opaque
 static u16 erode(const u16 *mk, u8 r)
@@ -561,48 +715,58 @@ static u16 erode(const u16 *mk, u8 r)
     return o & (u16)(o << 1) & (o >> 1) & (u16)~mk[r - 1] & (u16)~mk[r + 1];
 }
 
-// a unit and its shadow, both through the cover mask cm (ExtGraph: dest = dest & mask | data,
+// a unit and its shadow, both through its cover mask (ExtGraph: dest = dest & mask | data,
 // mask 1 = transparent, so the data is cleared under the cover too), the unit's contour drawn
-// over the cover, an enemy's diamond above it; cm RT_NULL: the unit alone, uncovered (the
-// rotation frames)
-static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const u16 *cm)
+// over the cover, an enemy's diamond above it; c RT_NULL: the unit alone, uncovered (the
+// rotation frames). The rows above the covered ones are drawn as they are (on the TI straight
+// from the data file), the others copied and eroded.
+static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
     RtSprite s;
-    u16 mk[COVER_H], ml[COVER_H], md[COVER_H], any = 0;
-    u8 r, mir;
-    const u8 *g = unit_frame(rot, i, &mir);
+    u16 mk[COVER_H], ml[COVER_H], md[COVER_H];
+    u8 r, top = UNIT_SH, cov = 0;              // rows [0, top) are drawn as they are
+    const u8 *g = unit_frame(rot, i);
     s.w = 16;
-    if (cm) {
+    if (c) {
+        const u16 *cm = c->cm;
         for (r = 0; r < 3; r++) {
-            u16 c = cm[UNIT_FOOT - 1 + r];
-            mk[r] = shadow_gfx[2][r] | c; ml[r] = shadow_gfx[0][r] & ~c; md[r] = shadow_gfx[1][r] & ~c;
+            u16 k = cm[UNIT_FOOT - 1 + r];
+            mk[r] = shadow_gfx[2][r] | k; ml[r] = shadow_gfx[0][r] & ~k; md[r] = shadow_gfx[1][r] & ~k;
         }
         s.h = 3;
         s.light = ml; s.dark = md; s.mask = mk;
         draw_sprite(sx - 8, sy - 1, &s);
+        if (c->r0 <= c->r1) { cov = 1; top = c->r0 - 2; }   // the erosion reads two rows above
     }
-    for (r = 0; r < UNIT_SH; r++) {
-        u16 l = RD16(g, r), d = RD16(g, UNIT_SH + r), k = RD16(g, 2 * UNIT_SH + r);
-        if (mir) { l = REV16(l); d = REV16(d); k = REV16(k); }
-        mk[r] = k; ml[r] = l; md[r] = d;
-        if (cm) any |= cm[r];
+#ifndef __m68k__
+    top = 0;                                   // the PC copies every row (byte order)
+#endif
+    if (top) {                                 // native big-endian rows: drawn in place
+        s.h = top;
+        s.light = g; s.dark = g + 2 * UNIT_SH; s.mask = g + 4 * UNIT_SH;
+        draw_sprite(sx - 8, sy - UNIT_FOOT, &s);
     }
-    if (any) {          // covered: only the contour stays (the white outline and the black
-        u8 r1 = UNIT_SH - 3;    // line inside it), the sprite eroded twice and taken away,
-        u16 a, b, c;            // on the covered rows only (rows 0, 1 and the last two: outline)
-        for (r = 2; r < r1 && !cm[r]; r++) ;
-        while (r1 > r && !cm[r1]) r1--;
-        a = erode(mk, r - 1); b = erode(mk, r);
-        for (; r <= r1; r++, a = b, b = c) {
-            u16 h;
-            c = erode(mk, r + 1);       // before mk[r] changes (it reads rows r .. r + 2)
-            h = cm[r] & b & (u16)(b << 1) & (b >> 1) & a & c;
-            mk[r] |= h; ml[r] &= ~h; md[r] &= ~h;
+    if (top < UNIT_SH) {
+        for (r = top; r < UNIT_SH; r++) {
+            mk[r] = RD16(g, 2 * UNIT_SH + r); ml[r] = RD16(g, r); md[r] = RD16(g, UNIT_SH + r);
         }
+        if (cov) {              // covered: only the contour stays (the white outline and the
+            const u16 *cm = c->cm;      // black line inside it), the sprite eroded twice and
+            u8 r1 = c->r1;              // taken away, on the covered rows only (rows 0, 1 and
+            u16 a, b, d;                // the last two: outline)
+            r = c->r0;
+            a = erode(mk, r - 1); b = erode(mk, r);
+            for (; r <= r1; r++, a = b, b = d) {
+                u16 h;
+                d = erode(mk, r + 1);   // before mk[r] changes (it reads rows r .. r + 2)
+                h = cm[r] & b & (u16)(b << 1) & (b >> 1) & a & d;
+                mk[r] |= h; ml[r] &= ~h; md[r] &= ~h;
+            }
+        }
+        s.h = UNIT_SH - top;
+        s.light = ml + top; s.dark = md + top; s.mask = mk + top;
+        draw_sprite(sx - 8, sy - UNIT_FOOT + top, &s);
     }
-    s.h = UNIT_SH;
-    s.light = ml; s.dark = md; s.mask = mk;
-    draw_sprite(sx - 8, sy - UNIT_FOOT, &s);
     if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
         s.h = FOE_H;                            // never covered (it shows a hidden one too)
         s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
@@ -745,6 +909,7 @@ static s16 ease(s16 c, s16 t)
 
 // ---------------------------------------------------------------- game
 static u8 *sbuf;
+static void hud_labels(void);
 
 static void
 #ifdef __m68k__
@@ -782,6 +947,9 @@ void game_init(void)
         }
         W = (Work *)(sbuf + 2 * SC_PLANE);
         memset(W, 0, sizeof(Work));
+        for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
+        W->hud_t[0] = 0xFE;
+        hud_labels();
         scene_l = sbuf; scene_d = sbuf + SC_PLANE;
 #ifdef __m68k__
         atexit(release);
@@ -798,33 +966,26 @@ void game_init(void)
     }
 }
 
-static void place(u8 i, u8 x, u8 z, u8 gfx, u8 team, u8 face)
-{
-    st.unit[i].x = x; st.unit[i].z = z; st.unit[i].gfx = gfx; st.unit[i].team = team;
-    st.unit[i].face = face;
-}
-
 void game_scenario(u16 n)
 {
-    u8 i;
-    for (i = 0; i < sizeof(st); i++) ((u8 *)&st)[i] = 0;
+    memset(&st, 0, sizeof st);
     if (!W) return;
-    place(0, 5, 5, UG_RAMZA, TEAM_PLAYER, 2);    // facing +z: the south camera
-    place(1, 7, 8, UG_DELITA, TEAM_PLAYER, 2);
-    place(2, 1, 11, UG_THIEF, TEAM_ENEMY, 3);    // behind a house from the south (fft_test --find)
-    place(3, 4, 5, UG_AGRIAS, TEAM_PLAYER, 2);
-    st.cx = 5; st.cz = 5;
-    if (n >= 1 && n <= 4) {                       // the thief behind a building, each view
+    rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
+    battle_units();                               // Gariland's eleven units at their start tiles
+    turn_start();
+    while (n && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
+    if (n >= 1 && n <= 4) {                       // an enemy behind a building, each view
+        st.unit[U_HIDE].x = 1; st.unit[U_HIDE].z = 11;    // (fft_test --find)
         st.rot = (u8)(n - 1);
-        st.cx = st.unit[2].x; st.cz = st.unit[2].z;
+        st.cx = st.unit[U_HIDE].x; st.cz = st.unit[U_HIDE].z;
     } else if (n == 5) {                          // Ramza selected, his range shown
-        st.mode = M_TARGET; st.sel = 0;
-        compute_reach(0);
+        st.mode = M_TARGET; st.sel = U_RAMZA;
+        compute_reach(U_RAMZA);
     } else if (n == 6) {                          // in the middle of a rotation
         st.turn = 1; st.turn_t = TURN_FRAMES / 2;
     } else if (n == 7) {                          // Ramza walking
-        st.sel = 0;
-        if (make_path(0, 7, 7)) { st.mode = M_WALK; st.path_i = 1; st.walk_t = 2; }
+        st.sel = U_RAMZA;
+        if (make_path(U_RAMZA, 4, 8)) { st.mode = M_WALK; st.path_i = 1; st.walk_t = 2; }
     }
     cam_target(&st.camx, &st.camy);
     hl_seq++;
@@ -869,8 +1030,13 @@ u8 game_update(void)
             st.unit[st.sel].x = st.path[st.path_i][0];
             st.unit[st.sel].z = st.path[st.path_i][1];
             st.cx = st.unit[st.sel].x; st.cz = st.unit[st.sel].z;
-            if (st.path_i + 1 >= st.path_n) st.mode = M_BROWSE;
+            if (st.path_i + 1 >= st.path_n) {
+                st.mode = M_BROWSE;
+                if (st.sel == st.act) turn_end(1, 0);   // no Act yet (milestone 16): the turn ends
+            }
         }
+    } else if (st.wait_t) {                        // an enemy's or the guest's turn: it waits
+        if (!st.turn && !--st.wait_t) turn_end(0, 0);
     } else if (!st.turn) {
         u32 arrows = rt_keys & (K_UP | K_DOWN | K_LEFT | K_RIGHT);
         if (input_pressed(K_UP | K_DOWN | K_LEFT | K_RIGHT)) st.rep = 0;
@@ -883,13 +1049,15 @@ u8 game_update(void)
         st.rep = arrows ? (u8)(st.rep < 255 ? st.rep + 1 : st.rep) : 0;
         if (input_pressed(K_A | K_ENTER)) {
             u8 o = unit_at(st.cx, st.cz), c = (u8)(st.cz * MAP_W + st.cx);
-            if (st.mode == M_BROWSE && o && st.unit[o - 1].team == TEAM_PLAYER) {
+            if (st.mode == M_BROWSE && o - 1 == st.act) {
                 st.mode = M_TARGET; st.sel = o - 1;
                 compute_reach(st.sel);
             } else if (st.mode == M_TARGET && st.reach[c] != 0xFF && st.reach[c] > 0
                        && make_path(st.sel, st.cx, st.cz)) {
                 st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
             }
+        } else if (input_pressed(K_C) && st.mode == M_BROWSE) {
+            turn_end(0, 0);                        // Wait (the menu comes at milestone 16)
         } else if (input_pressed(K_ESC | K_B)) {
             if (st.mode == M_TARGET) st.mode = M_BROWSE;
             else if (input_pressed(K_ESC)) return 0;
@@ -924,13 +1092,32 @@ static void copy_view(void)
     }
 }
 
+// the turns' labels: AMS text drawn once into the HUD buffer and kept as 16-pixel rows
+static void hud_labels(void)
+{
+    static const char ab[UNIT_GFX_N][3] = { "Ra", "De", "Sq", "Sq", "Ch", "Ch" };
+    void *sl = rt_light, *sd = rt_dark;
+    u8 g, r;
+    rt_light = HUD_L; rt_dark = HUD_D;
+    for (g = 0; g < UNIT_GFX_N; g++) {
+        memset(W->hud, 0, sizeof W->hud);
+        draw_text(0, 0, ab[g], F_SMALL, C_BLACK);
+        for (r = 0; r < 5; r++) W->label[g][r] = (u16)(HUD_L[r * RT_PBYTES] << 8 | HUD_L[r * RT_PBYTES + 1]);
+    }
+    rt_light = sl; rt_dark = sd;
+}
+
+// The HUD: both strips are drawn into W->hud when what they show changes, at most one per frame
+// (the turns from labels drawn once, the info line in AMS text), and copied each frame (~2k).
 static void draw_hud(void)
 {
     char s[24];
     const char *name = "";
-    u8 o = unit_at(st.cx, st.cz), h = map_tiles[st.cz * MAP_W + st.cx].stand, n = 0;
-    static const char *const names[UNIT_GFX_N] = { "Ramza", "Delita", "Agrias", "Thief" };
+    u8 o = unit_at(st.cx, st.cz), h = map_tiles[st.cz * MAP_W + st.cx].stand, n = 0, i, r, w;
+    static const char *const names[UNIT_GFX_N] = { "Ramza", "Delita", "Squire", "Squire", "Chemist", "Chemist" };
     static const char dirs[4] = { 'S', 'W', 'N', 'E' };
+    u32 *a, *b;
+    u16 *c, *d;
     if (o) name = names[st.unit[o - 1].gfx];
     s[n++] = dirs[st.rot]; s[n++] = ' '; s[n++] = 'h';
     if (h >= 20) s[n++] = (char)('0' + h / 20);
@@ -939,8 +1126,64 @@ static void draw_hud(void)
     s[n++] = ' ';
     while (*name && n < 22) s[n++] = *name++;
     s[n] = 0;
-    draw_rect(0, RT_H - 7, 4 * n + 2, 7, C_WHITE);
-    draw_text(1, RT_H - 6, s, F_SMALL, C_BLACK);
+    for (i = 0, w = 0; i < ORDER_N; i++) w |= st.turns[i] != W->hud_t[i];
+    if (w && !W->hud_late++) w = 0;                // not on the turn's first frame (the camera
+    if (w) {                                       // starts moving)
+        for (r = 0; r < 8; r++) {                  // white, 64 px
+            a = (u32 *)(HUD_L + r * RT_PBYTES); b = (u32 *)(HUD_D + r * RT_PBYTES);
+            a[0] = a[1] = b[0] = b[1] = 0;
+        }
+        // the turn order: the active unit, then the next turns; enemies on light grey,
+        // underlined in black
+        for (i = 0; i < ORDER_N && st.turns[i] != 0xFF; i++) {
+            const Unit *u = &st.unit[st.turns[i]];
+            s16 x = i ? 3 + 10 * i : 0, bw = i ? (i == ORDER_N - 1 ? 11 : 10) : 12, tx = x + 1 + !i;
+            u8 *pl = HUD_L + (x >> 3), *pd = HUD_D + (x >> 3);
+            if (u->team == TEAM_ENEMY) {           // light grey: the light plane; the line black
+                u32 m = ((1UL << bw) - 1) << (32 - bw - (x & 7));
+                u8 m0 = (u8)(m >> 24), m1 = (u8)(m >> 16), m2 = (u8)(m >> 8);
+                for (r = 0; r < 8; r++, pl += RT_PBYTES, pd += RT_PBYTES) {
+                    pl[0] |= m0; pl[1] |= m1; pl[2] |= m2;
+                    if (r == 7) { pd[0] |= m0; pd[1] |= m1; pd[2] |= m2; }
+                }
+            }
+            pl = HUD_L + RT_PBYTES + (tx >> 3); pd = HUD_D + RT_PBYTES + (tx >> 3);
+            for (r = 0; r < 5; r++, pl += RT_PBYTES, pd += RT_PBYTES) {   // black: both planes
+                u32 v = (u32)W->label[u->gfx][r] << (8 - (tx & 7));
+                u8 b0 = (u8)(v >> 16), b1 = (u8)(v >> 8), b2 = (u8)v;
+                pl[0] |= b0; pl[1] |= b1; pl[2] |= b2;
+                pd[0] |= b0; pd[1] |= b1; pd[2] |= b2;
+            }
+        }
+        for (i = 0; i < ORDER_N; i++) W->hud_t[i] = st.turns[i];
+        W->hud_late = 0;
+    } else if (!W->hud_late) {
+        for (i = 0; i <= n && s[i] == W->hud_s[i]; i++) ;
+        if (i <= n) {                              // the info line, its box to a whole word
+            void *sl = rt_light, *sd = rt_dark;
+            W->hud_w = (u8)((4 * n + 17) >> 4);
+            for (r = 0; r < 7; r++) {              // white
+                c = W->hud[0] + (8 + r) * (RT_PBYTES / 2); d = W->hud[1] + (8 + r) * (RT_PBYTES / 2);
+                for (i = 0; i < W->hud_w; i++) c[i] = d[i] = 0;
+            }
+            rt_light = HUD_L; rt_dark = HUD_D;
+            draw_text(1, 9, s, F_SMALL, C_BLACK);
+            rt_light = sl; rt_dark = sd;
+            for (i = 0; i <= n; i++) W->hud_s[i] = s[i];
+        }
+    }
+    c = W->hud[0]; d = W->hud[1];                  // copied: the turns, then the info line
+    for (r = 0; r < 8; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
+        a = (u32 *)((u8 *)rt_light + r * RT_PBYTES); b = (u32 *)((u8 *)rt_dark + r * RT_PBYTES);
+        a[0] = ((u32 *)c)[0]; a[1] = ((u32 *)c)[1];
+        b[0] = ((u32 *)d)[0]; b[1] = ((u32 *)d)[1];
+    }
+    w = W->hud_w;
+    for (r = 0; r < 7; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
+        u16 *pa = (u16 *)((u8 *)rt_light + (RT_H - 7 + r) * RT_PBYTES);
+        u16 *pb = (u16 *)((u8 *)rt_dark + (RT_H - 7 + r) * RT_PBYTES);
+        for (i = 0; i < w; i++) { pa[i] = c[i]; pb[i] = d[i]; }
+    }
 }
 
 void game_render(void)
@@ -970,10 +1213,17 @@ void game_render(void)
     }
     for (i = 0; i < NUNIT; i++) {
         u8 k = ord[i];
-        u16 cm[COVER_H];
+        s16 bx = f[k].x - st.camx - 8, by = f[k].y - st.camy - UNIT_FOOT;
+        Cover *c = &W->cover[k];
         if (st.unit[k].x >= MAP_W) continue;
-        cover(cm, f[k].x, f[k].y, f[k].depth);
-        draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, cm);
+        if (bx <= -16 || bx >= RT_W || by <= -UNIT_SH || by - FOE_H >= RT_H) continue;   // off screen
+        if (c->x != f[k].x || c->y != f[k].y || c->depth != f[k].depth || c->rot != st.rot) {
+            c->x = f[k].x; c->y = f[k].y; c->depth = f[k].depth; c->rot = st.rot;
+            cover(c->cm, f[k].x, f[k].y, f[k].depth);
+            for (c->r0 = 2; c->r0 <= UNIT_SH - 3 && !c->cm[c->r0]; c->r0++) ;
+            for (c->r1 = UNIT_SH - 3; c->r1 >= c->r0 && !c->cm[c->r1]; c->r1--) ;
+        }
+        draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, c);
     }
     ZE(4); ZB(5);
     // the cursor, above everything (blinking)

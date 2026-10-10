@@ -1,5 +1,7 @@
 map.h
 units.h
+battle.h
+oracle.h
 fftv*.bin
 *.89y
 x/

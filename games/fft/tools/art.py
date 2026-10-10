@@ -5,8 +5,7 @@ usage: art.py art.h
 Greys: 0 white, 1 light, 2 dark, 3 black (light plane = bit 0, dark plane = bit 1).
 The scenery is the game's own (tools/extract.py: the map's textured mesh drawn per view);
 and so are the units (tools/units.py -> units.h); this file holds the rest:
-- The units' shadow (ExtGraph sprite rows, mask bit 1 = transparent) and rev8, a byte with
-  its bits reversed (the units' sprites mirrored, as FFT draws two of the four directions).
+- The units' shadow (ExtGraph sprite rows, mask bit 1 = transparent).
 - The cursor and the reach marker (24x12 diamonds); the diamond above enemies (team at a glance).
 - The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
   the views (extract.py, map.h).
@@ -121,7 +120,6 @@ def main():
     sh = [[None if c == '.' else int(c) for c in l] for l in SHADOW.strip('\n').split('\n')]
     sh = [r + [None] * (16 - len(r)) for r in sh]
     L, D, M = plane_rows(sh, 16, len(sh))
-    w('static const u8 rev8[256] = { %s };\n' % ', '.join(str(int('{:08b}'.format(i)[::-1], 2)) for i in range(256)))
     w('static const u16 shadow_gfx[3][%d] = { { %s }, { %s }, { %s } };\n' % (len(sh), *(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M]))))
     # rotation frames (half resolution): solid greys (checkerboards between two greys were
     # tried: the user preferred solid faces)

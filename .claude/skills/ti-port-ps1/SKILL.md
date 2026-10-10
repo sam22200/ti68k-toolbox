@@ -362,6 +362,23 @@ only: nothing extracted from the disc).
   first player turn, RNG included; keep it a single process (a state saved and reloaded
   between steps gave a slightly different battle). FFT USA confirms with CIRCLE. The AI
   writes trial positions into the real unit records while thinking: trace between turns.
+  **Stats from the formula, checked on the oracle** (milestone 14): the decompilation gave the
+  draw and stat functions (raw stats of 24 bits, growth, job multipliers, equipment); a Python
+  model of them (`tools/battle.py --check`) read every unit's raw stats, job and equipment from
+  the oracle's RAM and matched all eleven units' HP, MP, Speed, PA, MA, Move and Jump at the
+  first try; the same raw values, written into a fixture, test the C (`oracle.h`). Random
+  values cannot be compared one by one: check ranges and candidates on the oracle, then
+  distributions over many seeds in C. Eleven units instead of four cost 260k: skip units
+  off screen, keep each cover mask until its unit moves, store the mirrored frames so the
+  TI draws a unit straight from the archived file (`RtSprite` planes are `const void *`:
+  `light + 26` moves 26 bytes, not rows; only the TI path used it, `make xcheck` caught it).
+  **Long traces by handing the player's side to the AI** (milestone 15): clearing the units'
+  player-controlled flag (FFT: team byte bit 0x08, poked every frame) lets the original play
+  the whole battle alone; 40 turns in 20 s, KOs included, logged when the turn flag rises on
+  the turn unit. The rule read in the decompilation (FFT's CT clock) then matched every turn's
+  unit and every unit's CT at the first try, fed with the original's per-turn CT bonuses
+  (derived from consecutive snapshots). Text drawn every frame cost ~40k cycles in the HUD
+  (ExtGraph fills and ROM `memcpy` have a high fixed cost): cache the HUD strips and copy them.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).
