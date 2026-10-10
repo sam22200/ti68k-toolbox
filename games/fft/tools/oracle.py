@@ -3,6 +3,7 @@
 turn at Gariland, saved as a core state (never committed). RE_NOTES.md § Battle oracle.
 
 usage: oracle.py DISC.cue OUT.state [trace.txt]
+       oracle.py --turns DISC.cue STATE N turns.txt
 The trace lists, from the battle's start to Ramza's turn, every frame where a unit's HP, CT,
 position or the turn unit changed (the turn order and the AI turns as the game plays them).
 Deterministic: the same inputs and pokes at the same frames give the same battle (the RNG
@@ -18,6 +19,11 @@ included). The path:
    slots 3 and 6) written into the deployment grid; START, CIRCLE: the battle starts.
 4. CIRCLE taps through the intro until READY!, the AI turns run alone, CIRCLE through the
    dialogue that opens Ramza's turn: his command menu is open.
+--turns goes on from that state: Ramza waits (menu Wait, facing kept), then the player's units
+lose their player-controlled flag (team +0x05 bit 0x08, poked every frame) so the AI plays the
+whole battle; each of the first N turns of a living unit is written as one line, the unit and
+every unit's CT and HP right after the clock picked it (has_turn +0x186 rising on the turn
+unit; the AI's trial writes, which flicker it, are skipped).
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../.claude/skills/ti-port-ps1/scripts'))
@@ -118,7 +124,49 @@ def unit_table(p):
     return rows
 
 
+IDS = [0, 1, 2, 3, 4, 5, 16, 17, 18, 19, 20]     # the battle's units in RAM order
+
+
+def turns(psx, n):
+    s = taps('DOWN:20 DOWN:30 CIRCLE:60 CIRCLE:60')   # Ramza's menu: Wait, then the facing
+    run(psx, len(s) + 1, s)
+    rows, last = [], {'ht': [0] * 21, 'row': None}
+    def hook(p, f):
+        for i in (16, 17, 18, 19, 20):
+            a = UNITS + UNIT_SIZE * i + 5
+            if p.read(a) & 8:
+                p.write(a, p.read(a) & ~8)
+        tu = p.read(TURN_UNIT)
+        for i in IDS:
+            h = p.read(UNITS + UNIT_SIZE * i + 0x186)
+            if h and not last['ht'][i] and i == tu and len(rows) < n:
+                cts = [p.read(UNITS + UNIT_SIZE * j + 0x39) for j in IDS]
+                hps = [p.read(UNITS + UNIT_SIZE * j + 0x28, 2) for j in IDS]
+                prev = last['row']
+                # a flicker: the same unit again with no other unit's CT grown
+                if not (prev and prev[0] == i and all(c <= d for k, (c, d) in enumerate(zip(cts, prev[1]))
+                                                      if IDS[k] != i)):
+                    rows.append((i, cts, hps))
+                    last['row'] = rows[-1]
+            last['ht'][i] = h
+    f = 0
+    while len(rows) < n and f < 60000:
+        run(psx, 600, lambda k: key('CIRCLE') if k % 90 < 4 else 0, hook)
+        f += 600
+    return ['%2d  ' % IDS.index(i) + ' '.join('%3d' % c for c in cts) + '  ' + ' '.join('%3d' % h for h in hps)
+            for i, cts, hps in rows]
+
+
 def main():
+    if sys.argv[1] == '--turns':
+        out = os.dup(1)
+        os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        psx = PSX(sys.argv[2])
+        psx.load(sys.argv[3])
+        rows = turns(psx, int(sys.argv[4]))
+        open(sys.argv[5], 'w').write('# unit (battle.h order), CT x 11 after the pick, HP x 11\n' + '\n'.join(rows) + '\n')
+        os.write(out, ('%d turns\n' % len(rows)).encode())
+        return
     out = os.dup(1)
     os.dup2(os.open(os.devnull, os.O_WRONLY), 1)      # the core prints to stdout
     psx = PSX(sys.argv[1])
