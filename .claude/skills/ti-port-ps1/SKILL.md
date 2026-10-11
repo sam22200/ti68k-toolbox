@@ -398,6 +398,15 @@ only: nothing extracted from the disc).
   from the sprite's `SEQ` file read as (frame, ticks) pairs from 0x406 (hit, swing, kneel,
   lying), not by eye on the 182 frames. Dropping 4 rings by copying the whole scene put an
   attack's first frame at 437k: put back only the rings' boxes when they are few.
+  **Abilities by poking the user's skill sets** (milestone 18): giving Ramza another primary
+  and secondary skill set and their learned bits in RAM made FFT list them in its own Act menu,
+  so one unit and one target served every ability (13 cases in 15 s, 600 trials in 10 min).
+  A status poked only in the unit's current set did nothing to a cure: the removal checks a
+  second copy (`inflicted_status`); poke both. Some costs land seconds after the visible effect
+  (Wish's HP cost to its user ~5 s later): wait long after an action before reading RAM. Read
+  what each unit actually knows before scoping (the learn rule left Accumulate, Yell and
+  Phoenix Down unlearnable at Gariland). The `rtk` grep wrapper prefixes line numbers: use
+  `rtk proxy grep` when its output is written to a file.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).

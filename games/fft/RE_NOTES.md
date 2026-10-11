@@ -46,6 +46,22 @@ IMPLEMENTATION** (what the TI does, and why).
   run resumes. Keys: [2nd]/[ENTER] confirm, [ESC]/[shift] cancel, F1/F5 the camera, [F2] status
   and turn order. Titanium, and the TI-89 through `-pack`.
 
+### Abilities (grilling, 2026-10-11, milestone 18)
+
+- Act opens a list as FFT's: Attack, then the unit's skill set, then its abilities (an item with
+  none left greyed); [shift] goes back a level.
+- Only what each unit knows, drawn at each battle by FFT's rule like the stats (a fixed seed in
+  the tests); Accumulate and Yell cannot be learned at level 1 (300 and 200 JP for at most 199).
+- Statuses only as the battle makes them (Dead, Critical, Defending); Heal, Antidote, Eye Drop
+  and Echo Grass usable and missing when there is nothing to remove, as in FFT. Defending's
+  effect in the formulas now, the Defend command with the AI (milestone 20); Equip Change not
+  kept (no effect in battle).
+- The bag as FFT's: the new game's items, used up; the enemies' do not run out.
+- Done when each ability's preview and outcome equal the original's on one case, with
+  distributions for the random ones (Dash, Throw Stone). Enemies and Delita still wait (the AI
+  comes at milestone 20). On screen: the user's FFT pose, the number (or the status removed)
+  rising, the ability's name at the top right.
+
 ## Tools
 
 - `psxiso.py ... sources/fft_ps1/disc` lists the files; `--file MAP/MAP022.GNS` (and the
@@ -90,6 +106,15 @@ IMPLEMENTATION** (what the TI does, and why).
   Brave +0x24, right hand +0x1d, sign: birthday +0x09 high nibble, sex +0x06 0x80 / 0x40,
   facing +0x49 low nibble). 40 previews and 400 attacks in 9 min; `battle.py --check ...
   attacks.txt` writes them into oracle.h.
+- **Abilities** (milestone 18): `tools/oracle.py --skills DISC STATE 300 skills.txt` gives Ramza
+  every Gariland ability by poking (primary skill set +0x12 = 0x19, secondary +0x13 = 0x06 Item,
+  learned bits +0x99 (row 0) FC 00 00 and (row 1) FF FC 00, Throw Item: support bits +0x91 |=
+  0x08); FFT then shows Guts and Item in the Act menu. Each case: Act, Guts or Item, the entry,
+  CIRCLE (the help box), LEFT (the recruit), CIRCLE: the preview (hit % 0x8014d058, amount
+  0x8014d056), then Execute and OK; the target's HP and statuses read before and after, Ramza's
+  HP and the bag (`g_main_item_quantities` 0x800596e0). A status must be poked in both the
+  current set (+0x58) and `inflicted_status` (+0x1bb, what a removal checks), or a cure misses.
+  13 cases and 300 executed Dash and Throw Stone each in ~10 min.
 
 ## Behaviour and data
 
@@ -336,6 +361,67 @@ IMPLEMENTATION** (what the TI does, and why).
   frames (~1.1 s: wind-up 6, blow 4, the target hit 8, the number rising 8 px), the number in
   black with a white outline (FFT: white). EXP and JP come at milestone 19.
 
+### Abilities (milestone 18)
+
+- OBSERVED (fft_decomp, read: `main_unit_calculate_abilities`, `main_unit_learn_job_abilities`,
+  `main_util_roll_pass_fail`; the JP table 0x80066182 read in the oracle's RAM: 0, 100, 200,
+  350...): a generated unit's JP per job are the JP its job level needs plus rand() * 100 /
+  32768 (level 0: 100 + that), so 100..199 at level 1 for every Gariland unit; then each
+  ability of the job's skill set, in the set's order (`g_main_ability_human_skillset_abilities`
+  0x80064a94: 16 actions, then reactions, supports, movements), is learned if rand() * 100 /
+  32768 < its learn rate and the JP left pay its cost. Ramza, made by the new game, knows Wish
+  only (`learned_abilities[0] = 4`). Only the primary set's abilities can be used (no unit has a
+  secondary set at Gariland). Learnable with 199 JP: Squire's Dash (80 JP, 90 %), Throw Stone
+  (90, 80 %), Heal (150, 70 %); Chemist's Potion (30, 100 %), Antidote (70, 65 %), Eye Drop (80,
+  35 %), Echo Grass (120, 35 %), Phoenix Down (90, 60 %); Delita's Wish (0, 100 %).
+- OBSERVED (run, RAM at Ramza's first turn): the eleven units' known abilities (+0x99, a row of
+  3 bytes per job) are all outcomes of that rule: Delita Dash and Wish, the enemy Squires Dash
+  (two of them Throw Stone too), the enemy Chemist Potion and Antidote, the recruits Dash, the
+  Chemists Potion with Antidote and Eye Drop or Eye Drop only. The party's bag
+  (`main_item_init_new_game_inventory`): Potion 5, Hi-Potion 2, Antidote 1, Eye Drop 2, Echo
+  Grass 1, Phoenix Down 2 and one of each other item; an enemy's item use is not counted
+  (`battle_action_decrement_player_item_quantity`: the player's team only), and an item is
+  used up when the action starts, whether it lands or not (`battle_action_prepare_attack`).
+- OBSERVED (fft_decomp, read: the ability range records 0x8005fbf0, `battle_target_set_ability_panels`,
+  `battle_target_set_panels_for_action`, `battle_target_apply_vertical_tolerance`, the formulas
+  `damage_random_y_times_pa`, `apply_damage_and_knockback`, `3c_..._heal_target_two_fifths`,
+  `heal_z_times_ten`, `heal_random_one_to_z_add_status`, `apply_status_to_action`,
+  `battle_status_modify_inflictions`, `calculate_final_hit_percent`,
+  `apply_evasion_changes_due_to_statuses`): an ability's range spreads `range` steps over the
+  map whatever the heights, then a vertical tolerance (where flagged) keeps the tiles within 2 x
+  tolerance half units of the user's height; items reach 1 tile, 4 with Throw Item (every
+  Chemist has it innately), heights aside. Dash: 1 step, not the user, within 1 level; damage
+  (rand() * 4 / 32768 + 1) * XA, XA = PA with the zodiac (no critical), never evaded; at
+  execution only, a knockback (Attack's) when rand() * target's Brave / 32768 < rand() *
+  user's Brave / 32768. Throw Stone: 4 steps, not the user, any height, (rand() * 2 / 32768 + 1)
+  * XA, evaded as Attack (flags 4 bit 0x02), the same knockback. Heal: 1 step or the user,
+  within 2 levels, removes Darkness, Silence, Poison; Antidote Poison, Eye Drop Darkness, Echo
+  Grass Silence; a removal keeps only the statuses the target has (`inflicted_status`), none:
+  a miss. Wish: 1 step, not the user, within 3 levels; the user loses max HP / 5, the target
+  heals twice that. Potion: 30 HP (Z 3 x 10). Phoenix Down: needs Dead, revives with rand() *
+  20 / 32768 + 1 HP. Defending halves the base hit (100 -> 50) of evadable actions: the chance
+  (50 - evade) * 100 / 50, the roll rand() * 50 / 32768 >= evade. No area, charge time or MP
+  cost at Gariland.
+- OBSERVED (run, `oracle.py --skills`, Ramza given every ability on the recruit south of him,
+  the attack's game case: PA 5, the worst signs, XA 3): previews Dash 100 % and 9 (FFT's preview
+  draws its own roll: the amount executed differs), Throw Stone 95 % and 6, Wish 20, Potion 30,
+  Phoenix Down 11 on a KO target (2 executed), Heal / Antidote / Echo Grass 100 % on a target
+  with the status (removed), 0 % without (a miss; Eye Drop and Phoenix Down used up anyway),
+  Throw Stone and Attack 90 % on a Defending target, Defending kept after the hit; Wish's cost to Ramza (52 -> 42) lands ~5 s after the heal.
+  300 Dash executed: 1, 2, 3, 4 times XA 25.0, 25.7, 24.0, 25.3 %; 300 Throw Stone: 5.7 %
+  misses, once and twice XA 46.3 and 48.0 %; no push (the tile behind the target is higher).
+- TARGET (`known`, `can_use`, `skill_range`, `skill_hit`, `skill_amount`, `skill`, the menus
+  `acts_keys`, `make_window` in `fft.c`; `battle.py` reads the sets, abilities and statuses):
+  the same rules and numbers with our RNG (`make test`: the 13 cases; 4000 Dash of ours 24.7,
+  25.3, 24.9, 25.0 %, 4000 Throw Stone 5.1 % misses, 47.3 and 47.6 %; 3000 battles' draws within
+  0.003 of the rule's exact odds; Dash on the flat pushed 534 of 1000 times, Brave 70 against
+  60). Differences, for the TI: the preview
+  shows the range of a random amount (Dmg 3-12, HP +1-20) instead of FFT's one roll; Wish shows
+  only the target's heal (the user's HP drops in its panel); a cure shows the first status
+  removed; the abilities use the attack's swing pose (FFT has throw and item poses, milestone
+  21); a KO unit's tile can be chosen only with Phoenix Down; the Defending status ends at the
+  unit's next turn (INTERPRETATION: FFT's own Defend lasts until then).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -348,3 +434,4 @@ IMPLEMENTATION** (what the TI does, and why).
 | rotation | ~0.5 s, smooth | 3 frames, 0.54 s | ti-cycles |
 | CT | +Speed per tick, act at 100+, -100, +20 per unused Move / Act, max 60 | same | decomp, 46 turns of `oracle.py --turns` |
 | Attack | XA (PA, knife (PA + SP) / 2) x WP, zodiac, critical 4 %, hit 100 - class evade from the front | same | decomp, 40 previews and 400 attacks of `oracle.py --attack` |
+| abilities | learned: JP 100..199 spent in order on passing learn rolls; Dash 1..4 x XA, Throw Stone 1..2 x XA, Wish 2 x max / 5, Potion 30, Phoenix Down 1..20 | same | decomp, 13 cases and 600 trials of `oracle.py --skills` |
