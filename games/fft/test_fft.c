@@ -1,6 +1,7 @@
 // Tests, headless: the four orientations, the map's heights, the battle's units and their stats
 // (against the original's, oracle.h), reach and paths, the scene and the occlusion of units by
-// the buildings in front of them, rotation and walking by keys.
+// the buildings in front of them, rotation and walking by keys, the turn menu, attacks (against
+// the original's previews and attacks, oracle.h).
 //   ./fft_test            every test
 //   ./fft_test --find     the tiles where a unit is hidden in one view and seen in another
 #include <stdio.h>
@@ -111,7 +112,7 @@ static void test_draw(void)
 {
     u16 seed, i, k, lo_hp = 999, hi_hp = 0, delita_eq[2] = { 0, 0 };
     for (seed = 1; seed <= 300; seed++) {
-        sw_init(seed + 100);                              // scenarios above 7: Ramza's first turn
+        sw_init(seed + 100);                              // scenarios above 9: Ramza's first turn
         CHECKV(st.cx, st.unit[U_RAMZA].x);
         for (i = 0; i < NUNIT; i++) {
             const Unit *u = &st.unit[i];
@@ -288,7 +289,7 @@ static void test_turn_keys(void)
 static void test_walk_keys(void)
 {
     int k;
-    sw_init(8);                                           // Ramza's turn, cursor on him (4, 11)
+    sw_init(10);                                          // Ramza's turn, cursor on him (4, 11)
     CHECKV(st.act, U_RAMZA);
     CHECKV(st.mode, M_MENU);
     press(K_A);                                           // Move
@@ -333,10 +334,12 @@ static void test_walk_keys(void)
 static void test_menu(void)
 {
     int k;
-    sw_init(8);
+    sw_init(10);
     press(K_DOWN);
     CHECKV(st.menu, MN_ACT);
-    press(K_A);                                           // Act: milestone 17
+    press(K_A);                                           // Act: its reach (test_attack)
+    CHECKV(st.mode, M_AIM);
+    press(K_B);
     CHECKV(st.mode, M_MENU);
     press(K_DOWN); press(K_DOWN);
     CHECKV(st.menu, MN_STATUS);
@@ -380,6 +383,119 @@ static void test_menu(void)
     CHECKV(st.mode, M_STATUS); CHECKV(st.sel, 1);
     press(K_B);
     CHECKV(st.mode, M_BROWSE);
+}
+
+// ---------------------------------------------------------------- milestone 17: attack
+// The original's previews (oracle.h: 40 cases poked into Ramza and the recruit south of him)
+// equal ours; its 400 attacks executed (misses, criticals seen, damage) against 4000 of ours;
+// the reach's height limits, the sides, an attack played by keys, a knockback, a KO.
+static void test_attack(void)
+{
+    u16 i, n, miss = 0, crit = 0, push = 0;
+    u32 sum = 0;
+    double om, oc, od, sd;
+    u8 x, z, d;
+    Unit *ra, *t;
+    sw_init(0);
+    ra = &st.unit[U_RAMZA]; t = &st.unit[10];             // (4, 11), (4, 12)
+    for (i = 0; i < ORACLE_ATTACKS; i++) {
+        const u8 *c = oracle_attacks[i];
+        ra->pa = c[0]; ra->sp = c[1]; ra->brave = c[2]; ra->eq[EQ_WEAPON] = c[3];
+        ra->zodiac = c[4]; ra->female = c[5]; t->zodiac = c[6]; t->female = c[7]; t->face = c[8];
+        if (hit_chance(U_RAMZA, 10) != c[9] || attack_damage(U_RAMZA, 10, 0, 0) != c[10]) {
+            printf("attack case %d: ", i);
+            CHECKV(hit_chance(U_RAMZA, 10), c[9]); CHECKV(attack_damage(U_RAMZA, 10, 0, 0), c[10]);
+        }
+    }
+    sw_init(0);                                           // the first case as the battle has it:
+    ra = &st.unit[U_RAMZA]; t = &st.unit[10];             // the oracle's signs (RAM +0x09:
+    ra->zodiac = 9; t->zodiac = 3; ra->female = t->female = 0;   // Capricorn, Cancer), both male
+    CHECKV(hit_chance(U_RAMZA, 10), 95);
+    CHECKV(attack_damage(U_RAMZA, 10, 0, 0), oracle_trials[0]);
+    for (n = 0; n < 4000; n++) {
+        attack(U_RAMZA, 10);
+        miss += !st.hit; crit += st.dmg > oracle_trials[0]; push += st.push; sum += st.dmg;
+    }
+    om = oracle_trials[2] / (double)oracle_trials[1];      // the original's rates, and ours
+    oc = oracle_trials[3] / (double)oracle_trials[1];
+    od = oracle_trials[4] / (double)oracle_trials[1];
+    printf("attack: %d previews as the original's; misses %.3f (original %.3f), criticals seen %.3f (%.3f), "
+           "damage %.2f (%.2f), pushes %d (%d)\n", ORACLE_ATTACKS, miss / 4000.0, om, crit / 4000.0, oc,
+           sum / 4000.0, od, push, oracle_trials[5]);
+    sd = 3 * 0.011 + 0.01;                               // 3 sigma of 400 trials at 5 %, ours
+    CHECK(miss / 4000.0 > om - sd && miss / 4000.0 < om + sd);
+    CHECK(crit / 4000.0 > oc - sd && crit / 4000.0 < oc + sd);
+    CHECK(sum / 4000.0 > od - 0.6 && sum / 4000.0 < od + 0.6);
+    // the sides: the target faces +z; from +z the front, -z the back, +-x a side
+    t->face = 2;
+    ra->x = 4; ra->z = 13; CHECKV(attack_side(U_RAMZA, 10), SIDE_FRONT); CHECKV(hit_chance(U_RAMZA, 10), 95);
+    ra->z = 11; CHECKV(attack_side(U_RAMZA, 10), SIDE_BACK); CHECKV(hit_chance(U_RAMZA, 10), 100);
+    ra->x = 5; ra->z = 12; CHECKV(attack_side(U_RAMZA, 10), SIDE_SIDE);
+    ra->x = 3; CHECKV(attack_side(U_RAMZA, 10), SIDE_SIDE);
+    // the reach: the four neighbours whose height is within [h - 6, h + 5] half units
+    for (n = 0, z = 0; z < MAP_H; z++)
+        for (x = 0; x < MAP_W; x++) {
+            if (!tile_at(x, z)->walk) continue;
+            ra->x = x; ra->z = z;
+            attack_range(U_RAMZA);
+            for (d = 0; d < 4; d++) {
+                s16 nx = x + (d == 0) - (d == 1), nz = z + (d == 2) - (d == 3);
+                const Tile *a = tile_at(nx, nz);
+                s16 dh = a ? (s16)a->stand - tile_at(x, z)->stand : 0;
+                if (!a) continue;
+                CHECKV(st.reach[nz * MAP_W + nx], a->walk && dh >= -6 && dh <= 5 ? 1 : 0xFF);
+                n += a->walk && (dh == -6 || dh == 5 || dh == -7 || dh == 6);
+            }
+        }
+    printf("attack: reach on every tile, %d neighbours at a height limit\n", n);
+    // by keys: Act, the enemy in front, the attack played, the menu back with Act and the
+    // move's undo gone
+    sw_init(10);
+    st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].face = 2;
+    n = st.unit[1].hp;
+    press(K_DOWN); press(K_A);
+    CHECKV(st.mode, M_AIM);
+    CHECKV(st.reach[10 * MAP_W + 4], 1);
+    press(K_A);                                           // the cursor on Ramza: nothing
+    CHECKV(st.mode, M_AIM);
+    press(K_B);
+    CHECKV(st.mode, M_MENU);
+    press(K_A);
+    st.cx = 4; st.cz = 10;
+    press(K_A);
+    CHECKV(st.mode, M_ACT);
+    CHECK(st.acted && st.unit[U_RAMZA].face == 3);
+    for (i = 0; i < ACT_END && st.mode == M_ACT; i++) sw_step(0);
+    CHECKV(st.mode, M_MENU);
+    CHECKV(st.menu, MN_MOVE);
+    CHECKV(st.unit[1].hp, st.hit ? (st.dmg >= n ? 0 : n - st.dmg) : n);
+    press(K_DOWN); press(K_A);                            // Act is greyed
+    CHECKV(st.mode, M_MENU);
+    // knockback: none onto a higher tile (behind the enemy of scenario 8: (4, 9), h 8 over 4;
+    // the original's 400 attacks pushed none either: (4, 13) is higher too); on the flat, from
+    // (7, 5) onto (7, 7); from a roof (3, 2) h 16 down to (2, 2) h 4: 6 levels, 3 over Jump
+    sw_init(8);
+    for (i = 0; i < 2000; i++) { attack(U_RAMZA, 1); CHECK(!st.push); }
+    sw_init(10);
+    st.unit[U_RAMZA].x = 7; st.unit[U_RAMZA].z = 5; st.unit[1].x = 7; st.unit[1].z = 6;
+    for (i = 0; i < 2000 && !st.push; i++) attack(U_RAMZA, 1);
+    CHECK(st.crit && st.push && st.kx == 7 && st.kz == 7);
+    n = st.dmg;
+    while (st.act_t <= ACT_HIT) sw_step(0);
+    CHECK(st.unit[1].x == 7 && st.unit[1].z == 7 && st.unit[1].hp == st.unit[1].max_hp - n);
+    sw_init(10);
+    st.unit[U_RAMZA].x = 4; st.unit[U_RAMZA].z = 2; st.unit[1].x = 3; st.unit[1].z = 2;
+    for (i = 0; i < 2000 && !st.push; i++) attack(U_RAMZA, 1);
+    CHECK(st.push && st.kx == 2 && st.kz == 2);
+    CHECK(st.dmg > 3 * st.unit[1].max_hp / 10);
+    // a KO: no knockback, out of the turn order
+    sw_init(8);
+    st.unit[1].hp = 1;
+    for (i = 0; i < 100 && !st.hit; i++) attack(U_RAMZA, 1);
+    CHECK(st.hit && !st.push);
+    while (st.mode == M_ACT) sw_step(0);
+    CHECKV(st.unit[1].hp, 0);
+    for (i = 1; i < ORDER_N; i++) CHECK(st.turns[i] != 1);
 }
 
 // ---------------------------------------------------------------- milestone 15: turn order
@@ -450,13 +566,23 @@ static void shots(void)
     sw_init(0);
     sw_step(0);
     scene_pgm("x/scene0.pgm");
-    sw_init(8);                                           // the turn menu, Status, the facing,
+    sw_init(10);                                          // the turn menu, Status, the facing,
     steps(0, 12); sw_write_png("x/m16_menu.png", 4);      // an enemy's panel
     press(K_UP); press(K_A); steps(0, 6); sw_write_png("x/m16_status.png", 4);
     press(K_B); press(K_UP); press(K_A); steps(0, 4); sw_write_png("x/m16_face.png", 4);
     press(K_B); press(K_B);
     st.cx = st.unit[7].x; st.cz = st.unit[7].z;
     steps(0, 30); sw_write_png("x/m16_browse.png", 4);
+    sw_init(8); steps(0, 12); sw_write_png("x/m17_aim.png", 4);   // an attack: aimed, the
+    sw_init(9); steps(0, 6); sw_write_png("x/m17_hit.png", 4);    // number, a miss, a KO
+    sw_init(8);
+    do attack(U_RAMZA, 1); while (st.hit);
+    while (st.act_t < ACT_HIT + 6) sw_step(0);
+    sw_write_png("x/m17_miss.png", 4);
+    sw_init(8); st.unit[1].hp = 1;
+    do attack(U_RAMZA, 1); while (!st.hit);
+    while (st.act_t < ACT_HIT + HIT_FRAMES + 6) sw_step(0);
+    sw_write_png("x/m17_ko.png", 4);
 }
 
 int main(int argc, char **argv)
@@ -472,6 +598,7 @@ int main(int argc, char **argv)
     test_turn_keys();
     test_walk_keys();
     test_menu();
+    test_attack();
     test_clock();
     test_turns();
     shots();

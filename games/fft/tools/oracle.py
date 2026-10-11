@@ -4,6 +4,7 @@ turn at Gariland, saved as a core state (never committed). RE_NOTES.md § Battle
 
 usage: oracle.py DISC.cue OUT.state [trace.txt]
        oracle.py --turns DISC.cue STATE N turns.txt
+       oracle.py --attack DISC.cue STATE N M attacks.txt
 The trace lists, from the battle's start to Ramza's turn, every frame where a unit's HP, CT,
 position or the turn unit changed (the turn order and the AI turns as the game plays them).
 Deterministic: the same inputs and pokes at the same frames give the same battle (the RNG
@@ -24,6 +25,14 @@ lose their player-controlled flag (team +0x05 bit 0x08, poked every frame) so th
 whole battle; each of the first N turns of a living unit is written as one line, the unit and
 every unit's CT and HP right after the clock picked it (has_turn +0x186 rising on the turn
 unit; the AI's trial writes, which flicker it, are skipped).
+--attack goes on from that state too: Ramza attacks the recruit south of him (unit 20, on +y:
+menu Act, Attack, the help box closed, LEFT, CIRCLE; then Execute, OK). N cases with the attacker's PA, Speed,
+Brave, weapon (none, Dagger, Broad Sword), sign and sex and the target's sign, sex and facing
+poked first (seeded draws): the hit % and damage FFT previews (g_battle_menu_active_turn_banner
+0x8014d056 / 0x8014d058). Then M attacks executed in the game's first case (Broad Sword, PA 5,
+the target facing him: 95 %), each after a different number of cursor moves (every preview
+draws rand(), so each attack rolls other numbers): the HP it took (0: a miss) and whether the
+target was pushed a tile (knockback).
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../.claude/skills/ti-port-ps1/scripts'))
@@ -157,7 +166,58 @@ def turns(psx, n):
             for i, cts, hps in rows]
 
 
+PREVIEW = 0x8014d056                              # projected damage (s16), hit % (u16)
+ATTACKER, TARGET = 16, 20                         # Ramza (4, 11), the recruit at (4, 12)
+
+
+def attack_case(psx, c):
+    """Poke one case (attacker PA, SP, Brave, weapon, sign, sex; target sign, sex, facing)."""
+    a, t = UNITS + UNIT_SIZE * ATTACKER, UNITS + UNIT_SIZE * TARGET
+    pa, sp, br, wp, az, af, tz, tf, face = c
+    psx.write(a + 0x36, pa); psx.write(a + 0x38, sp); psx.write(a + 0x24, br); psx.write(a + 0x1d, wp)
+    for u, z, f in ((a, az, af), (t, tz, tf)):
+        psx.write(u + 9, (psx.read(u + 9) & 0x0F) | z << 4)
+        psx.write(u + 6, (psx.read(u + 6) & 0x3F) | (0x40 if f else 0x80))
+    psx.write(t + 0x49, (psx.read(t + 0x49) & 0xF0) | face)
+
+
+def to_target(psx):
+    s = taps('DOWN:30 CIRCLE:40 CIRCLE:60 CIRCLE:60 LEFT:40')
+    run(psx, len(s) + 1, s)
+
+
+def attacks(psx, state, n, m):
+    import random
+    rng, rows = random.Random(17), []
+    for _ in range(n):
+        c = (rng.randint(1, 15), rng.randint(3, 12), rng.randint(20, 97), rng.choice((0xFF, 0x01, 0x13)),
+             rng.randrange(12), rng.randrange(2), rng.randrange(12), rng.randrange(2), rng.randrange(4))
+        psx.load(state)
+        attack_case(psx, c)
+        to_target(psx)
+        s = taps('CIRCLE:60'); run(psx, len(s) + 1, s)
+        rows.append('case ' + ' '.join(map(str, c)) + '  %d %d' % (psx.read(PREVIEW + 2, 2), psx.read(PREVIEW, 2)))
+    t = UNITS + UNIT_SIZE * TARGET
+    for k in range(m):
+        psx.load(state)
+        to_target(psx)
+        s = taps(' '.join(['RIGHT:8 LEFT:8'] * (k % 40)) + ' W:%d CIRCLE:60 CIRCLE:60 CIRCLE:300' % (1 + k // 40))
+        hp = psx.read(t + 0x28, 2)
+        run(psx, len(s) + 1, s)
+        rows.append('trial %d %d' % (hp - psx.read(t + 0x28, 2), (psx.read(t + 0x47), psx.read(t + 0x48)) != (4, 12)))
+    return rows
+
+
 def main():
+    if sys.argv[1] == '--attack':
+        out = os.dup(1)
+        os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        psx = PSX(sys.argv[2])
+        rows = attacks(psx, sys.argv[3], int(sys.argv[4]), int(sys.argv[5]))
+        open(sys.argv[6], 'w').write('# case: attacker PA SP Brave weapon sign female, target sign female facing (FFT)'
+                                     '  hit% damage\n# trial: HP taken, pushed\n' + '\n'.join(rows) + '\n')
+        os.write(out, ('%d rows\n' % len(rows)).encode())
+        return
     if sys.argv[1] == '--turns':
         out = os.dup(1)
         os.dup2(os.open(os.devnull, os.O_WRONLY), 1)

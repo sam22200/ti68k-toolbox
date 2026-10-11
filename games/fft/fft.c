@@ -128,12 +128,17 @@ typedef struct {
     u8 hud_t[ORDER_N], hud_late;
     u16 label[UNIT_GFX_N][5];           // the turns' labels (Ra, De, Sq, Ch), drawn once
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // the menu or a status window, and what it shows:
-    u8 win_k[3], win_w, win_n;          // mode, moved, unit; its width in words; its part to
-                                        // draw next (WIN_DONE: all drawn)
+    u8 win_k[3], win_w, win_h, win_n;   // mode, moved | acted << 1 (M_AIM: the attacker), unit;
+                                        // its width in words, its rows; its part to draw next
+                                        // (WIN_DONE: all drawn)
     u16 pan[2][2][PANEL_H];             // the active unit's panel (left), the cursor's (right):
     u16 pan_k[2][3];                    // light, dark; unit + 1 (0: none), HP, MP
     u8 arrow[4][2][8];                  // the facing arrows (view -v, +u, +v, -u): fill, outline
     u8 pname[UNIT_GFX_N][PANEL_H];      // the names turned a quarter, a row per panel row (5 bits)
+    u8 ringed[MAP_W * MAP_H], ring_n;   // the tiles whose reach ring is in the scene, how many,
+    u8 ring_i;                          // the next tile to look at (MAP_W * MAP_H: all drawn)
+    u32 num[2][7];                      // an attack's number (or Miss): black, its white outline
+    u8 num_w, num_ok;                   // its width; drawn for this attack
 } Work;
 static Work *W;
 #define span_l (W->span_l)
@@ -203,7 +208,16 @@ u8 unit_at(s16 x, s16 z)
 // FFT's model (tools/battle.py, checked on the original at Ramza's first turn): raw stats of 24
 // bits drawn from the unit type's base and variance, grown per level, times the job's
 // multiplier; then the equipment. Once per battle: the 32-bit divisions do not matter.
-static u16 rand15(void) { return rt_rand() >> 1; }        // 0..32767, as the PS1's rand()
+// Our own 32-bit xorshift for the battle's draws, seeded from the runtime's: the runtime's
+// wyhash16 (a 16-bit state) ties two draws in a row (after a 4 % critical roll its next draw,
+// the critical's bonus, was never 0: criticals seen 3.8 % for the original's 2.0 %)
+static u32 rng32 = 1;
+static void rand_seed(u16 s) { rng32 = 0x2545F491UL ^ ((u32)s << 16 | s); }
+static u16 rand15(void)                                   // 0..32767, as the PS1's rand()
+{
+    rng32 ^= rng32 << 13; rng32 ^= rng32 >> 17; rng32 ^= rng32 << 5;
+    return (u16)(rng32 >> 17);
+}
 
 void unit_stats(Unit *u)
 {
@@ -246,7 +260,7 @@ void battle_units(void)
         Unit *u = &st.unit[i];
         u16 day = d->day;
         u->x = d->x; u->z = d->z; u->gfx = d->gfx; u->team = d->team; u->face = d->face;
-        u->job = d->job; u->level = d->level; u->ct = 0; u->dc = 3;
+        u->job = d->job; u->level = d->level; u->ct = 0; u->dc = 3; u->female = d->type == 1;
         u->brave = d->brave ? d->brave : (u8)(45 + ((30UL * rand15()) >> 15));
         u->faith = d->faith ? d->faith : (u8)(45 + ((30UL * rand15()) >> 15));
         if (!day) day = (u16)(1 + ((365UL * rand15()) >> 15));
@@ -467,7 +481,7 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
     fill_spans(ymin, rows, pl, pd);
 }
 
-static u8 reach_hi(u8 world) { return st.mode == M_TARGET && st.reach[world] != 0xFF; }
+#define RINGS(m) ((m) == M_TARGET || (m) == M_AIM)   // the modes that show st.reach
 
 // pixels of the scene in front of view diagonal depth inside a box (byte columns, rows):
 // restored from the view (a reach ring drawn behind a building), but for a pattern of them:
@@ -476,20 +490,22 @@ static const u8 hide_pat[2] = { 0xCC, 0x33 };   // 2-pixel dashes (picked over t
                                                 // and a checkerboard)
 static void uncover(s16 x, s16 y, s16 w, s16 rows, u8 depth)
 {
-    const u8 *vl = vbuf, *vd = vl + SC_PLANE, *t1 = vd + SC_PLANE, *m1 = t1 + SC_PLANE;
-    const u8 *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
     s16 b0 = x >> 3, b1 = (x + w - 1) >> 3, r, b;
     if (b0 < 0) b0 = 0;
     if (b1 >= SC_BYTES) b1 = SC_BYTES - 1;
     if (y < 0) { rows += y; y = 0; }
     if (y + rows > SC_H) rows = SC_H - y;
     for (r = 0; r < rows; r++) {
+        // three pointers, the other planes at constant offsets (at most 3 SC_PLANE: a 16-bit
+        // displacement): nine pointers or six indexed arrays cost ~18k a ring
         u16 o = (u16)((y + r) * SC_BYTES + b0);
-        for (b = b0; b <= b1; b++, o++) {
-            u8 m = ((t1[o] > depth ? m1[o] : 0) | (t2[o] > depth ? m2[o] : 0)) & ~hide_pat[(y + r) & 1];
+        const u8 *v = vbuf + o, *t = vbuf + 2 * SC_PLANE + o;   // view: light, dark; depths
+        u8 *q = scene_l + o, hp = (u8)~hide_pat[(y + r) & 1];    // scene: light, dark
+        for (b = b0; b <= b1; b++, v++, t++, q++) {
+            u8 m = (u8)(((t[0] > depth ? t[SC_PLANE] : 0) | (t[2 * SC_PLANE] > depth ? t[3 * SC_PLANE] : 0)) & hp);
             if (!m) continue;
-            scene_l[o] = (u8)((scene_l[o] & ~m) | (vl[o] & m));
-            scene_d[o] = (u8)((scene_d[o] & ~m) | (vd[o] & m));
+            q[0] = (u8)((q[0] & ~m) | (v[0] & m));
+            q[SC_PLANE] = (u8)((q[SC_PLANE] & ~m) | (v[SC_PLANE] & m));
         }
     }
 }
@@ -557,22 +573,60 @@ static void draw_glints(void)
     }
 }
 
+// a ring's box in the scene: its tile's diamond at its standing height
+static void ring_box(u8 rot, u8 i, s16 *x, s16 *y, u8 *depth)
+{
+    s16 u, v;
+    view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
+    *x = scene_x(rot, u, v) - HW; *y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
+    *depth = (u8)(u + v);
+}
+
+// a new view, or many rings to drop (a Move's): copied whole (130k); a few (an attack's): only
+// their boxes put back from the view (~7k each; the frame an attack starts went over the
+// budget with the whole copy). The new rings are then drawn RING_STEP a frame (~18k each:
+// the four of an attack in one frame made it 381k with ten units on screen)
+#define RING_BOXES 12
+#define RING_STEP 2
 static void ensure_scene(u8 rot)
 {
-    u8 i;
-    if (scene_rot == rot && scene_seq == hl_seq) return;
+    u8 i, d, k;
+    s16 x, y;
+    if (scene_rot == rot && scene_seq == hl_seq) {
+        if (W->ring_i >= MAP_W * MAP_H) return;
+        goto rings;
+    }
     unpack_view(rot);
-    if (scene_rot != rot) make_glints(rot);
-    memcpy(scene_l, vbuf, 2 * SC_PLANE);
+    if (scene_rot != rot || W->ring_n > RING_BOXES) {
+        if (scene_rot != rot) make_glints(rot);
+        memcpy(scene_l, vbuf, 2 * SC_PLANE);
+    } else
+        for (i = 0; i < MAP_W * MAP_H; i++) {
+            s16 r, b0, b1, rows = 12;
+            if (!W->ringed[i]) continue;
+            ring_box(rot, i, &x, &y, &d);
+            b0 = x < 0 ? 0 : x >> 3; b1 = (x + 23) >> 3;
+            if (b1 >= SC_BYTES) b1 = SC_BYTES - 1;
+            if (y < 0) { rows += y; y = 0; }
+            if (y + rows > SC_H) rows = SC_H - y;
+            for (r = 0; r < rows; r++) {           // 3-4 bytes a row: no ROM memcpy
+                u16 o = (u16)((y + r) * SC_BYTES + b0), e = o + (b1 - b0);
+                for (; o <= e; o++) { scene_l[o] = vbuf[o]; scene_d[o] = vbuf[SC_PLANE + o]; }
+            }
+        }
     scene_rot = rot; scene_seq = hl_seq;
+    memset(W->ringed, 0, sizeof W->ringed);
+    W->ring_n = W->ring_i = 0;
+rings:
     dst_scene();
-    for (i = 0; i < MAP_W * MAP_H; i++) {
-        s16 u, v, x, y;
-        if (!reach_hi(i)) continue;
-        view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
-        x = scene_x(rot, u, v) - HW; y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
+    if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; return; }
+    for (k = 0; W->ring_i < MAP_W * MAP_H && k < RING_STEP; W->ring_i++) {
+        i = W->ring_i;
+        if (st.reach[i] == 0xFF) continue;
+        W->ringed[i] = 1; W->ring_n++; k++;
+        ring_box(rot, i, &x, &y, &d);
         blit24(x, y, 12, hi_l, hi_d, hi_m);
-        uncover(x, y, 24, 12, (u8)(u + v));
+        uncover(x, y, 24, 12, d);
     }
 }
 
@@ -643,6 +697,114 @@ u8 make_path(u8 who, u8 tx, u8 tz)
     return st.path_n;
 }
 
+// ---------------------------------------------------------------- attack
+// FFT's Attack with the battle's weapons (RE_NOTES.md § Attack: read in the decompilation,
+// checked on the original's previews and attacks). A sword or knife strikes the four tiles
+// around the unit whose standing height is at most 3 below or 2.5 above its own; the target
+// facing the attacker evades with its class evade (no shields, accessories or Weapon Guard
+// at Gariland), from the side or the back it is always hit. XA: PA (a sword, bare hands) or
+// (PA + Speed) / 2 (a knife), changed by the signs' compatibility, then on a critical hit
+// (4 %) XA + 0..XA - 1 and the target pushed a tile away; damage XA * WP (bare hands: PA *
+// Brave / 100), at most 999.
+void attack_range(u8 who)
+{
+    const Unit *u = &st.unit[who];
+    s16 h = map_tiles[u->z * MAP_W + u->x].stand;
+    u8 d;
+    hl_seq++;
+    memset(st.reach, 0xFF, sizeof st.reach);
+    for (d = 0; d < 4; d++) {
+        s16 x = u->x + dir_x[d], z = u->z + dir_z[d];
+        const Tile *t = tile_at(x, z);
+        if (t && t->walk && t->stand + 6 >= h && t->stand <= h + 5) st.reach[z * MAP_W + x] = 1;
+    }
+}
+
+// from the target: the attack's dominant axis against its facing (a tie: either axis)
+u8 attack_side(u8 a, u8 t)
+{
+    const Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    s16 dx = (s16)ua->x - ut->x, dz = (s16)ua->z - ut->z;
+    s16 ax = dx < 0 ? -dx : dx, az = dz < 0 ? -dz : dz, c = 0;
+    if (!ax && !az) return SIDE_BACK;
+    if (ax >= az) c += dir_x[ut->face] * (dx < 0 ? -1 : dx > 0);
+    if (az >= ax) c += dir_z[ut->face] * (dz < 0 ? -1 : dz > 0);
+    return c > 0 ? SIDE_FRONT : c < 0 ? SIDE_BACK : SIDE_SIDE;
+}
+
+u8 hit_chance(u8 a, u8 t)
+{
+    return attack_side(a, t) == SIDE_FRONT ? 100 - jobs[st.unit[t].job].cev : 100;
+}
+
+u16 attack_damage(u8 a, u8 t, u8 crit, u16 r)
+{
+    const Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    const Item *w = ua->eq[EQ_WEAPON] != 0xFF ? &items[ua->eq[EQ_WEAPON]] : RT_NULL;
+    s16 xa = w && w->knife ? (ua->pa + ua->sp) >> 1 : ua->pa, ya;
+    u8 c = zodiac_compat[ua->zodiac > ut->zodiac ? ua->zodiac - ut->zodiac : ut->zodiac - ua->zodiac];
+    u16 p = (u16)(xa * 25), d;
+    if (c == 3) c = ua->female == ut->female ? 4 : 5;       // opposite signs: worst, best
+    if (c == 1) xa -= p / 100;
+    else if (c == 2) xa += p / 100;
+    else if (c == 4) xa -= p / 50;
+    else if (c == 5) xa += p / 50;
+    if (xa < 1) xa = 1;
+    if (crit) xa += (s16)(((u32)r * (u16)xa) >> 15);
+    ya = w ? w->wp : (s16)((u16)(ua->pa * ua->brave) / 100);
+    if (ya < 1) ya = 1;
+    d = (u16)(xa * ya);
+    return d > 999 ? 999 : d;
+}
+
+// the hit rolled (rand() * 100 / 32768 >= the evade), then the critical, the damage and the
+// knockback: one tile away along the dominant axis (a tie: z), onto a walkable, free, dry tile
+// no higher (FFT compares the tiles' facing edges), not when the blow kills; a fall of more
+// than Jump levels costs (levels - Jump) * max HP / 10
+void attack(u8 a, u8 t)
+{
+    Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    s16 dx = (s16)ut->x - ua->x, dz = (s16)ut->z - ua->z;
+    u8 ev = 100 - hit_chance(a, t);
+    st.atk = a; st.tgt = t; st.act_t = 0; st.mode = M_ACT;
+    if (W) W->num_ok = 0;
+    ua->face = (dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz) ? (dx > 0 ? 0 : 1) : (dz > 0 ? 2 : 3);
+    st.hit = (u8)(((u32)rand15() * 100 >> 15) >= ev);
+    st.crit = st.push = 0; st.dmg = 0;
+    if (!st.hit) return;
+    st.crit = (u8)(((u32)rand15() * 100 >> 15) < 4);
+    st.dmg = attack_damage(a, t, st.crit, st.crit ? rand15() : 0);
+    if (st.crit && st.dmg < ut->hp) {
+        s16 kx = ut->x, kz = ut->z;
+        const Tile *s = &map_tiles[ut->z * MAP_W + ut->x], *n;
+        if ((dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz)) kx += dx > 0 ? 1 : -1;
+        else kz += dz > 0 ? 1 : -1;
+        n = tile_at(kx, kz);
+        if (n && n->walk && !n->water && n->stand <= s->stand && !unit_at(kx, kz)) {
+            s16 fall = ((s->stand - n->stand) >> 1) - ut->jump;
+            st.push = 1; st.kx = (u8)kx; st.kz = (u8)kz;
+            if (fall > 0) st.dmg += (u16)((u32)fall * ut->max_hp / 10);
+            if (st.dmg > 999) st.dmg = 999;
+        }
+    }
+}
+
+// M_ACT, once per frame: the target loses its HP at ACT_HIT (pushed, KO at 0: the turn order
+// again), the menu comes back at ACT_END
+static void attack_step(void)
+{
+    Unit *ut = &st.unit[st.tgt];
+    if (st.act_t == ACT_HIT && st.hit) {
+        ut->hp = st.dmg >= ut->hp ? 0 : ut->hp - st.dmg;
+        if (st.push) { ut->x = st.kx; ut->z = st.kz; }
+        if (!ut->hp) turn_order();
+    }
+    if (++st.act_t >= ACT_END) {
+        st.mode = M_MENU; st.menu = st.moved ? MN_WAIT : MN_MOVE;
+        st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
+    }
+}
+
 // ---------------------------------------------------------------- units on screen
 // a unit's feet: scene position of its tile centre at its standing height, interpolated
 // while walking (t / WALK_FRAMES of the way to the next tile, with a hop on height changes);
@@ -703,6 +865,19 @@ static const u8 idle_seq[32] = { 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 3, 3, 3, 3 };
 static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 };
 
+// a unit's pose (units.h: P_*), 0 for the idle or the walk: KO lying, the attacker's swing,
+// the target hit, kneeling with little HP left (FFT's Critical: HP <= max / 5)
+static u8 unit_pose(u8 i)
+{
+    const Unit *un = &st.unit[i];
+    if (st.mode == M_ACT) {
+        if (i == st.atk && st.act_t < ACT_HIT) return st.act_t < ACT_BLOW ? P_WIND : P_BLOW;
+        if (i == st.tgt && st.act_t >= ACT_HIT && st.act_t < ACT_HIT + HIT_FRAMES && st.hit) return P_HIT;
+    }
+    if (!un->hp) return P_KO;
+    return (u16)(un->hp * 5) <= un->max_hp ? P_KNEEL : 0;
+}
+
 // a unit's frame (units.h) seen from orientation rot: its facing turned into the view, front
 // frames looking down-left (+v), back ones up-left (-u), mirrored for +u and -v as in FFT (the
 // mirrored frames are stored after the others)
@@ -715,8 +890,12 @@ static const u8 *unit_frame(u8 rot, u8 i)
     view_of(rot, 0, 0, &u0, &v0);
     view_of(rot, fdx[un->face], fdz[un->face], &du, &dv);
     du -= u0; dv -= v0;
-    k = st.mode == M_WALK && i == st.sel ? walk_seq[t & 15] : idle_seq[t & 31];
-    if (du < 0 || dv < 0) k += 5;
+    k = unit_pose(i);
+    if (k) k += du < 0 || dv < 0;                      // a pose: front, back
+    else {
+        k = st.mode == M_WALK && i == st.sel ? walk_seq[t & 15] : idle_seq[t & 31];
+        if (du < 0 || dv < 0) k += 5;
+    }
     if (du > 0 || dv < 0) k += UNIT_FRAMES;
     return ugfx + (u16)(un->gfx * (2 * UNIT_FRAMES) + k) * (6 * UNIT_SH);
 }
@@ -984,6 +1163,7 @@ void game_scenario(u16 n)
     memset(&st, 0, sizeof st);
     if (!W) return;
     rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
+    rand_seed(rt_seed);
     battle_units();                               // Gariland's eleven units at their start tiles
     turn_start();
     while (n && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
@@ -998,7 +1178,15 @@ void game_scenario(u16 n)
         st.turn = 1; st.turn_t = TURN_FRAMES / 2;
     } else if (n == 7) {                          // Ramza walking
         st.sel = U_RAMZA;
-        if (make_path(U_RAMZA, 4, 8)) { st.mode = M_WALK; st.path_i = 1; st.walk_t = 2; }
+        if (make_path(U_RAMZA, 4, 8)) { st.mode = M_WALK; st.path_i = 1; st.walk_t = 2; }    } else if (n == 8 || n == 9) {                // an enemy in front of Ramza: aimed at, hit
+        st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].face = 2;
+        st.mode = M_AIM; st.cx = 4; st.cz = 10;
+        attack_range(U_RAMZA);
+        if (n == 9) {                             // (a hit: drawn again after a miss)
+            st.acted = 1;
+            do attack(U_RAMZA, 1); while (!st.hit);
+            while (st.act_t < ACT_HIT + 3) attack_step();
+        }
     }
     cam_target(&st.camx, &st.camy);
     hl_seq++;
@@ -1029,7 +1217,7 @@ static void to_menu(void)
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
 }
 
-// the turn menu: Move (once; undone with [shift] before acting), Act (milestone 17), Wait
+// the turn menu: Move and Act once each (a move undone with [shift] before acting), Wait
 // (then the facing), Status
 static void menu_keys(void)
 {
@@ -1040,6 +1228,9 @@ static void menu_keys(void)
         if (st.menu == MN_MOVE && !st.moved) {
             st.mode = M_TARGET; st.sel = st.act;
             compute_reach(st.act);
+        } else if (st.menu == MN_ACT && !st.acted) {
+            st.mode = M_AIM;
+            attack_range(st.act);
         } else if (st.menu == MN_WAIT) {
             st.mode = M_FACE; st.wface = u->face;
         } else if (st.menu == MN_STATUS) {
@@ -1087,6 +1278,8 @@ u8 game_update(void)
                 st.mode = M_MENU; st.moved = 1; st.menu = MN_WAIT;
             }
         }
+    } else if (st.mode == M_ACT) {
+        attack_step();
     } else if (st.wait_t) {                        // an enemy's or the guest's turn: it waits
         if (!st.turn && !--st.wait_t) turn_end(0, 0);
     } else if (!st.turn) {
@@ -1120,6 +1313,8 @@ u8 game_update(void)
                         st.mx = u->x; st.mz = u->z; st.mface = u->face;
                         st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
                     }
+                } else if (st.mode == M_AIM) {     // a unit in the weapon's reach
+                    if (st.reach[c] == 1 && o && st.unit[o - 1].hp) { st.acted = 1; attack(st.act, o - 1); }
                 } else if (o) {                    // a unit's numbers
                     st.mode = M_STATUS; st.sel = o - 1; st.back = M_BROWSE;
                 } else to_menu();
@@ -1134,7 +1329,7 @@ u8 game_update(void)
         st.camx = ease(st.camx, tx);
         st.camy = ease(st.camy, ty);
     }
-    if ((st.mode == M_TARGET) != (mode0 == M_TARGET)) hl_seq++;   // the reach rings
+    if (RINGS(st.mode) != RINGS(mode0)) hl_seq++;   // the reach rings
     return 1;
 }
 
@@ -1262,9 +1457,10 @@ static void make_panel(u8 side, u8 i)
     }
 }
 
-// The menu or a unit's numbers in a box at the top right (white, light grey for an enemy,
-// a black edge toward the map), drawn into W->win one part a frame: the box, then each line
-// (AMS text costs ~70k a status line). The menu's pointer is added when it is copied.
+// The menu, a unit's numbers or an attack's preview (its hit chance and damage, as FFT shows
+// them on the target) in a box at the top right (white, light grey for an enemy, a black
+// edge toward the map), drawn into W->win one part a frame: the box, then each line (AMS
+// text costs ~70k a status line). The menu's pointer is added when it is copied.
 static void make_window(void)
 {
     static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status" };
@@ -1273,9 +1469,9 @@ static void make_window(void)
     u8 r, i, n, k = W->win_n++;
     char s[28];
     if (!k) {
-        u8 h = 4 * 6 + 3, w = W->win_k[0] == M_MENU ? 2 : 6;
-        u8 enemy = W->win_k[0] == M_STATUS && u->team == TEAM_ENEMY;
-        W->win_w = w;
+        u8 h = (W->win_k[0] == M_AIM ? 2 : 4) * 6 + 3, w = W->win_k[0] == M_MENU ? 2 : W->win_k[0] == M_AIM ? 3 : 6;
+        u8 enemy = W->win_k[0] != M_MENU && u->team == TEAM_ENEMY;
+        W->win_w = w; W->win_h = h;
         for (r = 0; r < WIN_ROWS; r++)
             for (i = 0; i < w; i++) {
                 u16 e = r == h - 1 ? 0xFFFF : r >= h || i ? 0 : 0x8000;     // the edge: black
@@ -1286,7 +1482,15 @@ static void make_window(void)
     }
     k--;
     if (W->win_k[0] == M_MENU) {
-        text_into(l, d, 7, 2 + 6 * k, entries[k], k == MN_ACT || (k == MN_MOVE && W->win_k[1]) ? C_LGRAY : C_BLACK);
+        text_into(l, d, 7, 2 + 6 * k, entries[k], k <= MN_ACT && W->win_k[1] & (1 << k) ? C_LGRAY : C_BLACK);
+        return;
+    }
+    if (W->win_k[0] == M_AIM) {                    // the attacker is win_k[1]
+        if (k >= 2) return;
+        if (k == 0) { n = put_s(s, 0, "Hit "); n = put_n(s, n, hit_chance(W->win_k[1], W->win_k[2])); s[n++] = '%'; }
+        else { n = put_s(s, 0, "Dmg "); n = put_n(s, n, attack_damage(W->win_k[1], W->win_k[2], 0, 0)); }
+        s[n] = 0;
+        text_into(l, d, 3, 2 + 6 * k, s, C_BLACK);
         return;
     }
     if (k == 0) {
@@ -1324,8 +1528,11 @@ static void draw_hud(void)
     if (h & 1) { s[n++] = '.'; s[n++] = '5'; }
     s[n] = 0;
     k[0] = st.mode == M_MENU || st.mode == M_STATUS ? st.mode : 0;
-    k[1] = k[0] == M_MENU ? st.moved : 0;
+    k[1] = k[0] == M_MENU ? (u8)(st.moved | st.acted << 1) : 0;
     k[2] = k[0] == M_STATUS ? st.sel : 0;
+    if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && st.unit[o - 1].hp) {
+        k[0] = M_AIM; k[1] = st.act; k[2] = o - 1;  // the preview
+    }
     pk[0][0] = (u16)(st.act + 1); pk[0][1] = st.unit[st.act].hp; pk[0][2] = st.unit[st.act].mp;
     pk[1][0] = o && o - 1 != st.act ? o : 0;
     pk[1][1] = pk[1][0] ? st.unit[o - 1].hp : 0; pk[1][2] = pk[1][0] ? st.unit[o - 1].mp : 0;
@@ -1394,7 +1601,7 @@ static void draw_hud(void)
     if (k[0] && W->win_k[0] == k[0] && W->win_n >= WIN_DONE) {   // the window, against the
         u8 ww = W->win_w;                                          // right edge, once drawn
         c = W->win[0]; d = W->win[1];
-        for (r = 0; r < WIN_ROWS; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
+        for (r = 0; r < W->win_h; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
             u16 *pa = (u16 *)((u8 *)rt_light + r * RT_PBYTES) + RT_W / 16 - ww;
             u16 *pb = (u16 *)((u8 *)rt_dark + r * RT_PBYTES) + RT_W / 16 - ww;
             for (i = 0; i < ww; i++) { pa[i] = c[i]; pb[i] = d[i]; }
@@ -1415,6 +1622,37 @@ static void draw_hud(void)
             WR16(ql, 0, pl[r]); WR16(qd, 0, pd[r]);
         }
     }
+}
+
+// An attack's damage (or Miss) above its target from ACT_HIT, rising NUM_RISE pixels: AMS
+// text written once into the strip's spare rows, then a 32-pixel sprite with a white outline
+static void draw_number(void)
+{
+    Feet f = unit_feet(st.rot, st.tgt);
+    u8 r, t = (u8)(st.act_t - ACT_HIT);
+    RtSprite sp;
+    if (!W->num_ok) {
+        char s[6];
+        u32 g[7], o = 0;
+        u8 n = st.hit ? put_n(s, 0, st.dmg) : put_s(s, 0, "Miss");
+        s[n] = 0;
+        for (r = 8; r < HUD_ROWS; r++) memset(HUD_L + r * RT_PBYTES, 0, 4);
+        text_into(W->hud[0], W->hud[1], 1, 8, s, C_BLACK);
+        for (r = 0; r < 7; r++) {
+            const u8 *b = HUD_L + (7 + r) * RT_PBYTES;
+            g[r] = r && r < 6 ? (u32)b[0] << 24 | (u32)b[1] << 16 | (u32)b[2] << 8 | b[3] : 0;
+            o |= g[r];
+        }
+        for (W->num_w = 32; W->num_w && !(o & (1UL << (32 - W->num_w))); W->num_w--) ;
+        for (r = 0; r < 7; r++) {
+            u32 m = g[r] | (r ? g[r - 1] : 0) | (r < 6 ? g[r + 1] : 0);
+            W->num[0][r] = g[r];
+            W->num[1][r] = ~(m | m << 1 | m >> 1);
+        }
+        W->num_ok = 1;
+    }
+    sp.w = 32; sp.h = 7; sp.light = sp.dark = W->num[0]; sp.mask = W->num[1];
+    draw_sprite(f.x - st.camx - ((W->num_w + 2) >> 1), f.y - st.camy - UNIT_FOOT - 6 - (t < NUM_RISE ? t : NUM_RISE), &sp);
 }
 
 // the facing arrows around the active unit at Wait, the one it faces black
@@ -1485,8 +1723,9 @@ void game_render(void)
     // the cursor, above everything (blinking)
     dst_screen(st.camx, st.camy);
     view_of(st.rot, st.cx, st.cz, &u, &v);
+    if (st.mode == M_ACT && st.act_t >= ACT_HIT) draw_number();
     if (st.mode == M_FACE) draw_arrows();
-    else if (rt_frame & 8 || st.mode == M_TARGET)
+    else if (st.mode != M_ACT && (rt_frame & 8 || RINGS(st.mode)))
         blit24(scene_x(st.rot, u, v) - HW, scene_y(u, v) - (map_tiles[st.cz * MAP_W + st.cx].stand >> 1) * HU,
                12, cur_l, cur_d, cur_m);
     draw_hud();
