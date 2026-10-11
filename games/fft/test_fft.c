@@ -465,7 +465,7 @@ static void test_attack(void)
     press(K_A);
     CHECKV(st.mode, M_ACT);
     CHECK(st.acted && st.unit[U_RAMZA].face == 3);
-    for (i = 0; i < ACT_END && st.mode == M_ACT; i++) sw_step(0);
+    for (i = 0; i < ACT_END + GAIN_T && st.mode == M_ACT; i++) sw_step(0);
     CHECKV(st.mode, M_MENU);
     CHECKV(st.menu, MN_MOVE);
     CHECKV(st.unit[1].hp, st.hit ? (st.dmg >= n ? 0 : n - st.dmg) : n);
@@ -687,6 +687,103 @@ static void test_skills(void)
     CHECKV(st.act, 1); CHECKV(st.unit[1].status, 0);
 }
 
+// ---------------------------------------------------------------- milestone 19: KO and the end
+// The original's rewards (oracle.h: Ramza acting on the recruit south of him), the death counter
+// and what a KO unit becomes, picking a crystal or a chest up, a battle won and one lost by keys.
+static void test_end(void)
+{
+    u16 i, k, n, jp[NUNIT], cr[2] = { 0 };
+    Unit *ra, *u;
+    for (i = 0; i < ORACLE_REWARDS; i++) {
+        sw_init(0);
+        ra = &st.unit[U_RAMZA];
+        memcpy(ra->raw, oracle[U_RAMZA].raw, sizeof ra->raw);
+        unit_stats(ra);
+        ra->exp = oracle_rewards[i].exp; ra->tjp = oracle_rewards[i].tjp;
+        for (k = 0; k < NUNIT; k++) jp[k] = st.unit[k].jp;
+        if (oracle_rewards[i].kill) { st.unit[10].hp = 0; st.unit[10].kos = 1; }
+        if (oracle_rewards[i].hit) rewards(U_RAMZA, 10, oracle_rewards[i].kill);
+        CHECKV(ra->exp, oracle_rewards[i].exp2); CHECKV(ra->level, oracle_rewards[i].level2);
+        CHECKV(ra->max_hp, oracle_rewards[i].max_hp2); CHECKV(ra->hp, oracle_rewards[i].hp2);
+        for (k = 0; k < NUNIT; k++)                       // FFT gives the others' share to their
+            if (jobs[st.unit[k].job].row == jobs[ra->job].row)   // Squire JP: kept for the
+                CHECKV(st.unit[k].jp - jp[k], oracle_rewards[i].jp[k]);   // Squires only
+    }
+    printf("end: %d actions' EXP, JP and level up as the original's\n", ORACLE_REWARDS);
+    // a second KO of the same unit: 20 / 2 = 10; a lower target: at least 1; a job level up at
+    // 200 JP (8 + 2 x 2)
+    sw_init(0);
+    ra = &st.unit[U_RAMZA];
+    st.unit[10].kos = 2; rewards(U_RAMZA, 10, 1); CHECKV(st.gain, 10);
+    ra->level = 20; rewards(U_RAMZA, 10, 0); CHECKV(st.gain, 1);
+    ra->level = 1; ra->tjp = 200; n = ra->jp; rewards(U_RAMZA, 10, 0); CHECKV(ra->jp - n, 12);
+    // the death counter: 3, 2, 1, 0 at the KO unit's picks, then a crystal or a chest; the guest
+    // never turns
+    sw_init(0);
+    st.unit[1].hp = 0; st.unit[0].hp = 0;
+    for (n = 3, i = 0; i < 400 && !DC_OBJ(st.unit[1].dc); i++) {
+        u8 a = ct_next();
+        CHECK(st.unit[1].dc == n || st.unit[1].dc == n - 1 || DC_OBJ(st.unit[1].dc));
+        if (st.unit[1].dc <= 3) n = st.unit[1].dc;
+        ct_end(a, 1, 1);
+    }
+    CHECK(DC_OBJ(st.unit[1].dc) && n == 0); CHECKV(st.unit[0].dc, 3);
+    for (i = 0; i < 4000; i++) {                          // an enemy 1 in 2, a player's 3 in 4
+        for (k = 0; k < 2; k++) {
+            u = &st.unit[k ? 7 : 2];
+            u->hp = 0; u->dc = 0; u->ct = 200;
+            ct_next();
+            cr[k] += u->dc == DC_CRYSTAL;
+        }
+    }
+    printf("end: crystals %.3f of an enemy's, %.3f of a player's (FFT 0.5, 0.75)\n", cr[0] / 4000.0, cr[1] / 4000.0);
+    CHECK(cr[0] > 1850 && cr[0] < 2150 && cr[1] > 2850 && cr[1] < 3150);
+    // picked up by walking onto it: a crystal (HP, MP full), a chest (the dead unit's equipment);
+    // no undo after, no target on it
+    for (k = 0; k < 2; k++) {
+        sw_init(10);
+        ra = &st.unit[U_RAMZA]; u = &st.unit[1];
+        u->x = 4; u->z = 9; u->hp = 0; u->dc = k ? DC_CHEST : DC_CRYSTAL;
+        ra->hp = 10;
+        CHECKV(unit_at(4, 9), 0);
+        press(K_A); CHECKV(st.mode, M_TARGET);
+        CHECK(st.reach[9 * MAP_W + 4] != 0xFF);
+        st.cx = 4; st.cz = 9; press(K_A);
+        for (i = 0; i < 100 && st.mode == M_WALK; i++) sw_step(0);
+        CHECKV(st.mode, M_PICK); CHECKV(u->dc, DC_GONE);
+        if (k) CHECK(st.pick == u->eq[EQ_HEAD] || st.pick == u->eq[EQ_BODY] || st.pick == u->eq[EQ_ACC]
+                     || st.pick == u->eq[EQ_WEAPON] || st.pick == u->eq[EQ_SHIELD]);
+        else CHECK(st.pick == 0xFF && ra->hp == ra->max_hp);
+        steps(0, PICK_FRAMES);
+        CHECKV(st.mode, M_MENU);
+        press(K_B);
+        CHECK(ra->x == 4 && ra->z == 9 && st.mode == M_BROWSE);
+    }
+    // won by keys (fft(14): the last enemy at 1 HP): the results, then a new battle
+    sw_init(14);
+    press(K_DOWN); press(K_A); press(K_A); press(K_UP); press(K_A);
+    CHECKV(st.mode, M_ACT);
+    for (i = 0; i < 100 && st.mode == M_ACT; i++) sw_step(0);
+    CHECKV(st.mode, M_END); CHECKV(st.end, END_VICTORY);
+    CHECKV(st.unit[U_RAMZA].gexp, 20); CHECKV(st.unit[U_RAMZA].gjp, 10);
+    press(K_A);
+    CHECK(st.mode != M_END && !st.end && st.unit[1].hp == st.unit[1].max_hp);
+    // lost by keys (fft(15): Ramza's Wish knocks him out, the recruits KO): his counter runs
+    // out, a crystal or a chest: Game Over
+    sw_init(15);
+    press(K_DOWN); press(K_A); press(K_DOWN); press(K_A); press(K_A); press(K_UP); press(K_A);
+    CHECKV(st.mode, M_ACT);
+    for (i = 0; i < 2000 && st.mode != M_END; i++) sw_step(0);
+    CHECKV(st.end, END_DEFEAT); CHECK(DC_OBJ(st.unit[U_RAMZA].dc));
+    printf("end: won by keys; lost after %d frames (Ramza a %s)\n", i,
+           st.unit[U_RAMZA].dc == DC_CRYSTAL ? "crystal" : "chest");
+    // the guest's KO alone does not end it; every unit of the player's side KO does
+    sw_init(0);
+    st.unit[0].hp = 0; CHECKV(outcome(), END_NONE);
+    for (i = 6; i < NUNIT; i++) st.unit[i].hp = 0;
+    CHECKV(outcome(), END_DEFEAT);
+}
+
 // ---------------------------------------------------------------- milestone 15: turn order
 // FFT's clock replayed on the original's 46 first turns (oracle.h: the player's units played by
 // its AI): each turn's unit, every unit's CT when it starts, with the original's CT bonus at the
@@ -707,7 +804,7 @@ static void test_clock(void)
         for (i = 0; i < NUNIT; i++)
             if (oracle_turns[t].dead >> i & 1) st.unit[i].hp = 0;
     }
-    for (i = 0; i < NUNIT; i++) { ko += !st.unit[i].hp; gone += st.unit[i].dc == DC_GONE; }
+    for (i = 0; i < NUNIT; i++) { ko += !st.unit[i].hp; gone += DC_OBJ(st.unit[i].dc); }
     printf("clock: %d turns as the original's, %d KO, %d crystal or chest\n", ORACLE_TURNS, ko, gone);
     CHECK(ko >= 3 && gone >= 1);
     // the same CT, the lower index first; the cap at 60
@@ -776,6 +873,15 @@ static void shots(void)
     sw_init(11); steps(0, 10); sw_write_png("x/m18_items.png", 4);   // list, the items, a Potion
     sw_init(12); steps(0, 10); sw_write_png("x/m18_potion.png", 4);  // aimed, Wish landing
     sw_init(13); steps(0, 4); sw_write_png("x/m18_wish.png", 4);
+    sw_init(14);                                          // EXP+20 rising, the results; a
+    press(K_DOWN); press(K_A); press(K_A); press(K_UP); press(K_A);   // death counter, a crystal
+    steps(0, ACT_HIT + GAIN_T + 4); sw_write_png("x/m19_exp.png", 4);  // and a chest beside the KO
+    steps(0, 40); sw_write_png("x/m19_victory.png", 4);
+    sw_init(10);
+    st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].hp = 0; st.unit[1].dc = 2;
+    st.unit[2].x = 3; st.unit[2].z = 10; st.unit[2].hp = 0; st.unit[2].dc = DC_CRYSTAL;
+    st.unit[3].x = 5; st.unit[3].z = 10; st.unit[3].hp = 0; st.unit[3].dc = DC_CHEST;
+    steps(0, 4); sw_write_png("x/m19_ko.png", 4);
 }
 
 int main(int argc, char **argv)
@@ -793,6 +899,7 @@ int main(int argc, char **argv)
     test_menu();
     test_attack();
     test_skills();
+    test_end();
     test_clock();
     test_turns();
     shots();

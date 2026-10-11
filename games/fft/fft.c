@@ -138,8 +138,10 @@ typedef struct {
     u8 pname[UNIT_GFX_N][PANEL_H];      // the names turned a quarter, a row per panel row (5 bits)
     u8 ringed[MAP_W * MAP_H], ring_n;   // the tiles whose reach ring is in the scene, how many,
     u8 ring_i;                          // the next tile to look at (MAP_W * MAP_H: all drawn)
-    u32 num[2][7];                      // an attack's number (or Miss): black, its white outline
-    u8 num_w, num_ok;                   // its width; drawn for this attack
+    u32 num[2][2][7];                   // an attack's number (or Miss), the EXP its user earned:
+    u8 num_w[2], num_ok;                // black, its white outline; their widths; drawn (bits)
+    u8 end_n;                           // M_END: the results' next line to draw
+    u8 dcg[4][2][7];                    // the death counter's digits: black, mask (8 wide)
 } Work;
 static Work *W;
 #define span_l (W->span_l)
@@ -201,7 +203,7 @@ u8 unit_at(s16 x, s16 z)
 {
     u8 i;
     for (i = 0; i < NUNIT; i++)
-        if (st.unit[i].x == x && st.unit[i].z == z) return i + 1;
+        if (st.unit[i].x == x && st.unit[i].z == z && !DC_OBJ(st.unit[i].dc)) return i + 1;
     return 0;
 }
 
@@ -282,12 +284,20 @@ void battle_units(void)
         if (d->learned == 0xFF) {                  // its job's JP, then each ability in order:
             u16 jp = (u16)(100 + ((100UL * rand15()) >> 15));   // its learn rate, if JP are left
             const u8 *a = skill_sets[d->set].abil;
-            u->learned = 0;
+            u->learned = 0; u->tjp = jp;
             for (k = 0; k < SET_N && a[k] != 0xFF; k++)
                 if (((100UL * rand15()) >> 15) < abilities[a[k]].rate && jp >= abilities[a[k]].jp) {
                     jp -= abilities[a[k]].jp; u->learned |= (u8)(1 << k);
                 }
+            u->jp = jp;
         }
+    }
+    for (i = 0; i < NUNIT; i++) {                  // then the JP of those whose abilities are
+        const UnitDef *d = &unit_defs[i];          // fixed (Ramza), the EXP (ENTD: 0..99; a new
+        Unit *u = &st.unit[i];                     // game's Ramza 0)
+        if (d->learned != 0xFF) u->jp = u->tjp = (u16)(100 + ((100UL * rand15()) >> 15));
+        u->exp = d->type == 2 ? 0 : (u8)((100UL * rand15()) >> 15);
+        u->kos = 0; u->lv0 = u->level; u->gexp = u->gjp = 0;
     }
 }
 
@@ -296,23 +306,26 @@ void battle_units(void)
 // CT grows by its Speed (at most 254); a unit with CT >= 100 acts, the highest first, a tie to
 // the lowest index; its CT loses 100 when picked and gains 20 for each of Move and Act left
 // unused at the end, at most 60. A unit at 0 HP keeps its clock: each pick lowers its death
-// counter, then it turns into a crystal or a chest and its clock stops.
+// counter (3 to 0), the next one turns it into a crystal or a chest (a player's unit 3 times in
+// 4, an enemy 1 in 2) and its clock stops; the guest (Delita) never turns.
 u8 ct_next(void)
 {
     for (;;) {
         u8 i, best = 0xFF, max = 99;
         Unit *u;
         for (i = 0, u = st.unit; i < NUNIT; i++, u++)
-            if (u->dc != DC_GONE && u->ct > max) { max = u->ct; best = i; }
+            if (!DC_OBJ(u->dc) && u->ct > max) { max = u->ct; best = i; }
         if (best == 0xFF) {                        // a tick
             for (i = 0, u = st.unit; i < NUNIT; i++, u++)
-                if (u->dc != DC_GONE) { u16 c = u->ct + u->sp; u->ct = (u8)(c > 254 ? 254 : c); }
+                if (!DC_OBJ(u->dc)) { u16 c = u->ct + u->sp; u->ct = (u8)(c > 254 ? 254 : c); }
             continue;
         }
         u = &st.unit[best];
         u->ct = (u8)(max >= 200 ? max - 200 : max - 100);
         if (u->hp) return best;
-        u->dc = u->dc ? u->dc - 1 : DC_GONE;
+        if (u->team == TEAM_GUEST) continue;
+        if (u->dc) u->dc--;
+        else u->dc = rand15() & (u->team == TEAM_PLAYER ? 0x110 : 0x10) ? DC_CRYSTAL : DC_CHEST;
     }
 }
 
@@ -335,7 +348,7 @@ void turn_order(void)
     st.turns[0] = st.act; tk[0] = 0;
     for (i = 0, u = st.unit; i < NUNIT; i++, u++) {
         u16 tick = 0, ct = u->ct;
-        if (!u->hp || u->dc == DC_GONE) continue;
+        if (!u->hp) continue;
         for (t = 0; t < ORDER_N - 1; t++) {
             u16 k;
             if (ct < 100) {                        // the ticks to 100 at once
@@ -355,12 +368,16 @@ void turn_order(void)
     for (; n < ORDER_N; n++) st.turns[n] = 0xFF;
 }
 
+static void end_battle(u8 e);
+
 // the next turn: the cursor and the camera go to its unit (its Defending ends); enemies and the
-// guest wait, a player's unit opens its menu
+// guest wait, a player's unit opens its menu; the battle ends if Ramza just turned to crystal
 static void turn_start(void)
 {
     u8 me;
     st.act = ct_next();
+    st.pick_t = 0;
+    if (outcome()) { end_battle(outcome()); return; }
     st.unit[st.act].status &= (u8)~ST_DEFEND;
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
     me = st.unit[st.act].team == TEAM_PLAYER;
@@ -696,8 +713,9 @@ void compute_reach(u8 who)
     u8 i;
     hl_seq++;
     bfs(who, RT_NULL);
-    for (i = 0; i < NUNIT; i++)                                     // can't stop on a unit
-        if (i != who) st.reach[st.unit[i].z * MAP_W + st.unit[i].x] = 0xFF;
+    for (i = 0; i < NUNIT; i++)                   // can't stop on a unit (a crystal or a chest:
+        if (i != who && unit_at(st.unit[i].x, st.unit[i].z))       // can, it is picked up)
+            st.reach[st.unit[i].z * MAP_W + st.unit[i].x] = 0xFF;
 }
 
 u8 make_path(u8 who, u8 tx, u8 tz)
@@ -799,7 +817,7 @@ static void act_start(u8 a, u8 t)
     Unit *ua = &st.unit[a], *ut = &st.unit[t];
     s16 dx = (s16)ut->x - ua->x, dz = (s16)ut->z - ua->z;
     st.atk = a; st.tgt = t; st.act_t = 0; st.mode = M_ACT;
-    st.crit = st.push = 0; st.dmg = st.self = 0;
+    st.crit = st.push = 0; st.dmg = st.self = 0; st.gain = st.lvup = 0;
     if (W) W->num_ok = 0;
     if (dx || dz)
         ua->face = (dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz) ? (dx > 0 ? 0 : 1) : (dz > 0 ? 2 : 3);
@@ -925,6 +943,92 @@ void skill(u8 a, u8 t, u8 ab)
     }
 }
 
+// ---------------------------------------------------------------- KO and the end
+// FFT's rewards (RE_NOTES.md § KO and the end: read in the decompilation, checked on the
+// original): an action that did something earns its user 10 EXP (a kill: 20 / the times the
+// target was KO) + the target's level - the user's, 1 to 99; at 100 EXP a level up (EXP back
+// to 0, the stats grown, HP and MP kept); and 8 + 2 x its job level + its level / 4 JP, a
+// quarter of them to each living unit of its side in the same job. A KO user earns nothing.
+static const u16 job_jp[8] = { 100, 200, 350, 550, 800, 1150, 1550, 2100 };   // job levels
+
+u8 job_level(const Unit *u)
+{
+    u8 k = 0;
+    while (k < 8 && u->tjp >= job_jp[k]) k++;
+    return k;
+}
+
+static void add_jp(Unit *u, u16 jp)
+{
+    u->jp = u->jp + jp > 9999 ? 9999 : u->jp + jp;
+    u->tjp = u->tjp + jp > 9999 ? 9999 : u->tjp + jp;
+    u->gjp += jp;
+}
+
+void rewards(u8 a, u8 t, u8 kill)
+{
+    Unit *ua = &st.unit[a], *ut = &st.unit[t], *u;
+    s16 e = (kill ? 20 / ut->kos : 10) + ut->level - ua->level;
+    u16 jp;
+    u8 i, blue = ua->team != TEAM_ENEMY;
+    if (!ua->hp) return;
+    if (e < 1) e = 1;
+    if (e > 99) e = 99;
+    st.gain = (u8)e;
+    jp = (u16)(8 + 2 * job_level(ua) + (ua->level >> 2));
+    ua->gexp += (u16)e;
+    ua->exp += (u8)e;
+    if (ua->exp >= EXP_LEVEL) {
+        if (ua->level < 99) {                       // the stats grown from the raw ones
+            u16 hp = ua->hp, mp = ua->mp;
+            ua->level++; ua->exp = 0; st.lvup = 1;
+            unit_stats(ua);
+            ua->hp = hp < ua->max_hp ? hp : ua->max_hp;
+            ua->mp = mp < ua->max_mp ? mp : ua->max_mp;
+        } else ua->exp = 99;
+    }
+    add_jp(ua, jp);
+    for (i = 0, u = st.unit; i < NUNIT; i++, u++)
+        if (u != ua && u->hp && (u->team != TEAM_ENEMY) == blue && jobs[u->job].row == jobs[ua->job].row)
+            add_jp(u, jp >> 2);
+}
+
+// victory: every enemy KO (or a crystal or a chest); defeat: Ramza a crystal or a chest, or
+// every unit of the player's side KO, the guest included (FFT checks the defeat first)
+u8 outcome(void)
+{
+    u8 i, foes = 0, blue = 0;
+    const Unit *u;
+    for (i = 0, u = st.unit; i < NUNIT; i++, u++)
+        if (u->hp) { if (u->team == TEAM_ENEMY) foes++; else blue++; }
+    if (DC_OBJ(st.unit[U_RAMZA].dc) || !blue) return END_DEFEAT;
+    return foes ? END_NONE : END_VICTORY;
+}
+
+// a crystal gives back all HP and MP (FFT also offers its abilities: not kept); a chest one of
+// the dead unit's equipment, drawn (shown: there is no inventory); then the object is gone
+void pick_up(u8 who, u8 obj)
+{
+    Unit *u = &st.unit[who], *o = &st.unit[obj];
+    if (o->dc == DC_CRYSTAL) {
+        u->hp = u->max_hp; u->mp = u->max_mp;
+        st.pick = 0xFF;
+    } else {
+        u8 k, n = 0, eq[EQ_N];
+        for (k = 0; k < EQ_N; k++) if (o->eq[k] != 0xFF) eq[n++] = o->eq[k];
+        st.pick = eq[(u32)rand15() * n >> 15];
+    }
+    o->dc = DC_GONE; o->x = 0xFF;
+    st.mode = M_PICK; st.pick_t = 0;
+}
+
+static void end_battle(u8 e)
+{
+    st.end = e; st.mode = M_END;
+    scene_rot = 0xFF;                               // the scene buffer holds the results
+    if (W) W->end_n = 0;
+}
+
 // M_ACT, once per frame: the outcome lands at ACT_HIT (HP lost or healed, statuses removed, the
 // target pushed; a KO or a revival: the turn order again), the menu comes back at ACT_END (the
 // turn ends if the user fell: Wish)
@@ -936,15 +1040,18 @@ static void attack_step(void)
         if (kind == AB_DAMAGE) {
             ut->hp = st.dmg >= ut->hp ? 0 : ut->hp - st.dmg;
             if (st.push) { ut->x = st.kx; ut->z = st.kz; }
+            if (!ut->hp) ut->kos++;
         } else if (kind == AB_CURE) ut->status &= (u8)~abilities[st.abil].y;
         else {
             ut->hp = st.dmg >= ut->max_hp - ut->hp ? ut->max_hp : ut->hp + st.dmg;
             if (ko) ut->dc = 3;
         }
+        rewards(st.atk, st.tgt, kind == AB_DAMAGE && !ut->hp);
         if (st.self) ua->hp = st.self >= ua->hp ? 0 : ua->hp - st.self;
         if ((u8)!ut->hp != ko || !ua->hp) turn_order();
     }
-    if (++st.act_t >= ACT_END) {
+    if (++st.act_t >= (st.gain ? ACT_END + GAIN_T : ACT_END)) {
+        if (outcome()) { end_battle(outcome()); return; }
         if (!st.unit[st.act].hp) { turn_end(st.moved, 1); return; }
         st.mode = M_MENU; st.menu = st.moved ? MN_WAIT : MN_MOVE;
         st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
@@ -1034,6 +1141,9 @@ static const u8 *unit_frame(u8 rot, u8 i)
     const Unit *un = &st.unit[i];
     s16 u0, v0, du, dv;
     u8 t = (u8)(st.tick + 11 * i), k;                  // the units out of step
+    if (DC_OBJ(un->dc))                                // a crystal or a chest, after the units (a
+        return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * (6 * UNIT_SH)   // (u16) cast here, under
+            + (u8)(un->dc - DC_CRYSTAL) * (6 * UNIT_SH);  // the test, was folded to a wrong constant)
     view_of(rot, 0, 0, &u0, &v0);
     view_of(rot, fdx[un->face], fdz[un->face], &du, &dv);
     du -= u0; dv -= v0;
@@ -1053,6 +1163,14 @@ static u16 erode(const u16 *mk, u8 r)
     u16 o = (u16)~mk[r];
     return o & (u16)(o << 1) & (o >> 1) & (u16)~mk[r - 1] & (u16)~mk[r + 1];
 }
+
+// 3 x 5 digits and '/' for the panels' numbers, turned a quarter: per glyph column (left to
+// right), its 5 pixels (bit 4: the top row)
+static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 0x17, 0x15, 0x1D },
+    { 0x15, 0x15, 0x1F }, { 0x1C, 0x04, 0x1F }, { 0x1D, 0x15, 0x17 }, { 0x1F, 0x15, 0x17 },
+    { 0x10, 0x10, 0x1F }, { 0x1F, 0x15, 0x1F }, { 0x1D, 0x15, 0x1F }, { 0x03, 0x04, 0x18 } };
+
+#define DC_Y 18                         // a death counter's top above the feet
 
 // a unit and its shadow, both through its cover mask (ExtGraph: dest = dest & mask | data,
 // mask 1 = transparent, so the data is cleared under the cover too), the unit's contour drawn
@@ -1106,10 +1224,31 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
         s.light = ml + top; s.dark = md + top; s.mask = mk + top;
         draw_sprite(sx - 8, sy - UNIT_FOOT + top, &s);
     }
+    if (DC_OBJ(st.unit[i].dc)) return;
     if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
         s.h = FOE_H;                            // never covered (it shows a hidden one too)
         s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
         draw_sprite(sx - 8, sy - UNIT_FOOT - FOE_H + 1, &s);
+    }
+    if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
+        s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
+        draw_sprite(sx - 3, sy - DC_Y, &s);
+    }
+}
+
+// the death counter's digits 0-3 as sprites (black, a white outline), made once
+static void make_counters(void)
+{
+    u8 n, r, g;
+    for (n = 0; n < 4; n++) {
+        u8 b[7];
+        for (r = 0; r < 7; r++)
+            for (b[r] = 0, g = 0; g < 3; g++)
+                if (r && r < 6 && digits[n][g] & (0x20 >> r)) b[r] |= (u8)(0x40 >> g);
+        for (r = 0; r < 7; r++) {
+            u8 m = (u8)(b[r] | (r ? b[r - 1] : 0) | (r < 6 ? b[r + 1] : 0));
+            W->dcg[n][0][r] = b[r]; W->dcg[n][1][r] = (u8)~(m | m << 1 | m >> 1);
+        }
     }
 }
 
@@ -1289,6 +1428,7 @@ void game_init(void)
         for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
         W->hud_t[0] = 0xFE;
         hud_labels();
+        make_counters();
         scene_l = sbuf; scene_d = sbuf + SC_PLANE;
 #ifdef __m68k__
         atexit(release);
@@ -1305,12 +1445,12 @@ void game_init(void)
     }
 }
 
-// a target for the weapon or the ability: a living unit (Phoenix Down: a KO one, not yet a
-// crystal or a chest)
+// a target for the weapon or the ability: a living unit (Phoenix Down: a KO one; unit_at never
+// gives a crystal or a chest)
 static u8 aim_ok(u8 t)
 {
     const Unit *u = &st.unit[t];
-    if (st.abil != NO_ABIL && abilities[st.abil].kind == AB_REVIVE) return !u->hp && u->dc != DC_GONE;
+    if (st.abil != NO_ABIL && abilities[st.abil].kind == AB_REVIVE) return !u->hp;
     return u->hp != 0;
 }
 
@@ -1323,6 +1463,7 @@ static void aim(u8 ab)
 
 void game_scenario(u16 n)
 {
+    u8 i;
     memset(&st, 0, sizeof st);
     if (!W) return;
     rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
@@ -1362,6 +1503,12 @@ void game_scenario(u16 n)
             skill(U_RAMZA, 10, known(U_RAMZA, 0));
             while (st.act_t < ACT_HIT + 3) attack_step();
         }
+    } else if (n == 14) {                         // the end at hand: four enemies KO, the last
+        for (i = 2; i <= 5; i++) st.unit[i].hp = 0;   // with 1 HP in front of Ramza, its back to
+        st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].face = 3; st.unit[1].hp = 1;   // him
+    } else if (n == 15) {                         // the recruits KO, Delita in front of Ramza
+        for (i = 7; i < NUNIT; i++) st.unit[i].hp = 0;    // (5 HP: his Wish knocks him out)
+        st.unit[0].x = 4; st.unit[0].z = 10; st.unit[U_RAMZA].hp = 5;
     }
     cam_target(&st.camx, &st.camy);
     hl_seq++;
@@ -1411,7 +1558,7 @@ static void menu_keys(void)
             st.mode = M_STATUS; st.sel = st.act; st.back = M_MENU;
         }
     } else if (input_pressed(K_ESC | K_B)) {
-        if (st.moved && !st.acted) {               // the move undone
+        if (st.moved && !st.acted && !st.pick_t) {   // the move undone (not after a pick-up)
             u->x = st.mx; u->z = st.mz; u->face = st.mface;
             st.moved = 0; st.menu = MN_MOVE;
             to_menu();
@@ -1470,12 +1617,20 @@ u8 game_update(void)
             st.unit[st.sel].x = st.path[st.path_i][0];
             st.unit[st.sel].z = st.path[st.path_i][1];
             st.cx = st.unit[st.sel].x; st.cz = st.unit[st.sel].z;
-            if (st.path_i + 1 >= st.path_n) {      // back to the menu, on Wait (no Act yet)
+            if (st.path_i + 1 >= st.path_n) {      // back to the menu, on Wait (no Act yet), or
+                u8 i;                              // a crystal or a chest there picked up
                 st.mode = M_MENU; st.moved = 1; st.menu = MN_WAIT;
+                for (i = 0; i < NUNIT; i++)
+                    if (st.unit[i].x == st.cx && st.unit[i].z == st.cz && DC_OBJ(st.unit[i].dc)) pick_up(st.sel, i);
             }
         }
     } else if (st.mode == M_ACT) {
         attack_step();
+    } else if (st.mode == M_PICK) {                // the message, then the menu (no undo)
+        if (++st.pick_t >= PICK_FRAMES) st.mode = M_MENU;
+    } else if (st.mode == M_END) {                 // the results: the battle again, or quit
+        if (input_pressed(K_A | K_ENTER)) game_scenario(0);
+        else if (input_pressed(K_ESC)) return 0;
     } else if (st.wait_t) {                        // an enemy's or the guest's turn: it waits
         if (!st.turn && !--st.wait_t) turn_end(0, 0);
     } else if (!st.turn) {
@@ -1614,12 +1769,6 @@ static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color)
     rt_light = sl; rt_dark = sd;
 }
 
-// 3 x 5 digits and '/' for the panels' numbers, turned a quarter: per glyph column (left to
-// right), its 5 pixels (bit 4: the top row)
-static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 0x17, 0x15, 0x1D },
-    { 0x15, 0x15, 0x1F }, { 0x1C, 0x04, 0x1F }, { 0x1D, 0x15, 0x17 }, { 0x1F, 0x15, 0x17 },
-    { 0x10, 0x10, 0x1F }, { 0x1F, 0x15, 0x1F }, { 0x1D, 0x15, 0x1F }, { 0x03, 0x04, 0x18 } };
-
 // A unit's panel against a side of the screen, as Metal Gear Solid: Portable Ops' HUD, its
 // text turned a quarter (reading upwards): its name (AMS text), then its HP and MP as
 // "52/52" and "16/16" in 3 x 5 digits, each beside its 2-pixel gauge filling upwards (HP
@@ -1671,9 +1820,10 @@ static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" }
 static u8 win_lines(u8 m)
 {
     u8 n = 0;
-    if (m == M_MENU || m == M_STATUS) return 4;
+    if (m == M_STATUS) return 5;
+    if (m == M_MENU) return 4;
     if (m == M_ACTS || m == M_AIM) return 2;
-    if (m == M_ACT) return 1;
+    if (m == M_ACT || m == M_PICK) return 1;
     while (known(W->win_k[2], n) != 0xFF) n++;    // M_SKILLS
     return n;
 }
@@ -1714,6 +1864,9 @@ static void make_window(void)
         if (!can_use(W->win_k[2], ab)) c = C_LGRAY;
     } else if (m == M_ACT) {
         n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : abilities[st.abil].name);
+    } else if (m == M_PICK) {                      // a crystal or a chest picked up
+        if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");
+        else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
     } else if (m == M_AIM) {                       // the attacker is win_k[1]; Dash, Throw Stone
         u8 a = W->win_k[1], t = W->win_k[2];       // and Phoenix Down: their range of amounts
         const Ability *b = st.abil == NO_ABIL ? RT_NULL : &abilities[st.abil];
@@ -1743,8 +1896,11 @@ static void make_window(void)
     } else if (k == 2) {
         n = put_s(s, 0, "Move "); n = put_n(s, n, u->move); n = put_s(s, n, "  Jump "); n = put_n(s, n, u->jump);
         n = put_s(s, n, "  Speed "); n = put_n(s, n, u->sp);
-    } else {
+    } else if (k == 3) {
         n = put_s(s, 0, "PA "); n = put_n(s, n, u->pa); n = put_s(s, n, "  MA "); n = put_n(s, n, u->ma);
+    } else {
+        n = put_s(s, 0, "Exp "); n = put_n(s, n, u->exp); n = put_s(s, n, "  JP "); n = put_n(s, n, u->jp);
+        n = put_s(s, n, "  Job Lv "); n = put_n(s, n, job_level(u));
     }
     s[n] = 0;
     text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS ? 7 : 3, 2 + 6 * k, s, c);
@@ -1768,9 +1924,9 @@ static void draw_hud(void)
     if (h & 1) { s[n++] = '.'; s[n++] = '5'; }
     s[n] = 0;
     k[0] = st.mode == M_MENU || st.mode == M_STATUS || st.mode == M_ACTS || st.mode == M_SKILLS
-        || st.mode == M_ACT ? st.mode : 0;
+        || st.mode == M_ACT || st.mode == M_PICK ? st.mode : 0;
     k[1] = k[0] == M_MENU ? (u8)(st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == 0xFF
-        : k[0] == M_ACT ? st.abil : 0;
+        : k[0] == M_ACT ? st.abil : k[0] == M_PICK ? st.pick : 0;
     k[2] = k[0] == M_STATUS ? st.sel : k[0] == M_ACT ? st.atk : st.act;
     if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && aim_ok(o - 1)) {
         k[0] = M_AIM; k[1] = st.act; k[2] = o - 1;  // the preview
@@ -1867,19 +2023,42 @@ static void draw_hud(void)
     }
 }
 
-// An attack's damage (or Miss; +HP healed, the status removed) above its target from ACT_HIT,
-// rising NUM_RISE pixels: AMS text written once into the strip's spare rows, then a 32-pixel
-// sprite with a white outline
+// A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP): AMS text written
+// once into the strip's spare rows, then a 32-pixel sprite with a white outline
+static void make_number(u8 k, const char *s)
+{
+    u32 g[7], o = 0;
+    u8 r;
+    for (r = 8; r < HUD_ROWS; r++) memset(HUD_L + r * RT_PBYTES, 0, 4);
+    text_into(W->hud[0], W->hud[1], 1, 8, s, C_BLACK);
+    for (r = 0; r < 7; r++) {
+        const u8 *b = HUD_L + (7 + r) * RT_PBYTES;
+        g[r] = r && r < 6 ? (u32)b[0] << 24 | (u32)b[1] << 16 | (u32)b[2] << 8 | b[3] : 0;
+        o |= g[r];
+    }
+    for (W->num_w[k] = 32; W->num_w[k] && !(o & (1UL << (32 - W->num_w[k]))); W->num_w[k]--) ;
+    for (r = 0; r < 7; r++) {
+        u32 m = g[r] | (r ? g[r - 1] : 0) | (r < 6 ? g[r + 1] : 0);
+        W->num[k][0][r] = g[r];
+        W->num[k][1][r] = ~(m | m << 1 | m >> 1);
+    }
+}
+
+// the target's from ACT_HIT (HP lost or healed, the status removed, Miss), then the EXP its
+// user earned from ACT_HIT + GAIN_T ("LvUp" for a level up) above the user
 static void draw_number(void)
 {
-    Feet f = unit_feet(st.rot, st.tgt);
-    u8 r, t = (u8)(st.act_t - ACT_HIT);
+    u8 t = (u8)(st.act_t - ACT_HIT), k = st.gain && t >= GAIN_T;
+    Feet f = unit_feet(st.rot, k ? st.atk : st.tgt);
     RtSprite sp;
-    if (!W->num_ok) {
-        char s[8];
-        u32 g[7], o = 0;
+    char s[8];
+    if (k) t -= GAIN_T;
+    if (!(W->num_ok & (1 << k))) {                 // one a frame (AMS text)
         u8 kind = st.abil == NO_ABIL ? AB_DAMAGE : abilities[st.abil].kind, n = 0;
-        if (!st.hit) n = put_s(s, 0, "Miss");
+        if (k) {
+            if (st.lvup) n = put_s(s, 0, "LvUp");
+            else { n = put_s(s, 0, "EXP+"); n = put_n(s, n, st.gain); }
+        } else if (!st.hit) n = put_s(s, 0, "Miss");
         else if (kind == AB_CURE) {                // the first status removed
             while (!(st.dmg & (1 << n))) n++;
             n = put_s(s, 0, st_names[n]);
@@ -1888,23 +2067,11 @@ static void draw_number(void)
             n = put_n(s, n, st.dmg);
         }
         s[n] = 0;
-        for (r = 8; r < HUD_ROWS; r++) memset(HUD_L + r * RT_PBYTES, 0, 4);
-        text_into(W->hud[0], W->hud[1], 1, 8, s, C_BLACK);
-        for (r = 0; r < 7; r++) {
-            const u8 *b = HUD_L + (7 + r) * RT_PBYTES;
-            g[r] = r && r < 6 ? (u32)b[0] << 24 | (u32)b[1] << 16 | (u32)b[2] << 8 | b[3] : 0;
-            o |= g[r];
-        }
-        for (W->num_w = 32; W->num_w && !(o & (1UL << (32 - W->num_w))); W->num_w--) ;
-        for (r = 0; r < 7; r++) {
-            u32 m = g[r] | (r ? g[r - 1] : 0) | (r < 6 ? g[r + 1] : 0);
-            W->num[0][r] = g[r];
-            W->num[1][r] = ~(m | m << 1 | m >> 1);
-        }
-        W->num_ok = 1;
+        make_number(k, s);
+        W->num_ok |= (u8)(1 << k);
     }
-    sp.w = 32; sp.h = 7; sp.light = sp.dark = W->num[0]; sp.mask = W->num[1];
-    draw_sprite(f.x - st.camx - ((W->num_w + 2) >> 1), f.y - st.camy - UNIT_FOOT - 6 - (t < NUM_RISE ? t : NUM_RISE), &sp);
+    sp.w = 32; sp.h = 7; sp.light = sp.dark = W->num[k][0]; sp.mask = W->num[k][1];
+    draw_sprite(f.x - st.camx - ((W->num_w[k] + 2) >> 1), f.y - st.camy - UNIT_FOOT - 6 - (t < NUM_RISE ? t : NUM_RISE), &sp);
 }
 
 // the facing arrows around the active unit at Wait, the one it faces black
@@ -1932,6 +2099,40 @@ static void draw_arrows(void)
     }
 }
 
+// the results (M_END): the outcome, then each of the player's units with its level (before >
+// after), the EXP and JP it earned, and the keys; drawn into the scene buffer one line a frame
+// (AMS text), copied to the screen
+static void draw_end(void)
+{
+    u8 *l = scene_l, *d = scene_l + RT_PSIZE, k = W->end_n, i, j = 0, n;
+    char s[12];
+    if (k < 8) {
+        W->end_n++;
+        if (!k) { memset(l, 0, RT_PSIZE); memset(d, 0, RT_PSIZE); }
+        else if (k == 1) {
+            void *sl = rt_light, *sd = rt_dark;
+            rt_light = l; rt_dark = d;
+            draw_text(8, 4, st.end == END_VICTORY ? "Victory!" : "Game Over", F_MEDIUM, C_BLACK);
+            rt_light = sl; rt_dark = sd;
+        } else if (k < 7) {                        // the (k - 2)-th unit of the player's side
+            const Unit *u = st.unit;
+            for (i = 0; i < NUNIT; i++, u++) if (u->team == TEAM_PLAYER && j++ == k - 2) break;
+            if (i < NUNIT) {
+                s16 y = 10 + 10 * k;
+                text_into((u16 *)l, (u16 *)d, 8, y, unit_names[u->gfx], C_BLACK);
+                n = put_s(s, 0, "Lv "); n = put_n(s, n, u->lv0);
+                if (u->level != u->lv0) { s[n++] = '>'; n = put_n(s, n, u->level); }
+                s[n] = 0; text_into((u16 *)l, (u16 *)d, 48, y, s, C_BLACK);
+                n = put_s(s, 0, "EXP "); n = put_n(s, n, u->gexp); s[n] = 0;
+                text_into((u16 *)l, (u16 *)d, 82, y, s, C_BLACK);
+                n = put_s(s, 0, "JP "); n = put_n(s, n, u->gjp); s[n] = 0;
+                text_into((u16 *)l, (u16 *)d, 120, y, s, C_BLACK);
+            }
+        } else text_into((u16 *)l, (u16 *)d, 8, 90, "[ENTER] again   [ESC] quit", C_BLACK);
+    }
+    memcpy(rt_light, l, RT_PSIZE); memcpy(rt_dark, d, RT_PSIZE);
+}
+
 void game_render(void)
 {
     u8 ord[NUNIT], i, j;
@@ -1942,6 +2143,7 @@ void game_render(void)
         draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (75 KB)", F_SMALL, C_BLACK);
         return;
     }
+    if (st.mode == M_END) { draw_end(); return; }
     if (st.turn) {                                 // the view it turns to, unpacked meanwhile
         ZB(7); draw_turn(); ZE(7);
         ZB(8); unpack_view((st.rot + st.turn) & 3); ZE(8);

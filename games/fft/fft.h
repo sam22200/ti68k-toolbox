@@ -8,8 +8,9 @@
 
 typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py
 // battle.h (tools/battle.py): FFT's numbers for the Gariland battle
-typedef struct { u8 growth[5], mult[5], move, jump, cev; } Job;   // raw stats HP MP SP PA MA
-typedef struct { u8 id, hp, mp, pa, ma, sp, move, jump, wp, knife; } Item;
+typedef struct { u8 growth[5], mult[5], move, jump, cev, row; } Job;   // raw stats HP MP SP PA MA; row:
+                                                                    // its JP's career slot
+typedef struct { u8 id, hp, mp, pa, ma, sp, move, jump, wp, knife; char name[13]; } Item;
 typedef struct {
     u8 gfx, job, type, level, brave, faith;   // type: the generation table (male, female, Ramza)
     u16 day;                                   // birthday 1..365; 0, and Brave / Faith 0: drawn
@@ -51,7 +52,15 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define PATH_MAX 16
 #define AI_WAIT 15                     // frames an enemy's or the guest's turn lasts (it waits)
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
-#define DC_GONE 0xFF                   // death counter out: a crystal or a chest (milestone 19)
+// the death counter (Unit.dc): 3..0 while KO, then the unit is a crystal or a chest on its tile,
+// gone once picked up
+#define DC_CRYSTAL 0xFD
+#define DC_CHEST 0xFE
+#define DC_GONE 0xFF
+#define DC_OBJ(d) ((d) >= DC_CRYSTAL)          // out of the battle: its clock stopped
+#define EXP_LEVEL 100                  // EXP to the next level
+#define GAIN_T 14                      // M_ACT: the EXP gained rises from ACT_HIT + GAIN_T
+#define PICK_FRAMES 30                 // M_PICK: the message about what was picked up
 #define PANEL_H 46                     // a unit's panel against a side of the screen, at the bottom
 // an attack's frames: the wind-up, the blow from ACT_BLOW, the target hit (its HP lost, the
 // number shown) at ACT_HIT, its hit pose for HIT_FRAMES, the number rising NUM_RISE pixels,
@@ -66,8 +75,10 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // player's turn menu; M_TARGET: the reach shown, a tile to pick; M_WALK; M_FACE: the facing
 // chosen at Wait; M_STATUS: a unit's numbers; M_AIM: the weapon's or the ability's reach
 // shown, a target to pick; M_ACT: the attack or the ability played; M_ACTS: Act's list (Attack,
-// the skill set); M_SKILLS: the abilities the unit knows
-enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS };
+// the skill set); M_SKILLS: the abilities the unit knows; M_PICK: a crystal or a chest picked
+// up; M_END: the battle over, its results
+enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END };
+enum { END_NONE, END_VICTORY, END_DEFEAT };
 #define NO_ABIL 0xFF                   // st.abil: the weapon's Attack
 enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
 enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_N };   // the turn menu's entries
@@ -85,7 +96,10 @@ typedef struct {
     u8 eq[EQ_N];                       // index in items[], 0xFF none
     u16 hp, max_hp, mp, max_mp;
     u8 pa, ma, sp, ct, move, jump;
-    u8 dc;                             // death counter: 3, one less per turn at 0 HP, DC_GONE
+    u8 dc;                             // death counter: 3, one less per turn at 0 HP, then DC_*
+    u8 exp, kos, lv0;                  // EXP to the next level; times KO; level at the start
+    u16 jp, tjp;                       // its job's JP: left, earned in all (the job level)
+    u16 gexp, gjp;                     // EXP and JP earned in this battle (the results)
     u32 raw[5];                        // FFT's raw stats (24 bits): HP MP SP PA MA
 } Unit;
 
@@ -114,6 +128,9 @@ typedef struct {
     u16 self;                          // HP the user loses (Wish)
     u8 abil, sub, skill;               // the ability (NO_ABIL: Attack); M_ACTS's and M_SKILLS's entries
     u8 bag[NBAG];                      // the party's items
+    u8 gain, lvup;                     // M_ACT: the EXP the user earned (0 none), its level up
+    u8 pick, pick_t;                   // M_PICK: the item (items[] index; 0xFF: a crystal), frame
+    u8 end;                            // END_*
 } State;
 extern State st;
 
@@ -151,6 +168,13 @@ void skill_range(u8 who, u8 ab);
 u8 skill_hit(u8 a, u8 t, u8 ab);
 u16 skill_amount(u8 a, u8 t, u8 ab, u16 r);
 void skill(u8 a, u8 t, u8 ab);
+// the end of the battle (RE_NOTES.md § KO and the end): EXP and JP for an action that did
+// something (kill: it knocked the target out), a level up; the outcome (END_*); what a unit
+// stepping on a crystal or a chest gets
+void rewards(u8 a, u8 t, u8 kill);
+u8 job_level(const Unit *u);
+u8 outcome(void);
+void pick_up(u8 who, u8 obj);
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
 extern u8 scene_rot;                   // orientation it holds (0xFF: stale)

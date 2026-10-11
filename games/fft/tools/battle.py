@@ -2,13 +2,14 @@
 """The Gariland battle's units from the local FFT disc -> battle.h (never committed).
 
 usage: battle.py DISC.cue battle.h                 the data the game draws its units from
-       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt [SKILLS.txt]]]]
+       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt [SKILLS.txt [REWARDS.txt]]]]]
            every unit of the original at Ramza's first turn and their start tiles
            (tools/oracle.py) against this model; oracle.h: their raw stats, equipment, stats and
            known abilities for the C tests (never committed), with TURNS (oracle.py --turns) the
            battle's turns for the clock test, with ATTACKS (oracle.py --attack) the attacks'
            previews and the executed attacks' outcome, with SKILLS (oracle.py --skills) each
-           ability's preview and outcome and the Dash and Throw Stone trials
+           ability's preview and outcome and the Dash and Throw Stone trials, with REWARDS
+           (oracle.py --rewards) the EXP, JP and level up six actions earn
 Read from SCUS_942.21 (tables named after adamrt/fft_decomp, RE_NOTES.md § The battle's units):
 the jobs (0x800610b8, 48 bytes: growth and multiplier per raw stat, Move, Jump), the items
 (0x80062eb8 primary, 12 bytes; helmet / armour HP and MP 0x80063ed8; attributes 0x800642c4,
@@ -60,6 +61,7 @@ SET_NAMES = {0x05: 'Basic Skill', 0x06: 'Item', 0x19: 'Guts', 0x1C: 'Guts'}
 # the party's bag at a new game (main_item_init_new_game_inventory), by item id
 BAG = {0xF0: 5, 0xF1: 2, 0xF2: 1, 0xF3: 1, 0xF4: 1, 0xF5: 1, 0xF6: 1, 0xF7: 2, 0xF8: 1, 0xF9: 1, 0xFA: 1,
        0xFB: 1, 0xFC: 1, 0xFD: 2}
+ITEM_NAMES = {0x01: 'Dagger', 0x13: 'Broad Sword', 0x9D: 'Leather Hat', 0xBA: 'Clothes', 0xD0: 'Battle Boots'}
 RAMZA_LEARNED = (0x98,)                     # a new game's Ramza knows Wish only (learned_abilities[0] = 4)
 RANDOM, NONE = 0xFE, 0xFF
 T_MALE, T_FEMALE, T_RAMZA = 0, 1, 2
@@ -247,7 +249,7 @@ def turn_rows(path, sp):
     return out
 
 
-def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None):
+def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None, rewards=None):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../.claude/skills/ti-port-ps1/scripts'))
     from psxrun import PSX
     out, null = os.dup(1), os.open(os.devnull, os.O_WRONLY)
@@ -354,7 +356,33 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None):
             'static const u8 oracle_learned[11] = { %s };\n' % ', '.join('0x%02X' % m for m in learned))
         if skills:
             write_skills(fixture, skills, abil)
+        if rewards:
+            write_rewards(fixture, rewards)
     return bad
+
+
+def write_rewards(fixture, path):
+    """oracle.py --rewards: per case Ramza's EXP before, then after: his EXP, level, max HP, HP,
+    and each unit's JP gained in career slot 0 (Ramza's: Squire), for the C tests."""
+    rows = []
+    for ln in open(path):
+        w = ln.split()
+        if not w or w[0] != 'reward':
+            continue
+        v = list(map(int, w[2:]))
+        b, a = v[:len(v) // 2], v[len(v) // 2:]
+        r = 6 * 7                                    # Ramza: battle.h's unit 6
+        rows.append((int(w[1] == 'kill'), int(w[1] != 'heal-none'), b[r], b[r + 4], a[r], a[r + 1], a[-3], a[-2],
+                     ', '.join(str(a[7 * i + 2] - b[7 * i + 2]) for i in range(11))))
+    open(fixture, 'a').write(
+        '// The original\'s rewards (tools/oracle.py --rewards): Ramza acting on the recruit south of him\n'
+        '// (attack, kill, a level up from 95 EXP, Potion, Heal missing, Dash): kill, did something,\n'
+        '// his EXP and total JP before; after: EXP, level, max HP, HP; each unit\'s JP gained in his job\n'
+        '#define ORACLE_REWARDS %d\n'
+        'static const struct { u8 kill, hit, exp; u16 tjp; u8 exp2, level2; u16 max_hp2, hp2; u8 jp[11]; }\n'
+        '    oracle_rewards[ORACLE_REWARDS] = {\n' % len(rows)
+        + '\n'.join('    { %d, %d, %d, %d, %d, %d, %d, %d, { %s } },' % r for r in rows) + '\n};\n')
+    print('%d reward cases' % len(rows))
 
 
 SKILL_CASES = {'dash': 0x93, 'stone': 0x94, 'heal': 0x95, 'heal-none': 0x95, 'wish': 0x98, 'potion': 0x170,
@@ -432,18 +460,18 @@ def write(d, path):
             '// eleven units (fft.h: Job, Item, UnitDef), numbers as FFT has them.\n')
     f.write('#define NJOB %d\n#define NITEM %d\n#define NUNIT %d\n' % (len(jobs), len(items), len(defs)))
     f.write('static const Job jobs[NJOB] = {   // FFT job id: growth and multiplier (HP MP SP PA MA), Move, Jump,\n'
-            '                                  // class evade\n')
+            '                                  // class evade, career row (where its JP go: Squire 0, Chemist 1)\n')
     for j in jobs:
         e = d.job(j)
-        f.write('    { { %s }, { %s }, %d, %d, %d },   // %02X\n' % (', '.join(map(str, e['growth'])), ', '.join(map(str, e['mult'])),
-                                                              e['move'], e['jump'], e['cev'], j))
+        f.write('    { { %s }, { %s }, %d, %d, %d, %d },   // %02X\n' % (', '.join(map(str, e['growth'])), ', '.join(map(str, e['mult'])),
+                                                                  e['move'], e['jump'], e['cev'], j - 0x4A if j in (0x4A, 0x4B) else 0, j))
     f.write('};\nstatic const Item items[NITEM] = {   // FFT item id, HP, MP, PA, MA, SP, Move, Jump; a weapon\'s WP and\n'
-            '                                    // its XA (0 PA: a sword, 1 (PA + SP) / 2: a knife)\n')
+            '                                    // its XA (0 PA: a sword, 1 (PA + SP) / 2: a knife); its name\n')
     for i in items:
         it = d.item(i)
         assert it['wp'] != 0xFF, 'item %02X: a weapon other than a striking knife or sword (formula 1)' % i
-        f.write('    { 0x%02X, %d, %d, %d, %d, %d, %d, %d, %d, %d },\n' % (i, it['hp'], it['mp'], it['pa'], it['ma'], it['sp'],
-                                                                it['move'], it['jump'], it['wp'], it['type'] == KNIFE))
+        f.write('    { 0x%02X, %d, %d, %d, %d, %d, %d, %d, %d, %d, "%s" },\n' % (
+            i, it['hp'], it['mp'], it['pa'], it['ma'], it['sp'], it['move'], it['jump'], it['wp'], it['type'] == KNIFE, ITEM_NAMES[i]))
     f.write('};\n// raw stat base and variance per unit type (generic male, generic female, Ramza)\n')
     f.write('static const u8 gen_base[3][5] = { %s };\n' % ', '.join('{ %s }' % ', '.join(map(str, d.gen(t)[0])) for t in range(3)))
     f.write('static const u8 gen_var[3][5] = { %s };\n' % ', '.join('{ %s }' % ', '.join(map(str, d.gen(t)[1])) for t in range(3)))
@@ -492,8 +520,8 @@ def main():
     d = Disc(sys.argv[1])
     if sys.argv[2] == '--check':
         a = sys.argv + [None, None, None]
-        a += [None]
-        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7], a[8]) else 0)
+        a += [None, None]
+        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7], a[8], a[9]) else 0)
     write(d, sys.argv[2])
 
 

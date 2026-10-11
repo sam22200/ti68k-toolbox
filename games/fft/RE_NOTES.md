@@ -62,6 +62,21 @@ IMPLEMENTATION** (what the TI does, and why).
   comes at milestone 20). On screen: the user's FFT pose, the number (or the status removed)
   rising, the ability's name at the top right.
 
+### KO and the end (grilling, 2026-10-11, milestone 19)
+
+- A KO unit's death counter shown above it (3 to 0, the panels' 3 x 5 digits); the guest's is not
+  (FFT: Delita never turns).
+- A crystal gives back all HP and MP (FFT's ability learning dropped: a Squire would learn
+  little and it needs a choice screen); a chest one of the dead unit's items, shown by its name
+  only (no inventory); both from FFT's own sheet (`BATTLE/OTHER.SPR`).
+- EXP rising above the user after the target's number (`EXP+12`, `LvUp` for a level up), JP
+  only in Status; FFT's rules as they are (the enemies earn too, JP shared, job levels).
+- The results: `Victory!` or `Game Over`, a line per unit of the player's side (level before >
+  after, EXP and JP earned), [ENTER] the battle again with new draws. Saving with [ESC] at
+  milestone 22.
+- Done when a few rewards equal the original's (an attack, a kill, a level up), the crystal or
+  chest odds and the counter's length as the code reads, a battle won and one lost by keys.
+
 ## Tools
 
 - `psxiso.py ... sources/fft_ps1/disc` lists the files; `--file MAP/MAP022.GNS` (and the
@@ -115,6 +130,11 @@ IMPLEMENTATION** (what the TI does, and why).
   HP and the bag (`g_main_item_quantities` 0x800596e0). A status must be poked in both the
   current set (+0x58) and `inflicted_status` (+0x1bb, what a removal checks), or a cure misses.
   13 cases and 300 executed Dash and Throw Stone each in ~10 min.
+- **Rewards** (milestone 19): `tools/oracle.py --rewards DISC STATE rewards.txt` plays six actions
+  of Ramza (as `--skills`, every ability given) on the recruit south of him: Attack, a kill (its
+  HP poked to 1), a level up (his EXP +0x21 poked to 95), Potion, Heal missing, Dash; every
+  unit's EXP (+0x21), level (+0x22), JP and total JP of career slots 0 and 1 (+0xdc, +0x104,
+  u16 per job) and job levels (+0xd2) before and after, Ramza's raw stats (+0x72) and HP. 7 s.
 
 ## Behaviour and data
 
@@ -359,7 +379,7 @@ IMPLEMENTATION** (what the TI does, and why).
   preview is a small window at the top right (Hit 95% / Dmg 12) instead of FFT's two portraits;
   the poses are FFT's, scaled 0.6, without the weapon (milestone 21); the attack takes 34
   frames (~1.1 s: wind-up 6, blow 4, the target hit 8, the number rising 8 px), the number in
-  black with a white outline (FFT: white). EXP and JP come at milestone 19.
+  black with a white outline (FFT: white). EXP and JP: milestone 19.
 
 ### Abilities (milestone 18)
 
@@ -422,6 +442,58 @@ IMPLEMENTATION** (what the TI does, and why).
   21); a KO unit's tile can be chosen only with Phoenix Down; the Defending status ends at the
   unit's next turn (INTERPRETATION: FFT's own Defend lasts until then).
 
+### KO and the end (milestone 19)
+
+- OBSERVED (fft_decomp, read: `battle_unit_update_attacker_earned_experience`,
+  `battle_unit_apply_action_rewards`, `main_unit_check_level_up`, `main_unit_apply_level_growth`,
+  `battle_unit_store_jp_and_calculate_unlocked_jobs`, `main_job_calculate_level`): an action
+  whose outcome did something earns its user 10 EXP, a kill 20 / the target's KO count (counted
+  first), plus the target's level minus the user's, at least 1, at most 99 (Gained EXP Up
+  doubles); several targets: the highest award; a miss nothing; reactions nothing. Everybody
+  earns, enemies and the guest too, but a Dead, Crystal, Petrify or Treasure user. At 100 EXP
+  (level < 99): EXP 0 (the rest lost), level + 1, each raw stat += raw / (growth + the old
+  level) (growth 0 counts as 1), the stats made again, HP and MP only clamped to the new
+  maxima. JP: 8 + 2 x the job level + the old level / 4 (none without EXP), Gained JP Up x 1.5;
+  every other unit whose initial team is the user's gets a quarter, in the user's job slot;
+  9999 at most. Job levels: JP totals 100, 200, 350, 550, 800, 1150, 1550, 2100
+  (`g_main_job_level_jp_requirements` 0x80066184, read on the disc).
+- OBSERVED (run, `oracle.py --rewards`): Attack 10 EXP and 10 JP for Ramza (job level 1 at 173
+  total JP: 8 + 2 + 0), +2 JP in slot 0 for Delita and each living recruit (the Chemists too:
+  their Squire slot), none for the enemies; a kill 20 EXP and no share for the KO target; from
+  95 EXP a level up to 2 with EXP 0, raw HP 518253 -> 561440 (+ raw / 12: Squire growth 11 +
+  level 1), max HP 52 -> 55, HP kept at 52; Potion 10 EXP; Heal missing nothing; Dash 10.
+  Initial EXP: an ENTD unit's EXP is rand() * 100 / 32768 when its ENTD says random
+  (`main_unit_calculate_entd_data`; Delita 78, the enemies 11-98); the recruits (made from the
+  academy scene's ENTD: INTERPRETATION) 4-91; Ramza 0 (`main_unit_generate_out_of_battle`).
+  Every unit's total JP in its job 100-199 at the start (Ramza 173).
+- OBSERVED (fft_decomp, read: `main_status_set_ct`, `battle_status_build_upkeep_action`,
+  `battle_unit_generate_crystal_or_treasure`, `battle_unit_generate_treasure`,
+  `battle_unit_learn_from_crystal`): the death counter is set to 3 when Dead is set or removed
+  (0xFF for an IMMORTAL unit: Delita's ENTD flags 0x84); each dead upkeep (a pick of the unit)
+  lowers it 3 -> 0, the next one turns the unit (an Undead one may revive): a crystal when
+  rand() & 0x10 (an enemy, 1 in 2) or & 0x110 (a player-controlled unit, 3 in 4), else a
+  treasure; it stays on the map as a unit. A unit moving onto it: a chest gives one of the dead
+  unit's non-empty equipment slots at random (none: one of the 13 consumables 0xF0-0xFD but
+  Elixir); a crystal offers the abilities the mover can learn (each by its learn rate) or
+  restores HP and MP, only the restore when nothing is learnable.
+- OBSERVED (fft_decomp, read: `battle_action_check_battle_outcome`,
+  `battle_menu_dispatch_system_function`): defeat (checked first) when a unit with importance
+  3 (Ramza, team 0x0B) is a crystal, a chest or gone, or when every blue unit present, the guest
+  included, is in the KO set (Crystal, Dead, Petrify, Invite, Blood Suck, Treasure); victory when
+  every other unit is: a plain KO counts. Checked after each action's rewards, at Wait and
+  between turns. Gariland's own condition script was not read (the generic path is "defeat all
+  enemies"). Its war trophies (ENTD): Mythril Knife, Phoenix Down, Potion.
+- TARGET (`rewards`, `job_level`, `outcome`, `pick_up`, `end_battle`, `draw_end`, `ct_next` in
+  `fft.c`; the crystal and the chest from `BATTLE/OTHER.SPR`, `units.py`): the same rules and
+  numbers with our RNG (`make test`: the six actions equal, crystals 0.509 of an enemy's and 0.748
+  of a player's over 4000 each; the counter 3, 2, 1, 0 then the object; a battle won and one
+  lost by keys). Differences, for the TI: a crystal only restores HP and MP; a chest's item is
+  shown, not kept; JP shared to a unit of another job are dropped (we keep each unit's own job
+  only); a single target, so no highest-award rule; the results have no war trophies; the outcome
+  is checked after each action and at each turn's start (which covers Wait). The crystal is one
+  of FFT's eight turning images, white with a black line, floating; the chest is drawn at 0.55
+  (24 px wide) with its greys picked per material (by luminance it was a mush).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -435,3 +507,4 @@ IMPLEMENTATION** (what the TI does, and why).
 | CT | +Speed per tick, act at 100+, -100, +20 per unused Move / Act, max 60 | same | decomp, 46 turns of `oracle.py --turns` |
 | Attack | XA (PA, knife (PA + SP) / 2) x WP, zodiac, critical 4 %, hit 100 - class evade from the front | same | decomp, 40 previews and 400 attacks of `oracle.py --attack` |
 | abilities | learned: JP 100..199 spent in order on passing learn rolls; Dash 1..4 x XA, Throw Stone 1..2 x XA, Wish 2 x max / 5, Potion 30, Phoenix Down 1..20 | same | decomp, 13 cases and 600 trials of `oracle.py --skills` |
+| rewards | 10 EXP (kill 20 / KOs) + level difference, 100 a level; JP 8 + 2 x job level + level / 4, a quarter shared; death counter 3, then crystal (enemy 1/2, player 3/4) or chest | same (the share to the same job only) | decomp, six actions of `oracle.py --rewards` |
