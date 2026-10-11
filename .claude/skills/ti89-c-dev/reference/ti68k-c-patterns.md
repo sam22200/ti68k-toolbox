@@ -595,6 +595,12 @@ while (running) {
   the next word read). The same expression without the test, or written `p + 240UL * 156 +
   (u8)(d - 0xFD) * 156`, is right. The PC build and the unit tests cannot see it: give every new
   pointer path an `xcheck` scenario, and read the asm (`tigcc -S`) when a TI-only fault appears.
+- **An odd-sized `u8` member shifts the buffers after it to odd addresses** (found under
+  `ti-cycles`, `games/fft` milestone 20): GCC aligns a `short`/`long` member, not a `u8` array,
+  so `u8 en[150], ej;` in a work struct left every following `u8` buffer at an odd address, and
+  the code reading one of them as words (a rotation buffer cast to `u16 *`) took an Address
+  Error on the TI only. Keep each `u8` group's size even (a pad byte) or put new byte tables at
+  the struct's end, after the buffers read as words.
 - Stack size: measure instead of guessing: fill the free stack with a pattern at `_main`, run the
   game, scan for the high-water mark. Never put screen-sized buffers on the stack (TI-Chess dialogs
   put 7.5 KB there, even from inside its recursive search; path.c puts 5.8 KB).

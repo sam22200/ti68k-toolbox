@@ -7,6 +7,7 @@ usage: oracle.py DISC.cue OUT.state [trace.txt]
        oracle.py --attack DISC.cue STATE N M attacks.txt
        oracle.py --skills DISC.cue STATE M skills.txt
        oracle.py --rewards DISC.cue STATE rewards.txt
+       oracle.py --ai DISC.cue STATE N TRIALS ai.txt
 The trace lists, from the battle's start to Ramza's turn, every frame where a unit's HP, CT,
 position or the turn unit changed (the turn order and the AI turns as the game plays them).
 Deterministic: the same inputs and pokes at the same frames give the same battle (the RNG
@@ -313,7 +314,150 @@ def rewards(psx, state):
     return rows
 
 
+# The AI's turns: a snapshot of every unit when a turn starts (the previous turn done, before the
+# AI tries anything), and what the previous unit did (its record's movement / action taken, last
+# ability, its target's tile). Built situations: pokes on the first-turn state, the actor given
+# CT 100 and the recruits 0 so that it acts right after Ramza waits; each replayed with Ramza's
+# Wait delayed by another number of frames (other draws).
+AI_DATA, TILE_PRIORITY = 0x8019f3c4, 0x5f4       # g_battle_ai_data_base, its tile_priority (s16 [2][18][16])
+
+
+def ai_snap(p):
+    """Per unit (battle.h order) its tile, facing, HP, CT, death counter, status bytes, learned
+    bytes of its job's row, support; then the AI's tile priorities (map order, never reset)."""
+    out = []
+    for j in IDS:
+        a = UNITS + UNIT_SIZE * j
+        r = lambda q, k=1: p.read(a + q, k)
+        row = r(3) - 0x4A if r(3) in (0x4A, 0x4B) else 0
+        out.append([r(0x47), r(0x48), r(0x49) & 15, r(0x28, 2), r(0x39), r(7)] + [r(0x58 + k) for k in range(5)]
+                   + [r(0x99 + 3 * row + k) for k in range(3)] + [r(0x16, 2)])
+    tp = [p.read(AI_DATA + TILE_PRIORITY + 2 * (y * 16 + x), 2) for y in range(15) for x in range(10)]
+    return out + [[v - 65536 if v >= 32768 else v for v in tp]]
+
+
+def ai_turns(psx, n, wait=0, poke=None):
+    """The first n AI turns after Ramza waits: (unit, snapshot at its start, what it did, the
+    snapshot at the next turn's start)."""
+    if poke:
+        poke(psx)
+    s = taps('W:%d DOWN:20 DOWN:30 CIRCLE:60 CIRCLE:60' % (wait + 1))
+    run(psx, len(s) + 1, s)
+    log, last = [], {'ht': [0] * 21, 'row': None}
+    def hook(p, f):
+        for i in (16, 17, 18, 19, 20):
+            a = UNITS + UNIT_SIZE * i + 5
+            if p.read(a) & 8:
+                p.write(a, p.read(a) & ~8)
+        tu = p.read(TURN_UNIT)
+        for i in IDS:
+            h = p.read(UNITS + UNIT_SIZE * i + 0x186)
+            if h and not last['ht'][i] and i == tu and len(log) <= n:
+                cts = [p.read(UNITS + UNIT_SIZE * j + 0x39) for j in IDS]
+                prev = last['row']
+                if not (prev and prev[0] == i and all(c <= d for k, (c, d) in enumerate(zip(cts, prev[1]))
+                                                      if IDS[k] != i)):
+                    if log:
+                        a = UNITS + UNIT_SIZE * prev[0]
+                        r = lambda q, k=1: p.read(a + q, k)
+                        log[-1] += [[r(0x187), r(0x188), r(0x170, 2), r(0x17a, 2), r(0x17e, 2)], ai_snap(p)]
+                    last['row'] = (i, cts)
+                    log.append([IDS.index(i), ai_snap(p)])
+            last['ht'][i] = h
+    f = 0
+    while len(log) <= n and f < 60000:
+        run(psx, 300, lambda k: key('CIRCLE') if k % 90 < 4 else 0, hook)
+        f += 300
+    return log[:n]
+
+
+def ai_poke(units):
+    """Pokes: {unit (battle.h order): {'hp', 'dead', 'critical'}}; the first unit acts next
+    (positions cannot be poked: the game keeps them elsewhere too)."""
+    first = list(units)[0]
+    def poke(p):
+        for k, j in enumerate(IDS):                  # the others (Ramza acting aside) at CT 0
+            if k not in (first, U_RAMZA_ORA):
+                p.write(UNITS + UNIT_SIZE * j + 0x39, 0)
+        for k, v in units.items():
+            a = UNITS + UNIT_SIZE * IDS[k]
+            if k == first:
+                p.write(a + 0x39, 100)
+            if v.get('critical'):
+                p.write(a + 0x5a, p.read(a + 0x5a) | 0x01)
+            if 'hp' in v:
+                p.write(a + 0x28, v['hp'], 2)
+            if v.get('dead'):
+                p.write(a + 0x28, 0, 2)
+                for o in (0x58, 0x1bb):
+                    p.write(a + o, p.read(a + o) | 0x20)
+                p.write(a + 7, 3)
+    return poke
+
+
+U_RAMZA_ORA = 6
+# name: pokes (the actor first). At the first turn: Delita (7,9), enemies 1 (6,8) 2 (0,4) 3 (7,6)
+# 4 (8,6: the Chemist with Defend) 5 (3,7); Ramza (4,11), recruits 7 (3,11) 8 (6,12) 9 (5,12) 10 (4,12)
+AI_CASES = [
+    ('near', {1: {}}),                                        # an enemy Squire two tiles from Delita
+    ('critical', {1: {'hp': 6, 'critical': 1}}),              # Critical: it retreats
+    ('far', {2: {}}),                                         # out of reach: it comes closer
+    ('potion', {4: {}, 3: {'hp': 10}}),                       # the Chemist, an ally under half HP
+    ('kill', {5: {}, 7: {'hp': 4}}),                          # a recruit at 4 HP in reach
+    ('defend', {4: {}, 0: {'dead': 1}}),                      # the Chemist, Delita KO: none in reach
+    ('delita-low', {0: {'hp': 12}}),                          # Delita under 45/128: a healer
+    ('recruit', {7: {}}),                                     # a recruit (the player's AI)
+]
+
+
+TILES = 0x8018f8cc                               # g_battle_map_tile_data: 8 bytes a tile
+MOVE_MARK = 0x20                                 # byte 5: a move destination shown
+
+
+def reaches(psx, state):
+    """The move range FFT shows to Ramza at his first turn and to the recruit after him (Ramza
+    waits): per tile its mark."""
+    rows = []
+    for k in (0, 2):                             # (one Wait is not enough to reach its menu)
+        psx.load(state)
+        s = taps(' '.join(['DOWN:20 DOWN:30 CIRCLE:60 CIRCLE:60 W:300'] * k) + ' CIRCLE:60 CIRCLE:60')
+        run(psx, len(s) + 1, s)
+        rows.append('reach %d  %s' % (IDS.index(psx.read(TURN_UNIT)),
+                                      ''.join('1' if psx.read(TILES + 8 * c + 5) & MOVE_MARK else '0' for c in range(150))))
+    return rows
+
+
+def ai(psx, state, n, trials):
+    rows = reaches(psx, state)
+    psx.load(state)
+    for u, pre, did, post in ai_turns(psx, n):
+        rows.append(ai_row('battle', u, pre, did, post))
+    for name, units in AI_CASES:
+        for t in range(trials):
+            psx.load(state)
+            got = ai_turns(psx, 1, 7 * t, ai_poke(units))
+            u, pre, did, post = got[0]
+            rows.append(ai_row(name, u, pre, did, post))
+    return rows
+
+
+def ai_row(name, u, pre, did, post):
+    return 'ai %s %d  %s  %s  %s' % (name, u, ' '.join(','.join(map(str, v)) for v in pre), ','.join(map(str, did)),
+                                    ' '.join(','.join(map(str, v)) for v in post))
+
+
 def main():
+    if sys.argv[1] == '--ai':
+        out = os.dup(1)
+        os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        psx = PSX(sys.argv[2])
+        rows = ai(psx, sys.argv[3], int(sys.argv[4]), int(sys.argv[5]))
+        open(sys.argv[6], 'w').write(
+            '# ai CASE UNIT  at its turn\'s start, per unit (battle.h order) x,y,facing,HP,CT,death counter,\n'
+            '# status bytes 0-4, learned bytes of its job\'s row, support; the AI\'s tile priorities  what it\n'
+            '# did: moved,acted,last ability,target x,target y  the same snapshot at the next turn\'s start\n' + '\n'.join(rows) + '\n')
+        os.write(out, ('%d rows\n' % len(rows)).encode())
+        return
     if sys.argv[1] == '--rewards':
         out = os.dup(1)
         os.dup2(os.open(os.devnull, os.O_WRONLY), 1)

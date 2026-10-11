@@ -12,7 +12,8 @@
 #include <string.h>
 
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
-#include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking
+#include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking,
+                                         // 9 an AI unit's thinking (a frame's step)
 #define ZB(n) BENCH_BEGIN(n)
 #define ZE(n) BENCH_END(n)
 #else
@@ -116,7 +117,7 @@ typedef struct {                        // a unit's cover mask, and its covered 
 typedef struct {
     Cover cover[NUNIT];                 // per unit, for its feet, its depth and the view
     s16 span_l[TH + 8], span_r[TH + 8];
-    u8 queue[MAP_W * MAP_H], from[MAP_W * MAP_H];
+    u8 from[MAP_W * MAP_H];
     u8 half[2][TW / 8 * TH];
     u16 dbl[256];                       // byte -> its bits doubled
     u8 order[MAP_W * MAP_H], count[256];
@@ -142,11 +143,39 @@ typedef struct {
     u8 num_w[2], num_ok;                // black, its white outline; their widths; drawn (bits)
     u8 end_n;                           // M_END: the results' next line to draw
     u8 dcg[4][2][7];                    // the death counter's digits: black, mask (8 wide)
+    // the movement spread (spread_start, spread_go): its tiles to go on from by cost & 3, where it
+    // stands; the mover's enemies' tiles; each tile's x, z, standing height, height out of it
+    // (water: its surface), 1 walkable | 2 water; the moves out of each tile (edges()), for Jump ej
+    u8 sq[4][MAP_W * MAP_H], sq_n[4];
+    u8 sp_d, sp_i, sp_limit, sp_out, sp_left, *sp_dist, *sp_from;
+    const u8 *sp_need;
+    u8 blk[MAP_W * MAP_H], tx[MAP_W * MAP_H], tz[MAP_W * MAP_H];
+    u8 hs[MAP_W * MAP_H], hl[MAP_W * MAP_H], hw[MAP_W * MAP_H];
+    u8 eg[MAP_W * MAP_H][16], en[MAP_W * MAP_H], ej, ej_pad;
+    u8 top[MAP_W * MAP_H];              // a tile's column for a projectile (FFT: its height x 12);
+    u8 col[MAP_W * 28], row[MAP_H * 28];    // world x, z -> the tile's column, z * MAP_W
+    // the AI (fft.c § the AI): per tile the sets (1: can stop there, 2: to act from), the danger,
+    // the steps from the focus, what stepping there gives; the tiles to act from
+    // in map order and safest first; the ranking; the usable abilities, the unit's thinking step
+    u8 ai_m[MAP_W * MAP_H], ai_prox[MAP_W * MAP_H], ai_dist[MAP_W * MAP_H];
+    u8 ai_tt[NUNIT], ai_tu[NUNIT];      // an ability's targets (but the actor): their tiles, units
+    u8 ab, ab_k, ab_n, ab_all, ai_traj; // the ability being tried: its next origin, its targets,
+    u16 ab_done;                        // no target used up, a trajectory just checked; the
+    AiAct ab_best;                      // targets used up, its best so far
+    s16 ai_gain[MAP_W * MAP_H], ai_key[MAP_W * MAP_H];   // what stepping there gives, its key
+    u8 ai_grid[MAP_W * MAP_H], ai_ord[MAP_W * MAP_H], ai_no;
+    AiAct ai_rank[8];
+    u8 ai_n, ai_list[1 + SET_N], ai_nab, ai_k, ai_a, ai_self, ai_focus, ai_c0, ai_c1, ai_retreat;
+    u8 ai_er, ai_ar, ai_ranged;         // its shortest reach on an enemy, an ally; a ranged ability
+    u16 ai_use;                         // the units the ability is worth using on (bits)
+    s16 ai_base;                        // the fallback tile's score: to beat
+    u8 frz, frz_n, hold;                // a unit thinking: the picture stands still (no longer
+    u32 frz_h;                          // drawn), its frames so far, one more frame not drawn,
+                                        // the last one's checksum
 } Work;
 static Work *W;
 #define span_l (W->span_l)
 #define span_r (W->span_r)
-#define queue (W->queue)
 #define bfs_from (W->from)
 #define half (W->half)
 #define dbl (W->dbl)
@@ -299,6 +328,22 @@ void battle_units(void)
         u->exp = d->type == 2 ? 0 : (u8)((100UL * rand15()) >> 15);
         u->kos = 0; u->lv0 = u->level; u->gexp = u->gjp = 0;
     }
+    for (i = 0; i < NUNIT; i++) {                  // the support ability (not a new game's Ramza):
+        Unit *u = &st.unit[i];                     // Defend bought with the Squire job's JP after
+        u16 jp = u->jp;                            // the reactions and supports listed before it,
+        u->defend = 0;                             // then one of the two it knows
+        if (unit_defs[i].type == 2) continue;
+        if (jobs[u->job].row) {                    // another job: the Squire's JP and abilities
+            const u8 *a = skill_sets[SET_BASIC].abil;
+            jp = (u16)(100 + ((100UL * rand15()) >> 15));
+            for (k = 0; k < SET_N && a[k] != 0xFF; k++)
+                if (((100UL * rand15()) >> 15) < abilities[a[k]].rate && jp >= abilities[a[k]].jp)
+                    jp -= abilities[a[k]].jp;
+        }
+        for (k = 0; k < NRSM_PRE; k++)
+            if (((100UL * rand15()) >> 15) < rsm_pre[k][1] && jp >= rsm_pre[k][0]) jp -= rsm_pre[k][0];
+        if (((100UL * rand15()) >> 15) < DEFEND_RATE && jp >= DEFEND_JP) u->defend = !(rand15() >> 14);
+    }
 }
 
 // ---------------------------------------------------------------- turn order
@@ -369,9 +414,11 @@ void turn_order(void)
 }
 
 static void end_battle(u8 e);
+static void ai_next(void);
 
 // the next turn: the cursor and the camera go to its unit (its Defending ends); enemies and the
-// guest wait, a player's unit opens its menu; the battle ends if Ramza just turned to crystal
+// guest think (the AI), a player's unit opens its menu; the battle ends if Ramza just turned to
+// crystal
 static void turn_start(void)
 {
     u8 me;
@@ -380,14 +427,15 @@ static void turn_start(void)
     if (outcome()) { end_battle(outcome()); return; }
     st.unit[st.act].status &= (u8)~ST_DEFEND;
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
-    me = st.unit[st.act].team == TEAM_PLAYER;
-    st.wait_t = me ? 0 : AI_WAIT;
+    me = st.unit[st.act].team == TEAM_PLAYER && !st.ai_all;
+    st.ai = me ? AI_OFF : AI_THINK; st.ai_t = 0;
+    if (W) { W->ai_k = 0; W->frz = W->frz_n = 0; W->frz_h = 0; }
     st.mode = me ? M_MENU : M_BROWSE;
     st.menu = MN_MOVE; st.moved = st.acted = 0;
     turn_order();
 }
 
-static void turn_end(u8 moved, u8 acted)
+void turn_end(u8 moved, u8 acted)
 {
     ct_end(st.act, moved, acted);
     turn_start();
@@ -678,34 +726,100 @@ u16 scene_checksum(void)
 // ---------------------------------------------------------------- reach and paths
 static const s8 dir_x[4] = { 1, -1, 0, 0 }, dir_z[4] = { 0, 0, 1, -1 };
 
+// FFT's movement spread (battle_move_calculate_spread, measured on the original's move ranges;
+// RE_NOTES.md § Moving): the Move points each tile costs from tile c: a step 1, from water to
+// water 2, not into water from land with the last point; a jump over one tile 2 (from water 3;
+// Jump 2 or more: to a tile no lower by at most Jump half units, over ground no higher than it,
+// no enemy there); a step's height within Jump (out of water: from its surface); enemies block,
+// allies can be crossed. limit: the most it spends (dist 0xFF beyond); from: the previous tile.
+static u8 lower(u8 c)                    // a tile's height a unit leaves it from (half units)
+{
+    return (u8)(map_tiles[c].stand + (map_tiles[c].water << 1));
+}
+
+// the moves out of each tile a unit with that Jump can make whatever the units (to a walkable
+// tile, within its heights; a jump: over lower ground), made once: each its tile and kind (1 a
+// jump, 2 into water)
+static void edges(u8 jump)
+{
+    static const s8 step[4] = { 1, -1, MAP_W, -MAP_W };
+    u8 t, k, j;
+    W->ej = jump;
+    for (t = 0; t < MAP_W * MAP_H; t++) {
+        u8 x = W->tx[t], z = W->tz[t], h = W->hl[t], n = 0, *e = W->eg[t];
+        for (k = 0; k < 4; k++) {
+            u8 room = k == 0 ? MAP_W - 1 - x : k == 1 ? x : k == 2 ? MAP_H - 1 - z : z, nc = t;
+            for (j = 0; j <= (jump >= 2) && j < room; j++) {
+                s16 dh;
+                nc = (u8)(nc + step[k]);
+                if (!(W->hw[nc] & 1)) continue;
+                dh = (s16)W->hs[nc] - h;
+                if (dh > 2 * jump || dh < -2 * jump || (j && (dh < 0 || dh > jump))) continue;
+                if (j && W->hl[nc - step[k]] > W->hs[nc]) continue;   // over higher ground
+                e[n++] = nc; e[n++] = (u8)(j | (W->hw[nc] & 2));
+            }
+        }
+        W->en[t] = n;
+    }
+}
+
+// started by spread_start, carried on by spread_go a number of tiles at a time (the AI's spread
+// over the map takes several frames); 1 once done
+static void spread_start(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, const u8 *need, u8 left)
+{
+    const Unit *un = &st.unit[who];
+    u8 *blk = W->blk, i, foe = un->team == TEAM_ENEMY;
+    if (W->ej != un->jump) edges(un->jump);
+    memset(blk, 0, MAP_W * MAP_H);
+    for (i = 0; i < NUNIT; i++) {
+        const Unit *u = &st.unit[i];
+        if (!DC_OBJ(u->dc) && (u->team == TEAM_ENEMY) != foe) blk[u->z * MAP_W + u->x] = 1;
+    }
+    memset(dist, 0xFF, MAP_W * MAP_H);
+    W->sq_n[0] = W->sq_n[1] = W->sq_n[2] = W->sq_n[3] = 0;
+    dist[c] = 0;
+    W->sq[0][W->sq_n[0]++] = c;
+    W->sp_d = 0; W->sp_i = 0; W->sp_limit = limit; W->sp_out = out; W->sp_left = left;
+    W->sp_dist = dist; W->sp_from = from; W->sp_need = need;
+}
+
+static u8 spread_go(u16 n)
+{
+    u8 *blk = W->blk, *sn = W->sq_n, *sq[4], *dist = W->sp_dist, *from = W->sp_from;
+    const u8 *hw = W->hw, *en = W->en, *need = W->sp_need;
+    u8 d = W->sp_d, i = W->sp_i, b, limit = W->sp_limit, out = W->sp_out, left = W->sp_left;
+    for (b = 0; b < 4; b++) sq[b] = W->sq[b];
+    for (; d < limit; d++, i = 0) {
+        const u8 *q = sq[d & 3];
+        b = d & 3;
+        if (!sn[0] && !sn[1] && !sn[2] && !sn[3]) break;     // nothing left to go on from
+        for (; i < sn[b]; i++) {
+            u8 t = q[i], k, m, wet;
+            const u8 *e;
+            if (dist[t] != d) continue;                       // reached cheaper since
+            if (need && need[t] & 1 && !--left) return 1;     // all it was asked for: final
+            if (!n--) { W->sp_d = d; W->sp_i = i; W->sp_left = (u8)(left + (need && need[t] & 1)); return 0; }
+            wet = (u8)(hw[t] & 2); e = W->eg[t]; m = en[t];
+            for (k = 0; k < m; k += 2) {
+                u8 nc = e[k], f = e[k + 1], nd;
+                if (blk[nc] || (f & 1 && blk[((u16)t + nc) >> 1])) continue;
+                nd = (u8)(d + 1 + (f & 1) + (wet && (out || f)));
+                if (nd > limit || nd >= dist[nc] || (f & 2 && !wet && nd == limit)) continue;
+                dist[nc] = nd;
+                if (from) from[nc] = t;
+                sq[nd & 3][sn[nd & 3]++] = nc;
+            }
+        }
+        sn[b] = 0;
+    }
+    return 1;
+}
+
 static void bfs(u8 who, u8 *from)
 {
-    u8 qh = 0, qt = 0, i;
-    Unit *un = &st.unit[who];
-    for (i = 0; i < MAP_W * MAP_H; i++) st.reach[i] = 0xFF;
-    st.reach[un->z * MAP_W + un->x] = 0;
-    queue[qt++] = un->z * MAP_W + un->x;
-    while (qh < qt) {
-        u8 c = queue[qh++], x = c % MAP_W, z = c / MAP_W, d;
-        const Tile *t = &map_tiles[c];
-        if (st.reach[c] >= un->move) continue;
-        for (d = 0; d < 4; d++) {
-            s16 nx = x + dir_x[d], nz = z + dir_z[d];
-            const Tile *n = tile_at(nx, nz);
-            u8 o, nc;
-            s16 dh;
-            if (!n || !n->walk) continue;
-            nc = (u8)(nz * MAP_W + nx);
-            if (st.reach[nc] != 0xFF) continue;
-            dh = (s16)n->stand - t->stand;
-            if (dh > 2 * un->jump || dh < -2 * un->jump) continue;
-            o = unit_at(nx, nz);                                    // enemies block, allies pass
-            if (o && (st.unit[o - 1].team == TEAM_ENEMY) != (un->team == TEAM_ENEMY)) continue;
-            st.reach[nc] = st.reach[c] + 1;
-            if (from) from[nc] = c;
-            queue[qt++] = nc;
-        }
-    }
+    const Unit *un = &st.unit[who];
+    spread_start(who, (u8)(un->z * MAP_W + un->x), un->move, st.reach, from, 0, RT_NULL, 0);
+    spread_go(0xFFFF);
 }
 
 void compute_reach(u8 who)
@@ -716,14 +830,17 @@ void compute_reach(u8 who)
     for (i = 0; i < NUNIT; i++)                   // can't stop on a unit (a crystal or a chest:
         if (i != who && unit_at(st.unit[i].x, st.unit[i].z))       // can, it is picked up)
             st.reach[st.unit[i].z * MAP_W + st.unit[i].x] = 0xFF;
+    for (i = 0; i < MAP_W * MAP_H; i++)            // nor on a tree (crossed only)
+        if (map_tiles[i].walk == 2) st.reach[i] = 0xFF;
 }
 
 u8 make_path(u8 who, u8 tx, u8 tz)
 {
-    u8 c = tz * MAP_W + tx, n, i;
+    u8 c = tz * MAP_W + tx, s = st.unit[who].z * MAP_W + st.unit[who].x, n = 0, i;
     bfs(who, bfs_from);
-    n = st.reach[c];
-    if (n == 0xFF || n >= PATH_MAX) { st.path_n = 0; return 0; }
+    if (st.reach[c] == 0xFF) { st.path_n = 0; return 0; }
+    for (i = c; i != s; i = bfs_from[i]) n++;     // its steps (a jump is one)
+    if (n >= PATH_MAX) { st.path_n = 0; return 0; }
     for (i = n + 1; i-- > 0;) {
         st.path[i][0] = c % MAP_W; st.path[i][1] = c / MAP_W;
         c = bfs_from[c];
@@ -835,7 +952,7 @@ static void knockback(u8 a, u8 t)
     if ((dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz)) kx += dx > 0 ? 1 : -1;
     else kz += dz > 0 ? 1 : -1;
     n = tile_at(kx, kz);
-    if (n && n->walk && !n->water && n->stand <= s->stand && !unit_at(kx, kz)) {
+    if (n && n->walk == 1 && !n->water && n->stand <= s->stand && !unit_at(kx, kz)) {
         s16 fall = ((s->stand - n->stand) >> 1) - ut->jump;
         st.push = 1; st.kx = (u8)kx; st.kz = (u8)kz;
         if (fall > 0) st.dmg += (u16)((u32)fall * ut->max_hp / 10);
@@ -943,6 +1060,18 @@ void skill(u8 a, u8 t, u8 ab)
     }
 }
 
+// Defend (a unit whose support ability it is): Defending until its next turn, its evades doubled
+void defend(u8 a)
+{
+    act_start(a, a);
+    st.abil = ABIL_DEFEND; st.hit = 1;
+}
+
+u8 act_kind(void)
+{
+    return st.abil == NO_ABIL ? AB_DAMAGE : st.abil == ABIL_DEFEND ? AB_DEFEND : abilities[st.abil].kind;
+}
+
 // ---------------------------------------------------------------- KO and the end
 // FFT's rewards (RE_NOTES.md § KO and the end: read in the decompilation, checked on the
 // original): an action that did something earns its user 10 EXP (a kill: 20 / the times the
@@ -1024,7 +1153,7 @@ void pick_up(u8 who, u8 obj)
 
 static void end_battle(u8 e)
 {
-    st.end = e; st.mode = M_END;
+    st.end = e; st.mode = M_END; st.ai = AI_OFF;
     scene_rot = 0xFF;                               // the scene buffer holds the results
     if (W) W->end_n = 0;
 }
@@ -1036,7 +1165,11 @@ static void attack_step(void)
 {
     Unit *ut = &st.unit[st.tgt], *ua = &st.unit[st.atk];
     if (st.act_t == ACT_HIT && st.hit) {
-        u8 kind = st.abil == NO_ABIL ? AB_DAMAGE : abilities[st.abil].kind, ko = !ut->hp;
+        u8 kind = act_kind(), ko = !ut->hp;
+        if (kind == AB_DEFEND) {
+            ut->status |= ST_DEFEND;
+            goto shown;
+        }
         if (kind == AB_DAMAGE) {
             ut->hp = st.dmg >= ut->hp ? 0 : ut->hp - st.dmg;
             if (st.push) { ut->x = st.kx; ut->z = st.kz; }
@@ -1050,11 +1183,585 @@ static void attack_step(void)
         if (st.self) ua->hp = st.self >= ua->hp ? 0 : ua->hp - st.self;
         if ((u8)!ut->hp != ko || !ua->hp) turn_order();
     }
+shown:
     if (++st.act_t >= (st.gain ? ACT_END + GAIN_T : ACT_END)) {
         if (outcome()) { end_battle(outcome()); return; }
         if (!st.unit[st.act].hp) { turn_end(st.moved, 1); return; }
         st.mode = M_MENU; st.menu = st.moved ? MN_WAIT : MN_MOVE;
         st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
+        if (st.ai) ai_next();
+    }
+}
+
+// ---------------------------------------------------------------- the AI
+// FFT's AI for the enemies and the guest (RE_NOTES.md § Enemy AI: read in the decompilation,
+// checked on the original's turns). FFT plays each candidate in its battle engine, random rolls
+// at their middle (no critical), and scores the field: a unit is worth HP * 128 / max HP, -32
+// Critical, -192 KO, the actor's side +, the other -; here that change is computed on the units
+// an action touches. A turn: a focus (the nearest enemy; a guest under 45/128 HP or a Critical
+// unit retreating: the nearest unit that heals, or a crystal), each tile's danger (10 - steps,
+// summed over the enemies acting before its next turn), the steps from the focus, the tiles to
+// act from and to fall back to; each usable ability's best (origin, target) kept if it beats
+// standing on the fallback tile, the best eight drawn in order on their hit chance (none: to the
+// fallback tile, Defend if it has it); acting from its own tile, it acts first, then moves to
+// the safest tile. The setup, then an ability per frame.
+#define MAP_N (MAP_W * MAP_H)
+#define AI_UNREACHED 125                // FFT's steps to a tile its spread does not reach
+#define AI_BAD (-0x7FFF)
+enum { NT_ENEMY, NT_HEALER, NT_IMMINENT, NT_ANY_ENEMY };
+
+static u8 blue(const Unit *u) { return u->team != TEAM_ENEMY; }
+
+static u8 tile_h(const Tile *t)         // FFT's tile height: its lowest corner
+{
+    u8 h = t->c[0];
+    if (t->c[1] < h) h = t->c[1];
+    if (t->c[2] < h) h = t->c[2];
+    if (t->c[3] < h) h = t->c[3];
+    return h;
+}
+
+// a unit's worth with hp HP and those statuses (Poison -26, Darkness -64: FFT's weights)
+static s16 worth(const Unit *u, u16 hp, u8 status)
+{
+    s16 s;
+    if (!hp) return -192;
+    s = divs32_16((long)hp << 7, (short)u->max_hp);
+    if ((u16)(hp * 5) <= u->max_hp) s -= 32;
+    if (status & ST_POISON) s -= 26;
+    if (status & ST_DARK) s -= 64;
+    return s;
+}
+
+// clock ticks before a unit acts (a KO one, a crystal or a chest: never)
+static u16 ai_ticks(const Unit *u)
+{
+    if (!u->hp) return 0xFFFF;
+    return u->ct >= 100 ? 0 : (u16)((u16)(100 - u->ct + u->sp - 1) / u->sp);
+}
+
+// an ability the unit can use now: the enemies' items of their level, the party's in the bag
+static u8 ai_usable(u8 a, u8 ab)
+{
+    const Unit *u = &st.unit[a];
+    if (!(abilities[ab].flags & AF_ITEM)) return 1;
+    return u->team == TEAM_ENEMY ? abilities[ab].lv <= u->level : st.bag[abilities[ab].bag] != 0;
+}
+
+// its range for the AI (an item: at most the unit's Move, as FFT's AI takes it)
+static u8 ai_range(u8 a, u8 ab)
+{
+    if (ab == NO_ABIL) return 1;
+    if (abilities[ab].flags & AF_ITEM && st.unit[a].move < abilities[ab].range) return st.unit[a].move;
+    return abilities[ab].range;
+}
+
+// whether ab used from tile o reaches tile c (attack_range and skill_range's rules)
+static u8 ai_reaches(u8 a, u8 ab, u8 o, u8 c)
+{
+    const Tile *s = &map_tiles[o], *t = &map_tiles[c];
+    s16 dx = (s16)W->tx[c] - W->tx[o], dz = (s16)W->tz[c] - W->tz[o], h = (s16)t->stand - s->stand;
+    u8 d = (u8)((dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz));
+    if (!t->walk) return 0;
+    if (ab == NO_ABIL) return d == 1 && h >= -6 && h <= 5;
+    if (d > ai_range(a, ab) || (!d && !(abilities[ab].flags & AF_SELF))) return 0;
+    return abilities[ab].vert == 0xFF || (h < 0 ? -h : h) <= abilities[ab].vert;
+}
+
+// worth using ab on t (FFT's classify): damage on a living enemy, HP on an ally under half HP,
+// a cure on an ally with one of its statuses, a revival on a KO ally
+static u8 ai_useful(u8 a, u8 ab, u8 t)
+{
+    const Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    u8 kind = ab == NO_ABIL ? AB_DAMAGE : abilities[ab].kind;
+    if (DC_OBJ(ut->dc)) return 0;
+    if (kind == AB_DAMAGE) return ut->hp && blue(ut) != blue(ua) && t != a;
+    if (blue(ut) != blue(ua)) return 0;
+    if (kind == AB_REVIVE) return !ut->hp;
+    if (!ut->hp) return 0;
+    if (kind == AB_CURE) return (ut->status & abilities[ab].y) != 0;
+    return (u16)(ut->hp << 1) < ut->max_hp;
+}
+
+// a unit that can give HP to its allies (FFT's CAN_HEAL_ALLIES: Potion, Wish)
+static u8 ai_heals(u8 i)
+{
+    u8 k, ab;
+    for (k = 0; (ab = known(i, k)) != 0xFF; k++)
+        if ((abilities[ab].kind == AB_HEAL || abilities[ab].kind == AB_WISH) && ai_usable(i, ab)) return 1;
+    return 0;
+}
+
+// the nearest unit (steps heights aside, a tie: the first) of a kind; the actor if none
+static u8 ai_nearest(u8 a, u8 mode, u16 skip)
+{
+    const Unit *ua = &st.unit[a];
+    u16 lim = ai_ticks(ua);
+    u8 i, best = a, bd = 0xFF;
+    for (i = 0; i < NUNIT; i++) {
+        const Unit *u = &st.unit[i];
+        s16 dx = (s16)u->x - ua->x, dz = (s16)u->z - ua->z;
+        u8 d;
+        if (u->dc == DC_GONE || skip & (1 << i)) continue;
+        if (mode == NT_HEALER && u->dc == DC_CRYSTAL) ;     // a crystal heals too
+        else if (!u->hp) continue;
+        else if (mode == NT_HEALER) { if (blue(u) != blue(ua) || !ai_heals(i)) continue; }
+        else if (blue(u) == blue(ua)) continue;
+        d = (u8)((dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz));
+        if (mode == NT_IMMINENT && (ai_ticks(u) > lim || (d < 2 &&
+            (s16)tile_h(&map_tiles[u->z * MAP_W + u->x]) - tile_h(&map_tiles[ua->z * MAP_W + ua->x]) < -2))) continue;
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
+// the Move points from tile c over the map by unit a's moves (FFT's spread from its focus), as
+// far as the tiles it can stop on
+static void ai_flood(u8 a, u8 c)
+{
+    u8 i, n = 0;
+    for (i = 0; i < MAP_N; i++) n += W->ai_m[i] & 1;        // until its own tiles' are final
+    spread_start(a, c, AI_UNREACHED - 1, W->ai_dist, RT_NULL, 1, W->ai_m, n);
+}
+
+// what stepping on tile c gives unit a: a crystal's HP, +2 for a crystal or a chest unless it is
+// Critical or retreating (FFT's tile priority, negated)
+static s16 ai_gain(u8 a, u8 c)
+{
+    const Unit *u = &st.unit[a];
+    s16 g = 0;
+    u8 i;
+    for (i = 0; i < NUNIT; i++) {
+        const Unit *o = &st.unit[i];
+        if (!DC_OBJ(o->dc) || o->dc == DC_GONE || o->z * MAP_W + o->x != c) continue;
+        if (o->dc == DC_CRYSTAL) g += worth(u, u->max_hp, u->status) - worth(u, u->hp, u->status);
+        if (!(u->hp && (u16)(u->hp * 5) <= u->max_hp) && !W->ai_retreat) g += 2;
+    }
+    return g;
+}
+
+// FFT's choice of a tile among those of set bit: the lowest gain-and-danger key, then the
+// fewest steps from the focus (dist_first: the fewest steps, then the key); a tie: the later
+static u8 ai_select(u8 bit, s16 maxd, u8 dist_first)
+{
+    s16 best = 0x7FFF, bd = 0x7FFF;
+    u8 c, r = 0xFF;
+    for (c = 0; c < MAP_N; c++) {
+        s16 sc;
+        s16 d;
+        if (!(W->ai_m[c] & bit)) continue;
+        d = W->ai_dist[c];
+        if (maxd < d) continue;
+        sc = W->ai_key[c];
+        if (dist_first) {
+            if (maxd == d && best < sc) continue;
+            maxd = d;
+        } else {
+            if (best < sc) continue;
+            if (sc == best && bd < d) continue;
+        }
+        best = sc; bd = d; r = c;
+    }
+    return r;
+}
+
+static u8 ai_select_or_nearest(u8 bit, s16 maxd)
+{
+    u8 c = ai_select(bit, maxd, 0);
+    return c != 0xFF ? c : ai_select(bit, 0x7FFF, 1);
+}
+
+// FFT's direct trajectory (battle_effect_check_direct_trajectory_between_units: Throw Stone, an
+// item thrown 2 tiles or more): a straight line from the user's body to the target's (two
+// thirds of a unit's 36-unit height above its feet; a KO target: 12), a point every 2 units,
+// blocked inside a tile's column (to its height) or another standing unit's 16 x 16 x 36 box
+// (world units: a tile 28, a height level 12)
+static u16 isqrt(u32 v)
+{
+    u16 r = 0, b = 0x100;
+    while (b) { if ((u32)(r | b) * (r | b) <= v) r |= b; b >>= 1; }
+    return r;
+}
+
+static u8 ai_clear(u8 a, u8 t)
+{
+    const Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    s16 x0 = (s16)(ua->x * 28 + 14), z0 = (s16)(ua->z * 28 + 14), x1 = (s16)(ut->x * 28 + 14), z1 = (s16)(ut->z * 28 + 14);
+    s16 lx = (x0 < x1 ? x0 : x1) - 8, hx = (x0 < x1 ? x1 : x0) + 8, lz = (z0 < z1 ? z0 : z1) - 8, hz = (z0 < z1 ? z1 : z0) + 8;
+    s32 x = (s32)x0 << 16, z = (s32)z0 << 16, y, dx, dy, dz;
+    s16 ox[NUNIT], oz[NUNIT], oy[NUNIT];                    // the boxes of the other standing units
+    u16 l, n, i;                                            // near the line
+    u8 k, m = 0;
+    for (k = 0; k < NUNIT; k++) {
+        const Unit *u = &st.unit[k];
+        s16 ux = (s16)(u->x * 28 + 14), uz = (s16)(u->z * 28 + 14);
+        if (k == a || k == t || !u->hp || ux <= lx || ux >= hx || uz <= lz || uz >= hz) continue;
+        ox[m] = ux; oz[m] = uz; oy[m++] = (s16)(W->hs[u->z * MAP_W + u->x] * 6);
+    }
+    y = ((s32)W->hs[ua->z * MAP_W + ua->x] * 6 + 24) << 16;
+    dx = ((s32)x1 << 16) - x;
+    dz = ((s32)z1 << 16) - z;
+    dy = (((s32)W->hs[ut->z * MAP_W + ut->x] * 6 + (ut->hp ? 24 : 12)) << 16) - y;
+    l = isqrt((u32)((dx >> 16) * (dx >> 16) + (dy >> 16) * (dy >> 16) + (dz >> 16) * (dz >> 16)));
+    if (!l) return 1;
+    n = l >> 1;
+    dx = dx / l * 2; dy = dy / l * 2; dz = dz / l * 2;     // a step: 2 units along the line
+    for (i = 0; i < n; i++) {
+        s16 px, pz, py;
+        u8 c;
+        x += dx; y += dy; z += dz;
+        px = (s16)(x >> 16); pz = (s16)(z >> 16); py = (s16)(y >> 16);
+        if (py <= 0 || (u16)px >= MAP_W * 28 || (u16)pz >= MAP_H * 28) continue;
+        c = (u8)(W->col[px] + W->row[pz]);                  // the tile under the point
+        if (py <= W->top[c]) return 0;
+        for (k = 0; k < m; k++)
+            if (py > oy[k] && py < oy[k] + 36 && px > ox[k] - 8 && px < ox[k] + 8 && pz > oz[k] - 8 && pz < oz[k] + 8)
+                return 0;
+    }
+    return 1;
+}
+
+// FFT's score of actor a standing on o (already there) using ab on t: the worth changed, the
+// pickup at o; its hit chance (AI_BAD: no use)
+static s16 ai_score(u8 a, u8 ab, u8 t, u8 o, u8 *hit)
+{
+    Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    u8 kind = ab == NO_ABIL ? AB_DAMAGE : abilities[ab].kind, status = ut->status;
+    u16 hp = ut->hp, m;
+    s16 d;
+    *hit = ab == NO_ABIL ? hit_chance(a, t) : skill_hit(a, t, ab);
+    if (!*hit) return AI_BAD;
+    if (ab != NO_ABIL && abilities[ab].range > 1 && (!(abilities[ab].flags & AF_ITEM)
+        || (u8)((ua->x > ut->x ? ua->x - ut->x : ut->x - ua->x) + (ua->z > ut->z ? ua->z - ut->z : ut->z - ua->z)) >= 2)
+        && (W->ai_traj = 1, !ai_clear(a, t))) return AI_BAD;
+    if (kind == AB_DAMAGE) {
+        m = ab == NO_ABIL ? attack_damage(a, t, 0, 0) : skill_amount(a, t, ab, 0x4000);
+        hp = m >= hp ? 0 : hp - m;
+    } else if (kind == AB_CURE) status &= (u8)~abilities[ab].y;
+    else {
+        m = skill_amount(a, t, ab, 0x4000);
+        hp = m >= ut->max_hp - hp ? ut->max_hp : hp + m;
+    }
+    d = worth(ut, hp, status) - worth(ut, ut->hp, ut->status);
+    if (blue(ut) != blue(ua)) d = -d;
+    if (kind == AB_WISH) {
+        m = ua->max_hp / 5;
+        d += worth(ua, m >= ua->hp ? 0 : ua->hp - m, ua->status) - worth(ua, ua->hp, ua->status);
+    }
+    return d + W->ai_gain[o];
+}
+
+// a candidate into the ranking (FFT: above the fallback tile's score; then by score, hit
+// chance, the origin's danger; a tie: the earlier)
+static u8 ai_better(s16 pri, u8 hit, u8 o, const AiAct *e)
+{
+    if (pri != e->pri) return pri > e->pri;
+    if (hit != e->hit) return hit > e->hit;
+    return W->ai_prox[o] < W->ai_prox[e->o];
+}
+
+static void ai_insert(const AiAct *c)
+{
+    AiAct *r = W->ai_rank;
+    u8 i, j;
+    if (c->pri <= W->ai_base) return;
+    for (i = 0; i < W->ai_n && !ai_better(c->pri, c->hit, c->o, &r[i]); i++) ;
+    if (i >= 8) return;
+    for (j = W->ai_n < 8 ? W->ai_n : 7; j > i; j--) r[j] = r[j - 1];
+    r[i] = *c;
+    if (W->ai_n < 8) W->ai_n++;
+}
+
+// one candidate: a (standing on o) using ab on unit i of tile t, kept if better than *best;
+// whether it could be tried (a hit chance, a clear trajectory)
+static u8 ai_try(u8 a, u8 ab, u8 o, u8 t, u8 i, AiAct *best)
+{
+    u8 hit;
+    s16 p = ai_score(a, ab, i, o, &hit);
+    if (p == AI_BAD) return 0;
+    if (best->pri == AI_BAD || ai_better(p, hit, o, best)) {
+        best->pri = p; best->hit = hit; best->ab = ab; best->o = o; best->t = t;
+    }
+    return 1;
+}
+
+// ability ab's best candidate into the ranking (only on the actor itself: self). Attack from
+// every tile; the others try each target once, from the safest tile that reaches it (an item
+// the actor could use on itself: from every tile); an ability that can reach the user also from
+// its own tile and the tile it would move to. Started by ai_ability, carried on by
+// ai_ability_go a number of candidates at a time (1 once done, its best ranked).
+static void ai_ability(u8 a, u8 ab, u8 self)
+{
+    Unit *ua = &st.unit[a];
+    u8 x0 = ua->x, z0 = ua->z, me = (u8)(z0 * MAP_W + x0), i, n;
+    AiAct *best = &W->ab_best;
+    W->ab = ab; W->ab_k = 0; W->ab_done = 0; W->ab_n = 0;
+    W->ab_all = ab == NO_ABIL || (abilities[ab].flags & AF_ITEM && ai_useful(a, ab, a));
+    W->ai_use = 0;
+    for (i = 0; i < NUNIT; i++)
+        if ((!self || i == a) && ai_useful(a, ab, i)) W->ai_use |= (u16)(1 << i);
+    best->pri = AI_BAD; best->hit = 0; best->f = 0;
+    if (!W->ai_use) { W->ab_k = W->ai_no; return; }
+    if (ab != NO_ABIL && abilities[ab].flags & AF_SELF && W->ai_use & (1 << a)) {
+        if (ai_try(a, ab, W->ai_c1, me, a, best)) best->t = me;  // from its tile, then to the tile
+        best->f = best->pri != AI_BAD;                           // it would move to (the same:
+        ua->x = W->tx[W->ai_c1]; ua->z = W->tz[W->ai_c1];        // first wins)
+        if (ai_try(a, ab, W->ai_c1, W->ai_c1, a, best)) best->f = best->t == me;
+        ua->x = x0; ua->z = z0;
+        if (best->pri != AI_BAD) ai_insert(best);
+        best->pri = AI_BAD; best->f = 0;
+    }
+    for (i = n = 0; i < NUNIT; i++)             // the targets but itself, in map order
+        if (i != a && W->ai_use & (1 << i)) {
+            u8 j, c2 = (u8)(st.unit[i].z * MAP_W + st.unit[i].x);
+            for (j = n++; j > 0 && W->ai_tt[j - 1] > c2; j--) { W->ai_tt[j] = W->ai_tt[j - 1]; W->ai_tu[j] = W->ai_tu[j - 1]; }
+            W->ai_tt[j] = c2; W->ai_tu[j] = i;
+        }
+    W->ab_n = n;
+}
+
+static u8 ai_ability_go(u8 a, s16 *work)
+{
+    Unit *ua = &st.unit[a];
+    u8 x0 = ua->x, z0 = ua->z, ab = W->ab, n = W->ab_n, i, c, o;
+    AiAct *best = &W->ab_best;
+    for (; W->ab_k < W->ai_no && *work > 0; W->ab_k++) {
+        u8 j, self = (u8)(W->ai_use >> a & 1);      // on itself: its tile is the origin
+        o = ab == NO_ABIL ? W->ai_grid[W->ab_k] : W->ai_ord[W->ab_k];
+        ua->x = W->tx[o]; ua->z = W->tz[o];
+        *work -= 1;
+        for (j = 0; j <= n; j++) {
+            if (self && (j == n || o < W->ai_tt[j])) {
+                self = 0;
+                if (ai_reaches(a, ab, o, o)) { *work -= 1; ai_try(a, ab, o, o, a, best); }
+            }
+            if (j == n) break;
+            c = W->ai_tt[j]; i = W->ai_tu[j];
+            if (W->ab_done & (1 << i) || !ai_reaches(a, ab, o, c)) continue;
+            W->ai_traj = 0;
+            if (ai_try(a, ab, o, c, i, best) && !W->ab_all) W->ab_done |= (u16)(1 << i);
+            *work -= W->ai_traj ? 8 : 1;
+        }
+    }
+    ua->x = x0; ua->z = z0;
+    if (W->ab_k < W->ai_no) return 0;
+    if (best->pri != AI_BAD) ai_insert(best);
+    return 1;
+}
+
+// the setup of unit a's decision (acted: it has acted, no ability left), in two frames: its
+// abilities, the tiles it can stop on and their danger, the focus; then the steps from the focus
+// and the tiles to act from and to fall back to
+static void ai_setup(u8 a, u8 acted)
+{
+    Unit *u = &st.unit[a];
+    u8 me = (u8)(u->z * MAP_W + u->x), i, k, c, ab, n = 0, er = 0xFF, ar = 0xFF, ranged = 0, ally = 0, weak = 0;
+    u8 ex[NUNIT], ez[NUNIT], ne = 0;
+    u16 lim = ai_ticks(u);
+    W->ai_n = 0;
+    if (!acted) W->ai_list[n++] = NO_ABIL;
+    for (k = 0; !acted && (ab = known(a, k)) != 0xFF; k++)
+        if (ai_usable(a, ab)) W->ai_list[n++] = ab;
+    W->ai_nab = n;
+    for (k = 0; k < n; k++) {                   // the reach: the shortest range against an enemy,
+        u8 rg;                                  // for an ally (an item counts half)
+        ab = W->ai_list[k];
+        rg = ai_range(a, ab);
+        if (rg > 1) ranged = 1;
+        if (ab == NO_ABIL || abilities[ab].kind == AB_DAMAGE) { if (rg < er) er = rg; }
+        else {
+            if (abilities[ab].flags & AF_ITEM) rg = (u8)((rg + 1) >> 1);
+            if (rg < ar) ar = rg;
+        }
+    }
+    W->ai_er = er; W->ai_ar = ar; W->ai_ranged = ranged;
+    // the tiles it can stop on (only its own once it has moved), their danger
+    memset(W->ai_m, 0, MAP_N);
+    if (!st.moved) {
+        bfs(a, RT_NULL);
+        for (c = 0; c < MAP_N; c++) W->ai_m[c] = st.reach[c] != 0xFF && map_tiles[c].walk == 1;
+        for (i = 0; i < NUNIT; i++)
+            if (!DC_OBJ(st.unit[i].dc)) W->ai_m[st.unit[i].z * MAP_W + st.unit[i].x] = 0;
+    }
+    W->ai_m[me] = 1;
+    for (i = 0; i < NUNIT; i++) {               // the enemies acting before its next turn
+        const Unit *e = &st.unit[i];
+        if (e->hp && blue(e) != blue(u) && ai_ticks(e) <= lim) { ex[ne] = e->x; ez[ne++] = e->z; }
+    }
+    for (c = 0; c < MAP_N; c++) {
+        u8 p = 0;
+        if (W->ai_m[c])
+            for (i = 0; i < ne; i++) {
+                s16 dx = (s16)ex[i] - W->tx[c], dz = (s16)ez[i] - W->tz[c], dd;
+                dd = (dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz);
+                if (dd < 10) p += (u8)(10 - dd);
+            }
+        W->ai_prox[c] = p;
+    }
+    // a Critical unit retreats while its side has two units, one not Critical (the enemies lose
+    // that for good)
+    for (i = 0; i < NUNIT; i++)
+        if (st.unit[i].hp && blue(&st.unit[i]) == blue(u)) {
+            ally++;
+            if ((u16)(st.unit[i].hp * 5) <= st.unit[i].max_hp) weak++;
+        }
+    if ((ally < 2 || ally == weak) && u->team == TEAM_ENEMY) st.ai_nosup = 1;
+    W->ai_retreat = (u16)(u->hp * 5) <= u->max_hp && ally >= 2 && ally != weak && !(u->team == TEAM_ENEMY && st.ai_nosup);
+    memset(W->ai_gain, 0, sizeof W->ai_gain);   // a crystal or a chest it can step on
+    for (i = 0; i < NUNIT; i++)
+        if (DC_OBJ(st.unit[i].dc) && st.unit[i].dc != DC_GONE) {
+            c = (u8)(st.unit[i].z * MAP_W + st.unit[i].x);
+            if (W->ai_m[c]) W->ai_gain[c] = ai_gain(a, c);
+        }
+    for (c = 0; c < MAP_N; c++)                 // FFT's tile priority, then the danger
+        W->ai_key[c] = (s16)((s16)-W->ai_gain[c] * 128 + W->ai_prox[c]);   // (under 128)
+    // the focus, the steps from it (spread over the next frames)
+    if (W->ai_retreat || (blue(u) && divs32_16((long)u->hp << 7, (short)u->max_hp) < 45)) W->ai_focus = ai_nearest(a, NT_HEALER, 0);
+    else W->ai_focus = ai_nearest(a, NT_ENEMY, 0);
+    if (W->ai_focus == a) { memset(W->ai_dist, 0, MAP_N); W->sp_d = W->sp_limit = 0; }
+    else ai_flood(a, (u8)(st.unit[W->ai_focus].z * MAP_W + st.unit[W->ai_focus].x));
+}
+
+static void ai_setup2(u8 a, u8 acted)
+{
+    Unit *u = &st.unit[a];
+    u8 me = (u8)(u->z * MAP_W + u->x), i, k, c, f = W->ai_focus, er = W->ai_er, ar = W->ai_ar;
+    s16 d, r;
+    for (i = 0; i < MAP_N; i++) if (W->ai_dist[i] == 0xFF) W->ai_dist[i] = AI_UNREACHED;
+    if (W->ai_retreat) {                        // the safest tile, then the nearest to the focus
+        W->ai_c0 = W->ai_c1 = ai_select(1, 0xFF, 0);
+        W->ai_m[W->ai_c0] |= 2; W->ai_m[me] |= 2;
+    } else {
+        if ((u16)(u->hp << 1) < u->max_hp)      // under half HP: the crystals draw it
+            for (i = 0; i < NUNIT; i++)
+                if (st.unit[i].dc == DC_CRYSTAL) W->ai_dist[st.unit[i].z * MAP_W + st.unit[i].x] = 1;
+        d = W->ai_dist[me];
+        r = f != a && blue(&st.unit[f]) != blue(u) ? (er == 0xFF ? 0xFF : er + u->move) : (ar == 0xFF ? 0 : ar) + u->move;
+        k = 0;                                  // set 1: the tiles for the search
+        for (c = 0; c < MAP_N; c++)
+            if (W->ai_m[c] && W->ai_dist[c] <= (r >= d ? u->move + d : d - 1)) { W->ai_m[c] |= 2; k = 1; }
+        if (!k) for (c = 0; c < MAP_N; c++) W->ai_m[c] |= (u8)(W->ai_m[c] << 1);
+        if (r >= d) {                           // within reach: the safest tile, and to act from
+            W->ai_c1 = ai_select(2, 0x7FFF, 0); // (not yet acted) the safest one step nearer (3
+            if (!acted) {                       // steps with a ranged ability on an enemy)
+                s16 lim2 = d - 1;
+                if (f != a && blue(&st.unit[f]) != blue(u) && W->ai_ranged && lim2 < 3) lim2 = 3;
+                W->ai_c0 = ai_select_or_nearest(1, lim2);
+            } else W->ai_c0 = W->ai_c1;
+        } else {                                // out of reach: nearer, the safest from which
+            if (u->team == TEAM_ENEMY && !(rand15() % 7)) r >>= 1;   // to strike next turn
+            W->ai_c0 = W->ai_c1 = ai_select_or_nearest(2, r);
+        }
+        W->ai_m[me] |= 2;
+    }
+    W->ai_base = W->ai_gain[W->ai_c0];
+    // the origins: in map order (Attack), the safest first (the others; a tie: the later)
+    W->ai_no = 0;
+    for (c = 0; c < MAP_N; c++) {
+        s16 kc;
+        u8 j;
+        if (!(W->ai_m[c] & 2)) continue;
+        W->ai_grid[W->ai_no] = c;
+        kc = W->ai_key[c];
+        for (j = W->ai_no; j > 0 && W->ai_key[W->ai_ord[j - 1]] >= kc; j--)
+            W->ai_ord[j] = W->ai_ord[j - 1];
+        W->ai_ord[j] = c;
+        W->ai_no++;
+    }
+}
+
+// the ranking drawn: each action taken if rand() % 100 < its hit chance, else the first; none:
+// to the fallback tile, Defending if it can
+static void ai_choose(u8 a)
+{
+    Unit *u = &st.unit[a];
+    u8 i, me = (u8)(u->z * MAP_W + u->x);
+    const AiAct *r = W->ai_rank;
+    for (i = 0; i < W->ai_n && rand15() % 100 >= r[i].hit; i++) ;
+    if (i >= W->ai_n) i = 0;
+    if (W->ai_n) {
+        st.ai_ab = r[i].ab; st.ai_o = r[i].f ? me : r[i].o; st.ai_tgt = r[i].t;
+    } else {
+        st.ai_ab = u->defend && !st.acted ? ABIL_DEFEND : AI_NONE;
+        st.ai_o = W->ai_c0; st.ai_tgt = W->ai_c0;
+    }
+    st.ai_first = st.ai_ab != AI_NONE && st.ai_ab != ABIL_DEFEND && st.ai_o == me;
+}
+
+// the thinking, a step a frame: the setup's first half; the spread from the focus, AI_SPREAD
+// tiles a frame; the setup's second half; the abilities' candidates, AI_WORK a frame (a tile to
+// act from 1, a candidate 1, with a trajectory 8, the next ability 5; ~4k cycles a unit); the
+// choice. 1 once the plan is made
+#define AI_SPREAD 90
+#define AI_WORK 50
+static u8 ai_think(void)
+{
+    u8 a = st.act, done;
+    s16 w = AI_WORK;
+    if (W->ai_k == 0) {                             // its abilities, tiles, danger, focus
+        ai_setup(a, st.acted);
+        W->ai_k = 1;
+    } else if (W->ai_k == 1) {                      // the steps from the focus
+        done = spread_go(AI_SPREAD);
+        if (done) W->ai_k = 2;
+    } else if (W->ai_k == 2) {                      // the tiles to act from and to fall back to
+        ai_setup2(a, st.acted);
+        W->ai_k = 3; W->ai_a = 0; W->ai_self = W->ai_retreat;
+        if (W->ai_nab) ai_ability(a, W->ai_list[0], W->ai_self);
+    } else {                                        // each usable ability's best candidate
+        while (W->ai_a < W->ai_nab) {
+            if (w <= 0) return 0;
+            done = ai_ability_go(a, &w);
+            if (!done) return 0;
+            if (++W->ai_a < W->ai_nab) { ai_ability(a, W->ai_list[W->ai_a], W->ai_self); w -= 5; }
+        }
+        if (W->ai_n || !W->ai_self || !W->ai_nab) { ai_choose(a); return 1; }
+        W->ai_self = 0; W->ai_a = 0;                // retreating: on itself first, then on any
+        ai_ability(a, W->ai_list[0], 0);            // unit
+    }
+    return 0;
+}
+
+void ai_plan(u8 a, u8 acted)
+{
+    u8 act = st.act, ac = st.acted;
+    st.act = a; st.acted = acted; W->ai_k = 0;
+    while (!ai_think()) ;
+    st.act = act; st.acted = ac;
+}
+
+const AiAct *ai_ranked(u8 *n) { *n = W->ai_n; return W->ai_rank; }
+
+u8 ai_fallback(void) { return W->ai_c0; }
+u8 ai_frozen(void) { return W->frz; }
+
+// FFT's facing at Wait: towards the nearest enemy that acts before its next turn (else the
+// nearest enemy) by quadrant, unless the tile that way is off the map, blocked or 3 higher; else
+// the next such enemy; at last its own facing, or the last open side
+u8 ai_facing(u8 a)
+{
+    static const s8 fx[4] = { 0, -1, 0, 1 }, fz[4] = { -1, 0, 1, 0 };   // FFT's S W N E
+    static const u8 ours[4] = { 3, 1, 2, 0 };                          // FFT's facing <-> ours
+    const Unit *u = &st.unit[a];
+    u8 ok[4], d, last = 0, h = tile_h(&map_tiles[u->z * MAP_W + u->x]), t, any = 0;
+    u16 skip = 0;
+    for (d = 0; d < 4; d++) {
+        const Tile *n = tile_at(u->x + fx[d], u->z + fz[d]);
+        ok[d] = n && n->walk && (s16)tile_h(n) - h < 3;
+        if (ok[d]) last = d;
+    }
+    if (!(ok[0] | ok[1] | ok[2] | ok[3])) ok[0] = ok[1] = ok[2] = ok[3] = 1;
+    for (;;) {
+        s16 dx, dz, p, q;
+        t = ai_nearest(a, NT_IMMINENT, skip);
+        if (t == a) { t = ai_nearest(a, NT_ANY_ENEMY, 0); any = 1; }
+        if (t == a) return u->face;
+        dx = (s16)st.unit[t].x - u->x; dz = (s16)st.unit[t].z - u->z;
+        p = dz - dx; q = dz + dx;
+        d = p <= 0 && q < 0 ? 0 : p > 0 && q <= 0 ? 1 : p >= 0 && q > 0 ? 2 : 3;
+        if (ok[d]) return ours[d];
+        if (!any) { skip |= (u16)(1 << t); continue; }
+        return ok[ours[u->face]] ? u->face : ours[last];
     }
 }
 
@@ -1123,10 +1830,10 @@ static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 
 static u8 unit_pose(u8 i)
 {
     const Unit *un = &st.unit[i];
-    if (st.mode == M_ACT) {
+    if (st.mode == M_ACT && st.abil != ABIL_DEFEND) {
         if (i == st.atk && st.act_t < ACT_HIT) return st.act_t < ACT_BLOW ? P_WIND : P_BLOW;
         if (i == st.tgt && st.act_t >= ACT_HIT && st.act_t < ACT_HIT + HIT_FRAMES && st.hit
-            && (st.abil == NO_ABIL || abilities[st.abil].kind == AB_DAMAGE)) return P_HIT;
+            && act_kind() == AB_DAMAGE) return P_HIT;
     }
     if (!un->hp) return P_KO;
     return (u16)(un->hp * 5) <= un->max_hp ? P_KNEEL : 0;
@@ -1387,6 +2094,16 @@ static s16 ease(s16 c, s16 t)
 
 // ---------------------------------------------------------------- game
 static u8 *sbuf;
+
+// a checksum of the picture just drawn (an AI unit thinks once the picture stands still)
+static u32 planes_sum(void)
+{
+    const u32 *l = (const u32 *)rt_light, *d = (const u32 *)rt_dark;
+    u32 h = 0;
+    u16 i;
+    for (i = 0; i < RT_PSIZE / 4; i++) h = (h << 1 | h >> 31) ^ l[i] ^ d[i] * 3;
+    return h;
+}
 static void hud_labels(void);
 
 static void
@@ -1425,6 +2142,15 @@ void game_init(void)
         }
         W = (Work *)(sbuf + 2 * SC_PLANE);
         memset(W, 0, sizeof(Work));
+        for (i = 0; i < MAP_W * MAP_H; i++) {
+            W->tx[i] = (u8)(i % MAP_W); W->tz[i] = (u8)(i / MAP_W);
+            W->hs[i] = map_tiles[i].stand; W->hl[i] = lower((u8)i);
+            W->hw[i] = (u8)((map_tiles[i].walk != 0) | map_tiles[i].water << 1);
+            W->top[i] = (u8)(tile_h(&map_tiles[i]) * 12);
+        }
+        for (i = 0; i < MAP_W * 28; i++) W->col[i] = (u8)(i / 28);
+        for (i = 0; i < MAP_H * 28; i++) W->row[i] = (u8)(i / 28 * MAP_W);
+        edges(3);                              // Gariland's units all have Jump 3
         for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
         W->hud_t[0] = 0xFE;
         hud_labels();
@@ -1470,8 +2196,9 @@ void game_scenario(u16 n)
     rand_seed(rt_seed);
     battle_units();                               // Gariland's eleven units at their start tiles
     memcpy(st.bag, bag_init, NBAG);
+    st.ai_all = n == 16;                          // the AI plays both sides to the end
     turn_start();
-    while (n && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
+    while (n && n != 16 && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
     if (n >= 1 && n <= 4) {                       // an enemy behind a building, each view
         st.unit[U_HIDE].x = 1; st.unit[U_HIDE].z = 11;    // (fft_test --find)
         st.rot = (u8)(n - 1);
@@ -1572,9 +2299,12 @@ static void acts_keys(void)
 {
     u8 n = 0;
     if (st.mode == M_ACTS) {
-        if (input_pressed(K_UP | K_DOWN)) st.sub ^= 1;
+        u8 m = (u8)(2 + st.unit[st.act].defend);  // Attack, the skill set, Defend
+        if (input_pressed(K_UP)) st.sub = st.sub ? st.sub - 1 : m - 1;
+        if (input_pressed(K_DOWN)) st.sub = st.sub < m - 1 ? st.sub + 1 : 0;
         if (input_pressed(K_A | K_ENTER)) {
             if (!st.sub) aim(NO_ABIL);
+            else if (st.sub == 2) { st.acted = 1; defend(st.act); }
             else if (known(st.act, 0) != 0xFF) { st.mode = M_SKILLS; st.skill = 0; }
         } else if (input_pressed(K_ESC | K_B)) st.mode = M_MENU;
         return;
@@ -1588,12 +2318,71 @@ static void acts_keys(void)
     } else if (input_pressed(K_ESC | K_B)) st.mode = M_ACTS;
 }
 
+// an AI turn on screen, as a player's without the menus: what comes next in its plan (st.ai_*):
+// act (from its tile, or once moved), move (its range shown, then the walk), after acting from
+// its tile think again where to go, then the facing
+static void ai_next(void)
+{
+    Unit *u = &st.unit[st.act];
+    u8 me = (u8)(u->z * MAP_W + u->x);
+    st.ai_t = 0;
+    st.mode = M_BROWSE;
+    W->frz = W->frz_n = 0; W->frz_h = 0;
+    st.cx = u->x; st.cz = u->z;
+    if (!st.acted && st.ai_ab != AI_NONE && (st.ai_o == me || st.moved)) {
+        if (st.ai_ab == ABIL_DEFEND) { st.acted = 1; defend(st.act); return; }
+        st.ai = AI_AIM;
+        aim(st.ai_ab);
+        st.cx = st.ai_tgt % MAP_W; st.cz = st.ai_tgt / MAP_W;
+    } else if (!st.moved && st.ai_o != me) {
+        st.ai = AI_MOVE;
+        st.mode = M_TARGET; st.sel = st.act;
+        compute_reach(st.act);
+        st.cx = st.ai_o % MAP_W; st.cz = st.ai_o / MAP_W;
+    } else if (st.acted && !st.moved && st.ai_first) {
+        st.ai = AI_THINK; st.ai_first = 0;
+        W->ai_k = 0;
+    } else {
+        st.ai = AI_FACE;
+        st.mode = M_FACE;
+        u->face = ai_facing(st.act);
+    }
+}
+
+static void ai_step(void)
+{
+    if (st.ai == AI_THINK) {                    // once the picture stands still (game_render)
+        if (W->frz || ++W->frz_n > 40) {        // (40 frames at most: the picture no longer
+            u8 done;                            // drawn anyway)
+            ZB(9); done = ai_think(); ZE(9);
+            if (done) st.ai = AI_GO;
+        }
+    } else if (st.ai == AI_GO) {                // the plan shown from the next frame (this one
+        ai_next(); W->hold = 1;                 // keeps the picture)
+    }
+    else if (++st.ai_t >= (st.ai == AI_FACE ? AI_SHOW / 2 : AI_SHOW)) {
+        if (st.ai == AI_MOVE) {
+            Unit *u = &st.unit[st.act];
+            if (make_path(st.act, st.ai_o % MAP_W, st.ai_o / MAP_W)) {
+                st.mx = u->x; st.mz = u->z; st.mface = u->face;
+                st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
+            } else { st.moved = 1; ai_next(); }
+        } else if (st.ai == AI_AIM) {
+            u8 o = unit_at(st.ai_tgt % MAP_W, st.ai_tgt / MAP_W);
+            st.acted = 1;
+            if (!o) ai_next();
+            else if (st.ai_ab == NO_ABIL) attack(st.act, o - 1);
+            else skill(st.act, o - 1, st.ai_ab);
+        } else turn_end(st.moved, st.acted);
+    }
+}
+
 u8 game_update(void)
 {
     s16 tx, ty;
     u8 mode0 = st.mode;
     if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
-    st.tick++;
+    if (st.ai != AI_THINK) st.tick++;            // (a unit thinking: the picture stands still)
     if (st.turn) {                                 // rotating: nothing else moves the view
         if (++st.turn_t >= TURN_FRAMES) {          // done: the cursor stays where it was
             s16 u, v, px, py;
@@ -1622,17 +2411,18 @@ u8 game_update(void)
                 st.mode = M_MENU; st.moved = 1; st.menu = MN_WAIT;
                 for (i = 0; i < NUNIT; i++)
                     if (st.unit[i].x == st.cx && st.unit[i].z == st.cz && DC_OBJ(st.unit[i].dc)) pick_up(st.sel, i);
+                if (st.ai && st.mode == M_MENU) ai_next();
             }
         }
     } else if (st.mode == M_ACT) {
         attack_step();
     } else if (st.mode == M_PICK) {                // the message, then the menu (no undo)
-        if (++st.pick_t >= PICK_FRAMES) st.mode = M_MENU;
+        if (++st.pick_t >= PICK_FRAMES) { st.mode = M_MENU; if (st.ai) ai_next(); }
     } else if (st.mode == M_END) {                 // the results: the battle again, or quit
         if (input_pressed(K_A | K_ENTER)) game_scenario(0);
         else if (input_pressed(K_ESC)) return 0;
-    } else if (st.wait_t) {                        // an enemy's or the guest's turn: it waits
-        if (!st.turn && !--st.wait_t) turn_end(0, 0);
+    } else if (st.ai) {                            // an AI unit's turn
+        if (!st.turn) ai_step();
     } else if (!st.turn) {
         if (st.mode == M_MENU) {
             menu_keys();
@@ -1822,7 +2612,8 @@ static u8 win_lines(u8 m)
     u8 n = 0;
     if (m == M_STATUS) return 5;
     if (m == M_MENU) return 4;
-    if (m == M_ACTS || m == M_AIM) return 2;
+    if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend);
+    if (m == M_AIM) return 2;
     if (m == M_ACT || m == M_PICK) return 1;
     while (known(W->win_k[2], n) != 0xFF) n++;    // M_SKILLS
     return n;
@@ -1853,8 +2644,8 @@ static void make_window(void)
         n = put_s(s, 0, entries[k]);
         if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_LGRAY;
     } else if (m == M_ACTS) {
-        n = put_s(s, 0, k ? skill_sets[u->set].name : "Attack");
-        if (k && W->win_k[1]) c = C_LGRAY;
+        n = put_s(s, 0, k == 2 ? st_names[0] : k ? skill_sets[u->set].name : "Attack");
+        if (k == 1 && W->win_k[1]) c = C_LGRAY;
     } else if (m == M_SKILLS) {                    // an item: how many are left
         u8 ab = known(W->win_k[2], k);
         n = put_s(s, 0, abilities[ab].name);
@@ -1863,7 +2654,7 @@ static void make_window(void)
         }
         if (!can_use(W->win_k[2], ab)) c = C_LGRAY;
     } else if (m == M_ACT) {
-        n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : abilities[st.abil].name);
+        n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : st.abil == ABIL_DEFEND ? st_names[0] : abilities[st.abil].name);
     } else if (m == M_PICK) {                      // a crystal or a chest picked up
         if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");
         else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
@@ -2054,11 +2845,12 @@ static void draw_number(void)
     char s[8];
     if (k) t -= GAIN_T;
     if (!(W->num_ok & (1 << k))) {                 // one a frame (AMS text)
-        u8 kind = st.abil == NO_ABIL ? AB_DAMAGE : abilities[st.abil].kind, n = 0;
+        u8 kind = act_kind(), n = 0;
         if (k) {
             if (st.lvup) n = put_s(s, 0, "LvUp");
             else { n = put_s(s, 0, "EXP+"); n = put_n(s, n, st.gain); }
         } else if (!st.hit) n = put_s(s, 0, "Miss");
+        else if (kind == AB_DEFEND) n = put_s(s, 0, st_names[0]);
         else if (kind == AB_CURE) {                // the first status removed
             while (!(st.dmg & (1 << n))) n++;
             n = put_s(s, 0, st_names[n]);
@@ -2138,9 +2930,13 @@ void game_render(void)
     u8 ord[NUNIT], i, j;
     Feet f[NUNIT];
     s16 u, v;
+    if (W && (W->hold || ((st.ai == AI_THINK || st.ai == AI_GO) && W->frz))) {   // the same picture in
+        W->hold = 0;                                                           // both buffers: the
+        return;                                                                // AI thinks
+    }
     if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) {
         draw_rect(0, 0, RT_W, RT_H, C_WHITE);
-        draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (75 KB)", F_SMALL, C_BLACK);
+        draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (88 KB)", F_SMALL, C_BLACK);
         return;
     }
     if (st.mode == M_END) { draw_end(); return; }
@@ -2179,9 +2975,14 @@ void game_render(void)
     view_of(st.rot, st.cx, st.cz, &u, &v);
     if (st.mode == M_ACT && st.act_t >= ACT_HIT) draw_number();
     if (st.mode == M_FACE) draw_arrows();
-    else if (st.mode != M_ACT && (rt_frame & 8 || RINGS(st.mode)))
+    else if (st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)))
         blit24(scene_x(st.rot, u, v) - HW, scene_y(u, v) - (map_tiles[st.cz * MAP_W + st.cx].stand >> 1) * HU,
                12, cur_l, cur_d, cur_m);
     draw_hud();
     ZE(5);
+    if (st.ai == AI_THINK) {                    // two pictures in a row the same: stop drawing
+        u32 h = planes_sum();
+        if (h == W->frz_h) W->frz = 1;
+        W->frz_h = h;
+    }
 }

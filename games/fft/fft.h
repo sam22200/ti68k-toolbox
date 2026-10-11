@@ -6,7 +6,8 @@
 #define FFT_H
 #include "../../runtime/core/rt.h"
 
-typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py
+typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py (walk 2:
+                                                                    // crossed, not stopped on)
 // battle.h (tools/battle.py): FFT's numbers for the Gariland battle
 typedef struct { u8 growth[5], mult[5], move, jump, cev, row; } Job;   // raw stats HP MP SP PA MA; row:
                                                                     // its JP's career slot
@@ -23,11 +24,11 @@ typedef struct {
 // target heals twice that), AB_HEAL (Y x 10 HP), AB_REVIVE (a KO unit back with 1..Y HP). Range:
 // tiles at most `range` steps away (any path), within `vert` half units of the user's height
 // (0xFF: any); AF_SELF: the user's own tile too, AF_EVADE: evaded as an attack, AF_ITEM: from
-// the bag (slot `bag`; the enemies' items do not run out).
-enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE };
+// the bag (slot `bag`; the enemies' items do not run out, those of their level `lv` or less).
+enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND };   // AB_DEFEND: the command
 enum { AF_SELF = 1, AF_EVADE = 2, AF_ITEM = 4 };
 enum { ST_DEFEND = 1, ST_POISON = 2, ST_DARK = 4, ST_SILENCE = 8 };   // Dead: 0 HP
-typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 jp; } Ability;
+typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 jp; u8 lv; } Ability;
 #define SET_N 6                                // abilities per skill set at most
 typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
@@ -50,7 +51,8 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define TURN_FRAMES 3                  // rotation animation: frames between two views
 #define WALK_FRAMES 4                  // frames per tile when a unit walks
 #define PATH_MAX 16
-#define AI_WAIT 15                     // frames an enemy's or the guest's turn lasts (it waits)
+#define AI_SHOW 9                      // frames an AI unit's move range or target is shown
+#define AI_NONE 0xFD                   // an AI plan without an action
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
 // the death counter (Unit.dc): 3..0 while KO, then the unit is a crystal or a chest on its tile,
 // gone once picked up
@@ -79,7 +81,16 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // up; M_END: the battle over, its results
 enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END };
 enum { END_NONE, END_VICTORY, END_DEFEAT };
+// an AI unit's turn (st.ai): thinking (a few frames), its move range shown, its target shown,
+// its facing shown; between them the walk and the act run as a player's (M_WALK, M_ACT)
+enum { AI_OFF, AI_THINK, AI_GO, AI_MOVE, AI_AIM, AI_FACE };   // AI_GO: the plan made, shown from
+                                                             // the next frame
+typedef struct { s16 pri; u8 hit, ab, o, t, f; } AiAct;   // a ranked action: FFT's score, hit
+                                                         // chance, ability (NO_ABIL: Attack), the
+                                                         // tile it acts from (f: from its own tile,
+                                                         // then to o), the target's (z * MAP_W + x)
 #define NO_ABIL 0xFF                   // st.abil: the weapon's Attack
+#define ABIL_DEFEND 0xFE               // st.abil: Defend (the support ability's command)
 enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
 enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
@@ -97,6 +108,7 @@ typedef struct {
     u16 hp, max_hp, mp, max_mp;
     u8 pa, ma, sp, ct, move, jump;
     u8 dc;                             // death counter: 3, one less per turn at 0 HP, then DC_*
+    u8 defend;                         // Defend is its support ability (a command)
     u8 exp, kos, lv0;                  // EXP to the next level; times KO; level at the start
     u16 jp, tjp;                       // its job's JP: left, earned in all (the job level)
     u16 gexp, gjp;                     // EXP and JP earned in this battle (the results)
@@ -116,7 +128,7 @@ typedef struct {
     Unit unit[NUNIT];
     s16 camx, camy;                    // camera, scene pixels of the current orientation
     u8 reach[MAP_W * MAP_H];           // M_TARGET: steps to each tile, 0xFF unreachable
-    u8 act, wait_t;                    // the unit whose turn it is, AI_WAIT frames left
+    u8 act;                            // the unit whose turn it is
     u8 turns[ORDER_N];                 // the next turns (FFT's AT list), turns[0] = act
     u8 menu, back;                     // the menu's entry; the mode M_STATUS returns to
     u8 moved, acted;                   // this turn so far
@@ -131,6 +143,12 @@ typedef struct {
     u8 gain, lvup;                     // M_ACT: the EXP the user earned (0 none), its level up
     u8 pick, pick_t;                   // M_PICK: the item (items[] index; 0xFF: a crystal), frame
     u8 end;                            // END_*
+    u8 ai, ai_t;                       // an AI turn: AI_*, its frame
+    u8 ai_ab, ai_o, ai_tgt, ai_first;  // its plan: the ability (NO_ABIL, ABIL_DEFEND, AI_NONE), the
+                                       // tile to act from, the target's tile, to act before moving
+    u8 ai_all;                         // the AI plays the player's units too (a test scenario)
+    u8 ai_nosup;                       // FFT's sticky flag: the enemies have lost their support
+                                       // (fewer than two, or all Critical): no more retreats
 } State;
 extern State st;
 
@@ -150,6 +168,7 @@ void unit_stats(Unit *u);              // FFT's stats from the raw ones, the job
 u8 ct_next(void);                      // FFT's clock to the next turn: its unit
 void ct_end(u8 who, u8 moved, u8 acted);   // its CT when the turn ends
 void turn_order(void);                 // st.turns from the CTs
+void turn_end(u8 moved, u8 acted);     // the active unit's turn over, the next one starts
 void compute_reach(u8 who);            // st.reach from unit who (BFS, Move/Jump)
 u8 make_path(u8 who, u8 tx, u8 tz);    // st.path to a reachable tile, its length
 // FFT's Attack (RE_NOTES.md § Attack): the tiles a weapon reaches (st.reach 1, else 0xFF), the
@@ -168,6 +187,8 @@ void skill_range(u8 who, u8 ab);
 u8 skill_hit(u8 a, u8 t, u8 ab);
 u16 skill_amount(u8 a, u8 t, u8 ab, u16 r);
 void skill(u8 a, u8 t, u8 ab);
+void defend(u8 a);                     // Defend: Defending until its next turn
+u8 act_kind(void);                     // st.abil's AB_*
 // the end of the battle (RE_NOTES.md § KO and the end): EXP and JP for an action that did
 // something (kill: it knocked the target out), a level up; the outcome (END_*); what a unit
 // stepping on a crystal or a chest gets
@@ -175,6 +196,14 @@ void rewards(u8 a, u8 t, u8 kill);
 u8 job_level(const Unit *u);
 u8 outcome(void);
 void pick_up(u8 who, u8 obj);
+// FFT's AI (RE_NOTES.md § Enemy AI): unit a's plan made at once (st.ai_ab, st.ai_o, st.ai_tgt,
+// st.ai_first; acted: after acting, where to go), the actions it ranked, the tile it falls back
+// to, whether the picture stands still (an AI turn thinks then), the facing it takes at Wait
+void ai_plan(u8 a, u8 acted);
+const AiAct *ai_ranked(u8 *n);
+u8 ai_fallback(void);
+u8 ai_frozen(void);
+u8 ai_facing(u8 a);
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
 extern u8 scene_rot;                   // orientation it holds (0xFF: stale)
