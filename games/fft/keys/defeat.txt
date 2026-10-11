@@ -1,7 +1,7 @@
 # A battle lost from fft(15) (the recruits KO, Delita in front of Ramza, Ramza at 5 HP): Act,
-# Guts, Wish onto Delita: Ramza falls to 0 HP; the enemies and Delita wait, Ramza's death
-# counter runs down at his turns (3, 2, 1, 0), then he becomes a crystal or a chest: Game Over.
-#   make xcheck XCHECK=15 FRAMES=700 KEYS=keys/defeat.txt
+# Guts, Wish onto Delita: Ramza falls to 0 HP; the enemies and Delita play their turns (the AI)
+# until Delita is KO (or Ramza's counter runs out: a crystal or a chest): Game Over.
+#   make xcheck XCHECK=15 FRAMES=1500 KEYS=keys/defeat.txt
 20 DOWN
 22
 30 A

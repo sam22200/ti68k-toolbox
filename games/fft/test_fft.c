@@ -4,6 +4,7 @@
 // the original's previews and attacks, oracle.h), abilities (against the original's, oracle.h).
 //   ./fft_test            every test
 //   ./fft_test --find     the tiles where a unit is hidden in one view and seen in another
+//   ./fft_test --ai       every test, and each AI turn of the original's that ours plays otherwise
 #include <stdio.h>
 #include <string.h>
 #include "../../runtime/platform-sw/rt_sw.h"
@@ -81,7 +82,7 @@ static void test_heights(void)
             }
     // Gariland's measured heights (RE_NOTES.md): street 2, canal 0, house roofs 6-8, chimney 10
     CHECKV(tile_at(5, 5)->stand, 4);                      // stone street, h 2 (half units)
-    CHECK(!tile_at(4, 0)->walk);                          // canal
+    CHECK(tile_at(4, 0)->water && tile_at(4, 0)->walk);   // canal: waded
     CHECKV(tile_at(4, 3)->c[0], 8);                       // roof ridge
     CHECKV(tile_at(1, 13)->c[0], 10);                     // the chimney
     CHECK(tile_at(4, 2)->c[0] == 6 && tile_at(4, 2)->c[3] == 8);   // roof slope rising to +z
@@ -141,33 +142,46 @@ static void test_draw(void)
 }
 
 // ---------------------------------------------------------------- reach and paths
+static void ai_load(u16 r);
+
 static void test_reach(void)
 {
-    u8 i, n;
+    u8 i, k, n, diff = 0;
     const Unit *r = &st.unit[U_RAMZA];
     sw_init(0);
     compute_reach(U_RAMZA);                               // Ramza at (4, 11), h 2, Move 5 Jump 3
     CHECKV(st.reach[11 * MAP_W + 4], 0);
     CHECKV(st.reach[10 * MAP_W + 4], 1);                  // the street in front of him
-    CHECKV(st.reach[11 * MAP_W + 5], 0xFF);               // the canal: never
+    CHECKV(st.reach[11 * MAP_W + 5], 1);                  // into the canal: 1
+    CHECKV(st.reach[11 * MAP_W + 6], 3);                  // out of it: 2
     CHECKV(st.reach[11 * MAP_W + 2], 2);                  // through an ally (the squire at 3, 11)
     CHECKV(st.reach[11 * MAP_W + 3], 0xFF);               // but not onto it
-    CHECKV(st.reach[7 * MAP_W + 3], 5);                   // a roof, up from the next one
-    for (i = 0; i < MAP_W * MAP_H; i++)                   // never more than Move steps
+    for (i = 0; i < MAP_W * MAP_H; i++)                   // never more than Move
         CHECK(st.reach[i] == 0xFF || st.reach[i] <= r->move);
     n = make_path(U_RAMZA, 4, 8);
     CHECKV(n, 4);                                         // 3 steps up the street
     CHECKV(st.path[0][0], 4); CHECKV(st.path[0][1], 11);
     CHECKV(st.path[n - 1][0], 4); CHECKV(st.path[n - 1][1], 8);
-    for (i = 1; i < n; i++) {                             // adjacent steps, Jump respected
+    for (i = 1; i < n; i++) {                             // steps (or a jump over one tile), Jump
         s16 dx = st.path[i][0] - st.path[i - 1][0], dz = st.path[i][1] - st.path[i - 1][1];
         s16 dh = tile_at(st.path[i][0], st.path[i][1])->stand - tile_at(st.path[i - 1][0], st.path[i - 1][1])->stand;
-        CHECKV(dx * dx + dz * dz, 1);
-        CHECK(dh <= 2 * r->jump && dh >= -2 * r->jump);
+        CHECK(dx * dx + dz * dz == 1 || dx * dx + dz * dz == 4);
+        CHECK(dh <= 2 * r->jump + 2 && dh >= -2 * r->jump - 2);
     }
-    CHECKV(make_path(U_RAMZA, 5, 11), 0);                 // a canal tile: no path
     compute_reach(U_HIDE);                                // an enemy: the player's units block it
     CHECKV(st.reach[11 * MAP_W + 3], 0xFF);
+    // the original's move ranges (Ramza at his first turn, the recruit after him)
+    for (k = 0; k < 2; k++) {
+        ai_load(0);
+        compute_reach(oracle_reach[k].unit);
+        for (i = 0; i < MAP_W * MAP_H; i++)
+            if ((st.reach[i] != 0xFF && st.reach[i]) != (oracle_reach[k].row[i / MAP_W] >> (i % MAP_W) & 1)) {
+                printf("  reach u%d (%d, %d): ours %d\n", oracle_reach[k].unit, i % MAP_W, i / MAP_W, st.reach[i]);
+                diff++;
+            }
+    }
+    printf("reach: Ramza's and a recruit's move ranges as the original's but %d tiles\n", diff);
+    CHECK(diff <= 4);
 }
 
 // ---------------------------------------------------------------- milestone 3-4: occlusion
@@ -263,7 +277,7 @@ static void test_turn_keys(void)
 {
     u16 scene0, i;
     u8 cx, cz;
-    sw_init(0);
+    sw_init(10);                                          // Ramza's turn: nothing moves alone
     sw_step(0);
     scene0 = scene_checksum();
     cx = st.cx; cz = st.cz;
@@ -768,15 +782,15 @@ static void test_end(void)
     CHECKV(st.unit[U_RAMZA].gexp, 20); CHECKV(st.unit[U_RAMZA].gjp, 10);
     press(K_A);
     CHECK(st.mode != M_END && !st.end && st.unit[1].hp == st.unit[1].max_hp);
-    // lost by keys (fft(15): Ramza's Wish knocks him out, the recruits KO): his counter runs
-    // out, a crystal or a chest: Game Over
+    // lost by keys (fft(15): Ramza's Wish knocks him out, the recruits KO): the enemies knock
+    // Delita out, or Ramza's counter runs out (a crystal or a chest): Game Over
     sw_init(15);
     press(K_DOWN); press(K_A); press(K_DOWN); press(K_A); press(K_A); press(K_UP); press(K_A);
     CHECKV(st.mode, M_ACT);
-    for (i = 0; i < 2000 && st.mode != M_END; i++) sw_step(0);
-    CHECKV(st.end, END_DEFEAT); CHECK(DC_OBJ(st.unit[U_RAMZA].dc));
-    printf("end: won by keys; lost after %d frames (Ramza a %s)\n", i,
-           st.unit[U_RAMZA].dc == DC_CRYSTAL ? "crystal" : "chest");
+    for (i = 0; i < 4000 && st.mode != M_END; i++) sw_step(0);
+    CHECKV(st.end, END_DEFEAT); CHECK(DC_OBJ(st.unit[U_RAMZA].dc) || !st.unit[0].hp);
+    printf("end: won by keys; lost after %d frames (%s)\n", i,
+           DC_OBJ(st.unit[U_RAMZA].dc) ? "Ramza a crystal or a chest" : "Delita KO");
     // the guest's KO alone does not end it; every unit of the player's side KO does
     sw_init(0);
     st.unit[0].hp = 0; CHECKV(outcome(), END_NONE);
@@ -811,22 +825,154 @@ static void test_clock(void)
     st.unit[0].ct = 50; ct_end(0, 0, 0); CHECKV(st.unit[0].ct, 60);
 }
 
-// the battle from its start: Delita and the five enemies wait their turns, then Ramza's; the
-// order shown is FFT's AT list
+// ---------------------------------------------------------------- milestone 20: the AI
+// The original's AI turns (oracle.h): each situation put in our engine with the original's units
+// (its stats, Brave, signs, what each knows), our plan against what its AI did.
+static void ai_load(u16 r)
+{
+    u8 i;
+    sw_init(10);
+    for (i = 0; i < NUNIT; i++) {
+        Unit *u = &st.unit[i];
+        const u8 *v = oracle_ai[r].u[i];
+        u8 k;
+        u->job = oracle[i].job; u->level = oracle[i].level;
+        for (k = 0; k < 5; k++) { u->raw[k] = oracle[i].raw[k]; u->eq[k] = oracle[i].eq[k]; }
+        unit_stats(u);
+        u->brave = oracle_bz[i][0]; u->faith = oracle_bz[i][1]; u->zodiac = oracle_bz[i][2]; u->female = oracle_bz[i][3];
+        u->x = v[0]; u->z = v[1]; u->face = v[2]; u->hp = v[3]; u->ct = v[4]; u->dc = v[5];
+        u->status = v[6]; u->learned = v[7]; u->defend = v[8];
+    }
+    st.act = oracle_ai[r].unit; st.moved = st.acted = 0; st.ai_nosup = 0;
+}
+
+static const char *const ai_cases[] = { "battle", "near", "critical", "far", "potion", "kill", "defend", "delita-low", "recruit" };
+static int ai_diff;                                       // --ai: each turn that differs
+
+// our plan against what the original's AI did, turn by turn: the action (and its target), whether
+// FFT's is in our ranking (its draws on the hit chance take a lower one at times), the tile it
+// ends on (acting from its own tile, where it goes after), its facing; in each built situation
+// (replayed with other draws) FFT's most frequent choice must be our first
+static void test_ai(void)
+{
+    u16 r, same = 0, inlist = 0, tile = 0, face = 0, cases = 0, firsts = 0;
+    u8 c, pick[ORACLE_AI][2];
+    for (r = 0; r < ORACLE_AI; r++) {
+        const AiAct *k;
+        u8 n, i, a = oracle_ai[r].unit, fab = oracle_ai[r].ab, ft = (u8)(oracle_ai[r].tz * MAP_W + oracle_ai[r].tx);
+        u8 ab, o, t, x, z, f, hit = 0, ok;
+        ai_load(r);
+        ai_plan(a, 0);
+        k = ai_ranked(&n);
+        ab = n ? k[0].ab : st.unit[a].defend ? ABIL_DEFEND : AI_NONE;
+        o = n ? k[0].o : ai_fallback(); t = n ? k[0].t : o;
+        pick[r][0] = ab; pick[r][1] = ab >= AI_NONE ? 0 : t;
+        for (i = 0; i < n; i++) if (k[i].ab == fab && k[i].t == ft) hit = 1;
+        if (fab >= AI_NONE && !n && ab == fab) hit = 1;
+        ok = ab == fab && (ab >= AI_NONE || t == ft);
+        same += ok; inlist += hit;
+        if (n && (k[0].f || o == (u8)(st.unit[a].z * MAP_W + st.unit[a].x))) {
+            for (i = 0; i < NUNIT; i++) st.unit[i].hp = oracle_ai[r].u[i][9];
+            ai_plan(a, 1);
+            o = ai_fallback();
+        }
+        x = o % MAP_W; z = o / MAP_W;
+        st.unit[a].x = x; st.unit[a].z = z;
+        for (i = 0; i < NUNIT; i++) st.unit[i].hp = oracle_ai[r].u[i][9];
+        f = ai_facing(a);
+        tile += x == oracle_ai[r].x && z == oracle_ai[r].z;
+        face += f == oracle_ai[r].face;
+        if (ai_diff && (!ok || x != oracle_ai[r].x || z != oracle_ai[r].z || f != oracle_ai[r].face))
+            printf("  ai%3d %-10s u%-2d ours %02X t%d,%d -> %d,%d f%d | FFT %02X t%d,%d -> %d,%d f%d%s\n",
+                   r, ai_cases[oracle_ai[r].kase], a, ab, t % MAP_W, t / MAP_W, x, z, f, fab, oracle_ai[r].tx,
+                   oracle_ai[r].tz, oracle_ai[r].x, oracle_ai[r].z, oracle_ai[r].face, hit ? " (in our ranking)" : "");
+    }
+    for (c = 1; c < sizeof ai_cases / sizeof *ai_cases; c++) {   // the built situations
+        u16 best = 0, j, m;
+        u8 bab = 0, bt = 0, first = 0xFF;
+        for (r = 0; r < ORACLE_AI; r++) {
+            u8 t = oracle_ai[r].ab >= AI_NONE ? 0 : (u8)(oracle_ai[r].tz * MAP_W + oracle_ai[r].tx);
+            if (oracle_ai[r].kase != c) continue;
+            if (first == 0xFF) first = (u8)r;
+            for (j = m = 0; j < ORACLE_AI; j++)
+                m += oracle_ai[j].kase == c && oracle_ai[j].ab == oracle_ai[r].ab
+                     && (oracle_ai[j].ab >= AI_NONE ? 0 : (u8)(oracle_ai[j].tz * MAP_W + oracle_ai[j].tx)) == t;
+            if (m > best) { best = m; bab = oracle_ai[r].ab; bt = t; }
+        }
+        if (first == 0xFF) continue;
+        cases++;
+        firsts += pick[first][0] == bab && pick[first][1] == bt;
+    }
+    printf("ai: %d turns of the original's: the same action %d, in our ranking %d, the same tile %d, facing %d;"
+           " FFT's most frequent choice our first in %d of %d situations\n", ORACLE_AI, same, inlist, tile, face, firsts, cases);
+    CHECK(same >= 129 && inlist >= 134 && tile >= 125 && face >= 128);
+    CHECKV(firsts, cases);
+}
+
+// the AI on both sides (fft(16)): a whole battle plays itself to its end; an AI turn's thinking
+// waits for the picture to stand still, then takes a few frames
+static void test_ai_battle(void)
+{
+    u32 i, think = 0, frozen = 0, turns = 0, most = 0, run = 0, fmost = 0, frun = 0;
+    sw_init(16);
+    for (i = 0; i < 20000 && st.mode != M_END; i++) {
+        u8 a = st.ai == AI_THINK, t = st.act;
+        if (a && ai_frozen()) { frozen++; if (++frun > fmost) fmost = frun; } else if (!a) frun = 0;
+        sw_step(0);
+        if (a) { think++; run++; if (run > most) most = run; } else run = 0;
+        if (st.act != t) turns++;
+    }
+    printf("ai battle: %s after %lu frames, %lu turns; thinking %.1f frames a turn (%lu at most): the camera on"
+           " the unit, then %.1f with the picture still (%lu at most)\n", st.end == END_VICTORY ? "won" : "lost",
+           (unsigned long)i, (unsigned long)turns, (double)think / turns, (unsigned long)most, (double)frozen / turns,
+           (unsigned long)fmost);
+    CHECK(st.mode == M_END && fmost <= 15);
+}
+
+// Defend: drawn as FFT draws a support ability; a command after the skill set, Defending until
+// the unit's next turn
+static void test_defend(void)
+{
+    u16 n, d[2] = { 0 }, all[2] = { 0 };
+    u8 i;
+    for (n = 1; n <= 500; n++) {
+        sw_init(n);
+        for (i = 0; i < NUNIT; i++)
+            if (i != U_RAMZA) { all[jobs[st.unit[i].job].row]++; d[jobs[st.unit[i].job].row] += st.unit[i].defend; }
+        CHECKV(st.unit[U_RAMZA].defend, 0);
+    }
+    printf("defend: %.3f of the Squires, %.3f of the Chemists\n", (double)d[0] / all[0], (double)d[1] / all[1]);
+    CHECK(d[0] && d[1] && d[0] * 4 < all[0] && d[1] * 4 < all[1]);
+    sw_init(10);
+    st.unit[U_RAMZA].defend = 1;
+    press(K_DOWN); press(K_A); CHECKV(st.mode, M_ACTS);   // Act: Attack, Guts, Defend
+    press(K_DOWN); press(K_DOWN); CHECKV(st.sub, 2);
+    press(K_A); CHECKV(st.mode, M_ACT);
+    while (st.mode == M_ACT) sw_step(0);
+    CHECK(st.unit[U_RAMZA].status & ST_DEFEND && st.acted && st.mode == M_MENU);
+    turn_end(0, 1);
+    while (st.act != U_RAMZA) turn_end(0, 0);
+    CHECKV(st.unit[U_RAMZA].status & ST_DEFEND, 0);       // gone at its next turn
+}
+
+// the battle from its start: Delita and the five enemies end their turns without moving or
+// acting, then Ramza's; the order shown is FFT's AT list
 static void test_turns(void)
 {
     u8 i;
     sw_init(0);
     CHECKV(st.act, 0);                                    // all at CT 102: Delita, index 0
+    CHECKV(st.ai, AI_THINK);                              // the guest's AI
     for (i = 0; i < ORDER_N; i++) CHECKV(st.turns[i], i);
     for (i = 1; i <= 5; i++) {
-        steps(0, AI_WAIT);
+        turn_end(0, 0);
         CHECKV(st.act, i);
         CHECK(st.cx == st.unit[i].x && st.cz == st.unit[i].z);
         CHECKV(st.unit[i - 1].ct, 42);                    // waited: 2 + 40
     }
-    steps(0, AI_WAIT);
+    turn_end(0, 0);
     CHECKV(st.act, U_RAMZA);
+    CHECKV(st.ai, AI_OFF);
     CHECKV(st.turns[1], U_RAMZA + 1);                     // the recruits, still at 102
     steps(0, 60);
     CHECKV(st.act, U_RAMZA);                              // the player's turn waits for keys
@@ -882,11 +1028,31 @@ static void shots(void)
     st.unit[2].x = 3; st.unit[2].z = 10; st.unit[2].hp = 0; st.unit[2].dc = DC_CRYSTAL;
     st.unit[3].x = 5; st.unit[3].z = 10; st.unit[3].hp = 0; st.unit[3].dc = DC_CHEST;
     steps(0, 4); sw_write_png("x/m19_ko.png", 4);
+    {                                                     // an AI turn (fft(16)): the first that
+        u16 f, fm = 0, fa = 0, fh = 0, ff = 0, n;         // moves and acts: its range shown, the
+        sw_init(16);                                      // target marked, the blow, the facing
+        for (f = 0; f < 3000 && !ff; f++) {
+            sw_step(0);
+            if (st.ai == AI_MOVE && st.ai_t == 5) fm = f;
+            if (st.ai == AI_AIM && st.ai_t == 5 && fm) fa = f;
+            if (fa && st.mode == M_ACT && st.act_t == ACT_HIT + 3) fh = f;
+            if (fh && st.ai == AI_FACE && st.ai_t == 2) ff = f;
+        }
+        sw_init(16);
+        for (n = 0; n <= ff; n++) {
+            sw_step(0);
+            if (n == fm) sw_write_png("x/m20_move.png", 4);
+            if (n == fa) sw_write_png("x/m20_aim.png", 4);
+            if (n == fh) sw_write_png("x/m20_hit.png", 4);
+            if (n == ff) sw_write_png("x/m20_face.png", 4);
+        }
+    }
 }
 
 int main(int argc, char **argv)
 {
     if (argc > 1 && !strcmp(argv[1], "--find")) { find_spots(); return 0; }
+    ai_diff = argc > 1 && !strcmp(argv[1], "--ai");
     test_rotations();
     test_heights();
     test_stats();
@@ -902,6 +1068,9 @@ int main(int argc, char **argv)
     test_end();
     test_clock();
     test_turns();
+    test_ai();
+    test_ai_battle();
+    test_defend();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;
