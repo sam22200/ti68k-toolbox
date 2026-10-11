@@ -388,6 +388,16 @@ only: nothing extracted from the disc).
   the bottom corners (the user's Metal Gear Solid: Portable Ops reference) keep the map's height;
   a cache that skips a turn's first frame must reset its flag when nothing changed, or a
   change undone before the redraw stops every later one.
+  **Formulas against the game's own preview** (milestone 17): a sub-agent read the attack's
+  formulas in the decompilation (~5 min) and FFT shows its prediction (hit %, damage) in RAM
+  before confirming: poking the attacker's and target's stats, weapon, signs, sexes and facing
+  into the two units of one fixed situation gave 40 exact checks in 40 s, and 400 executed
+  attacks (each after a different number of cursor moves: every preview draws rand()) gave
+  the miss and critical rates in 9 min. Units could not be moved by poking their x / y (the
+  game finds a target through its own tile map): poke stats, not positions. The poses came
+  from the sprite's `SEQ` file read as (frame, ticks) pairs from 0x406 (hit, swing, kneel,
+  lying), not by eye on the 182 frames. Dropping 4 rings by copying the whole scene put an
+  attack's first frame at 437k: put back only the rings' boxes when they are few.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).
