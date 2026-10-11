@@ -39,8 +39,13 @@ typedef struct {
 #define AI_WAIT 15                     // frames an enemy's or the guest's turn lasts (it waits)
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
 #define DC_GONE 0xFF                   // death counter out: a crystal or a chest (milestone 19)
+#define PANEL_H 46                     // a unit's panel against a side of the screen, at the bottom
 
-enum { M_BROWSE, M_TARGET, M_WALK };
+// M_BROWSE: the cursor free (enemies' turns, or the player looking around); M_MENU: the
+// player's turn menu; M_TARGET: the reach shown, a tile to pick; M_WALK; M_FACE: the facing
+// chosen at Wait; M_STATUS: a unit's numbers
+enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS };
+enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
 #define U_RAMZA 6                      // in battle.h's order: Delita, five enemies, Ramza, recruits
 #define U_HIDE 2                       // the enemy the occlusion scenarios move behind a house
@@ -71,6 +76,9 @@ typedef struct {
     u8 reach[MAP_W * MAP_H];           // M_TARGET: steps to each tile, 0xFF unreachable
     u8 act, wait_t;                    // the unit whose turn it is, AI_WAIT frames left
     u8 turns[ORDER_N];                 // the next turns (FFT's AT list), turns[0] = act
+    u8 menu, back;                     // the menu's entry; the mode M_STATUS returns to
+    u8 moved, acted;                   // this turn so far
+    u8 mx, mz, mface, wface;           // the active unit before its move (undone), at Wait
 } State;
 extern State st;
 

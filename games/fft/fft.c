@@ -105,7 +105,9 @@ static u8 *vbuf, vbuf_rot;
 #define TH (RT_H / 2)
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
-#define HUD_ROWS 15                     // the turns strip (rows 0-7), the info strip (8-14)
+#define HUD_ROWS 14                     // the top strip (rows 0-7), text to be turned (8-13)
+#define WIN_ROWS 27                     // the menu or a unit's numbers, at the top right
+#define WIN_DONE 5                      // its box, then its four lines: one per frame
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
     u8 depth, rot, r0, r1;
@@ -121,10 +123,17 @@ typedef struct {
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
-    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // the HUD's two strips, drawn when they change
-    char hud_s[24];                     // what they show: the info line, the turns
-    u8 hud_t[ORDER_N], hud_w, hud_late; // (hud_w: the info strip's width in bytes)
+    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // the top strip (the turns, the view and height)
+    char hud_s[8];                      // what it shows
+    u8 hud_t[ORDER_N], hud_late;
     u16 label[UNIT_GFX_N][5];           // the turns' labels (Ra, De, Sq, Ch), drawn once
+    u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // the menu or a status window, and what it shows:
+    u8 win_k[3], win_w, win_n;          // mode, moved, unit; its width in words; its part to
+                                        // draw next (WIN_DONE: all drawn)
+    u16 pan[2][2][PANEL_H];             // the active unit's panel (left), the cursor's (right):
+    u16 pan_k[2][3];                    // light, dark; unit + 1 (0: none), HP, MP
+    u8 arrow[4][2][8];                  // the facing arrows (view -v, +u, +v, -u): fill, outline
+    u8 pname[UNIT_GFX_N][PANEL_H];      // the names turned a quarter, a row per panel row (5 bits)
 } Work;
 static Work *W;
 #define span_l (W->span_l)
@@ -315,19 +324,23 @@ void turn_order(void)
     for (; n < ORDER_N; n++) st.turns[n] = 0xFF;
 }
 
-// the next turn: the cursor and the camera go to its unit; enemies and the guest wait
+// the next turn: the cursor and the camera go to its unit; enemies and the guest wait, a
+// player's unit opens its menu
 static void turn_start(void)
 {
+    u8 me;
     st.act = ct_next();
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
-    st.wait_t = st.unit[st.act].team == TEAM_PLAYER ? 0 : AI_WAIT;
+    me = st.unit[st.act].team == TEAM_PLAYER;
+    st.wait_t = me ? 0 : AI_WAIT;
+    st.mode = me ? M_MENU : M_BROWSE;
+    st.menu = MN_MOVE; st.moved = st.acted = 0;
     turn_order();
 }
 
 static void turn_end(u8 moved, u8 acted)
 {
     ct_end(st.act, moved, acted);
-    st.mode = M_BROWSE;
     turn_start();
 }
 
@@ -1001,6 +1014,46 @@ static void move_cursor(s16 du, s16 dv)
     st.cx = (u8)x; st.cz = (u8)z;
 }
 
+// a step (du, dv) in the view as a facing (world +x, -x, +z, -z), and back
+static u8 face_of(s16 du, s16 dv)
+{
+    s16 x0, z0, x, z;
+    world_of(st.rot, 1, 1, &x0, &z0);
+    world_of(st.rot, 1 + du, 1 + dv, &x, &z);
+    return x > x0 ? 0 : x < x0 ? 1 : z > z0 ? 2 : 3;
+}
+
+static void to_menu(void)
+{
+    st.mode = M_MENU;
+    st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
+}
+
+// the turn menu: Move (once; undone with [shift] before acting), Act (milestone 17), Wait
+// (then the facing), Status
+static void menu_keys(void)
+{
+    Unit *u = &st.unit[st.act];
+    if (input_pressed(K_UP)) st.menu = st.menu ? st.menu - 1 : MN_N - 1;
+    if (input_pressed(K_DOWN)) st.menu = st.menu < MN_N - 1 ? st.menu + 1 : 0;
+    if (input_pressed(K_A | K_ENTER)) {
+        if (st.menu == MN_MOVE && !st.moved) {
+            st.mode = M_TARGET; st.sel = st.act;
+            compute_reach(st.act);
+        } else if (st.menu == MN_WAIT) {
+            st.mode = M_FACE; st.wface = u->face;
+        } else if (st.menu == MN_STATUS) {
+            st.mode = M_STATUS; st.sel = st.act; st.back = M_MENU;
+        }
+    } else if (input_pressed(K_ESC | K_B)) {
+        if (st.moved && !st.acted) {               // the move undone
+            u->x = st.mx; u->z = st.mz; u->face = st.mface;
+            st.moved = 0; st.menu = MN_MOVE;
+            to_menu();
+        } else st.mode = M_BROWSE;                 // looking around
+    }
+}
+
 u8 game_update(void)
 {
     s16 tx, ty;
@@ -1030,37 +1083,50 @@ u8 game_update(void)
             st.unit[st.sel].x = st.path[st.path_i][0];
             st.unit[st.sel].z = st.path[st.path_i][1];
             st.cx = st.unit[st.sel].x; st.cz = st.unit[st.sel].z;
-            if (st.path_i + 1 >= st.path_n) {
-                st.mode = M_BROWSE;
-                if (st.sel == st.act) turn_end(1, 0);   // no Act yet (milestone 16): the turn ends
+            if (st.path_i + 1 >= st.path_n) {      // back to the menu, on Wait (no Act yet)
+                st.mode = M_MENU; st.moved = 1; st.menu = MN_WAIT;
             }
         }
     } else if (st.wait_t) {                        // an enemy's or the guest's turn: it waits
         if (!st.turn && !--st.wait_t) turn_end(0, 0);
     } else if (!st.turn) {
-        u32 arrows = rt_keys & (K_UP | K_DOWN | K_LEFT | K_RIGHT);
-        if (input_pressed(K_UP | K_DOWN | K_LEFT | K_RIGHT)) st.rep = 0;
-        if (arrows && (st.rep == 0 || (st.rep >= 8 && !((st.rep - 8) % 3)))) {
-            if (arrows & K_UP) move_cursor(0, -1);
-            if (arrows & K_DOWN) move_cursor(0, 1);
-            if (arrows & K_LEFT) move_cursor(-1, 0);
-            if (arrows & K_RIGHT) move_cursor(1, 0);
-        }
-        st.rep = arrows ? (u8)(st.rep < 255 ? st.rep + 1 : st.rep) : 0;
-        if (input_pressed(K_A | K_ENTER)) {
-            u8 o = unit_at(st.cx, st.cz), c = (u8)(st.cz * MAP_W + st.cx);
-            if (st.mode == M_BROWSE && o - 1 == st.act) {
-                st.mode = M_TARGET; st.sel = o - 1;
-                compute_reach(st.sel);
-            } else if (st.mode == M_TARGET && st.reach[c] != 0xFF && st.reach[c] > 0
-                       && make_path(st.sel, st.cx, st.cz)) {
-                st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
+        if (st.mode == M_MENU) {
+            menu_keys();
+        } else if (st.mode == M_FACE) {            // the arrows turn the unit, as the cursor
+            Unit *u = &st.unit[st.act];
+            if (input_pressed(K_UP)) u->face = face_of(0, -1);
+            if (input_pressed(K_DOWN)) u->face = face_of(0, 1);
+            if (input_pressed(K_LEFT)) u->face = face_of(-1, 0);
+            if (input_pressed(K_RIGHT)) u->face = face_of(1, 0);
+            if (input_pressed(K_A | K_ENTER)) turn_end(st.moved, st.acted);
+            else if (input_pressed(K_ESC | K_B)) { u->face = st.wface; st.mode = M_MENU; }
+        } else if (st.mode == M_STATUS) {
+            if (input_pressed(K_A | K_ENTER | K_ESC | K_B)) st.mode = st.back;
+        } else {                                   // the cursor: looking around, or a tile
+            u32 arrows = rt_keys & (K_UP | K_DOWN | K_LEFT | K_RIGHT);
+            if (input_pressed(K_UP | K_DOWN | K_LEFT | K_RIGHT)) st.rep = 0;
+            if (arrows && (st.rep == 0 || (st.rep >= 8 && !((st.rep - 8) % 3)))) {
+                if (arrows & K_UP) move_cursor(0, -1);
+                if (arrows & K_DOWN) move_cursor(0, 1);
+                if (arrows & K_LEFT) move_cursor(-1, 0);
+                if (arrows & K_RIGHT) move_cursor(1, 0);
             }
-        } else if (input_pressed(K_C) && st.mode == M_BROWSE) {
-            turn_end(0, 0);                        // Wait (the menu comes at milestone 16)
-        } else if (input_pressed(K_ESC | K_B)) {
-            if (st.mode == M_TARGET) st.mode = M_BROWSE;
-            else if (input_pressed(K_ESC)) return 0;
+            st.rep = arrows ? (u8)(st.rep < 255 ? st.rep + 1 : st.rep) : 0;
+            if (input_pressed(K_A | K_ENTER)) {
+                u8 o = unit_at(st.cx, st.cz), c = (u8)(st.cz * MAP_W + st.cx);
+                if (st.mode == M_TARGET) {
+                    Unit *u = &st.unit[st.sel];
+                    if (st.reach[c] != 0xFF && st.reach[c] > 0 && make_path(st.sel, st.cx, st.cz)) {
+                        st.mx = u->x; st.mz = u->z; st.mface = u->face;
+                        st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
+                    }
+                } else if (o) {                    // a unit's numbers
+                    st.mode = M_STATUS; st.sel = o - 1; st.back = M_BROWSE;
+                } else to_menu();
+            } else if (input_pressed(K_ESC | K_B)) {
+                if (st.mode == M_BROWSE && input_pressed(K_ESC)) return 0;
+                to_menu();
+            }
         }
     }
     if (!st.turn) {
@@ -1068,7 +1134,7 @@ u8 game_update(void)
         st.camx = ease(st.camx, tx);
         st.camy = ease(st.camy, ty);
     }
-    if (st.mode != mode0) hl_seq++;
+    if ((st.mode == M_TARGET) != (mode0 == M_TARGET)) hl_seq++;   // the reach rings
     return 1;
 }
 
@@ -1092,43 +1158,181 @@ static void copy_view(void)
     }
 }
 
-// the turns' labels: AMS text drawn once into the HUD buffer and kept as 16-pixel rows
+static const char *const unit_names[UNIT_GFX_N] = { "Ramza", "Delita", "Squire", "Squire", "Chemist", "Chemist" };
+
+// the turns' labels: AMS text drawn once into the HUD buffer and kept as 16-pixel rows; the
+// names turned a quarter for the panels (reading upwards: glyph row y in bit 4 - y); the
+// facing arrows: a right triangle pointing up-right, mirrored for the other three, outlined
 static void hud_labels(void)
 {
     static const char ab[UNIT_GFX_N][3] = { "Ra", "De", "Sq", "Sq", "Ch", "Ch" };
+    static const u8 tri[8] = { 0, 0x7E, 0x3E, 0x1E, 0x0E, 0x06, 0x02, 0 };
     void *sl = rt_light, *sd = rt_dark;
-    u8 g, r;
+    u8 g, r, b;
     rt_light = HUD_L; rt_dark = HUD_D;
     for (g = 0; g < UNIT_GFX_N; g++) {
+        u8 x;
         memset(W->hud, 0, sizeof W->hud);
         draw_text(0, 0, ab[g], F_SMALL, C_BLACK);
         for (r = 0; r < 5; r++) W->label[g][r] = (u16)(HUD_L[r * RT_PBYTES] << 8 | HUD_L[r * RT_PBYTES + 1]);
+        memset(W->hud, 0, sizeof W->hud);
+        draw_text(0, 0, unit_names[g], F_SMALL, C_BLACK);
+        for (r = 0; r < 5; r++)
+            for (x = 0; x < PANEL_H - 3; x++)
+                if (HUD_L[r * RT_PBYTES + (x >> 3)] & (0x80 >> (x & 7))) W->pname[g][PANEL_H - 2 - x] |= (u8)(0x10 >> r);
     }
+    rt_light = sl; rt_dark = sd;
+    for (g = 0; g < 4; g++)
+        for (r = 0; r < 8; r++) {
+            u8 f = tri[g == 1 || g == 2 ? 7 - r : r], m = 0;            // +u, +v: upside down
+            if (g >= 2) { for (b = 0; b < 8; b++) if (f & (1 << b)) m |= (u8)(0x80 >> b); f = m; }
+            W->arrow[g][0][r] = f;                                     // +v, -u: mirrored
+        }
+    for (g = 0; g < 4; g++)
+        for (r = 0; r < 8; r++) {
+            u8 o = (u8)((r ? W->arrow[g][0][r - 1] : 0) | W->arrow[g][0][r] | (r < 7 ? W->arrow[g][0][r + 1] : 0));
+            W->arrow[g][1][r] = (u8)(o | o << 1 | o >> 1);
+        }
+}
+
+static u8 put_s(char *s, u8 n, const char *t) { while (*t) s[n++] = *t++; return n; }
+static u8 put_n(char *s, u8 n, u16 v)
+{
+    char b[5];
+    u8 k = 0;
+    do { b[k++] = (char)('0' + v % 10); v /= 10; } while (v);
+    while (k) s[n++] = b[--k];
+    return n;
+}
+
+
+// AMS text drawn into a HUD buffer (rows of RT_PBYTES), the screen planes put back
+static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color)
+{
+    void *sl = rt_light, *sd = rt_dark;
+    rt_light = l; rt_dark = d;
+    draw_text(x, y, s, F_SMALL, color);
     rt_light = sl; rt_dark = sd;
 }
 
-// The HUD: both strips are drawn into W->hud when what they show changes, at most one per frame
-// (the turns from labels drawn once, the info line in AMS text), and copied each frame (~2k).
+// 3 x 5 digits and '/' for the panels' numbers, turned a quarter: per glyph column (left to
+// right), its 5 pixels (bit 4: the top row)
+static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 0x17, 0x15, 0x1D },
+    { 0x15, 0x15, 0x1F }, { 0x1C, 0x04, 0x1F }, { 0x1D, 0x15, 0x17 }, { 0x1F, 0x15, 0x17 },
+    { 0x10, 0x10, 0x1F }, { 0x1F, 0x15, 0x1F }, { 0x1D, 0x15, 0x1F }, { 0x03, 0x04, 0x18 } };
+
+// A unit's panel against a side of the screen, as Metal Gear Solid: Portable Ops' HUD, its
+// text turned a quarter (reading upwards): its name (AMS text), then its HP and MP as
+// "52/52" and "16/16" in 3 x 5 digits, each beside its 2-pixel gauge filling upwards (HP
+// black, MP dark grey); white (light grey: an enemy), a black edge toward the map. 16 x
+// PANEL_H; columns: name 0-4, numbers 6-10, gauges 12-13, edge 15 on the left side; edge 0,
+// name 2-6, numbers 8-12, gauges 14-15 on the right one (read in the same order).
+#define SEG 19                                     // a number and its gauge: 5 characters
+static void make_panel(u8 side, u8 i)
+{
+    u16 *pl = W->pan[side][0], *pd = W->pan[side][1];
+    const Unit *u = &st.unit[i];
+    const u8 *nm = W->pname[u->gfx];
+    u16 bg = u->team == TEAM_ENEMY ? 0xFFFF : 0, edge = side ? 0x8000 : 1, gb = side ? 0x0003 : 0x000C;
+    u8 ns = side ? 9 : 11, ds = side ? 3 : 5;      // the name's, the numbers' shift (5 bits)
+    u8 r, x, k, n, g;
+    char s[12];
+    for (r = 0; r < PANEL_H; r++) {                // the edge, the name
+        u16 v = (u16)nm[r] << ns;
+        pl[r] = bg | edge | v; pd[r] = edge | v;
+    }
+    pl[0] = pd[0] = 0xFFFF;                        // and the top row
+    for (k = 0; k < 2; k++) {                      // HP at the bottom, MP above it
+        u16 v = k ? u->mp : u->hp, m = k ? u->max_mp : u->hp > u->max_hp ? u->hp : u->max_hp;
+        u8 base = (u8)(PANEL_H - 2 - k * (SEG + 3)), f = v && m ? (u8)((SEG * v + m - 1) / m) : 0;
+        n = put_n(s, 0, v); s[n++] = '/'; n = put_n(s, n, m);
+        for (x = 0; x < n && 4 * x + 3 <= SEG; x++) {
+            const u8 *gl = digits[s[x] == '/' ? 10 : s[x] - '0'];
+            for (g = 0; g < 3; g++) {
+                u16 b = (u16)gl[g] << ds;
+                pl[base - 4 * x - g] |= b; pd[base - 4 * x - g] |= b;
+            }
+        }
+        for (x = 0; x < SEG; x++) {
+            r = (u8)(base - x);
+            if (x >= f) { if (bg) pl[r] &= ~gb; else pl[r] |= gb; }
+            else if (k) { pl[r] &= ~gb; pd[r] |= gb; }
+            else { pl[r] |= gb; pd[r] |= gb; }
+        }
+    }
+}
+
+// The menu or a unit's numbers in a box at the top right (white, light grey for an enemy,
+// a black edge toward the map), drawn into W->win one part a frame: the box, then each line
+// (AMS text costs ~70k a status line). The menu's pointer is added when it is copied.
+static void make_window(void)
+{
+    static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status" };
+    u16 *l = W->win[0], *d = W->win[1];
+    const Unit *u = &st.unit[W->win_k[2]];
+    u8 r, i, n, k = W->win_n++;
+    char s[28];
+    if (!k) {
+        u8 h = 4 * 6 + 3, w = W->win_k[0] == M_MENU ? 2 : 6;
+        u8 enemy = W->win_k[0] == M_STATUS && u->team == TEAM_ENEMY;
+        W->win_w = w;
+        for (r = 0; r < WIN_ROWS; r++)
+            for (i = 0; i < w; i++) {
+                u16 e = r == h - 1 ? 0xFFFF : r >= h || i ? 0 : 0x8000;     // the edge: black
+                WR16((u8 *)l, r * (RT_PBYTES / 2) + i, (r < h && enemy ? 0xFFFF : 0) | e);
+                WR16((u8 *)d, r * (RT_PBYTES / 2) + i, e);
+            }
+        return;
+    }
+    k--;
+    if (W->win_k[0] == M_MENU) {
+        text_into(l, d, 7, 2 + 6 * k, entries[k], k == MN_ACT || (k == MN_MOVE && W->win_k[1]) ? C_LGRAY : C_BLACK);
+        return;
+    }
+    if (k == 0) {
+        n = put_s(s, 0, unit_names[u->gfx]);
+        if (u->gfx <= UG_DELITA) n = put_s(s, n, " Squire");
+        n = put_s(s, n, "  Lv "); n = put_n(s, n, u->level);
+    } else if (k == 1) {
+        n = put_s(s, 0, "HP "); n = put_n(s, n, u->hp); s[n++] = '/'; n = put_n(s, n, u->max_hp);
+        n = put_s(s, n, "  MP "); n = put_n(s, n, u->mp); s[n++] = '/'; n = put_n(s, n, u->max_mp);
+    } else if (k == 2) {
+        n = put_s(s, 0, "Move "); n = put_n(s, n, u->move); n = put_s(s, n, "  Jump "); n = put_n(s, n, u->jump);
+        n = put_s(s, n, "  Speed "); n = put_n(s, n, u->sp);
+    } else {
+        n = put_s(s, 0, "PA "); n = put_n(s, n, u->pa); n = put_s(s, n, "  MA "); n = put_n(s, n, u->ma);
+    }
+    s[n] = 0;
+    text_into(l, d, 3, 2 + 6 * k, s, C_BLACK);
+}
+
+// The HUD: the top strip (the turn order, the view and the height under the cursor), the menu
+// or a status window at the top right, the units' panels at the bottom corners. Each is drawn
+// into a buffer when what it shows changes, at most one per frame and none on a turn's first
+// frame (the camera starts moving), and copied every frame.
 static void draw_hud(void)
 {
-    char s[24];
-    const char *name = "";
-    u8 o = unit_at(st.cx, st.cz), h = map_tiles[st.cz * MAP_W + st.cx].stand, n = 0, i, r, w;
-    static const char *const names[UNIT_GFX_N] = { "Ramza", "Delita", "Squire", "Squire", "Chemist", "Chemist" };
+    char s[8];
+    u8 o = unit_at(st.cx, st.cz), h = map_tiles[st.cz * MAP_W + st.cx].stand, n = 0, i, r, w, k[3];
     static const char dirs[4] = { 'S', 'W', 'N', 'E' };
     u32 *a, *b;
     u16 *c, *d;
-    if (o) name = names[st.unit[o - 1].gfx];
+    u16 pk[2][3];
     s[n++] = dirs[st.rot]; s[n++] = ' '; s[n++] = 'h';
     if (h >= 20) s[n++] = (char)('0' + h / 20);
     s[n++] = (char)('0' + (h / 2) % 10);
     if (h & 1) { s[n++] = '.'; s[n++] = '5'; }
-    s[n++] = ' ';
-    while (*name && n < 22) s[n++] = *name++;
     s[n] = 0;
+    k[0] = st.mode == M_MENU || st.mode == M_STATUS ? st.mode : 0;
+    k[1] = k[0] == M_MENU ? st.moved : 0;
+    k[2] = k[0] == M_STATUS ? st.sel : 0;
+    pk[0][0] = (u16)(st.act + 1); pk[0][1] = st.unit[st.act].hp; pk[0][2] = st.unit[st.act].mp;
+    pk[1][0] = o && o - 1 != st.act ? o : 0;
+    pk[1][1] = pk[1][0] ? st.unit[o - 1].hp : 0; pk[1][2] = pk[1][0] ? st.unit[o - 1].mp : 0;
     for (i = 0, w = 0; i < ORDER_N; i++) w |= st.turns[i] != W->hud_t[i];
-    if (w && !W->hud_late++) w = 0;                // not on the turn's first frame (the camera
-    if (w) {                                       // starts moving)
+    if (!w) W->hud_late = 0;
+    else if (!W->hud_late++) w = 0;                // not on the turn's first frame
+    if (w) {
         for (r = 0; r < 8; r++) {                  // white, 64 px
             a = (u32 *)(HUD_L + r * RT_PBYTES); b = (u32 *)(HUD_D + r * RT_PBYTES);
             a[0] = a[1] = b[0] = b[1] = 0;
@@ -1159,30 +1363,82 @@ static void draw_hud(void)
         W->hud_late = 0;
     } else if (!W->hud_late) {
         for (i = 0; i <= n && s[i] == W->hud_s[i]; i++) ;
-        if (i <= n) {                              // the info line, its box to a whole word
-            void *sl = rt_light, *sd = rt_dark;
-            W->hud_w = (u8)((4 * n + 17) >> 4);
-            for (r = 0; r < 7; r++) {              // white
-                c = W->hud[0] + (8 + r) * (RT_PBYTES / 2); d = W->hud[1] + (8 + r) * (RT_PBYTES / 2);
-                for (i = 0; i < W->hud_w; i++) c[i] = d[i] = 0;
+        if (i <= n) {                              // the view and the height: 32 px after them
+            for (r = 0; r < 8; r++) {
+                a = (u32 *)(HUD_L + r * RT_PBYTES); b = (u32 *)(HUD_D + r * RT_PBYTES);
+                a[2] = b[2] = 0;
             }
-            rt_light = HUD_L; rt_dark = HUD_D;
-            draw_text(1, 9, s, F_SMALL, C_BLACK);
-            rt_light = sl; rt_dark = sd;
+            text_into(W->hud[0], W->hud[1], 67, 1, s, C_BLACK);
             for (i = 0; i <= n; i++) W->hud_s[i] = s[i];
+        } else if (k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2])) {
+            for (i = 0; i < 3; i++) W->win_k[i] = k[i];
+            W->win_n = 0;
+            make_window();
+        } else if (k[0] && W->win_n < WIN_DONE) {
+            make_window();
+        } else {
+            for (i = 0; i < 2; i++)
+                if (pk[i][0] && (pk[i][0] != W->pan_k[i][0] || pk[i][1] != W->pan_k[i][1] || pk[i][2] != W->pan_k[i][2])) {
+                    W->pan_k[i][0] = pk[i][0]; W->pan_k[i][1] = pk[i][1]; W->pan_k[i][2] = pk[i][2];
+                    make_panel(i, (u8)(pk[i][0] - 1));
+                    break;
+                }
         }
     }
-    c = W->hud[0]; d = W->hud[1];                  // copied: the turns, then the info line
+    c = W->hud[0]; d = W->hud[1];                  // copied: the strip, 96 px
     for (r = 0; r < 8; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
         a = (u32 *)((u8 *)rt_light + r * RT_PBYTES); b = (u32 *)((u8 *)rt_dark + r * RT_PBYTES);
-        a[0] = ((u32 *)c)[0]; a[1] = ((u32 *)c)[1];
-        b[0] = ((u32 *)d)[0]; b[1] = ((u32 *)d)[1];
+        a[0] = ((u32 *)c)[0]; a[1] = ((u32 *)c)[1]; a[2] = ((u32 *)c)[2];
+        b[0] = ((u32 *)d)[0]; b[1] = ((u32 *)d)[1]; b[2] = ((u32 *)d)[2];
     }
-    w = W->hud_w;
-    for (r = 0; r < 7; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
-        u16 *pa = (u16 *)((u8 *)rt_light + (RT_H - 7 + r) * RT_PBYTES);
-        u16 *pb = (u16 *)((u8 *)rt_dark + (RT_H - 7 + r) * RT_PBYTES);
-        for (i = 0; i < w; i++) { pa[i] = c[i]; pb[i] = d[i]; }
+    if (k[0] && W->win_k[0] == k[0] && W->win_n >= WIN_DONE) {   // the window, against the
+        u8 ww = W->win_w;                                          // right edge, once drawn
+        c = W->win[0]; d = W->win[1];
+        for (r = 0; r < WIN_ROWS; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
+            u16 *pa = (u16 *)((u8 *)rt_light + r * RT_PBYTES) + RT_W / 16 - ww;
+            u16 *pb = (u16 *)((u8 *)rt_dark + r * RT_PBYTES) + RT_W / 16 - ww;
+            for (i = 0; i < ww; i++) { pa[i] = c[i]; pb[i] = d[i]; }
+        }
+        if (k[0] == M_MENU)                        // the pointer: a small black triangle
+            for (r = 0; r < 5; r++) {
+                u16 o2 = (u16)((3 + 6 * st.menu + r) * RT_PBYTES + RT_W / 8 - 2 * ww);
+                u8 b2 = (u8)(r == 2 ? 0x38 : r == 1 || r == 3 ? 0x30 : 0x20);
+                ((u8 *)rt_light)[o2] |= b2; ((u8 *)rt_dark)[o2] |= b2;
+            }
+    }
+    for (i = 0; i < 2; i++) {                      // the panels, at the bottom corners
+        const u16 *pl = W->pan[i][0], *pd = W->pan[i][1];
+        u8 *ql = (u8 *)rt_light + (RT_H - PANEL_H) * RT_PBYTES + i * (RT_W / 8 - 2);
+        u8 *qd = (u8 *)rt_dark + (RT_H - PANEL_H) * RT_PBYTES + i * (RT_W / 8 - 2);
+        if (!pk[i][0] || pk[i][0] != W->pan_k[i][0]) continue;
+        for (r = 0; r < PANEL_H; r++, ql += RT_PBYTES, qd += RT_PBYTES) {
+            WR16(ql, 0, pl[r]); WR16(qd, 0, pd[r]);
+        }
+    }
+}
+
+// the facing arrows around the active unit at Wait, the one it faces black
+static void draw_arrows(void)
+{
+    static const s8 ax[4] = { 13, 13, -13, -13 }, ay[4] = { -6, 7, 7, -6 };
+    static const s8 fdx[4] = { 1, -1, 0, 0 }, fdz[4] = { 0, 0, 1, -1 };
+    const Unit *un = &st.unit[st.act];
+    Feet f = unit_feet(st.rot, st.act);
+    s16 u0, v0, du, dv;
+    u8 g, r, sel, lm[8], mk[8];
+    RtSprite sp;
+    view_of(st.rot, 1, 1, &u0, &v0);
+    view_of(st.rot, 1 + fdx[un->face], 1 + fdz[un->face], &du, &dv);
+    du -= u0; dv -= v0;
+    sel = dv < 0 ? 0 : du > 0 ? 1 : dv > 0 ? 2 : 3;
+    sp.w = 8; sp.h = 8; sp.light = sp.dark = lm; sp.mask = mk;
+    for (g = 0; g < 4; g++) {
+        for (r = 0; r < 8; r++) {
+            u8 fi = W->arrow[g][0][r], o = W->arrow[g][1][r];
+            lm[r] = g == sel ? fi : (u8)(o & ~fi);
+            mk[r] = (u8)~o;
+        }
+        draw_sprite(f.x - st.camx + ax[g] - 4, f.y - st.camy + ay[g] - 4, &sp);
     }
 }
 
@@ -1229,7 +1485,8 @@ void game_render(void)
     // the cursor, above everything (blinking)
     dst_screen(st.camx, st.camy);
     view_of(st.rot, st.cx, st.cz, &u, &v);
-    if (rt_frame & 8 || st.mode == M_TARGET)
+    if (st.mode == M_FACE) draw_arrows();
+    else if (rt_frame & 8 || st.mode == M_TARGET)
         blit24(scene_x(st.rot, u, v) - HW, scene_y(u, v) - (map_tiles[st.cz * MAP_W + st.cx].stand >> 1) * HU,
                12, cur_l, cur_d, cur_m);
     draw_hud();

@@ -261,6 +261,22 @@ IMPLEMENTATION** (what the TI does, and why).
   AT list of the next ORDER_N (6) turns. Until the menus (milestone 16): enemies and the guest
   wait (+40), a player's unit moves (+20, the turn ends) or waits with [diamond].
 
+### The turn menu (milestone 16)
+
+- OBSERVED (run, `oracle.py --turns`): Ramza's turn opens a menu whose third entry is Wait
+  (DOWN DOWN CIRCLE from the first, Move, then Act); Wait asks for the facing, confirmed with
+  CIRCLE, and the turn ends with the +40 bonus.
+- TARGET (`menu_keys`, `make_window`, `make_panel`, `draw_arrows` in `fft.c`): Move / Act /
+  Wait / Status at the top right, one line each in AMS's small font; Move once (greyed after),
+  Act greyed until milestone 17; Wait shows four arrows on the neighbouring tiles' sides, the
+  facing in black, turned by the arrows as the cursor moves. Differences from FFT, for the TI:
+  a move can be undone ([shift] in the menu) until the unit acts, which FFT does not allow;
+  Status shows only what the battle uses (level, HP, MP, Move, Jump, Speed, PA, MA: Brave,
+  Faith and the zodiac stay hidden numbers, decision of milestone 13; no EXP or JP until
+  milestone 19); the units' panels follow Metal Gear Solid: Portable Ops (the user's
+  reference) instead of FFT's bottom windows: two thin columns at the bottom corners, read
+  sideways, with the name, HP and MP as numbers and gauges, so the map keeps its height.
+
 ## Numbers
 
 | | FFT | TI | how |

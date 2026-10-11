@@ -95,11 +95,21 @@ with `-pack` (decided at milestone 13).
     list, the next six turns, enemies on light grey); the cursor and the camera to the active
     unit; enemies wait, a player's unit moves or waits ([diamond]). The HUD strips cached (a
     40-turn battle stays under 356k a frame; program 22,935 bytes).
-16. **The turn and its menu.** Move / Act / Wait / Status, a move undone before acting, the
+16. **The turn and its menu** (done). Move / Act / Wait / Status, a move undone before acting, the
     facing chosen at Wait (the four directions shown on the tile), the active unit's panel
-    (name, job, HP, MP, CT) and the cursor's target panel; a menu readable in 160 x 100 (a
-    small font window at the bottom, one line per entry); the turn played by key scripts.
-    Done: a whole player turn by keys in a test, the enemies only waiting.
+    and the cursor's target panel, only what the player uses (name, HP, MP; no CT, Brave,
+    Faith or EXP, which FFT's panel shows but nobody reads), drawn in thin columns against
+    the screen's left and right edges as Metal Gear Solid: Portable Ops does (its life and
+    stamina are thin vertical gauges at the bottom left, the weapon and its ammo written
+    turned 90 degrees along the right edge): HP / MP as vertical gauges, the name as text
+    turned a quarter, pre-rendered like the turn labels, so the map keeps its full height;
+    a menu readable in 160 x 100 (a small font window, one line per entry); the turn played
+    by key scripts.
+    Done: a whole player turn by keys in a test (`test_menu`, `keys/turn.txt`: TI = PC), the
+    enemies only waiting. The panels show HP and MP as numbers too (`52/52`, `16/16`, a 3 x 5
+    digit font, the user's request) beside their gauges; the menu at the top right; a window
+    or panel drawn one part a frame, the scene made again only for the reach rings: a
+    1300-frame battle stays under 345k a frame; program 26,445 bytes.
 17. **Attack.** The weapon's range in tiles with FFT's height rules (vertical tolerance; bows
     and their arc where the battle has them), the target chosen on the map with its hit
     chance and predicted damage shown, FFT's evasion (class, shield, accessory; front, side
@@ -128,7 +138,10 @@ with `-pack` (decided at milestone 13).
 21. **Presentation.** Every pose the battle uses (attack, hit, KO, crystal, chest), the
     number and the hit flash, the menu windows drawn over the scene at a fixed cost, the
     turn order and HP readable at a glance (outlined, 2-pixel details), the camera moving
-    to the action. Frame <= 360k in every state.
+    to the action. The cursor and the ground markers (reach rings, targets, areas) fit the
+    tile they sit on: several inclinations drawn (flat, and each slope direction of the
+    tile, as the view shows it), maybe several sizes too, instead of one flat diamond on
+    every tile. Frame <= 360k in every state.
 22. **The whole battle on the calculator.** Titanium then TI-89 HW2: one full battle in TiEmu
     (a GIF), the cycles per state, the program and data sizes, the free RAM.
 
