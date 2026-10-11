@@ -1,7 +1,8 @@
-# A whole player turn from fft(8) (Ramza's first turn): Act (greyed: nothing), Status and
-# back, Move to (4, 9), the move undone, Move and back, Wait facing +x; then the next recruit
-# leaves its menu (looking around), the cursor moves, A on an empty tile: back to its menu.
-#   make xcheck XCHECK=8 FRAMES=360 KEYS=keys/turn.txt
+# A whole player turn from fft(10) (Ramza's first turn): down to Status past Act and Wait,
+# Status and back, Move to (4, 9), the move undone, Move and back, Wait facing +x; then the
+# next recruit leaves its menu (looking around), the cursor moves, A on an empty tile: back to
+# its menu.
+#   make xcheck XCHECK=10 FRAMES=360 KEYS=keys/turn.txt
 20 DOWN
 22
 30 DOWN

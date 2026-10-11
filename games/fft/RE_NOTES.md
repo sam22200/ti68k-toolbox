@@ -82,6 +82,14 @@ IMPLEMENTATION** (what the TI does, and why).
   four KOs among them. `battle.py --check ... oracle.h turns.txt` turns them into the fixture:
   each turn's CT bonus is its unit's CT at the next turn less the ticks between (counted on a
   living unit that did not act).
+- **Attacks** (milestone 17): `tools/oracle.py --attack DISC STATE 40 400 attacks.txt` goes on from
+  the first-turn state: Ramza's menu DOWN, CIRCLE (Act), CIRCLE (Attack), CIRCLE (closes the
+  help box), LEFT (the recruit south of him), CIRCLE: the preview; then Execute and OK (two
+  CIRCLEs). Units cannot be moved by poking x / y (the game finds a target through its own
+  map of the tiles), so the cases poke the two units' stats instead (PA +0x36, Speed +0x38,
+  Brave +0x24, right hand +0x1d, sign: birthday +0x09 high nibble, sex +0x06 0x80 / 0x40,
+  facing +0x49 low nibble). 40 previews and 400 attacks in 9 min; `battle.py --check ...
+  attacks.txt` writes them into oracle.h.
 
 ## Behaviour and data
 
@@ -277,6 +285,57 @@ IMPLEMENTATION** (what the TI does, and why).
   reference) instead of FFT's bottom windows: two thin columns at the bottom corners, read
   sideways, with the name, HP and MP as numbers and gauges, so the map keeps its height.
 
+### Attack (milestone 17)
+
+- OBSERVED (fft_decomp, read: `battle_action_run_pre_formula_setup`, `battle_formula_weapon_damage`,
+  `battle_formula_calculate_weapon_damage`, `..._physical_evade`, `..._facing_evade`,
+  `..._final_hit_percent`, `..._zodiac_compatibility`, `..._critical_hit`, `..._knockback`,
+  `battle_move_check_knockback_destination`, `battle_move_apply_knockback`,
+  `battle_target_calculate_strike_lunge_range`, `battle_target_calculate_aoe_vertical_tolerance`):
+  Attack runs the weapon's formula; the battle's weapons (Dagger 0x01: knife, WP 3; Broad
+  Sword 0x13: sword, WP 4; none: item 0) all use formula 1 and strike (flag 0x80). XA = PA
+  (sword, bare hands) or (PA + Speed) / 2 (knife), then the zodiac (below), then a critical
+  hit (rand() * 100 / 32768 < 4) adds rand() * XA / 32768 to XA and calls the knockback;
+  damage XA * YA, YA = WP (bare hands: PA * Brave / 100, at least 1), at most 999. Each step
+  is a 16-bit multiply then a truncated division. Zodiac: the signs' distance indexes
+  BATTLE.BIN 0x8018f600 (0 0 0 1 2 0 3 0 2 1 0 0: 1 bad, 2 good, 3 opposite: worst for the
+  same sex, best else); p = XA * 25: good +p / 100, best +p / 50, bad -p / 100, worst -p / 50,
+  XA at least 1. Hit: evades are the target's class evade (job byte 0x19: Ramza's Squire 10,
+  the other Squires and Chemists 5), shield, accessory, weapon (only with Weapon Guard); the
+  attack's dominant axis against the target's facing: facing the attacker is the front (all
+  evades), the back drops class and shields, a side the class evade; accessory evade always
+  counts; each source rolled rand() * 100 / 32768 >= evade. The preview draws the same rolls
+  (it advances the RNG) and shows no critical (its random value is 0x4000). Range: the four
+  neighbouring tiles whose height (2 h + half, half units) is within [h - 6, h + 5] of the
+  attacker's. Knockback (a critical only, not when it kills): one tile away along the
+  dominant axis (a tie: y), onto a tile in the map, free, not higher (facing edges compared),
+  without water or lava; a fall of more than Jump levels costs (levels - Jump) * max HP / 10.
+  At 0 HP the unit is Dead, its death counter 3. HP <= max / 5: Critical (the kneeling pose).
+- OBSERVED (`BATTLE/TYPE1.SEQ`, animation records from 0x406, (frame, ticks) pairs and 0xFF
+  opcodes): hit 19 / 20 (animations 66-69), the swing 11, 27 (wind-up), 31 (blow), 27 facing
+  the camera and 29, 33 facing away (52-57), kneeling 21 / 22, lying 23 / 24 (102-105). The
+  weapon is a separate sprite in FFT (WEP*.SPR), not in these frames.
+- OBSERVED (run, `oracle.py --attack`: Ramza's first turn, Act, Attack, the recruit south of him
+  (a target can be an ally), the preview read at 0x8014d056 / 0x8014d058): the game's own case
+  previews 95 % and 12 (Broad Sword, PA 5; the target faces him, opposite signs, both male:
+  worst); 40 cases with the attacker's PA, Speed, Brave, weapon, sign and sex and the target's
+  sign, sex and facing poked: every preview equals the model. 400 attacks executed in the
+  game's case (each after other cursor moves, which draw rand()): 19 misses (4.75 %), 8
+  criticals seen (damage above 12, 2.0 %; with XA 3 a critical adds 0 a third of the time), no
+  push (the tile behind the target is higher), 11.55 HP per attack.
+- TARGET (`attack_range`, `attack_side`, `hit_chance`, `attack_damage`, `attack`, `attack_step`
+  in `fft.c`): the same rules and numbers with our RNG (`make test`: the 40 previews equal;
+  4000 of our attacks: misses 4.2 %, criticals seen 2.9 %, 11.68 HP per attack). Our draws use
+  a 32-bit xorshift: the runtime's wyhash16 (16-bit state) tied two draws in a row, every
+  critical then adding at least 1 (criticals seen 3.8 %). Differences, for the TI: Act goes straight
+  to the weapon's targets (FFT's submenu of Attack and the skills comes with them, milestone 18);
+  only a tile with a living unit can be confirmed (FFT lets an empty tile be attacked); the
+  knockback compares standing heights, and a fall's damage is added to the number shown; the
+  preview is a small window at the top right (Hit 95% / Dmg 12) instead of FFT's two portraits;
+  the poses are FFT's, scaled 0.6, without the weapon (milestone 21); the attack takes 34
+  frames (~1.1 s: wind-up 6, blow 4, the target hit 8, the number rising 8 px), the number in
+  black with a white outline (FFT: white). EXP and JP come at milestone 19.
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -288,3 +347,4 @@ IMPLEMENTATION** (what the TI does, and why).
 | HP at level 1 | Squires 34-44, Chemists 35-38, Ramza 52, Delita 53 | same model, drawn | `battle.py --check`, `test_draw` |
 | rotation | ~0.5 s, smooth | 3 frames, 0.54 s | ti-cycles |
 | CT | +Speed per tick, act at 100+, -100, +20 per unused Move / Act, max 60 | same | decomp, 46 turns of `oracle.py --turns` |
+| Attack | XA (PA, knife (PA + SP) / 2) x WP, zodiac, critical 4 %, hit 100 - class evade from the front | same | decomp, 40 previews and 400 attacks of `oracle.py --attack` |

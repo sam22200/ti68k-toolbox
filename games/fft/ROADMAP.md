@@ -110,13 +110,25 @@ with `-pack` (decided at milestone 13).
     digit font, the user's request) beside their gauges; the menu at the top right; a window
     or panel drawn one part a frame, the scene made again only for the reach rings: a
     1300-frame battle stays under 345k a frame; program 26,445 bytes.
-17. **Attack.** The weapon's range in tiles with FFT's height rules (vertical tolerance; bows
+17. **Attack** (done). The weapon's range in tiles with FFT's height rules (vertical tolerance; bows
     and their arc where the battle has them), the target chosen on the map with its hit
     chance and predicted damage shown, FFT's evasion (class, shield, accessory; front, side
     and back), the weapon's damage formula, zodiac compatibility, the critical hit and
     knockback, the damage number rising above the target, the attack and hit poses, KO at 0
     HP. TI and emulator run (the first battle-menu frame measured on hardware paths). Done:
     hit chance and mean damage equal to the original's over repeated trials in the oracle.
+    Done: FFT's formulas read in the decompilation (`RE_NOTES.md` § Attack); 40 previews of the
+    original (stats, weapon, signs, sexes, facing poked) equal ours, and 400 executed attacks
+    (4.75 % misses, 2.0 % criticals seen, 11.55 HP per attack) match 4000 of ours (4.2 %, 2.9 %,
+    11.68). Act opens the reach (the four tiles within the height limits), the preview at the
+    top right (Hit / Dmg), the swing, the hit, kneeling and KO poses (FFT's frames, `fftu`
+    37.4 KB), the number rising, knockback, KO out of the turn order (`keys/attack.txt`: TI =
+    PC). No bows at Gariland; the weapon sprite and FFT's Attack / skills submenu come later
+    (21, 18). The rings' boxes put back instead of the whole scene copied, the rings drawn two
+    a frame: an attack stays under 340k a frame, Move is no longer a stall (350k), a 1300-frame
+    battle with attacks 344k at most; program 29,905 bytes. The emulator run is left for
+    milestone 22 with the whole battle (the menus touch no hardware path; this session had no
+    X display).
 18. **The units' abilities.** The skills of the jobs present at Gariland (decided at 13 from
     the deployment: Squire's Basic Skill, Chemist's Items, Thief's skills, Ramza's own...):
     targeting areas, MP and charge time where they have one (a charging unit in the turn

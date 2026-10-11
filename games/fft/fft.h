@@ -8,8 +8,8 @@
 
 typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py
 // battle.h (tools/battle.py): FFT's numbers for the Gariland battle
-typedef struct { u8 growth[5], mult[5], move, jump; } Job;   // raw stats HP MP SP PA MA
-typedef struct { u8 id, hp, mp, pa, ma, sp, move, jump; } Item;
+typedef struct { u8 growth[5], mult[5], move, jump, cev; } Job;   // raw stats HP MP SP PA MA
+typedef struct { u8 id, hp, mp, pa, ma, sp, move, jump, wp, knife; } Item;
 typedef struct {
     u8 gfx, job, type, level, brave, faith;   // type: the generation table (male, female, Ramza)
     u16 day;                                   // birthday 1..365; 0, and Brave / Faith 0: drawn
@@ -40,11 +40,21 @@ typedef struct {
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
 #define DC_GONE 0xFF                   // death counter out: a crystal or a chest (milestone 19)
 #define PANEL_H 46                     // a unit's panel against a side of the screen, at the bottom
+// an attack's frames: the wind-up, the blow from ACT_BLOW, the target hit (its HP lost, the
+// number shown) at ACT_HIT, its hit pose for HIT_FRAMES, the number rising NUM_RISE pixels,
+// the menu back at ACT_END
+#define ACT_BLOW 6
+#define ACT_HIT 10
+#define HIT_FRAMES 8
+#define NUM_RISE 8
+#define ACT_END 34
 
 // M_BROWSE: the cursor free (enemies' turns, or the player looking around); M_MENU: the
 // player's turn menu; M_TARGET: the reach shown, a tile to pick; M_WALK; M_FACE: the facing
-// chosen at Wait; M_STATUS: a unit's numbers
-enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS };
+// chosen at Wait; M_STATUS: a unit's numbers; M_AIM: the weapon's reach shown, a target to
+// pick; M_ACT: the attack played
+enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT };
+enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
 enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
 #define U_RAMZA 6                      // in battle.h's order: Delita, five enemies, Ramza, recruits
@@ -54,6 +64,7 @@ enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD, EQ_N };
 typedef struct {
     u8 x, z, gfx, team, face;          // face: world +x, -x, +z, -z
     u8 job, level, brave, faith, zodiac;   // job: index in jobs[]; zodiac 0 Aries .. 11 Pisces
+    u8 female;
     u8 eq[EQ_N];                       // index in items[], 0xFF none
     u16 hp, max_hp, mp, max_mp;
     u8 pa, ma, sp, ct, move, jump;
@@ -79,6 +90,9 @@ typedef struct {
     u8 menu, back;                     // the menu's entry; the mode M_STATUS returns to
     u8 moved, acted;                   // this turn so far
     u8 mx, mz, mface, wface;           // the active unit before its move (undone), at Wait
+    u8 atk, tgt, act_t;                // M_ACT: attacker, target, frame
+    u8 hit, crit, push, kx, kz;        // its outcome: hit, critical, pushed to (kx, kz)
+    u16 dmg;                           // HP taken (the fall's included)
 } State;
 extern State st;
 
@@ -100,6 +114,13 @@ void ct_end(u8 who, u8 moved, u8 acted);   // its CT when the turn ends
 void turn_order(void);                 // st.turns from the CTs
 void compute_reach(u8 who);            // st.reach from unit who (BFS, Move/Jump)
 u8 make_path(u8 who, u8 tx, u8 tz);    // st.path to a reachable tile, its length
+// FFT's Attack (RE_NOTES.md § Attack): the tiles a weapon reaches (st.reach 1, else 0xFF), the
+// side an attack comes from, the hit chance and the damage (crit: XA + r * XA / 32768, r 0..32767)
+void attack_range(u8 who);
+u8 attack_side(u8 a, u8 t);
+u8 hit_chance(u8 a, u8 t);
+u16 attack_damage(u8 a, u8 t, u8 crit, u16 r);
+void attack(u8 a, u8 t);               // rolled and started (M_ACT), its outcome in st
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
 extern u8 scene_rot;                   // orientation it holds (0xFF: stale)

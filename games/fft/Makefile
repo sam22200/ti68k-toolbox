@@ -32,16 +32,20 @@ battle.h: tools/battle.py
 	@test -f $(DISC) || { echo "missing the local disc roms/ps1/Final Fantasy Tactics (USA) (not in git)"; exit 1; }
 	$(PY) tools/battle.py $(DISC) $@
 # the original at Ramza's first turn (tools/oracle.py, 30 s, once), its next 40 turns played by
-# its AI (20 s, once), and its units and turns for the tests
+# its AI (20 s, once), 40 attack previews and 400 attacks (9 min, once), and its units, turns
+# and attacks for the tests
 ORACLE := $(TI)/sources/fft_ps1/gariland_t1
 TURNS := $(TI)/sources/fft_ps1/gariland_turns.txt
+ATTACKS := $(TI)/sources/fft_ps1/gariland_attacks.txt
 $(ORACLE).state:
 	$(PY) tools/oracle.py $(DISC) $@ $(ORACLE).txt
 $(TURNS): $(ORACLE).state
 	$(PY) tools/oracle.py --turns $(DISC) $(ORACLE).state 40 $@
-oracle.h: tools/battle.py $(ORACLE).state $(TURNS)
-	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS)
+$(ATTACKS): $(ORACLE).state
+	$(PY) tools/oracle.py --attack $(DISC) $(ORACLE).state 40 400 $@
+oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS)
+	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS)
 $(NAME)_test: oracle.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h battle.h art.h fft.h $(VIEWS:=.bin) fftu.bin
-XCHECK := 0 1 2 3 4 5 6 7
+XCHECK := 0 1 2 3 4 5 6 7 8 9
 FRAMES := 40

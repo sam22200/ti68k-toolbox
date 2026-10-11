@@ -2,17 +2,21 @@
 """The Gariland battle's units from the local FFT disc -> battle.h (never committed).
 
 usage: battle.py DISC.cue battle.h                 the data the game draws its units from
-       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt]]   every unit of the
-           original at Ramza's first turn and their start tiles (tools/oracle.py) against this
-           model; oracle.h: their raw stats, equipment and stats for the C tests (never
-           committed), and with TURNS (oracle.py --turns) the battle's turns for the clock test
+       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt]]]
+           every unit of the original at Ramza's first turn and their start tiles
+           (tools/oracle.py) against this model; oracle.h: their raw stats, equipment and stats
+           for the C tests (never committed), with TURNS (oracle.py --turns) the battle's turns
+           for the clock test, with ATTACKS (oracle.py --attack) the attacks' previews and the
+           executed attacks' outcome
 Read from SCUS_942.21 (tables named after adamrt/fft_decomp, RE_NOTES.md § The battle's units):
 the jobs (0x800610b8, 48 bytes: growth and multiplier per raw stat, Move, Jump), the items
 (0x80062eb8 primary, 12 bytes; helmet / armour HP and MP 0x80063ed8; attributes 0x800642c4,
-25 bytes: PA, MA, SP, Move, Jump), the unit generation tables (0x8005e90c base, 0x8005e93c
+25 bytes: PA, MA, SP, Move, Jump; weapons 0x80063ab8, 8 bytes: range, flags, formula, -, WP;
+the jobs' class evade, byte 0x19), the unit generation tables (0x8005e90c base, 0x8005e93c
 variance: generic male, generic female, Ramza), the zodiac's day limits (0x800661e8); from
 BATTLE/ENTD*.ENT the encounters (40 bytes per unit): Gariland 0x184 (Delita, five enemies) and
-the Military Academy 0x188 (the recruits who join before it).
+the Military Academy 0x188 (the recruits who join before it); from BATTLE.BIN the zodiac
+compatibility table (0x8018f600).
 The model (FFT's own, read in the decompilation and checked here on the oracle):
 - raw stat (24 bits) = base << 14 + rand15 * variance / 2 (rand15: 0..32767);
 - per level above 1: raw += raw / (growth + level - 1);
@@ -27,8 +31,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 import extract                  # noqa: E402  (disc access)
 
 EXE = 0x80010000 - 0x800        # SCUS_942.21: file offset = address - EXE
-JOBS, ITEMS, ARMOUR, ATTRS = 0x800610b8, 0x80062eb8, 0x80063ed8, 0x800642c4
+JOBS, ITEMS, ARMOUR, ATTRS, WEAPONS = 0x800610b8, 0x80062eb8, 0x80063ed8, 0x800642c4, 0x80063ab8
+KNIFE, SWORD = 1, 3                  # item types: XA = (PA + SP) / 2, XA = PA
 GEN_BASE, GEN_VAR, ZODIAC = 0x8005e90c, 0x8005e93c, 0x800661e8
+BAT, ZCOMPAT = 0x80067000, 0x8018f600     # BATTLE.BIN: file offset = address - BAT; the zodiac table
 RANDOM, NONE = 0xFE, 0xFF
 T_MALE, T_FEMALE, T_RAMZA = 0, 1, 2
 # equipment slots of a battle unit (battle_stats_t 0x1a) and the item ids of each category
@@ -54,6 +60,7 @@ class Disc:
         disc, files = extract.disc_files(cue)
         self.exe = disc.read(*files['SCUS_942.21'])
         self.ent = {k: disc.read(*files['BATTLE/ENTD%d.ENT' % k]) for k in (1, 2, 3, 4)}
+        self.bat = disc.read(*files['BATTLE.BIN'])
 
     def at(self, addr, n):
         return self.exe[addr - EXE:addr - EXE + n]
@@ -66,7 +73,7 @@ class Disc:
     def job(self, j):
         b = self.at(JOBS + 48 * j, 48)
         return {'growth': list(b[13:23:2]), 'mult': list(b[14:23:2]), 'move': b[23], 'jump': b[24] & 0x7F,
-                'cats': b[9:13]}
+                'cats': b[9:13], 'cev': b[0x19]}
 
     def item(self, i):
         b = self.at(ITEMS + 12 * i, 12)
@@ -74,7 +81,11 @@ class Disc:
         hp = mp = 0
         if b[3] & 0x30:
             hp, mp = self.at(ARMOUR + 2 * b[4], 2)
-        return {'level': b[2], 'flags': b[3], 'type': b[5], 'hp': hp, 'mp': mp,
+        wp = 0
+        if b[3] & 0x80:                    # a weapon: range, flags, formula, -, WP, W-Ev, element, proc
+            w = self.at(WEAPONS + 8 * i, 8)
+            wp = w[4] if b[5] in (KNIFE, SWORD) and w[1] & 0x80 and w[2] == 1 else 0xFF   # else: not modelled
+        return {'level': b[2], 'flags': b[3], 'type': b[5], 'hp': hp, 'mp': mp, 'wp': wp,
                 'pa': a[0], 'ma': a[1], 'sp': a[2], 'move': a[3], 'jump': a[4]}
 
     def gen(self, t):
@@ -175,7 +186,7 @@ def turn_rows(path, sp):
     return out
 
 
-def check(d, state, trace, fixture=None, turns=None):
+def check(d, state, trace, fixture=None, turns=None, attacks=None):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../.claude/skills/ti-port-ps1/scripts'))
     from psxrun import PSX
     out, null = os.dup(1), os.open(os.devnull, os.O_WRONLY)
@@ -240,6 +251,32 @@ def check(d, state, trace, fixture=None, turns=None):
                 + '\n'.join('    { %d, %d, { %s }, 0x%03X },' % (u, b, ', '.join(map(str, c)), m) for u, b, c, m in t)
                 + '\n};\n')
             print('%d turns' % len(t))
+        if attacks:
+            cases, trials = [], []
+            for ln in open(attacks):
+                w = ln.split()
+                if w and w[0] == 'case':
+                    v = list(map(int, w[1:]))
+                    v[3] = items.index(v[3]) if v[3] in items else 0xFF
+                    v[8] = FACE[v[8]]
+                    cases.append(v)
+                elif w and w[0] == 'trial':
+                    trials.append((int(w[1]), int(w[2])))
+            base = min(dm for dm, _ in trials if dm)   # a hit without a critical (the preview)
+            open(fixture, 'a').write(
+                '// The original\'s attack previews (tools/oracle.py --attack): Ramza on the recruit south of\n'
+                '// him, poked: his PA, Speed, Brave, weapon (item index, 0xFF none), sign, female; the\n'
+                '// target\'s sign, female, facing (ours); the hit %% and damage FFT shows.\n'
+                '#define ORACLE_ATTACKS %d\n'
+                'static const u8 oracle_attacks[ORACLE_ATTACKS][11] = {\n' % len(cases)
+                + '\n'.join('    { %s },' % ', '.join(map(str, c)) for c in cases) + '\n};\n'
+                '// Attacks executed in the first of them (the target facing him: 95 %%): the damage\n'
+                '// without a critical, the attacks, misses, hits above it (criticals; one adding 0 is not\n'
+                '// seen), total damage, pushes\n'
+                'static const u16 oracle_trials[6] = { %d, %d, %d, %d, %d, %d };\n' % (
+                    base, len(trials), sum(1 for dm, _ in trials if not dm),
+                    sum(1 for dm, _ in trials if dm > base), sum(dm for dm, _ in trials), sum(p for _, p in trials)))
+            print('%d attack cases, %d trials' % (len(cases), len(trials)))
     return bad
 
 
@@ -253,20 +290,27 @@ def write(d, path):
             '// committed. The Gariland battle: its jobs, items, the unit generation tables and the\n'
             '// eleven units (fft.h: Job, Item, UnitDef), numbers as FFT has them.\n')
     f.write('#define NJOB %d\n#define NITEM %d\n#define NUNIT %d\n' % (len(jobs), len(items), len(defs)))
-    f.write('static const Job jobs[NJOB] = {   // FFT job id: growth and multiplier (HP MP SP PA MA), Move, Jump\n')
+    f.write('static const Job jobs[NJOB] = {   // FFT job id: growth and multiplier (HP MP SP PA MA), Move, Jump,\n'
+            '                                  // class evade\n')
     for j in jobs:
         e = d.job(j)
-        f.write('    { { %s }, { %s }, %d, %d },   // %02X\n' % (', '.join(map(str, e['growth'])), ', '.join(map(str, e['mult'])),
-                                                          e['move'], e['jump'], j))
-    f.write('};\nstatic const Item items[NITEM] = {   // FFT item id, HP, MP, PA, MA, SP, Move, Jump\n')
+        f.write('    { { %s }, { %s }, %d, %d, %d },   // %02X\n' % (', '.join(map(str, e['growth'])), ', '.join(map(str, e['mult'])),
+                                                              e['move'], e['jump'], e['cev'], j))
+    f.write('};\nstatic const Item items[NITEM] = {   // FFT item id, HP, MP, PA, MA, SP, Move, Jump; a weapon\'s WP and\n'
+            '                                    // its XA (0 PA: a sword, 1 (PA + SP) / 2: a knife)\n')
     for i in items:
         it = d.item(i)
-        f.write('    { 0x%02X, %d, %d, %d, %d, %d, %d, %d },\n' % (i, it['hp'], it['mp'], it['pa'], it['ma'], it['sp'], it['move'], it['jump']))
+        assert it['wp'] != 0xFF, 'item %02X: a weapon other than a striking knife or sword (formula 1)' % i
+        f.write('    { 0x%02X, %d, %d, %d, %d, %d, %d, %d, %d, %d },\n' % (i, it['hp'], it['mp'], it['pa'], it['ma'], it['sp'],
+                                                                it['move'], it['jump'], it['wp'], it['type'] == KNIFE))
     f.write('};\n// raw stat base and variance per unit type (generic male, generic female, Ramza)\n')
     f.write('static const u8 gen_base[3][5] = { %s };\n' % ', '.join('{ %s }' % ', '.join(map(str, d.gen(t)[0])) for t in range(3)))
     f.write('static const u8 gen_var[3][5] = { %s };\n' % ', '.join('{ %s }' % ', '.join(map(str, d.gen(t)[1])) for t in range(3)))
     f.write('static const u16 zodiac_days[12] = { %s };   // a sign starts at each\n'
             % ', '.join(map(str, struct.unpack('<12H', d.at(ZODIAC, 24)))))
+    f.write('// zodiac compatibility by the signs\' distance (0 neutral, 1 bad, 2 good, 3 opposite: worst for\n'
+            '// the same sex, best else)\n')
+    f.write('static const u8 zodiac_compat[12] = { %s };\n' % ', '.join(map(str, d.bat[ZCOMPAT - BAT:ZCOMPAT - BAT + 12])))
     f.write('// the units in FFT\'s order: sheet, job, type, level, Brave, Faith (0: drawn), birthday (0:\n'
             '// drawn), x, z, facing, team, equipment (head, body, accessory, weapon, shield: up to two\n'
             '// item indices, one drawn; 0xFF none)\n')
@@ -284,8 +328,8 @@ def write(d, path):
 def main():
     d = Disc(sys.argv[1])
     if sys.argv[2] == '--check':
-        a = sys.argv + [None, None]
-        sys.exit(1 if check(d, a[3], a[4], a[5], a[6]) else 0)
+        a = sys.argv + [None, None, None]
+        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7]) else 0)
     write(d, sys.argv[2])
 
 
