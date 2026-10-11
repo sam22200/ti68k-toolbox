@@ -5,6 +5,8 @@ turn at Gariland, saved as a core state (never committed). RE_NOTES.md § Battle
 usage: oracle.py DISC.cue OUT.state [trace.txt]
        oracle.py --turns DISC.cue STATE N turns.txt
        oracle.py --attack DISC.cue STATE N M attacks.txt
+       oracle.py --skills DISC.cue STATE M skills.txt
+       oracle.py --rewards DISC.cue STATE rewards.txt
 The trace lists, from the battle's start to Ramza's turn, every frame where a unit's HP, CT,
 position or the turn unit changed (the turn order and the AI turns as the game plays them).
 Deterministic: the same inputs and pokes at the same frames give the same battle (the RNG
@@ -269,7 +271,60 @@ def skills(psx, state, m):
     return rows
 
 
+# name, menu (Ramza's, from the first-turn state, skill_setup applied), target HP poked,
+# Ramza's EXP poked (None: kept)
+REWARDS = [('attack', 'DOWN:30 CIRCLE:40 ', None, None),
+           ('kill', 'DOWN:30 CIRCLE:40 ', 1, None),
+           ('levelup', 'DOWN:30 CIRCLE:40 ', None, 95),
+           ('potion', ITEM, 10, None),
+           ('heal-none', GUTS + 'DOWN:20 ' * 3, None, None),
+           ('dash', GUTS + 'DOWN:20 ', None, None)]
+
+
+def reward_state(psx):
+    """Per unit (battle.h order): EXP, level, JP and total JP of career slots 0 and 1, job level
+    byte 0; then Ramza's five raw stats, max HP, HP and the target's HP."""
+    out = []
+    for i in IDS:
+        a = UNITS + UNIT_SIZE * i
+        out += [psx.read(a + 0x21), psx.read(a + 0x22), psx.read(a + 0xdc, 2), psx.read(a + 0xde, 2),
+                psx.read(a + 0x104, 2), psx.read(a + 0x106, 2), psx.read(a + 0xd2)]
+    a = UNITS + UNIT_SIZE * ATTACKER
+    out += [psx.read(a + 0x72 + 3 * k) | psx.read(a + 0x73 + 3 * k) << 8 | psx.read(a + 0x74 + 3 * k) << 16
+            for k in range(5)]
+    return out + [psx.read(a + 0x2a, 2), psx.read(a + 0x28, 2), psx.read(UNITS + UNIT_SIZE * TARGET + 0x28, 2)]
+
+
+def rewards(psx, state):
+    rows = []
+    t, a = UNITS + UNIT_SIZE * TARGET, UNITS + UNIT_SIZE * ATTACKER
+    for name, menu, hp, exp in REWARDS:
+        psx.load(state)
+        skill_setup(psx)
+        if hp is not None:
+            psx.write(t + 0x28, hp, 2)
+        if exp is not None:
+            psx.write(a + 0x21, exp)
+        s = taps(menu + 'CIRCLE:60 CIRCLE:60 LEFT:40 CIRCLE:60')
+        run(psx, len(s) + 1, s)
+        before = reward_state(psx)
+        s = taps('CIRCLE:60 CIRCLE:600'); run(psx, len(s) + 1, s)
+        rows.append('reward %s  %s  %s' % (name, ' '.join(map(str, before)), ' '.join(map(str, reward_state(psx)))))
+    return rows
+
+
 def main():
+    if sys.argv[1] == '--rewards':
+        out = os.dup(1)
+        os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        psx = PSX(sys.argv[2])
+        rows = rewards(psx, sys.argv[3])
+        open(sys.argv[4], 'w').write(
+            '# reward NAME  before and after the action: per unit (battle.h order) EXP, level, JP and\n'
+            '# total JP of career slots 0 and 1, job level byte 0; Ramza raw HP MP SP PA MA, max HP, HP;\n'
+            '# the target HP\n' + '\n'.join(rows) + '\n')
+        os.write(out, ('%d rows\n' % len(rows)).encode())
+        return
     if sys.argv[1] == '--skills':
         out = os.dup(1)
         os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
