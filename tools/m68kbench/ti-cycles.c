@@ -28,7 +28,9 @@
  * DerefSym, EM_moveSym*), the fonts of OO_CondGetAttr (runtime/platform-sw/amsfont.h, extracted
  * from the TI OS; blank glyphs without it), FontGetSys/FontSetSys, GKeyFlush.
  * Each BENCH_SHOT also prints the checksum of the 160x100 view, as the PC --headless run does.
- * Output: one line per zone: id name calls total average (cycles), then ROM calls, then the
+ * Output: one line per zone: id name calls total average (cycles); then per zone called more
+ * than once "max id name cycles at call n", its costliest call (from 0, the first left out:
+ * usually the setup); then ROM calls, then the
  * whole program's cycles. Exit status 0 when _main returned.
  */
 #include <stdio.h>
@@ -69,7 +71,7 @@ static uint32_t heap_ptr = HEAP_ADDR, handles[4096];   /* handle h -> address (h
 static uint32_t handle_size[4096];
 static int nhandles = 1;
 
-static struct { char name[64]; unsigned long long sum, begin; long calls; int open; } zone[64];
+static struct { char name[64]; unsigned long long sum, begin, max; long calls, at; int open; } zone[64];
 static struct { long calls; unsigned long long cyc; } romstat[NROM];
 static const char *romname[NROM];
 static uint32_t pending_name_id;
@@ -101,7 +103,9 @@ static void io_write(uint32_t a, uint32_t v, int size)
     switch (off) {
     case 0x00: if (v < 64) { zone[v].begin = now(); zone[v].open = 1; } break;   /* BEGIN */
     case 0x02: if (v < 64 && zone[v].open) {                                    /* END */
-                   zone[v].sum += now() - zone[v].begin; zone[v].calls++; zone[v].open = 0; }
+                   unsigned long long d = now() - zone[v].begin;
+                   if (zone[v].calls && d > zone[v].max) { zone[v].max = d; zone[v].at = zone[v].calls; }
+                   zone[v].sum += d; zone[v].calls++; zone[v].open = 0; }
                break;
     case 0x04: printf("value: %ld (0x%lx)\n", (long)(int32_t)v, (unsigned long)v); break;
     case 0x08: pending_name_id = v; break;
@@ -528,6 +532,9 @@ int main(int argc, char **argv)
         if (zone[i].calls)
             printf("%-3d %-28s %8ld %12llu %10llu\n", i, zone[i].name[0] ? zone[i].name : "-",
                    zone[i].calls, zone[i].sum, zone[i].sum / zone[i].calls);
+    for (i = 1; i < 64; i++)
+        if (zone[i].calls > 1)
+            printf("max %-3d %-24s %12llu at call %ld\n", i, zone[i].name[0] ? zone[i].name : "-", zone[i].max, zone[i].at);
     for (i = 0; i < NROM; i++)
         if (romstat[i].calls)
             printf("rom %-3x %-24s %8ld %12llu   (estimated)\n", i, romname[i] ? romname[i] : "", romstat[i].calls, romstat[i].cyc);
