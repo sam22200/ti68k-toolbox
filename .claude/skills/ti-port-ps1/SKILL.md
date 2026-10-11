@@ -379,6 +379,15 @@ only: nothing extracted from the disc).
   unit and every unit's CT at the first try, fed with the original's per-turn CT bonuses
   (derived from consecutive snapshots). Text drawn every frame cost ~40k cycles in the HUD
   (ExtGraph fills and ROM `memcpy` have a high fixed cost): cache the HUD strips and copy them.
+  **Menus and panels** (milestone 16): a 1300-frame battle run under `ti-cycles` with every
+  player turn through the menu, read through the `max` lines (each zone's costliest call),
+  found the frames over budget at once: a status window of AMS text (~30k a line: draw one
+  part per frame), a panel whose text was turned a quarter pixel by pixel (78k: turn the
+  names once at the start and keep the digits as an already-turned table, 21k), and the scene
+  remade at every change of mode (130k: only when the reach rings change). Sideways panels in
+  the bottom corners (the user's Metal Gear Solid: Portable Ops reference) keep the map's height;
+  a cache that skips a turn's first frame must reset its flag when nothing changed, or a
+  change undone before the redraw stops every later one.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).

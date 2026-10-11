@@ -18,18 +18,24 @@ itself (menus, attacks, AI) is being built: `ROADMAP.md` milestones 13-22. Study
 
 | Key | Action |
 |---|---|
-| arrows | move the cursor (relative to the view: UP = up-right, RIGHT = down-right) |
+| arrows | the menu's entry; the cursor (relative to the view: UP = up-right, RIGHT = down-right); at Wait, the facing |
 | [F5] / [F1] | rotate the camera 90 degrees clockwise / counter-clockwise |
-| [2nd] or [ENTER] | on the unit whose turn it is: show the reach; on a reachable tile: walk there (the turn ends) |
-| [diamond] (PC: C) | Wait: end the turn without moving |
-| [shift] or [ESC] | cancel the selection; [ESC] with nothing selected quits |
+| [2nd] or [ENTER] | pick the menu's entry; on a reachable tile: walk there; at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
+| [shift] or [ESC] | back: from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.
-Enemies and Delita (a guest) only wait for now (half a second each); the menu with Act comes
-at milestone 16. The HUD shows the turn order at the top left (FFT's AT list: the active unit,
-then the next five turns; enemies on light grey, underlined), and at the bottom the view (S,
-W, N, E: where the camera stands), the height under the cursor in FFT units (`h2`, `h7.5` on
-a slope) and the unit there. Scenarios (`fft(n)`, `--scenario n`):
+Enemies and Delita (a guest) only wait for now (half a second each). A player's unit opens its
+menu at the top right: **Move** (once; the move can be undone with [shift] until it acts, which
+FFT does not allow), **Act** (greyed until milestone 17), **Wait** (four arrows around the
+unit, the one it faces black: the arrows turn it, [2nd] ends the turn) and **Status** (its
+level, HP, MP, Move, Jump, Speed, PA and MA; Brave, Faith and the zodiac stay hidden, as
+decided at milestone 13). The HUD shows the turn order at the top left (FFT's AT list: the
+active unit, then the next five turns; enemies on light grey, underlined), then the view (S,
+W, N, E: where the camera stands) and the height under the cursor in FFT units (`h2`, `h7.5`
+on a slope). At the bottom corners, as in Metal Gear Solid: Portable Ops, two thin panels
+read sideways: the active unit at the left, the unit under the cursor at the right (light
+grey: an enemy), each with its name, its HP and MP as `52/52` and `16/16` and a gauge beside
+each number (HP black, MP dark grey). Scenarios (`fft(n)`, `--scenario n`):
 0 the battle's start (a new draw each run: seeded from the clock; Delita's turn), and from Ramza's
 first turn (the six units before him waited): 1-4 an enemy moved behind a house seen from each
 view, 5 Ramza's reach, 6 mid-rotation, 7 Ramza walking; above 7 that turn drawn with seed n
@@ -162,27 +168,35 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   a crystal or a chest and its clock stops. The order shown is FFT's AT list (`turn_order`:
   each living unit's next turns by its clock alone, by tick then CT reached), made at each
   turn change (11 x 5 divisions, ~10k cycles).
-- **HUD.** Both strips (turn order, info line) are drawn into a work buffer when what they
-  show changes and copied each frame by words (~2k cycles): drawn every frame with
-  `draw_rect` and AMS text they cost ~40k (ExtGraph's fill and the ROM's `memcpy` have a high
-  fixed cost per call, under `ti-cycles` at least). The turn labels (Ra, De, Sq, Ch) are drawn
-  once at the start and ORed in at a bit offset; at most one strip is rebuilt per frame, and
-  not on a turn's first frame (the camera starts its pan there, the heaviest frames).
+- **HUD.** Each part (the top strip, the menu or status window, the two panels) is drawn
+  into a work buffer when what it shows changes and copied each frame by words (~5k cycles
+  for all): drawn every frame with `draw_rect` and AMS text they cost ~40k and more (ExtGraph's
+  fill and the ROM's `memcpy` have a high fixed cost per call, under `ti-cycles` at least). At
+  most one part is rebuilt per frame, none on a turn's first frame (the camera starts its pan
+  there, the heaviest frames), and a window one part a frame (its box, then each line: a
+  status line of AMS text costs up to ~38k, the box ~30k); the menu's pointer is added at the copy, so the arrows
+  redraw nothing. What does not change is made once at the start: the turn labels (Ra, De, Sq,
+  Ch) ORed in at a bit offset, the names turned a quarter for the panels, the facing arrows;
+  the panels' numbers come from a 3 x 5 digit table already turned. A panel costs ~21k to make
+  (78k when its text was turned pixel by pixel). The scene is made again only when the reach
+  rings appear or go, not at every change of mode.
 
 ## Numbers (ti-cycles, Titanium, datasheet timings)
 
 | | cycles | at 12 MHz |
 |---|---|---|
-| ordinary frame (view copy 66-73k, with water glints up to 152k; the units on screen 93-181k: 6 to 10 of the 11; cursor + HUD 15-25k) | 176-356k (a 40-turn battle: 356k at most, the camera panning over Ramza's group) | 32 fps (frame-limited) |
-| a turn change (the clock, the AT list) | +10-20k, one frame | |
-| walking frame (the walker's cover mask made again each frame) | 290-350k; the walk's last frame 420k (the scene copied again) | 32 fps |
-| selecting a unit (view copied, reach rings drawn) | 0.56 M | 0.05 s |
+| ordinary frame (view copy 66-73k, with water glints up to 152k; the units on screen 93-181k: 6 to 10 of the 11; cursor + HUD 15-46k) | 176-345k (a 1300-frame battle, every player turn through the menu: 345k at most) | 32 fps (frame-limited) |
+| a turn change (the clock, the AT list) | +10-45k, one frame | |
+| walking frame (the walker's cover mask made again each frame) | 290-350k | 32 fps |
+| Move (view copied, reach rings drawn) | 0.92 M | 0.08 s |
+| a tile picked (the path, the scene without rings) | 0.62 M | 0.05 s |
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 22,935 bytes (the TI-89's limit is 24,576), plus the units' sprites `fftu` (18.7 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
-unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, ~6 KB
-of work. Checked in TiEmu (Titanium, `ti-run`, the four views archived
+Program: `fft.89z` 26,445 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (18.7 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
+unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 11 KB
+of work (~81 KB in all). Checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a
 selection, local). The first version drew
@@ -193,8 +207,8 @@ frame 370k, selection 3.8 M.
 
 - The rotation is 0.54 s and the selection 0.31 s, not instantaneous: drawing polygon rows in
   C costs ~550 cycles per row (both planes), and a rotation frame has ~200 polygons.
-- The TI-89 HW2 (AMS 2.09) was not run; the program fits its limit, the game needs ~75 KB
-  of free RAM (else it says so).
+- The TI-89 HW2 (AMS 2.09) was not run; the program is over its limit (26.4 KB: `-pack`
+  planned), the game needs ~81 KB of free RAM (else it says so).
 - Smaller data was measured and not kept: tile sprites deduplicated (FFT paints each face of
   each house: 686 sprites, 616 unique, 601 with 180-degree and mirror flips, 439 at 20 % of
   pixels tolerated: 102 KB), smoothing the speckles before packing (-10 %, windows lost);
@@ -207,8 +221,7 @@ frame 370k, selection 3.8 M.
 - The camera has one elevation (FFT has two), no zoom; the map has only its first level (FFT's
   second level, bridges over passages, is empty on Gariland).
 - Roofs are walkable as in the terrain data.
-- No menus, combat or AI yet (milestones 16-22): enemies only wait, a player's unit moves or
-  waits, the facing at the end of a turn is not chosen; the stats are computed but not shown.
-- The ordinary frame's margin is thin with ten units on screen (356k of 360k while the camera
-  pans over Ramza's group): the battle's menus (milestone 16) will need it back. The walk's
-  last frame (420k) is over the budget, as before this milestone.
+- No combat or AI yet (milestones 17-22): Act is greyed, enemies only wait.
+- The ordinary frame's margin is thin with ten units on screen (345k of 360k). Move (0.92 M)
+  and picking a tile (0.62 M) are one-frame stalls, as selecting was before the menu.
+- The cursor and the reach rings are flat diamonds on sloped tiles too (milestone 21).
