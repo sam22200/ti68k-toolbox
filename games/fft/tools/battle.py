@@ -2,14 +2,15 @@
 """The Gariland battle's units from the local FFT disc -> battle.h (never committed).
 
 usage: battle.py DISC.cue battle.h                 the data the game draws its units from
-       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt [SKILLS.txt [REWARDS.txt]]]]]
+       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt [SKILLS.txt [REWARDS.txt [AI.txt]]]]]]
            every unit of the original at Ramza's first turn and their start tiles
            (tools/oracle.py) against this model; oracle.h: their raw stats, equipment, stats and
            known abilities for the C tests (never committed), with TURNS (oracle.py --turns) the
            battle's turns for the clock test, with ATTACKS (oracle.py --attack) the attacks'
            previews and the executed attacks' outcome, with SKILLS (oracle.py --skills) each
            ability's preview and outcome and the Dash and Throw Stone trials, with REWARDS
-           (oracle.py --rewards) the EXP, JP and level up six actions earn
+           (oracle.py --rewards) the EXP, JP and level up six actions earn, with AI (oracle.py --ai)
+           the AI's turns and what it did
 Read from SCUS_942.21 (tables named after adamrt/fft_decomp, RE_NOTES.md § The battle's units):
 the jobs (0x800610b8, 48 bytes: growth and multiplier per raw stat, Move, Jump), the items
 (0x80062eb8 primary, 12 bytes; helmet / armour HP and MP 0x80063ed8; attributes 0x800642c4,
@@ -48,6 +49,8 @@ BAT, ZCOMPAT = 0x80067000, 0x8018f600     # BATTLE.BIN: file offset = address - 
 # status records (6 bytes: type, 5 status bytes)
 SKILLSETS, ABILITY, ABILITY_RANGE, ITEM_ABILITY, STATUS_SET = 0x80064a94, 0x8005ebf0, 0x8005fbf0, 0x80063f98, 0x80063fc4
 ITEM_FIRST, THROW_ITEM = 0x170, 0x1DA       # the first item ability; Throw Item (an innate support)
+SUPPORT_FIRST, MOVEMENT_FIRST = 0x1C6, 0x1E6   # reaction, support, movement ability ids
+EQUIP_AXE, DEFEND, EQUIP_CHANGE = 0x1CC, 0x1DF, 0x1E0
 JP_MAX = 199                                # a level 1 job's JP: 100 + rand(0..99) (main_unit_calculate_abilities)
 # the formulas modelled (fft.h AB_*): Y x PA damage with a Brave knockback, statuses cancelled,
 # Wish, Z x 10 HP, a revival with 1..Z HP
@@ -146,7 +149,9 @@ class Disc:
                 y = ' | '.join(STATUS[i] for i in ids)
             else:
                 assert ids == [0x02]
-        return {'id': a, 'kind': kind, 'y': y, 'range': rng, 'vert': vert, 'flags': flags, 'jp': jp, 'rate': rate}
+        lv = self.item(a - ITEM_FIRST + 0xF0)['level'] if a >= ITEM_FIRST else 0
+        return {'id': a, 'kind': kind, 'y': y, 'range': rng, 'vert': vert, 'flags': flags, 'jp': jp, 'rate': rate,
+                'lv': lv}
 
     def gen(self, t):
         return list(self.at(GEN_BASE + 12 * t, 5)), list(self.at(GEN_VAR + 5 * t, 5)), list(self.at(GEN_BASE + 12 * t + 5, 7))
@@ -249,7 +254,7 @@ def turn_rows(path, sp):
     return out
 
 
-def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None, rewards=None):
+def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None, rewards=None, ai=None):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../.claude/skills/ti-port-ps1/scripts'))
     from psxrun import PSX
     out, null = os.dup(1), os.open(os.devnull, os.O_WRONLY)
@@ -261,7 +266,7 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None, 
     for t in open(trace).read().split('\n')[11].split()[3:]:
         k, v = t.split(':')
         start[int(k)] = tuple(int(c) for c in v.split('(')[1].rstrip(')').split(','))
-    bad, rows, sp, learned = 0, [], [], []
+    bad, rows, sp, learned, defend, bz = 0, [], [], [], [], []
     sets, lists, abil = ability_table(d, unit_defs(d))
     jobs = sorted({u['job'] for u in unit_defs(d)})
     items = sorted({i for u in unit_defs(d) for e in u['eq'] for i in e})
@@ -296,6 +301,11 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None, 
                 (u['learned'] is None and sum(d.ability(a)['jp'] for a in known) > JP_MAX):
             errs.append('abilities %s' % [hex(a) for a in known])
         learned.append(sum(1 << lists[u['set']].index(a) for a in known if a in lists[u['set']]))
+        sup = r(0x16, 2)                  # its support: drawn among those it can afford (Ramza: none)
+        if sup not in ((0,) if u['type'] == T_RAMZA else (EQUIP_AXE, DEFEND, EQUIP_CHANGE)):
+            errs.append('support %03x' % sup)
+        defend.append(sup == DEFEND)
+        bz.append((r(0x24), r(0x26), r(9) >> 4, int(bool(r(6) & 0x40))))
         print('%2d %-9s lv %d hp %3d mp %3d sp %d pa %d ma %d mv %d jp %d br %2d fa %2d eq %s %s' % (
             slot, u['gfx'], r(0x22), got['hp'], got['mp'], got['sp'], got['pa'], got['ma'], got['move'], got['jump'],
             r(0x24), r(0x26), ' '.join('%02x' % i for i in eq[:4]), 'ok' if not errs else 'DIFFERS: ' + ', '.join(errs)))
@@ -353,12 +363,78 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None, 
             print('%d attack cases, %d trials' % (len(cases), len(trials)))
         open(fixture, 'a').write(
             '// The abilities each unit knows in the original (bit k: its skill set\'s k-th in battle.h)\n'
-            'static const u8 oracle_learned[11] = { %s };\n' % ', '.join('0x%02X' % m for m in learned))
+            'static const u8 oracle_learned[11] = { %s };\n' % ', '.join('0x%02X' % m for m in learned)
+            + '// the units whose support ability is Defend in the original (bit per unit)\n'
+            'static const u16 oracle_defend = 0x%03X;\n' % sum(1 << i for i, v in enumerate(defend) if v)
+            + '// their Brave, Faith, zodiac sign and sex (1: female)\n'
+            'static const u8 oracle_bz[11][4] = { %s };\n' % ', '.join('{ %d, %d, %d, %d }' % v for v in bz))
         if skills:
             write_skills(fixture, skills, abil)
         if rewards:
             write_rewards(fixture, rewards)
+        if ai:
+            write_ai(d, fixture, ai, sets, lists, abil)
     return bad
+
+
+AI_CASES = ['battle', 'near', 'critical', 'far', 'potion', 'kill', 'defend', 'delita-low', 'recruit']   # oracle.py
+
+
+def write_ai(d, fixture, path, sets, lists, abil):
+    """oracle.py --ai: each AI turn's start (per unit: tile, facing, HP, CT, death counter,
+    statuses, the abilities it knows, Defend) and what it did, for the C tests."""
+    defs, rows, reach = unit_defs(d), [], []
+    for ln in open(path):
+        w = ln.split()
+        if w and w[0] == 'reach':
+            m = w[2]
+            reach.append((int(w[1]), [sum(1 << x for x in range(10) if m[z * 10 + x] == '1') for z in range(15)]))
+        if not w or w[0] != 'ai':
+            continue
+        u = int(w[2])
+        pre = [list(map(int, x.split(','))) for x in w[3:14]]
+        did = list(map(int, w[15].split(',')))               # (w[14], w[27]: the tile priorities)
+        post = [list(map(int, x.split(','))) for x in w[16:27]]
+        units = []
+        for k, v in enumerate(pre):
+            x, y, f, hp, ct, dc, b, bits, sup = v[0], v[1], v[2], v[3], v[4], v[5], v[6:11], v[11:14], v[14]
+            bits = bits[0] << 16 | bits[1] << 8 | bits[2]
+            st = defs[k]['set']
+            known = [a for i, a in enumerate(d.skillset(st)) if a and bits & 0x800000 >> i]
+            mask = sum(1 << lists[st].index(a) for a in known if a in lists[st])
+            if b[0] & 0x40 or b[1] & 0x01:                       # a crystal, a chest
+                dc = 0xFD if b[0] & 0x40 else 0xFE
+            elif hp or dc > 3:                                    # alive; the guest's KO: 0xFF
+                dc = 3
+            units.append((x, y, FACE[f], hp, ct, dc, our_status(b), mask, int(sup == DEFEND), post[k][3]))
+        moved, acted, ab, tx, ty = did
+        a = post[u]
+        if not acted:
+            ours = 0xFD                                           # AI_NONE
+        elif ab == 0 and (tx, ty) == (0, 0) and a[6] & 0x02 and not pre[u][6] & 0x02:
+            ours = 0xFE                                           # ABIL_DEFEND
+        elif ab == 0:
+            ours = 0xFF                                           # NO_ABIL: Attack
+        else:
+            ours = abil.index(ab)
+        rows.append((AI_CASES.index(w[1]), u, units, moved, acted, ours, tx, ty, a[0], a[1], FACE[a[2]]))
+    open(fixture, 'a').write(
+        '// The original\'s AI turns (tools/oracle.py --ai): the battle played by its AI from Ramza\'s\n'
+        '// first turn (case 0), then built situations each replayed with other draws: the case, the\n'
+        '// unit, then per unit x, z, facing (ours), HP, CT, death counter, statuses (ours), the\n'
+        '// abilities it knows, Defend, HP after the turn; what it did: moved, acted, the ability\n'
+        '// (NO_ABIL Attack, ABIL_DEFEND, AI_NONE), the target tile, its tile and facing after\n'
+        '#define ORACLE_AI %d\n'
+        'static const struct { u8 kase, unit, u[11][10], moved, acted, ab, tx, tz, x, z, face; }\n'
+        '    oracle_ai[ORACLE_AI] = {\n' % len(rows)
+        + '\n'.join('    { %d, %d, { %s }, %d, %d, 0x%02X, %d, %d, %d, %d, %d },' % (
+            c, u, ', '.join('{ %s }' % ', '.join(map(str, v)) for v in units), *rest)
+            for c, u, units, *rest in rows) + '\n};\n'
+        '// The move range the original shows (Ramza at his first turn, the recruit after him): the\n'
+        '// unit, a bit per tile (bit x of row z)\n'
+        'static const struct { u8 unit; u16 row[15]; } oracle_reach[%d] = { %s };\n' % (
+            len(reach), ', '.join('{ %d, { %s } }' % (u, ', '.join('0x%03X' % r for r in rr)) for u, rr in reach)))
+    print('%d AI turns, %d move ranges' % (len(rows), len(reach)))
 
 
 def write_rewards(fixture, path):
@@ -449,6 +525,34 @@ def ability_table(d, defs):
     return sets, lists, abil
 
 
+def rsm(d, k):
+    """The reaction, support and movement abilities of skill set k in FFT's order: (id, JP, rate)."""
+    b = d.at(SKILLSETS + 25 * k, 25)
+    hi = b[0] << 16 | b[1] << 8 | b[2]
+    ids = [b[19 + i] | (0x100 if hi & 0x80 >> i else 0) for i in range(6)]
+    return [(a,) + struct.unpack('<HB', d.at(ABILITY + 8 * a, 3)) for a in ids if a]
+
+
+def write_support(d, f, sets):
+    """The support ability (main_unit_calculate_rsm): one of those the unit learned with its jobs'
+    JP, drawn. With at most JP_MAX JP per job only Equip Change (Chemist, 0 JP, always learned),
+    Defend and Equip Axe (Squire) can be bought; Defend comes with the Squire job's JP left after
+    its abilities and the reactions and supports listed before it."""
+    sq, ch = rsm(d, 0x05), rsm(d, 0x06)
+    sup = lambda a: SUPPORT_FIRST <= a < MOVEMENT_FIRST
+    can = [(a, jp, r) for a, jp, r in sq + ch if sup(a) and jp <= JP_MAX and a != THROW_ITEM]
+    assert [a for a, _, _ in can] == [EQUIP_AXE, DEFEND, EQUIP_CHANGE], can
+    assert can[2][1:] == (0, 100) and can[0][1] + can[1][1] > JP_MAX, 'Equip Change not certain, or two Squire supports'
+    k = [a for a, _, _ in sq].index(DEFEND)
+    f.write('// the support ability (FFT draws one of those a unit learned): Defend, learned with the Squire job\'s\n'
+            '// JP (left after its abilities; for another job 100..199 and its Squire abilities drawn first)\n'
+            '// after the reactions and supports before it (JP, learn rate), then one of two (Equip Change,\n'
+            '// always learned)\n')
+    f.write('#define SET_BASIC %d\n#define NRSM_PRE %d\nstatic const u8 rsm_pre[NRSM_PRE][2] = { %s };\n' % (
+        sets.index(0x05), k, ', '.join('{ %d, %d }' % (min(jp, 255), r) for _, jp, r in sq[:k])))
+    f.write('#define DEFEND_JP %d\n#define DEFEND_RATE %d\n' % sq[k][1:])
+
+
 def write(d, path):
     defs = unit_defs(d)
     jobs = sorted({u['job'] for u in defs})
@@ -483,20 +587,23 @@ def write(d, path):
     sets, lists, abil = ability_table(d, defs)
     bag = [a for a in abil if a >= ITEM_FIRST]
     f.write('// the abilities the units can know: name, kind, Y (Z, statuses), range, vertical tolerance\n'
-            '// (half units, 0xFF none), flags, bag slot (0xFF none), learn rate, JP cost\n')
+            '// (half units, 0xFF none), flags, bag slot (0xFF none), learn rate, JP cost, an item\'s level (the\n'
+            '// enemies use those of their level or less)\n')
     f.write('#define NABIL %d\nstatic const Ability abilities[NABIL] = {\n' % len(abil))
     for a in abil:
         e = d.ability(a)
-        f.write('    { "%s", %s, %s, %d, %d, %s, %s, %d, %d },   // %03X\n' % (
+        f.write('    { "%s", %s, %s, %d, %d, %s, %s, %d, %d, %d },   // %03X\n' % (
             NAMES[a], e['kind'], e['y'], e['range'], e['vert'], ' | '.join(e['flags']) or '0',
-            bag.index(a) if a in bag else 0xFF, e['rate'], e['jp'], a))
+            bag.index(a) if a in bag else 0xFF, e['rate'], e['jp'], e['lv'], a))
     f.write('};\n// the skill sets: name, then its abilities in FFT\'s order (the order a unit learns them)\n')
     f.write('#define NSET %d\nstatic const SkillSet skill_sets[NSET] = {\n' % len(sets))
     for k in sets:
         ids = [str(abil.index(a)) for a in lists[k]] + ['0xFF'] * (SET_N - len(lists[k]))
         f.write('    { "%s", { %s } },   // %02X\n' % (SET_NAMES[k], ', '.join(ids), k))
     assert max(len(lists[k]) for k in sets) <= SET_N
-    f.write('};\n// the party\'s bag at a new game, per bag slot (the enemies\' items do not run out)\n')
+    f.write('};\n')
+    write_support(d, f, sets)
+    f.write('// the party\'s bag at a new game, per bag slot (the enemies\' items do not run out)\n')
     f.write('#define NBAG %d\nstatic const u8 bag_init[NBAG] = { %s };\n' % (
         len(bag), ', '.join(str(BAG[a - ITEM_FIRST + 0xF0]) for a in bag)))
     f.write('// the units in FFT\'s order: sheet, job, type, level, Brave, Faith (0: drawn), birthday (0:\n'
@@ -519,9 +626,8 @@ def write(d, path):
 def main():
     d = Disc(sys.argv[1])
     if sys.argv[2] == '--check':
-        a = sys.argv + [None, None, None]
-        a += [None, None]
-        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7], a[8], a[9]) else 0)
+        a = sys.argv + [None] * 8
+        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]) else 0)
     write(d, sys.argv[2])
 
 
