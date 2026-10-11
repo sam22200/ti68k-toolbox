@@ -1,7 +1,7 @@
 // Tests, headless: the four orientations, the map's heights, the battle's units and their stats
 // (against the original's, oracle.h), reach and paths, the scene and the occlusion of units by
 // the buildings in front of them, rotation and walking by keys, the turn menu, attacks (against
-// the original's previews and attacks, oracle.h).
+// the original's previews and attacks, oracle.h), abilities (against the original's, oracle.h).
 //   ./fft_test            every test
 //   ./fft_test --find     the tiles where a unit is hidden in one view and seen in another
 #include <stdio.h>
@@ -337,8 +337,8 @@ static void test_menu(void)
     sw_init(10);
     press(K_DOWN);
     CHECKV(st.menu, MN_ACT);
-    press(K_A);                                           // Act: its reach (test_attack)
-    CHECKV(st.mode, M_AIM);
+    press(K_A);                                           // Act: its list (test_skills)
+    CHECKV(st.mode, M_ACTS);
     press(K_B);
     CHECKV(st.mode, M_MENU);
     press(K_DOWN); press(K_DOWN);
@@ -453,13 +453,13 @@ static void test_attack(void)
     sw_init(10);
     st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].face = 2;
     n = st.unit[1].hp;
-    press(K_DOWN); press(K_A);
+    press(K_DOWN); press(K_A); press(K_A);                // Act, Attack
     CHECKV(st.mode, M_AIM);
     CHECKV(st.reach[10 * MAP_W + 4], 1);
     press(K_A);                                           // the cursor on Ramza: nothing
     CHECKV(st.mode, M_AIM);
     press(K_B);
-    CHECKV(st.mode, M_MENU);
+    CHECKV(st.mode, M_ACTS);
     press(K_A);
     st.cx = 4; st.cz = 10;
     press(K_A);
@@ -496,6 +496,195 @@ static void test_attack(void)
     while (st.mode == M_ACT) sw_step(0);
     CHECKV(st.unit[1].hp, 0);
     for (i = 1; i < ORDER_N; i++) CHECK(st.turns[i] != 1);
+}
+
+// ---------------------------------------------------------------- milestone 18: abilities
+// What a unit knows: the original's units are outcomes of FFT's draw, and our draws learn each
+// ability as often as the rule's exact odds (JP 100..199, each ability of the set in order
+// bought if its learn rate roll passes and the JP left pay for it)
+static void learn_odds(u8 set, double *p)
+{
+    const u8 *a = skill_sets[set].abil;
+    u8 n = 0, k;
+    u16 jp, m;
+    while (n < SET_N && a[n] != 0xFF) n++;
+    for (k = 0; k < n; k++) p[k] = 0;
+    for (jp = 100; jp < 200; jp++)
+        for (m = 0; m < 1u << n; m++) {             // m: the rolls that pass
+            double w = 0.01;
+            u16 left = jp;
+            for (k = 0; k < n; k++) w *= m >> k & 1 ? abilities[a[k]].rate / 100.0 : 1 - abilities[a[k]].rate / 100.0;
+            for (k = 0; k < n; k++)
+                if (m >> k & 1 && left >= abilities[a[k]].jp) { left -= abilities[a[k]].jp; p[k] += w; }
+        }
+}
+
+static u8 abil_of(const char *name)
+{
+    u8 i;
+    for (i = 0; i < NABIL && strcmp(abilities[i].name, name); i++) ;
+    return i;
+}
+
+static void test_skills(void)
+{
+    u16 i, n, k, h[2][5] = { { 0 } }, push[2] = { 0 };
+    u32 cnt[NSET][SET_N] = { { 0 } }, units[NSET] = { 0 };
+    double p[SET_N], worst = 0;
+    Unit *ra, *t;
+    u8 dash = abil_of("Dash"), stone = abil_of("Throw Stone"), potion = abil_of("Potion"),
+       phoenix = abil_of("Phoenix Down"), wish = abil_of("Wish"), heal = abil_of("Heal");
+    sw_init(0);
+    for (i = 0; i < NUNIT; i++) {                         // the original's: possible outcomes
+        const u8 *a = skill_sets[unit_defs[i].set].abil;
+        u16 jp = 0;
+        for (k = 0; k < SET_N; k++) if (oracle_learned[i] >> k & 1) { CHECK(a[k] != 0xFF); jp += abilities[a[k]].jp; }
+        if (unit_defs[i].learned == 0xFF) CHECK(jp <= 199);
+        else CHECKV(oracle_learned[i], unit_defs[i].learned);
+    }
+    for (n = 100; n < 3100; n++) {                        // ours: 3000 battles
+        game_scenario(n);
+        for (i = 0; i < NUNIT; i++) {
+            if (unit_defs[i].learned != 0xFF) { CHECKV(st.unit[i].learned, unit_defs[i].learned); continue; }
+            units[st.unit[i].set]++;
+            for (k = 0; k < SET_N; k++) cnt[st.unit[i].set][k] += st.unit[i].learned >> k & 1;
+        }
+    }
+    for (i = 0; i < NSET; i++) {
+        if (!units[i]) continue;
+        learn_odds((u8)i, p);
+        for (k = 0; k < SET_N && skill_sets[i].abil[k] != 0xFF; k++) {
+            double d = cnt[i][k] / (double)units[i] - p[k];
+            if (d < 0) d = -d;
+            if (d > worst) worst = d;
+            CHECK(d < 0.03);
+        }
+    }
+    printf("skills: the original's %d units possible draws; ours learn as the rule's odds (worst %.3f)\n", NUNIT, worst);
+
+    // the original's cases: Ramza on the recruit south of him, the attack's game case
+    for (i = 0; i < ORACLE_SKILLS; i++) {
+        u8 ab = oracle_skills[i].abil;
+        sw_init(0);
+        ra = &st.unit[U_RAMZA]; t = &st.unit[10];
+        ra->zodiac = 9; t->zodiac = 3; ra->female = t->female = 0;
+        t->hp = oracle_skills[i].hp; t->status = oracle_skills[i].status;
+        if (ab == 0xFF) {                                 // Attack on a Defending target
+            CHECKV(hit_chance(U_RAMZA, 10), oracle_skills[i].hit);
+            continue;
+        }
+        if (skill_hit(U_RAMZA, 10, ab) != oracle_skills[i].hit) {
+            printf("skill case %d: ", i); CHECKV(skill_hit(U_RAMZA, 10, ab), oracle_skills[i].hit);
+        }
+        if (oracle_skills[i].hit && abilities[ab].kind != AB_CURE) {   // FFT's preview: one roll
+            u16 lo = skill_amount(U_RAMZA, 10, ab, 0), hi = skill_amount(U_RAMZA, 10, ab, 32767);
+            CHECK(oracle_skills[i].amount >= lo && oracle_skills[i].amount <= hi);
+            if (abilities[ab].kind == AB_DAMAGE) CHECKV(oracle_skills[i].amount % lo, 0);
+        }
+        do skill(U_RAMZA, 10, ab); while (oracle_skills[i].hit && oracle_skills[i].hit < 100 && !st.hit);
+        while (st.mode == M_ACT) sw_step(0);
+        if (oracle_skills[i].hit && (abilities[ab].kind == AB_DAMAGE || abilities[ab].kind == AB_REVIVE)) {
+            u16 lo = skill_amount(U_RAMZA, 10, ab, 0), d = abilities[ab].kind == AB_DAMAGE   // a roll
+                ? oracle_skills[i].hp - oracle_skills[i].hp2 : oracle_skills[i].hp2;
+            if (d < lo || d > skill_amount(U_RAMZA, 10, ab, 32767)) {
+                printf("skill case %d: ", i); CHECK(d >= lo && d <= skill_amount(U_RAMZA, 10, ab, 32767));
+            }
+        } else CHECKV(t->hp, oracle_skills[i].hp2);
+        CHECKV(t->status, oracle_skills[i].status2);
+        CHECKV(ra->hp, oracle_skills[i].ramza);
+        for (k = 0; k < NBAG; k++) CHECKV(st.bag[k], oracle_skills[i].bag[k]);
+    }
+    // Dash and Throw Stone executed 4000 times: how often each multiple of XA, pushes
+    sw_init(0);
+    ra = &st.unit[U_RAMZA]; t = &st.unit[10];
+    ra->zodiac = 9; t->zodiac = 3; ra->female = t->female = 0;
+    for (k = 0; k < 2; k++)
+        for (n = 0; n < 4000; n++) {
+            skill(U_RAMZA, 10, k ? stone : dash);
+            h[k][st.hit ? st.dmg / 3 : 0]++; push[k] += st.push;
+        }
+    for (k = 0; k < 2; k++) {
+        const u16 *o = oracle_skill_trials[k];
+        printf("skills: %s x0..4 ", k ? "Throw Stone" : "Dash");
+        for (i = 0; i < 5; i++) {
+            double ours = h[k][i] / 4000.0, theirs = o[2 + i] / (double)o[0];
+            printf("%.3f (%.3f) ", ours, theirs);
+            CHECK(ours > theirs - 0.09 && ours < theirs + 0.09);   // 3 sigma of 300 at 50 %
+        }
+        printf("pushes %d (%d)\n", push[k], o[1]);
+        CHECK(!push[k] == !o[1]);
+    }
+    // a push by Brave: on the flat, from (7, 5) onto (7, 7), Dash
+    sw_init(10);
+    st.unit[U_RAMZA].x = 7; st.unit[U_RAMZA].z = 5; st.unit[1].x = 7; st.unit[1].z = 6;
+    for (n = 0, i = 0; i < 1000; i++) { skill(U_RAMZA, 1, dash); n += st.push; }
+    printf("skills: Dash pushed %d of 1000 (Brave %d against %d)\n", n, st.unit[U_RAMZA].brave, st.unit[1].brave);
+    CHECK(n > 100 && n < 900);
+    // the reach: Throw Stone 4 steps, not the user; Potion 4 with the user; Dash 1 step within
+    // 1 level (2 half units); Heal 1 step and the user, within 2 levels
+    sw_init(0);
+    ra = &st.unit[U_RAMZA];
+    for (k = 0; k < 4; k++) {
+        static const char *const nm[4] = { "Throw Stone", "Potion", "Dash", "Heal" };
+        u8 ab = abil_of(nm[k]);
+        s16 x, z, hr = tile_at(ra->x, ra->z)->stand;
+        skill_range(U_RAMZA, ab);
+        for (z = 0; z < MAP_H; z++)
+            for (x = 0; x < MAP_W; x++) {
+                const Tile *tl = tile_at(x, z);
+                s16 d = (x > ra->x ? x - ra->x : ra->x - x) + (z > ra->z ? z - ra->z : ra->z - z);
+                s16 dh = tl->stand > hr ? tl->stand - hr : hr - tl->stand;
+                u8 want = tl->walk && d <= abilities[ab].range && (d || abilities[ab].flags & AF_SELF)
+                    && (abilities[ab].vert == 0xFF || dh <= abilities[ab].vert);
+                CHECKV(st.reach[z * MAP_W + x], want ? 1 : 0xFF);
+            }
+    }
+    CHECK(abilities[stone].range == 4 && !(abilities[stone].flags & AF_SELF) && abilities[stone].vert == 0xFF);
+    CHECK(abilities[potion].range == 4 && abilities[potion].flags & AF_SELF);
+    CHECK(abilities[dash].range == 1 && abilities[dash].vert == 2 && abilities[heal].vert == 4);
+    // by keys: Ramza's Act, Guts, Wish on the recruit (10 HP): +20, Ramza -10
+    sw_init(10);
+    st.unit[10].hp = 10;
+    press(K_DOWN); press(K_A); CHECKV(st.mode, M_ACTS);
+    press(K_DOWN); press(K_A); CHECKV(st.mode, M_SKILLS);
+    CHECKV(known(U_RAMZA, 0), wish); CHECKV(known(U_RAMZA, 1), 0xFF);
+    press(K_A); CHECKV(st.mode, M_AIM); CHECKV(st.abil, wish);
+    CHECKV(st.reach[11 * MAP_W + 4], 0xFF);               // not himself
+    press(K_B); CHECKV(st.mode, M_SKILLS);
+    press(K_B); CHECKV(st.mode, M_ACTS); CHECKV(st.sub, 1);
+    press(K_A); press(K_A);
+    st.cx = 4; st.cz = 12;
+    press(K_A); CHECKV(st.mode, M_ACT);
+    while (st.mode == M_ACT) sw_step(0);
+    CHECKV(st.unit[10].hp, 30); CHECKV(st.unit[U_RAMZA].hp, st.unit[U_RAMZA].max_hp - st.unit[U_RAMZA].max_hp / 5);
+    CHECK(st.mode == M_MENU && st.acted);
+    // the Chemist's items: Potion on Ramza (the bag 5 -> 4), an empty Phoenix Down greyed, then
+    // one revives a KO unit
+    sw_init(11);
+    CHECKV(st.mode, M_SKILLS);
+    CHECKV(known(U_CHEMIST, 0), potion);
+    press(K_A); CHECKV(st.mode, M_AIM);
+    st.cx = 4; st.cz = 11;
+    press(K_A); CHECKV(st.mode, M_ACT);
+    while (st.mode == M_ACT) sw_step(0);
+    CHECKV(st.unit[U_RAMZA].hp, 50); CHECKV(st.bag[abilities[potion].bag], 4);
+    st.bag[abilities[potion].bag] = 0;
+    CHECK(!can_use(U_CHEMIST, potion)); CHECK(can_use(1, potion));   // the enemies' never run out
+    sw_init(10);
+    st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].hp = 0;
+    CHECKV(skill_hit(U_RAMZA, 1, phoenix), 100); CHECKV(skill_hit(U_RAMZA, 10, phoenix), 0);
+    skill(U_RAMZA, 1, phoenix);
+    while (st.mode == M_ACT) sw_step(0);
+    CHECK(st.unit[1].hp >= 1 && st.unit[1].hp <= 20 && st.bag[abilities[phoenix].bag] == 1);
+    // Wish when it leaves Ramza at 0 HP: the turn ends; a Defending unit stops at its turn
+    sw_init(10);
+    st.unit[U_RAMZA].hp = 5; st.unit[1].status = ST_DEFEND;
+    skill(U_RAMZA, 10, wish);
+    while (st.act == U_RAMZA) sw_step(0);
+    CHECKV(st.unit[U_RAMZA].hp, 0);
+    for (i = 0; i < 2000 && st.act != 1; i++)            // the player's units wait
+        if (st.unit[st.act].team == TEAM_PLAYER && st.mode == M_MENU) wait_turn(); else sw_step(0);
+    CHECKV(st.act, 1); CHECKV(st.unit[1].status, 0);
 }
 
 // ---------------------------------------------------------------- milestone 15: turn order
@@ -583,6 +772,10 @@ static void shots(void)
     do attack(U_RAMZA, 1); while (!st.hit);
     while (st.act_t < ACT_HIT + HIT_FRAMES + 6) sw_step(0);
     sw_write_png("x/m17_ko.png", 4);
+    sw_init(10); press(K_DOWN); press(K_A); steps(0, 6); sw_write_png("x/m18_acts.png", 4);   // Act's
+    sw_init(11); steps(0, 10); sw_write_png("x/m18_items.png", 4);   // list, the items, a Potion
+    sw_init(12); steps(0, 10); sw_write_png("x/m18_potion.png", 4);  // aimed, Wish landing
+    sw_init(13); steps(0, 4); sw_write_png("x/m18_wish.png", 4);
 }
 
 int main(int argc, char **argv)
@@ -599,6 +792,7 @@ int main(int argc, char **argv)
     test_walk_keys();
     test_menu();
     test_attack();
+    test_skills();
     test_clock();
     test_turns();
     shots();
