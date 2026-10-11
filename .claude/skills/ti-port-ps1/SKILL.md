@@ -404,9 +404,17 @@ only: nothing extracted from the disc).
   A status poked only in the unit's current set did nothing to a cure: the removal checks a
   second copy (`inflicted_status`); poke both. Some costs land seconds after the visible effect
   (Wish's HP cost to its user ~5 s later): wait long after an action before reading RAM. Read
-  what each unit actually knows before scoping (the learn rule left Accumulate, Yell and
-  Phoenix Down unlearnable at Gariland). The `rtk` grep wrapper prefixes line numbers: use
+  what each unit actually knows before scoping (the learn rule left Accumulate and Yell
+  unlearnable at Gariland). The `rtk` grep wrapper prefixes line numbers: use
   `rtk proxy grep` when its output is written to a file.
+  **Rewards from a handful of actions** (milestone 19): EXP, JP and level-up rules read in the
+  decompilation, then six actions from the same state (one poke each: the target's HP to 1 for
+  a kill, the user's EXP to 95 for a level up) with every unit's EXP, level and JP slots dumped
+  before and after (7 s) checked them all, the JP share to allies included. Random rules with no
+  RNG fidelity (crystal or chest) need no run: the code's mask gives the odds. A new drawing
+  path must be reached by an `xcheck` scenario or key script: a crystal drawn only on the TI
+  hit a GCC4TI miscompilation (a `(u16)` product under a range test folded to a wrong odd
+  constant, an address error) that the PC and the unit tests could not see.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).

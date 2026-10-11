@@ -589,6 +589,12 @@ while (running) {
   instruction, divide by zero) to a stub that raises an AMS error (`ER_throw`, line-1010 opcode
   `0xA006`) caught by that frame; its table has an offset bug (only the first three vectors are
   right) and it leaks the exception frame: do not copy it as is.
+- **GCC4TI miscompiles a `(u16)` product under a range test** (found under `ti-cycles`, read in
+  the generated asm; `games/fft` milestone 19): `if (d >= 0xFD) return p + (u16)(240 + d - 0xFD)
+  * 156U;` compiled to `p + 30739`, a wrong constant that ignores `d` (odd: an Address Error on
+  the next word read). The same expression without the test, or written `p + 240UL * 156 +
+  (u8)(d - 0xFD) * 156`, is right. The PC build and the unit tests cannot see it: give every new
+  pointer path an `xcheck` scenario, and read the asm (`tigcc -S`) when a TI-only fault appears.
 - Stack size: measure instead of guessing: fill the free stack with a pattern at `_main`, run the
   game, scan for the high-water mark. Never put screen-sized buffers on the stack (TI-Chess dialogs
   put 7.5 KB there, even from inside its recursive search; path.c puts 5.8 KB).

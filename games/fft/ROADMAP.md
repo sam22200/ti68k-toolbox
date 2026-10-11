@@ -146,11 +146,23 @@ with `-pack` (decided at milestone 13).
     by poking his skill sets) equal ours, and 300 Dash and Throw Stone each match 4000 of ours
     (`oracle.py --skills`); our draws within 0.003 of the rule's odds; `keys/skills.txt`: TI =
     PC, 13 scenarios too. Frames 260-352k; program 33,765 bytes.
-19. **KO, the death counter and the end.** A KO unit's counter (3 turns, then a crystal or a
+19. **KO, the death counter and the end** (done). A KO unit's counter (3 turns, then a crystal or a
     chest; raising it in time with a Phoenix Down), the victory condition (all enemies KO,
     crystal or chest), the defeat (Ramza or the whole party out), the rewards the units earn
     as they act (EXP and JP per action, a level up shown) and the end screen. Done: a battle
     played to victory and one to defeat by key scripts.
+    Done: FFT's rules read in the decompilation (`RE_NOTES.md` § KO and the end) and six of
+    Ramza's actions in the original (`oracle.py --rewards`: an attack 10 EXP and 10 JP, +2 to
+    each ally of his job; a kill 20; a level up from 95 EXP, raw HP + raw / 12, HP kept) equal
+    ours; the counter shown above a KO unit, 3 to 0, then a crystal (an enemy 1 in 2, a player's
+    unit 3 in 4: ours 0.509, 0.748) or a chest, FFT's own images (`BATTLE/OTHER.SPR`), picked up
+    by walking onto it (HP and MP full; the dead unit's item, shown only); `EXP+20` / `LvUp`
+    rising above the user, EXP and JP in Status; victory (every enemy KO), defeat (Ramza a
+    crystal or a chest, or the whole party KO), the results (level, EXP and JP per unit), then
+    the battle again. `keys/victory.txt` and `keys/defeat.txt`: TI = PC, 15 scenarios too. A
+    GCC4TI miscompilation found by `ti-cycles` (a `(u16)` product under a range test folded to
+    a wrong odd constant: an address error). Frames up to 356k, one crowded pan 374k (5 KO
+    counters; 362k without); program 36,579 bytes.
 20. **Enemy AI.** FFT's AI is a search over the unit's reachable tiles x actions x targets;
     the target is a scored search of the same kind kept small: for each reachable tile (Move
     4: <= ~40), the best action (expected damage, a kill, healing a hurt ally, a status) and
