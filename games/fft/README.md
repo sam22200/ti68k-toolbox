@@ -11,13 +11,15 @@ critical hits and knockback, checked on the original's previews and attacks) and
 abilities (what each one knows drawn as FFT does: Dash, Throw Stone, Heal, Wish, the Chemists'
 items from the party's bag; checked on the original's previews and outcomes), KO and the end
 (the death counter, crystals and chests, EXP, JP and level ups checked on the original,
-victory, defeat and the results). Not a port: our own engine on the Portable Game Runtime;
+victory, defeat and the results), and FFT's AI for the enemies and Delita (its scores, its
+ranking drawn on the hit chance, its moves; 129 of 136 of the original's turns played the same,
+as are its move ranges). Not a port: our own engine on the Portable Game Runtime;
 the heights and the scenery (the map's own textured mesh, drawn in four greys on the PC), the
 units (FFT's own battle sprites of Ramza, Delita, the Squires and the Chemists, scaled 0.6) and
 the battle's numbers come from the local disc (`tools/extract.py`, `tools/units.py`,
-`tools/battle.py`); the cursor, shadow and rotation greys are ours (`tools/art.py`). The battle
-itself (the enemies' AI) is being built: `ROADMAP.md` milestones 13-22. Study notes:
-`RE_NOTES.md`.
+`tools/battle.py`); the cursor, shadow and rotation greys are ours (`tools/art.py`). The
+battle's presentation and the whole battle on the calculator come next: `ROADMAP.md` milestones
+21-22. Study notes: `RE_NOTES.md`.
 
 ## Controls
 
@@ -30,10 +32,15 @@ itself (the enemies' AI) is being built: `ROADMAP.md` milestones 13-22. Study no
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.
-Enemies and Delita (a guest) only wait for now (half a second each). A player's unit opens its
+Enemies and Delita (a guest) play as FFT's AI does: once the camera is on the unit the picture
+stands still for ~0.2 s while it thinks, then its move range is shown, it walks, its target is
+marked (the preview at the top right), it acts (the name at the top right) and turns to face
+the nearest enemy; a unit hitting from its own tile backs off after. A player's unit opens its
 menu at the top right: **Move** (once; the move can be undone with [shift] until it acts, which
-FFT does not allow), **Act** (once: a list as FFT's, **Attack** and the unit's skill set,
-Basic Skill, Item or Guts, then the abilities it knows, an item with how many are left and
+FFT does not allow; canals can be waded, a step from water to water costs 2), **Act** (once: a
+list as FFT's, **Attack**, the unit's skill set, Basic Skill, Item or Guts, and **Defend** for a
+unit whose support ability it is (drawn as FFT draws one: ~8 %; Defending until its next turn),
+then the abilities it knows, an item with how many are left and
 greyed at 0; the reach shown, the cursor on a unit shows FFT's preview at the top right, `Hit
 95%` and `Dmg 12` (`Dmg 3-12` for a random amount, `HP +30` for a heal, `- Poison` for a
 cure), [2nd] uses it: the swing, the ability's name at the top right, the target hit, the
@@ -60,12 +67,13 @@ view, 5 Ramza's reach, 6 mid-rotation, 7 Ramza walking, 8 an enemy in front of h
 at, 9 that enemy hit (the number rising), 10 that turn drawn with seed 10 (the tests), 11 the
 female Chemist's items, 12 her Potion aimed at Ramza, 13 Ramza's Wish landing on the recruit
 south of him, 14 four enemies KO and the last at 1 HP in front of Ramza, 15 the recruits KO,
-Delita in front of Ramza at 5 HP; above 15 Ramza's turn drawn with seed n.
+Delita in front of Ramza at 5 HP, 16 the AI on both sides from the start (a whole battle plays
+itself: won in ~6,000 frames); above 16 Ramza's turn drawn with seed n.
 Key scripts: `keys/turn.txt` (a whole turn through the menu), `keys/attack.txt` (Ramza
 attacks, moves and waits) and `keys/skills.txt` (Ramza's Wish, then Wait), all from `fft(10)`;
 `keys/victory.txt` (from `fft(14)`: the last enemy knocked out, the results) and
-`keys/defeat.txt` (from `fft(15)`: Ramza's Wish knocks him out, his counter runs out: Game
-Over).
+`keys/defeat.txt` (from `fft(15)`: Ramza's Wish knocks him out, the enemies knock Delita out:
+Game Over).
 
 ## Build
 
@@ -82,13 +90,16 @@ make test         # headless tests (rotations, heights, the units' stats against
                   # their draw, reach, occlusion, team marker, keys, the turn order against the
                   # original's 46 turns, attacks against its previews and attacks, abilities
                   # against its cases and trials, rewards against its six actions, the death
-                  # counter, pick-ups, a battle won and one lost by keys); the first run makes
-                  # oracle.h (the oracle below, 30 s, its next 40 turns, 20 s, its attacks,
-                  # 9 min, its abilities, 10 min, its rewards, 7 s, then tools/battle.py --check)
+                  # counter, pick-ups, a battle won and one lost by keys, the move ranges and
+                  # the AI against the original's, a battle the AI plays both sides of, Defend);
+                  # the first run makes oracle.h (the oracle below, 30 s, its next 40 turns,
+                  # 20 s, its attacks, 9 min, its abilities, 10 min, its rewards, 7 s, its AI's
+                  # turns, 2 min, then tools/battle.py --check); ./fft_test --ai lists each
+                  # turn of the original's AI that ours plays otherwise
 make pc           # SDL window: ./fft_pc   (F1 / F5 on the PC keyboard too)
 make ti           # fft.89z, fftu.89y and fftv0.89y .. fftv3.89y: send all six, archive the five
                   # data files (read in place), run fft()
-make xcheck       # the TI binary under ti-cycles = the PC, 15 scenarios
+make xcheck       # the TI binary under ti-cycles = the PC, 16 scenarios
 ../../tools/pyenv/bin/python tools/oracle.py DISC.cue ../../sources/fft_ps1/gariland_t1.state trace.txt
                   # the original at Ramza's first Gariland turn (30 s, RE_NOTES.md)
 ../../tools/pyenv/bin/python tools/oracle.py --turns DISC.cue STATE 40 turns.txt
@@ -99,10 +110,13 @@ make xcheck       # the TI binary under ti-cycles = the PC, 15 scenarios
                   # from there, Ramza given every ability: 13 cases, 300 Dash and Throw Stone
 ../../tools/pyenv/bin/python tools/oracle.py --rewards DISC.cue STATE rewards.txt
                   # from there, six actions: every unit's EXP, level, JP before and after
-../../tools/pyenv/bin/python tools/battle.py DISC.cue --check STATE TRACE [oracle.h turns.txt attacks.txt skills.txt rewards.txt]
+../../tools/pyenv/bin/python tools/oracle.py --ai DISC.cue STATE 40 12 ai.txt
+                  # from there, the move range FFT shows two units, its AI's first 40 turns (each
+                  # unit's state and what the actor did) and 8 built situations replayed 12 times
+../../tools/pyenv/bin/python tools/battle.py DISC.cue --check STATE TRACE [oracle.h turns.txt attacks.txt skills.txt rewards.txt ai.txt]
                   # its eleven units against our model (stats, ranges, equipment, start tiles,
-                  # abilities known); oracle.h: the test fixture (units, the turns with their CT
-                  # bonuses, attacks, abilities, rewards)
+                  # abilities known, support); oracle.h: the test fixture (units, the turns with
+                  # their CT bonuses, attacks, abilities, rewards, the AI's turns, move ranges)
 ```
 
 `map.h`, `units.h`, `battle.h`, `oracle.h`, `fftu.bin` and the views are generated from the disc
@@ -183,9 +197,13 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   grey darker when facing right, so the frames keep the views' tones (light streets, dark
   roofs) and the volumes. Checkerboards between two greys (7 shades) were tried and declined
   by the user (`x/turn8_damiers.gif` against `x/turn8_sans_damiers.gif`, local).
-- **Reach.** FFT's rules, each unit's own Move and Jump (height difference in half units, both
-  ways), canals, trees and chimneys block, enemies block, allies (and the guest Delita) can be
-  passed but not stood on (`bfs`). The reachable tiles get a marker at their standing height (a black diamond line with a white
+- **Reach.** FFT's moves, measured on the original's move ranges (`spread`; `RE_NOTES.md` §
+  Moving): a step costs 1, from water to water 2, never into water from land with the last
+  point; Jump bounds a step's height in half units (out of water, from its surface); a jump over
+  one tile (2 points, 3 from water) to a tile no lower by at most Jump half units, over lower
+  ground with no enemy; enemies block, allies (and the guest Delita) can be passed but not stood
+  on, nor the trees (FFT's untargetable tiles). The moves out of each tile are listed once
+  (`edges`, 2.4 KB); the spread is Dial's algorithm (4 queues by cost). The reachable tiles get a marker at their standing height (a black diamond line with a white
   one outside it, readable on every floor; chosen among four, `x/choix_marqueurs.png`), drawn into the
   scene buffer after a fresh copy of the view; the pixels in front of the tile (the view's
   depth) are put back over it.
@@ -239,6 +257,19 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   up at the end of a walk, then DC_GONE and off the map. The outcome is checked after each
   action and at each turn; the results are drawn into the scene buffer one line a frame (AMS
   text) and copied each frame. The death counter is a 3 x 5 digit sprite made once.
+- **Enemy AI.** (`ai_setup`, `ai_ability`, `ai_choose`, `ai_facing`; the rules in `RE_NOTES.md`
+  § Enemy AI) FFT's own decision without its simulation: each usable ability's best (origin,
+  target) by the change of the field's worth (a unit: HP x 128 / max HP, -32 Critical, -192 KO,
+  its side + and the other -; damage at the middle roll), kept if it beats standing on the
+  fallback tile; the best eight drawn in order on their hit chance; the tiles by their danger
+  (10 - steps, summed over the enemies acting before the unit's next turn) and their steps from
+  the focus (the nearest enemy; the nearest healer or crystal for a Critical unit retreating or a
+  guest under 45/128 HP); Throw Stone and thrown items need a clear line (FFT's projectile, every
+  2 units through the terrain's columns and the units' boxes); Attack tried from every tile, the
+  others once per target from the safest tile. Spread over frames: the picture stands still
+  first (the animation clock stops; once two frames in a row have the same checksum the frame is
+  no longer drawn), then a step a frame within ~270k cycles (the setup's halves, 90 tiles of the
+  spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most.
 - **Rings without stalls.** Old rings go by putting back their boxes from the view when they
   are few (an attack's four; a Move's dozens: the whole copy, 130k), new ones are drawn two a
   frame (`uncover` with three pointers and constant plane offsets: 18k a ring before). An
@@ -266,16 +297,18 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | an attack (Act: 4 rings, two a frame; the swing, the number; its first frame drops the rings) | 290-340k | 32 fps |
 | an ability (its list, the reach of up to 41 tiles, the preview, the name, the number) | 260-352k | 32 fps |
 | a battle won by keys (the attack, the EXP rising, the results drawn one line a frame) | 356k at most | 32 fps |
+| an AI unit thinking (the picture still: the frame not drawn; a step a frame) | 94k on average, 270k at most | 5 frames a turn (6 at most), after the camera's pan |
+| a battle the AI plays both sides of (fft(16), 6,065 frames: walks, acts, rings, 11 units on screen) | 343k on average; up to 590k when rings come or go over a crowd | the decisions alone within 270k |
 | a crowded pan (11 units on screen, 5 KO with their counters, some behind houses) | 374k (362k without the counters) | 30 fps |
 | Move (the reach, its rings drawn two a frame) | 350k, rings complete in ~0.5 s | 32 fps |
 | a tile picked (the path, the scene without rings) | 0.60 M | 0.05 s |
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 36,579 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 45,849 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (37.8 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
-unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 11 KB
-of work (~81 KB in all). Checked in TiEmu (Titanium, `ti-run`, the four views archived
+unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 18 KB
+of work (the AI's and the moves' tables 7 KB; ~88 KB in all). Checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a
 selection, local). The first version drew
@@ -286,8 +319,8 @@ frame 370k, selection 3.8 M.
 
 - The rotation is 0.54 s and the selection 0.31 s, not instantaneous: drawing polygon rows in
   C costs ~550 cycles per row (both planes), and a rotation frame has ~200 polygons.
-- The TI-89 HW2 (AMS 2.09) was not run; the program is over its limit (36.6 KB: `-pack`
-  planned), the game needs ~81 KB of free RAM (else it says so).
+- The TI-89 HW2 (AMS 2.09) was not run; the program is over its limit (45.8 KB: `-pack`
+  planned), the game needs ~88 KB of free RAM (else it says so).
 - Smaller data was measured and not kept: tile sprites deduplicated (FFT paints each face of
   each house: 686 sprites, 616 unique, 601 with 180-degree and mirror flips, 439 at 20 % of
   pixels tolerated: 102 KB), smoothing the speckles before packing (-10 %, windows lost);
@@ -300,8 +333,13 @@ frame 370k, selection 3.8 M.
 - The camera has one elevation (FFT has two), no zoom; the map has only its first level (FFT's
   second level, bridges over passages, is empty on Gariland).
 - Roofs are walkable as in the terrain data.
-- No AI yet (milestone 20): enemies and Delita only wait, so Defend (the enemy Chemist's)
-  is not offered; the attack has no weapon sprite (FFT draws it apart); abilities use the
+- The AI plays the enemies and the guest only (FFT's auto-battle for the player's units is a
+  test scenario); FFT's mostly-support policy is not coded (no Gariland unit can reach its
+  77/128 helpful abilities: an Attack is always there, an enemy Chemist only uses Potion at
+  level 1); FFT's tile priorities are never reset between turns (the unit's own tile can then
+  rank first): left out, it changed none of the 136 turns checked. Of the original's 136
+  turns, 7 take another action (5 of them one of our ranking that its draws on the hit chance
+  picked), 11 end on another tile and 8 face another way. The attack has no weapon sprite (FFT draws it apart); abilities use the
   swing pose (FFT has throw and item poses); a random amount is previewed as its range (FFT
   shows one roll); Wish shows the target's heal only (the user's cost drops in its panel).
 - A crystal only restores HP and MP (FFT also offers its abilities); a chest's item is shown,
@@ -309,6 +347,7 @@ frame 370k, selection 3.8 M.
   in that job); the results have no war trophies (FFT's Mythril Knife, Phoenix Down, Potion);
   [ESC] does not save the battle yet (milestone 22).
 - The ordinary frame's margin is thin with ten units on screen (345k of 360k); a pan over a
-  crowd of KO units with their counters reaches 374k (milestone 21: every state under 360k). Picking a tile
+  crowd of KO units with their counters reaches 374k, a battle the AI plays averages 343k and
+  peaks at 590k when rings come or go over a crowd (milestone 21: every state under 360k). Picking a tile
   (0.60 M: the path) is a one-frame stall; a Move's rings take ~0.5 s to appear (two a frame).
 - The cursor and the reach rings are flat diamonds on sloped tiles too (milestone 21).

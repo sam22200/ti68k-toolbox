@@ -415,6 +415,23 @@ only: nothing extracted from the disc).
   path must be reached by an `xcheck` scenario or key script: a crystal drawn only on the TI
   hit a GCC4TI miscompilation (a `(u16)` product under a range test folded to a wrong odd
   constant, an address error) that the PC and the unit tests could not see.
+  **An AI checked turn by turn** (milestone 20): the decompiled AI (108 `battle_ai_*` files: a
+  sub-agent's report, then each rule re-read) runs the real engine per candidate; ours scores
+  what an action changes. The reference: the original's own AI turns logged with every unit's
+  state at the turn's start (the battle, then built situations from one state with HP and
+  status pokes, each replayed 12 times by delaying the last key: other draws) and our plan
+  computed from each logged state with the original's units (stats, Brave, signs, what each
+  knows) loaded: 129 of 136 the same action. The mismatches pointed at the engine, not the AI:
+  measuring the original's move ranges (tile byte 5's destination mark, read once the help
+  box is closed; a fresh state load per range, menus are fragile) showed the canals walkable,
+  so a map flag read at milestone 11 was wrong, and fitted water costs and a lower jump height
+  that the code reading had missed; probing the AI's own workspace frame by frame (its grids,
+  candidate tiles, ranked actions) settled the rest (a thrown item needs a clear line; a target
+  is used up only once really tried). Statics-free AI work must fit the frame: on the TI a
+  turn's thinking (~1 M cycles even optimised) only fits with the picture standing still (no
+  animation, the frame not drawn once two frames in a row have the same checksum), a bounded
+  step a frame. A struct of `u8` tables with an odd size put the next buffer at an odd address:
+  an address error only the TI binary hit (`make xcheck`).
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).

@@ -423,6 +423,13 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   late: the game keeps the same speed on HW1/HW2/HW3.
 - **Spread expensive work over frames**: AI every 2nd–4th frame, pathfinding a few nodes per frame,
   collision checks for distant objects less often. Time-slice anything longer than a frame.
+- **Think while the picture stands still** (measured with `ti-cycles`, `games/fft` milestone 20):
+  when a busy scene's render alone takes ~300k of the ~360k budget, a computation of ~1 M
+  cycles (FFT's AI turn) gets no room by time-slicing. Stop the animation clocks, draw until two
+  frames in a row have the same checksum of the planes (~15k), then skip the drawing: both
+  double buffers hold the same picture, so the flips show nothing moving, and the work gets
+  the whole frame, a bounded step per frame (resumable loops, a work budget counted in units
+  calibrated by `ti-cycles` zones). FFT's AI: 5 frames a turn, steps of at most 270k.
 - **Precompute** at start-up: trig/sqrt/division tables, row offsets, sprite masks, level data
   decoded once.
 - **Cheap tests first**: grid cell or bounding box before pixel-perfect collision; early exit as

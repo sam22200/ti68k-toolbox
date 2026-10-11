@@ -77,6 +77,33 @@ IMPLEMENTATION** (what the TI does, and why).
 - Done when a few rewards equal the original's (an attack, a kill, a level up), the crystal or
   chest odds and the counter's length as the code reads, a battle won and one lost by keys.
 
+### Enemy AI (grilling, 2026-10-11, milestone 20)
+
+- FFT's scoring without its simulation: FFT plays each candidate in its real engine (random
+  rolls at their midpoint) and scores the whole field; we compute the same score's change on
+  the units the action touches (mean damage, no critical, the KO weight).
+- All of FFT's rules kept: the 8 best actions ranked and drawn on their hit chance, act then
+  back off to the safest tile, a Critical unit retreats, a mostly-support unit heals and revives,
+  the enemies' 1-in-7 push, Delita seeking a healer or a crystal below 45/128 HP, Accumulate and
+  Yell on a coin flip, the Wait facing.
+- The search as FFT's (Attack from every adjacent tile, the other abilities once per target
+  from the safest tile), spread over frames: at most ~150k cycles of thinking per frame, a turn
+  decided in under 0.5 s (15 frames); the numbers to the user first if the worst case is over.
+- An AI turn shown as a player's without the menus: the cursor on the unit, its move range
+  briefly, the walk, the ability's name at the top right, the target marked briefly, the act,
+  the facing.
+- Defend and the AI's item range measured on the original, then as FFT's: Defend drawn as FFT
+  draws a support ability, a command for the player's units that have it.
+- Checked on the original: `oracle.py --ai` logs its AI's turns (unit, tiles, ability, target,
+  facing) over the 40 turns already replayed and over built situations replayed with other
+  draws; our first choice must be FFT's most frequent one, our moves the same tile or one as
+  safe.
+- No AI for the player's side as a feature; a test scenario where the AI plays both sides to the
+  end (tests, xcheck, cycles).
+- Measured then: the oracle's enemy Chemist has Defend (support 0x1DF); FFT's AI throws items at
+  most the unit's Move away (its exact targeting: 4) and the enemies use the items of their
+  level or less (at level 1 only Potion).
+
 ## Tools
 
 - `psxiso.py ... sources/fft_ps1/disc` lists the files; `--file MAP/MAP022.GNS` (and the
@@ -113,6 +140,19 @@ IMPLEMENTATION** (what the TI does, and why).
   four KOs among them. `battle.py --check ... oracle.h turns.txt` turns them into the fixture:
   each turn's CT bonus is its unit's CT at the next turn less the ticks between (counted on a
   living unit that did not act).
+- **The AI's turns** (milestone 20): `tools/oracle.py --ai DISC STATE 40 12 ai.txt` goes on from
+  the first-turn state: the move range FFT shows Ramza and the recruit after him (tile byte 5
+  bit 0x20 of `g_battle_map_tile_data` 0x8018f8cc, the menu's Move opened, a fresh load each),
+  then the AI's first 40 turns as `--turns` plays them, then 8 built situations (the actor given
+  CT 100, the others 0; HP, Critical or Dead poked: positions cannot be poked, the game keeps
+  them elsewhere too) each replayed 12 times with Ramza's Wait delayed 7 frames more each time
+  (other draws). Per turn: each unit's tile, facing, HP, CT, death counter, statuses, the
+  learned bytes of its job's row, its support, and the AI's tile priorities
+  (`g_battle_ai_data_base` 0x8019f3c4 + 0x5f4), at its turn's start and the next one's; what the
+  actor did from its record (+0x187 moved, +0x188 acted, +0x170 last ability, +0x17a / +0x17e the
+  target's tile; Defend: acted, no ability, Defending after). 2 min. A probe of the AI workspace
+  frame by frame while a unit thinks (its grids, candidate tiles, ranked actions: `battle.h`'s
+  `battle_ai_data_t` offsets) settled the Potion case below.
 - **Attacks** (milestone 17): `tools/oracle.py --attack DISC STATE 40 400 attacks.txt` goes on from
   the first-turn state: Ramza's menu DOWN, CIRCLE (Act), CIRCLE (Attack), CIRCLE (closes the
   help box), LEFT (the recruit south of him), CIRCLE: the preview; then Execute and OK (two
@@ -145,11 +185,15 @@ IMPLEMENTATION** (what the TI does, and why).
   time of day and weather; the primary mesh is `MAP022.9` (35,984 bytes).
 - OBSERVED: the mesh's u32 at 0x68 points to the terrain: x count (10), z count (15), then
   2 levels x 15 x 10 tiles of 8 bytes: byte 0 & 0x3F surface, byte 2 height, byte 3 slope height
-  (& 0x1F) and depth (>> 5), byte 4 slope type, byte 6 flags (bit 6 can't walk), byte 7 auto
-  camera. Level 1 is all zero on Gariland.
+  (& 0x1F) and depth (>> 5), byte 4 slope type, byte 5 ceiling depth and the transient marks
+  (0x20: a move destination shown), byte 6 flags (bit 0 blocked, bit 1 untargetable, bit 7
+  can't stop: `map_tile_t` in fft_decomp), byte 7 auto camera. Level 1 is all zero on Gariland.
 - OBSERVED: heights 0 (canals) to 10 (a chimney); streets and squares at 2, houses 6-8 with
   sloped roofs; surfaces grass, waterway, wooden floor, stone floor, roof, tree, box, chimney,
-  bridge. The canals are flagged can't-walk.
+  bridge. Correction (milestone 20): bit 6 (set on the canals) was read as "can't walk" until
+  the move ranges were measured on the original; it has no established meaning. No tile is
+  blocked at Gariland: the canals (depth 1) are waded, the chimneys stood on, the trees (bit 1,
+  untargetable) crossed but not stopped on.
 - OBSERVED: the slope byte is four 2-bit edges, from the top bits N S W E (0 low, 1 half,
   2 high); N is +z and E is +x: every incline's high side meets the neighbour at h + slope
   height (the 25 sloped tiles checked once against their neighbours). A corner is high when an
@@ -494,6 +538,97 @@ IMPLEMENTATION** (what the TI does, and why).
   of FFT's eight turning images, white with a black line, floating; the chest is drawn at 0.55
   (24 px wide) with its greys picked per material (by luminance it was a mush).
 
+### Moving (milestone 20)
+
+- OBSERVED IN FFT (oracle: the move ranges shown to Ramza, Move 5, and to the recruit after him,
+  Move 4, Jump 3 both): the canal tiles (surface 0x0E, depth 1) are in them, a chimney too; the
+  occupied tiles are not; a tree tile is never a destination.
+- OBSERVED (fft_decomp, read: `battle_move_set_tile_flags_for_pathfinding`,
+  `battle_move_calculate_spread`, `battle_move_update_candidate`, `battle_move_check_horizontal_
+  jump`, `battle_move_init_source_geometry` / `_destination_geometry`): a tile is enterable unless
+  blocked (untargetable ones too for a walking unit); a step's remaining range loses the terrain
+  cost of the tile it spreads from (`g_main_terrain_movement_cost_tables[0]`, 0x8005ea50: 2 for
+  surface 0x0E-0x11, 255 for 0x12, 0x19, 0x1C, 0x3F, 1 for the others at Gariland); its height
+  is the exit side's (+ 2 x depth out of water) against the entry side's, at most 2 x Jump; a
+  unit spreads by jumps too, over up to Jump / 2 tiles (1 here), to a tile no lower, the tiles
+  jumped over below the unit's body; enemies' tiles are not enterable, allies' are.
+- LIKELY INTERPRETATION (fitted to the two ranges and the AI's turns, where the code read above
+  did not match): a step from water to water costs 2, any other step 1; a step into water from
+  land cannot use the last point; a jump costs 2 (3 from water) and climbs at most Jump half
+  units (3: a 1.5-level rise), not 2 x Jump. With these the two ranges are exact (0 tiles off of
+  150 each) and the AI's turns end on the original's tile 125 times in 136 (73 with the old
+  rule: canals, trees and chimneys blocked).
+- TARGET (`edges`, `spread_start`, `spread_go`, `compute_reach`, `make_path`): those rules for the
+  player's units and the AI; the AI's spread from its focus uses the code's cost (the tile it
+  spreads from: from the focus outwards, so a step out of water costs 2), which matched more of
+  its moves. A jump's path is one step of two tiles (the walk slides over the gap). Units in
+  water stand on its bottom (their sprite is not sunk).
+
+### Enemy AI (milestone 20)
+
+- OBSERVED (fft_decomp, read: `battle_ai_build_command`, `select_initial_action`,
+  `init_target_consideration`, `find_nearest_target`, `build_movement_scenarios`,
+  `select_destination`, `fill_foe_proximity_grid`, `simulate_action_and_score`,
+  `classify_ability_effect`, `evaluate_ability_outcome`, `evaluate_movement_origins`,
+  `take_next_movement_origin`, `insert_ranked_action`, `select_ranked_action`,
+  `choose_wait_facing`, `select_retreat_action`; a sub-agent's report, every point re-read):
+  FFT plays each candidate (ability, target tile, origin tile) in its battle engine with the
+  random rolls at their middle (`get_random_0_7fff` returns 0x4000: no critical, Dash's mean)
+  and scores the field: each unit HP x 128 / max HP plus a signed weight per status (Dead -192,
+  Critical -32, Poison -26, Darkness -64 x the share of its abilities it blocks...) plus 357 for
+  its kept equipment, the actor's side + and the other -. The best candidate of each ability
+  enters a ranking of 8 if it beats the score of moving to the fallback tile (by score, then hit
+  chance, then the origin's danger); the ranking is drawn in order, entry i taken when rand() %
+  100 < its hit chance, else the first. Tiles: danger = sum over the enemies acting before the
+  unit's next turn of max(0, 10 - steps, heights aside); steps from the focus by the unit's moves
+  (125 where the spread does not reach); the focus is the nearest enemy (Manhattan, the lower
+  index on a tie), for a Critical unit with support left (two of its side alive, one not
+  Critical) or a guest under 45/128 HP the nearest unit that can give HP (Potion, Wish) or a
+  crystal. Within reach (Move + the shortest range on an enemy, items counting half on an ally,
+  at least the steps from the focus) the fallback is the safest tile one step nearer (3 steps
+  with a ranged ability against an enemy), else the safest tile from which it strikes next turn
+  (that reach halved 1 time in 7 for the enemies); acting from its own tile it acts, then runs the
+  decision again with no ability: the safest tile (hit and back off). Attack is tried from every
+  tile (its facing changes the hit chance), the others once per target from the safest tile
+  reaching it (a target used up only once really tried); an ability that can reach the user is
+  also tried on itself from its own tile then the fallback tile (ties: from its own tile first).
+  Throw Stone and items thrown 2 tiles or more need a clear straight line (from 24 above the
+  feet to 24 above the target's, every 2 units: inside a tile's column up to its height x 12, or
+  a standing unit's 16 x 16 x 36 box, blocks it). Enemies use the items of their level or less
+  (Potion only, level 1; Phoenix Down is level 13), items at the unit's Move at most. With none
+  ranked it goes to the fallback tile, Defending if Defend is its support. At Wait it faces the
+  nearest enemy acting before its next turn, by quadrant, unless the neighbour that way is off
+  the map, blocked or 3 higher.
+- OBSERVED (oracle `--ai`): of the original's 136 turns (40 of the battle, 96 in 8 built
+  situations), the same action and target as our first choice 129 times, in our ranking 134,
+  the same tile at the end 125, the same facing 128; in each built situation FFT's most
+  frequent choice is our first (a Squire next to a recruit attacks then backs off; Critical:
+  Throw Stone from its tile then away; out of reach: closer; the Chemist: Potion on the hurt
+  ally from the tile its throw reaches, then away; a recruit at 4 HP: Throw Stone 9 times in 12,
+  Dash 3; the Chemist with nobody in reach: moves and Defends; Delita under 45/128: still
+  attacks). FFT's support abilities: drawn among those the unit's jobs' JP bought
+  (`main_unit_calculate_rsm`): at 199 JP at most only Equip Change (Chemist, 0 JP, always),
+  Equip Axe or Defend (Squire, 170 or 50 JP); the enemy Chemist of the oracle has Defend (0x1DF),
+  the others Equip Change (0x1E0), Ramza none.
+- OBSERVED (probe): FFT's tile priorities are never reset between turns (`score_reachable_tiles`
+  writes only the tiles it scores); with the unit's own tile left unscored they can make it rank
+  first among the origins. LIKELY INTERPRETATION: the case is rare; emulated (the field's
+  absolute score, the grid kept across turns, FFT's own grid loaded in the tests) it changed none
+  of the 136 turns, so it was left out.
+- LIKELY INTERPRETATION: FFT's mostly-support policy (a unit with 77/128 of its usable
+  abilities on allies heals and revives first) cannot occur at Gariland (Attack is always
+  usable, an enemy Chemist only Potion), nor statuses but KO, Critical and Defending.
+- TARGET (`ai_setup`, `ai_setup2`, `ai_ability`, `ai_ability_go`, `ai_score`, `ai_clear`,
+  `ai_choose`, `ai_facing`, `ai_think`, `ai_next`, `ai_step`): the same rules computed on what an
+  action changes (the units hit, the user for Wish, a crystal's or a chest's pickup), the same
+  ranking and draw with our RNG; Defend drawn as FFT draws a support (Defend learned with the
+  Squire job's JP after the reactions and supports listed before it, then one of the two
+  supports), a command of the Act list for the player's units that have it. The turn shown as a
+  player's without the menus. Cost on the TI: the picture stands still once two frames in a
+  row have the same checksum (the animation clock stops while thinking), the frame is then not
+  drawn and the thinking runs a step a frame within ~270k cycles: 5 frames a turn on average,
+  6 at most, after the camera's pan (~13 frames, as before).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -508,3 +643,5 @@ IMPLEMENTATION** (what the TI does, and why).
 | Attack | XA (PA, knife (PA + SP) / 2) x WP, zodiac, critical 4 %, hit 100 - class evade from the front | same | decomp, 40 previews and 400 attacks of `oracle.py --attack` |
 | abilities | learned: JP 100..199 spent in order on passing learn rolls; Dash 1..4 x XA, Throw Stone 1..2 x XA, Wish 2 x max / 5, Potion 30, Phoenix Down 1..20 | same | decomp, 13 cases and 600 trials of `oracle.py --skills` |
 | rewards | 10 EXP (kill 20 / KOs) + level difference, 100 a level; JP 8 + 2 x job level + level / 4, a quarter shared; death counter 3, then crystal (enemy 1/2, player 3/4) or chest | same (the share to the same job only) | decomp, six actions of `oracle.py --rewards` |
+| moving | canals waded (water to water 2), jumps over one tile, trees crossed | same, the two measured ranges exact | 2 ranges of `oracle.py --ai`, decomp |
+| AI | scores the field (HP x 128 / max, KO -192, Critical -32), ranks 8, draws on hit chance; danger 10 - steps; hit and back off | same, 129 of 136 turns the same action, 125 the same tile | decomp, 136 turns of `oracle.py --ai` |

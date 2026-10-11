@@ -163,13 +163,29 @@ with `-pack` (decided at milestone 13).
     GCC4TI miscompilation found by `ti-cycles` (a `(u16)` product under a range test folded to
     a wrong odd constant: an address error). Frames up to 356k, one crowded pan 374k (5 KO
     counters; 362k without); program 36,579 bytes.
-20. **Enemy AI.** FFT's AI is a search over the unit's reachable tiles x actions x targets;
+20. **Enemy AI** (done). FFT's AI is a search over the unit's reachable tiles x actions x targets;
     the target is a scored search of the same kind kept small: for each reachable tile (Move
     4: <= ~40), the best action (expected damage, a kill, healing a hurt ally, a status) and
     the tile's danger (enemies able to reach it), spread over frames; the enemies' habits
     measured on the oracle (whom they attack, whether they retreat or heal) and kept. Done:
     every enemy turn decided in under ~0.5 s, its choices close to the original's on the
     same situations.
+    Done: FFT's decision read in the decompilation (`RE_NOTES.md` § Enemy AI) and computed on
+    what an action changes: the field's worth, the 8 best ranked and drawn on their hit chance,
+    the tiles by danger and steps from the focus, hit and back off, the retreat of a Critical
+    unit, Delita's healer search, the Wait facing, Throw Stone's and the items' straight line;
+    the enemies' Defend drawn as FFT draws a support (a command for the player's units too).
+    Checked on 136 of the original's AI turns (`oracle.py --ai`: the battle and 8 built
+    situations replayed 12 times): the same action 129, in our ranking 134, the same tile 125,
+    the same facing 128, FFT's most frequent choice our first in every situation. Measuring its
+    moves corrected milestone 11: canals waded (water to water costs 2), jumps over one tile,
+    chimneys stood on, trees crossed (the map flag read as "can't walk" was not one); the two
+    move ranges measured are exact. An AI turn thinks with the picture standing still (not
+    drawn once two frames in a row are the same), a step a frame within 270k: 5 frames a turn
+    (6 at most) after the camera's pan. `fft(16)`: the AI plays both sides to victory (~6,000
+    frames), TI = PC, 16 scenarios and the key scripts too. A battle the AI plays averages
+    343k a frame and peaks at 590k where rings come or go over a crowd (milestone 21); program
+    45,849 bytes, RAM ~88 KB.
 21. **Presentation.** Every pose the battle uses (attack, hit, KO, crystal, chest), the
     number and the hit flash, the menu windows drawn over the scene at a fixed cost, the
     turn order and HP readable at a glance (outlined, 2-pixel details), the camera moving
