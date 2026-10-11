@@ -37,15 +37,18 @@ battle.h: tools/battle.py
 ORACLE := $(TI)/sources/fft_ps1/gariland_t1
 TURNS := $(TI)/sources/fft_ps1/gariland_turns.txt
 ATTACKS := $(TI)/sources/fft_ps1/gariland_attacks.txt
+SKILLS := $(TI)/sources/fft_ps1/gariland_skills.txt
 $(ORACLE).state:
 	$(PY) tools/oracle.py $(DISC) $@ $(ORACLE).txt
 $(TURNS): $(ORACLE).state
 	$(PY) tools/oracle.py --turns $(DISC) $(ORACLE).state 40 $@
 $(ATTACKS): $(ORACLE).state
 	$(PY) tools/oracle.py --attack $(DISC) $(ORACLE).state 40 400 $@
-oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS)
-	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS)
+$(SKILLS): $(ORACLE).state
+	$(PY) tools/oracle.py --skills $(DISC) $(ORACLE).state 300 $@
+oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS) $(SKILLS)
+	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS) $(SKILLS)
 $(NAME)_test: oracle.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h battle.h art.h fft.h $(VIEWS:=.bin) fftu.bin
-XCHECK := 0 1 2 3 4 5 6 7 8 9
+XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13
 FRAMES := 40

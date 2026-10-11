@@ -15,7 +15,20 @@ typedef struct {
     u16 day;                                   // birthday 1..365; 0, and Brave / Faith 0: drawn
     u8 x, z, face, team;
     u8 eq[5][2];                               // head, body, accessory, weapon, shield: one of two
+    u8 set, learned;                           // skill set; the abilities it knows (0xFF: drawn)
 } UnitDef;
+// An ability (RE_NOTES.md § Abilities): AB_DAMAGE (1..Y times PA, the zodiac, a knockback by
+// Brave), AB_CURE (removes the statuses Y, else misses), AB_WISH (the user loses max HP / 5, the
+// target heals twice that), AB_HEAL (Y x 10 HP), AB_REVIVE (a KO unit back with 1..Y HP). Range:
+// tiles at most `range` steps away (any path), within `vert` half units of the user's height
+// (0xFF: any); AF_SELF: the user's own tile too, AF_EVADE: evaded as an attack, AF_ITEM: from
+// the bag (slot `bag`; the enemies' items do not run out).
+enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE };
+enum { AF_SELF = 1, AF_EVADE = 2, AF_ITEM = 4 };
+enum { ST_DEFEND = 1, ST_POISON = 2, ST_DARK = 4, ST_SILENCE = 8 };   // Dead: 0 HP
+typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 jp; } Ability;
+#define SET_N 6                                // abilities per skill set at most
+typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
 #include "units.h"
 #include "battle.h"
@@ -51,20 +64,24 @@ typedef struct {
 
 // M_BROWSE: the cursor free (enemies' turns, or the player looking around); M_MENU: the
 // player's turn menu; M_TARGET: the reach shown, a tile to pick; M_WALK; M_FACE: the facing
-// chosen at Wait; M_STATUS: a unit's numbers; M_AIM: the weapon's reach shown, a target to
-// pick; M_ACT: the attack played
-enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT };
+// chosen at Wait; M_STATUS: a unit's numbers; M_AIM: the weapon's or the ability's reach
+// shown, a target to pick; M_ACT: the attack or the ability played; M_ACTS: Act's list (Attack,
+// the skill set); M_SKILLS: the abilities the unit knows
+enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS };
+#define NO_ABIL 0xFF                   // st.abil: the weapon's Attack
 enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
 enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
 #define U_RAMZA 6                      // in battle.h's order: Delita, five enemies, Ramza, recruits
+#define U_CHEMIST 8                    // the female Chemist
 #define U_HIDE 2                       // the enemy the occlusion scenarios move behind a house
 enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD, EQ_N };
 
 typedef struct {
     u8 x, z, gfx, team, face;          // face: world +x, -x, +z, -z
     u8 job, level, brave, faith, zodiac;   // job: index in jobs[]; zodiac 0 Aries .. 11 Pisces
-    u8 female;
+    u8 female, set, learned, status;   // skill set, the abilities it knows (bit k: the set's
+                                       // k-th), ST_* bits
     u8 eq[EQ_N];                       // index in items[], 0xFF none
     u16 hp, max_hp, mp, max_mp;
     u8 pa, ma, sp, ct, move, jump;
@@ -92,7 +109,11 @@ typedef struct {
     u8 mx, mz, mface, wface;           // the active unit before its move (undone), at Wait
     u8 atk, tgt, act_t;                // M_ACT: attacker, target, frame
     u8 hit, crit, push, kx, kz;        // its outcome: hit, critical, pushed to (kx, kz)
-    u16 dmg;                           // HP taken (the fall's included)
+    u16 dmg;                           // HP taken (the fall's included), healed, or the statuses
+                                       // removed (AB_CURE)
+    u16 self;                          // HP the user loses (Wish)
+    u8 abil, sub, skill;               // the ability (NO_ABIL: Attack); M_ACTS's and M_SKILLS's entries
+    u8 bag[NBAG];                      // the party's items
 } State;
 extern State st;
 
@@ -121,6 +142,15 @@ u8 attack_side(u8 a, u8 t);
 u8 hit_chance(u8 a, u8 t);
 u16 attack_damage(u8 a, u8 t, u8 crit, u16 r);
 void attack(u8 a, u8 t);               // rolled and started (M_ACT), its outcome in st
+// the abilities: a unit's k-th known one (abilities[] index, 0xFF none), whether it can use it
+// now (an item left), its reach (st.reach 1), the hit chance, the amount (damage or HP healed;
+// r: the random roll 0..32767 of Dash, Throw Stone and Phoenix Down), the ability used
+u8 known(u8 who, u8 k);
+u8 can_use(u8 who, u8 ab);
+void skill_range(u8 who, u8 ab);
+u8 skill_hit(u8 a, u8 t, u8 ab);
+u16 skill_amount(u8 a, u8 t, u8 ab, u16 r);
+void skill(u8 a, u8 t, u8 ab);
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
 extern u8 scene_rot;                   // orientation it holds (0xFF: stale)

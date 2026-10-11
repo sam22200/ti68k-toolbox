@@ -106,8 +106,8 @@ static u8 *vbuf, vbuf_rot;
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
 #define HUD_ROWS 14                     // the top strip (rows 0-7), text to be turned (8-13)
-#define WIN_ROWS 27                     // the menu or a unit's numbers, at the top right
-#define WIN_DONE 5                      // its box, then its four lines: one per frame
+#define WIN_ROWS 33                     // the menu, a list or a unit's numbers, at the top right:
+                                        // five lines at most
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
     u8 depth, rot, r0, r1;
@@ -128,9 +128,10 @@ typedef struct {
     u8 hud_t[ORDER_N], hud_late;
     u16 label[UNIT_GFX_N][5];           // the turns' labels (Ra, De, Sq, Ch), drawn once
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // the menu or a status window, and what it shows:
-    u8 win_k[3], win_w, win_h, win_n;   // mode, moved | acted << 1 (M_AIM: the attacker), unit;
+    u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_AIM: the attacker;
+                                        // M_ACTS: no ability known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
-                                        // (WIN_DONE: all drawn)
+                                        // its parts (the box, a line each; win_n == win_m: drawn)
     u16 pan[2][2][PANEL_H];             // the active unit's panel (left), the cursor's (right):
     u16 pan_k[2][3];                    // light, dark; unit + 1 (0: none), HP, MP
     u8 arrow[4][2][8];                  // the facing arrows (view -v, +u, +v, -u): fill, outline
@@ -207,7 +208,9 @@ u8 unit_at(s16 x, s16 z)
 // ---------------------------------------------------------------- the battle's units
 // FFT's model (tools/battle.py, checked on the original at Ramza's first turn): raw stats of 24
 // bits drawn from the unit type's base and variance, grown per level, times the job's
-// multiplier; then the equipment. Once per battle: the 32-bit divisions do not matter.
+// multiplier; then the equipment; the abilities it knows: its job's JP (100..199 at level 1)
+// spent in its skill set's order on each ability whose learn rate roll passes. Once per
+// battle: the 32-bit divisions do not matter.
 // Our own 32-bit xorshift for the battle's draws, seeded from the runtime's: the runtime's
 // wyhash16 (a 16-bit state) ties two draws in a row (after a 4 % critical roll its next draw,
 // the critical's bonus, was never 0: criticals seen 3.8 % for the original's 2.0 %)
@@ -271,6 +274,20 @@ void battle_units(void)
         for (k = 0; k < EQ_N; k++)                 // one of the two candidates (FFT: of n)
             u->eq[k] = d->eq[k][d->eq[k][1] != 0xFF ? rand15() >> 14 : 0];
         unit_stats(u);
+    }
+    for (i = 0; i < NUNIT; i++) {                  // drawn after the stats (theirs kept per seed)
+        const UnitDef *d = &unit_defs[i];
+        Unit *u = &st.unit[i];
+        u->set = d->set; u->status = 0; u->learned = d->learned;
+        if (d->learned == 0xFF) {                  // its job's JP, then each ability in order:
+            u16 jp = (u16)(100 + ((100UL * rand15()) >> 15));   // its learn rate, if JP are left
+            const u8 *a = skill_sets[d->set].abil;
+            u->learned = 0;
+            for (k = 0; k < SET_N && a[k] != 0xFF; k++)
+                if (((100UL * rand15()) >> 15) < abilities[a[k]].rate && jp >= abilities[a[k]].jp) {
+                    jp -= abilities[a[k]].jp; u->learned |= (u8)(1 << k);
+                }
+        }
     }
 }
 
@@ -338,12 +355,13 @@ void turn_order(void)
     for (; n < ORDER_N; n++) st.turns[n] = 0xFF;
 }
 
-// the next turn: the cursor and the camera go to its unit; enemies and the guest wait, a
-// player's unit opens its menu
+// the next turn: the cursor and the camera go to its unit (its Defending ends); enemies and the
+// guest wait, a player's unit opens its menu
 static void turn_start(void)
 {
     u8 me;
     st.act = ct_next();
+    st.unit[st.act].status &= (u8)~ST_DEFEND;
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
     me = st.unit[st.act].team == TEAM_PLAYER;
     st.wait_t = me ? 0 : AI_WAIT;
@@ -732,24 +750,34 @@ u8 attack_side(u8 a, u8 t)
     return c > 0 ? SIDE_FRONT : c < 0 ? SIDE_BACK : SIDE_SIDE;
 }
 
+// from the front the target evades with its class evade; Defending halves the base hit (100):
+// the chance (base - evade) * 100 / base
 u8 hit_chance(u8 a, u8 t)
 {
-    return attack_side(a, t) == SIDE_FRONT ? 100 - jobs[st.unit[t].job].cev : 100;
+    const Unit *ut = &st.unit[t];
+    u8 base = ut->status & ST_DEFEND ? 50 : 100, ev = attack_side(a, t) == SIDE_FRONT ? jobs[ut->job].cev : 0;
+    return (u8)((base - ev) * 100 / base);
+}
+
+// XA = x changed by the signs' compatibility (at least 1)
+static s16 zodiac_xa(const Unit *ua, const Unit *ut, s16 xa)
+{
+    u8 c = zodiac_compat[ua->zodiac > ut->zodiac ? ua->zodiac - ut->zodiac : ut->zodiac - ua->zodiac];
+    u16 p = (u16)(xa * 25);
+    if (c == 3) c = ua->female == ut->female ? 4 : 5;       // opposite signs: worst, best
+    if (c == 1) xa -= p / 100;
+    else if (c == 2) xa += p / 100;
+    else if (c == 4) xa -= p / 50;
+    else if (c == 5) xa += p / 50;
+    return xa < 1 ? 1 : xa;
 }
 
 u16 attack_damage(u8 a, u8 t, u8 crit, u16 r)
 {
     const Unit *ua = &st.unit[a], *ut = &st.unit[t];
     const Item *w = ua->eq[EQ_WEAPON] != 0xFF ? &items[ua->eq[EQ_WEAPON]] : RT_NULL;
-    s16 xa = w && w->knife ? (ua->pa + ua->sp) >> 1 : ua->pa, ya;
-    u8 c = zodiac_compat[ua->zodiac > ut->zodiac ? ua->zodiac - ut->zodiac : ut->zodiac - ua->zodiac];
-    u16 p = (u16)(xa * 25), d;
-    if (c == 3) c = ua->female == ut->female ? 4 : 5;       // opposite signs: worst, best
-    if (c == 1) xa -= p / 100;
-    else if (c == 2) xa += p / 100;
-    else if (c == 4) xa -= p / 50;
-    else if (c == 5) xa += p / 50;
-    if (xa < 1) xa = 1;
+    s16 xa = zodiac_xa(ua, ut, w && w->knife ? (ua->pa + ua->sp) >> 1 : ua->pa), ya;
+    u16 d;
     if (crit) xa += (s16)(((u32)r * (u16)xa) >> 15);
     ya = w ? w->wp : (s16)((u16)(ua->pa * ua->brave) / 100);
     if (ya < 1) ya = 1;
@@ -757,49 +785,167 @@ u16 attack_damage(u8 a, u8 t, u8 crit, u16 r)
     return d > 999 ? 999 : d;
 }
 
-// the hit rolled (rand() * 100 / 32768 >= the evade), then the critical, the damage and the
-// knockback: one tile away along the dominant axis (a tie: z), onto a walkable, free, dry tile
-// no higher (FFT compares the tiles' facing edges), not when the blow kills; a fall of more
-// than Jump levels costs (levels - Jump) * max HP / 10
-void attack(u8 a, u8 t)
+// the evades rolled: a miss when rand() * base / 32768 < the evade (base 100, 50 Defending)
+static u8 roll_hit(u8 a, u8 t)
+{
+    const Unit *ut = &st.unit[t];
+    u8 base = ut->status & ST_DEFEND ? 50 : 100, ev = attack_side(a, t) == SIDE_FRONT ? jobs[ut->job].cev : 0;
+    return (u8)(((u32)rand15() * base >> 15) >= ev);
+}
+
+// the act starts: the user turns to its target (M_ACT)
+static void act_start(u8 a, u8 t)
 {
     Unit *ua = &st.unit[a], *ut = &st.unit[t];
     s16 dx = (s16)ut->x - ua->x, dz = (s16)ut->z - ua->z;
-    u8 ev = 100 - hit_chance(a, t);
     st.atk = a; st.tgt = t; st.act_t = 0; st.mode = M_ACT;
+    st.crit = st.push = 0; st.dmg = st.self = 0;
     if (W) W->num_ok = 0;
-    ua->face = (dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz) ? (dx > 0 ? 0 : 1) : (dz > 0 ? 2 : 3);
-    st.hit = (u8)(((u32)rand15() * 100 >> 15) >= ev);
-    st.crit = st.push = 0; st.dmg = 0;
-    if (!st.hit) return;
-    st.crit = (u8)(((u32)rand15() * 100 >> 15) < 4);
-    st.dmg = attack_damage(a, t, st.crit, st.crit ? rand15() : 0);
-    if (st.crit && st.dmg < ut->hp) {
-        s16 kx = ut->x, kz = ut->z;
-        const Tile *s = &map_tiles[ut->z * MAP_W + ut->x], *n;
-        if ((dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz)) kx += dx > 0 ? 1 : -1;
-        else kz += dz > 0 ? 1 : -1;
-        n = tile_at(kx, kz);
-        if (n && n->walk && !n->water && n->stand <= s->stand && !unit_at(kx, kz)) {
-            s16 fall = ((s->stand - n->stand) >> 1) - ut->jump;
-            st.push = 1; st.kx = (u8)kx; st.kz = (u8)kz;
-            if (fall > 0) st.dmg += (u16)((u32)fall * ut->max_hp / 10);
-            if (st.dmg > 999) st.dmg = 999;
-        }
+    if (dx || dz)
+        ua->face = (dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz) ? (dx > 0 ? 0 : 1) : (dz > 0 ? 2 : 3);
+}
+
+// knockback: one tile away along the dominant axis (a tie: z), onto a walkable, free, dry tile
+// no higher (FFT compares the tiles' facing edges), not when the blow kills; a fall of more
+// than Jump levels costs (levels - Jump) * max HP / 10
+static void knockback(u8 a, u8 t)
+{
+    Unit *ua = &st.unit[a], *ut = &st.unit[t];
+    s16 dx = (s16)ut->x - ua->x, dz = (s16)ut->z - ua->z, kx = ut->x, kz = ut->z;
+    const Tile *s = &map_tiles[ut->z * MAP_W + ut->x], *n;
+    if (st.dmg >= ut->hp || (!dx && !dz)) return;
+    if ((dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz)) kx += dx > 0 ? 1 : -1;
+    else kz += dz > 0 ? 1 : -1;
+    n = tile_at(kx, kz);
+    if (n && n->walk && !n->water && n->stand <= s->stand && !unit_at(kx, kz)) {
+        s16 fall = ((s->stand - n->stand) >> 1) - ut->jump;
+        st.push = 1; st.kx = (u8)kx; st.kz = (u8)kz;
+        if (fall > 0) st.dmg += (u16)((u32)fall * ut->max_hp / 10);
+        if (st.dmg > 999) st.dmg = 999;
     }
 }
 
-// M_ACT, once per frame: the target loses its HP at ACT_HIT (pushed, KO at 0: the turn order
-// again), the menu comes back at ACT_END
+// the hit rolled, then the critical (4 %: XA + 0..XA - 1 and a knockback) and the damage
+void attack(u8 a, u8 t)
+{
+    act_start(a, t);
+    st.abil = NO_ABIL;
+    st.hit = roll_hit(a, t);
+    if (!st.hit) return;
+    st.crit = (u8)(((u32)rand15() * 100 >> 15) < 4);
+    st.dmg = attack_damage(a, t, st.crit, st.crit ? rand15() : 0);
+    if (st.crit) knockback(a, t);
+}
+
+// ---------------------------------------------------------------- abilities
+// FFT's abilities at Gariland (RE_NOTES.md § Abilities: read in the decompilation, checked on
+// the original's previews and outcomes): what a unit knows is drawn with it (battle_units)
+u8 known(u8 who, u8 k)
+{
+    const Unit *u = &st.unit[who];
+    const u8 *a = skill_sets[u->set].abil;
+    u8 i;
+    for (i = 0; i < SET_N && a[i] != 0xFF; i++)
+        if (u->learned & (1 << i) && !k--) return a[i];
+    return 0xFF;
+}
+
+u8 can_use(u8 who, u8 ab)
+{
+    return !(abilities[ab].flags & AF_ITEM) || st.unit[who].team != TEAM_PLAYER || st.bag[abilities[ab].bag];
+}
+
+// the tiles at most `range` steps away (FFT spreads the range over the map, heights aside),
+// walkable, within the vertical tolerance, the user's own only with AF_SELF
+void skill_range(u8 who, u8 ab)
+{
+    const Ability *b = &abilities[ab];
+    const Unit *u = &st.unit[who];
+    s16 h = map_tiles[u->z * MAP_W + u->x].stand, x, z;
+    hl_seq++;
+    memset(st.reach, 0xFF, sizeof st.reach);
+    for (z = 0; z < MAP_H; z++)
+        for (x = 0; x < MAP_W; x++) {
+            s16 dx = x - u->x, dz = z - u->z, d = (dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz);
+            const Tile *t = &map_tiles[z * MAP_W + x];
+            if (d > b->range || (!d && !(b->flags & AF_SELF)) || !t->walk) continue;
+            if (b->vert != 0xFF && (t->stand > h ? t->stand - h : h - t->stand) > b->vert) continue;
+            st.reach[z * MAP_W + x] = 1;
+        }
+}
+
+// Throw Stone is evaded as an attack; Dash, Wish and the items always land; a cure needs one of
+// its statuses on the target, Phoenix Down a KO target
+u8 skill_hit(u8 a, u8 t, u8 ab)
+{
+    const Ability *b = &abilities[ab];
+    const Unit *ut = &st.unit[t];
+    if (b->kind == AB_CURE) return ut->status & b->y ? 100 : 0;
+    if (b->kind == AB_REVIVE) return ut->hp ? 0 : 100;
+    return b->flags & AF_EVADE ? hit_chance(a, t) : 100;
+}
+
+// AB_DAMAGE: (r * Y / 32768 + 1) * XA, XA the user's PA and the signs (no critical); AB_HEAL:
+// Y x 10; AB_REVIVE: r * Y / 32768 + 1; AB_WISH: twice the user's max HP / 5
+u16 skill_amount(u8 a, u8 t, u8 ab, u16 r)
+{
+    const Ability *b = &abilities[ab];
+    const Unit *ua = &st.unit[a];
+    u16 k = (u16)(((u32)r * b->y >> 15) + 1);
+    if (b->kind == AB_DAMAGE) {
+        u16 d = (u16)(k * zodiac_xa(ua, &st.unit[t], ua->pa));
+        return d > 999 ? 999 : d;
+    }
+    if (b->kind == AB_HEAL) return (u16)(b->y * 10);
+    if (b->kind == AB_REVIVE) return k;
+    if (b->kind == AB_WISH) return (u16)(ua->max_hp / 5 * 2);
+    return 0;
+}
+
+// rolled and started (M_ACT); an item leaves the bag whatever the outcome; Dash and Throw Stone
+// push the target when rand() * its Brave / 32768 < rand() * the user's Brave / 32768
+void skill(u8 a, u8 t, u8 ab)
+{
+    const Ability *b = &abilities[ab];
+    act_start(a, t);
+    st.abil = ab;
+    if (b->flags & AF_ITEM && st.unit[a].team == TEAM_PLAYER) {
+        st.bag[b->bag]--;
+        if (W) W->win_k[0] = 0;                    // the item list shows the count
+    }
+    st.hit = skill_hit(a, t, ab) == 100;
+    if (b->flags & AF_EVADE) st.hit = roll_hit(a, t);
+    if (!st.hit) return;
+    st.dmg = skill_amount(a, t, ab, rand15());
+    if (b->kind == AB_CURE) st.dmg = st.unit[t].status & b->y;   // the statuses removed (shown)
+    if (b->kind == AB_WISH) st.self = st.unit[a].max_hp / 5;
+    if (b->kind == AB_DAMAGE) {
+        u16 r = (u16)((u32)rand15() * st.unit[a].brave >> 15);
+        if (((u32)rand15() * st.unit[t].brave >> 15) < r) knockback(a, t);
+    }
+}
+
+// M_ACT, once per frame: the outcome lands at ACT_HIT (HP lost or healed, statuses removed, the
+// target pushed; a KO or a revival: the turn order again), the menu comes back at ACT_END (the
+// turn ends if the user fell: Wish)
 static void attack_step(void)
 {
-    Unit *ut = &st.unit[st.tgt];
+    Unit *ut = &st.unit[st.tgt], *ua = &st.unit[st.atk];
     if (st.act_t == ACT_HIT && st.hit) {
-        ut->hp = st.dmg >= ut->hp ? 0 : ut->hp - st.dmg;
-        if (st.push) { ut->x = st.kx; ut->z = st.kz; }
-        if (!ut->hp) turn_order();
+        u8 kind = st.abil == NO_ABIL ? AB_DAMAGE : abilities[st.abil].kind, ko = !ut->hp;
+        if (kind == AB_DAMAGE) {
+            ut->hp = st.dmg >= ut->hp ? 0 : ut->hp - st.dmg;
+            if (st.push) { ut->x = st.kx; ut->z = st.kz; }
+        } else if (kind == AB_CURE) ut->status &= (u8)~abilities[st.abil].y;
+        else {
+            ut->hp = st.dmg >= ut->max_hp - ut->hp ? ut->max_hp : ut->hp + st.dmg;
+            if (ko) ut->dc = 3;
+        }
+        if (st.self) ua->hp = st.self >= ua->hp ? 0 : ua->hp - st.self;
+        if ((u8)!ut->hp != ko || !ua->hp) turn_order();
     }
     if (++st.act_t >= ACT_END) {
+        if (!st.unit[st.act].hp) { turn_end(st.moved, 1); return; }
         st.mode = M_MENU; st.menu = st.moved ? MN_WAIT : MN_MOVE;
         st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
     }
@@ -872,7 +1018,8 @@ static u8 unit_pose(u8 i)
     const Unit *un = &st.unit[i];
     if (st.mode == M_ACT) {
         if (i == st.atk && st.act_t < ACT_HIT) return st.act_t < ACT_BLOW ? P_WIND : P_BLOW;
-        if (i == st.tgt && st.act_t >= ACT_HIT && st.act_t < ACT_HIT + HIT_FRAMES && st.hit) return P_HIT;
+        if (i == st.tgt && st.act_t >= ACT_HIT && st.act_t < ACT_HIT + HIT_FRAMES && st.hit
+            && (st.abil == NO_ABIL || abilities[st.abil].kind == AB_DAMAGE)) return P_HIT;
     }
     if (!un->hp) return P_KO;
     return (u16)(un->hp * 5) <= un->max_hp ? P_KNEEL : 0;
@@ -1158,6 +1305,22 @@ void game_init(void)
     }
 }
 
+// a target for the weapon or the ability: a living unit (Phoenix Down: a KO one, not yet a
+// crystal or a chest)
+static u8 aim_ok(u8 t)
+{
+    const Unit *u = &st.unit[t];
+    if (st.abil != NO_ABIL && abilities[st.abil].kind == AB_REVIVE) return !u->hp && u->dc != DC_GONE;
+    return u->hp != 0;
+}
+
+static void aim(u8 ab)
+{
+    st.mode = M_AIM; st.abil = ab;
+    if (ab == NO_ABIL) attack_range(st.act); else skill_range(st.act, ab);
+    if (W) W->win_k[0] = 0;                        // the preview: for this ability
+}
+
 void game_scenario(u16 n)
 {
     memset(&st, 0, sizeof st);
@@ -1165,6 +1328,7 @@ void game_scenario(u16 n)
     rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
     rand_seed(rt_seed);
     battle_units();                               // Gariland's eleven units at their start tiles
+    memcpy(st.bag, bag_init, NBAG);
     turn_start();
     while (n && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
     if (n >= 1 && n <= 4) {                       // an enemy behind a building, each view
@@ -1185,6 +1349,17 @@ void game_scenario(u16 n)
         if (n == 9) {                             // (a hit: drawn again after a miss)
             st.acted = 1;
             do attack(U_RAMZA, 1); while (!st.hit);
+            while (st.act_t < ACT_HIT + 3) attack_step();
+        }
+    } else if (n >= 11 && n <= 13) {              // abilities: the female Chemist's items (she
+        Unit *c = &st.unit[U_CHEMIST];            // always knows Potion: rate 100, 30 JP), the
+        st.unit[U_RAMZA].hp = 20;                 // Potion aimed at Ramza hurt; Ramza's Wish
+        st.act = U_CHEMIST; st.cx = c->x; st.cz = c->z;   // landing on the recruit south of him
+        st.mode = M_SKILLS; st.skill = 0;
+        if (n == 12) { aim(known(U_CHEMIST, 0)); st.cx = 4; st.cz = 11; }
+        if (n == 13) {
+            st.act = U_RAMZA; st.acted = 1; st.unit[10].hp = 10;
+            skill(U_RAMZA, 10, known(U_RAMZA, 0));
             while (st.act_t < ACT_HIT + 3) attack_step();
         }
     }
@@ -1229,8 +1404,7 @@ static void menu_keys(void)
             st.mode = M_TARGET; st.sel = st.act;
             compute_reach(st.act);
         } else if (st.menu == MN_ACT && !st.acted) {
-            st.mode = M_AIM;
-            attack_range(st.act);
+            st.mode = M_ACTS; st.sub = 0;
         } else if (st.menu == MN_WAIT) {
             st.mode = M_FACE; st.wface = u->face;
         } else if (st.menu == MN_STATUS) {
@@ -1243,6 +1417,28 @@ static void menu_keys(void)
             to_menu();
         } else st.mode = M_BROWSE;                 // looking around
     }
+}
+
+// Act's list (Attack, the unit's skill set) and the abilities it knows (an item without any
+// left greyed); [shift] goes back a level
+static void acts_keys(void)
+{
+    u8 n = 0;
+    if (st.mode == M_ACTS) {
+        if (input_pressed(K_UP | K_DOWN)) st.sub ^= 1;
+        if (input_pressed(K_A | K_ENTER)) {
+            if (!st.sub) aim(NO_ABIL);
+            else if (known(st.act, 0) != 0xFF) { st.mode = M_SKILLS; st.skill = 0; }
+        } else if (input_pressed(K_ESC | K_B)) st.mode = M_MENU;
+        return;
+    }
+    while (known(st.act, n) != 0xFF) n++;
+    if (input_pressed(K_UP)) st.skill = st.skill ? st.skill - 1 : n - 1;
+    if (input_pressed(K_DOWN)) st.skill = st.skill < n - 1 ? st.skill + 1 : 0;
+    if (input_pressed(K_A | K_ENTER)) {
+        u8 ab = known(st.act, st.skill);
+        if (can_use(st.act, ab)) aim(ab);
+    } else if (input_pressed(K_ESC | K_B)) st.mode = M_ACTS;
 }
 
 u8 game_update(void)
@@ -1285,6 +1481,8 @@ u8 game_update(void)
     } else if (!st.turn) {
         if (st.mode == M_MENU) {
             menu_keys();
+        } else if (st.mode == M_ACTS || st.mode == M_SKILLS) {
+            acts_keys();
         } else if (st.mode == M_FACE) {            // the arrows turn the unit, as the cursor
             Unit *u = &st.unit[st.act];
             if (input_pressed(K_UP)) u->face = face_of(0, -1);
@@ -1313,14 +1511,20 @@ u8 game_update(void)
                         st.mx = u->x; st.mz = u->z; st.mface = u->face;
                         st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
                     }
-                } else if (st.mode == M_AIM) {     // a unit in the weapon's reach
-                    if (st.reach[c] == 1 && o && st.unit[o - 1].hp) { st.acted = 1; attack(st.act, o - 1); }
+                } else if (st.mode == M_AIM) {     // a unit in the weapon's or the ability's reach
+                    if (st.reach[c] == 1 && o && aim_ok(o - 1)) {
+                        st.acted = 1;
+                        if (st.abil == NO_ABIL) attack(st.act, o - 1); else skill(st.act, o - 1, st.abil);
+                    }
                 } else if (o) {                    // a unit's numbers
                     st.mode = M_STATUS; st.sel = o - 1; st.back = M_BROWSE;
                 } else to_menu();
             } else if (input_pressed(K_ESC | K_B)) {
                 if (st.mode == M_BROWSE && input_pressed(K_ESC)) return 0;
-                to_menu();
+                if (st.mode == M_AIM) {            // back to the list it came from
+                    st.mode = st.abil == NO_ABIL ? M_ACTS : M_SKILLS;
+                    st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
+                } else to_menu();
             }
         }
     }
@@ -1457,21 +1661,34 @@ static void make_panel(u8 side, u8 i)
     }
 }
 
-// The menu, a unit's numbers or an attack's preview (its hit chance and damage, as FFT shows
-// them on the target) in a box at the top right (white, light grey for an enemy, a black
-// edge toward the map), drawn into W->win one part a frame: the box, then each line (AMS
-// text costs ~70k a status line). The menu's pointer is added when it is copied.
+// The menu, Act's lists, a unit's numbers, an attack's or an ability's preview (the hit chance
+// and the amount, as FFT shows them on the target) or the ability being used, in a box at the
+// top right (white, light grey for an enemy, a black edge toward the map), drawn into W->win
+// one part a frame: the box, then each line (AMS text costs ~70k a status line). The lists'
+// pointer is added when it is copied.
+static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };   // ST_*
+
+static u8 win_lines(u8 m)
+{
+    u8 n = 0;
+    if (m == M_MENU || m == M_STATUS) return 4;
+    if (m == M_ACTS || m == M_AIM) return 2;
+    if (m == M_ACT) return 1;
+    while (known(W->win_k[2], n) != 0xFF) n++;    // M_SKILLS
+    return n;
+}
+
 static void make_window(void)
 {
     static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status" };
     u16 *l = W->win[0], *d = W->win[1];
     const Unit *u = &st.unit[W->win_k[2]];
-    u8 r, i, n, k = W->win_n++;
+    u8 r, i, n, k = W->win_n++, m = W->win_k[0], c = C_BLACK;
     char s[28];
     if (!k) {
-        u8 h = (W->win_k[0] == M_AIM ? 2 : 4) * 6 + 3, w = W->win_k[0] == M_MENU ? 2 : W->win_k[0] == M_AIM ? 3 : 6;
-        u8 enemy = W->win_k[0] != M_MENU && u->team == TEAM_ENEMY;
-        W->win_w = w; W->win_h = h;
+        u8 h = win_lines(m) * 6 + 3, w = m == M_MENU ? 2 : m == M_AIM ? 3 : m == M_STATUS ? 6 : 4;
+        u8 enemy = m == M_STATUS && u->team == TEAM_ENEMY;
+        W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
         for (r = 0; r < WIN_ROWS; r++)
             for (i = 0; i < w; i++) {
                 u16 e = r == h - 1 ? 0xFFFF : r >= h || i ? 0 : 0x8000;     // the edge: black
@@ -1481,19 +1698,42 @@ static void make_window(void)
         return;
     }
     k--;
-    if (W->win_k[0] == M_MENU) {
-        text_into(l, d, 7, 2 + 6 * k, entries[k], k <= MN_ACT && W->win_k[1] & (1 << k) ? C_LGRAY : C_BLACK);
-        return;
-    }
-    if (W->win_k[0] == M_AIM) {                    // the attacker is win_k[1]
-        if (k >= 2) return;
-        if (k == 0) { n = put_s(s, 0, "Hit "); n = put_n(s, n, hit_chance(W->win_k[1], W->win_k[2])); s[n++] = '%'; }
-        else { n = put_s(s, 0, "Dmg "); n = put_n(s, n, attack_damage(W->win_k[1], W->win_k[2], 0, 0)); }
-        s[n] = 0;
-        text_into(l, d, 3, 2 + 6 * k, s, C_BLACK);
-        return;
-    }
-    if (k == 0) {
+    n = 0;
+    if (m == M_MENU) {
+        n = put_s(s, 0, entries[k]);
+        if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_LGRAY;
+    } else if (m == M_ACTS) {
+        n = put_s(s, 0, k ? skill_sets[u->set].name : "Attack");
+        if (k && W->win_k[1]) c = C_LGRAY;
+    } else if (m == M_SKILLS) {                    // an item: how many are left
+        u8 ab = known(W->win_k[2], k);
+        n = put_s(s, 0, abilities[ab].name);
+        if (abilities[ab].flags & AF_ITEM && u->team == TEAM_PLAYER) {
+            s[n++] = ' '; n = put_n(s, n, st.bag[abilities[ab].bag]);
+        }
+        if (!can_use(W->win_k[2], ab)) c = C_LGRAY;
+    } else if (m == M_ACT) {
+        n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : abilities[st.abil].name);
+    } else if (m == M_AIM) {                       // the attacker is win_k[1]; Dash, Throw Stone
+        u8 a = W->win_k[1], t = W->win_k[2];       // and Phoenix Down: their range of amounts
+        const Ability *b = st.abil == NO_ABIL ? RT_NULL : &abilities[st.abil];
+        if (k == 0) {
+            n = put_s(s, 0, "Hit "); n = put_n(s, n, b ? skill_hit(a, t, st.abil) : hit_chance(a, t)); s[n++] = '%';
+        } else if (!b) {
+            n = put_s(s, 0, "Dmg "); n = put_n(s, n, attack_damage(a, t, 0, 0));
+        } else if (b->kind == AB_CURE) {
+            if (skill_hit(a, t, st.abil)) {
+                for (i = 0; !(u->status & b->y & (1 << i)); i++) ;
+                n = put_s(s, 0, "- "); n = put_s(s, n, st_names[i]);
+            }
+        } else {
+            n = put_s(s, 0, b->kind == AB_DAMAGE ? "Dmg " : "HP +");
+            n = put_n(s, n, skill_amount(a, t, st.abil, 0));
+            if (b->kind == AB_DAMAGE || b->kind == AB_REVIVE) {
+                s[n++] = '-'; n = put_n(s, n, skill_amount(a, t, st.abil, 32767));
+            }
+        }
+    } else if (k == 0) {
         n = put_s(s, 0, unit_names[u->gfx]);
         if (u->gfx <= UG_DELITA) n = put_s(s, n, " Squire");
         n = put_s(s, n, "  Lv "); n = put_n(s, n, u->level);
@@ -1507,7 +1747,7 @@ static void make_window(void)
         n = put_s(s, 0, "PA "); n = put_n(s, n, u->pa); n = put_s(s, n, "  MA "); n = put_n(s, n, u->ma);
     }
     s[n] = 0;
-    text_into(l, d, 3, 2 + 6 * k, s, C_BLACK);
+    text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS ? 7 : 3, 2 + 6 * k, s, c);
 }
 
 // The HUD: the top strip (the turn order, the view and the height under the cursor), the menu
@@ -1527,10 +1767,12 @@ static void draw_hud(void)
     s[n++] = (char)('0' + (h / 2) % 10);
     if (h & 1) { s[n++] = '.'; s[n++] = '5'; }
     s[n] = 0;
-    k[0] = st.mode == M_MENU || st.mode == M_STATUS ? st.mode : 0;
-    k[1] = k[0] == M_MENU ? (u8)(st.moved | st.acted << 1) : 0;
-    k[2] = k[0] == M_STATUS ? st.sel : 0;
-    if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && st.unit[o - 1].hp) {
+    k[0] = st.mode == M_MENU || st.mode == M_STATUS || st.mode == M_ACTS || st.mode == M_SKILLS
+        || st.mode == M_ACT ? st.mode : 0;
+    k[1] = k[0] == M_MENU ? (u8)(st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == 0xFF
+        : k[0] == M_ACT ? st.abil : 0;
+    k[2] = k[0] == M_STATUS ? st.sel : k[0] == M_ACT ? st.atk : st.act;
+    if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && aim_ok(o - 1)) {
         k[0] = M_AIM; k[1] = st.act; k[2] = o - 1;  // the preview
     }
     pk[0][0] = (u16)(st.act + 1); pk[0][1] = st.unit[st.act].hp; pk[0][2] = st.unit[st.act].mp;
@@ -1581,7 +1823,7 @@ static void draw_hud(void)
             for (i = 0; i < 3; i++) W->win_k[i] = k[i];
             W->win_n = 0;
             make_window();
-        } else if (k[0] && W->win_n < WIN_DONE) {
+        } else if (k[0] && W->win_n < W->win_m) {
             make_window();
         } else {
             for (i = 0; i < 2; i++)
@@ -1598,7 +1840,7 @@ static void draw_hud(void)
         a[0] = ((u32 *)c)[0]; a[1] = ((u32 *)c)[1]; a[2] = ((u32 *)c)[2];
         b[0] = ((u32 *)d)[0]; b[1] = ((u32 *)d)[1]; b[2] = ((u32 *)d)[2];
     }
-    if (k[0] && W->win_k[0] == k[0] && W->win_n >= WIN_DONE) {   // the window, against the
+    if (k[0] && W->win_k[0] == k[0] && W->win_n >= W->win_m) {   // the window, against the
         u8 ww = W->win_w;                                          // right edge, once drawn
         c = W->win[0]; d = W->win[1];
         for (r = 0; r < W->win_h; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
@@ -1606,9 +1848,10 @@ static void draw_hud(void)
             u16 *pb = (u16 *)((u8 *)rt_dark + r * RT_PBYTES) + RT_W / 16 - ww;
             for (i = 0; i < ww; i++) { pa[i] = c[i]; pb[i] = d[i]; }
         }
-        if (k[0] == M_MENU)                        // the pointer: a small black triangle
-            for (r = 0; r < 5; r++) {
-                u16 o2 = (u16)((3 + 6 * st.menu + r) * RT_PBYTES + RT_W / 8 - 2 * ww);
+        if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS)   // the pointer: a small
+            for (r = 0; r < 5; r++) {                                // black triangle
+                u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : st.skill;
+                u16 o2 = (u16)((3 + 6 * e + r) * RT_PBYTES + RT_W / 8 - 2 * ww);
                 u8 b2 = (u8)(r == 2 ? 0x38 : r == 1 || r == 3 ? 0x30 : 0x20);
                 ((u8 *)rt_light)[o2] |= b2; ((u8 *)rt_dark)[o2] |= b2;
             }
@@ -1624,17 +1867,26 @@ static void draw_hud(void)
     }
 }
 
-// An attack's damage (or Miss) above its target from ACT_HIT, rising NUM_RISE pixels: AMS
-// text written once into the strip's spare rows, then a 32-pixel sprite with a white outline
+// An attack's damage (or Miss; +HP healed, the status removed) above its target from ACT_HIT,
+// rising NUM_RISE pixels: AMS text written once into the strip's spare rows, then a 32-pixel
+// sprite with a white outline
 static void draw_number(void)
 {
     Feet f = unit_feet(st.rot, st.tgt);
     u8 r, t = (u8)(st.act_t - ACT_HIT);
     RtSprite sp;
     if (!W->num_ok) {
-        char s[6];
+        char s[8];
         u32 g[7], o = 0;
-        u8 n = st.hit ? put_n(s, 0, st.dmg) : put_s(s, 0, "Miss");
+        u8 kind = st.abil == NO_ABIL ? AB_DAMAGE : abilities[st.abil].kind, n = 0;
+        if (!st.hit) n = put_s(s, 0, "Miss");
+        else if (kind == AB_CURE) {                // the first status removed
+            while (!(st.dmg & (1 << n))) n++;
+            n = put_s(s, 0, st_names[n]);
+        } else {
+            if (kind != AB_DAMAGE) s[n++] = '+';
+            n = put_n(s, n, st.dmg);
+        }
         s[n] = 0;
         for (r = 8; r < HUD_ROWS; r++) memset(HUD_L + r * RT_PBYTES, 0, 4);
         text_into(W->hud[0], W->hud[1], 1, 8, s, C_BLACK);

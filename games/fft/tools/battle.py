@@ -2,12 +2,13 @@
 """The Gariland battle's units from the local FFT disc -> battle.h (never committed).
 
 usage: battle.py DISC.cue battle.h                 the data the game draws its units from
-       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt]]]
+       battle.py DISC.cue --check ORACLE.state TRACE.txt [oracle.h [TURNS.txt [ATTACKS.txt [SKILLS.txt]]]]
            every unit of the original at Ramza's first turn and their start tiles
-           (tools/oracle.py) against this model; oracle.h: their raw stats, equipment and stats
-           for the C tests (never committed), with TURNS (oracle.py --turns) the battle's turns
-           for the clock test, with ATTACKS (oracle.py --attack) the attacks' previews and the
-           executed attacks' outcome
+           (tools/oracle.py) against this model; oracle.h: their raw stats, equipment, stats and
+           known abilities for the C tests (never committed), with TURNS (oracle.py --turns) the
+           battle's turns for the clock test, with ATTACKS (oracle.py --attack) the attacks'
+           previews and the executed attacks' outcome, with SKILLS (oracle.py --skills) each
+           ability's preview and outcome and the Dash and Throw Stone trials
 Read from SCUS_942.21 (tables named after adamrt/fft_decomp, RE_NOTES.md § The battle's units):
 the jobs (0x800610b8, 48 bytes: growth and multiplier per raw stat, Move, Jump), the items
 (0x80062eb8 primary, 12 bytes; helmet / armour HP and MP 0x80063ed8; attributes 0x800642c4,
@@ -16,7 +17,9 @@ the jobs' class evade, byte 0x19), the unit generation tables (0x8005e90c base, 
 variance: generic male, generic female, Ramza), the zodiac's day limits (0x800661e8); from
 BATTLE/ENTD*.ENT the encounters (40 bytes per unit): Gariland 0x184 (Delita, five enemies) and
 the Military Academy 0x188 (the recruits who join before it); from BATTLE.BIN the zodiac
-compatibility table (0x8018f600).
+compatibility table (0x8018f600); the skill sets' lists (0x80064a94), the abilities (0x8005ebf0:
+JP cost, learn rate; range data 0x8005fbf0; the items' 0x80063f98) and the status records
+(0x80063fc4).
 The model (FFT's own, read in the decompilation and checked here on the oracle):
 - raw stat (24 bits) = base << 14 + rand15 * variance / 2 (rand15: 0..32767);
 - per level above 1: raw += raw / (growth + level - 1);
@@ -24,9 +27,13 @@ The model (FFT's own, read in the decompilation and checked here on the oracle):
 - then the equipment: helmet and armour HP / MP, the items' PA, MA, SP, Move, Jump (<= 7);
 - an ENTD value 254 is random: Brave, Faith 45 + rand15 * 30 / 32768, birthday 1..365, an
   item: one of the items of the highest required level <= the unit's level that its job can
-  equip (not rare).
+  equip (not rare);
+- the abilities a unit knows (main_unit_calculate_abilities): its job's JP 100 + rand(0..99) at
+  level 1, then each ability of its skill set in order learned if a roll passes its learn rate
+  and the JP left pay for it (Ramza, made by the new game, knows Wish only).
 """
 import os, struct, sys
+SET_N = 6                       # abilities per skill set at most (fft.h)
 sys.path.insert(0, os.path.dirname(__file__))
 import extract                  # noqa: E402  (disc access)
 
@@ -35,6 +42,25 @@ JOBS, ITEMS, ARMOUR, ATTRS, WEAPONS = 0x800610b8, 0x80062eb8, 0x80063ed8, 0x8006
 KNIFE, SWORD = 1, 3                  # item types: XA = (PA + SP) / 2, XA = PA
 GEN_BASE, GEN_VAR, ZODIAC = 0x8005e90c, 0x8005e93c, 0x800661e8
 BAT, ZCOMPAT = 0x80067000, 0x8018f600     # BATTLE.BIN: file offset = address - BAT; the zodiac table
+# abilities: the skill sets' lists (25 bytes: 3 bytes of id bit 8, 22 ids), the abilities (8 bytes:
+# JP cost, learn rate), their range data (14 bytes), the items' (3 bytes: formula, Z, status), the
+# status records (6 bytes: type, 5 status bytes)
+SKILLSETS, ABILITY, ABILITY_RANGE, ITEM_ABILITY, STATUS_SET = 0x80064a94, 0x8005ebf0, 0x8005fbf0, 0x80063f98, 0x80063fc4
+ITEM_FIRST, THROW_ITEM = 0x170, 0x1DA       # the first item ability; Throw Item (an innate support)
+JP_MAX = 199                                # a level 1 job's JP: 100 + rand(0..99) (main_unit_calculate_abilities)
+# the formulas modelled (fft.h AB_*): Y x PA damage with a Brave knockback, statuses cancelled,
+# Wish, Z x 10 HP, a revival with 1..Z HP
+FORMULAS = {0x37: 'AB_DAMAGE', 0x38: 'AB_CURE', 0x3C: 'AB_WISH', 0x48: 'AB_HEAL', 0x4B: 'AB_REVIVE'}
+# FFT status (id: byte id / 8, bit 0x80 >> id % 8) -> ours (fft.h ST_*); Dead: 0 HP
+STATUS = {0x02: 'ST_DEAD', 0x06: 'ST_DEFEND', 0x0A: 'ST_DARK', 0x0C: 'ST_SILENCE', 0x18: 'ST_POISON'}
+# the names the menus show (the game's English names)
+NAMES = {0x92: 'Accumulate', 0x93: 'Dash', 0x94: 'Throw Stone', 0x95: 'Heal', 0x96: 'Yell', 0x98: 'Wish',
+         0x170: 'Potion', 0x176: 'Antidote', 0x177: 'Eye Drop', 0x178: 'Echo Grass', 0x17D: 'Phoenix Down'}
+SET_NAMES = {0x05: 'Basic Skill', 0x06: 'Item', 0x19: 'Guts', 0x1C: 'Guts'}
+# the party's bag at a new game (main_item_init_new_game_inventory), by item id
+BAG = {0xF0: 5, 0xF1: 2, 0xF2: 1, 0xF3: 1, 0xF4: 1, 0xF5: 1, 0xF6: 1, 0xF7: 2, 0xF8: 1, 0xF9: 1, 0xFA: 1,
+       0xFB: 1, 0xFC: 1, 0xFD: 2}
+RAMZA_LEARNED = (0x98,)                     # a new game's Ramza knows Wish only (learned_abilities[0] = 4)
 RANDOM, NONE = 0xFE, 0xFF
 T_MALE, T_FEMALE, T_RAMZA = 0, 1, 2
 # equipment slots of a battle unit (battle_stats_t 0x1a) and the item ids of each category
@@ -73,7 +99,8 @@ class Disc:
     def job(self, j):
         b = self.at(JOBS + 48 * j, 48)
         return {'growth': list(b[13:23:2]), 'mult': list(b[14:23:2]), 'move': b[23], 'jump': b[24] & 0x7F,
-                'cats': b[9:13], 'cev': b[0x19]}
+                'cats': b[9:13], 'cev': b[0x19], 'set': b[0],
+                'innate': [b[1 + 2 * k] | b[2 + 2 * k] << 8 for k in range(4)]}
 
     def item(self, i):
         b = self.at(ITEMS + 12 * i, 12)
@@ -87,6 +114,37 @@ class Disc:
             wp = w[4] if b[5] in (KNIFE, SWORD) and w[1] & 0x80 and w[2] == 1 else 0xFF   # else: not modelled
         return {'level': b[2], 'flags': b[3], 'type': b[5], 'hp': hp, 'mp': mp, 'wp': wp,
                 'pa': a[0], 'ma': a[1], 'sp': a[2], 'move': a[3], 'jump': a[4]}
+
+    def skillset(self, k):
+        """The 16 action entries of skill set k (0: none)."""
+        b = self.at(SKILLSETS + 25 * k, 25)
+        hi = b[0] << 16 | b[1] << 8 | b[2]
+        return [b[3 + i] | (0x100 if hi & 0x800000 >> i else 0) for i in range(16)]
+
+    def ability(self, a):
+        """An action ability as fft.h's Ability: kind, Y (Z, our status bits), range, vertical
+        tolerance (half units, 0xFF none), flags, JP, learn rate."""
+        jp, rate = struct.unpack('<HB', self.at(ABILITY + 8 * a, 3))
+        if a >= ITEM_FIRST:
+            form, z, st = self.at(ITEM_ABILITY + 3 * (a - ITEM_FIRST), 3)
+            rng, vert, flags = 4, 0xFF, ['AF_SELF', 'AF_ITEM']   # Throw Item: 4 tiles, any height
+        else:
+            r = self.at(ABILITY_RANGE + 14 * a, 14)
+            rng, f1, f4, form, z, st = r[0], r[3], r[6], r[8], r[10], r[11]
+            assert r[1] == 0 and r[12] == 0 and r[13] == 0, 'ability %03X: an area, a charge or MP' % a
+            vert = 2 * r[2] if f1 & 0x08 else 0xFF
+            flags = ['AF_SELF'] * (not f1 & 0x01) + ['AF_EVADE'] * bool(f4 & 0x02)
+        kind = FORMULAS.get(form)
+        y = z
+        if kind in ('AB_CURE', 'AB_REVIVE'):
+            b = self.at(STATUS_SET + 6 * st, 6)
+            ids = [i for i in range(40) if b[1 + i // 8] & 0x80 >> i % 8]
+            assert b[0] & 0x10 and all(i in STATUS for i in ids), 'ability %03X: status %s' % (a, b.hex())
+            if kind == 'AB_CURE':
+                y = ' | '.join(STATUS[i] for i in ids)
+            else:
+                assert ids == [0x02]
+        return {'id': a, 'kind': kind, 'y': y, 'range': rng, 'vert': vert, 'flags': flags, 'jp': jp, 'rate': rate}
 
     def gen(self, t):
         return list(self.at(GEN_BASE + 12 * t, 5)), list(self.at(GEN_VAR + 5 * t, 5)), list(self.at(GEN_BASE + 12 * t + 5, 7))
@@ -116,7 +174,8 @@ def unit_defs(d):
             base, var, eq = d.gen(T_RAMZA)
             out.append({'gfx': 'RAMZA', 'job': 0x01, 'type': T_RAMZA, 'level': 1, 'brave': 70, 'faith': 70,
                         'day': 0, 'x': u[1], 'z': u[2], 'face': FACE[0], 'team': TEAM_PLAYER,
-                        'eq': [[i] if i != NONE else [] for i in eq]})
+                        'eq': [[i] if i != NONE else [] for i in eq], 'set': d.job(0x01)['set'],
+                        'learned': RAMZA_LEARNED})
             continue
         if isinstance(u[0], tuple):
             (ev, slot), x, z, face = u[0], u[1], u[2], FACE[0]
@@ -140,7 +199,9 @@ def unit_defs(d):
         out.append({'gfx': gfx, 'job': job, 'type': T_MALE if male else T_FEMALE, 'level': level,
                     'brave': 0 if b[6] > 100 else b[6], 'faith': 0 if b[7] > 100 else b[7], 'day': day,
                     'x': b[25] if x is None else x, 'z': b[26] if z is None else z,
-                    'face': FACE[b[27] & 3] if face is None else face, 'team': team, 'eq': eq})
+                    'face': FACE[b[27] & 3] if face is None else face, 'team': team, 'eq': eq,
+                    'set': d.job(job)['set'] if b[0x1d] in (0, NONE) else b[0x1d], 'learned': None})
+        assert b[0x1d] == NONE and b[11] == 0, 'a fixed skill set or a secondary one: not modelled'
     return out
 
 
@@ -186,7 +247,7 @@ def turn_rows(path, sp):
     return out
 
 
-def check(d, state, trace, fixture=None, turns=None, attacks=None):
+def check(d, state, trace, fixture=None, turns=None, attacks=None, skills=None):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../.claude/skills/ti-port-ps1/scripts'))
     from psxrun import PSX
     out, null = os.dup(1), os.open(os.devnull, os.O_WRONLY)
@@ -198,7 +259,8 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None):
     for t in open(trace).read().split('\n')[11].split()[3:]:
         k, v = t.split(':')
         start[int(k)] = tuple(int(c) for c in v.split('(')[1].rstrip(')').split(','))
-    bad, rows, sp = 0, [], []
+    bad, rows, sp, learned = 0, [], [], []
+    sets, lists, abil = ability_table(d, unit_defs(d))
     jobs = sorted({u['job'] for u in unit_defs(d)})
     items = sorted({i for u in unit_defs(d) for e in u['eq'] for i in e})
     for n, (u, slot) in enumerate(zip(unit_defs(d), list(range(6)) + list(range(16, 21)))):
@@ -222,6 +284,16 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None):
             errs.append('birthday')
         if start[slot] != (u['x'], u['z']):
             errs.append('start tile')
+        # the abilities it knows: its primary set's row (generic jobs: job - Squire; else row 0)
+        # must be an outcome of FFT's draw (a subset of the set, bought with at most JP_MAX JP)
+        row = (u['job'] - 0x4A) if u['job'] in (0x4A, 0x4B) else 0
+        bits = r(0x99 + 3 * row) << 16 | r(0x9a + 3 * row) << 8 | r(0x9b + 3 * row)
+        known = [a for i, a in enumerate(d.skillset(u['set'])) if a and bits & 0x800000 >> i]
+        if r(0x12) != u['set'] or r(0x13) or not all(a in lists[u['set']] for a in known) or \
+                (u['learned'] is not None and tuple(known) != u['learned']) or \
+                (u['learned'] is None and sum(d.ability(a)['jp'] for a in known) > JP_MAX):
+            errs.append('abilities %s' % [hex(a) for a in known])
+        learned.append(sum(1 << lists[u['set']].index(a) for a in known if a in lists[u['set']]))
         print('%2d %-9s lv %d hp %3d mp %3d sp %d pa %d ma %d mv %d jp %d br %2d fa %2d eq %s %s' % (
             slot, u['gfx'], r(0x22), got['hp'], got['mp'], got['sp'], got['pa'], got['ma'], got['move'], got['jump'],
             r(0x24), r(0x26), ' '.join('%02x' % i for i in eq[:4]), 'ok' if not errs else 'DIFFERS: ' + ', '.join(errs)))
@@ -277,7 +349,76 @@ def check(d, state, trace, fixture=None, turns=None, attacks=None):
                     base, len(trials), sum(1 for dm, _ in trials if not dm),
                     sum(1 for dm, _ in trials if dm > base), sum(dm for dm, _ in trials), sum(p for _, p in trials)))
             print('%d attack cases, %d trials' % (len(cases), len(trials)))
+        open(fixture, 'a').write(
+            '// The abilities each unit knows in the original (bit k: its skill set\'s k-th in battle.h)\n'
+            'static const u8 oracle_learned[11] = { %s };\n' % ', '.join('0x%02X' % m for m in learned))
+        if skills:
+            write_skills(fixture, skills, abil)
     return bad
+
+
+SKILL_CASES = {'dash': 0x93, 'stone': 0x94, 'heal': 0x95, 'heal-none': 0x95, 'wish': 0x98, 'potion': 0x170,
+               'antidote': 0x176, 'eye-drop-none': 0x177, 'echo-grass': 0x178, 'phoenix': 0x17D,
+               'phoenix-alive': 0x17D, 'stone-defend': 0x94, 'attack-defend': None}
+OUR_STATUS = {'ST_DEFEND': 1, 'ST_POISON': 2, 'ST_DARK': 4, 'ST_SILENCE': 8}   # fft.h
+
+
+def our_status(b):
+    """FFT's five current status bytes -> our bits (Dead is 0 HP)."""
+    return sum(OUR_STATUS[STATUS[i]] for i in STATUS if STATUS[i] in OUR_STATUS and b[i // 8] & 0x80 >> i % 8)
+
+
+def write_skills(fixture, path, abil):
+    """oracle.py --skills: each case (Ramza with every skill on the recruit south of him) and the
+    executed Dash and Throw Stone trials, for the C tests."""
+    cases, trials = [], {'dash': [], 'stone': []}
+    for ln in open(path):
+        w = ln.split()
+        if w and w[0] == 'skill':
+            v = list(map(int, w[2:]))
+            hit, amount, bef, aft = v[0], v[1], v[2:16], v[16:30]
+            a = SKILL_CASES[w[1]]
+            cases.append((abil.index(a) if a is not None else 0xFF, bef[0], our_status(bef[1:6]), hit, amount,
+                          aft[0], our_status(aft[1:6]), aft[8], *aft[9:14]))
+        elif w and w[0] == 'trial':
+            trials[w[1]].append((int(w[2]), int(w[3])))
+    hist = []
+    for k in ('dash', 'stone'):
+        t = trials[k]
+        base = min(dm for dm, _ in t if dm)
+        hist.append([len(t), sum(p for _, p in t)] + [sum(1 for dm, _ in t if dm == base * m) for m in range(5)])
+        assert sum(hist[-1][2:]) == len(t), 'a damage not a multiple of %d' % base
+    open(fixture, 'a').write(
+        '// The original\'s abilities (tools/oracle.py --skills): Ramza on the recruit south of him (the\n'
+        '// attack\'s game case) with each ability (battle.h index, 0xFF Attack), the target\'s HP and\n'
+        '// statuses (ours) poked; FFT\'s preview (hit %%, amount: a random roll for Dash, Throw Stone,\n'
+        '// Phoenix Down; garbage when it misses), then after the execution: the target\'s HP, statuses,\n'
+        '// Ramza\'s HP, the bag (Potion, Antidote, Eye Drop, Echo Grass, Phoenix Down).\n'
+        '#define ORACLE_SKILLS %d\n'
+        'static const struct { u8 abil; u16 hp; u8 status, hit; u16 amount, hp2; u8 status2; u16 ramza; u8 bag[5]; }\n'
+        '    oracle_skills[ORACLE_SKILLS] = {\n' % len(cases)
+        + '\n'.join('    { %d, %d, %d, %d, %d, %d, %d, %d, { %d, %d, %d, %d, %d } },' % c for c in cases) + '\n};\n'
+        '// Dash and Throw Stone executed in the game case: trials, pushes, then how many took 0 (a miss),\n'
+        '// 1, 2, 3, 4 times XA (3)\n'
+        'static const u16 oracle_skill_trials[2][7] = { %s };\n'
+        % ', '.join('{ %s }' % ', '.join(map(str, h)) for h in hist))
+    print('%d ability cases, %d + %d trials' % (len(cases), len(trials['dash']), len(trials['stone'])))
+
+
+def ability_table(d, defs):
+    """The skill sets the units use and their abilities that can be learned (a level 1 job has at
+    most JP_MAX JP: dearer ones are never bought) or are fixed (Ramza's Wish)."""
+    sets = sorted({u['set'] for u in defs})
+    fixed = {a for u in defs for a in (u['learned'] or ())}
+    jp = lambda a: struct.unpack('<H', d.at(ABILITY + 8 * a, 2))[0]
+    lists = {k: [a for a in d.skillset(k) if a and (jp(a) <= JP_MAX or a in fixed)] for k in sets}
+    abil = sorted({a for k in sets for a in lists[k]})
+    for a in abil:
+        assert d.ability(a)['kind'] and a in NAMES, 'ability %03X: not modelled' % a
+    for u in defs:
+        if any(a >= ITEM_FIRST for a in lists[u['set']]):
+            assert THROW_ITEM in d.job(u['job'])['innate'], 'items without Throw Item: range 1'
+    return sets, lists, abil
 
 
 def write(d, path):
@@ -311,16 +452,38 @@ def write(d, path):
     f.write('// zodiac compatibility by the signs\' distance (0 neutral, 1 bad, 2 good, 3 opposite: worst for\n'
             '// the same sex, best else)\n')
     f.write('static const u8 zodiac_compat[12] = { %s };\n' % ', '.join(map(str, d.bat[ZCOMPAT - BAT:ZCOMPAT - BAT + 12])))
+    sets, lists, abil = ability_table(d, defs)
+    bag = [a for a in abil if a >= ITEM_FIRST]
+    f.write('// the abilities the units can know: name, kind, Y (Z, statuses), range, vertical tolerance\n'
+            '// (half units, 0xFF none), flags, bag slot (0xFF none), learn rate, JP cost\n')
+    f.write('#define NABIL %d\nstatic const Ability abilities[NABIL] = {\n' % len(abil))
+    for a in abil:
+        e = d.ability(a)
+        f.write('    { "%s", %s, %s, %d, %d, %s, %s, %d, %d },   // %03X\n' % (
+            NAMES[a], e['kind'], e['y'], e['range'], e['vert'], ' | '.join(e['flags']) or '0',
+            bag.index(a) if a in bag else 0xFF, e['rate'], e['jp'], a))
+    f.write('};\n// the skill sets: name, then its abilities in FFT\'s order (the order a unit learns them)\n')
+    f.write('#define NSET %d\nstatic const SkillSet skill_sets[NSET] = {\n' % len(sets))
+    for k in sets:
+        ids = [str(abil.index(a)) for a in lists[k]] + ['0xFF'] * (SET_N - len(lists[k]))
+        f.write('    { "%s", { %s } },   // %02X\n' % (SET_NAMES[k], ', '.join(ids), k))
+    assert max(len(lists[k]) for k in sets) <= SET_N
+    f.write('};\n// the party\'s bag at a new game, per bag slot (the enemies\' items do not run out)\n')
+    f.write('#define NBAG %d\nstatic const u8 bag_init[NBAG] = { %s };\n' % (
+        len(bag), ', '.join(str(BAG[a - ITEM_FIRST + 0xF0]) for a in bag)))
     f.write('// the units in FFT\'s order: sheet, job, type, level, Brave, Faith (0: drawn), birthday (0:\n'
             '// drawn), x, z, facing, team, equipment (head, body, accessory, weapon, shield: up to two\n'
-            '// item indices, one drawn; 0xFF none)\n')
+            '// item indices, one drawn; 0xFF none), skill set, the abilities it knows (bit k: the set\'s\n'
+            '// k-th; 0xFF: drawn)\n')
     f.write('static const UnitDef unit_defs[NUNIT] = {\n')
     for u in defs:
         eq = [u['eq'][k] for k in (0, 1, 2, 3, 6)]
-        f.write('    { UG_%s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, { %s } },\n' % (
+        learned = 0xFF if u['learned'] is None else sum(1 << lists[u['set']].index(a) for a in u['learned'])
+        f.write('    { UG_%s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, { %s }, %d, 0x%02X },\n' % (
             u['gfx'], jobs.index(u['job']), u['type'], u['level'], u['brave'], u['faith'], u['day'], u['x'], u['z'],
             u['face'], u['team'], ', '.join('{ %s }' % ', '.join(str(items.index(s[k])) if k < len(s) else '0xFF'
-                                                                for k in range(2)) for s in eq)))
+                                                                for k in range(2)) for s in eq),
+            sets.index(u['set']), learned))
     f.write('};\n')
     f.close()
 
@@ -329,7 +492,8 @@ def main():
     d = Disc(sys.argv[1])
     if sys.argv[2] == '--check':
         a = sys.argv + [None, None, None]
-        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7]) else 0)
+        a += [None]
+        sys.exit(1 if check(d, a[3], a[4], a[5], a[6], a[7], a[8]) else 0)
     write(d, sys.argv[2])
 
 

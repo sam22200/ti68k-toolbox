@@ -129,12 +129,23 @@ with `-pack` (decided at milestone 13).
     battle with attacks 344k at most; program 29,905 bytes. The emulator run is left for
     milestone 22 with the whole battle (the menus touch no hardware path; this session had no
     X display).
-18. **The units' abilities.** The skills of the jobs present at Gariland (decided at 13 from
+18. **The units' abilities** (done). The skills of the jobs present at Gariland (decided at 13 from
     the deployment: Squire's Basic Skill, Chemist's Items, Thief's skills, Ramza's own...):
     targeting areas, MP and charge time where they have one (a charging unit in the turn
     order, a spell landing later), status effects they cause, the items in the party's
     bag (Potion, Phoenix Down...). Reaction and support abilities the units carry
     (Counter Tackle...). Done: each ability's effect equal to the original's on one case.
+    Done: what the units know read in RAM and its rule in the decompilation (JP 100..199 spent
+    in the set's order on passing learn rolls): only Dash, Throw Stone, Heal, Wish (Ramza's
+    only one) and the Chemists' Potion, Antidote, Eye Drop, Echo Grass, Phoenix Down can be
+    known at Gariland; no charge time, MP cost, secondary set or reaction there (Accumulate,
+    Yell and Counter Tackle out of reach; Equip Change no effect; Defend, the enemy Chemist's,
+    with the AI). Act opens FFT's list (Attack, the skill set, its abilities; an item's count),
+    the preview (`Dmg 3-12`, `HP +30`), the ability's name, `+20` or the status removed rising;
+    the party's bag, the enemies' unlimited. 13 cases of the original (Ramza given every ability
+    by poking his skill sets) equal ours, and 300 Dash and Throw Stone each match 4000 of ours
+    (`oracle.py --skills`); our draws within 0.003 of the rule's odds; `keys/skills.txt`: TI =
+    PC, 13 scenarios too. Frames 260-352k; program 33,765 bytes.
 19. **KO, the death counter and the end.** A KO unit's counter (3 turns, then a crystal or a
     chest; raising it in time with a Phoenix Down), the victory condition (all enemies KO,
     crystal or chest), the defeat (Ramza or the whole party out), the rewards the units earn

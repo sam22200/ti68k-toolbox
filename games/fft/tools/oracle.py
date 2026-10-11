@@ -208,7 +208,79 @@ def attacks(psx, state, n, m):
     return rows
 
 
+ITEMS = 0x800596e0                               # g_main_item_quantities: one byte per item id
+POISON, DARK, SILENCE, DEAD, DEFEND = (3, 0x80), (1, 0x20), (1, 0x08), (0, 0x20), (0, 0x02)   # status byte, bit
+GUTS = 'DOWN:30 CIRCLE:40 DOWN:20 CIRCLE:60 '    # Act, Ramza's own skill set (poked to 0x19)
+ITEM = 'DOWN:30 CIRCLE:40 DOWN:20 DOWN:20 CIRCLE:60 '   # Act, Item (the secondary set, poked)
+# name, menu entry, target pokes (HP, statuses); Guts: Accumulate Dash Throw Stone Heal Yell Wish
+SKILLS = [('dash', GUTS, 1, None, ()), ('stone', GUTS, 2, None, ()), ('heal', GUTS, 3, None, (POISON, DARK)),
+          ('heal-none', GUTS, 3, None, ()), ('wish', GUTS, 5, 10, ()), ('potion', ITEM, 0, 10, ()),
+          ('antidote', ITEM, 6, None, (POISON,)), ('eye-drop-none', ITEM, 7, None, ()),
+          ('echo-grass', ITEM, 8, None, (SILENCE,)), ('phoenix', ITEM, 13, 0, (DEAD,)),
+          ('phoenix-alive', ITEM, 13, None, ()), ('stone-defend', GUTS, 2, None, (DEFEND,)),
+          ('attack-defend', 'DOWN:30 CIRCLE:40 ', 0, None, (DEFEND,))]
+
+
+def skill_setup(psx):
+    """Ramza given every Gariland skill: primary set 0x19 (Squire's four, Yell, Wish), secondary
+    Item with all fourteen items learned, Throw Item (range 4)."""
+    a = UNITS + UNIT_SIZE * ATTACKER
+    psx.write(a + 0x12, 0x19); psx.write(a + 0x13, 0x06)
+    for k, v in enumerate((0xFC, 0, 0, 0xFF, 0xFC, 0)):
+        psx.write(a + 0x99 + k, v)
+    psx.write(a + 0x91, psx.read(a + 0x91) | 0x08)
+
+
+def skill_state(psx):
+    a, t = UNITS + UNIT_SIZE * ATTACKER, UNITS + UNIT_SIZE * TARGET
+    return [psx.read(t + 0x28, 2), *(psx.read(t + 0x58 + k) for k in range(5)), psx.read(t + 0x47), psx.read(t + 0x48),
+            psx.read(a + 0x28, 2), psx.read(ITEMS + 0xF0), psx.read(ITEMS + 0xF6), psx.read(ITEMS + 0xF7),
+            psx.read(ITEMS + 0xF8), psx.read(ITEMS + 0xFD)]
+
+
+def skills(psx, state, m):
+    rows = []
+    t = UNITS + UNIT_SIZE * TARGET
+    for name, menu, k, hp, sts in SKILLS:
+        psx.load(state)
+        skill_setup(psx)
+        if hp is not None:
+            psx.write(t + 0x28, hp, 2)
+        for b, bit in sts:                      # current (+0x58) and inflicted (+0x1bb: what a cure removes)
+            for o in (0x58, 0x1bb):
+                psx.write(t + o + b, psx.read(t + o + b) | bit)
+        s = taps(menu + 'DOWN:20 ' * k + 'CIRCLE:60 CIRCLE:60 LEFT:40 CIRCLE:60')
+        run(psx, len(s) + 1, s)
+        pv = (psx.read(PREVIEW + 2, 2), psx.read(PREVIEW, 2))
+        before = skill_state(psx)
+        s = taps('CIRCLE:60 CIRCLE:600'); run(psx, len(s) + 1, s)   # Wish's cost lands after ~5 s
+        rows.append('skill %s  %d %d  %s  %s' % (name, pv[0], pv[1], ' '.join(map(str, before)),
+                                                 ' '.join(map(str, skill_state(psx)))))
+    for name, k in (('dash', 1), ('stone', 2)):
+        for j in range(m):
+            psx.load(state)
+            skill_setup(psx)
+            s = taps(GUTS + 'DOWN:20 ' * k + 'CIRCLE:60 CIRCLE:60 LEFT:40 ' + ' '.join(['RIGHT:8 LEFT:8'] * (j % 40))
+                     + ' W:%d CIRCLE:60 CIRCLE:60 CIRCLE:300' % (1 + j // 40))
+            hp = psx.read(t + 0x28, 2)
+            run(psx, len(s) + 1, s)
+            rows.append('trial %s %d %d' % (name, hp - psx.read(t + 0x28, 2),
+                                            (psx.read(t + 0x47), psx.read(t + 0x48)) != (4, 12)))
+    return rows
+
+
 def main():
+    if sys.argv[1] == '--skills':
+        out = os.dup(1)
+        os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        psx = PSX(sys.argv[2])
+        rows = skills(psx, sys.argv[3], int(sys.argv[4]))
+        open(sys.argv[5], 'w').write(
+            '# skill NAME  preview damage (HP; a heal shown as such) hit%  then before and after the\n'
+            '# execution: target HP, status bytes 0-4, x, y; Ramza HP; Potion, Antidote, Eye Drop,\n'
+            '# Echo Grass, Phoenix Down in the bag\n# trial NAME: HP taken, pushed\n' + '\n'.join(rows) + '\n')
+        os.write(out, ('%d rows\n' % len(rows)).encode())
+        return
     if sys.argv[1] == '--attack':
         out = os.dup(1)
         os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
