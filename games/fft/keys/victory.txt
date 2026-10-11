@@ -1,0 +1,14 @@
+# A battle won from fft(14) (four enemies KO, the last with 1 HP in front of Ramza, its back to
+# him: always hit): Act, Attack, the cursor up onto it, the attack (EXP+20 rising: a kill), then
+# the results ("Victory!", what each unit earned).
+#   make xcheck XCHECK=14 FRAMES=120 KEYS=keys/victory.txt
+20 DOWN
+22
+30 A
+32
+40 A
+42
+50 UP
+52
+60 A
+62
