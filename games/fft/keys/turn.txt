@@ -1,0 +1,50 @@
+# A whole player turn from fft(8) (Ramza's first turn): Act (greyed: nothing), Status and
+# back, Move to (4, 9), the move undone, Move and back, Wait facing +x; then the next recruit
+# leaves its menu (looking around), the cursor moves, A on an empty tile: back to its menu.
+#   make xcheck XCHECK=8 FRAMES=360 KEYS=keys/turn.txt
+20 DOWN
+22
+30 DOWN
+32
+40 DOWN
+42
+50 A
+52
+80 B
+82
+90 DOWN
+92
+100 A
+102
+110 UP
+112
+120 UP
+122
+130 A
+132
+170 B
+172
+180 A
+182
+190 B
+192
+200 DOWN
+202
+210 DOWN
+212
+220 A
+222
+230 RIGHT
+232
+240 A
+242
+280 B
+282
+290 UP
+292
+300 UP
+302
+310 A
+312
+340 B
+342

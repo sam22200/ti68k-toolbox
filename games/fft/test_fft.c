@@ -15,6 +15,8 @@ static int fails;
 
 static void steps(u32 keys, int n) { while (n--) sw_step(keys); }
 static void press(u32 keys) { sw_step(keys); sw_step(0); }
+// a player's unit waits, facing as it does: Wait in its menu, then the facing confirmed
+static void wait_turn(void) { press(K_DOWN); press(K_DOWN); press(K_A); press(K_A); }
 
 // the scene buffer as a PGM (4 greys)
 static void scene_pgm(const char *path)
@@ -183,9 +185,11 @@ static int shown(u8 i)
     st.unit[i].x = 200;                                   // out of the map: not drawn
     sw_step(0);
     mid = 0;
-    for (y = 0; y < RT_H - 8; y++)
-        for (x = 0; x < RT_W; x++)
-            if (with[y][x] != sw_level(x, y)) { n++; mid += with[y][x] == 1 || with[y][x] == 2; }
+    for (y = 8; y < RT_H; y++)                            // not the HUD: the top strip and
+        for (x = 0; x < RT_W; x++)                        // the units' panels
+            if ((y < RT_H - PANEL_H || (x >= 16 && x < RT_W - 16)) && with[y][x] != sw_level(x, y)) {
+                n++; mid += with[y][x] == 1 || with[y][x] == 2;
+            }
     st = save;
     st.unit[i].x = ux;
     return n;
@@ -245,6 +249,7 @@ static void test_team(void)
 {
     int foe, ally;
     sw_init(2);
+    steps(0, 10);                                         // the HUD drawn: one part per frame
     foe = shown(2);
     st.unit[2].team = TEAM_PLAYER;
     ally = shown(2);
@@ -285,7 +290,8 @@ static void test_walk_keys(void)
     int k;
     sw_init(8);                                           // Ramza's turn, cursor on him (4, 11)
     CHECKV(st.act, U_RAMZA);
-    press(K_A);
+    CHECKV(st.mode, M_MENU);
+    press(K_A);                                           // Move
     CHECKV(st.mode, M_TARGET);
     press(K_UP); press(K_UP);                             // view v = world z at r 0
     press(K_RIGHT); press(K_LEFT);                        // view u = world x
@@ -293,21 +299,87 @@ static void test_walk_keys(void)
     press(K_A);
     CHECKV(st.mode, M_WALK);
     for (k = 0; k < 40 && st.mode == M_WALK; k++) sw_step(0);
-    CHECKV(st.mode, M_BROWSE);
+    CHECKV(st.mode, M_MENU);                              // back to the menu, on Wait
+    CHECKV(st.menu, MN_WAIT);
     CHECK(st.unit[U_RAMZA].x == 4 && st.unit[U_RAMZA].z == 9);
     CHECKV(st.unit[U_RAMZA].face, 3);                     // facing its last step: -z
+    press(K_A);                                           // Wait: the facing
+    CHECKV(st.mode, M_FACE);
+    press(K_RIGHT);                                       // view +u = world +x at r 0
+    CHECKV(st.unit[U_RAMZA].face, 0);
+    press(K_A);
     CHECKV(st.unit[U_RAMZA].ct, 22);                      // moved, no Act: 2 + 20
+    CHECKV(st.unit[U_RAMZA].face, 0);
     CHECKV(st.act, U_RAMZA + 1);                          // the next recruit's turn, cursor on it
     CHECK(st.cx == 3 && st.cz == 11);
-    press(K_A); press(K_ESC);                             // select then cancel: no quit
+    CHECKV(st.mode, M_MENU);
+    press(K_B);                                           // looking around
     CHECKV(st.mode, M_BROWSE);
     // after a turn the arrows follow the view: at r 1, view +v is world +x
     press(K_F5); steps(0, TURN_FRAMES);
     press(K_DOWN);
     CHECK(st.cx == 4 && st.cz == 11);
-    press(K_A);                                           // not the active unit: nothing
+    press(K_A);                                           // no unit there: back to the menu
+    CHECKV(st.mode, M_MENU);
+    CHECK(st.cx == 3 && st.cz == 11);
+    press(K_ESC);
     CHECKV(st.mode, M_BROWSE);
-    CHECKV(sw_step(K_ESC), 0);                            // ESC in browse quits
+    CHECKV(sw_step(K_ESC), 0);                            // ESC while looking around quits
+}
+
+// ---------------------------------------------------------------- milestone 16: the turn menu
+// a whole player turn by keys: Act not yet there, Status, a move undone, the facing chosen
+// then cancelled, Wait; a unit's numbers while looking around
+static void test_menu(void)
+{
+    int k;
+    sw_init(8);
+    press(K_DOWN);
+    CHECKV(st.menu, MN_ACT);
+    press(K_A);                                           // Act: milestone 17
+    CHECKV(st.mode, M_MENU);
+    press(K_DOWN); press(K_DOWN);
+    CHECKV(st.menu, MN_STATUS);
+    press(K_A);
+    CHECKV(st.mode, M_STATUS); CHECKV(st.sel, U_RAMZA);
+    steps(0, 4);
+    press(K_B);
+    CHECKV(st.mode, M_MENU);
+    press(K_DOWN);                                        // the entries wrap
+    CHECKV(st.menu, MN_MOVE);
+    press(K_A); press(K_UP); press(K_UP); press(K_A);     // Move to (4, 9)
+    for (k = 0; k < 40 && st.mode == M_WALK; k++) sw_step(0);
+    CHECK(st.unit[U_RAMZA].z == 9 && st.moved);
+    press(K_UP); press(K_UP);                             // Move is greyed: nothing
+    CHECKV(st.menu, MN_MOVE);
+    press(K_A);
+    CHECKV(st.mode, M_MENU);
+    press(K_B);                                           // the move undone
+    CHECKV(st.mode, M_MENU);
+    CHECK(st.unit[U_RAMZA].x == 4 && st.unit[U_RAMZA].z == 11 && !st.moved);
+    CHECKV(st.unit[U_RAMZA].face, unit_defs[U_RAMZA].face);
+    CHECK(st.cx == 4 && st.cz == 11);
+    press(K_A);                                           // Move again
+    CHECKV(st.mode, M_TARGET);
+    press(K_B);
+    CHECKV(st.mode, M_MENU);
+    press(K_DOWN); press(K_DOWN); press(K_A);             // Wait
+    CHECKV(st.mode, M_FACE);
+    press(K_LEFT);                                        // view -u = world -x
+    CHECKV(st.unit[U_RAMZA].face, 1);
+    press(K_B);                                           // cancelled: the facing back
+    CHECKV(st.mode, M_MENU);
+    CHECKV(st.unit[U_RAMZA].face, unit_defs[U_RAMZA].face);
+    press(K_A); press(K_DOWN); press(K_A);                // Wait, facing +z
+    CHECKV(st.unit[U_RAMZA].face, 2);
+    CHECKV(st.unit[U_RAMZA].ct, 42);                      // no move, no Act: 2 + 40
+    CHECKV(st.act, U_RAMZA + 1);
+    press(K_B);                                           // an enemy's numbers
+    st.cx = st.unit[1].x; st.cz = st.unit[1].z;
+    press(K_A);
+    CHECKV(st.mode, M_STATUS); CHECKV(st.sel, 1);
+    press(K_B);
+    CHECKV(st.mode, M_BROWSE);
 }
 
 // ---------------------------------------------------------------- milestone 15: turn order
@@ -356,11 +428,11 @@ static void test_turns(void)
     CHECKV(st.turns[1], U_RAMZA + 1);                     // the recruits, still at 102
     steps(0, 60);
     CHECKV(st.act, U_RAMZA);                              // the player's turn waits for keys
-    press(K_C);                                           // Wait
+    wait_turn();
     CHECKV(st.unit[U_RAMZA].ct, 42);
     CHECKV(st.act, U_RAMZA + 1);
     // after the recruits, the next tick: everyone at 42 + 60 = 102 again, Delita first
-    for (i = 0; i < 4; i++) press(K_C);
+    for (i = 0; i < 4; i++) wait_turn();
     CHECKV(st.act, 0);
     CHECKV(st.unit[0].ct, 2);
 }
@@ -378,6 +450,13 @@ static void shots(void)
     sw_init(0);
     sw_step(0);
     scene_pgm("x/scene0.pgm");
+    sw_init(8);                                           // the turn menu, Status, the facing,
+    steps(0, 12); sw_write_png("x/m16_menu.png", 4);      // an enemy's panel
+    press(K_UP); press(K_A); steps(0, 6); sw_write_png("x/m16_status.png", 4);
+    press(K_B); press(K_UP); press(K_A); steps(0, 4); sw_write_png("x/m16_face.png", 4);
+    press(K_B); press(K_B);
+    st.cx = st.unit[7].x; st.cz = st.unit[7].z;
+    steps(0, 30); sw_write_png("x/m16_browse.png", 4);
 }
 
 int main(int argc, char **argv)
@@ -392,6 +471,7 @@ int main(int argc, char **argv)
     test_team();
     test_turn_keys();
     test_walk_keys();
+    test_menu();
     test_clock();
     test_turns();
     shots();
