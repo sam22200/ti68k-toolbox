@@ -629,6 +629,32 @@ IMPLEMENTATION** (what the TI does, and why).
   drawn and the thinking runs a step a frame within ~270k cycles: 5 frames a turn on average,
   6 at most, after the camera's pan (~13 frames, as before).
 
+### Presentation (milestone 21)
+
+- Decisions (grilling): every frame of the game within 360k (the start, the rotation and a
+  picked tile's path allowed as stalls); C before asm (asked first); FFT's throw pose only (no
+  weapon sprite: 1-2 px at 0.6; no item pose); the hit as FFT draws it, measured; the camera:
+  while walking it follows the walker past a margin, while aiming or acting it stays when both
+  units are on screen, else centres between them; the markers drawn from each tile's real
+  corners; the HUD as it is unless the user flags something.
+- OBSERVED (`BATTLE/TYPE1.SEQ` animations 58 / 59: frames 11, 27, then 28 held facing the camera
+  and 16, 29, 30 facing away; run headless, `oracle.py`'s skills state, Ramza's Throw Stone on
+  the recruit, a picture every 3 frames): the thrower raises the arm behind the head then holds
+  it forward over the head: the same wind-up as the swing (27 / 29), then 28 / 30 instead of the
+  blow 31 / 33.
+- OBSERVED (same run, the target every 2 frames): at the impact a white burst about twice the
+  unit's size covers the target for ~4 frames (60 Hz), then breaks into white sparkles and a
+  blue glow flying apart for ~12 frames; the number rises over it; the target's sprite itself
+  keeps its colours (the hit pose).
+- TARGET: the throw pose for Throw Stone and the items (`unit_pose`, `units.py` frames 28 and
+  30); the burst as a white blob outlined black for 2 frames and 8 outlined sparkles flying
+  apart for 6 (`art.py` `spark`, `draw_spark`), for damage that hits: white alone vanishes on the
+  light floors, FFT's glow cannot be drawn in 4 greys.
+- OBSERVED (`map.h`): 25 of the 150 tiles are sloped: ramps of 1 or 2 units (two adjacent
+  corners up) in the four directions, and two tiles with one corner up.
+- TARGET: the cursor and the rings drawn on the tile's four corners at their heights (`art.py`
+  `slope_marker`, 13 shapes, picked by the corners' lifts in the view, `marker`).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -645,3 +671,4 @@ IMPLEMENTATION** (what the TI does, and why).
 | rewards | 10 EXP (kill 20 / KOs) + level difference, 100 a level; JP 8 + 2 x job level + level / 4, a quarter shared; death counter 3, then crystal (enemy 1/2, player 3/4) or chest | same (the share to the same job only) | decomp, six actions of `oracle.py --rewards` |
 | moving | canals waded (water to water 2), jumps over one tile, trees crossed | same, the two measured ranges exact | 2 ranges of `oracle.py --ai`, decomp |
 | AI | scores the field (HP x 128 / max, KO -192, Critical -32), ranks 8, draws on hit chance; danger 10 - steps; hit and back off | same, 129 of 136 turns the same action, 125 the same tile | decomp, 136 turns of `oracle.py --ai` |
+| a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | an outlined blob 2 frames, sparkles 6 (30 Hz) | a picture every 2 frames of a Throw Stone |

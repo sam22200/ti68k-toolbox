@@ -927,6 +927,9 @@ static void test_ai_battle(void)
            (unsigned long)i, (unsigned long)turns, (double)think / turns, (unsigned long)most, (double)frozen / turns,
            (unsigned long)fmost);
     CHECK(st.mode == M_END && fmost <= 15);
+    printf("redraw: %lu frames from the screen's copy of the scene so far, %lu of them not the view's\n",
+           (unsigned long)bg_used, (unsigned long)bg_bad);
+    CHECK(bg_used > 1000 && bg_bad == 0);
 }
 
 // Defend: drawn as FFT draws a support ability; a command after the skill set, Defending until
@@ -1046,6 +1049,31 @@ static void shots(void)
             if (n == fh) sw_write_png("x/m20_hit.png", 4);
             if (n == ff) sw_write_png("x/m20_face.png", 4);
         }
+    }
+    {                                                     // milestone 21: the throw pose and a
+        u16 f, ft = 0, fs = 0, n, i;                      // hit's burst (fft(16)), the reach and
+        sw_init(16);                                      // the cursor on a sloped tile (fft(5))
+        for (f = 0; f < 6000 && !(ft && fs); f++) {
+            sw_step(0);
+            if (!ft && st.mode == M_ACT && st.abil != NO_ABIL && st.abil != ABIL_DEFEND
+                && abilities[st.abil].flags & AF_EVADE && st.act_t == ACT_BLOW + 1) ft = f;
+            if (ft && !fs && st.mode == M_ACT && st.hit && st.act_t == ACT_HIT + 1) fs = f;
+        }
+        sw_init(16);
+        for (n = 0; n <= fs; n++) {
+            sw_step(0);
+            if (n == ft) sw_write_png("x/m21_throw.png", 4);
+            if (n == fs) sw_write_png("x/m21_spark.png", 4);
+        }
+        sw_init(5);
+        steps(0, 40);
+        for (i = 0; i < MAP_W * MAP_H; i++) {
+            const Tile *t = &map_tiles[i];
+            if (st.reach[i] != 0xFF && (t->c[0] != t->c[1] || t->c[1] != t->c[2] || t->c[2] != t->c[3])) break;
+        }
+        CHECK(i < MAP_W * MAP_H);
+        st.cx = (u8)(i % MAP_W); st.cz = (u8)(i / MAP_W);
+        steps(0, 24); sw_write_png("x/m21_slope.png", 4);
     }
 }
 

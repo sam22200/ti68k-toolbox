@@ -35,8 +35,9 @@ CHARS = [('RAMZA', 'RAMUZA', 'TYPE1'), ('DELITA', 'DILY', 'TYPE1'), ('SQUIRE_M',
          ('SQUIRE_F', 'MINA_W', 'TYPE1'), ('CHEMIST_M', 'ITEM_M', 'TYPE2'), ('CHEMIST_F', 'ITEM_W', 'TYPE2')]
 # TYPE1 and TYPE2 alike: the idle 9-13 front, 14-18 back; then each pose front, back (TYPE1.SEQ:
 # hit 19 / 20 (animations 66-69), the swing's wind-up 27 / 29 and its blow 31 / 33 (52-57),
-# kneeling 21 / 22 (HP low), lying KO 23 / 24 (the end of 102-105))
-FRAMES = list(range(9, 19)) + [19, 20, 27, 29, 31, 33, 21, 22, 23, 24]
+# kneeling 21 / 22 (HP low), lying KO 23 / 24 (the end of 102-105), the throw 28 / 30 after the
+# same wind-up (58-59: Throw Stone, seen on the original run headless))
+FRAMES = list(range(9, 19)) + [19, 20, 27, 29, 31, 33, 21, 22, 23, 24, 28, 30]
 LIFT = {23: 4, 24: 4}            # lying: drawn 4 rows higher to fit (still on its tile)
 SIZES = [(8, 8), (16, 8), (16, 16), (16, 24), (24, 8), (24, 16), (24, 24), (32, 8), (32, 16),
          (32, 24), (32, 32), (32, 40), (40, 16), (40, 32), (48, 48), (56, 56)]
@@ -193,21 +194,46 @@ def main():
             '// the TI the archived variable read in place): per unit UNIT_FRAMES frames, 0-4 facing\n'
             '// the camera (FFT TYPE1 9-13, looking down-left), 5-9 facing away (14-18, up-left), then\n'
             '// the poses P_*, each facing the camera then away, then all of them mirrored; per frame\n'
-            '// light, dark, mask (1 = transparent) rows, 16 wide, the anchor (the tile centre under\n'
-            '// the feet) at column 8, row UNIT_FOOT.\n')
+            '// light, dark, mask (1 = transparent) rows, the shadow under the feet (art.py) included,\n'
+            '// then the inside (the opaque pixels eroded twice, and the shadow\'s own: what a cover\n'
+            '// takes away, the contour kept), 16 wide, the anchor (the tile centre under the feet)\n'
+            '// at column 8, row UNIT_FOOT.\n')
     f.write('enum { %s, UNIT_GFX_N };\n' % ', '.join('UG_' + c for c, _, _ in CHARS))
-    f.write('enum { P_HIT = 10, P_WIND = 12, P_BLOW = 14, P_KNEEL = 16, P_KO = 18 };\n')
+    f.write('enum { P_HIT = 10, P_WIND = 12, P_BLOW = 14, P_KNEEL = 16, P_KO = 18, P_THROW = 20 };\n')
     f.write('#define UNIT_FRAMES %d\n#define UNIT_SH %d\n#define UNIT_FOOT %d\n' % (len(FRAMES), H, FOOT))
+    f.write('#define UNIT_FB (8 * UNIT_SH)          // bytes per frame\n')
     f.write('// then the objects, as a frame (not mirrored): a crystal, a chest\nenum { OBJ_CRYSTAL, OBJ_CHEST, OBJ_N };\n')
     f.close()
     out = bytearray()
     bits = 1 << (15 - np.arange(W))
+
+    def erode(k, r):                    # row r's opaque pixels whose four neighbours are opaque
+        o = ~k[r] & 0xFFFF
+        return o & (o << 1) & 0xFFFF & (o >> 1) & ~k[r - 1] & ~k[r + 1] & 0xFFFF
+
+    def inside(k):                      # eroded twice, rows 2 .. H - 3 (fft.c draw_unit_covered)
+        e = [0] * H
+        for r in range(2, H - 2):
+            a, b, d = erode(k, r - 1), erode(k, r), erode(k, r + 1)
+            e[r] = b & (b << 1) & 0xFFFF & (b >> 1) & a & d
+        return e
+
+    from art import SHADOW              # the shadow under the feet (rows FOOT - 1 .. FOOT + 1)
+    shadow = [[c != '.' for c in r.ljust(W, '.')] for r in SHADOW.strip('\n').split('\n')]
     for frames in sprites + [objs]:
         for s in frames + ([s[:, ::-1] for s in frames] if frames is not objs else []):   # mirrored
+            e = inside([(bits * (s[y] < 0)).sum() for y in range(H)])   # the unit's own mask
+            s = s.copy()
+            under = [0] * H                 # the shadow's pixels left uncovered by the unit
+            for r, row in enumerate(shadow):
+                y = FOOT - 1 + r
+                for x in range(W):
+                    if row[x] and s[y, x] < 0:
+                        s[y, x] = 2; under[y] |= 0x8000 >> x
             l = [(bits * ((s[y] >= 0) & ((s[y] & 1) > 0))).sum() for y in range(H)]
             d = [(bits * ((s[y] >= 0) & ((s[y] & 2) > 0))).sum() for y in range(H)]
             k = [(bits * (s[y] < 0)).sum() for y in range(H)]
-            out += struct.pack('>%dH' % (3 * H), *(l + d + k))
+            out += struct.pack('>%dH' % (4 * H), *(l + d + k + [a | b for a, b in zip(e, under)]))
     open(os.path.join(os.path.dirname(sys.argv[2]) or '.', 'fftu.bin'), 'wb').write(out)
     if len(sys.argv) > 3:
         from PIL import Image

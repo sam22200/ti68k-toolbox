@@ -186,13 +186,30 @@ with `-pack` (decided at milestone 13).
     frames), TI = PC, 16 scenarios and the key scripts too. A battle the AI plays averages
     343k a frame and peaks at 590k where rings come or go over a crowd (milestone 21); program
     45,849 bytes, RAM ~88 KB.
-21. **Presentation.** Every pose the battle uses (attack, hit, KO, crystal, chest), the
+21. **Presentation** (done). Every pose the battle uses (attack, hit, KO, crystal, chest), the
     number and the hit flash, the menu windows drawn over the scene at a fixed cost, the
     turn order and HP readable at a glance (outlined, 2-pixel details), the camera moving
     to the action. The cursor and the ground markers (reach rings, targets, areas) fit the
     tile they sit on: several inclinations drawn (flat, and each slope direction of the
     tile, as the view shows it), maybe several sizes too, instead of one flat diamond on
     every tile. Frame <= 360k in every state.
+    Done (grilling: the budget first, C before asm, FFT's throw only, the hit measured on the
+    original, the camera rules, markers from the real corners, the HUD left as it is): FFT's
+    throw pose for Throw Stone and the items (frames 28 / 30 after the wind-up, its animations
+    58-59, seen on the original run headless); its hit burst (a white blob over the target, then
+    sparkles flying apart: here a black-outlined blob for 2 frames, 8 sparkles for 6); the cursor
+    and the reach rings drawn on each sloped tile's four corners (13 shapes by `art.py`); while a
+    unit walks the camera stays until the walker nears the edge, while it aims or acts it stays
+    when both units are on screen, else it centres between them. The budget: the screen-aligned
+    copy of the scene kept once the camera stands still (25k instead of 107k a frame, patched as
+    rings come and go), rings drawn by 16-bit words with their depths compared two bytes at once,
+    rings dropped by scene rows, the units' eroded inside and shadow made by `units.py`, the AI's
+    picture check without its multiply, a picked tile reusing the reach's steps, and a frame budget
+    that delays the optional work (rings, HUD parts, the copy) a frame or two. Every frame of the
+    player's turns within 329k; a battle the AI plays averages 236k (343k before), 8 frames of
+    6,100 at 361-383k (an AI aim or facing panning over 8-9 units), the key scripts 6 of 2,375 up
+    to 405k: a 68000 view copy would close the gap (asm: ask). Program 53,069 bytes, `fftu` 55.4
+    KB, RAM ~92 KB.
 22. **The whole battle on the calculator.** Titanium then TI-89 HW2: one full battle in TiEmu
     (a GIF), the cycles per state, the program and data sizes, the free RAM.
 

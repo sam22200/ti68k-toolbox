@@ -114,8 +114,11 @@ typedef struct {                        // a unit's cover mask, and its covered 
     u8 depth, rot, r0, r1;
     u16 cm[COVER_H];
 } Cover;
+typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
 typedef struct {
     Cover cover[NUNIT];                 // per unit, for its feet, its depth and the view
+    Feet feet[NUNIT];                   // its feet (unit_feet) for its tile and the
+    u16 feet_k[NUNIT];                  // view (x | z << 8 | rot << 12 | 0x8000; 0: none)
     s16 span_l[TH + 8], span_r[TH + 8];
     u8 from[MAP_W * MAP_H];
     u8 half[2][TW / 8 * TH];
@@ -137,8 +140,11 @@ typedef struct {
     u16 pan_k[2][3];                    // light, dark; unit + 1 (0: none), HP, MP
     u8 arrow[4][2][8];                  // the facing arrows (view -v, +u, +v, -u): fill, outline
     u8 pname[UNIT_GFX_N][PANEL_H];      // the names turned a quarter, a row per panel row (5 bits)
-    u8 ringed[MAP_W * MAP_H], ring_n;   // the tiles whose reach ring is in the scene, how many,
-    u8 ring_i;                          // the next tile to look at (MAP_W * MAP_H: all drawn)
+    s16 ring_y0, ring_y1;               // the scene rows the reach rings are on
+    s16 drop_y0, drop_y1;               // the rows still to put back (rings going)
+    u8 from_who;                        // whose reach W->from holds the steps of (+ 1; 0: none)
+    u8 ring_i;                          // the next tile whose reach ring to draw (MAP_W * MAP_H:
+                                        // all drawn)
     u32 num[2][2][7];                   // an attack's number (or Miss), the EXP its user earned:
     u8 num_w[2], num_ok;                // black, its white outline; their widths; drawn (bits)
     u8 end_n;                           // M_END: the results' next line to draw
@@ -171,9 +177,38 @@ typedef struct {
     s16 ai_base;                        // the fallback tile's score: to beat
     u8 frz, frz_n, hold;                // a unit thinking: the picture stands still (no longer
     u32 frz_h;                          // drawn), its frames so far, one more frame not drawn,
+    u32 bg[2][RT_H * RT_W / 32];        // the scene as the screen shows it (copy_view's), from
+    s16 bg_x, bg_y;                     // this camera and scene version (bg_ok): copied to the
+    u16 bg_ver;                         // screen without shifts while the camera stands still;
+    u8 bg_ok, bg_part;                  // patched as rings come and go; its top half kept
+    u8 ring_wait, hud_wait, bg_wait;    // frames the rings, a HUD part, the copy waited for room
+    s16 left, upd_k;                    // the frame's budget left for optional work, the update's
+                                        // heavy work this frame (k cycles)
                                         // the last one's checksum
 } Work;
 static Work *W;
+
+// A frame's budget, in thousands of cycles (ti-cycles): what a frame costs without its optional
+// work is reckoned before drawing (the units on screen, their cover masks to make, the copy of
+// the scene); the optional work (new rings, a part of the HUD, the screen's copy kept) waits for
+// a frame with room for it: it shows a frame or two later, the frame stays within the budget
+#define FRAME_K 340
+#define BASE_K 45                       // glints, HUD copies, cursor, the units' sort
+#define UNIT_K 19                       // a unit on screen
+#define COVER_K 16                      // its cover mask made again
+#define BG_K 25                         // the screen's copy of the scene put back
+#define VIEW_K 105                      // the view copied (the camera moved)
+#define RING_K 30                       // a new flat ring (12 rows; a sloped one by its rows)
+#define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
+#define HUD_K 40                        // a part of the HUD made
+#define SAVE_K 15                       // half the screen's copy kept
+#define SAVE_WAIT 2                     // frames the copy waits at most once the camera stops,
+#define WAIT_MAX 8                      // the rings or a HUD part (then done anyway)
+#define SUM_K 25                        // an AI unit's picture checked (planes_sum)
+#define TURN_K 45                       // the update's own heavy work: a turn's start (the clock,
+#define AIM_K 35                        // the AT list), an aim (the reach, the preview), a Move's
+#define REACH_K 90                      // reach, an AI unit's facing (W->upd_k)
+#define FACE_K 50
 #define span_l (W->span_l)
 #define span_r (W->span_r)
 #define bfs_from (W->from)
@@ -422,6 +457,7 @@ static void ai_next(void);
 static void turn_start(void)
 {
     u8 me;
+    if (W) W->upd_k += TURN_K;
     st.act = ct_next();
     st.pick_t = 0;
     if (outcome()) { end_battle(outcome()); return; }
@@ -566,29 +602,66 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
 
 #define RINGS(m) ((m) == M_TARGET || (m) == M_AIM)   // the modes that show st.reach
 
-// pixels of the scene in front of view diagonal depth inside a box (byte columns, rows):
-// restored from the view (a reach ring drawn behind a building), but for a pattern of them:
-// a hidden ring stays visible over the building, set apart from the seen ones
+// A tile's marker (a reach ring, or the cursor: cur) in view rot: the flat diamond (hi_*,
+// cur_*, 24 x 12) at its standing height, or on a sloped tile the outline of its four corners
+// at their heights (art.py slope_*), scene box left x, top y, its rows
+typedef struct { const u32 *l, *d, *m; s16 x, y, rows; u8 depth; } Marker;
+static void marker(u8 rot, u8 i, u8 cur, Marker *k)
+{
+    s16 u, v, lo = 255, n;
+    u8 h[4], c, sk = 0;
+    view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
+    k->x = scene_x(rot, u, v) - HW; k->depth = (u8)(u + v);
+    for (c = 0; c < 4; c++) { h[c] = corner_h(rot, u, v, c); if (h[c] < lo) lo = h[c]; }
+    for (c = 0; c < 4; c++) sk |= (u8)((h[c] - lo > 3 ? 3 : h[c] - lo) << (2 * c));
+    for (n = 0; sk && n < NSLOPE; n++)
+        if (slope_key[n] == sk) {
+            u8 o = slope_off[n];
+            k->l = (cur ? sc_l : sl_l) + o; k->d = (cur ? sc_d : sl_d) + o; k->m = (cur ? sc_m : sl_m) + o;
+            k->rows = slope_rows[n]; k->y = scene_y(u, v) - (lo + 2) * HU + slope_top[n];
+            return;
+        }
+    k->l = cur ? cur_l : hi_l; k->d = cur ? cur_d : hi_d; k->m = cur ? cur_m : hi_m;
+    k->rows = 12; k->y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
+}
+
+// A reach ring (its marker) drawn into the scene on a tile of view diagonal depth, but where
+// the view has something in front of its pixels (a greater diagonal): there the view shows, but
+// for a pattern of them: a hidden ring stays visible over the building, set apart from the seen
+// ones. A 16-bit word at a time, its two depth bytes compared at once (diagonals < 128: t + 127 -
+// depth has bit 7 set when t > depth, no carry between the bytes): ~6k a ring (a blit then the
+// view put back over the whole box cost ~19k, and wiped a nearer tile's ring drawn before).
 static const u8 hide_pat[2] = { 0xCC, 0x33 };   // 2-pixel dashes (picked over the whole ring
                                                 // and a checkerboard)
-static void uncover(s16 x, s16 y, s16 w, s16 rows, u8 depth)
+static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
 {
-    s16 b0 = x >> 3, b1 = (x + w - 1) >> 3, r, b;
-    if (b0 < 0) b0 = 0;
-    if (b1 >= SC_BYTES) b1 = SC_BYTES - 1;
-    if (y < 0) { rows += y; y = 0; }
-    if (y + rows > SC_H) rows = SC_H - y;
-    for (r = 0; r < rows; r++) {
-        // three pointers, the other planes at constant offsets (at most 3 SC_PLANE: a 16-bit
-        // displacement): nine pointers or six indexed arrays cost ~18k a ring
-        u16 o = (u16)((y + r) * SC_BYTES + b0);
-        const u8 *v = vbuf + o, *t = vbuf + 2 * SC_PLANE + o;   // view: light, dark; depths
-        u8 *q = scene_l + o, hp = (u8)~hide_pat[(y + r) & 1];    // scene: light, dark
-        for (b = b0; b <= b1; b++, v++, t++, q++) {
-            u8 m = (u8)(((t[0] > depth ? t[SC_PLANE] : 0) | (t[2 * SC_PLANE] > depth ? t[3 * SC_PLANE] : 0)) & hp);
-            if (!m) continue;
-            q[0] = (u8)((q[0] & ~m) | (v[0] & m));
-            q[SC_PLANE] = (u8)((q[SC_PLANE] & ~m) | (v[SC_PLANE] & m));
+    s16 r, k, w0 = mk->x >> 4, sh = mk->x & 15;
+    u16 dd = (u16)(0x7F7F - (mk->depth | mk->depth << 8));
+    for (r = 0; r < mk->rows; r++) {
+        s16 yy = mk->y + r;
+        u32 m32 = mk->m[r] >> sh, l32 = mk->l[r] >> sh, d32 = mk->d[r] >> sh;
+        u16 hp = (u16)~(hide_pat[yy & 1] * 0x0101);
+        if ((u16)yy >= SC_H) continue;
+        for (k = 0; k < 3; k++) {
+            s16 w = w0 + k;
+            u16 m, o, g1, g2, c;
+            const u8 *t;
+            u8 *q;
+            if (k < 2) { m = (u16)(m32 >> (16 - 16 * k)); }
+            else m = sh > 8 ? (u16)(mk->m[r] << (16 - sh)) : 0;
+            if (!m || (u16)w >= SC_BYTES / 2) continue;
+            o = (u16)(yy * SC_BYTES + 2 * w);
+            t = vbuf + 2 * SC_PLANE + o;            // depths, masks: constant offsets
+            g1 = (u16)(RD16(t, 0) + dd) & 0x8080; g1 = (u16)((g1 << 1) - (g1 >> 7));
+            g2 = (u16)(RD16(t + 2 * SC_PLANE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
+            c = (u16)(((g1 & RD16(t + SC_PLANE, 0)) | (g2 & RD16(t + 3 * SC_PLANE, 0))) & m & hp);
+            q = scene_l + o;
+            {
+                u16 a = k < 2 ? (u16)(l32 >> (16 - 16 * k)) : (u16)(mk->l[r] << (16 - sh));
+                u16 b = k < 2 ? (u16)(d32 >> (16 - 16 * k)) : (u16)(mk->d[r] << (16 - sh));
+                WR16(q, 0, (u16)((RD16(q, 0) & ~m) | (a & m & ~c) | (RD16(vbuf + o, 0) & c)));
+                WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~m) | (b & m & ~c) | (RD16(vbuf + SC_PLANE + o, 0) & c)));
+            }
         }
     }
 }
@@ -596,6 +669,8 @@ static void uncover(s16 x, s16 y, s16 w, s16 rows, u8 depth)
 // The scene of orientation rot with the current reach rings: the view copied from its file,
 // then a dotted ring on each reachable tile, behind what stands in front of it
 static u8 scene_seq;                    // hl_seq it was made for
+static u16 scene_ver;                   // bumped when the scene is made again whole (boxes
+                                        // changed otherwise are patched into W->bg)
 static u8 hl_seq;                       // bumped when the highlights may have changed
 
 static void unpack_view(u8 rot)
@@ -656,60 +731,95 @@ static void draw_glints(void)
     }
 }
 
-// a ring's box in the scene: its tile's diamond at its standing height
-static void ring_box(u8 rot, u8 i, s16 *x, s16 *y, u8 *depth)
+// the screen-aligned copy of the scene (W->bg) brought up to date on a box of the scene (pixels
+// x .. x + w - 1, rows y .. y + h - 1) that changed: it stays valid while rings come and go
+static void bg_patch(s16 x, s16 y, s16 w, s16 h)
 {
-    s16 u, v;
-    view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
-    *x = scene_x(rot, u, v) - HW; *y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
-    *depth = (u8)(u + v);
+    s16 j, j0, j1, r, sh = st.camx & 15, wb = (st.camx >> 4) << 1;
+    if (!(W->bg_ok || W->bg_part) || W->bg_x != st.camx || W->bg_y != st.camy) return;
+    x -= st.camx; y -= st.camy;                // (a copy half made: its other half comes after)
+    if (y < 0) { h += y; y = 0; }
+    if (y + h > RT_H) h = RT_H - y;
+    if (h <= 0 || x + w <= 0 || x >= RT_W) return;
+    j0 = x < 0 ? 0 : x >> 4; j1 = (x + w - 1) >> 4;
+    if (j1 >= RT_W / 16) j1 = RT_W / 16 - 1;
+    for (r = y; r < y + h; r++) {
+        const u8 *sl = scene_l + (st.camy + r) * SC_BYTES + wb, *sd = sl + SC_PLANE;
+        u8 *bl = (u8 *)W->bg[0] + r * (RT_W / 8), *bd = (u8 *)W->bg[1] + r * (RT_W / 8);
+        for (j = j0; j <= j1; j++) {
+            WR16(bl, j, (u16)((RD32(sl, j) << sh) >> 16));
+            WR16(bd, j, (u16)((RD32(sd, j) << sh) >> 16));
+        }
+    }
 }
 
 // a new view, or many rings to drop (a Move's): copied whole (130k); a few (an attack's): only
 // their boxes put back from the view (~7k each; the frame an attack starts went over the
 // budget with the whole copy). The new rings are then drawn RING_STEP a frame (~18k each:
 // the four of an attack in one frame made it 381k with ten units on screen)
-#define RING_BOXES 12
-#define RING_STEP 2
+#define RING_STEP 4                     // new rings a frame at most (and as the budget allows)
+
+static u8 bg_usable(void)
+{
+    return W->bg_ok && W->bg_x == st.camx && W->bg_y == st.camy && W->bg_ver == scene_ver;
+}
+// scene rows [y, y + n) put back from the view (u32 copies: ~0.6k a row)
+static void scene_rows(s16 y, s16 n)
+{
+    u32 *a = (u32 *)(scene_l + y * SC_BYTES), *b = (u32 *)(scene_d + y * SC_BYTES);
+    const u32 *p = (const u32 *)(vbuf + y * SC_BYTES), *q = (const u32 *)(vbuf + SC_PLANE + y * SC_BYTES);
+    u16 k = (u16)(n * (SC_BYTES / 4));
+    while (k--) { *a++ = *p++; *b++ = *q++; }
+}
+
 static void ensure_scene(u8 rot)
 {
-    u8 i, d, k;
-    s16 x, y;
+    u8 i, k;
+    Marker mk;
     if (scene_rot == rot && scene_seq == hl_seq) {
+        if (W->drop_y0 < W->drop_y1) goto drop;
         if (W->ring_i >= MAP_W * MAP_H) return;
         goto rings;
     }
     unpack_view(rot);
-    if (scene_rot != rot || W->ring_n > RING_BOXES) {
-        if (scene_rot != rot) make_glints(rot);
+    if (scene_rot != rot) {
+        make_glints(rot);
         memcpy(scene_l, vbuf, 2 * SC_PLANE);
-    } else
-        for (i = 0; i < MAP_W * MAP_H; i++) {
-            s16 r, b0, b1, rows = 12;
-            if (!W->ringed[i]) continue;
-            ring_box(rot, i, &x, &y, &d);
-            b0 = x < 0 ? 0 : x >> 3; b1 = (x + 23) >> 3;
-            if (b1 >= SC_BYTES) b1 = SC_BYTES - 1;
-            if (y < 0) { rows += y; y = 0; }
-            if (y + rows > SC_H) rows = SC_H - y;
-            for (r = 0; r < rows; r++) {           // 3-4 bytes a row: no ROM memcpy
-                u16 o = (u16)((y + r) * SC_BYTES + b0), e = o + (b1 - b0);
-                for (; o <= e; o++) { scene_l[o] = vbuf[o]; scene_d[o] = vbuf[SC_PLANE + o]; }
-            }
+        scene_ver++;
+        W->drop_y0 = W->drop_y1 = 0;
+    } else if (W->ring_y0 < W->ring_y1) {          // the rows the rings are on, put back below
+        if (W->drop_y0 >= W->drop_y1) { W->drop_y0 = W->ring_y0; W->drop_y1 = W->ring_y1; }
+        else {
+            if (W->ring_y0 < W->drop_y0) W->drop_y0 = W->ring_y0;
+            if (W->ring_y1 > W->drop_y1) W->drop_y1 = W->ring_y1;
         }
+    }
     scene_rot = rot; scene_seq = hl_seq;
-    memset(W->ringed, 0, sizeof W->ringed);
-    W->ring_n = W->ring_i = 0;
+    W->ring_i = 0;
+    W->ring_y0 = SC_H; W->ring_y1 = 0;
+drop:
+    if (W->drop_y0 < W->drop_y1) {                 // the rings going: their rows put back from
+        s16 n = W->left > 8 * ROW_K ? W->left / ROW_K : 8;   // the view (and into the screen's
+        if (n > W->drop_y1 - W->drop_y0) n = W->drop_y1 - W->drop_y0;   // copy) as the budget
+        scene_rows(W->drop_y0, n);                 // allows, then the new ones (a whole scene
+        bg_patch(0, W->drop_y0, SC_W, n);          // copy, 130k, or the rings' boxes one by one,
+        W->drop_y0 += n; W->left -= n * ROW_K;     // ~10k each, went over the budget)
+        if (W->drop_y0 < W->drop_y1) return;
+    }
 rings:
     dst_scene();
     if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; return; }
     for (k = 0; W->ring_i < MAP_W * MAP_H && k < RING_STEP; W->ring_i++) {
         i = W->ring_i;
         if (st.reach[i] == 0xFF) continue;
-        W->ringed[i] = 1; W->ring_n++; k++;
-        ring_box(rot, i, &x, &y, &d);
-        blit24(x, y, 12, hi_l, hi_d, hi_m);
-        uncover(x, y, 24, 12, d);
+        marker(rot, i, 0, &mk);
+        if (W->left < RING_K * mk.rows / 12 && W->ring_wait < WAIT_MAX) { W->ring_wait++; break; }
+        W->left -= RING_K * mk.rows / 12; W->ring_wait = 0;
+        k++;
+        ring_into_scene(&mk);
+        bg_patch(mk.x, mk.y, 24, mk.rows);
+        if (mk.y < W->ring_y0) W->ring_y0 = mk.y < 0 ? 0 : mk.y;
+        if (mk.y + mk.rows > W->ring_y1) W->ring_y1 = mk.y + mk.rows > SC_H ? SC_H : mk.y + mk.rows;
     }
 }
 
@@ -826,7 +936,9 @@ void compute_reach(u8 who)
 {
     u8 i;
     hl_seq++;
-    bfs(who, RT_NULL);
+    bfs(who, bfs_from);                           // the steps kept for make_path
+    W->from_who = who + 1;
+    W->upd_k += REACH_K;
     for (i = 0; i < NUNIT; i++)                   // can't stop on a unit (a crystal or a chest:
         if (i != who && unit_at(st.unit[i].x, st.unit[i].z))       // can, it is picked up)
             st.reach[st.unit[i].z * MAP_W + st.unit[i].x] = 0xFF;
@@ -834,10 +946,13 @@ void compute_reach(u8 who)
         if (map_tiles[i].walk == 2) st.reach[i] = 0xFF;
 }
 
+// the path to (tx, tz) from the steps of who's reach (made again unless compute_reach made them:
+// a spread costs ~90k)
 u8 make_path(u8 who, u8 tx, u8 tz)
 {
-    u8 c = tz * MAP_W + tx, s = st.unit[who].z * MAP_W + st.unit[who].x, n = 0, i;
-    bfs(who, bfs_from);
+    u8 c = tz * MAP_W + tx, s = st.unit[who].z * MAP_W + st.unit[who].x, n = 0, i, kept = W->from_who == who + 1;
+    W->from_who = 0;
+    if (!kept) bfs(who, bfs_from);
     if (st.reach[c] == 0xFF) { st.path_n = 0; return 0; }
     for (i = c; i != s; i = bfs_from[i]) n++;     // its steps (a jump is one)
     if (n >= PATH_MAX) { st.path_n = 0; return 0; }
@@ -846,7 +961,8 @@ u8 make_path(u8 who, u8 tx, u8 tz)
         c = bfs_from[c];
     }
     st.path_n = n + 1;                                             // path[0] = the start
-    compute_reach(who);
+    if (!kept) { compute_reach(who); W->from_who = 0; }
+    else hl_seq++;
     return st.path_n;
 }
 
@@ -1769,8 +1885,6 @@ u8 ai_facing(u8 a)
 // a unit's feet: scene position of its tile centre at its standing height, interpolated
 // while walking (t / WALK_FRAMES of the way to the next tile, with a hop on height changes);
 // depth: the diagonal it is drawn after (both tiles' while walking)
-typedef struct { s16 x, y; u8 depth; } Feet;
-
 static Feet unit_feet(u8 rot, u8 i)
 {
     Feet f;
@@ -1831,7 +1945,9 @@ static u8 unit_pose(u8 i)
 {
     const Unit *un = &st.unit[i];
     if (st.mode == M_ACT && st.abil != ABIL_DEFEND) {
-        if (i == st.atk && st.act_t < ACT_HIT) return st.act_t < ACT_BLOW ? P_WIND : P_BLOW;
+        if (i == st.atk && st.act_t < ACT_HIT)     // Throw Stone (the evaded skill) and items:
+            return st.act_t < ACT_BLOW ? P_WIND    // FFT's throw after the same wind-up
+                : st.abil != NO_ABIL && abilities[st.abil].flags & (AF_EVADE | AF_ITEM) ? P_THROW : P_BLOW;
         if (i == st.tgt && st.act_t >= ACT_HIT && st.act_t < ACT_HIT + HIT_FRAMES && st.hit
             && act_kind() == AB_DAMAGE) return P_HIT;
     }
@@ -1849,8 +1965,8 @@ static const u8 *unit_frame(u8 rot, u8 i)
     s16 u0, v0, du, dv;
     u8 t = (u8)(st.tick + 11 * i), k;                  // the units out of step
     if (DC_OBJ(un->dc))                                // a crystal or a chest, after the units (a
-        return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * (6 * UNIT_SH)   // (u16) cast here, under
-            + (u8)(un->dc - DC_CRYSTAL) * (6 * UNIT_SH);  // the test, was folded to a wrong constant)
+        return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * UNIT_FB   // (u16) cast here, under
+            + (u8)(un->dc - DC_CRYSTAL) * UNIT_FB;  // the test, was folded to a wrong constant)
     view_of(rot, 0, 0, &u0, &v0);
     view_of(rot, fdx[un->face], fdz[un->face], &du, &dv);
     du -= u0; dv -= v0;
@@ -1861,14 +1977,7 @@ static const u8 *unit_frame(u8 rot, u8 i)
         if (du < 0 || dv < 0) k += 5;
     }
     if (du > 0 || dv < 0) k += UNIT_FRAMES;
-    return ugfx + (u16)(un->gfx * (2 * UNIT_FRAMES) + k) * (6 * UNIT_SH);
-}
-
-// the opaque pixels of row r (1 .. UNIT_SH - 2) of a sprite mask whose four neighbours are opaque
-static u16 erode(const u16 *mk, u8 r)
-{
-    u16 o = (u16)~mk[r];
-    return o & (u16)(o << 1) & (o >> 1) & (u16)~mk[r - 1] & (u16)~mk[r + 1];
+    return ugfx + (u32)(u16)(un->gfx * (2 * UNIT_FRAMES) + k) * UNIT_FB;
 }
 
 // 3 x 5 digits and '/' for the panels' numbers, turned a quarter: per glyph column (left to
@@ -1879,58 +1988,56 @@ static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 
 
 #define DC_Y 18                         // a death counter's top above the feet
 
-// a unit and its shadow, both through its cover mask (ExtGraph: dest = dest & mask | data,
-// mask 1 = transparent, so the data is cleared under the cover too), the unit's contour drawn
-// over the cover, an enemy's diamond above it; c RT_NULL: the unit alone, uncovered (the
-// rotation frames). The rows above the covered ones are drawn as they are (on the TI straight
-// from the data file), the others copied and eroded.
+// a unit with its shadow (in its frames) through its cover mask, the unit's contour drawn over
+// the cover, an enemy's diamond above it; c RT_NULL: uncovered (the rotation frames). Under the
+// cover only the contour stays (the white outline and the black line inside it): the frame's
+// inside (its opaque pixels eroded twice, and the shadow's, made by units.py) is taken away
+// there (mask 1 = transparent). On the TI the rows it leaves alone are drawn straight from the data file,
+// the others copied first.
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
     RtSprite s;
-    u16 mk[COVER_H], ml[COVER_H], md[COVER_H];
-    u8 r, top = UNIT_SH, cov = 0;              // rows [0, top) are drawn as they are
+    u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
+    u8 r, h0 = UNIT_SH, h1 = 0;                // rows [h0, h1] lose pixels to the cover
     const u8 *g = unit_frame(rot, i);
     s.w = 16;
     if (c) {
         const u16 *cm = c->cm;
-        for (r = 0; r < 3; r++) {
-            u16 k = cm[UNIT_FOOT - 1 + r];
-            mk[r] = shadow_gfx[2][r] | k; ml[r] = shadow_gfx[0][r] & ~k; md[r] = shadow_gfx[1][r] & ~k;
-        }
-        s.h = 3;
-        s.light = ml; s.dark = md; s.mask = mk;
-        draw_sprite(sx - 8, sy - 1, &s);
-        if (c->r0 <= c->r1) { cov = 1; top = c->r0 - 2; }   // the erosion reads two rows above
+        for (r = c->r0; r <= c->r1; r++)
+            if ((h[r] = cm[r] & RD16(g, 3 * UNIT_SH + r)) != 0) { if (r < h0) h0 = r; h1 = r; }
     }
-#ifndef __m68k__
-    top = 0;                                   // the PC copies every row (byte order)
-#endif
-    if (top) {                                 // native big-endian rows: drawn in place
-        s.h = top;
+    sy -= UNIT_FOOT;
+#ifdef __m68k__                                // native big-endian rows: drawn in place
+    if (h0) {
+        s.h = h0;
         s.light = g; s.dark = g + 2 * UNIT_SH; s.mask = g + 4 * UNIT_SH;
-        draw_sprite(sx - 8, sy - UNIT_FOOT, &s);
+        draw_sprite(sx - 8, sy, &s);
     }
-    if (top < UNIT_SH) {
-        for (r = top; r < UNIT_SH; r++) {
-            mk[r] = RD16(g, 2 * UNIT_SH + r); ml[r] = RD16(g, r); md[r] = RD16(g, UNIT_SH + r);
+    if (h0 < UNIT_SH) {
+        u8 e = h1 + 1;
+        for (r = h0; r < e; r++) {
+            u16 k = h[r];
+            mk[r] = RD16(g, 2 * UNIT_SH + r) | k; ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
         }
-        if (cov) {              // covered: only the contour stays (the white outline and the
-            const u16 *cm = c->cm;      // black line inside it), the sprite eroded twice and
-            u8 r1 = c->r1;              // taken away, on the covered rows only (rows 0, 1 and
-            u16 a, b, d;                // the last two: outline)
-            r = c->r0;
-            a = erode(mk, r - 1); b = erode(mk, r);
-            for (; r <= r1; r++, a = b, b = d) {
-                u16 h;
-                d = erode(mk, r + 1);   // before mk[r] changes (it reads rows r .. r + 2)
-                h = cm[r] & b & (u16)(b << 1) & (b >> 1) & a & d;
-                mk[r] |= h; ml[r] &= ~h; md[r] &= ~h;
-            }
+        s.h = e - h0;
+        s.light = ml + h0; s.dark = md + h0; s.mask = mk + h0;
+        draw_sprite(sx - 8, sy + h0, &s);
+        if (e < UNIT_SH) {
+            s.h = UNIT_SH - e;
+            s.light = g + 2 * e; s.dark = g + 2 * (UNIT_SH + e); s.mask = g + 2 * (2 * UNIT_SH + e);
+            draw_sprite(sx - 8, sy + e, &s);
         }
-        s.h = UNIT_SH - top;
-        s.light = ml + top; s.dark = md + top; s.mask = mk + top;
-        draw_sprite(sx - 8, sy - UNIT_FOOT + top, &s);
     }
+#else                                          // the PC copies every row (byte order)
+    for (r = 0; r < UNIT_SH; r++) {
+        u16 k = r >= h0 && r <= h1 ? h[r] : 0;
+        mk[r] = RD16(g, 2 * UNIT_SH + r) | k; ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
+    }
+    s.h = UNIT_SH;
+    s.light = ml; s.dark = md; s.mask = mk;
+    draw_sprite(sx - 8, sy, &s);
+#endif
+    sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
     if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
         s.h = FOE_H;                            // never covered (it shows a hidden one too)
@@ -2068,6 +2175,9 @@ static void draw_turn(void)
 }
 
 // ---------------------------------------------------------------- camera
+#define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
+#define CAM_MT 32                       // for the camera to stay (its sprite above them, the
+#define CAM_MB 12                       // HUD's top strip)
 static void cam_clamp(s16 *x, s16 *y)
 {
     if (*x < 0) *x = 0;
@@ -2076,12 +2186,34 @@ static void cam_clamp(s16 *x, s16 *y)
     if (*y > SC_H - RT_H) *y = SC_H - RT_H;
 }
 
+// is scene point (x, y) (a unit's feet) on the screen with a margin (its sprite, the HUD)?
+static u8 cam_sees(s16 x, s16 y)
+{
+    x -= st.camx; y -= st.camy;
+    return x >= CAM_MX && x < RT_W - CAM_MX && y >= CAM_MT && y < RT_H - CAM_MB;
+}
+
+// Where the camera goes: the cursor centred; while a unit walks, it stays until the walker
+// nears the edge, then centres it; while a unit aims or acts, it stays when the unit and its
+// target are both on screen, else centres the point between them
 static void cam_target(s16 *tx, s16 *ty)
 {
-    s16 u, v;
+    s16 u, v, x, y;
     view_of(st.rot, st.cx, st.cz, &u, &v);
-    *tx = scene_x(st.rot, u, v) - RT_W / 2;
-    *ty = scene_y(u, v) + HH - map_tiles[st.cz * MAP_W + st.cx].stand * (HU / 2) - RT_H / 2 - 6;
+    x = scene_x(st.rot, u, v);
+    y = scene_y(u, v) + HH - map_tiles[st.cz * MAP_W + st.cx].stand * (HU / 2);
+    if (st.mode == M_WALK) {
+        Feet f = unit_feet(st.rot, st.sel);
+        if (cam_sees(f.x, f.y)) { *tx = st.camx; *ty = st.camy; return; }
+        x = f.x; y = f.y;
+    } else if (st.mode == M_AIM || st.mode == M_ACT) {
+        Feet a = unit_feet(st.rot, st.mode == M_ACT ? st.atk : st.act);
+        if (st.mode == M_ACT) { Feet t = unit_feet(st.rot, st.tgt); x = t.x; y = t.y; }
+        if (cam_sees(a.x, a.y) && cam_sees(x, y)) { *tx = st.camx; *ty = st.camy; return; }
+        x = (x + a.x) >> 1; y = (y + a.y) >> 1;
+    }
+    *tx = x - RT_W / 2;
+    *ty = y - RT_H / 2 - 6;
     cam_clamp(tx, ty);
 }
 
@@ -2095,14 +2227,19 @@ static s16 ease(s16 c, s16 t)
 // ---------------------------------------------------------------- game
 static u8 *sbuf;
 
-// a checksum of the picture just drawn (an AI unit thinks once the picture stands still)
+// a checksum of the picture just drawn, its 160 x 100 pixels (an AI unit thinks once the
+// picture stands still): two sums (Fletcher's), no multiply or long rotation (~25k)
 static u32 planes_sum(void)
 {
-    const u32 *l = (const u32 *)rt_light, *d = (const u32 *)rt_dark;
-    u32 h = 0;
-    u16 i;
-    for (i = 0; i < RT_PSIZE / 4; i++) h = (h << 1 | h >> 31) ^ l[i] ^ d[i] * 3;
-    return h;
+    const u8 *l = rt_light, *d = rt_dark;
+    u32 a = 0, b = 0;
+    u16 y;
+    for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
+        const u32 *p = (const u32 *)l, *q = (const u32 *)d;
+        a += p[0]; b += a; a += p[1]; b += a; a += p[2]; b += a; a += p[3]; b += a; a += p[4]; b += a;
+        a += q[0]; b += a; a += q[1]; b += a; a += q[2]; b += a; a += q[3]; b += a; a += q[4]; b += a;
+    }
+    return a ^ b;
 }
 static void hud_labels(void);
 
@@ -2182,6 +2319,7 @@ static u8 aim_ok(u8 t)
 
 static void aim(u8 ab)
 {
+    if (W) W->upd_k += AIM_K;
     st.mode = M_AIM; st.abil = ab;
     if (ab == NO_ABIL) attack_range(st.act); else skill_range(st.act, ab);
     if (W) W->win_k[0] = 0;                        // the preview: for this ability
@@ -2345,7 +2483,7 @@ static void ai_next(void)
     } else {
         st.ai = AI_FACE;
         st.mode = M_FACE;
-        u->face = ai_facing(st.act);
+        u->face = ai_facing(st.act); W->upd_k += FACE_K;
     }
 }
 
@@ -2379,6 +2517,7 @@ static void ai_step(void)
 
 u8 game_update(void)
 {
+    if (W) W->upd_k = 0;
     s16 tx, ty;
     u8 mode0 = st.mode;
     if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
@@ -2484,12 +2623,29 @@ u8 game_update(void)
 
 // the camera's window of the scene: 100 rows of 160 px from any pixel position, 32 bits at a
 // time (a 32-bit word and the next 16 bits shifted)
-static void copy_view(void)
+static void __attribute__((noinline)) copy_view(void)   // its own registers (inlined: spilled)
 {
-    s16 y, i, sh = st.camx & 15, rs = 16 - sh;
+    s16 y, sh = st.camx & 15, rs = 16 - sh;
     const u8 *sl = scene_l + st.camy * SC_BYTES + ((st.camx >> 4) << 1);
     const u8 *sd = scene_d + st.camy * SC_BYTES + ((st.camx >> 4) << 1);
     u8 *dl = rt_light, *dd = rt_dark;
+#ifdef __m68k__                                 // a row: 5 longs, each a long and the next word
+    for (y = 0; y < RT_H; y++, sl += SC_BYTES, sd += SC_BYTES, dl += RT_PBYTES, dd += RT_PBYTES) {
+        const u16 *a = (const u16 *)sl, *b = (const u16 *)sd;
+        u32 *p = (u32 *)dl, *q = (u32 *)dd;
+        if (!sh) {
+            const u32 *c = (const u32 *)a, *e = (const u32 *)b;
+            p[0] = c[0]; p[1] = c[1]; p[2] = c[2]; p[3] = c[3]; p[4] = c[4];
+            q[0] = e[0]; q[1] = e[1]; q[2] = e[2]; q[3] = e[3]; q[4] = e[4];
+            continue;
+        }
+#define CV(k) p[k] = *(const u32 *)(a + 2 * k) << sh | a[2 * k + 2] >> rs; \
+              q[k] = *(const u32 *)(b + 2 * k) << sh | b[2 * k + 2] >> rs
+        CV(0); CV(1); CV(2); CV(3); CV(4);
+#undef CV
+    }
+#else
+    s16 i;
     for (y = 0; y < RT_H; y++, sl += SC_BYTES, sd += SC_BYTES, dl += RT_PBYTES, dd += RT_PBYTES) {
         if (!sh) {
             for (i = 0; i < RT_W / 16; i += 2) { WR32(dl, i, RD32(sl, i)); WR32(dd, i, RD32(sd, i)); }
@@ -2500,6 +2656,53 @@ static void copy_view(void)
             }
         }
     }
+#endif
+}
+
+// the scene on the screen: the camera and the scene standing still, the last copy kept aligned
+// to the screen (~25k), else the view copied (~105k), kept once the camera stands still
+#ifndef __m68k__
+u32 bg_used, bg_bad;                           // the tests: frames from the copy, those wrong
+#endif
+static void screen_scene(void)
+{
+    u8 *l = rt_light, *d = rt_dark;
+    u32 *p = W->bg[0], *q = W->bg[1], *a, *b;
+    s16 y;
+    if (bg_usable()) {
+        for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
+            a = (u32 *)l; b = (u32 *)d;
+            a[0] = *p++; a[1] = *p++; a[2] = *p++; a[3] = *p++; a[4] = *p++;
+            b[0] = *q++; b[1] = *q++; b[2] = *q++; b[3] = *q++; b[4] = *q++;
+        }
+#ifndef __m68k__
+        {                                      // the tests: the copy is the view's
+            static u8 t[2][RT_PSIZE];
+            memcpy(t[0], rt_light, RT_PSIZE); memcpy(t[1], rt_dark, RT_PSIZE);
+            copy_view();
+            bg_used++;
+            if (memcmp(t[0], rt_light, RT_PSIZE) || memcmp(t[1], rt_dark, RT_PSIZE)) bg_bad++;
+        }
+#endif
+        return;
+    }
+    copy_view();                               // kept once the camera stands still: half the
+    if (W->bg_x != st.camx || W->bg_y != st.camy || W->bg_ver != scene_ver) {   // rows a frame,
+        W->bg_wait = W->bg_part = W->bg_ok = 0;   // with room or anyway after a frame or two (it
+        W->bg_x = st.camx; W->bg_y = st.camy; W->bg_ver = scene_ver;   // frees ~80k a frame)
+        return;
+    }
+    if (!W->bg_part && W->left < SAVE_K && ++W->bg_wait <= SAVE_WAIT) return;
+    W->left -= SAVE_K; W->bg_wait = 0;
+    W->bg_ok = 0;                              // (the copy being remade)
+    y = W->bg_part ? RT_H / 2 : 0;
+    l += y * RT_PBYTES; d += y * RT_PBYTES; p += y * (RT_W / 32); q += y * (RT_W / 32);
+    for (y = 0; y < RT_H / 2; y++, l += RT_PBYTES, d += RT_PBYTES) {
+        a = (u32 *)l; b = (u32 *)d;
+        *p++ = a[0]; *p++ = a[1]; *p++ = a[2]; *p++ = a[3]; *p++ = a[4];
+        *q++ = b[0]; *q++ = b[1]; *q++ = b[2]; *q++ = b[3]; *q++ = b[4];
+    }
+    W->bg_ok = W->bg_part; W->bg_part ^= 1;
 }
 
 static const char *const unit_names[UNIT_GFX_N] = { "Ramza", "Delita", "Squire", "Squire", "Chemist", "Chemist" };
@@ -2525,6 +2728,7 @@ static void hud_labels(void)
             for (x = 0; x < PANEL_H - 3; x++)
                 if (HUD_L[r * RT_PBYTES + (x >> 3)] & (0x80 >> (x & 7))) W->pname[g][PANEL_H - 2 - x] |= (u8)(0x10 >> r);
     }
+    memset(W->hud, 0, sizeof W->hud);              // the strip blank until made (was the last name)
     rt_light = sl; rt_dark = sd;
     for (g = 0; g < 4; g++)
         for (r = 0; r < 8; r++) {
@@ -2727,7 +2931,8 @@ static void draw_hud(void)
     pk[1][1] = pk[1][0] ? st.unit[o - 1].hp : 0; pk[1][2] = pk[1][0] ? st.unit[o - 1].mp : 0;
     for (i = 0, w = 0; i < ORDER_N; i++) w |= st.turns[i] != W->hud_t[i];
     if (!w) W->hud_late = 0;
-    else if (!W->hud_late++) w = 0;                // not on the turn's first frame
+    else if (!W->hud_late++ || (W->left < HUD_K && W->hud_late <= WAIT_MAX)) w = 0;   // not on the
+                                                         // turn's first frame, nor without room
     if (w) {
         for (r = 0; r < 8; r++) {                  // white, 64 px
             a = (u32 *)(HUD_L + r * RT_PBYTES); b = (u32 *)(HUD_D + r * RT_PBYTES);
@@ -2757,7 +2962,8 @@ static void draw_hud(void)
         }
         for (i = 0; i < ORDER_N; i++) W->hud_t[i] = st.turns[i];
         W->hud_late = 0;
-    } else if (!W->hud_late) {
+    } else if (!W->hud_late && (W->left >= HUD_K || ++W->hud_wait > WAIT_MAX)) {
+        W->hud_wait = 0;
         for (i = 0; i <= n && s[i] == W->hud_s[i]; i++) ;
         if (i <= n) {                              // the view and the height: 32 px after them
             for (r = 0; r < 8; r++) {
@@ -2812,6 +3018,18 @@ static void draw_hud(void)
             WR16(ql, 0, pl[r]); WR16(qd, 0, pd[r]);
         }
     }
+}
+
+// a hit's spark over the target (art.py: FFT's white burst, then sparkles), on damage that hit
+static void draw_spark(void)
+{
+    u8 t = (u8)(st.act_t - ACT_HIT);
+    RtSprite sp;
+    Feet f;
+    if (t >= SPARK_N || !st.hit || st.abil == ABIL_DEFEND || act_kind() != AB_DAMAGE) return;
+    f = unit_feet(st.rot, st.tgt);
+    sp.w = 32; sp.h = SPARK_H; sp.light = spark_l[t]; sp.dark = spark_d[t]; sp.mask = spark_m[t];
+    draw_sprite(f.x - st.camx - 16, f.y - st.camy - 10 - SPARK_H / 2, &sp);
 }
 
 // A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP): AMS text written
@@ -2927,7 +3145,8 @@ static void draw_end(void)
 
 void game_render(void)
 {
-    u8 ord[NUNIT], i, j;
+    u8 ord[NUNIT], vis[NUNIT], i, j;
+    s16 n;
     Feet f[NUNIT];
     s16 u, v;
     if (W && (W->hold || ((st.ai == AI_THINK || st.ai == AI_GO) && W->frz))) {   // the same picture in
@@ -2936,7 +3155,7 @@ void game_render(void)
     }
     if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) {
         draw_rect(0, 0, RT_W, RT_H, C_WHITE);
-        draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (88 KB)", F_SMALL, C_BLACK);
+        draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (92 KB)", F_SMALL, C_BLACK);
         return;
     }
     if (st.mode == M_END) { draw_end(); return; }
@@ -2945,22 +3164,34 @@ void game_render(void)
         ZB(8); unpack_view((st.rot + st.turn) & 3); ZE(8);
         return;
     }
+    for (i = 0, n = 0; i < NUNIT; i++) {           // units back to front, those on screen and
+        s16 bx, by;                                // the frame's cost without the optional work
+        u16 fk = (u16)(st.unit[i].x | st.unit[i].z << 8 | st.rot << 12 | 0x8000);
+        if (st.mode == M_WALK && i == st.sel) f[i] = unit_feet(st.rot, i), W->feet_k[i] = 0;
+        else if (W->feet_k[i] == fk) f[i] = W->feet[i];   // kept while it stands
+        else { f[i] = W->feet[i] = unit_feet(st.rot, i); W->feet_k[i] = fk; }
+        for (j = i; j > 0 && f[ord[j - 1]].depth > f[i].depth; j--) ord[j] = ord[j - 1];
+        ord[j] = i;
+        bx = f[i].x - st.camx - 8; by = f[i].y - st.camy - UNIT_FOOT;
+        vis[i] = st.unit[i].x < MAP_W && bx > -16 && bx < RT_W && by > -UNIT_SH && by - FOE_H < RT_H;
+        if (vis[i]) {
+            const Cover *c = &W->cover[i];
+            n += UNIT_K;
+            if (c->x != f[i].x || c->y != f[i].y || c->depth != f[i].depth || c->rot != st.rot) n += COVER_K;
+        }
+    }
+    if (st.ai == AI_THINK) n += SUM_K;
+    n += W->upd_k;
+    W->left = (s16)(FRAME_K - BASE_K - n - (bg_usable() ? BG_K : VIEW_K));
     ZB(6);
     ensure_scene(st.rot);
     ZE(6);
-    ZB(3); copy_view(); draw_glints(); ZE(3);
+    ZB(3); screen_scene(); draw_glints(); ZE(3);
     ZB(4);
-    for (i = 0; i < NUNIT; i++) {                  // units back to front
-        f[i] = unit_feet(st.rot, i);
-        for (j = i; j > 0 && f[ord[j - 1]].depth > f[i].depth; j--) ord[j] = ord[j - 1];
-        ord[j] = i;
-    }
     for (i = 0; i < NUNIT; i++) {
         u8 k = ord[i];
-        s16 bx = f[k].x - st.camx - 8, by = f[k].y - st.camy - UNIT_FOOT;
         Cover *c = &W->cover[k];
-        if (st.unit[k].x >= MAP_W) continue;
-        if (bx <= -16 || bx >= RT_W || by <= -UNIT_SH || by - FOE_H >= RT_H) continue;   // off screen
+        if (!vis[k]) continue;                     // off screen
         if (c->x != f[k].x || c->y != f[k].y || c->depth != f[k].depth || c->rot != st.rot) {
             c->x = f[k].x; c->y = f[k].y; c->depth = f[k].depth; c->rot = st.rot;
             cover(c->cm, f[k].x, f[k].y, f[k].depth);
@@ -2973,16 +3204,23 @@ void game_render(void)
     // the cursor, above everything (blinking)
     dst_screen(st.camx, st.camy);
     view_of(st.rot, st.cx, st.cz, &u, &v);
-    if (st.mode == M_ACT && st.act_t >= ACT_HIT) draw_number();
+    if (st.mode == M_ACT && st.act_t >= ACT_HIT) { draw_spark(); draw_number(); }
     if (st.mode == M_FACE) draw_arrows();
-    else if (st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)))
-        blit24(scene_x(st.rot, u, v) - HW, scene_y(u, v) - (map_tiles[st.cz * MAP_W + st.cx].stand >> 1) * HU,
-               12, cur_l, cur_d, cur_m);
+    else if (st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
+        Marker mk;
+        marker(st.rot, (u8)(st.cz * MAP_W + st.cx), 1, &mk);
+        blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, mk.m);
+    }
     draw_hud();
     ZE(5);
     if (st.ai == AI_THINK) {                    // two pictures in a row the same: stop drawing
-        u32 h = planes_sum();
-        if (h == W->frz_h) W->frz = 1;
-        W->frz_h = h;
+        s16 tx, ty;
+        cam_target(&tx, &ty);
+        if (tx != st.camx || ty != st.camy) W->frz_h = 0;   // still panning: not checked
+        else {
+            u32 h = planes_sum();
+            if (h == W->frz_h) W->frz = 1;
+            W->frz_h = h;
+        }
     }
 }

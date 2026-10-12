@@ -426,10 +426,31 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
 - **Think while the picture stands still** (measured with `ti-cycles`, `games/fft` milestone 20):
   when a busy scene's render alone takes ~300k of the ~360k budget, a computation of ~1 M
   cycles (FFT's AI turn) gets no room by time-slicing. Stop the animation clocks, draw until two
-  frames in a row have the same checksum of the planes (~15k), then skip the drawing: both
+  frames in a row have the same checksum of the planes, then skip the drawing: both
   double buffers hold the same picture, so the flips show nothing moving, and the work gets
   the whole frame, a bounded step per frame (resumable loops, a work budget counted in units
   calibrated by `ti-cycles` zones). FFT's AI: 5 frames a turn, steps of at most 270k.
+  The checksum: the 160 x 100 visible rows only (not the 240 x 128 plane), two sums (Fletcher),
+  ~25k; `h = rol(h, 1) ^ l ^ d * 3` over the whole plane was 163k (GCC made the rotation a
+  31-bit `ror.l`, 70 cycles, and the `* 3` a `__mulsi3` call).
+- **Keep the scene aligned to the screen while the camera stands still** (measured with
+  `ti-cycles`, `games/fft` milestone 21): a scrolling view copied at any pixel costs ~107k a
+  frame (a 32-bit shift per long); keep that copy (4 KB, the visible rows), patch the boxes of
+  the scene that change into it, and put it back with plain long moves (~25k). Make it half the
+  rows a frame once the camera has stopped. Check it in the PC tests: every frame drawn from the
+  copy compared with a real copy of the view (4,600 frames of a battle, none different).
+- **A frame budget for the optional work** (same game): reckon before drawing what the frame
+  costs without it (units on screen x their measured cost, the copy or the kept copy, the
+  update's known heavy calls), then let the optional work (rings drawn into the scene, a HUD
+  part, the copy kept) run only with room left, and anyway after a few frames' wait (else a
+  crowded scene starves it forever). It shows a frame or two later; an AI battle's frames went
+  from 351k on average (590k at most) to 236k, the player's from up to 437k to 329k at most.
+- **Compare bytes two at a time in a 16-bit word** when they are under 128: `(w + 0x7F7F - k *
+  0x0101) & 0x8080` sets bit 7 of each byte greater than k, with no carry between them;
+  `(g << 1) - (g >> 7)` widens each bit into a byte mask. A depth test per byte in C cost ~600
+  cycles a byte (GCC spills); by words a reach ring went from ~29k to ~24k.
+- **Mark hot loops `noinline` when they are called from a big function**: inlined into the
+  render, the view copy spilled its pointers to the stack (150k); on its own, 107k.
 - **Precompute** at start-up: trig/sqrt/division tables, row offsets, sprite masks, level data
   decoded once.
 - **Cheap tests first**: grid cell or bounding box before pixel-perfect collision; early exit as
