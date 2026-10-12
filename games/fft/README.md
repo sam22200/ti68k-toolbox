@@ -17,9 +17,11 @@ as are its move ranges). Not a port: our own engine on the Portable Game Runtime
 the heights and the scenery (the map's own textured mesh, drawn in four greys on the PC), the
 units (FFT's own battle sprites of Ramza, Delita, the Squires and the Chemists, scaled 0.6) and
 the battle's numbers come from the local disc (`tools/extract.py`, `tools/units.py`,
-`tools/battle.py`); the cursor, shadow and rotation greys are ours (`tools/art.py`). The
-battle's presentation and the whole battle on the calculator come next: `ROADMAP.md` milestones
-21-22. Study notes: `RE_NOTES.md`.
+`tools/battle.py`); the cursor, shadow, markers, hit sparks and rotation greys are ours
+(`tools/art.py`). Its presentation: FFT's throw pose and hit burst (seen on the original), the
+cursor and reach rings drawn on each tile's real slope, a camera that frames the action, and
+every frame of the player's turns within the 360k budget (`ROADMAP.md` milestone 21). The whole
+battle on the calculator comes next (milestone 22). Study notes: `RE_NOTES.md`.
 
 ## Controls
 
@@ -32,6 +34,9 @@ battle's presentation and the whole battle on the calculator come next: `ROADMAP
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.
+While a unit walks the camera stays until the walker nears the screen's edge; while it aims or
+acts, it stays when the unit and its target are both on screen, else it centres the point
+between them.
 Enemies and Delita (a guest) play as FFT's AI does: once the camera is on the unit the picture
 stands still for ~0.2 s while it thinks, then its move range is shown, it walks, its target is
 marked (the preview at the top right), it acts (the name at the top right) and turns to face
@@ -43,7 +48,8 @@ unit whose support ability it is (drawn as FFT draws one: ~8 %; Defending until 
 then the abilities it knows, an item with how many are left and
 greyed at 0; the reach shown, the cursor on a unit shows FFT's preview at the top right, `Hit
 95%` and `Dmg 12` (`Dmg 3-12` for a random amount, `HP +30` for a heal, `- Poison` for a
-cure), [2nd] uses it: the swing, the ability's name at the top right, the target hit, the
+cure), [2nd] uses it: the swing (FFT's throw for Throw Stone and the items), the ability's name
+at the top right, the target hit (FFT's burst: a white blob, then sparkles flying apart), the
 damage, `+20` or the status removed, or `Miss`, rising above it, a critical hit or a Dash
 pushing it a tile, KO at 0 HP lying down, Phoenix Down raising a KO unit; a unit with a fifth
 of its HP or less kneels; then `EXP+12` rising above the user, `LvUp` for a level up), **Wait** (four arrows around the
@@ -146,13 +152,23 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 - **Views in memory**: one view at a time is unpacked into a 52 KB buffer (`zx0_asm` from
   `lib/unpack68k.s` on the TI, 2.2 M cycles = 0.18 s; a C copy on the PC), during the first
   frame of the turn that reaches it, and copied into the 17 KB scene buffer when the
-  orientation or the reach changes. Two allocations: AMS refuses blocks above ~64 KB.
-- **Reach rings** are drawn into that scene copy, then the pixels in front of their tile are
-  restored from the view but for 2-pixel dashes: a tile behind a house keeps a dashed ring
-  over it (the user's pick over the whole ring and a checkerboard, `x/bench_cases_cachees.png`,
-  local); no cost per frame. The cursor's line is 4 px per row (`x/bench_curseur.png`).
+  orientation changes (the rows of the reach rings put back as they go). Two allocations: AMS refuses blocks above ~64 KB.
+- **Reach rings** are drawn into that scene copy, but where the view has something in front of
+  their pixels: there the view shows, but for 2-pixel dashes: a tile behind a house keeps a
+  dashed ring over it (the user's pick over the whole ring and a checkerboard,
+  `x/bench_cases_cachees.png`, local); no cost per frame. One pass per 16-bit word, its two
+  depth bytes compared at once (diagonals < 128: `t + 127 - depth` sets bit 7 when `t > depth`):
+  ~24k a ring. The cursor's line is 4 px per row (`x/bench_curseur.png`).
+- **Markers on slopes.** A flat tile gets the 24 x 12 diamond at its height; a sloped one
+  (25 of 150 at Gariland: ramps of 1 or 2 units, a corner raised) the outline of its four
+  corners at their heights, drawn by `art.py` by the distance to the quad's edges (so a tilted
+  tile's near-horizontal edge gets a line too): 13 shapes (ramps and single corners up by 1 or 2
+  units, the front corner 2 up seen edge-on left flat), ring and cursor, picked per tile and view
+  from the corners' lifts (`marker`).
 - **Every frame**: the camera's 160 x 100
-  window is copied from it at any pixel (32-bit shifted words), the units on screen are drawn
+  window is copied from it at any pixel (32-bit shifted words, ~107k; once the camera stands
+  still, that copy is kept aligned to the screen in 4 KB, `W->bg`, made half a frame at a time,
+  patched as rings come and go, and put back by plain long moves, ~25k), the units on screen are drawn
   back to front (those off it skipped) through a **cover mask**: the pixels of their 16 x 26
   box whose depth is greater than the unit's diagonal, read from the view (both layers), so a
   building hides them exactly as it is drawn, except their contour: on the covered rows the
@@ -160,9 +176,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   that inside is taken away, so the white outline and the black line inside it stay drawn over
   the building (a hidden unit shows as an outline; no projection). The mask and its covered
   rows are kept per unit and made again only when its feet, depth or the view change (15k
-  cycles each time); the rows above the covered ones are drawn straight from the archived
-  `fftu` (native big-endian rows, mirrored frames stored), only the covered rows are copied
-  and eroded. Then the blinking cursor (always on top, as in FFT) and the HUD.
+  cycles each time); the frame's inside (eroded twice) is made once by `units.py` and stored
+  in `fftu` with it, so only the rows that lose pixels to the cover are copied, the others
+  drawn straight from the archived file (native big-endian rows, mirrored frames stored). The
+  shadow is in the frames too (one sprite call fewer). Then the blinking cursor (always on top,
+  as in FFT) and the HUD.
 - **Units.** FFT's sprites (`tools/units.py`): its tile-made frames (`TYPE1.SHP`) composed,
   scaled 0.6 (each TI pixel takes the source pixels whose centre falls in it: opaque when half
   of them are, its grey their vote), the face's skin one grey lighter and each eye placed on its own (FFT's eye pixels found as 1-2
@@ -176,10 +194,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   for the other two (stored mirrored in `fftu`: drawn as they are); each unit has a world
   facing, turned into the view each frame, set by each step of a walk. The battle idle (FFT
   marches in place) and the walk are FFT's sequences (`TYPE1.SEQ`; the Chemists' `TYPE2` has
-  the same frames), then five poses each facing the camera and away (hit, the swing's wind-up
-  and blow, kneeling, lying KO: `TYPE1.SEQ`'s frames, a raised hand's top row cut, the lying
-  ones drawn 4 rows higher to fit), 20 frames per sheet and 20 mirrored, 6.2 KB per sheet; six
-  sheets (Ramza, Delita, Squire and Chemist, male and female).
+  the same frames), then six poses each facing the camera and away (hit, the swing's wind-up
+  and blow, kneeling, lying KO, the throw: `TYPE1.SEQ`'s frames, a raised hand's top row cut,
+  the lying ones drawn 4 rows higher to fit), 22 frames per sheet and 22 mirrored, each with
+  its inside plane, 9.1 KB per sheet; six sheets (Ramza, Delita, Squire and Chemist, male and
+  female).
 - **The battle's units** (`tools/battle.py` -> `battle.h`, `battle_units()`, `unit_stats()`):
   Gariland's ENTD (Delita, five enemies), the new game's Ramza and four of the Military
   Academy's recruits at the oracle's deployment tiles. At each battle every random value is
@@ -270,13 +289,20 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   first (the animation clock stops; once two frames in a row have the same checksum the frame is
   no longer drawn), then a step a frame within ~270k cycles (the setup's halves, 90 tiles of the
   spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most.
-- **Rings without stalls.** Old rings go by putting back their boxes from the view when they
-  are few (an attack's four; a Move's dozens: the whole copy, 130k), new ones are drawn two a
-  frame (`uncover` with three pointers and constant plane offsets: 18k a ring before). An
-  attack's first frame was 437k, Move a 0.74 M stall.
+- **Rings without stalls.** Old rings go by putting back the scene rows they are on from the
+  view (~0.5k a row, and into the screen's copy), as many rows a frame as the budget allows;
+  the new ones come after, as the budget allows too (the whole scene copied in one frame was
+  130k, a ring's box ~10k; an attack's first frame was 437k, Move a 0.74 M stall). Picking a
+  tile reuses the steps of the reach just shown (`make_path`: a spread less, ~90k).
+- **A frame's budget** (`FRAME_K`, thousands of cycles): before drawing, what the frame costs
+  without its optional work is reckoned (19k a unit on screen, 16k a cover mask to make, the
+  scene's copy 25k or the view 107k, the update's known heavy work: a turn's start, an aim, a
+  reach, an AI facing); the optional work (new rings, a HUD part, the screen's copy kept) waits
+  for a frame with room for it, 8 frames at most (the copy 2), then is done anyway. Things
+  appear a frame or two later; the frames keep within the budget.
 - **HUD.** Each part (the top strip, the menu or status window, the two panels) is drawn
-  into a work buffer when what it shows changes and copied each frame by words (~5k cycles
-  for all): drawn every frame with `draw_rect` and AMS text they cost ~40k and more (ExtGraph's
+  into a work buffer when what it shows changes (as the frame's budget allows) and copied each
+  frame by words (~5k cycles for all): drawn every frame with `draw_rect` and AMS text they cost ~40k and more (ExtGraph's
   fill and the ROM's `memcpy` have a high fixed cost per call, under `ti-cycles` at least). At
   most one part is rebuilt per frame, none on a turn's first frame (the camera starts its pan
   there, the heaviest frames), and a window one part a frame (its box, then each line: a
@@ -291,27 +317,23 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
-| ordinary frame (view copy 66-73k, with water glints up to 152k; the units on screen 93-185k: 6 to 10 of the 11; cursor + HUD 15-46k) | 176-345k (a 1300-frame battle, every player turn attacking through the menu: 344k at most) | 32 fps (frame-limited) |
-| a turn change (the clock, the AT list) | +10-45k, one frame | |
-| walking frame (the walker's cover mask made again each frame) | 290-350k | 32 fps |
-| an attack (Act: 4 rings, two a frame; the swing, the number; its first frame drops the rings) | 290-340k | 32 fps |
-| an ability (its list, the reach of up to 41 tiles, the preview, the name, the number) | 260-352k | 32 fps |
-| a battle won by keys (the attack, the EXP rising, the results drawn one line a frame) | 356k at most | 32 fps |
+| a player's turn (menus, the reach, a tile picked, walks, attacks, abilities, Wait, the results; every frame of the five key scripts and of 15 scenarios) | 160-250k on average a state, 329k at most | 32 fps (frame-limited) |
+| a battle the AI plays both sides of (fft(16), every one of 6,100 frames: pans, rings, walks, blows, up to 11 units on screen) | 236k on average (343k before); 8 frames at 361-383k (an AI aim or facing while the camera pans over 8-9 units) | 32 fps |
+| its parts: the view copied (the camera moving) / its screen-aligned copy put back (still) | 107k / 25k | |
+| a unit on screen (its cover mask made again: +16k) | ~19k | |
+| a reach ring drawn into the scene | ~24k flat, ~45k sloped (as the budget allows) | |
 | an AI unit thinking (the picture still: the frame not drawn; a step a frame) | 94k on average, 270k at most | 5 frames a turn (6 at most), after the camera's pan |
-| a battle the AI plays both sides of (fft(16), 6,065 frames: walks, acts, rings, 11 units on screen) | 343k on average; up to 590k when rings come or go over a crowd | the decisions alone within 270k |
-| a crowded pan (11 units on screen, 5 KO with their counters, some behind houses) | 374k (362k without the counters) | 30 fps |
-| Move (the reach, its rings drawn two a frame) | 350k, rings complete in ~0.5 s | 32 fps |
-| a tile picked (the path, the scene without rings) | 0.60 M | 0.05 s |
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 45,849 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
-TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (37.8 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
-unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 18 KB
-of work (the AI's and the moves' tables 7 KB; ~88 KB in all). Checked in TiEmu (Titanium, `ti-run`, the four views archived
+Program: `fft.89z` 53,069 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (55.4 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
+unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 22 KB
+of work (the AI's and the moves' tables 7 KB, the screen's copy of the scene 4 KB; ~92 KB in
+all). Checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a
-selection, local). The first version drew
+selection, local; milestone 21's build: a Chemist's turn with its rings, `x/emu_m21.png`). The first version drew
 its own scenery on the calculator (24 KB program, 4 x 17 KB of RAM): start 1.6 s, walking
 frame 370k, selection 3.8 M.
 
@@ -320,7 +342,7 @@ frame 370k, selection 3.8 M.
 - The rotation is 0.54 s and the selection 0.31 s, not instantaneous: drawing polygon rows in
   C costs ~550 cycles per row (both planes), and a rotation frame has ~200 polygons.
 - The TI-89 HW2 (AMS 2.09) was not run; the program is over its limit (45.8 KB: `-pack`
-  planned), the game needs ~88 KB of free RAM (else it says so).
+  planned), the game needs ~92 KB of free RAM (else it says so).
 - Smaller data was measured and not kept: tile sprites deduplicated (FFT paints each face of
   each house: 686 sprites, 616 unique, 601 with 180-degree and mirror flips, 439 at 20 % of
   pixels tolerated: 102 KB), smoothing the speckles before packing (-10 %, windows lost);
@@ -339,15 +361,16 @@ frame 370k, selection 3.8 M.
   level 1); FFT's tile priorities are never reset between turns (the unit's own tile can then
   rank first): left out, it changed none of the 136 turns checked. Of the original's 136
   turns, 7 take another action (5 of them one of our ranking that its draws on the hit chance
-  picked), 11 end on another tile and 8 face another way. The attack has no weapon sprite (FFT draws it apart); abilities use the
-  swing pose (FFT has throw and item poses); a random amount is previewed as its range (FFT
+  picked), 11 end on another tile and 8 face another way. The attack has no weapon sprite (FFT draws it apart); Dash, Heal and Wish
+  use the swing pose, Throw Stone and the items FFT's throw (FFT has an item pose too); a random amount is previewed as its range (FFT
   shows one roll); Wish shows the target's heal only (the user's cost drops in its panel).
 - A crystal only restores HP and MP (FFT also offers its abilities); a chest's item is shown,
   not kept (no inventory); JP shared to a unit of another job are not kept (FFT stores them
   in that job); the results have no war trophies (FFT's Mythril Knife, Phoenix Down, Potion);
   [ESC] does not save the battle yet (milestone 22).
-- The ordinary frame's margin is thin with ten units on screen (345k of 360k); a pan over a
-  crowd of KO units with their counters reaches 374k, a battle the AI plays averages 343k and
-  peaks at 590k when rings come or go over a crowd (milestone 21: every state under 360k). Picking a tile
-  (0.60 M: the path) is a one-frame stall; a Move's rings take ~0.5 s to appear (two a frame).
-- The cursor and the reach rings are flat diamonds on sloped tiles too (milestone 21).
+- A battle the AI plays has 8 frames of 6,100 over the budget (361-383k: an AI aim or facing
+  while the camera pans over 8-9 units; the key scripts 6 of 2,375, up to 405k); a faster view
+  copy (68000 asm) would close the gap. The budget delays optional work by a frame or two: a
+  Move's 44 rings take 13 frames (0.4 s; an AI unit's range 3 on average, 7 at most), the HUD's
+  parts follow the camera's pan.
+- The hit burst is drawn for damage only (FFT has other effects for heals and statuses).

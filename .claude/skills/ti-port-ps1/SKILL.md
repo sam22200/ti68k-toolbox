@@ -432,6 +432,14 @@ only: nothing extracted from the disc).
   animation, the frame not drawn once two frames in a row have the same checksum), a bounded
   step a frame. A struct of `u8` tables with an odd size put the next buffer at an odd address:
   an address error only the TI binary hit (`make xcheck`).
+  **The presentation read off the running game** (milestone 21): to know which pose and which
+  hit effect an action uses, play it from a state and keep a cropped picture every 2-3 frames
+  in one sheet (the camera moves: crop on the actor, then on the target); the poses' frame
+  numbers then come from the animation file (`TYPE1.SEQ`'s records), not from guessing on a
+  contact sheet of every frame. The budget work: measure every frame of a long self-playing
+  battle per state (a `BENCH_VALUE` per frame: state and cycles), not averages: the averages
+  hid 590k frames; the fixes were a screen-aligned copy of the scene kept while the camera
+  stands still and a per-frame budget delaying the optional work.
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).
