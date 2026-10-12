@@ -203,6 +203,9 @@ void ai_plan(u8 a, u8 acted);
 const AiAct *ai_ranked(u8 *n);
 u8 ai_fallback(void);
 u8 ai_frozen(void);
+#ifndef __m68k__
+extern u32 bg_used, bg_bad;            // frames drawn from the screen's copy of the scene, and
+#endif                                  // those that differ from the view's (tests)
 u8 ai_facing(u8 a);
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
