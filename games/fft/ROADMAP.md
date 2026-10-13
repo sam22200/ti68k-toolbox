@@ -277,12 +277,24 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     297-345k (defeat 371k, 6 frames over), the AI battle 359k at most in its first 14,000
     frames (6 over 360k before), 114 reach stalls. Program 56,226 bytes. Not done: pre-shifted
     flat tiles (~5k a tile without the depth, ~12k with it), left for later.
-25. **Blows.** The hit flash on the target's inside (the 4th plane): its greys up to light
+25. **Blows** (done). The hit flash on the target's inside (the 4th plane): its greys up to light
     grey then white held ~8 frames, then back, the black outline kept; the target knocked back
     a pixel or two; the sparkles of milestone 21 dropped. The sword and the dagger from
     `BATTLE/WEP.SPR` (placed by `WEP1/WEP2.SHP` and `.SEQ`), outlined white, a blade at least
     2 pixels wide, shown during the blow only as in FFT (Gariland: Broad Sword and Dagger; the
     enemy Chemist unarmed). A frame-by-frame sheet of a blow.
+    Done: original armed hands/body plus WEP1/2 level-strike blades, all four facings,
+    sampled/rotated offline into archived `fftw` (40,704 bytes); weapon script, body frame,
+    rotation and UV records checked on the original for both weapons. Two-pixel blades with
+    a white outline, their own cached cover, drawn behind the body at its depth. Visible at
+    frames 13-18, then put away; unarmed/skills show no blade. Successful damage flashes
+    the fourth-plane interior: light 2, white 8, light 2; black contour/shadow stay. Visual
+    recoil 2/1 pixels, then 1/1, then zero; no gameplay changes. Burst/sparkles removed.
+    `make test`, 25 xcheck scenarios, 87 phase/replay PC/TI screens (`make check-blows`) pass.
+    Every ordinary measured frame <= 360k: blow doors 307,218, AI battle 356,180, defeat
+    replay 359,070 (its six old overruns removed by deferring optional work through crowded
+    pans). Review: `make review-blows`, `x/m25_blows.png`, nine blows in eleven frames.
+    Program 56,297 bytes. No new hardware path; TiEmu left for milestone 29.
 26. **FFTA-style interface** (captured on the original, `x/ffta_*.png`). Bottom left a light
     grey band with a dark rule: the unit's portrait from its `.SPR` (19x29, rising above the
     band), its name, HP above MP, a line with Lv and CT. The action menu bottom right with a

@@ -715,6 +715,38 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   map's corner heights (the top faces' upper edges at four columns of the sprite): as the
   view's depth says half hidden or not on 558 of 560 tiles and views (`make test`).
 
+## Blows (milestone 25)
+
+- OBSERVED IN FFT (disc plus `tools/weapons.py --check DISC STATE`): the level strike uses
+  unit SEQ 130/131, body wind-up 86/135, blades with body 87/136, 89/138, 90/139. Weapon
+  scripts 2/3 in WEP1 (TYPE1 units) and WEP2 (Chemists) select their own shapes. WEP SHP
+  has 32 weapon-type offsets at +4, 512 frame offsets at +0x44, data at +0x846; its header
+  rotation indexes `BATTLE.BIN`'s table at 0x80094508. This is a screen rotation, applied by
+  `battle_gfx_construct_polygon_data_for_units`. WEP.SPR's first palette block and sheet at
+  +0x200 supply the blade; `g_battle_gfx_item_graphic_data` at 0x800943e4 supplies its palette
+  and row. Dagger type 1, Broad Sword type 3. On the original's back-facing level swings,
+  frames 34/35/36 and 74/75/76 match our body frames, weapon animation, rotation and part
+  position/size/UV exactly. The fixture updates the initialized display weapon as well as
+  battle stats; a stats-only poke leaves the original's graphics stale.
+- TARGET: existing 0.6 scale and original palettes, a blade thickened horizontally and
+  vertically to at least two pixels, white outline. Rotation and sampling are offline;
+  separate archived `fftw` (40,704 bytes), no RAM sprite copies except the covered blade.
+  Armed hands/body use the original level-strike frames; low/high swings remain adapted to
+  the level swing. Blade drawn behind the body (the ordering table prepends the original's
+  weapon layer), hidden during wind-up, visible at 13-18, put away at 19.
+- TARGET (user's explicit choice): the earlier burst/sparkles removed. Successful damage
+  flashes only the sprite's fourth-plane interior: light grey 2 frames, white 8, light 2,
+  then normal; black contour and dark shadow stay. Rendered recoil away from the attacker:
+  horizontal 2 px/vertical 1 for 6 frames, then 1/1 for 4, then 0. The logical tile, HP,
+  hit/miss, abilities and critical gameplay knockback are unchanged.
+- CHECKED: 91 interior pixels light/white, 32 black contour pixels unchanged, misses/heals/
+  Defend unflashed; `make test`; 25 default xcheck scenarios, 87 additional PC/TI screens at
+  blow phases and replay ends (`make check-blows`). Every measured ordinary frame <= 360k:
+  blow doors 307,218 max, 14,000-frame AI run 356,180, defeat replay 359,070. Initial/view
+  loads, rotations and all-at-once reach creation are the allowed stalls. Optional HUD,
+  cursor mask and ring removal no longer force themselves into a crowded camera pan.
+  Review sheet: `make review-blows` -> `x/m25_blows.png` (local).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -731,5 +763,5 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
 | rewards | 10 EXP (kill 20 / KOs) + level difference, 100 a level; JP 8 + 2 x job level + level / 4, a quarter shared; death counter 3, then crystal (enemy 1/2, player 3/4) or chest | same (the share to the same job only) | decomp, six actions of `oracle.py --rewards` |
 | moving | canals waded (water to water 2), jumps over one tile, trees crossed | same, the two measured ranges exact | 2 ranges of `oracle.py --ai`, decomp |
 | AI | scores the field (HP x 128 / max, KO -192, Critical -32), ranks 8, draws on hit chance; danger 10 - steps; hit and back off | same, 129 of 136 turns the same action, 125 the same tile | decomp, 136 turns of `oracle.py --ai` |
-| a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | an outlined blob 2 frames, sparkles 6 (30 Hz) | a picture every 2 frames of a Throw Stone |
+| a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | interior flash 2 light / 8 white / 2 light, small visual recoil, no sparkles | user choice, milestone 25 pixel checks |
 | pace (60 Hz / ours 30) | a tile 14, a jump ~21; Execute to hit 31, menu +188; AI glide ~12, preview ~30 | 7, 10; 16, +78 after the hit; 2 a tile, 15 | movement records and pictures, § Pace |
