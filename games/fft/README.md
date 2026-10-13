@@ -17,7 +17,7 @@ as are its move ranges). Not a port: our own engine on the Portable Game Runtime
 the heights and the scenery (the map's own textured mesh, drawn in four greys on the PC), the
 units (FFT's own battle sprites of Ramza, Delita, the Squires and the Chemists, scaled 0.6) and
 the battle's numbers come from the local disc (`tools/extract.py`, `tools/units.py`,
-`tools/battle.py`, `tools/weapons.py`); the cursor, shadow, markers and rotation greys are ours
+`tools/battle.py`, `tools/weapons.py`, `tools/interface.py`); the cursor, shadow, markers and rotation greys are ours
 (`tools/art.py`). Its presentation: FFT's throw pose, the target's interior flashing on damage, the
 cursor and reach rings drawn on each tile's real slope, a camera that frames the action, and
 every frame of the player's turns within the 360k budget (`ROADMAP.md` milestone 21). From
@@ -29,8 +29,10 @@ hidden (milestone 23). The reach as FFT's tiles (white, a dark edge drawing the 
 shown at once, [MODE] drawing them over the scenery in front (milestone 24).
 The original sword and dagger, outlined and at least two pixels thick, appear through the
 impact; the target recoils two pixels and flashes light/white inside its black contour
-(milestone 25, `x/m25_blows.png`). Next (`ROADMAP.md` milestones 26-28): an
-FFTA-style interface, the water, eight orientations; then the whole battle on the calculator
+(milestone 25, `x/m25_blows.png`). FFTA-style horizontal portrait bands, bottom-right
+menus, two full-screen Status pages, original generic names and active-unit marker
+(milestone 26, `x/m26_interface.png`). Next (`ROADMAP.md` milestones 27-28):
+the water, eight orientations; then the whole battle on the calculator
 (milestone 29). Study notes: `RE_NOTES.md`.
 
 ## Controls
@@ -38,6 +40,7 @@ FFTA-style interface, the water, eight orientations; then the whole battle on th
 | Key | Action |
 |---|---|
 | arrows | the menu's entry; the cursor (relative to the view: UP = up-right, RIGHT = down-right); at Wait, the facing |
+| Status: LEFT / RIGHT | switch stats and equipment / abilities pages |
 | [F5] / [F1] | rotate the camera 90 degrees clockwise / counter-clockwise |
 | [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can); at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
 | [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
@@ -53,38 +56,41 @@ Enemies and Delita (a guest) play as FFT's AI does: once the camera is on the un
 stands still for ~0.2 s while it thinks, then the cursor glides to the tile it goes to, its move
 range is shown, it walks; when it or its target is more than half hidden the view turns (back to
 the player's on the player's turn); the cursor glides to its target, the preview shows at the
-top right (0.5 s), an ability's name 1 s more, it acts and turns to face the nearest enemy; a
+right above the target band (0.5 s), an ability's name 1 s more, it acts and turns to face the nearest enemy; a
 unit hitting from its own tile backs off after. The pace is FFT's at 30 fps: a step 0.23 s (a
 climb, a drop or a jump 0.33 s), an attack's blow 0.5 s after the order, the target hit 0.8 s,
 the user's EXP then its JP, the menu back 3.1 s after the order. A player's unit opens its
-menu at the top right: **Move** (once; the move can be undone with [shift] until it acts, which
+menu at the bottom right: **Move** (once; the move can be undone with [shift] until it acts, which
 FFT does not allow; canals can be waded, a step from water to water costs 2), **Act** (once: a
 list as FFT's, **Attack**, the unit's skill set, Basic Skill, Item or Guts, and **Defend** for a
 unit whose support ability it is (drawn as FFT draws one: ~8 %; Defending until its next turn),
 then the abilities it knows, an item with how many are left and
-greyed at 0; the reach shown, the cursor on a unit shows FFT's preview at the top right, `Hit
+greyed at 0; the reach shown, the cursor on a unit shows FFT's preview above its bottom-right band, `Hit
 95%` and `Dmg 12` (`Dmg 3-12` for a random amount, `HP +30` for a heal, `- Poison` for a
 cure), [2nd] uses it: the swing (FFT's throw for Throw Stone and the items), the ability's name
-at the top right, the target's interior flashing white with a small recoil, the
+before the AI blow, the target's interior flashing white with a small recoil, the
 damage, `+20` or the status removed, or `Miss`, rising above it, a critical hit or a Dash
 pushing it a tile, KO at 0 HP lying down, Phoenix Down raising a KO unit; a unit with a fifth
 of its HP or less kneels; then `EXP+12` rising above the user, `LvUp` for a level up, then
 `JP+10`), **Wait** (four arrows around the
 unit, the one it faces black: the arrows turn it, [2nd] ends the turn) and **Status** (its
-level, HP, MP, Move, Jump, Speed, PA, MA, EXP, JP and job level; Brave, Faith and the zodiac
-stay hidden, as decided at milestone 13). A KO unit shows its death counter (3 to 0) above it;
+portrait, name, job, HP/MP with gauges, Lv/Exp, Brave/Faith, zodiac, Move/Jump/Speed,
+PA/MA, CT, JP and job level; LEFT / RIGHT switches to equipment and known abilities). A KO unit shows its death counter (3 to 0) above it;
 at its next turn after 0 it becomes a crystal or a chest, which a unit walking onto it picks
 up (a crystal: HP and MP full; a chest: `Got Clothes`, one of the dead unit's items, shown
 only). The battle ends when every enemy is KO (`Victory!`) or when Ramza becomes a crystal or
 a chest or the whole party, Delita included, is KO (`Game Over`): the results list each of
 the player's units with its level, the EXP and JP it earned. The HUD shows the height under
-the cursor at the top left in FFT units (`h2`, `h7.5` on a slope); [APPS] shows the turn order
-in a window (FFT's AT list: the active unit, then the next five turns; enemies in dark grey).
-The cursor is dashed where the scenery is in front of it, as the hidden reach tiles. At the
-bottom corners, as in Metal Gear Solid: Portable Ops, two thin panels read sideways: the
-active unit at the left, the unit under the cursor at the right (light grey: an enemy), each
-with its name, its HP above its MP as `52/52` and `16/16` and a gauge beside each number (HP
-black, MP dark grey). Scenarios (`fft(n)`, `--scenario n`):
+its cursor at the top right (`2h`, `7.5h` on a slope; `depth 1` on canal water); [APPS] shows
+FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
+The cursor is dashed behind the scenery. FFTA-style light grey bands sit at the bottom:
+active unit left, hovered or aimed-at unit mirrored right, each with a 19x29 original
+portrait, name, HP above MP with numbers and gauges, Lv and CT. The MENU tab and ball cursor
+sit bottom right; Act and skill lists replace the menu in place. Bands and menus disappear
+during walking and action animations. An original FFT pointer marks the active unit above its
+head; enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
+without duplicates at each battle with a separate deterministic generator; Ramza and Delita
+keep their names. Scenarios (`fft(n)`, `--scenario n`):
 0 the battle's start (a new draw each run: seeded from the clock; Delita's turn), and from Ramza's
 first turn (the six units before him waited): 1-4 an enemy moved behind a house seen from each
 view, 5 Ramza's reach, 6 mid-rotation, 7 Ramza walking, 8 an enemy in front of him aimed
@@ -93,12 +99,16 @@ female Chemist's items, 12 her Potion aimed at Ramza, 13 Ramza's Wish landing on
 south of him, 14 four enemies KO and the last at 1 HP in front of Ramza, 15 the recruits KO,
 Delita in front of Ramza at 5 HP, 16 the AI on both sides from the start (a whole battle plays
 itself: won in ~10,000 frames); 17-20 Ramza's sword strike in the four views, 21-24 his
-dagger strike, 25 the enemy Chemist's unarmed strike; above 25 Ramza's turn drawn with seed n.
+dagger strike, 25 the enemy Chemist's unarmed strike; 26 menu, 27 Act, 28 Chemist's items,
+29 attack preview, 30 Potion preview, 31 Status stats, 32 equipment, 33 enemy Status,
+34 water height, 35 hovered recruit, 36 walk, 37 blow, 38 turn order, 39 Quit, 40 Chemist's
+Status equipment/abilities; above 40 Ramza's turn drawn with seed n.
 Key scripts: `keys/turn.txt` (a whole turn through the menu), `keys/attack.txt` (Ramza
 attacks, moves and waits) and `keys/skills.txt` (Ramza's Wish, then Wait), all from `fft(10)`;
 `keys/victory.txt` (from `fft(14)`: the last enemy knocked out, the results) and
 `keys/defeat.txt` (from `fft(15)`: Ramza's Wish knocks him out, the enemies knock Delita out:
-Game Over).
+Game Over); `keys/interface.txt` starts at `fft(31)` and pages Status, returns to Act,
+then browse and the turn order.
 
 ## Build
 
@@ -108,6 +118,7 @@ make map.h        # once: reads MAP/MAP022 from roms/ps1/Final Fantasy Tactics (
 make units.h      # once: the units' sprites from BATTLE/*.SPR, TYPE1.SHP and TYPE2.SHP (a second):
                   # units.h and the data file fftu.bin (37.8 KB, big-endian rows, mirrored too;
                   # the crystal and the chest from BATTLE/OTHER.SPR)
+make interface.h  # portraits, names, marker and preshifted small text: ffti.bin (40.9 KB)
 make weapons.h    # armed body poses and blades from WEP.SPR, WEP1/2.SHP/.SEQ: fftw.bin
 make battle.h     # once: the battle's units, jobs, items and weapons, generation tables, the
                   # zodiac table, the skill sets, abilities and the bag (SCUS_942.21, ENTD,
@@ -123,10 +134,12 @@ make test         # headless tests (rotations, heights, the units' stats against
                   # turns, 2 min, then tools/battle.py --check); ./fft_test --ai lists each
                   # turn of the original's AI that ours plays otherwise
 make pc           # SDL window: ./fft_pc   (F1 / F5 on the PC keyboard too)
-make ti           # fft.89z, fftu.89y, fftw.89y and fftv0.89y .. fftv3.89y: send all seven, archive the six
+make ti           # fft.89z, fftu.89y, fftw.89y, ffti.89y, fftv0.89y .. fftv3.89y: send all eight, archive the seven
                   # data files (read in place), run fft()
-make xcheck       # the TI binary under ti-cycles = the PC, 25 scenarios
+make xcheck       # the TI binary under ti-cycles = the PC, 40 scenarios
 make check-blows  # 87 PC/TI screens, frame costs for every blow phase and six complete replays
+make check-interface # 116 partial-build / page / input PC/TI screens; every UI frame <= 360k
+make review-interface # x/m26_interface.png: menus, targeting, both Status pages, motion
 make review-blows # x/m25_blows.png: nine blows in eleven frames (original sword/dagger, bare hands)
 ../../tools/pyenv/bin/python tools/oracle.py DISC.cue ../../sources/fft_ps1/gariland_t1.state trace.txt
                   # the original at Ramza's first Gariland turn (30 s, RE_NOTES.md)
@@ -147,9 +160,10 @@ make review-blows # x/m25_blows.png: nine blows in eleven frames (original sword
                   # their CT bonuses, attacks, abilities, rewards, the AI's turns, move ranges)
 ```
 
-`map.h`, `units.h`, `battle.h`, `oracle.h`, `fftu.bin` and the views are generated from the disc
+`map.h`, `units.h`, `weapons.h`, `interface.h`, `battle.h`, `oracle.h`,
+`fftu.bin`, `fftw.bin`, `ffti.bin` and the views are generated from the disc
 and never committed: without the disc the game does not build. `art.h` is ours and committed (`make art.h` regenerates it from
-`tools/art.py`). Without its data files the game says `missing fftu, fftv0-fftv3`.
+`tools/art.py`). Without its data files the game says `missing fftu/w/i/fftv0-3`.
 
 ## Architecture
 
@@ -291,7 +305,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   the target evades with its class evade (5, Ramza 10), from a side or the back it is hit;
   damage XA x WP with the signs' compatibility (a 16-bit step each), critical hits 4 % (XA +
   0..XA - 1, the target pushed a tile if it lands free and no higher), at most 999; KO at 0
-  HP (the turn order made again). The number is AMS text written once into the HUD's spare
+  HP (the turn order made again). The number uses AMS small glyphs written once into the HUD's spare
   rows and drawn as a 32-pixel outlined sprite. The timeline is the original's at 30 fps
   (`ACT_*`, `RE_NOTES.md` § Pace): standing 5 frames, the wind-up, the blow at 13, the hit at
   16 (hit pose 24 frames, the number 24), the EXP at +29, the JP at +51, the menu at +78 after
@@ -350,18 +364,24 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   for a frame with room for it, 8 frames at most (the copy 2); mandatory completion of HUD,
   cursor masks and ring removal waits through a crowded camera pan. Things
   appear a frame or two later; the frames keep within the budget.
-- **HUD.** Each part (the height, the menu, status, turn order or "Quit?" window, the two panels) is drawn
-  into a work buffer when what it shows changes (as the frame's budget allows) and copied each
-  frame by words (~5k cycles for all): drawn every frame with `draw_rect` and AMS text they cost ~40k and more (ExtGraph's
-  fill and the ROM's `memcpy` have a high fixed cost per call, under `ti-cycles` at least). At
-  most one part is rebuilt per frame, none on a turn's first frame (the camera starts its pan
-  there, the heaviest frames), and a window one part a frame (its box, then each line: a
-  status line of AMS text costs up to ~38k, the box ~30k); the menu's pointer is added at the copy, so the arrows
-  redraw nothing. What does not change is made once at the start: the names turned a quarter
-  for the panels, the facing arrows;
-  the panels' numbers come from a 3 x 5 digit table already turned. A panel costs ~21k to make
-  (78k when its text was turned pixel by pixel). The scene is made again only when the reach
-  rings appear or go, not at every change of mode.
+- **Interface** (milestone 26, `tools/interface.py`). `ffti` (40,876 bytes, archived, read in
+  place) holds six 19x29 portraits with their mirrors (32-wide padded planes), the original
+  selection pointer (16x14), 255 names per gender (12 bytes each), and 95 AMS small glyphs
+  pre-shifted to every word alignment. Portrait UVs and palette 8 are from the `.SPR` raw
+  rows at `0x8200`; marker UV `(64,128)..(80,152)` from `EVENT/FRAME.BIN`, palette from
+  `BATTLE.BIN`. `interface.py --check DISC STATE` compares all six portrait sheets and the
+  pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
+  Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
+  an independent 16-bit generator avoids changing combat/stat RNG draws.
+- **HUD caches.** Each horizontal band is built in five parts (background/portrait, name,
+  HP, MP, Lv/CT), the menu in a tab then a line per frame, and Status in nine parts while
+  simulation pauses. The screen receives aligned long copies. Small text uses pre-shifted
+  glyph words; no text rotation or run-time shifting per glyph row. Only changed HP/MP,
+  maxima, level, CT or unit rebuild a band; cached fields are reset at a new battle or on
+  entering Status. Marker and ball cursor use ExtGraph sprites. The frame budget reserves
+  65k for base work and 60k for one optional UI part. A newly completed background cache
+  cannot force HUD/cursor work in the expensive frame that created it; it saves work from
+  the next frame. The scene is rebuilt only when reach tiles come or go.
 - **Stacked tiles** (milestone 22). In every view 21-27 screen spots are shared by two tiles: a
   canal tile at height 0 and the street tile 2 units higher one tile diagonally in front draw
   their markers on the same pixels (the user's "can't attack" and "teleport" reports: Ramza in
@@ -376,8 +396,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| milestone 26: menus / Status doors, AI battle and defeat replay | 313,278 / 357,270 / 359,840 at most | 32 fps (frame-limited) |
 | milestone 25: five key replays (including the defeat) and nine armed/unarmed blow doors | 359,070 at most; blow doors at most 307,218 | 32 fps (frame-limited) |
-| a battle the AI plays both sides of (fft(16), its first 14,000 frames: pans, reach tiles, walks, blows, up to 11 units on screen) | 356,180 at most, 166 allowed stalls for its reach tiles and its camera turns (allowed stalls, as F1 / F5) | 32 fps |
+| milestone 25: a battle the AI plays both sides of (fft(16), its first 14,000 frames: pans, reach tiles, walks, blows, up to 11 units on screen) | 356,180 at most, 166 allowed stalls for its reach tiles and its camera turns (allowed stalls, as F1 / F5) | 32 fps |
 | an AI unit's view picked (its plan's frame, not drawn) | 6k, 93k when the other views are tried | |
 | its parts: the view copied (the camera moving) / its screen-aligned copy put back (still) | 107k / 25k | |
 | a unit on screen (its cover mask made again: +16k) | ~19k | |
@@ -386,11 +407,12 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 56,297 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
-TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (55.4 KB) and weapons `fftw` (40.7 KB), both read in place, and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
-unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 22 KB
-of work (the AI's and the moves' tables 7 KB, the screen's copy of the scene 4 KB; ~92 KB in
-all). Checked in TiEmu (Titanium, `ti-run`, the four views archived
+Program: `fft.89z` 58,749 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
+`ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
+unpacked view 52,320 bytes plus scene/work allocation 52,538 bytes (~105 KB of game buffers;
+full-screen Status and horizontal bands add ~13 KB to milestone 25). Both blocks remain
+below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a
 selection, local; milestone 21's build: a Chemist's turn with its rings, `x/emu_m21.png`). The first version drew
@@ -431,5 +453,5 @@ frame 370k, selection 3.8 M.
 - The reach tiles appear in one stall (Ramza's Move ~0.1 s; a view change with them up to
   0.2 s); pre-shifted flat tiles (the x of a tile is a multiple of 12) would roughly halve it.
   The frame budget delays optional work while the camera pans over a crowd; the defeat
-  replay now stays within 359,070 cycles (the six earlier overruns removed).
+  replay now stays within 359,840 cycles (the six earlier overruns removed).
 - The interior flash is drawn for damage only (FFT has other effects for heals and statuses).

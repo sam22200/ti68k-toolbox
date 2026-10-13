@@ -295,7 +295,7 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     replay 359,070 (its six old overruns removed by deferring optional work through crowded
     pans). Review: `make review-blows`, `x/m25_blows.png`, nine blows in eleven frames.
     Program 56,297 bytes. No new hardware path; TiEmu left for milestone 29.
-26. **FFTA-style interface** (captured on the original, `x/ffta_*.png`). Bottom left a light
+26. **FFTA-style interface** (done; captured on the original, `x/ffta_*.png`). Bottom left a light
     grey band with a dark rule: the unit's portrait from its `.SPR` (19x29, rising above the
     band), its name, HP above MP, a line with Lv and CT. The action menu bottom right with a
     "MENU" tab and a ball cursor, sub-menus replacing it in place; while aiming, the target's
@@ -307,6 +307,19 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     theirs. Status full screen in FFTA's layout with FFT's fields (portrait, name, job, HP and
     MP with bars, Lv/Exp, Brave, Faith, zodiac, Move/Jump/Speed, PA/MA; a second page for the
     equipment and abilities). A review sheet before applying the layout everywhere.
+    Done: six original 19x29 mirrored portraits, 510 generic names and the FRAME pointer in
+    archived `ffti` (40,876 bytes), with pre-shifted AMS text. FFTA-style bands / MENU tab /
+    ball cursor, target preview above the mirrored target band, height and canal depth top
+    right; bands and menus hidden through movement / blows. Status fills the screen, LEFT /
+    RIGHT switches stats and equipment / learned abilities. Names use separate seeded draws,
+    unique by gender, heroes fixed. Original check: six VRAM portrait sheets (9,216 source
+    pixels), pointer texture / palette and nine names match. Review before completion:
+    `make review-interface`, `x/m26_interface.png` (15 states). Tests, 40 xcheck scenarios,
+    116 UI phase / key screens and 87 blow / replay screens pass. Ordinary frame peaks:
+    UI doors 313,278; full AI battle 357,270; defeat replay 359,840. The expensive frame
+    creating the screen cache no longer forces optional HUD / cursor work as though it had
+    already used it. Program 58,749 bytes; game buffers ~105 KB. No new hardware path;
+    TiEmu remains milestone 29.
 27. **Water.** Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

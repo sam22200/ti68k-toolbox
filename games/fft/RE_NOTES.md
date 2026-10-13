@@ -765,3 +765,50 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
 | AI | scores the field (HP x 128 / max, KO -192, Critical -32), ranks 8, draws on hit chance; danger 10 - steps; hit and back off | same, 129 of 136 turns the same action, 125 the same tile | decomp, 136 turns of `oracle.py --ai` |
 | a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | interior flash 2 light / 8 white / 2 light, small visual recoil, no sparkles | user choice, milestone 25 pixel checks |
 | pace (60 Hz / ours 30) | a tile 14, a jump ~21; Execute to hit 31, menu +188; AI glide ~12, preview ~30 | 7, 10; 16, +78 after the hit; 2 a tile, 15 | movement records and pictures, § Pace |
+
+## FFTA-style interface (milestone 26, 2026-10-13)
+
+- OBSERVED IN FFTA: the local original captures `x/ffta_*.png` show bottom portrait bands,
+  bottom-right MENU and ball cursor, target band mirrored, full-screen Status with a second
+  equipment page. These are layout references; the numbers and rules remain FFT's.
+- OBSERVED IN FFT: portrait raw pixels are `.SPR +0x8200..0x9200`, a 256x32 texture.
+  The original quad maps UV `(128,0),(128,31),(80,0),(80,31)` to the portrait's four corners:
+  the 48x32 patch is rotated into a 32x48 bust. Portrait palette 8 matches player CLUTs in
+  the oracle's VRAM; enemy recolour palette 11 is adapted to the same four-greys portrait.
+  `battle_gfx_load_spritesheet_into_vram_slot` and
+  `battle_menu_build_unit_portrait_poly` establish the texture and UVs.
+- OBSERVED IN FFT: the floating selection pointer uses FRAME.BIN UV `(64,128)..(80,152)`,
+  CLUT `(64,0x1E2)`. Its palette is `BATTLE.BIN` at loaded address `0x80094B64`. Texture
+  pixels start at FRAME.BIN `0x1000`. The original points at its cursor; the target uses
+  this shape over the active unit, as requested, keeping native tile targeting rings.
+- OBSERVED IN FFT: `EVENT/SMALL.OUT` loaded at `0x801D7000` binds name sections through
+  offsets at `+0x70` and string base `+0xEC`; the names start at `+0xED`. Entries
+  `0x100..0x1FE` are 255 male names; `0x200..0x2FE` are 255 female names. Name records use
+  digits `0..9`, capitals `0x0A..0x23`, lowercase `0x24..0x3D`; `FA` is a space,
+  `D9 C1` an apostrophe, `D9 B6` a period, `FE/FF` terminate a record. Names are at most
+  11 characters. `main_unit_store_character_names` excludes used names of the same gender.
+- TARGET IMPLEMENTATION: `tools/interface.py` creates archived `ffti` (40,876 bytes),
+  generated `interface.h`, six mirrored 19x29 busts with white outlines, a 16x14 pointer,
+  two fixed-width name tables and AMS small glyphs pre-shifted offline. Portraits use
+  nearest-neighbour scaling, four greys by the existing palette-luminance thresholds.
+  Generic names are unique by gender, drawn once per battle by an independent 16-bit
+  generator seeded from that battle; existing combat/stat RNG streams stay unchanged.
+- TARGET IMPLEMENTATION: 80-pixel horizontal bands, light grey with a dark rule, portrait
+  rising above the band, name / HP / MP / Lv-CT. Menus replace one another bottom right
+  under a tab, ball cursor; a valid target gets its mirrored band and the hit/amount
+  preview above it. Motion and action animations hide bands and menu. Height `2h` / `0h`
+  and canal `depth 1` appear top right. Status pauses simulation: stats on page 1, equipment
+  and learned skills on page 2; LEFT / RIGHT pages, ESC / shift returns.
+- CHECKED: `interface.py --check DISC gariland_t1.state` matches all six portrait sheets
+  against the original's VRAM (9,216 source portrait pixels), pointer texture/palette and
+  all nine generic oracle names. Native tests cover seeded name stability/uniqueness,
+  HP/CT updates, page reversal with unchanged units, depth label and hidden motion bands.
+  40 xcheck scenarios, 116 additional UI partial-build/page/input screens and 87 existing
+  blow/replay screens agree between PC and TI. Fifteen review states are in local
+  `x/m26_interface.png`. No new hardware path; no emulator run for this milestone.
+- CHECKED: all ordinary measured frames <=360,000 cycles: UI doors 313,278, the 14,000-frame
+  AI replay 357,270, defeat replay 359,840. Profiling found a just-completed background cache
+  was permitting forced HUD work in the expensive frame that built it: `bg_drawn` records
+  whether the frame actually used the cheap cache. Budget also adjusts when scene edits
+  invalidate a previously usable copy. Aligned long copies and cached preshifted text keep
+  the native UI small; Status builds a part per frame, peaking at 173,440 cycles.
