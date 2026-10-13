@@ -107,8 +107,8 @@ static u8 *vbuf, vbuf_rot;
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
 #define HUD_ROWS 14                     // the top strip (rows 0-7), text to be turned (8-13)
-#define WIN_ROWS 33                     // the menu, a list or a unit's numbers, at the top right:
-                                        // five lines at most
+#define WIN_ROWS 39                     // the menu, a list or a unit's numbers, at the top right:
+                                        // six lines at most (the turn order)
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
     u8 depth, rot, r0, r1;
@@ -127,10 +127,10 @@ typedef struct {
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
-    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // the top strip (the turns, the view and height)
+    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // the top strip (the height under the cursor)
     char hud_s[8];                      // what it shows
-    u8 hud_t[ORDER_N], hud_late;
-    u16 label[UNIT_GFX_N][5];           // the turns' labels (Ra, De, Sq, Ch), drawn once
+    u8 hud_t[ORDER_N], hud_late;        // the turns the HUD was last drawn for (a turn's start),
+                                        // frames since they changed
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // the menu or a status window, and what it shows:
     u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_AIM: the attacker;
                                         // M_ACTS: no ability known; M_ACT: the ability), unit;
@@ -145,6 +145,8 @@ typedef struct {
     u8 from_who;                        // whose reach W->from holds the steps of (+ 1; 0: none)
     u8 ring_i;                          // the next tile whose reach ring to draw (MAP_W * MAP_H:
                                         // all drawn)
+    u32 cur_m[24];                      // the cursor's mask, dashed where the view is in front
+    u16 cur_k;                          // of it, for this tile | rot << 8 | 0x8000 (0: none)
     u32 num[2][2][7];                   // an attack's number (or Miss), the EXP its user earned:
     u8 num_w[2], num_ok;                // black, its white outline; their widths; drawn (bits)
     u8 end_n;                           // M_END: the results' next line to draw
@@ -181,7 +183,8 @@ typedef struct {
     s16 bg_x, bg_y;                     // this camera and scene version (bg_ok): copied to the
     u16 bg_ver;                         // screen without shifts while the camera stands still;
     u8 bg_ok, bg_part;                  // patched as rings come and go; its top half kept
-    u8 ring_wait, hud_wait, bg_wait;    // frames the rings, a HUD part, the copy waited for room
+    u8 ring_wait, hud_wait, bg_wait;    // frames the rings, a HUD part, the copy, the cursor's
+    u8 cur_wait;                        // dashes waited for room
     s16 left, upd_k;                    // the frame's budget left for optional work, the update's
                                         // heavy work this frame (k cycles)
                                         // the last one's checksum
@@ -205,6 +208,7 @@ static Work *W;
 #define SAVE_WAIT 2                     // frames the copy waits at most once the camera stops,
 #define WAIT_MAX 8                      // the rings or a HUD part (then done anyway)
 #define SUM_K 25                        // an AI unit's picture checked (planes_sum)
+#define CUR_K 15                        // the cursor's dashes made again (8-19k)
 #define TURN_K 45                       // the update's own heavy work: a turn's start (the clock,
 #define AIM_K 35                        // the AT list), an aim (the reach, the preview), a Move's
 #define REACH_K 90                      // reach, an AI unit's facing (W->upd_k)
@@ -600,7 +604,8 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
     fill_spans(ymin, rows, pl, pd);
 }
 
-#define RINGS(m) ((m) == M_TARGET || (m) == M_AIM)   // the modes that show st.reach
+#define RINGS(m) ((m) == M_TARGET || (m) == M_AIM || ((m) == M_ORDER && (st.back == M_TARGET || st.back == M_AIM)))
+                                                 // the modes that show st.reach
 
 // A tile's marker (a reach ring, or the cursor: cur) in view rot: the flat diamond (hi_*,
 // cur_*, 24 x 12) at its standing height, or on a sloped tile the outline of its four corners
@@ -687,6 +692,41 @@ static u8 seen(s16 x, s16 y, u8 depth)
     u16 o = (u16)(y * SC_BYTES + (x >> 3));
     u8 b = (u8)(0x80 >> (x & 7));
     return !((t1[o] > depth && m1[o] & b) || (t2[o] > depth && m2[o] & b));
+}
+
+// The cursor's mask (marker mk of tile c) dashed as the hidden rings where the view has something
+// in front of it (a canal tile behind a higher street tile): the view's depth bytes compared a
+// byte (8 pixels) at a time, made again only when the cursor or the view changes (optional work:
+// without room in the frame's budget the cursor is drawn whole a frame or two); the player's
+// cursor only: the AI's frames are the fullest
+static const u32 *cursor_mask(const Marker *mk, u8 c)
+{
+    u16 k = (u16)(c | st.rot << 8 | 0x8000), o;
+    s16 r, b0 = mk->x >> 3, sh = mk->x & 7, yy = mk->y, j;
+    const u8 *t1 = vbuf + 2 * SC_PLANE;
+    u8 dp = mk->depth;
+    if (vbuf_rot != st.rot || st.ai) return mk->m;  // (an AI turn: whole, its frames are full)
+    if (W->cur_k == k) return W->cur_m;
+    if (W->left < CUR_K && W->cur_wait++ < WAIT_MAX) return mk->m;
+    W->cur_wait = 0; W->left -= CUR_K;
+    W->cur_k = k;
+    o = (u16)(yy * SC_BYTES + b0);
+    for (r = 0; r < mk->rows; r++, yy++, o += SC_BYTES) {
+        u32 cv = 0;
+        if ((u16)yy < SC_H)
+            for (j = 0; j < 4; j++) {
+                const u8 *t = t1 + o + j;
+                u8 h = 0;
+                if ((u16)(b0 + j) < SC_BYTES) {
+                    if (t[0] > dp) h = t[SC_PLANE];
+                    if (t[2 * SC_PLANE] > dp) h |= t[3 * SC_PLANE];
+                }
+                cv = cv << 8 | h;
+            }
+        cv &= yy & 1 ? 0xCCCCCCCCUL : 0x33333333UL;  // hidden but for the dashes (hide_pat)
+        W->cur_m[r] = mk->m[r] & ~(cv << sh);
+    }
+    return W->cur_m;
 }
 
 // The water's glints of orientation rot: 2-pixel dashes on a lattice of the scene's pixels
@@ -2515,6 +2555,33 @@ static void ai_step(void)
     }
 }
 
+// can tile c be picked: a reachable tile to walk to, or (aim) a unit in reach to act on?
+static u8 pickable(u8 c, u8 aim)
+{
+    u8 o;
+    if (!aim) return st.reach[c] != 0xFF && st.reach[c] > 0;
+    o = unit_at(c % MAP_W, c / MAP_W);
+    return st.reach[c] == 1 && o && aim_ok(o - 1);
+}
+
+// [2nd] on a tile that cannot be picked: the tile drawn on the same pixels (in every view a
+// canal tile at height 0 and the street tile 2 units higher one tile diagonally in front of
+// it share 21-27 spots) when that one can be (+ 1; 0: none)
+static u8 twin(u8 c, u8 aim)
+{
+    s16 u, v, x, y;
+    u8 i;
+    view_of(st.rot, c % MAP_W, c / MAP_W, &u, &v);
+    x = scene_x(st.rot, u, v); y = scene_y(u, v) - map_tiles[c].stand * (HU / 2);
+    for (i = 0; i < MAP_W * MAP_H; i++) {
+        if (i == c) continue;
+        view_of(st.rot, i % MAP_W, i / MAP_W, &u, &v);
+        if (scene_x(st.rot, u, v) == x && scene_y(u, v) - map_tiles[i].stand * (HU / 2) == y && pickable(i, aim))
+            return (u8)(i + 1);
+    }
+    return 0;
+}
+
 u8 game_update(void)
 {
     if (W) W->upd_k = 0;
@@ -2563,7 +2630,16 @@ u8 game_update(void)
     } else if (st.ai) {                            // an AI unit's turn
         if (!st.turn) ai_step();
     } else if (!st.turn) {
-        if (st.mode == M_MENU) {
+        if (input_pressed(K_APPS) && (st.mode == M_BROWSE || st.mode == M_MENU || st.mode == M_TARGET
+            || st.mode == M_AIM || st.mode == M_ACTS || st.mode == M_SKILLS)) {
+            st.back = st.mode; st.mode = M_ORDER;  // the turn order, closed by any key
+        } else if (st.mode == M_ORDER) {
+            if (input_pressed(K_A | K_B | K_ENTER | K_ESC | K_APPS | K_UP | K_DOWN | K_LEFT | K_RIGHT)) st.mode = st.back;
+        } else if (st.mode == M_QUIT) {            // "Quit?": No unless Yes is picked
+            if (input_pressed(K_UP | K_DOWN)) st.quit ^= 1;
+            if (input_pressed(K_A | K_ENTER)) { if (!st.quit) return 0; st.mode = M_BROWSE; }
+            else if (input_pressed(K_ESC | K_B)) st.mode = M_BROWSE;
+        } else if (st.mode == M_MENU) {
             menu_keys();
         } else if (st.mode == M_ACTS || st.mode == M_SKILLS) {
             acts_keys();
@@ -2588,7 +2664,12 @@ u8 game_update(void)
             }
             st.rep = arrows ? (u8)(st.rep < 255 ? st.rep + 1 : st.rep) : 0;
             if (input_pressed(K_A | K_ENTER)) {
-                u8 o = unit_at(st.cx, st.cz), c = (u8)(st.cz * MAP_W + st.cx);
+                u8 o, c = (u8)(st.cz * MAP_W + st.cx);
+                if ((st.mode == M_TARGET || st.mode == M_AIM) && !pickable(c, st.mode == M_AIM)) {
+                    u8 t = twin(c, st.mode == M_AIM);
+                    if (t) { c = t - 1; st.cx = c % MAP_W; st.cz = c / MAP_W; }
+                }
+                o = unit_at(st.cx, st.cz);
                 if (st.mode == M_TARGET) {
                     Unit *u = &st.unit[st.sel];
                     if (st.reach[c] != 0xFF && st.reach[c] > 0 && make_path(st.sel, st.cx, st.cz)) {
@@ -2604,8 +2685,8 @@ u8 game_update(void)
                     st.mode = M_STATUS; st.sel = o - 1; st.back = M_BROWSE;
                 } else to_menu();
             } else if (input_pressed(K_ESC | K_B)) {
-                if (st.mode == M_BROWSE && input_pressed(K_ESC)) return 0;
-                if (st.mode == M_AIM) {            // back to the list it came from
+                if (st.mode == M_BROWSE && input_pressed(K_ESC)) { st.mode = M_QUIT; st.quit = 1; }
+                else if (st.mode == M_AIM) {            // back to the list it came from
                     st.mode = st.abil == NO_ABIL ? M_ACTS : M_SKILLS;
                     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
                 } else to_menu();
@@ -2707,21 +2788,17 @@ static void screen_scene(void)
 
 static const char *const unit_names[UNIT_GFX_N] = { "Ramza", "Delita", "Squire", "Squire", "Chemist", "Chemist" };
 
-// the turns' labels: AMS text drawn once into the HUD buffer and kept as 16-pixel rows; the
-// names turned a quarter for the panels (reading upwards: glyph row y in bit 4 - y); the
-// facing arrows: a right triangle pointing up-right, mirrored for the other three, outlined
+// the names turned a quarter for the panels (AMS text drawn once into the HUD buffer; reading
+// upwards: glyph row y in bit 4 - y); the facing arrows: a right triangle pointing up-right,
+// mirrored for the other three, outlined
 static void hud_labels(void)
 {
-    static const char ab[UNIT_GFX_N][3] = { "Ra", "De", "Sq", "Sq", "Ch", "Ch" };
     static const u8 tri[8] = { 0, 0x7E, 0x3E, 0x1E, 0x0E, 0x06, 0x02, 0 };
     void *sl = rt_light, *sd = rt_dark;
     u8 g, r, b;
     rt_light = HUD_L; rt_dark = HUD_D;
     for (g = 0; g < UNIT_GFX_N; g++) {
         u8 x;
-        memset(W->hud, 0, sizeof W->hud);
-        draw_text(0, 0, ab[g], F_SMALL, C_BLACK);
-        for (r = 0; r < 5; r++) W->label[g][r] = (u16)(HUD_L[r * RT_PBYTES] << 8 | HUD_L[r * RT_PBYTES + 1]);
         memset(W->hud, 0, sizeof W->hud);
         draw_text(0, 0, unit_names[g], F_SMALL, C_BLACK);
         for (r = 0; r < 5; r++)
@@ -2764,8 +2841,8 @@ static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color)
 }
 
 // A unit's panel against a side of the screen, as Metal Gear Solid: Portable Ops' HUD, its
-// text turned a quarter (reading upwards): its name (AMS text), then its HP and MP as
-// "52/52" and "16/16" in 3 x 5 digits, each beside its 2-pixel gauge filling upwards (HP
+// text turned a quarter (reading upwards): its name (AMS text), then its MP and HP as
+// "16/16" and "52/52" in 3 x 5 digits (HP above, as FFT's), each beside its 2-pixel gauge filling upwards (HP
 // black, MP dark grey); white (light grey: an enemy), a black edge toward the map. 16 x
 // PANEL_H; columns: name 0-4, numbers 6-10, gauges 12-13, edge 15 on the left side; edge 0,
 // name 2-6, numbers 8-12, gauges 14-15 on the right one (read in the same order).
@@ -2784,9 +2861,9 @@ static void make_panel(u8 side, u8 i)
         pl[r] = bg | edge | v; pd[r] = edge | v;
     }
     pl[0] = pd[0] = 0xFFFF;                        // and the top row
-    for (k = 0; k < 2; k++) {                      // HP at the bottom, MP above it
+    for (k = 0; k < 2; k++) {                      // MP at the bottom, HP above it
         u16 v = k ? u->mp : u->hp, m = k ? u->max_mp : u->hp > u->max_hp ? u->hp : u->max_hp;
-        u8 base = (u8)(PANEL_H - 2 - k * (SEG + 3)), f = v && m ? (u8)((SEG * v + m - 1) / m) : 0;
+        u8 base = (u8)(PANEL_H - 2 - !k * (SEG + 3)), f = v && m ? (u8)((SEG * v + m - 1) / m) : 0;
         n = put_n(s, 0, v); s[n++] = '/'; n = put_n(s, n, m);
         for (x = 0; x < n && 4 * x + 3 <= SEG; x++) {
             const u8 *gl = digits[s[x] == '/' ? 10 : s[x] - '0'];
@@ -2816,6 +2893,8 @@ static u8 win_lines(u8 m)
     u8 n = 0;
     if (m == M_STATUS) return 5;
     if (m == M_MENU) return 4;
+    if (m == M_QUIT) return 3;
+    if (m == M_ORDER) { while (n < ORDER_N && st.turns[n] != 0xFF) n++; return n; }
     if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend);
     if (m == M_AIM) return 2;
     if (m == M_ACT || m == M_PICK) return 1;
@@ -2831,7 +2910,7 @@ static void make_window(void)
     u8 r, i, n, k = W->win_n++, m = W->win_k[0], c = C_BLACK;
     char s[28];
     if (!k) {
-        u8 h = win_lines(m) * 6 + 3, w = m == M_MENU ? 2 : m == M_AIM ? 3 : m == M_STATUS ? 6 : 4;
+        u8 h = win_lines(m) * 6 + 3, w = m == M_MENU || m == M_QUIT ? 2 : m == M_AIM ? 3 : m == M_STATUS ? 6 : 4;
         u8 enemy = m == M_STATUS && u->team == TEAM_ENEMY;
         W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
         for (r = 0; r < WIN_ROWS; r++)
@@ -2844,7 +2923,14 @@ static void make_window(void)
     }
     k--;
     n = 0;
-    if (m == M_MENU) {
+    if (m == M_QUIT) {
+        n = put_s(s, 0, k == 0 ? "Quit?" : k == 1 ? "Yes" : "No");
+    } else if (m == M_ORDER) {                     // the next turns, the active unit first;
+        const Unit *t = &st.unit[st.turns[k]];     // enemies in dark grey
+        s[0] = (char)('1' + k); s[1] = ' ';
+        n = put_s(s, 2, unit_names[t->gfx]);
+        if (t->team == TEAM_ENEMY) c = C_DGRAY;
+    } else if (m == M_MENU) {
         n = put_s(s, 0, entries[k]);
         if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_LGRAY;
     } else if (m == M_ACTS) {
@@ -2898,30 +2984,29 @@ static void make_window(void)
         n = put_s(s, n, "  Job Lv "); n = put_n(s, n, job_level(u));
     }
     s[n] = 0;
-    text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS ? 7 : 3, 2 + 6 * k, s, c);
+    text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS || (m == M_QUIT && k) ? 7 : 3, 2 + 6 * k, s, c);
 }
 
-// The HUD: the top strip (the turn order, the view and the height under the cursor), the menu
-// or a status window at the top right, the units' panels at the bottom corners. Each is drawn
-// into a buffer when what it shows changes, at most one per frame and none on a turn's first
-// frame (the camera starts moving), and copied every frame.
+// The HUD: the height under the cursor at the top left, the menu, a status window, the turn
+// order ([APPS]) or "Quit?" at the top right, the units' panels at the bottom corners. Each is
+// drawn into a buffer when what it shows changes, at most one per frame and none on a turn's
+// first frame (the camera starts moving), and copied every frame.
 static void draw_hud(void)
 {
     char s[8];
     u8 o = unit_at(st.cx, st.cz), h = map_tiles[st.cz * MAP_W + st.cx].stand, n = 0, i, r, w, k[3];
-    static const char dirs[4] = { 'S', 'W', 'N', 'E' };
     u32 *a, *b;
     u16 *c, *d;
     u16 pk[2][3];
-    s[n++] = dirs[st.rot]; s[n++] = ' '; s[n++] = 'h';
+    s[n++] = 'h';
     if (h >= 20) s[n++] = (char)('0' + h / 20);
     s[n++] = (char)('0' + (h / 2) % 10);
     if (h & 1) { s[n++] = '.'; s[n++] = '5'; }
     s[n] = 0;
     k[0] = st.mode == M_MENU || st.mode == M_STATUS || st.mode == M_ACTS || st.mode == M_SKILLS
-        || st.mode == M_ACT || st.mode == M_PICK ? st.mode : 0;
+        || st.mode == M_ACT || st.mode == M_PICK || st.mode == M_ORDER || st.mode == M_QUIT ? st.mode : 0;
     k[1] = k[0] == M_MENU ? (u8)(st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == 0xFF
-        : k[0] == M_ACT ? st.abil : k[0] == M_PICK ? st.pick : 0;
+        : k[0] == M_ACT ? st.abil : k[0] == M_PICK ? st.pick : k[0] == M_ORDER ? st.turns[1] : 0;
     k[2] = k[0] == M_STATUS ? st.sel : k[0] == M_ACT ? st.atk : st.act;
     if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && aim_ok(o - 1)) {
         k[0] = M_AIM; k[1] = st.act; k[2] = o - 1;  // the preview
@@ -2930,47 +3015,20 @@ static void draw_hud(void)
     pk[1][0] = o && o - 1 != st.act ? o : 0;
     pk[1][1] = pk[1][0] ? st.unit[o - 1].hp : 0; pk[1][2] = pk[1][0] ? st.unit[o - 1].mp : 0;
     for (i = 0, w = 0; i < ORDER_N; i++) w |= st.turns[i] != W->hud_t[i];
-    if (!w) W->hud_late = 0;
-    else if (!W->hud_late++ || (W->left < HUD_K && W->hud_late <= WAIT_MAX)) w = 0;   // not on the
-                                                         // turn's first frame, nor without room
-    if (w) {
-        for (r = 0; r < 8; r++) {                  // white, 64 px
-            a = (u32 *)(HUD_L + r * RT_PBYTES); b = (u32 *)(HUD_D + r * RT_PBYTES);
-            a[0] = a[1] = b[0] = b[1] = 0;
-        }
-        // the turn order: the active unit, then the next turns; enemies on light grey,
-        // underlined in black
-        for (i = 0; i < ORDER_N && st.turns[i] != 0xFF; i++) {
-            const Unit *u = &st.unit[st.turns[i]];
-            s16 x = i ? 3 + 10 * i : 0, bw = i ? (i == ORDER_N - 1 ? 11 : 10) : 12, tx = x + 1 + !i;
-            u8 *pl = HUD_L + (x >> 3), *pd = HUD_D + (x >> 3);
-            if (u->team == TEAM_ENEMY) {           // light grey: the light plane; the line black
-                u32 m = ((1UL << bw) - 1) << (32 - bw - (x & 7));
-                u8 m0 = (u8)(m >> 24), m1 = (u8)(m >> 16), m2 = (u8)(m >> 8);
-                for (r = 0; r < 8; r++, pl += RT_PBYTES, pd += RT_PBYTES) {
-                    pl[0] |= m0; pl[1] |= m1; pl[2] |= m2;
-                    if (r == 7) { pd[0] |= m0; pd[1] |= m1; pd[2] |= m2; }
-                }
-            }
-            pl = HUD_L + RT_PBYTES + (tx >> 3); pd = HUD_D + RT_PBYTES + (tx >> 3);
-            for (r = 0; r < 5; r++, pl += RT_PBYTES, pd += RT_PBYTES) {   // black: both planes
-                u32 v = (u32)W->label[u->gfx][r] << (8 - (tx & 7));
-                u8 b0 = (u8)(v >> 16), b1 = (u8)(v >> 8), b2 = (u8)v;
-                pl[0] |= b0; pl[1] |= b1; pl[2] |= b2;
-                pd[0] |= b0; pd[1] |= b1; pd[2] |= b2;
-            }
-        }
-        for (i = 0; i < ORDER_N; i++) W->hud_t[i] = st.turns[i];
-        W->hud_late = 0;
-    } else if (!W->hud_late && (W->left >= HUD_K || ++W->hud_wait > WAIT_MAX)) {
+    if (!w) W->hud_late = 0;                       // a new turn: nothing on its first frame (the
+    else if (W->hud_late++ && (W->left >= HUD_K || W->hud_late > WAIT_MAX)) {   // camera starts
+        for (i = 0; i < ORDER_N; i++) W->hud_t[i] = st.turns[i];   // moving), then a frame with
+        W->hud_late = 0;                                            // room
+    } else w = 0;
+    if (!w && !W->hud_late && (W->left >= HUD_K || ++W->hud_wait > WAIT_MAX)) {
         W->hud_wait = 0;
         for (i = 0; i <= n && s[i] == W->hud_s[i]; i++) ;
-        if (i <= n) {                              // the view and the height: 32 px after them
+        if (i <= n) {                              // the height under the cursor: 32 px
             for (r = 0; r < 8; r++) {
                 a = (u32 *)(HUD_L + r * RT_PBYTES); b = (u32 *)(HUD_D + r * RT_PBYTES);
-                a[2] = b[2] = 0;
+                a[0] = b[0] = 0;
             }
-            text_into(W->hud[0], W->hud[1], 67, 1, s, C_BLACK);
+            text_into(W->hud[0], W->hud[1], 1, 1, s, C_BLACK);
             for (i = 0; i <= n; i++) W->hud_s[i] = s[i];
         } else if (k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2])) {
             for (i = 0; i < 3; i++) W->win_k[i] = k[i];
@@ -2987,11 +3045,10 @@ static void draw_hud(void)
                 }
         }
     }
-    c = W->hud[0]; d = W->hud[1];                  // copied: the strip, 96 px
+    c = W->hud[0]; d = W->hud[1];                  // copied: the strip, 32 px
     for (r = 0; r < 8; r++, c += RT_PBYTES / 2, d += RT_PBYTES / 2) {
         a = (u32 *)((u8 *)rt_light + r * RT_PBYTES); b = (u32 *)((u8 *)rt_dark + r * RT_PBYTES);
-        a[0] = ((u32 *)c)[0]; a[1] = ((u32 *)c)[1]; a[2] = ((u32 *)c)[2];
-        b[0] = ((u32 *)d)[0]; b[1] = ((u32 *)d)[1]; b[2] = ((u32 *)d)[2];
+        a[0] = ((u32 *)c)[0]; b[0] = ((u32 *)d)[0];
     }
     if (k[0] && W->win_k[0] == k[0] && W->win_n >= W->win_m) {   // the window, against the
         u8 ww = W->win_w;                                          // right edge, once drawn
@@ -3001,9 +3058,9 @@ static void draw_hud(void)
             u16 *pb = (u16 *)((u8 *)rt_dark + r * RT_PBYTES) + RT_W / 16 - ww;
             for (i = 0; i < ww; i++) { pa[i] = c[i]; pb[i] = d[i]; }
         }
-        if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS)   // the pointer: a small
-            for (r = 0; r < 5; r++) {                                // black triangle
-                u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : st.skill;
+        if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT)   // the pointer:
+            for (r = 0; r < 5; r++) {                                // a small black triangle
+                u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : 1 + st.quit;
                 u16 o2 = (u16)((3 + 6 * e + r) * RT_PBYTES + RT_W / 8 - 2 * ww);
                 u8 b2 = (u8)(r == 2 ? 0x38 : r == 1 || r == 3 ? 0x30 : 0x20);
                 ((u8 *)rt_light)[o2] |= b2; ((u8 *)rt_dark)[o2] |= b2;
@@ -3201,7 +3258,7 @@ void game_render(void)
         draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, c);
     }
     ZE(4); ZB(5);
-    // the cursor, above everything (blinking)
+    // the cursor, above everything (blinking), dashed behind the scenery
     dst_screen(st.camx, st.camy);
     view_of(st.rot, st.cx, st.cz, &u, &v);
     if (st.mode == M_ACT && st.act_t >= ACT_HIT) { draw_spark(); draw_number(); }
@@ -3209,7 +3266,7 @@ void game_render(void)
     else if (st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
         Marker mk;
         marker(st.rot, (u8)(st.cz * MAP_W + st.cx), 1, &mk);
-        blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, mk.m);
+        blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, cursor_mask(&mk, (u8)(st.cz * MAP_W + st.cx)));
     }
     draw_hud();
     ZE(5);

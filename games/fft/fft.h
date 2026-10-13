@@ -78,8 +78,9 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // chosen at Wait; M_STATUS: a unit's numbers; M_AIM: the weapon's or the ability's reach
 // shown, a target to pick; M_ACT: the attack or the ability played; M_ACTS: Act's list (Attack,
 // the skill set); M_SKILLS: the abilities the unit knows; M_PICK: a crystal or a chest picked
-// up; M_END: the battle over, its results
-enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END };
+// up; M_END: the battle over, its results; M_ORDER: the turn order ([APPS]); M_QUIT: "Quit?"
+enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END,
+       M_ORDER, M_QUIT };
 enum { END_NONE, END_VICTORY, END_DEFEAT };
 // an AI unit's turn (st.ai): thinking (a few frames), its move range shown, its target shown,
 // its facing shown; between them the walk and the act run as a player's (M_WALK, M_ACT)
@@ -130,7 +131,8 @@ typedef struct {
     u8 reach[MAP_W * MAP_H];           // M_TARGET: steps to each tile, 0xFF unreachable
     u8 act;                            // the unit whose turn it is
     u8 turns[ORDER_N];                 // the next turns (FFT's AT list), turns[0] = act
-    u8 menu, back;                     // the menu's entry; the mode M_STATUS returns to
+    u8 menu, back;                     // the menu's entry; the mode M_STATUS, M_ORDER return to
+    u8 quit;                           // M_QUIT's entry: 0 Yes, 1 No
     u8 moved, acted;                   // this turn so far
     u8 mx, mz, mface, wface;           // the active unit before its move (undone), at Wait
     u8 atk, tgt, act_t;                // M_ACT: attacker, target, frame
