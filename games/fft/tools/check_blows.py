@@ -10,7 +10,7 @@ import re
 import subprocess
 
 OUT = Path('x'); OUT.mkdir(exist_ok=True)
-FILES = ['fftv0', 'fftv1', 'fftv2', 'fftv3', 'fftu', 'fftw']
+FILES = ['fftv0', 'fftv1', 'fftv2', 'fftv3', 'fftu', 'fftw', 'ffti']
 BASE = ['../../tools/bin/ti-cycles', '--max', '8000']
 for name in FILES: BASE += ['--file', name + '.89y']
 

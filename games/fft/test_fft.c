@@ -200,9 +200,9 @@ static int shown(u8 i)
     st.unit[i].x = 200;                                   // out of the map: not drawn
     sw_step(0);
     mid = 0;
-    for (y = 8; y < RT_H; y++)                            // not the HUD: the top strip and
-        for (x = 0; x < RT_W; x++)                        // the units' panels
-            if ((y < RT_H - PANEL_H || (x >= 16 && x < RT_W - 16)) && with[y][x] != sw_level(x, y)) {
+    for (y = 8; y < RT_H; y++)                            // exclude the height and bottom bands
+        for (x = 0; x < RT_W; x++)
+            if ((y < 71 && (y >= 17 || x < 128)) && with[y][x] != sw_level(x, y)) {
                 n++; mid += with[y][x] == 1 || with[y][x] == 2;
             }
     st = save;
@@ -293,7 +293,7 @@ static void test_team(void)
 {
     int foe, ally;
     sw_init(2);
-    steps(0, 10);                                         // the HUD drawn: one part per frame
+    steps(0, 40);                                         // all cached HUD parts settled
     foe = shown(2);
     st.unit[2].team = TEAM_PLAYER;
     ally = shown(2);
@@ -421,22 +421,14 @@ static void test_walk_keys(void)
 static int hud_shown(void)                    // the active unit's panel edge, the height's text
 {
     int x, y, ink = 0;
-    for (y = 1; y < 7; y++) for (x = 1; x < 16; x++) ink += sw_level(x, y) == 3;
-    return sw_level(15, RT_H - 10) == 3 && sw_level(8, RT_H - PANEL_H) == 3 && ink > 4;
+    for (y = 1; y < 9; y++) for (x = 128; x < 155; x++) ink += sw_level(x, y) == 3;
+    return sw_level(35, 74) == C_DGRAY && ink > 4;
 }
 
 static void test_fixes(void)
 {
     u8 c, t, i, n = 0;
     u16 hp;
-    sw_init(0);                                           // the HUD on the AI's turns: a
-    for (i = 0; i < 60 && st.mode != M_WALK; i++) sw_step(0);   // unit walking (its reach's
-    for (i = 0; i < 8 && !hud_shown(); i++) sw_step(0);        // rows put back first), and the
-    CHECK(hud_shown());                                   // next unit's panel made within a few
-    c = st.act;                                           // frames of its turn
-    while (st.act == c) sw_step(0);
-    for (i = 0; i < 20 && !hud_shown(); i++) sw_step(0);
-    CHECK(i < 20);
     sw_init(10);
     steps(0, 20);
     CHECK(hud_shown());
@@ -1271,6 +1263,50 @@ static void test_turns(void)
     CHECKV(st.unit[0].ct, 2);
 }
 
+// Milestone 26: names are stable by seed and unique by gender, two reversible Status
+// pages, horizontal bands hidden during action/motion, live HP/CT and a canal depth label.
+static void test_interface(void)
+{
+    State original;
+    char names[NUNIT][12];
+    u32 page0, page1, old;
+    u8 i, j;
+    int x, y, ink0 = 0, ink1 = 0;
+    sw_init(26);
+    original = st;
+    for (i = 0; i < NUNIT; i++) {
+        CHECK(strlen(unit_name(i)) > 0 && strlen(unit_name(i)) <= 11);
+        strcpy(names[i], unit_name(i));
+        for (j = 0; j < i; j++) if (st.unit[i].gfx > UG_DELITA && st.unit[j].gfx > UG_DELITA
+            && st.unit[i].female == st.unit[j].female) CHECK(strcmp(names[j], names[i]));
+    }
+    CHECK(!strcmp(names[U_RAMZA], "Ramza") && !strcmp(names[0], "Delita"));
+    sw_init(26); CHECK(!memcmp(&original, &st, sizeof st));
+    for (i = 0; i < NUNIT; i++) CHECK(!strcmp(names[i], unit_name(i)));
+    sw_init(27); CHECK(strcmp(names[1], unit_name(1)));
+    sw_init(26); steps(0, 30); CHECK(hud_shown());
+    old = sw_checksum(); st.unit[st.act].hp--; st.unit[st.act].ct++;
+    steps(0, 30); CHECK(sw_checksum() != old); CHECK(hud_shown());
+    sw_init(31); steps(0, 12); original = st; page0 = sw_checksum();
+    CHECK(st.page == 0 && st.mode == M_STATUS);
+    press(K_RIGHT); steps(0, 12); page1 = sw_checksum();
+    CHECK(st.page == 1 && st.mode == M_STATUS && page0 != page1);
+    CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
+    press(K_LEFT); steps(0, 12); CHECKV(sw_checksum(), page0);
+    press(K_ESC); CHECKV(st.mode, M_MENU);
+    st.menu = MN_STATUS; press(K_A); steps(0, 12); CHECKV(sw_checksum(), page0);
+    // Portrait, numerical fields and equipment are inside the screen; the 2h top-right
+    // height changes to a depth-labelled 0h in water, even when no unit occupies the tile.
+    sw_init(34); steps(0, 30);
+    for (y = 11; y < 16; y++) for (x = 128; x < 160; x++) ink0 += sw_level(x, y) == C_BLACK;
+    st.cx = 4; st.cz = 11; steps(0, 30);
+    for (y = 11; y < 16; y++) for (x = 128; x < 160; x++) ink1 += sw_level(x, y) == C_BLACK;
+    CHECK(ink0 > 10 && ink1 == 0);
+    sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
+    sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());
+    printf("interface: 510 disc names, deterministic unique draws, live bands, two Status pages, depth label, hidden during motion/blows\n");
+}
+
 static void shots(void)
 {
     u8 n;
@@ -1388,6 +1424,7 @@ int main(int argc, char **argv)
     test_pace();
     test_blows();
     test_defend();
+    test_interface();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;

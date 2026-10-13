@@ -21,8 +21,11 @@ $(VIEWS:=.bin): map.h
 	$(TI)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat $< $*
 fftu.bin: units.h
 fftw.bin: weapons.h
-ti cycles: $(VIEWS:=.89y) fftu.89y fftw.89y
-TI_FILES := $(VIEWS:=.89y) fftu.89y fftw.89y
+ffti.bin: interface.h
+interface.h: tools/interface.py tools/units.py
+	$(PY) tools/interface.py $(DISC)
+ti cycles: $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
+TI_FILES := $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
 TI_FLAGS := ../../lib/unpack68k.s
 art.h: tools/art.py
 	$(PY) tools/art.py $@
@@ -58,11 +61,17 @@ $(AI): $(ORACLE).state
 oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 $(NAME)_test: oracle.h
-$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h weapons.h battle.h art.h fft.h $(VIEWS:=.bin) fftu.bin fftw.bin
-XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h weapons.h interface.h battle.h art.h fft.h $(VIEWS:=.bin) fftu.bin fftw.bin ffti.bin
+XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40
 FRAMES := 40
 .PHONY: review-blows check-blows
 review-blows: pc
 	$(PY) tools/review_blows.py
 check-blows:
 	$(PY) tools/check_blows.py
+
+.PHONY: review-interface check-interface
+review-interface: pc
+	$(PY) tools/review_interface.py
+check-interface:
+	$(PY) tools/check_interface.py

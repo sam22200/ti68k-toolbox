@@ -68,3 +68,6 @@ __pycache__/
 /tools/pcsx_rearmed/
 /games/fft/weapons.h
 /games/fft/fftw.bin
+
+/games/fft/interface.h
+/games/fft/ffti.bin
