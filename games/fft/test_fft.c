@@ -240,6 +240,35 @@ static void find_spots(void)
         }
 }
 
+static int verbose_hides;
+
+// the AI's camera: the rows of a unit's sprite hidden in each view, from the map's heights,
+// against the view's depth: more than half hidden or not alike (unit 2 on every free tile)
+static void test_hides(void)
+{
+    s16 x, z;
+    u8 r;
+    int n = 0, bad = 0;
+    sw_init(0);
+    for (r = 0; r < 4; r++) {
+        st.rot = r; sw_step(0);
+        for (z = 0; z < MAP_H; z++)
+            for (x = 0; x < MAP_W; x++) {
+                int e, h;
+                if (!tile_at(x, z)->walk || unit_at(x, z)) continue;
+                st.unit[2].x = (u8)x; st.unit[2].z = (u8)z;
+                e = view_hides(r, 2); h = view_hides_now(2);
+                n++;
+                if ((e > 44) != (h > 44)) {
+                    bad++;
+                    if (verbose_hides) printf("(%d, %d) view %d: depth %d, heights %d\n", x, z, r, h, e);
+                }
+            }
+    }
+    printf("hides: %d of %d tiles and views alike on half hidden\n", n - bad, n);
+    CHECK(bad * 100 <= n);
+}
+
 static void test_occlusion(void)
 {
     int s[4], m[4], inside;
@@ -365,10 +394,11 @@ static void test_fixes(void)
 {
     u8 c, t, i, n = 0;
     u16 hp;
-    sw_init(0);                                           // the HUD on the AI's turns: a turn
-    steps(0, 60);                                         // on, and the next unit's panel
-    CHECK(hud_shown());                                   // made within a few frames of its
-    while (st.act == 1) sw_step(0);                       // turn
+    sw_init(0);                                           // the HUD on the AI's turns: a
+    for (i = 0; i < 60 && st.mode != M_WALK; i++) sw_step(0);   // unit walking, and the next
+    CHECK(hud_shown());                                   // unit's panel made within a few
+    c = st.act;                                           // frames of its turn
+    while (st.act == c) sw_step(0);
     for (i = 0; i < 20 && !hud_shown(); i++) sw_step(0);
     CHECK(i < 20);
     sw_init(10);
@@ -560,7 +590,7 @@ static void test_attack(void)
     press(K_A);
     CHECKV(st.mode, M_ACT);
     CHECK(st.acted && st.unit[U_RAMZA].face == 3);
-    for (i = 0; i < ACT_END + GAIN_T && st.mode == M_ACT; i++) sw_step(0);
+    for (i = 0; i < ACT_GAIN_END && st.mode == M_ACT; i++) sw_step(0);
     CHECKV(st.mode, M_MENU);
     CHECKV(st.menu, MN_MOVE);
     CHECKV(st.unit[1].hp, st.hit ? (st.dmg >= n ? 0 : n - st.dmg) : n);
@@ -1013,6 +1043,88 @@ static void test_ai_battle(void)
     CHECK(bg_used > 1000 && bg_bad == 0);
 }
 
+// milestone 23, the original's pace (RE_NOTES.md § Pace): a walked step WALK_FRAMES frames, a
+// climb, a drop or a jump CLIMB_FRAMES; an attack's menu back at ACT_GAIN_END after a hit (the
+// EXP and the JP shown), at ACT_END after a miss; on the AI's turns the cursor gliding a tile
+// every AI_GLIDE frames to its target, the preview AI_PREVIEW frames (an ability's name AI_NAME
+// more), the view turned when the actor or its target is more than half hidden and the player's
+// view back on the player's turn
+static void test_pace(void)
+{
+    State s0;
+    u16 c;
+    u32 i, f, flat = 0, climb = 0, glides = 0, aims = 0, names = 0, turned = 0, bad = 0;
+    u8 k, p, cx, cz, back = 0;
+    sw_init(10);
+    compute_reach(U_RAMZA);
+    s0 = st;
+    for (c = 0; c < MAP_W * MAP_H && (flat < 8 || climb < 4); c++) {
+        if (s0.reach[c] == 0xFF || !s0.reach[c]) continue;
+        st = s0; st.sel = U_RAMZA;
+        if (!make_path(U_RAMZA, (u8)(c % MAP_W), (u8)(c / MAP_W))) continue;
+        st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
+        while (st.mode == M_WALK) {
+            const u8 *a = st.path[st.path_i], *b = st.path[st.path_i + 1];
+            u8 up = tile_at(a[0], a[1])->stand != tile_at(b[0], b[1])->stand || (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) > 1;
+            for (p = st.path_i, f = 0; st.path_i == p && f < 20; f++) sw_step(0);
+            CHECKV(f, up ? CLIMB_FRAMES : WALK_FRAMES);
+            if (up) climb++; else flat++;
+        }
+    }
+    CHECK(flat >= 8 && climb >= 4);
+    sw_init(10);                                          // an attack that hits, one that misses
+    st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].face = 2;
+    s0 = st;
+    for (k = 0; k < 2; k++) {
+        for (i = 0; i < 1000; i++) {
+            st = s0; attack(U_RAMZA, 1);
+            if (st.hit == !k) break;
+        }
+        for (f = 0; st.mode == M_ACT && f < 200; f++) sw_step(0);
+        CHECKV(f, k ? ACT_END : ACT_GAIN_END);
+        CHECKV(st.mode, M_MENU);
+    }
+    sw_init(16);                                          // the AI plays the whole battle
+    for (i = 0; i < 30000 && st.mode != M_END; i++) {
+        u8 r = st.rot, aim = st.ai == AI_AIM && st.mode == M_AIM && !st.turn, at = st.ai_t;
+        cx = st.cx; cz = st.cz;
+        sw_step(0);
+        if (st.rot != r) turned++;
+        if (!aim) continue;
+        if (st.cx != cx || st.cz != cz) {                // a glide step: one tile, AI_GLIDE frames
+            glides++;
+            bad += (st.cx - cx) * (st.cx - cx) + (st.cz - cz) * (st.cz - cz) != 1 || st.ai_t;
+        }
+        if (st.mode == M_ACT) {                          // the preview, an ability's name
+            aims++;
+            names += st.abil != NO_ABIL;
+            bad += at + 1 != (st.abil == NO_ABIL ? AI_PREVIEW : AI_PREVIEW + AI_NAME);
+        }
+    }
+    CHECK(st.mode == M_END);
+    CHECKV(bad, 0);
+    printf("pace: %lu walked steps and %lu climbs or jumps as timed; the AI's cursor glided %lu tiles to %lu"
+           " targets (%lu abilities named); the view turned %lu times\n", (unsigned long)flat, (unsigned long)climb,
+           (unsigned long)glides, (unsigned long)aims, (unsigned long)names, (unsigned long)turned);
+    CHECK(glides && names && turned);
+    sw_init(0);                                           // the player's view back after an AI turned it
+    for (i = 0; i < 30000 && st.mode != M_END && !back; i++) {
+        if (!st.ai && st.mode == M_MENU && !st.turn && st.want == 0xFF) {
+            if (st.prot != 0xFF) break;
+            turn_end(0, 0);
+        }
+        p = st.prot;
+        sw_step(0);
+        if (p != 0xFF && st.prot == 0xFF && !st.ai) {    // a player's turn: turning back
+            for (f = 0; f < 4 * TURN_FRAMES && st.want != 0xFF; f++) sw_step(0);
+            for (f = 0; f < 4 * TURN_FRAMES && st.turn; f++) sw_step(0);
+            CHECKV(st.rot, p);
+            back = 1;
+        }
+    }
+    CHECK(back);
+}
+
 // Defend: drawn as FFT draws a support ability; a command after the skill set, Defending until
 // the unit's next turn
 static void test_defend(void)
@@ -1161,6 +1273,7 @@ static void shots(void)
 int main(int argc, char **argv)
 {
     if (argc > 1 && !strcmp(argv[1], "--find")) { find_spots(); return 0; }
+    if (argc > 1 && !strcmp(argv[1], "--hides")) { verbose_hides = 1; test_hides(); return 0; }
     ai_diff = argc > 1 && !strcmp(argv[1], "--ai");
     test_rotations();
     test_heights();
@@ -1168,6 +1281,7 @@ int main(int argc, char **argv)
     test_draw();
     test_reach();
     test_occlusion();
+    test_hides();
     test_team();
     test_turn_keys();
     test_walk_keys();
@@ -1180,6 +1294,7 @@ int main(int argc, char **argv)
     test_turns();
     test_ai();
     test_ai_battle();
+    test_pace();
     test_defend();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);

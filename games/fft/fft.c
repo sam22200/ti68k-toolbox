@@ -147,8 +147,8 @@ typedef struct {
                                         // all drawn)
     u32 cur_m[24];                      // the cursor's mask, dashed where the view is in front
     u16 cur_k;                          // of it, for this tile | rot << 8 | 0x8000 (0: none)
-    u32 num[2][2][7];                   // an attack's number (or Miss), the EXP its user earned:
-    u8 num_w[2], num_ok;                // black, its white outline; their widths; drawn (bits)
+    u32 num[3][2][7];                   // an attack's number (or Miss), the EXP and the JP its user
+    u8 num_w[3], num_ok;                // earned: black, its white outline; their widths; drawn (bits)
     u8 end_n;                           // M_END: the results' next line to draw
     u8 dcg[4][2][7];                    // the death counter's digits: black, mask (8 wide)
     // the movement spread (spread_start, spread_go): its tiles to go on from by cost & 3, where it
@@ -469,6 +469,7 @@ static void turn_start(void)
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
     me = st.unit[st.act].team == TEAM_PLAYER && !st.ai_all;
     st.ai = me ? AI_OFF : AI_THINK; st.ai_t = 0;
+    if (me && st.prot != 0xFF) { st.want = st.prot; st.prot = 0xFF; }   // the player's view back
     if (W) { W->ai_k = 0; W->frz = W->frz_n = 0; W->frz_h = 0; }
     st.mode = me ? M_MENU : M_BROWSE;
     st.menu = MN_MOVE; st.moved = st.acted = 0;
@@ -1090,7 +1091,7 @@ static void act_start(u8 a, u8 t)
     Unit *ua = &st.unit[a], *ut = &st.unit[t];
     s16 dx = (s16)ut->x - ua->x, dz = (s16)ut->z - ua->z;
     st.atk = a; st.tgt = t; st.act_t = 0; st.mode = M_ACT;
-    st.crit = st.push = 0; st.dmg = st.self = 0; st.gain = st.lvup = 0;
+    st.crit = st.push = 0; st.dmg = st.self = 0; st.gain = st.lvup = st.jpg = 0;
     if (W) W->num_ok = 0;
     if (dx || dz)
         ua->face = (dx < 0 ? -dx : dx) > (dz < 0 ? -dz : dz) ? (dx > 0 ? 0 : 1) : (dz > 0 ? 2 : 3);
@@ -1261,6 +1262,7 @@ void rewards(u8 a, u8 t, u8 kill)
     if (e > 99) e = 99;
     st.gain = (u8)e;
     jp = (u16)(8 + 2 * job_level(ua) + (ua->level >> 2));
+    st.jpg = (u8)jp;
     ua->gexp += (u16)e;
     ua->exp += (u8)e;
     if (ua->exp >= EXP_LEVEL) {
@@ -1315,8 +1317,8 @@ static void end_battle(u8 e)
 }
 
 // M_ACT, once per frame: the outcome lands at ACT_HIT (HP lost or healed, statuses removed, the
-// target pushed; a KO or a revival: the turn order again), the menu comes back at ACT_END (the
-// turn ends if the user fell: Wish)
+// target pushed; a KO or a revival: the turn order again), the menu comes back at ACT_END or,
+// after the EXP and the JP shown, ACT_GAIN_END (the turn ends if the user fell: Wish)
 static void attack_step(void)
 {
     Unit *ut = &st.unit[st.tgt], *ua = &st.unit[st.atk];
@@ -1340,7 +1342,7 @@ static void attack_step(void)
         if ((u8)!ut->hp != ko || !ua->hp) turn_order();
     }
 shown:
-    if (++st.act_t >= (st.gain ? ACT_END + GAIN_T : ACT_END)) {
+    if (++st.act_t >= (st.gain ? ACT_GAIN_END : ACT_END)) {
         if (outcome()) { end_battle(outcome()); return; }
         if (!st.unit[st.act].hp) { turn_end(st.moved, 1); return; }
         st.mode = M_MENU; st.menu = st.moved ? MN_WAIT : MN_MOVE;
@@ -1922,9 +1924,23 @@ u8 ai_facing(u8 a)
 }
 
 // ---------------------------------------------------------------- units on screen
+// frames of walking step i (to path[i + 1]): FFT's climbs, drops and jumps over a tile are slower
+static u8 step_frames(u8 i)
+{
+    const u8 *a = st.path[i], *b = st.path[i + 1];
+    return map_tiles[a[1] * MAP_W + a[0]].stand != map_tiles[b[1] * MAP_W + b[0]].stand
+        || (u8)(a[0] - b[0] + 1) > 2 || (u8)(a[1] - b[1] + 1) > 2 ? CLIMB_FRAMES : WALK_FRAMES;
+}
+
+// a step's frame t: how far along (64ths) and the hop (pixels, up to 8 at mid-step) of a climb,
+// the first WALK_FRAMES for a walk, the next CLIMB_FRAMES for a climb (no divide per frame)
+static const u8 walk_q[WALK_FRAMES + CLIMB_FRAMES] = { 0, 9, 18, 27, 37, 46, 55,
+    0, 6, 13, 19, 26, 32, 38, 45, 51, 58 };
+static const u8 walk_h[CLIMB_FRAMES] = { 0, 3, 5, 7, 8, 8, 8, 7, 5, 3 };
+
 // a unit's feet: scene position of its tile centre at its standing height, interpolated
-// while walking (t / WALK_FRAMES of the way to the next tile, with a hop on height changes);
-// depth: the diagonal it is drawn after (both tiles' while walking)
+// while walking (with a hop on a climb, a drop or a jump); depth: the diagonal it is drawn
+// after (both tiles' while walking)
 static Feet unit_feet(u8 rot, u8 i)
 {
     Feet f;
@@ -1936,15 +1952,16 @@ static Feet unit_feet(u8 rot, u8 i)
     f.depth = (u8)(u + v);
     if (st.mode == M_WALK && st.sel == i && st.path_i + 1 < st.path_n) {
         const u8 *a = st.path[st.path_i], *b = st.path[st.path_i + 1];
-        s16 u2, v2, x2, y2, t = st.walk_t, hop;
+        s16 u2, v2, x2, y2, t = st.walk_t, hop = 0, q;
         s16 sa = map_tiles[a[1] * MAP_W + a[0]].stand, sb = map_tiles[b[1] * MAP_W + b[0]].stand;
         view_of(rot, a[0], a[1], &u, &v);
         view_of(rot, b[0], b[1], &u2, &v2);
         f.x = scene_x(rot, u, v); f.y = scene_y(u, v) + HH - sa * (HU / 2);
         x2 = scene_x(rot, u2, v2); y2 = scene_y(u2, v2) + HH - sb * (HU / 2);
-        hop = sa != sb ? (t * (WALK_FRAMES - t)) * 2 : 0;            // up to 8 px at mid-step
-        f.x += (x2 - f.x) * t / WALK_FRAMES;
-        f.y += (y2 - f.y) * t / WALK_FRAMES - hop;
+        if (step_frames(st.path_i) == CLIMB_FRAMES) { hop = walk_h[t]; t += WALK_FRAMES; }
+        q = walk_q[t];
+        f.x += ((x2 - f.x) * q) >> 6;
+        f.y += (((y2 - f.y) * q) >> 6) - hop;
         f.depth = (u8)(u + v > u2 + v2 ? u + v : u2 + v2);
     }
     return f;
@@ -1985,7 +2002,8 @@ static u8 unit_pose(u8 i)
 {
     const Unit *un = &st.unit[i];
     if (st.mode == M_ACT && st.abil != ABIL_DEFEND) {
-        if (i == st.atk && st.act_t < ACT_HIT)     // Throw Stone (the evaded skill) and items:
+        if (i == st.atk && st.act_t >= ACT_WIND && st.act_t < ACT_HIT)   // Throw Stone (the evaded
+                                                                         // skill) and items:
             return st.act_t < ACT_BLOW ? P_WIND    // FFT's throw after the same wind-up
                 : st.abil != NO_ABIL && abilities[st.abil].flags & (AF_EVADE | AF_ITEM) ? P_THROW : P_BLOW;
         if (i == st.tgt && st.act_t >= ACT_HIT && st.act_t < ACT_HIT + HIT_FRAMES && st.hit
@@ -2369,6 +2387,7 @@ void game_scenario(u16 n)
 {
     u8 i;
     memset(&st, 0, sizeof st);
+    st.want = st.prot = st.ai_view = 0xFF;
     if (!W) return;
     rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
     rand_seed(rt_seed);
@@ -2496,9 +2515,95 @@ static void acts_keys(void)
     } else if (input_pressed(K_ESC | K_B)) st.mode = M_ACTS;
 }
 
+// How much of unit i view rot hides (the AI's camera): the tiles in front of it (greater
+// diagonals) whose top face rises over its sprite, from the map's corner heights (the other
+// views' depth is not unpacked), at four of the sprite's columns: the rows hidden, 0..4 * VIS_H
+// (the tests: as the view's depth says half hidden or not on 558 of 560 tiles and views)
+#define VIS_H 22
+#define HIDE(j, r) do { s16 r_ = (r); if (r_ > hid[j]) hid[j] = r_; } while (0)
+u8 view_hides(u8 rot, u8 i)
+{
+    static const s8 wdx[4] = { 1, 0, -1, 0 }, wdz[4] = { 0, -1, 0, 1 };   // world step of view +u
+    const Unit *un = &st.unit[i];
+    s16 u, v, k, d, base, x, z, hid[4] = { 0, 0, 0, 0 };
+    s8 sx = (s8)(wdx[rot] + wdx[(rot + 3) & 3]), sz = (s8)(wdz[rot] + wdz[(rot + 3) & 3]);   // +u +v
+    u8 j, n = 0, c0 = (u8)(-rot & 3), c1 = (u8)((1 - rot) & 3), c3 = (u8)((3 - rot) & 3);
+    view_of(rot, un->x, un->z, &u, &v);
+    base = HH - map_tiles[un->z * MAP_W + un->x].stand * (HU / 2);
+    for (k = -1; k <= 1; k++) {                     // the three columns of tiles over the sprite
+        d = k ? 1 : 2;                              // (d: diagonals in front), from the nearest:
+        world_of(rot, u + ((d + k) >> 1), v + ((d - k) >> 1), &x, &z);   // a step is +u +v
+        for (; d * HH <= base + MAXH * HU; d += 2, x += sx, z += sz) {
+            const u8 *c;
+            s16 h0, top, l, r;
+            if ((u16)x >= MAP_W || (u16)z >= MAP_H) continue;
+            c = map_tiles[z * MAP_W + x].c;
+            h0 = c[c0];                             // its top face's upper edges: from the left
+            top = base - d * HH + h0 * HU;          // corner up to the top one (rows above the
+            l = (s16)c[c3] - h0 - 1;                // feet), down to the right one; the sprite's
+            r = (s16)c[c1] - h0 - 1;                // columns -5 -2 2 5 against the tile's centre
+            if (!k) {
+                HIDE(0, top + (l * 5 >> 1)); HIDE(1, top + l); HIDE(2, top + r); HIDE(3, top + (r * 5 >> 1));
+            } else if (k > 0) {                     // the tile to the right (centre +HW)
+                HIDE(2, top + l * 5); HIDE(3, top + (l * 7 >> 1));
+            } else {
+                HIDE(0, top + (r * 7 >> 1)); HIDE(1, top + r * 5);
+            }
+        }
+    }
+    for (j = 0; j < 4; j++) n += (u8)(hid[j] > VIS_H ? VIS_H : hid[j]);
+    return n;
+}
+
+#ifndef __m68k__
+// the same rows read from the current view's depth (the tests; 0xFF: the view not unpacked)
+u8 view_hides_now(u8 i)
+{
+    static const s8 col[4] = { -5, -2, 2, 5 };
+    const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+    Feet f;
+    u8 j, n = 0;
+    s16 y;
+    if (vbuf_rot != st.rot) return 0xFF;
+    f = unit_feet(st.rot, i);
+    for (j = 0; j < 4; j++) {
+        s16 x = f.x + col[j];
+        u8 bit = (u8)(0x80 >> (x & 7));
+        for (y = f.y - VIS_H; y < f.y; y++) {
+            u16 o = (u16)(y * SC_BYTES + (x >> 3));
+            if ((u16)y >= SC_H) continue;
+            if ((t1[o] > f.depth && m1[o] & bit) || (t2[o] > f.depth && m2[o] & bit)) n++;
+        }
+    }
+    return n;
+}
+#endif
+
+// An AI unit's plan made (the frame not drawn): the view it will act in. When, from the tile it
+// acts from, it or its target is more than half hidden: the view hiding the least of the worse
+// of them (FFT turns the camera after the move; the player's view back on the player's turn)
+static void ai_camera(void)
+{
+    Unit *a = &st.unit[st.act];
+    u8 o = unit_at(st.ai_tgt % MAP_W, st.ai_tgt / MAP_W), x = a->x, z = a->z, r, h, g, bh = 0xFF;
+    st.ai_view = 0xFF;
+    if (st.acted || st.ai_ab == AI_NONE || st.ai_ab == ABIL_DEFEND) return;
+    a->x = st.ai_o % MAP_W; a->z = st.ai_o / MAP_W;
+    for (r = 0; r < 4; r++) {
+        u8 q = (st.rot + r) & 3;
+        h = view_hides(q, st.act);
+        if (o && o - 1 != st.act && (g = view_hides(q, o - 1)) > h) h = g;
+        if (!r && h <= 2 * VIS_H) break;
+        if (h < bh) { bh = h; st.ai_view = q; }
+    }
+    a->x = x; a->z = z;
+    if (st.ai_view == st.rot) st.ai_view = 0xFF;
+}
+
 // an AI turn on screen, as a player's without the menus: what comes next in its plan (st.ai_*):
-// act (from its tile, or once moved), move (its range shown, then the walk), after acting from
-// its tile think again where to go, then the facing
+// act (from its tile, or once moved: the view turned if needed, the cursor gliding to the
+// target, the preview, an ability's name), move (the cursor gliding to the tile, its range
+// shown, then the walk), after acting from its tile think again where to go, then the facing
 static void ai_next(void)
 {
     Unit *u = &st.unit[st.act];
@@ -2511,12 +2616,15 @@ static void ai_next(void)
         if (st.ai_ab == ABIL_DEFEND) { st.acted = 1; defend(st.act); return; }
         st.ai = AI_AIM;
         aim(st.ai_ab);
-        st.cx = st.ai_tgt % MAP_W; st.cz = st.ai_tgt / MAP_W;
+        if (st.ai_view != 0xFF && st.ai_view != st.rot) {   // the view turned first
+            if (st.prot == 0xFF) st.prot = st.rot;
+            st.want = st.ai_view;
+        }
+        st.ai_view = 0xFF;
     } else if (!st.moved && st.ai_o != me) {
         st.ai = AI_MOVE;
         st.mode = M_TARGET; st.sel = st.act;
         compute_reach(st.act);
-        st.cx = st.ai_o % MAP_W; st.cz = st.ai_o / MAP_W;
     } else if (st.acted && !st.moved && st.ai_first) {
         st.ai = AI_THINK; st.ai_first = 0;
         W->ai_k = 0;
@@ -2525,6 +2633,23 @@ static void ai_next(void)
         st.mode = M_FACE;
         u->face = ai_facing(st.act); W->upd_k += FACE_K;
     }
+}
+
+// AI_MOVE, AI_AIM, once per frame: the cursor glides to the tile (a tile every AI_GLIDE
+// frames), then stays: the move range AI_SHOW frames, the preview AI_PREVIEW, an ability's name
+// AI_NAME more; done?
+static u8 ai_shown(void)
+{
+    u8 c = st.ai == AI_MOVE ? st.ai_o : st.ai_tgt, x = c % MAP_W, z = c / MAP_W;
+    if (st.cx != x || st.cz != z) {
+        if (++st.ai_t >= AI_GLIDE) {
+            st.ai_t = 0;
+            if (st.cx != x) st.cx += st.cx < x ? 1 : -1;
+            else st.cz += st.cz < z ? 1 : -1;
+        }
+        return 0;
+    }
+    return ++st.ai_t >= (st.ai == AI_MOVE ? AI_SHOW : st.ai_ab == NO_ABIL ? AI_PREVIEW : AI_PREVIEW + AI_NAME);
 }
 
 static void ai_step(void)
@@ -2536,9 +2661,9 @@ static void ai_step(void)
             if (done) st.ai = AI_GO;
         }
     } else if (st.ai == AI_GO) {                // the plan shown from the next frame (this one
-        ai_next(); W->hold = 1;                 // keeps the picture)
+        ai_camera(); ai_next(); W->hold = 1;    // keeps the picture)
     }
-    else if (++st.ai_t >= (st.ai == AI_FACE ? AI_SHOW / 2 : AI_SHOW)) {
+    else if (st.ai == AI_FACE ? ++st.ai_t >= AI_SHOW / 2 : ai_shown()) {
         if (st.ai == AI_MOVE) {
             Unit *u = &st.unit[st.act];
             if (make_path(st.act, st.ai_o % MAP_W, st.ai_o / MAP_W)) {
@@ -2600,13 +2725,18 @@ u8 game_update(void)
             st.camx = scene_x(st.rot, u, v) - px; st.camy = scene_y(u, v) - py;
             cam_clamp(&st.camx, &st.camy);
         }
-    } else if (input_pressed(K_F5)) { st.turn = 1; st.turn_t = 0; }
-    else if (input_pressed(K_F1)) { st.turn = -1; st.turn_t = 0; }
+    } else if (input_pressed(K_F5 | K_F1)) {      // the player's view from now on
+        st.turn = input_pressed(K_F5) ? 1 : -1; st.turn_t = 0;
+        st.want = st.prot = 0xFF;
+    } else if (st.want != 0xFF) {                  // turning to the view an AI unit wants
+        if (st.want == st.rot) st.want = 0xFF;
+        else { st.turn = ((st.want - st.rot) & 3) == 3 ? -1 : 1; st.turn_t = 0; }
+    }
 
     if (st.mode == M_WALK) {
         const u8 *a = st.path[st.path_i], *b = st.path[st.path_i + 1];
         st.unit[st.sel].face = b[0] > a[0] ? 0 : b[0] < a[0] ? 1 : b[1] > a[1] ? 2 : 3;
-        if (++st.walk_t >= WALK_FRAMES) {
+        if (++st.walk_t >= step_frames(st.path_i)) {
             st.walk_t = 0;
             st.path_i++;
             st.unit[st.sel].x = st.path[st.path_i][0];
@@ -3010,6 +3140,10 @@ static void draw_hud(void)
     k[2] = k[0] == M_STATUS ? st.sel : k[0] == M_ACT ? st.atk : st.act;
     if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && aim_ok(o - 1)) {
         k[0] = M_AIM; k[1] = st.act; k[2] = o - 1;  // the preview
+        if (st.ai == AI_AIM && st.abil != NO_ABIL && st.ai_t >= AI_PREVIEW
+            && st.cz * MAP_W + st.cx == st.ai_tgt) {
+            k[0] = M_ACT; k[1] = st.abil; k[2] = st.act;   // then an AI unit's ability: its name
+        }
     }
     pk[0][0] = (u16)(st.act + 1); pk[0][1] = st.unit[st.act].hp; pk[0][2] = st.unit[st.act].mp;
     pk[1][0] = o && o - 1 != st.act ? o : 0;
@@ -3089,8 +3223,8 @@ static void draw_spark(void)
     draw_sprite(f.x - st.camx - 16, f.y - st.camy - 10 - SPARK_H / 2, &sp);
 }
 
-// A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP): AMS text written
-// once into the strip's spare rows, then a 32-pixel sprite with a white outline
+// A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP, 2 the JP): AMS
+// text written once into the strip's spare rows, then a 32-pixel sprite with a white outline
 static void make_number(u8 k, const char *s)
 {
     u32 g[7], o = 0;
@@ -3111,17 +3245,22 @@ static void make_number(u8 k, const char *s)
 }
 
 // the target's from ACT_HIT (HP lost or healed, the status removed, Miss), then the EXP its
-// user earned from ACT_HIT + GAIN_T ("LvUp" for a level up) above the user
+// user earned from ACT_HIT + GAIN_T ("LvUp" for a level up) and its JP from ACT_HIT + JP_T
+// above the user
 static void draw_number(void)
 {
-    u8 t = (u8)(st.act_t - ACT_HIT), k = st.gain && t >= GAIN_T;
-    Feet f = unit_feet(st.rot, k ? st.atk : st.tgt);
+    u8 t = (u8)(st.act_t - ACT_HIT), k = 0;
+    Feet f;
     RtSprite sp;
     char s[8];
-    if (k) t -= GAIN_T;
+    if (st.gain && t >= JP_T) { k = 2; t -= JP_T; }
+    else if (st.gain && t >= GAIN_T) { k = 1; t -= GAIN_T; }
+    if (t >= (k ? GAIN_N : NUM_T)) return;
+    f = unit_feet(st.rot, k ? st.atk : st.tgt);
     if (!(W->num_ok & (1 << k))) {                 // one a frame (AMS text)
         u8 kind = act_kind(), n = 0;
-        if (k) {
+        if (k == 2) { n = put_s(s, 0, "JP+"); n = put_n(s, n, st.jpg); }
+        else if (k) {
             if (st.lvup) n = put_s(s, 0, "LvUp");
             else { n = put_s(s, 0, "EXP+"); n = put_n(s, n, st.gain); }
         } else if (!st.hit) n = put_s(s, 0, "Miss");

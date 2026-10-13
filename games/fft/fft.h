@@ -49,9 +49,13 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane
 
 #define TURN_FRAMES 3                  // rotation animation: frames between two views
-#define WALK_FRAMES 4                  // frames per tile when a unit walks
+#define WALK_FRAMES 7                  // frames per tile when a unit walks (FFT: 14 at 60 Hz)
+#define CLIMB_FRAMES 10                // a step up, down or over a tile (FFT: ~21)
 #define PATH_MAX 16
-#define AI_SHOW 9                      // frames an AI unit's move range or target is shown
+#define AI_GLIDE 2                     // AI turns: frames per tile of the cursor gliding to the
+#define AI_SHOW 8                      // tile it moves to, then its move range shown; the preview
+#define AI_PREVIEW 15                  // on its target, then an ability's name (FFT: ~1 s)
+#define AI_NAME 30
 #define AI_NONE 0xFD                   // an AI plan without an action
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
 // the death counter (Unit.dc): 3..0 while KO, then the unit is a crystal or a chest on its tile,
@@ -61,17 +65,24 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define DC_GONE 0xFF
 #define DC_OBJ(d) ((d) >= DC_CRYSTAL)          // out of the battle: its clock stopped
 #define EXP_LEVEL 100                  // EXP to the next level
-#define GAIN_T 14                      // M_ACT: the EXP gained rises from ACT_HIT + GAIN_T
 #define PICK_FRAMES 30                 // M_PICK: the message about what was picked up
 #define PANEL_H 46                     // a unit's panel against a side of the screen, at the bottom
-// an attack's frames: the wind-up, the blow from ACT_BLOW, the target hit (its HP lost, the
-// number shown) at ACT_HIT, its hit pose for HIT_FRAMES, the number rising NUM_RISE pixels,
-// the menu back at ACT_END
-#define ACT_BLOW 6
-#define ACT_HIT 10
-#define HIT_FRAMES 8
+// an attack's frames, FFT's at 30 fps (RE_NOTES.md § Pace): the attacker standing, its wind-up
+// from ACT_WIND, the blow from ACT_BLOW, the target hit (its HP lost, the number shown) at
+// ACT_HIT, its hit pose for HIT_FRAMES, the number rising NUM_RISE pixels and shown NUM_T frames,
+// the EXP the user gained from ACT_HIT + GAIN_T, its JP from ACT_HIT + JP_T (GAIN_N frames
+// each), the menu back at ACT_END (ACT_GAIN_END after a gain)
+#define ACT_WIND 5
+#define ACT_BLOW 13
+#define ACT_HIT 16
+#define HIT_FRAMES 24
 #define NUM_RISE 8
-#define ACT_END 34
+#define NUM_T 24
+#define GAIN_T 29
+#define JP_T 51
+#define GAIN_N 18
+#define ACT_END (ACT_HIT + 28)
+#define ACT_GAIN_END (ACT_HIT + 78)
 
 // M_BROWSE: the cursor free (enemies' turns, or the player looking around); M_MENU: the
 // player's turn menu; M_TARGET: the reach shown, a tile to pick; M_WALK; M_FACE: the facing
@@ -118,6 +129,8 @@ typedef struct {
 
 typedef struct {
     u8 rot;                            // orientation 0..3 (F5 +1, F1 -1)
+    u8 want, prot;                     // the orientation to turn to; the player's (F1 / F5), the
+                                       // view back on the player's turns after an AI turned it
     s8 turn;                           // rotation in progress: +1 / -1, 0 none
     u8 turn_t;                         // its frame, 1..TURN_FRAMES
     u8 cx, cz;                         // cursor, world tile
@@ -142,12 +155,14 @@ typedef struct {
     u16 self;                          // HP the user loses (Wish)
     u8 abil, sub, skill;               // the ability (NO_ABIL: Attack); M_ACTS's and M_SKILLS's entries
     u8 bag[NBAG];                      // the party's items
-    u8 gain, lvup;                     // M_ACT: the EXP the user earned (0 none), its level up
+    u8 gain, lvup, jpg;                // M_ACT: the EXP the user earned (0 none), its level up,
+                                       // its JP
     u8 pick, pick_t;                   // M_PICK: the item (items[] index; 0xFF: a crystal), frame
     u8 end;                            // END_*
     u8 ai, ai_t;                       // an AI turn: AI_*, its frame
     u8 ai_ab, ai_o, ai_tgt, ai_first;  // its plan: the ability (NO_ABIL, ABIL_DEFEND, AI_NONE), the
                                        // tile to act from, the target's tile, to act before moving
+    u8 ai_view;                        // the view it acts in (0xFF: the current one)
     u8 ai_all;                         // the AI plays the player's units too (a test scenario)
     u8 ai_nosup;                       // FFT's sticky flag: the enemies have lost their support
                                        // (fewer than two, or all Critical): no more retreats
@@ -209,6 +224,10 @@ u8 ai_frozen(void);
 extern u32 bg_used, bg_bad;            // frames drawn from the screen's copy of the scene, and
 #endif                                  // those that differ from the view's (tests)
 u8 ai_facing(u8 a);
+u8 view_hides(u8 rot, u8 i);           // rows of unit i's sprite view rot hides (4 columns, 0..88):
+#ifndef __m68k__                        // from the map's heights; from the current view's depth
+u8 view_hides_now(u8 i);
+#endif
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
 extern u8 scene_rot;                   // orientation it holds (0xFF: stale)
