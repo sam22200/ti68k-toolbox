@@ -73,7 +73,7 @@ IMPLEMENTATION** (what the TI does, and why).
   only in Status; FFT's rules as they are (the enemies earn too, JP shared, job levels).
 - The results: `Victory!` or `Game Over`, a line per unit of the player's side (level before >
   after, EXP and JP earned), [ENTER] the battle again with new draws. Saving with [ESC] at
-  milestone 22.
+  milestone 29 (renumbered 2026-10-13).
 - Done when a few rewards equal the original's (an attack, a kill, a level up), the crystal or
   chest odds and the counter's length as the code reads, a battle won and one lost by keys.
 
@@ -103,6 +103,31 @@ IMPLEMENTATION** (what the TI does, and why).
 - Measured then: the oracle's enemy Chemist has Defend (support 0x1DF); FFT's AI throws items at
   most the unit's Move away (its exact targeting: 4) and the enemies use the items of their
   level or less (at level 1 only Potion).
+
+## Decisions after playing milestone 21 (grilling, 2026-10-13, milestones 22-29)
+
+From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
+- OBSERVED (our build, headless): the "can't attack" and "farthest water tile" reports were the
+  cursor on a canal tile drawn on the same pixels as the street tile 2 units higher in front
+  (21-27 such spots a view); the reach, the attack and the projection were right.
+- OBSERVED IN FFT: a walked tile ~0.33 s, the blow ~0.7 s after the order, an attack with its
+  EXP ~3.2 s (menu back at frame ~192 of 60 Hz); ours were 2-3x faster. The weapon is its own
+  sprite (`BATTLE/WEP.SPR`, 85,504 bytes, placed by `WEP1/WEP2.SHP/.SEQ`); each unit `.SPR`
+  holds a ~48x32 portrait (rotated, raw rows); generic units have names (unit record +0x12C:
+  Goodman, Thompson, Barton, Miria, Edgar; Greg, Doreth, Sorvez, Hampsten), drawn anew each
+  game; the active-unit marker and the UI digits are in `EVENT/FRAME.BIN`; height shown as a
+  large "2h" top right, "depth 1" on water; all 38 canal tiles height 0, depth 1; four
+  45-degree yaws only.
+- OBSERVED IN FFTA (`x/ffta_*.png`, the snowball tutorial): a see-through band bottom left with
+  a bust rising above it, name, HP/MP/JP as numbers; the command menu bottom right under a
+  "MENU" tab, a ball cursor; the target's band mirrored bottom right; Status full screen.
+- TARGET: the original's durations at 30 fps, FFT's pauses before an AI action, the AI's camera
+  turned only when the actor or the target is more than half hidden; move tiles all at once,
+  style chosen on a sheet (and a test without depth); the hit flash on the sprite's inside, a
+  small knockback, no sparkles; the sword and dagger from the disc during the blow; FFTA's
+  layout in 4 greys (light grey bands, not dithered: text must read), FFT's portraits, names
+  and marker, the turn order on APPS; water sinking as measured; eight orientations only after
+  a one-view experiment.
 
 ## Tools
 
