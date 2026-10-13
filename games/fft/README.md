@@ -22,9 +22,13 @@ the battle's numbers come from the local disc (`tools/extract.py`, `tools/units.
 cursor and reach rings drawn on each tile's real slope, a camera that frames the action, and
 every frame of the player's turns within the 360k budget (`ROADMAP.md` milestone 21). From
 playing it: [2nd] on a tile drawn over by a higher one picks that one, the cursor dashed behind
-the scenery, the turn order on [APPS], "Quit?" on [ESC], HP above MP (milestone 22).
-Next (`ROADMAP.md` milestones 23-28): the original's pace, the move tiles, the hit flash and the weapons, an FFTA-style interface, the
-water, eight orientations; then the whole battle on the calculator (milestone 29). Study notes: `RE_NOTES.md`.
+the scenery, the turn order on [APPS], "Quit?" on [ESC], HP above MP (milestone 22). The
+original's pace, measured on it: walks, blows, the EXP and the JP, the AI's cursor gliding to
+its target, its preview and its ability's name, its camera turned when a unit is more than half
+hidden (milestone 23).
+Next (`ROADMAP.md` milestones 24-28): the move tiles, the hit flash and the weapons, an
+FFTA-style interface, the water, eight orientations; then the whole battle on the calculator
+(milestone 29). Study notes: `RE_NOTES.md`.
 
 ## Controls
 
@@ -42,9 +46,13 @@ While a unit walks the camera stays until the walker nears the screen's edge; wh
 acts, it stays when the unit and its target are both on screen, else it centres the point
 between them.
 Enemies and Delita (a guest) play as FFT's AI does: once the camera is on the unit the picture
-stands still for ~0.2 s while it thinks, then its move range is shown, it walks, its target is
-marked (the preview at the top right), it acts (the name at the top right) and turns to face
-the nearest enemy; a unit hitting from its own tile backs off after. A player's unit opens its
+stands still for ~0.2 s while it thinks, then the cursor glides to the tile it goes to, its move
+range is shown, it walks; when it or its target is more than half hidden the view turns (back to
+the player's on the player's turn); the cursor glides to its target, the preview shows at the
+top right (0.5 s), an ability's name 1 s more, it acts and turns to face the nearest enemy; a
+unit hitting from its own tile backs off after. The pace is FFT's at 30 fps: a step 0.23 s (a
+climb, a drop or a jump 0.33 s), an attack's blow 0.5 s after the order, the target hit 0.8 s,
+the user's EXP then its JP, the menu back 3.1 s after the order. A player's unit opens its
 menu at the top right: **Move** (once; the move can be undone with [shift] until it acts, which
 FFT does not allow; canals can be waded, a step from water to water costs 2), **Act** (once: a
 list as FFT's, **Attack**, the unit's skill set, Basic Skill, Item or Guts, and **Defend** for a
@@ -56,7 +64,8 @@ cure), [2nd] uses it: the swing (FFT's throw for Throw Stone and the items), the
 at the top right, the target hit (FFT's burst: a white blob, then sparkles flying apart), the
 damage, `+20` or the status removed, or `Miss`, rising above it, a critical hit or a Dash
 pushing it a tile, KO at 0 HP lying down, Phoenix Down raising a KO unit; a unit with a fifth
-of its HP or less kneels; then `EXP+12` rising above the user, `LvUp` for a level up), **Wait** (four arrows around the
+of its HP or less kneels; then `EXP+12` rising above the user, `LvUp` for a level up, then
+`JP+10`), **Wait** (four arrows around the
 unit, the one it faces black: the arrows turn it, [2nd] ends the turn) and **Status** (its
 level, HP, MP, Move, Jump, Speed, PA, MA, EXP, JP and job level; Brave, Faith and the zodiac
 stay hidden, as decided at milestone 13). A KO unit shows its death counter (3 to 0) above it;
@@ -79,7 +88,7 @@ at, 9 that enemy hit (the number rising), 10 that turn drawn with seed 10 (the t
 female Chemist's items, 12 her Potion aimed at Ramza, 13 Ramza's Wish landing on the recruit
 south of him, 14 four enemies KO and the last at 1 HP in front of Ramza, 15 the recruits KO,
 Delita in front of Ramza at 5 HP, 16 the AI on both sides from the start (a whole battle plays
-itself: won in ~6,000 frames); above 16 Ramza's turn drawn with seed n.
+itself: won in ~10,000 frames); above 16 Ramza's turn drawn with seed n.
 Key scripts: `keys/turn.txt` (a whole turn through the menu), `keys/attack.txt` (Ramza
 attacks, moves and waits) and `keys/skills.txt` (Ramza's Wish, then Wait), all from `fft(10)`;
 `keys/victory.txt` (from `fft(14)`: the last enemy knocked out, the results) and
@@ -242,8 +251,10 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   the building. Chosen over an inverted outline (black outside, white inside) and a dotted
   one, which need a second look (`x/choix_camps.png`, local); FFT itself tells the teams by
   palettes, which 4 greys cannot.
-- **Walking.** Tile by tile along the BFS path, 4 frames per tile, a hop on height changes;
-  while between two tiles the unit is sorted after both.
+- **Walking.** Tile by tile along the BFS path, FFT's pace (measured on the original's
+  movement record: 14 frames a tile at 60 Hz, ~21 for a jump up): 7 frames a tile, 10 for a
+  climb, a drop or a jump over a tile with a hop (tables of 64ths, no divide); while between
+  two tiles the unit is sorted after both.
 - **Turns.** FFT's clock (`ct_next`, `ct_end`): each tick every unit's CT grows by its Speed;
   the highest CT of 100 or more acts (a tie to the lower index: Delita, the enemies, Ramza,
   the recruits), losing 100; at the end it gets 20 back for each of Move and Act unused, at
@@ -259,7 +270,10 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   damage XA x WP with the signs' compatibility (a 16-bit step each), critical hits 4 % (XA +
   0..XA - 1, the target pushed a tile if it lands free and no higher), at most 999; KO at 0
   HP (the turn order made again). The number is AMS text written once into the HUD's spare
-  rows and drawn as a 32-pixel outlined sprite. The battle's draws come from our own 32-bit
+  rows and drawn as a 32-pixel outlined sprite. The timeline is the original's at 30 fps
+  (`ACT_*`, `RE_NOTES.md` § Pace): standing 5 frames, the wind-up, the blow at 13, the hit at
+  16 (hit pose 24 frames, the number 24), the EXP at +29, the JP at +51, the menu at +78 after
+  the hit (+28 without a gain). The battle's draws come from our own 32-bit
   xorshift (the runtime's 16-bit wyhash tied two draws in a row: every critical added at
   least 1).
 - **Abilities.** (`known`, `can_use`, `skill_range`, `skill_hit`, `skill_amount`, `skill`;
@@ -293,7 +307,14 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   others once per target from the safest tile. Spread over frames: the picture stands still
   first (the animation clock stops; once two frames in a row have the same checksum the frame is
   no longer drawn), then a step a frame within ~270k cycles (the setup's halves, 90 tiles of the
-  spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most.
+  spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most. Shown at FFT's
+  pace: the cursor glides a tile every 2 frames to where the unit goes and to its target, the
+  preview 15 frames, an ability's name 30 more. Its camera (`view_hides`, `ai_camera`): on the
+  plan's frame (not drawn) each view's hiding of the actor (on the tile it acts from) and of its
+  target is read from the map's corner heights at four columns of the sprite (the other views'
+  depth is not unpacked; as the view's depth on 558 of 560 tiles and views); more than half of
+  either hidden: the view turns to the one hiding the least before it aims, and back to the
+  player's view on the player's turn.
 - **Rings without stalls.** Old rings go by putting back the scene rows they are on from the
   view (~0.5k a row, and into the screen's copy), as many rows a frame as the budget allows;
   the new ones come after, as the budget allows too (the whole scene copied in one frame was
@@ -332,7 +353,8 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | | cycles | at 12 MHz |
 |---|---|---|
 | a player's turn (menus, the reach, a tile picked, walks, attacks, abilities, Wait, the results; every frame of the five key scripts and of 15 scenarios) | 160-250k on average a state, 329k at most | 32 fps (frame-limited) |
-| a battle the AI plays both sides of (fft(16), every one of 6,100 frames: pans, rings, walks, blows, up to 11 units on screen) | 236k on average (343k before); 7 frames at 360-381k (an AI aim or facing while the camera pans over 8-9 units) | 32 fps |
+| a battle the AI plays both sides of (fft(16), its first 14,000 frames: pans, rings, walks, blows, up to 11 units on screen) | 6 frames at 360-389k (an AI aim or facing while the camera pans over 8-9 units), and its camera turns (allowed stalls, as F1 / F5) | 32 fps |
+| an AI unit's view picked (its plan's frame, not drawn) | 6k, 93k when the other views are tried | |
 | its parts: the view copied (the camera moving) / its screen-aligned copy put back (still) | 107k / 25k | |
 | a unit on screen (its cover mask made again: +16k) | ~19k | |
 | a reach ring drawn into the scene | ~24k flat, ~45k sloped (as the budget allows) | |
@@ -340,7 +362,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 53,806 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 55,419 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (55.4 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
 unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 22 KB
 of work (the AI's and the moves' tables 7 KB, the screen's copy of the scene 4 KB; ~92 KB in

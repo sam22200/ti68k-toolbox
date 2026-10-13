@@ -237,13 +237,33 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     (360-381k) instead of 8; program 53,806 bytes. TiEmu: the build ran, but typing in the
     emulator on the desktop became unreliable before [APPS] could be checked on the keyboard
     matrix.
-23. **Pace.** The original's durations at 30 fps (ours were 2-3x faster: a walked tile 0.33 s
+23. **Pace** (done). The original's durations at 30 fps (ours were 2-3x faster: a walked tile 0.33 s
     instead of 0.13, the blow ~0.7 s after the order, an attack with its EXP ~3.2 s instead of
     1.6), measured more finely on the original (the hit pose, the menu's return). Before an AI
     action, FFT's own pauses: the cursor gliding to the target, the ability's name ~1 s. The
     AI's camera: before an action, the 4 views scored on how much of the actor and the target
     the depth leaves visible; a turn only when one of them is more than half hidden, back to
     the player's view on his turn. Then decide the asm view copy on the new numbers.
+    Done (measured on the original run headless: the units' movement records
+    `g_battle_unit_misc_data` from fft_decomp, the HP, pictures every 2-8 frames; `RE_NOTES.md`
+    § Pace): a flat tile is 14 frames at 60 Hz (0.23 s, not 0.33), a jump up ~21; an attack
+    hits 31 frames after Execute, the target's hit pose ~48, the number ~48, "EXP" from +60,
+    "JP" from +102, the menu at +156 after the hit; an AI turn: the camera pans to the actor,
+    the cursor glides to its target (~12), the preview ~30, then the blow (Gariland's AI acted
+    with Attack: the ability's name kept at ~1 s from the roadmap). Ours at 30 fps:
+    `WALK_FRAMES` 7, `CLIMB_FRAMES` 10 (climbs, drops, jumps over a tile: hop tables, no
+    divide), `ACT_*` (wind-up from 5, blow 13, hit 16, hit pose 24, the EXP then the JP shown,
+    the menu at hit + 78, + 28 without a gain), the AI's cursor gliding a tile every 2 frames
+    to its tile and its target, the preview 15 frames, an ability's name 30 more. The AI's
+    camera: `view_hides` reads how many rows of a unit's sprite a view hides from the map's
+    corner heights (the other views' depth not unpacked; as the depth says on 558 of 560 tiles
+    and views), `ai_camera` picks the view on the plan's frame (not drawn: 6k, 93k when the
+    other views are tried), the turn played before the aim, the player's view back on the
+    player's turn. Frames: the key scripts as before (280-321k), the AI battle 6 frames at
+    360-389k in its first 14,000 (7 at 360-381k in 6,100 before) and the AI's camera turns
+    (stalls as F1 / F5); `keys/attack.txt`, `skills.txt` retimed. Program 55,419 bytes. The asm
+    view copy: not needed for the player's frames; the 6 AI frames over 360k are the only case.
+
 24. **Move tiles.** All shown at once (a stall added to the allowed ones) instead of ~4 a
     frame; a sheet of styles to choose from: A a white centre with a dark edge drawing the grid,
     B a light grey centre with a black edge, C the grid lines only; a test without the depth
