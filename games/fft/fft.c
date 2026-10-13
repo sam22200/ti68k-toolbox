@@ -13,7 +13,7 @@
 
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
 #include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking,
-                                         // 9 an AI unit's thinking (a frame's step)
+                                         // 9 an AI unit's thinking (a frame's step), 10 the new reach rings
 #define ZB(n) BENCH_BEGIN(n)
 #define ZE(n) BENCH_END(n)
 #else
@@ -183,7 +183,7 @@ typedef struct {
     s16 bg_x, bg_y;                     // this camera and scene version (bg_ok): copied to the
     u16 bg_ver;                         // screen without shifts while the camera stands still;
     u8 bg_ok, bg_part;                  // patched as rings come and go; its top half kept
-    u8 ring_wait, hud_wait, bg_wait;    // frames the rings, a HUD part, the copy, the cursor's
+    u8 drop_wait, hud_wait, bg_wait;    // frames the rings going, a HUD part, the copy, the cursor's
     u8 cur_wait;                        // dashes waited for room
     s16 left, upd_k;                    // the frame's budget left for optional work, the update's
                                         // heavy work this frame (k cycles)
@@ -201,12 +201,13 @@ static Work *W;
 #define COVER_K 16                      // its cover mask made again
 #define BG_K 25                         // the screen's copy of the scene put back
 #define VIEW_K 105                      // the view copied (the camera moved)
-#define RING_K 30                       // a new flat ring (12 rows; a sloped one by its rows)
+#define RING_K 30                       // a new flat ring (12 rows; a sloped one by its rows): taken
+                                        // from the budget, the other optional work waits
 #define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
 #define HUD_K 40                        // a part of the HUD made
 #define SAVE_K 15                       // half the screen's copy kept
 #define SAVE_WAIT 2                     // frames the copy waits at most once the camera stops,
-#define WAIT_MAX 8                      // the rings or a HUD part (then done anyway)
+#define WAIT_MAX 8                      // the rings going or a HUD part (then done anyway)
 #define SUM_K 25                        // an AI unit's picture checked (planes_sum)
 #define CUR_K 15                        // the cursor's dashes made again (8-19k)
 #define TURN_K 45                       // the update's own heavy work: a turn's start (the clock,
@@ -631,7 +632,7 @@ static void marker(u8 rot, u8 i, u8 cur, Marker *k)
     k->rows = 12; k->y = scene_y(u, v) - map_tiles[i].stand * (HU / 2);
 }
 
-// A reach ring (its marker) drawn into the scene on a tile of view diagonal depth, but where
+// A reach tile (its marker) drawn into the scene on a tile of view diagonal depth, but where
 // the view has something in front of its pixels (a greater diagonal): there the view shows, but
 // for a pattern of them: a hidden ring stays visible over the building, set apart from the seen
 // ones. A 16-bit word at a time, its two depth bytes compared at once (diagonals < 128: t + 127 -
@@ -641,33 +642,29 @@ static const u8 hide_pat[2] = { 0xCC, 0x33 };   // 2-pixel dashes (picked over t
                                                 // and a checkerboard)
 static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
 {
-    s16 r, k, w0 = mk->x >> 4, sh = mk->x & 15;
+    s16 r, k, w0 = mk->x >> 4, sh = mk->x & 15, yy = mk->y;
     u16 dd = (u16)(0x7F7F - (mk->depth | mk->depth << 8));
-    for (r = 0; r < mk->rows; r++) {
-        s16 yy = mk->y + r;
-        u32 m32 = mk->m[r] >> sh, l32 = mk->l[r] >> sh, d32 = mk->d[r] >> sh;
-        u16 hp = (u16)~(hide_pat[yy & 1] * 0x0101);
-        if ((u16)yy >= SC_H) continue;
+    u16 hp = (u16)~(hide_pat[yy & 1] * 0x0101), o = (u16)(yy * SC_BYTES + 2 * w0);
+    for (r = 0; r < mk->rows; r++, yy++, o += SC_BYTES, hp = (u16)~hp) {
+        u32 m = mk->m[r], l = mk->l[r], d = mk->d[r], a;
+        u16 m3[3], l3[3], d3[3];
+        if ((u16)yy >= SC_H || !m) continue;
+        a = m >> sh; m3[0] = (u16)(a >> 16); m3[1] = (u16)a; m3[2] = (u16)(m << (16 - sh));
+        a = l >> sh; l3[0] = (u16)(a >> 16); l3[1] = (u16)a; l3[2] = (u16)(l << (16 - sh));
+        a = d >> sh; d3[0] = (u16)(a >> 16); d3[1] = (u16)a; d3[2] = (u16)(d << (16 - sh));
         for (k = 0; k < 3; k++) {
-            s16 w = w0 + k;
-            u16 m, o, g1, g2, c;
-            const u8 *t;
-            u8 *q;
-            if (k < 2) { m = (u16)(m32 >> (16 - 16 * k)); }
-            else m = sh > 8 ? (u16)(mk->m[r] << (16 - sh)) : 0;
-            if (!m || (u16)w >= SC_BYTES / 2) continue;
-            o = (u16)(yy * SC_BYTES + 2 * w);
-            t = vbuf + 2 * SC_PLANE + o;            // depths, masks: constant offsets
-            g1 = (u16)(RD16(t, 0) + dd) & 0x8080; g1 = (u16)((g1 << 1) - (g1 >> 7));
-            g2 = (u16)(RD16(t + 2 * SC_PLANE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
-            c = (u16)(((g1 & RD16(t + SC_PLANE, 0)) | (g2 & RD16(t + 3 * SC_PLANE, 0))) & m & hp);
-            q = scene_l + o;
-            {
-                u16 a = k < 2 ? (u16)(l32 >> (16 - 16 * k)) : (u16)(mk->l[r] << (16 - sh));
-                u16 b = k < 2 ? (u16)(d32 >> (16 - 16 * k)) : (u16)(mk->d[r] << (16 - sh));
-                WR16(q, 0, (u16)((RD16(q, 0) & ~m) | (a & m & ~c) | (RD16(vbuf + o, 0) & c)));
-                WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~m) | (b & m & ~c) | (RD16(vbuf + SC_PLANE + o, 0) & c)));
+            u16 mw = m3[k], g1, g2, c, oo = (u16)(o + 2 * k);
+            const u8 *t = vbuf + 2 * SC_PLANE + oo;     // depths, masks: constant offsets
+            u8 *q = scene_l + oo;
+            if (!mw || (u16)(w0 + k) >= SC_BYTES / 2) continue;
+            if (st.over) c = 0;                         // over the scenery: no depth test
+            else {
+                g1 = (u16)(RD16(t, 0) + dd) & 0x8080; g1 = (u16)((g1 << 1) - (g1 >> 7));
+                g2 = (u16)(RD16(t + 2 * SC_PLANE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
+                c = (u16)(((g1 & RD16(t + SC_PLANE, 0)) | (g2 & RD16(t + 3 * SC_PLANE, 0))) & mw & hp);
             }
+            WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(vbuf + oo, 0) & c)));
+            WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (d3[k] & mw & ~c) | (RD16(vbuf + SC_PLANE + oo, 0) & c)));
         }
     }
 }
@@ -796,9 +793,8 @@ static void bg_patch(s16 x, s16 y, s16 w, s16 h)
 
 // a new view, or many rings to drop (a Move's): copied whole (130k); a few (an attack's): only
 // their boxes put back from the view (~7k each; the frame an attack starts went over the
-// budget with the whole copy). The new rings are then drawn RING_STEP a frame (~18k each:
-// the four of an attack in one frame made it 381k with ten units on screen)
-#define RING_STEP 4                     // new rings a frame at most (and as the budget allows)
+// budget with the whole copy). The new rings are then all drawn in one frame (~18k each), as
+// FFT shows them at once: a Move's is a stall (zone 10 under ti-cycles), as a turn of the view
 
 static u8 bg_usable(void)
 {
@@ -815,7 +811,7 @@ static void scene_rows(s16 y, s16 n)
 
 static void ensure_scene(u8 rot)
 {
-    u8 i, k;
+    u8 i;
     Marker mk;
     if (scene_rot == rot && scene_seq == hl_seq) {
         if (W->drop_y0 < W->drop_y1) goto drop;
@@ -842,26 +838,28 @@ drop:
     if (W->drop_y0 < W->drop_y1) {                 // the rings going: their rows put back from
         s16 n = W->left > 8 * ROW_K ? W->left / ROW_K : 8;   // the view (and into the screen's
         if (n > W->drop_y1 - W->drop_y0) n = W->drop_y1 - W->drop_y0;   // copy) as the budget
-        scene_rows(W->drop_y0, n);                 // allows, then the new ones (a whole scene
-        bg_patch(0, W->drop_y0, SC_W, n);          // copy, 130k, or the rings' boxes one by one,
-        W->drop_y0 += n; W->left -= n * ROW_K;     // ~10k each, went over the budget)
+        if (W->left < n * ROW_K && W->drop_wait < WAIT_MAX) { W->drop_wait++; return; }
+        W->drop_wait = 0;                          // allows, then the new ones (a whole scene
+        scene_rows(W->drop_y0, n);                 // copy, 130k, or the rings' boxes one by one,
+        bg_patch(0, W->drop_y0, SC_W, n);          // ~10k each, went over the budget)
+        W->drop_y0 += n; W->left -= n * ROW_K;
         if (W->drop_y0 < W->drop_y1) return;
     }
 rings:
     dst_scene();
     if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; return; }
-    for (k = 0; W->ring_i < MAP_W * MAP_H && k < RING_STEP; W->ring_i++) {
+    ZB(10);
+    for (; W->ring_i < MAP_W * MAP_H; W->ring_i++) {
         i = W->ring_i;
         if (st.reach[i] == 0xFF) continue;
         marker(rot, i, 0, &mk);
-        if (W->left < RING_K * mk.rows / 12 && W->ring_wait < WAIT_MAX) { W->ring_wait++; break; }
-        W->left -= RING_K * mk.rows / 12; W->ring_wait = 0;
-        k++;
+        W->left -= RING_K * mk.rows / 12;
         ring_into_scene(&mk);
         bg_patch(mk.x, mk.y, 24, mk.rows);
         if (mk.y < W->ring_y0) W->ring_y0 = mk.y < 0 ? 0 : mk.y;
         if (mk.y + mk.rows > W->ring_y1) W->ring_y1 = mk.y + mk.rows > SC_H ? SC_H : mk.y + mk.rows;
     }
+    ZE(10);
 }
 
 u16 scene_checksum(void)
@@ -2714,6 +2712,7 @@ u8 game_update(void)
     u8 mode0 = st.mode;
     if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
     if (st.ai != AI_THINK) st.tick++;            // (a unit thinking: the picture stands still)
+    if (input_pressed(K_MODE)) { st.over ^= 1; hl_seq++; }  // the reach over the scenery, or not
     if (st.turn) {                                 // rotating: nothing else moves the view
         if (++st.turn_t >= TURN_FRAMES) {          // done: the cursor stays where it was
             s16 u, v, px, py;
