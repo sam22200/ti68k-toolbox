@@ -25,8 +25,9 @@ playing it: [2nd] on a tile drawn over by a higher one picks that one, the curso
 the scenery, the turn order on [APPS], "Quit?" on [ESC], HP above MP (milestone 22). The
 original's pace, measured on it: walks, blows, the EXP and the JP, the AI's cursor gliding to
 its target, its preview and its ability's name, its camera turned when a unit is more than half
-hidden (milestone 23).
-Next (`ROADMAP.md` milestones 24-28): the move tiles, the hit flash and the weapons, an
+hidden (milestone 23). The reach as FFT's tiles (white, a dark edge drawing the grid), all
+shown at once, [MODE] drawing them over the scenery in front (milestone 24).
+Next (`ROADMAP.md` milestones 25-28): the hit flash and the weapons, an
 FFTA-style interface, the water, eight orientations; then the whole battle on the calculator
 (milestone 29). Study notes: `RE_NOTES.md`.
 
@@ -39,6 +40,7 @@ FFTA-style interface, the water, eight orientations; then the whole battle on th
 | [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can); at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
 | [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
 | [APPS] or [CATALOG] | the turn order (PC: A), closed by any key |
+| [MODE] | the reach tiles drawn over the scenery in front of them, or hidden by it but for dashes (PC: M) |
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.
@@ -76,7 +78,7 @@ a chest or the whole party, Delita included, is KO (`Game Over`): the results li
 the player's units with its level, the EXP and JP it earned. The HUD shows the height under
 the cursor at the top left in FFT units (`h2`, `h7.5` on a slope); [APPS] shows the turn order
 in a window (FFT's AT list: the active unit, then the next five turns; enemies in dark grey).
-The cursor is dashed where the scenery is in front of it, as the hidden reach rings. At the
+The cursor is dashed where the scenery is in front of it, as the hidden reach tiles. At the
 bottom corners, as in Metal Gear Solid: Portable Ops, two thin panels read sideways: the
 active unit at the left, the unit under the cursor at the right (light grey: an enemy), each
 with its name, its HP above its MP as `52/52` and `16/16` and a gauge beside each number (HP
@@ -167,12 +169,15 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   `lib/unpack68k.s` on the TI, 2.2 M cycles = 0.18 s; a C copy on the PC), during the first
   frame of the turn that reaches it, and copied into the 17 KB scene buffer when the
   orientation changes (the rows of the reach rings put back as they go). Two allocations: AMS refuses blocks above ~64 KB.
-- **Reach rings** are drawn into that scene copy, but where the view has something in front of
+- **Reach tiles** (milestone 24: style A of a sheet of three, `x/m24_styles.png`, local: a
+  white diamond, its edge 2 px of dark grey, the diamonds overlapping so the edges draw the
+  grid) are drawn into that scene copy, but where the view has something in front of
   their pixels: there the view shows, but for 2-pixel dashes: a tile behind a house keeps a
-  dashed ring over it (the user's pick over the whole ring and a checkerboard,
+  dashed edge over it (the user's pick over the whole tile and a checkerboard,
   `x/bench_cases_cachees.png`, local); no cost per frame. One pass per 16-bit word, its two
-  depth bytes compared at once (diagonals < 128: `t + 127 - depth` sets bit 7 when `t > depth`):
-  ~24k a ring. The cursor's line is 4 px per row (`x/bench_curseur.png`).
+  depth bytes compared at once (diagonals < 128: `t + 127 - depth` sets bit 7 when `t > depth`),
+  each row's three words computed once: ~20k a tile (+3k its shape, +3k the screen's copy).
+  [MODE] (`st.over`) skips the depth: the tiles drawn over the scenery in front, ~12k. The cursor's line is 4 px per row (`x/bench_curseur.png`).
 - **Markers on slopes.** A flat tile gets the 24 x 12 diamond at its height; a sloped one
   (25 of 150 at Gariland: ramps of 1 or 2 units, a corner raised) the outline of its four
   corners at their heights, drawn by `art.py` by the distance to the quad's edges (so a tilted
@@ -315,10 +320,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   depth is not unpacked; as the view's depth on 558 of 560 tiles and views); more than half of
   either hidden: the view turns to the one hiding the least before it aims, and back to the
   player's view on the player's turn.
-- **Rings without stalls.** Old rings go by putting back the scene rows they are on from the
-  view (~0.5k a row, and into the screen's copy), as many rows a frame as the budget allows;
-  the new ones come after, as the budget allows too (the whole scene copied in one frame was
-  130k, a ring's box ~10k; an attack's first frame was 437k, Move a 0.74 M stall). Picking a
+- **Reach tiles at once.** Old tiles go by putting back the scene rows they are on from the
+  view (~0.5k a row, and into the screen's copy), as many rows a frame as the budget allows
+  (8 frames at most); the new ones come after, all in one frame: a stall, as F1 / F5 (Ramza's
+  Move, 44 tiles, ~1.24 M, ~0.92 M over the scenery; an attack's 4 tiles ~0.1 M; before,
+  ~4 a frame: Move's 44 took 13 frames). The whole scene copied in one frame was 130k. Picking a
   tile reuses the steps of the reach just shown (`make_path`: a spread less, ~90k).
 - **A frame's budget** (`FRAME_K`, thousands of cycles): before drawing, what the frame costs
   without its optional work is reckoned (19k a unit on screen, 16k a cover mask to make, the
@@ -353,16 +359,16 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | | cycles | at 12 MHz |
 |---|---|---|
 | a player's turn (menus, the reach, a tile picked, walks, attacks, abilities, Wait, the results; every frame of the five key scripts and of 15 scenarios) | 160-250k on average a state, 329k at most | 32 fps (frame-limited) |
-| a battle the AI plays both sides of (fft(16), its first 14,000 frames: pans, rings, walks, blows, up to 11 units on screen) | 6 frames at 360-389k (an AI aim or facing while the camera pans over 8-9 units), and its camera turns (allowed stalls, as F1 / F5) | 32 fps |
+| a battle the AI plays both sides of (fft(16), its first 14,000 frames: pans, reach tiles, walks, blows, up to 11 units on screen) | 359k at most, its reach tiles (114 stalls, ~0.67 M median, 2.5 M at most with a view change) and its camera turns (allowed stalls, as F1 / F5) | 32 fps |
 | an AI unit's view picked (its plan's frame, not drawn) | 6k, 93k when the other views are tried | |
 | its parts: the view copied (the camera moving) / its screen-aligned copy put back (still) | 107k / 25k | |
 | a unit on screen (its cover mask made again: +16k) | ~19k | |
-| a reach ring drawn into the scene | ~24k flat, ~45k sloped (as the budget allows) | |
+| a reach tile drawn into the scene (all in one frame) | ~26k, ~18k over the scenery ([MODE]) | |
 | an AI unit thinking (the picture still: the frame not drawn; a step a frame) | 94k on average, 270k at most | 5 frames a turn (6 at most), after the camera's pan |
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 55,419 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 56,226 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (55.4 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
 unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 22 KB
 of work (the AI's and the moves' tables 7 KB, the screen's copy of the scene 4 KB; ~92 KB in
@@ -404,9 +410,8 @@ frame 370k, selection 3.8 M.
   not kept (no inventory); JP shared to a unit of another job are not kept (FFT stores them
   in that job); the results have no war trophies (FFT's Mythril Knife, Phoenix Down, Potion);
   [ESC] does not save the battle yet (milestone 29).
-- A battle the AI plays has 8 frames of 6,100 over the budget (361-383k: an AI aim or facing
-  while the camera pans over 8-9 units; the key scripts 6 of 2,375, up to 405k); a faster view
-  copy (68000 asm) would close the gap. The budget delays optional work by a frame or two: a
-  Move's 44 rings take 13 frames (0.4 s; an AI unit's range 3 on average, 7 at most), the HUD's
-  parts follow the camera's pan.
+- The reach tiles appear in one stall (Ramza's Move ~0.1 s; a view change with them up to
+  0.2 s); pre-shifted flat tiles (the x of a tile is a multiple of 12) would roughly halve it.
+  A battle lost by keys has 6 frames over the budget (up to 371k); the budget delays other
+  optional work by a frame or two (the HUD's parts follow the camera's pan).
 - The hit burst is drawn for damage only (FFT has other effects for heals and statuses).
