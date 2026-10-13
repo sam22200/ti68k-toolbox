@@ -264,10 +264,19 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     (stalls as F1 / F5); `keys/attack.txt`, `skills.txt` retimed. Program 55,419 bytes. The asm
     view copy: not needed for the player's frames; the 6 AI frames over 360k are the only case.
 
-24. **Move tiles.** All shown at once (a stall added to the allowed ones) instead of ~4 a
+24. **Move tiles** (done). All shown at once (a stall added to the allowed ones) instead of ~4 a
     frame; a sheet of styles to choose from: A a white centre with a dark edge drawing the grid,
     B a light grey centre with a black edge, C the grid lines only; a test without the depth
     (no dashes: tiles drawn over the scenery in front), its cost measured, to compare.
+    Done: the user picked A (`x/m24_styles.png`, local: A, B, C and A without the depth) and
+    both ways of A, switched by [MODE] (a new runtime key, `K_MODE`; PC: M). The tiles all
+    drawn in one frame (`ensure_scene`), the old ones going as the budget allows (8 frames at
+    most); `ring_into_scene` computes each row's three words once (26k -> 18k a ring, same
+    pixels). A tile: ~20k with the depth, ~12k without (+3k its shape, +3k the screen's copy);
+    Ramza's Move (44 tiles) ~1.24 M / ~0.92 M, a stall as F1 / F5. Frames: the key scripts
+    297-345k (defeat 371k, 6 frames over), the AI battle 359k at most in its first 14,000
+    frames (6 over 360k before), 114 reach stalls. Program 56,226 bytes. Not done: pre-shifted
+    flat tiles (~5k a tile without the depth, ~12k with it), left for later.
 25. **Blows.** The hit flash on the target's inside (the 4th plane): its greys up to light
     grey then white held ~8 frames, then back, the black outline kept; the target knocked back
     a pixel or two; the sparkles of milestone 21 dropped. The sword and the dagger from

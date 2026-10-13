@@ -329,6 +329,41 @@ static void test_turn_keys(void)
     }
 }
 
+// ---------------------------------------------------------------- milestone 24: the reach tiles
+static int scene_whites(void)
+{
+    int i, n = 0;
+    for (i = 0; i < SC_BYTES * SC_H; i++) n += __builtin_popcount((u8)~(scene_l[i] | scene_d[i]));
+    return n;
+}
+
+// a Move's reach all drawn the frame it opens (view E: tiles behind the houses); [MODE] draws
+// them over the scenery in front (more white), again as in FFT (the same scene)
+static void test_reach_tiles(void)
+{
+    u16 s1;
+    int w0, w1, w2;
+    sw_init(10);
+    press(K_F5); steps(0, TURN_FRAMES + 2);
+    w0 = scene_whites();
+    press(K_A);
+    CHECKV(st.mode, M_TARGET);
+    s1 = scene_checksum(); w1 = scene_whites();
+    steps(0, 10);
+    CHECKV(scene_checksum(), s1);
+    CHECK(w1 > w0 + 2000);
+    press(K_MODE);
+    CHECKV(st.over, 1);
+    steps(0, 10);
+    w2 = scene_whites();
+    printf("reach tiles: %d white pixels in the scene, %d with the reach, %d over the scenery\n", w0, w1, w2);
+    CHECK(w2 > w1 + 500);
+    press(K_MODE);
+    CHECKV(st.over, 0);
+    steps(0, 10);
+    CHECKV(scene_checksum(), s1);
+}
+
 static void test_walk_keys(void)
 {
     int k;
@@ -395,8 +430,9 @@ static void test_fixes(void)
     u8 c, t, i, n = 0;
     u16 hp;
     sw_init(0);                                           // the HUD on the AI's turns: a
-    for (i = 0; i < 60 && st.mode != M_WALK; i++) sw_step(0);   // unit walking, and the next
-    CHECK(hud_shown());                                   // unit's panel made within a few
+    for (i = 0; i < 60 && st.mode != M_WALK; i++) sw_step(0);   // unit walking (its reach's
+    for (i = 0; i < 8 && !hud_shown(); i++) sw_step(0);        // rows put back first), and the
+    CHECK(hud_shown());                                   // next unit's panel made within a few
     c = st.act;                                           // frames of its turn
     while (st.act == c) sw_step(0);
     for (i = 0; i < 20 && !hud_shown(); i++) sw_step(0);
@@ -1284,6 +1320,7 @@ int main(int argc, char **argv)
     test_hides();
     test_team();
     test_turn_keys();
+    test_reach_tiles();
     test_walk_keys();
     test_menu();
     test_fixes();

@@ -131,6 +131,8 @@ typedef struct {
     u8 rot;                            // orientation 0..3 (F5 +1, F1 -1)
     u8 want, prot;                     // the orientation to turn to; the player's (F1 / F5), the
                                        // view back on the player's turns after an AI turned it
+    u8 over;                           // [MODE]: the reach tiles drawn over the scenery in front
+                                       // of them (else hidden by it but for dashes, as in FFT)
     s8 turn;                           // rotation in progress: +1 / -1, 0 none
     u8 turn_t;                         // its frame, 1..TURN_FRAMES
     u8 cx, cz;                         // cursor, world tile
