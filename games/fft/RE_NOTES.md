@@ -680,6 +680,41 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
 - TARGET: the cursor and the rings drawn on the tile's four corners at their heights (`art.py`
   `slope_marker`, 13 shapes, picked by the corners' lifts in the view, `marker`).
 
+### Pace (milestone 23)
+
+- OBSERVED (run headless from `gariland_t1.state`, Ramza's first turn; each unit's movement
+  record `g_battle_unit_misc_data` 0x800b7308, 16 x 0x440 bytes, found by its backlink +0x134
+  to the unit's stats: `real` +0x18 x / height / depth in 1/4096 world units, `step_phase`
+  +0x7f; read in fft_decomp): Move, a tile picked, the unit walks at once (6 frames after
+  [O]) and FFT asks "Are you sure you want to move here?" once it stands there. A flat tile
+  is two phases of 7 frames at 60 Hz (to the edge, to the centre: 8190 units a frame, a tile
+  28 x 4096): 14 frames, 0.23 s; a step up 2 units: the edge, a jump phase rising 10 frames
+  and falling 2, the centre: ~21 frames. (Our first estimate, 0.33 s, counted the cursor's
+  glide.)
+- OBSERVED (Ramza's Attack on the recruit, Broad Sword; pictures every 2-6 frames): Execute
+  at 0; the panels close (8); the wind-up from ~10, the blade from ~26; the slash and the hit
+  at ~31 (the HP lowered in RAM at +10, ahead of the picture); the target's hit pose ~48
+  frames; the number rises ~12 frames and stays to ~+84; "10 EXP." +92-+128, "10 JP" +134-+164;
+  the menu back at ~+188 (3.1 s).
+- OBSERVED (the first AI turns after Ramza waits, a Chemist's Attack): the turn's unit at 0,
+  the camera pans to it (~30 frames), its panel ~36, the move range then the walk; after the
+  walk the camera turned (~16 frames) where the actor was behind a house; its panel again
+  (~36), the cursor glides to the target (~12) and its panel (~12), the preview with the hit
+  chance ~30, the blow ~30 later; a level up message ~40; the next turn ~200 after the hit.
+  No ability was used in these turns: the name box was not measured (~1 s kept from the
+  grilling).
+- TARGET (30 fps, half the frames): a tile 7 frames, a climb, drop or jump 10 (a hop table);
+  the attack: standing 5, wind-up to 13, blow to 16, the hit at 16 (hit pose 24, the number
+  24), the EXP at +29, the JP at +51 (18 frames each), the menu at +78 (+28 when nothing is
+  earned); the AI: the cursor gliding a tile every 2 frames to its tile and its target, the
+  preview 15 frames, an ability's name 30 more. The panels' slides are not reproduced (our
+  panels are drawn when they change).
+- TARGET (the AI's camera): FFT's rule is not read; ours turns only when the actor (on the tile
+  it acts from) or its target is more than half hidden, to the view hiding the least of the
+  worse of them, and the player's view comes back on the player's turn. Hidden rows from the
+  map's corner heights (the top faces' upper edges at four columns of the sprite): as the
+  view's depth says half hidden or not on 558 of 560 tiles and views (`make test`).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -697,3 +732,4 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
 | moving | canals waded (water to water 2), jumps over one tile, trees crossed | same, the two measured ranges exact | 2 ranges of `oracle.py --ai`, decomp |
 | AI | scores the field (HP x 128 / max, KO -192, Critical -32), ranks 8, draws on hit chance; danger 10 - steps; hit and back off | same, 129 of 136 turns the same action, 125 the same tile | decomp, 136 turns of `oracle.py --ai` |
 | a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | an outlined blob 2 frames, sparkles 6 (30 Hz) | a picture every 2 frames of a Throw Stone |
+| pace (60 Hz / ours 30) | a tile 14, a jump ~21; Execute to hit 31, menu +188; AI glide ~12, preview ~30 | 7, 10; 16, +78 after the hit; 2 a tile, 15 | movement records and pictures, § Pace |

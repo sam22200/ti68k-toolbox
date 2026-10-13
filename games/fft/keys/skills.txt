@@ -1,7 +1,7 @@
 # Ramza's Wish from fft(10) (his first turn): Act, Guts, Wish, the cursor down onto the recruit
 # south of him (full HP: Wish heals nothing, Ramza loses a fifth of his), the ability played
 # (+20 rising), then Wait facing as he does: the turn ends.
-#   make xcheck XCHECK=10 FRAMES=200 KEYS=keys/skills.txt
+#   make xcheck XCHECK=10 FRAMES=250 KEYS=keys/skills.txt
 20 DOWN
 22
 30 A
@@ -16,11 +16,11 @@
 72
 80 A
 82
-130 DOWN
-132
-140 DOWN
-142
-150 A
-152
-160 A
-162
+180 DOWN
+182
+190 DOWN
+192
+200 A
+202
+210 A
+212

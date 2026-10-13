@@ -1,7 +1,7 @@
 # Ramza attacks from fft(10) (his first turn): Act, Attack, the cursor down onto the recruit south of
 # him (the oracle's case: an ally, FFT allows it), the attack played (the number rising), then
 # Move to (4, 9) and Wait: the turn ends.
-#   make xcheck XCHECK=10 FRAMES=200 KEYS=keys/attack.txt
+#   make xcheck XCHECK=10 FRAMES=260 KEYS=keys/attack.txt
 20 DOWN
 22
 30 A
@@ -12,15 +12,15 @@
 42
 50 A
 52
-100 A
-102
-110 UP
-112
-120 UP
-122
-130 A
-132
-170 A
+160 A
+162
+170 UP
 172
-180 A
+180 UP
 182
+190 A
+192
+230 A
+232
+240 A
+242
