@@ -1161,6 +1161,60 @@ static void test_pace(void)
     CHECK(back);
 }
 
+// The flash changes visible flesh/clothes and keeps the black contour. Compare pixels
+// in the actual hit pose, with the recoil's screen displacement removed; HP/tiles stay put.
+static void test_blows(void)
+{
+    u8 normal[UNIT_SH][16], light[UNIT_SH][16];
+    const u8 *data;
+    u16 size, lit = 0, edges = 0;
+    s16 u, v, sx, sy, x, y;
+    u8 k;
+    State before;
+    sw_init(17);
+    for (k = 0; k < NUNIT; k++) if (k != 1) st.unit[k].x = 200;
+    st.unit[1].x = 9; st.unit[1].z = 14; st.unit[1].face = 2;
+    st.unit[st.atk].face = 3; st.rot = 0; st.abil = NO_ABIL; st.hit = 1;
+    st.unit[1].hp = st.unit[1].max_hp;
+    view_of(0, 9, 14, &u, &v);
+    sx = scene_x(0, u, v); sy = scene_y(u, v) + HH - map_tiles[149].stand * (HU / 2);
+    st.camx = sx - 80; st.camy = sy - 65; sx = 80; sy = 65;
+    data = rt_file("fftu", &size) + (st.unit[1].gfx * 2 * UNIT_FRAMES + P_HIT) * UNIT_FB;
+    st.act_t = ACT_HIT + FLASH_FRAMES;
+    game_render(); game_render();
+    for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) normal[y][x] = sw_level(sx - 8 + x, sy - UNIT_FOOT + y);
+    before = st;
+    st.act_t = ACT_HIT + 10;
+    game_render();
+    for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) light[y][x] = sw_level(sx - 8 + x, sy - UNIT_FOOT + y);
+    st.act_t = ACT_HIT + 8;
+    game_render();
+    for (y = 2; y < UNIT_FOOT - 1; y++) for (x = 0; x < 16; x++) {
+        u16 bit = (u16)(0x8000 >> x), in = (u16)(data[2 * (3 * UNIT_SH + y)] << 8 | data[2 * (3 * UNIT_SH + y) + 1]);
+        u16 mask = (u16)(data[2 * (2 * UNIT_SH + y)] << 8 | data[2 * (2 * UNIT_SH + y) + 1]);
+        u8 white = sw_level(sx - 8 + x + 1, sy - UNIT_FOOT + y - 1);
+        if (in & bit) { CHECKV(light[y][x], C_LGRAY); CHECKV(white, C_WHITE); lit++; }
+        else if (!(mask & bit) && normal[y][x] == C_BLACK) { CHECKV(light[y][x], C_BLACK); CHECKV(white, C_BLACK); edges++; }
+    }
+    CHECK(lit >= 20 && edges >= 10);
+    CHECKV(st.unit[1].x, before.unit[1].x); CHECKV(st.unit[1].z, before.unit[1].z); CHECKV(st.unit[1].hp, before.unit[1].hp);
+    // Misses, healing and Defend keep the normal idle sprite, even during the flash window.
+    st.mode = M_BROWSE;
+    game_render(); game_render();
+    for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) normal[y][x] = sw_level(sx - 8 + x, sy - UNIT_FOOT + y);
+    for (k = 0; k < NABIL && abilities[k].kind != AB_HEAL; k++) ;
+    CHECK(k < NABIL);
+    for (u8 which = 0; which < 3; which++) {
+        st.mode = M_ACT; st.act_t = ACT_HIT + 10; st.hit = which != 0;
+        st.abil = which == 0 ? NO_ABIL : which == 1 ? k : ABIL_DEFEND;
+        game_render();
+        for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) CHECKV(sw_level(sx - 8 + x, sy - UNIT_FOOT + y), normal[y][x]);
+        CHECKV(st.unit[1].hp, before.unit[1].hp);
+    }
+    for (k = 17; k <= 25; k++) { sw_init(k); steps(0, BLADE_END + 1); CHECKV(st.mode, M_ACT); }
+    printf("blows: %u interior pixels light/white, %u black contour pixels kept; nine armed/unarmed doors\n", lit, edges);
+}
+
 // Defend: drawn as FFT draws a support ability; a command after the skill set, Defending until
 // the unit's next turn
 static void test_defend(void)
@@ -1332,6 +1386,7 @@ int main(int argc, char **argv)
     test_ai();
     test_ai_battle();
     test_pace();
+    test_blows();
     test_defend();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);

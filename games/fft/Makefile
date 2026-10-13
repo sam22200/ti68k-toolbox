@@ -20,14 +20,17 @@ $(VIEWS:=.bin): map.h
 %.89y: %.bin
 	$(TI)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat $< $*
 fftu.bin: units.h
-ti cycles: $(VIEWS:=.89y) fftu.89y
-TI_FILES := $(VIEWS:=.89y) fftu.89y
+fftw.bin: weapons.h
+ti cycles: $(VIEWS:=.89y) fftu.89y fftw.89y
+TI_FILES := $(VIEWS:=.89y) fftu.89y fftw.89y
 TI_FLAGS := ../../lib/unpack68k.s
 art.h: tools/art.py
 	$(PY) tools/art.py $@
 units.h: tools/units.py
 	@test -f $(DISC) || { echo "missing the local disc roms/ps1/Final Fantasy Tactics (USA) (not in git)"; exit 1; }
 	$(PY) tools/units.py $(DISC) $@
+weapons.h: tools/weapons.py tools/units.py
+	$(PY) tools/weapons.py $(DISC) $@
 battle.h: tools/battle.py
 	@test -f $(DISC) || { echo "missing the local disc roms/ps1/Final Fantasy Tactics (USA) (not in git)"; exit 1; }
 	$(PY) tools/battle.py $(DISC) $@
@@ -55,6 +58,11 @@ $(AI): $(ORACLE).state
 oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 $(NAME)_test: oracle.h
-$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h battle.h art.h fft.h $(VIEWS:=.bin) fftu.bin
-XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h weapons.h battle.h art.h fft.h $(VIEWS:=.bin) fftu.bin fftw.bin
+XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
 FRAMES := 40
+.PHONY: review-blows check-blows
+review-blows: pc
+	$(PY) tools/review_blows.py
+check-blows:
+	$(PY) tools/check_blows.py

@@ -7,7 +7,7 @@ The scenery is the game's own (tools/extract.py: the map's textured mesh drawn p
 and so are the units (tools/units.py -> units.h); this file holds the rest:
 - The units' shadow (drawn into their frames by tools/units.py).
 - The cursor and the reach marker (24x12 diamonds); the diamond above enemies (team at a glance);
-  a hit's spark (FFT's white burst, then sparkles).
+  enemy markers and ground shapes.
 - The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
   the views (extract.py, map.h).
 """
@@ -117,40 +117,6 @@ def slope_marker(lift, cur):
     return pix
 
 
-SPARK_W, SPARK_H, SPARK_N = 32, 22, 8
-
-
-def spark():
-    """A hit on a unit, as FFT draws it (seen on the original run headless: a white burst over
-    the target for ~4 of its frames, then white sparkles flying apart for ~12): here a white
-    blob for 2 frames, then 8 white sparkles for 6, everything outlined black (white alone
-    vanishes on the light floors). Centre (16, 11)."""
-    import math
-    frames = []
-    for f in range(SPARK_N):
-        pix = [[None] * SPARK_W for _ in range(SPARK_H)]
-        if f < 2:
-            rx, ry = (8, 5) if f == 0 else (11, 7)
-            inside = lambda x, y: ((x + .5 - 16) / rx) ** 2 + ((y + .5 - 11) / ry) ** 2 <= 1
-            for y in range(SPARK_H):
-                for x in range(SPARK_W):
-                    if inside(x, y):
-                        pix[y][x] = 0
-                    elif any(inside(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                        pix[y][x] = 3
-        else:
-            r = 6 + 2 * (f - 2)
-            for k in range(8):
-                a = k * math.pi / 4 + math.pi / 8
-                cx = int(round(16 + r * math.cos(a) - 1)); cy = int(round(11 + r * .65 * math.sin(a) - 1))
-                for y in range(cy - 1, cy + 3):
-                    for x in range(cx - 1, cx + 3):
-                        if 0 <= x < SPARK_W and 0 <= y < SPARK_H and pix[y][x] is None:
-                            pix[y][x] = 0 if cx <= x <= cx + 1 and cy <= y <= cy + 1 else 3
-        frames.append(pix)
-    return frames
-
-
 # 8x8 polygon patterns (the rotation frames): rows of (light, dark) bytes,
 # written doubled as 16-bit words
 def pattern(f):
@@ -205,14 +171,6 @@ def main():
     w('static const u8 slope_off[NSLOPE] = { %s };   // its first row in sl_* and sc_*\n' % ', '.join(str(sum(rows[:k])) for k in range(len(rows))))
     for n, r in data.items():
         arr(n, r)
-    w('#define SPARK_N %d\n#define SPARK_H %d\n' % (SPARK_N, SPARK_H))
-    sp = [plane_rows(f, SPARK_W, SPARK_H) for f in spark()]
-    for name, k in (('spark_l', 0), ('spark_d', 1), ('spark_m', 2)):
-        w('static const u32 %s[SPARK_N][SPARK_H] = {\n' % name)
-        for P in sp:
-            rows = P[k] if k < 2 else [~m & 0xFFFFFFFF for m in P[2]]   # mask: 1 = transparent
-            w('    { %s },\n' % ', '.join('0x%08lXUL' % v for v in rows))
-        w('};\n')
     w('#define SHADES 4\n')
     w('static const u16 turn_pat[SHADES][2][8] = {\n')
     for k in range(4):

@@ -21,6 +21,17 @@
 #define ZE(n)
 #endif
 
+#if defined(FFT_MEASURE) && defined(RT_CYCLES)
+static u32 frame_begin;
+static u8 frame_stall;
+#define FRAME_BEGIN() (frame_begin = BENCH_CYCLES, frame_stall = st.turn != 0)
+#define FRAME_END() do { BENCH_VALUE(((u32)frame_stall << 31) | ((u32)st.mode << 24) | ((u32)st.act_t << 16) | (u16)rt_frame); \
+    BENCH_VALUE(BENCH_CYCLES - frame_begin); } while (0)
+#else
+#define FRAME_BEGIN()
+#define FRAME_END()
+#endif
+
 // Planes are big-endian 16-bit words (MSB = leftmost pixel): native on the TI, composed on
 // the PC. RMW16: word = word & ~k | v.
 #ifdef __m68k__
@@ -98,6 +109,7 @@ u8 scene_rot;
 #define VIEW_BYTES (6UL * SC_PLANE)          // 52,320: above a 16-bit int
 static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
+static const u8 *wgfx;                  // armed body poses and blades (fftw), read in place
 static u8 *vbuf, vbuf_rot;
 
 // Work memory, allocated with the scene (globals and statics are stored in the program file
@@ -117,6 +129,9 @@ typedef struct {                        // a unit's cover mask, and its covered 
 typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
 typedef struct {
     Cover cover[NUNIT];                 // per unit, for its feet, its depth and the view
+    u32 wcover[WEAPON_SH];              // the blade's cover, kept while its anchor stands
+    s16 wx, wy;
+    u8 wrot, wdepth;
     Feet feet[NUNIT];                   // its feet (unit_feet) for its tile and the
     u16 feet_k[NUNIT];                  // view (x | z << 8 | rot << 12 | 0x8000; 0: none)
     s16 span_l[TH + 8], span_r[TH + 8];
@@ -190,12 +205,13 @@ typedef struct {
                                         // the last one's checksum
 } Work;
 static Work *W;
+static u8 bg_usable(void);
 
 // A frame's budget, in thousands of cycles (ti-cycles): what a frame costs without its optional
 // work is reckoned before drawing (the units on screen, their cover masks to make, the copy of
 // the scene); the optional work (new rings, a part of the HUD, the screen's copy kept) waits for
 // a frame with room for it: it shows a frame or two later, the frame stays within the budget
-#define FRAME_K 340
+#define FRAME_K 332
 #define BASE_K 45                       // glints, HUD copies, cursor, the units' sort
 #define UNIT_K 19                       // a unit on screen
 #define COVER_K 16                      // its cover mask made again
@@ -705,7 +721,7 @@ static const u32 *cursor_mask(const Marker *mk, u8 c)
     u8 dp = mk->depth;
     if (vbuf_rot != st.rot || st.ai) return mk->m;  // (an AI turn: whole, its frames are full)
     if (W->cur_k == k) return W->cur_m;
-    if (W->left < CUR_K && W->cur_wait++ < WAIT_MAX) return mk->m;
+    if (W->left < CUR_K && (W->cur_wait++ < WAIT_MAX || !bg_usable())) return mk->m;
     W->cur_wait = 0; W->left -= CUR_K;
     W->cur_k = k;
     o = (u16)(yy * SC_BYTES + b0);
@@ -813,6 +829,9 @@ static void ensure_scene(u8 rot)
 {
     u8 i;
     Marker mk;
+#if defined(FFT_MEASURE) && defined(RT_CYCLES)
+    if (scene_rot != rot) frame_stall = 1;       // initial load or a rotated view
+#endif
     if (scene_rot == rot && scene_seq == hl_seq) {
         if (W->drop_y0 < W->drop_y1) goto drop;
         if (W->ring_i >= MAP_W * MAP_H) return;
@@ -838,7 +857,7 @@ drop:
     if (W->drop_y0 < W->drop_y1) {                 // the rings going: their rows put back from
         s16 n = W->left > 8 * ROW_K ? W->left / ROW_K : 8;   // the view (and into the screen's
         if (n > W->drop_y1 - W->drop_y0) n = W->drop_y1 - W->drop_y0;   // copy) as the budget
-        if (W->left < n * ROW_K && W->drop_wait < WAIT_MAX) { W->drop_wait++; return; }
+        if (W->left < n * ROW_K && (W->drop_wait < WAIT_MAX || !bg_usable())) { W->drop_wait++; return; }
         W->drop_wait = 0;                          // allows, then the new ones (a whole scene
         scene_rows(W->drop_y0, n);                 // copy, 130k, or the rings' boxes one by one,
         bg_patch(0, W->drop_y0, SC_W, n);          // ~10k each, went over the budget)
@@ -848,6 +867,9 @@ drop:
 rings:
     dst_scene();
     if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; return; }
+#if defined(FFT_MEASURE) && defined(RT_CYCLES)
+    frame_stall = 1;
+#endif
     ZB(10);
     for (; W->ring_i < MAP_W * MAP_H; W->ring_i++) {
         i = W->ring_i;
@@ -1994,6 +2016,29 @@ static const u8 idle_seq[32] = { 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 3, 3, 3, 3 };
 static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 };
 
+// Armed body and blade phase, 0 outside a weapon Attack. Skills and bare hands use fftu.
+static u8 armed_pose(u8 i)
+{
+    if (st.mode != M_ACT || st.abil != NO_ABIL || i != st.atk || st.unit[i].eq[EQ_WEAPON] == 0xFF
+        || st.act_t < ACT_WIND || st.act_t >= BLADE_END) return 0;
+    return st.act_t < ACT_BLOW ? 1 : st.act_t == ACT_BLOW ? 2 : st.act_t == ACT_BLOW + 1 ? 3 : 4;
+}
+
+static u8 hit_flash(u8 i)
+{
+    u8 t = (u8)(st.act_t - ACT_HIT);
+    if (st.mode != M_ACT || i != st.tgt || !st.hit || st.abil == ABIL_DEFEND || act_kind() != AB_DAMAGE
+        || t >= FLASH_FRAMES) return 0;
+    return t < 2 || t >= 10 ? 1 : 2;
+}
+
+// View facing: 0 front, 1 back, 2 mirrored front, 3 mirrored back.
+static u8 unit_direction(u8 rot, u8 i)
+{
+    static const u8 dir[4][4] = { { 2, 1, 0, 3 }, { 0, 3, 1, 2 }, { 1, 2, 3, 0 }, { 3, 0, 2, 1 } };
+    return dir[rot][st.unit[i].face];
+}
+
 // a unit's pose (units.h: P_*), 0 for the idle or the walk: KO lying, the attacker's swing,
 // the target hit, kneeling with little HP left (FFT's Critical: HP <= max / 5)
 static u8 unit_pose(u8 i)
@@ -2016,23 +2061,20 @@ static u8 unit_pose(u8 i)
 // mirrored frames are stored after the others)
 static const u8 *unit_frame(u8 rot, u8 i)
 {
-    static const s8 fdx[4] = { 1, -1, 0, 0 }, fdz[4] = { 0, 0, 1, -1 };
     const Unit *un = &st.unit[i];
-    s16 u0, v0, du, dv;
-    u8 t = (u8)(st.tick + 11 * i), k;                  // the units out of step
+    u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
     if (DC_OBJ(un->dc))                                // a crystal or a chest, after the units (a
         return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * UNIT_FB   // (u16) cast here, under
             + (u8)(un->dc - DC_CRYSTAL) * UNIT_FB;  // the test, was folded to a wrong constant)
-    view_of(rot, 0, 0, &u0, &v0);
-    view_of(rot, fdx[un->face], fdz[un->face], &du, &dv);
-    du -= u0; dv -= v0;
+    armed = st.mode == M_ACT && i == st.atk ? armed_pose(i) : 0;
+    if (armed) return wgfx + (u32)(u16)(un->gfx * 16 + (dir >> 1) * 8 + (dir & 1) * 4 + armed - 1) * UNIT_FB;
     k = unit_pose(i);
-    if (k) k += du < 0 || dv < 0;                      // a pose: front, back
+    if (k) k += dir & 1;                              // a pose: front, back
     else {
         k = st.mode == M_WALK && i == st.sel ? walk_seq[t & 15] : idle_seq[t & 31];
-        if (du < 0 || dv < 0) k += 5;
+        if (dir & 1) k += 5;
     }
-    if (du > 0 || dv < 0) k += UNIT_FRAMES;
+    if (dir & 2) k += UNIT_FRAMES;
     return ugfx + (u32)(u16)(un->gfx * (2 * UNIT_FRAMES) + k) * UNIT_FB;
 }
 
@@ -2054,7 +2096,7 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
     RtSprite s;
     u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
-    u8 r, h0 = UNIT_SH, h1 = 0;                // rows [h0, h1] lose pixels to the cover
+    u8 r, h0 = UNIT_SH, h1 = 0, flash = st.mode == M_ACT && i == st.tgt ? hit_flash(i) : 0;
     const u8 *g = unit_frame(rot, i);
     s.w = 16;
     if (c) {
@@ -2063,6 +2105,18 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
             if ((h[r] = cm[r] & RD16(g, 3 * UNIT_SH + r)) != 0) { if (r < h0) h0 = r; h1 = r; }
     }
     sy -= UNIT_FOOT;
+    if (flash) {
+        for (r = 0; r < UNIT_SH; r++) {
+            u16 k = c ? c->cm[r] & RD16(g, 3 * UNIT_SH + r) : 0;
+            u16 in = r < UNIT_FOOT - 1 ? RD16(g, 3 * UNIT_SH + r) : 0;   // leave the shadow dark
+            mk[r] = RD16(g, 2 * UNIT_SH + r) | k;
+            ml[r] = ((RD16(g, r) & ~in) | (flash == 1 ? in : 0)) & ~k;
+            md[r] = RD16(g, UNIT_SH + r) & ~(in | k);
+        }
+        s.h = UNIT_SH; s.light = ml; s.dark = md; s.mask = mk;
+        draw_sprite(sx - 8, sy, &s);
+        goto markers;
+    }
 #ifdef __m68k__                                // native big-endian rows: drawn in place
     if (h0) {
         s.h = h0;
@@ -2093,6 +2147,7 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     s.light = ml; s.dark = md; s.mask = mk;
     draw_sprite(sx - 8, sy, &s);
 #endif
+markers:
     sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
     if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
@@ -2104,6 +2159,52 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
         s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
         draw_sprite(sx - 3, sy - DC_Y, &s);
     }
+}
+
+// The original blade behind the armed body, at the same sorted depth, through scenery.
+// Its 32-column cover is cached independently of the body's 16-column cover.
+static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
+{
+    u8 phase = armed_pose(i), dir, k, r;
+    const u8 *g;
+    u32 l[WEAPON_SH], d[WEAPON_SH], m[WEAPON_SH];
+    RtSprite sp;
+    s16 bx, by, b0, sh;
+    if (phase < 2) return;
+    dir = unit_direction(st.rot, i);
+    k = (u8)((st.unit[i].gfx >= UG_CHEMIST_M ? 24 : 0)
+        + (items[st.unit[i].eq[EQ_WEAPON]].knife ? 0 : 12) + (dir >> 1) * 6 + (dir & 1) * 3 + phase - 2);
+    g = wgfx + WEAPON_OFF + (u32)k * WEAPON_FB;
+    bx = sx + weapon_x[k]; by = sy - WEAPON_FOOT;
+    b0 = bx >> 3; sh = bx & 7;
+    if (W->wx != bx || W->wy != by || W->wrot != st.rot || W->wdepth != depth) {
+        const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+        for (r = 0; r < WEAPON_SH; r++) {
+            s16 y = by + r;
+            u32 cm = 0;
+            u8 tail = 0, j;
+            if ((u16)y < SC_H) {
+                u16 o = (u16)(y * SC_BYTES + b0);
+                for (j = 0; j < 5; j++, o++) {
+                    u8 b = 0;
+                    if ((u16)(b0 + j) < SC_BYTES) {
+                        if (t1[o] > depth) b |= m1[o];
+                        if (t2[o] > depth) b |= m2[o];
+                    }
+                    if (j < 4) cm = cm << 8 | b; else tail = b;
+                }
+            }
+            W->wcover[r] = (cm << sh) | ((u32)tail >> (8 - sh));
+        }
+        W->wx = bx; W->wy = by; W->wrot = st.rot; W->wdepth = depth;
+    }
+    for (r = 0; r < WEAPON_SH; r++) {
+        u32 c = W->wcover[r];
+        l[r] = RD32(g, 2 * r) & ~c; d[r] = RD32(g, 2 * (WEAPON_SH + r)) & ~c;
+        m[r] = RD32(g, 2 * (2 * WEAPON_SH + r)) | c;
+    }
+    sp.w = 32; sp.h = WEAPON_SH; sp.light = l; sp.dark = d; sp.mask = m;
+    draw_sprite(bx - st.camx, by - st.camy, &sp);
 }
 
 // the death counter's digits 0-3 as sprites (black, a white outline), made once
@@ -2325,6 +2426,7 @@ void game_init(void)
         views[i] = rt_file(name, RT_NULL);
     }
     ugfx = rt_file("fftu", RT_NULL);
+    wgfx = rt_file("fftw", RT_NULL);
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB
         vbuf = malloc(VIEW_BYTES);
         sbuf = vbuf ? malloc(2 * SC_PLANE + sizeof(Work)) : RT_NULL;
@@ -2345,6 +2447,7 @@ void game_init(void)
         for (i = 0; i < MAP_H * 28; i++) W->row[i] = (u8)(i / 28 * MAP_W);
         edges(3);                              // Gariland's units all have Jump 3
         for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
+        W->wrot = 0xFF;
         W->hud_t[0] = 0xFE;
         hud_labels();
         make_counters();
@@ -2431,6 +2534,19 @@ void game_scenario(u16 n)
     } else if (n == 15) {                         // the recruits KO, Delita in front of Ramza
         for (i = 7; i < NUNIT; i++) st.unit[i].hp = 0;    // (5 HP: his Wish knocks him out)
         st.unit[0].x = 4; st.unit[0].z = 10; st.unit[U_RAMZA].hp = 5;
+    } else if (n >= 17 && n <= 25) {              // armed blows in four views, and bare hands
+        u8 a = U_RAMZA, knife = n >= 21;
+        st.rot = (u8)((n - 17) & 3);
+        st.unit[1].x = 4; st.unit[1].z = 10; st.unit[1].face = 2;
+        for (i = 0; i < NITEM; i++) if (items[i].id == (knife ? 1 : 0x13)) break;
+        st.unit[a].eq[EQ_WEAPON] = i; unit_stats(&st.unit[a]);
+        if (n == 25) {                          // Gariland's enemy Chemist is unarmed
+            a = 3; st.unit[a].x = 4; st.unit[a].z = 11;
+            st.unit[a].eq[EQ_WEAPON] = 0xFF;
+            st.unit[U_RAMZA].x = 200;
+        }
+        st.act = a; st.ai = AI_OFF; st.cx = 4; st.cz = 10;
+        do attack(a, 1); while (!st.hit || st.push);
     }
     cam_target(&st.camx, &st.camy);
     hl_seq++;
@@ -2707,10 +2823,11 @@ static u8 twin(u8 c, u8 aim)
 
 u8 game_update(void)
 {
+    FRAME_BEGIN();
     if (W) W->upd_k = 0;
     s16 tx, ty;
     u8 mode0 = st.mode;
-    if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
+    if (!W || !ugfx || !wgfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
     if (st.ai != AI_THINK) st.tick++;            // (a unit thinking: the picture stands still)
     if (input_pressed(K_MODE)) { st.over ^= 1; hl_seq++; }  // the reach over the scenery, or not
     if (st.turn) {                                 // rotating: nothing else moves the view
@@ -3149,11 +3266,11 @@ static void draw_hud(void)
     pk[1][1] = pk[1][0] ? st.unit[o - 1].hp : 0; pk[1][2] = pk[1][0] ? st.unit[o - 1].mp : 0;
     for (i = 0, w = 0; i < ORDER_N; i++) w |= st.turns[i] != W->hud_t[i];
     if (!w) W->hud_late = 0;                       // a new turn: nothing on its first frame (the
-    else if (W->hud_late++ && (W->left >= HUD_K || W->hud_late > WAIT_MAX)) {   // camera starts
+    else if (W->hud_late++ && (W->left >= HUD_K || (W->hud_late > WAIT_MAX && bg_usable()))) {   // camera starts
         for (i = 0; i < ORDER_N; i++) W->hud_t[i] = st.turns[i];   // moving), then a frame with
         W->hud_late = 0;                                            // room
     } else w = 0;
-    if (!w && !W->hud_late && (W->left >= HUD_K || ++W->hud_wait > WAIT_MAX)) {
+    if (!w && !W->hud_late && (W->left >= HUD_K || (++W->hud_wait > WAIT_MAX && bg_usable()))) {
         W->hud_wait = 0;
         for (i = 0; i <= n && s[i] == W->hud_s[i]; i++) ;
         if (i <= n) {                              // the height under the cursor: 32 px
@@ -3208,18 +3325,6 @@ static void draw_hud(void)
             WR16(ql, 0, pl[r]); WR16(qd, 0, pd[r]);
         }
     }
-}
-
-// a hit's spark over the target (art.py: FFT's white burst, then sparkles), on damage that hit
-static void draw_spark(void)
-{
-    u8 t = (u8)(st.act_t - ACT_HIT);
-    RtSprite sp;
-    Feet f;
-    if (t >= SPARK_N || !st.hit || st.abil == ABIL_DEFEND || act_kind() != AB_DAMAGE) return;
-    f = unit_feet(st.rot, st.tgt);
-    sp.w = 32; sp.h = SPARK_H; sp.light = spark_l[t]; sp.dark = spark_d[t]; sp.mask = spark_m[t];
-    draw_sprite(f.x - st.camx - 16, f.y - st.camy - 10 - SPARK_H / 2, &sp);
 }
 
 // A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP, 2 the JP): AMS
@@ -3346,25 +3451,36 @@ void game_render(void)
     s16 u, v;
     if (W && (W->hold || ((st.ai == AI_THINK || st.ai == AI_GO) && W->frz))) {   // the same picture in
         W->hold = 0;                                                           // both buffers: the
-        return;                                                                // AI thinks
+        FRAME_END(); return;                                                                // AI thinks
     }
-    if (!W || !ugfx || !views[0] || !views[1] || !views[2] || !views[3]) {
+    if (!W || !ugfx || !wgfx || !views[0] || !views[1] || !views[2] || !views[3]) {
         draw_rect(0, 0, RT_W, RT_H, C_WHITE);
-        draw_text(4, 40, W ? "missing fftu, fftv0-fftv3" : "not enough memory (92 KB)", F_SMALL, C_BLACK);
-        return;
+        draw_text(4, 40, W ? "missing fftu/fftw/fftv0-3" : "not enough memory (92 KB)", F_SMALL, C_BLACK);
+        FRAME_END(); return;
     }
-    if (st.mode == M_END) { draw_end(); return; }
+    if (st.mode == M_END) { draw_end(); FRAME_END(); return; }
     if (st.turn) {                                 // the view it turns to, unpacked meanwhile
+#if defined(FFT_MEASURE) && defined(RT_CYCLES)
+        frame_stall = 1;
+#endif
         ZB(7); draw_turn(); ZE(7);
         ZB(8); unpack_view((st.rot + st.turn) & 3); ZE(8);
-        return;
+        FRAME_END(); return;
     }
     for (i = 0, n = 0; i < NUNIT; i++) {           // units back to front, those on screen and
         s16 bx, by;                                // the frame's cost without the optional work
         u16 fk = (u16)(st.unit[i].x | st.unit[i].z << 8 | st.rot << 12 | 0x8000);
-        if (st.mode == M_WALK && i == st.sel) f[i] = unit_feet(st.rot, i), W->feet_k[i] = 0;
+        if (st.unit[i].x >= MAP_W || st.unit[i].z >= MAP_H) {
+            f[i].x = f[i].y = 0; f[i].depth = 0;   // removed unit / test injection: no map access
+        } else if (st.mode == M_WALK && i == st.sel) f[i] = unit_feet(st.rot, i), W->feet_k[i] = 0;
         else if (W->feet_k[i] == fk) f[i] = W->feet[i];   // kept while it stands
         else { f[i] = W->feet[i] = unit_feet(st.rot, i); W->feet_k[i] = fk; }
+        if (st.mode == M_ACT && i == st.tgt && hit_flash(i)) {   // visual recoil only
+            static const s8 dx[4] = { -1, -1, 1, 1 }, dy[4] = { 1, -1, 1, -1 };
+            u8 dir = unit_direction(st.rot, st.atk), t = (u8)(st.act_t - ACT_HIT);
+            u8 step = t < 6 ? 2 : t < 10 ? 1 : 0;
+            f[i].x += dx[dir] * step; f[i].y += dy[dir] * (step != 0);
+        }
         for (j = i; j > 0 && f[ord[j - 1]].depth > f[i].depth; j--) ord[j] = ord[j - 1];
         ord[j] = i;
         bx = f[i].x - st.camx - 8; by = f[i].y - st.camy - UNIT_FOOT;
@@ -3372,6 +3488,10 @@ void game_render(void)
         if (vis[i]) {
             const Cover *c = &W->cover[i];
             n += UNIT_K;
+            if (st.mode == M_ACT) {
+                if (i == st.tgt && hit_flash(i)) n += 7;
+                if (i == st.atk && armed_pose(i) >= 2) n += 45;
+            }
             if (c->x != f[i].x || c->y != f[i].y || c->depth != f[i].depth || c->rot != st.rot) n += COVER_K;
         }
     }
@@ -3393,13 +3513,14 @@ void game_render(void)
             for (c->r0 = 2; c->r0 <= UNIT_SH - 3 && !c->cm[c->r0]; c->r0++) ;
             for (c->r1 = UNIT_SH - 3; c->r1 >= c->r0 && !c->cm[c->r1]; c->r1--) ;
         }
+        if (st.mode == M_ACT && k == st.atk) draw_weapon(f[k].x, f[k].y, k, f[k].depth);
         draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, c);
     }
     ZE(4); ZB(5);
     // the cursor, above everything (blinking), dashed behind the scenery
     dst_screen(st.camx, st.camy);
     view_of(st.rot, st.cx, st.cz, &u, &v);
-    if (st.mode == M_ACT && st.act_t >= ACT_HIT) { draw_spark(); draw_number(); }
+    if (st.mode == M_ACT && st.act_t >= ACT_HIT) draw_number();
     if (st.mode == M_FACE) draw_arrows();
     else if (st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
         Marker mk;
@@ -3418,4 +3539,5 @@ void game_render(void)
             W->frz_h = h;
         }
     }
+    FRAME_END();
 }

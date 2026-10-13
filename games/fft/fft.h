@@ -33,6 +33,7 @@ typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 j
 typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
 #include "units.h"
+#include "weapons.h"
 #include "battle.h"
 #include "map.h"
 
@@ -76,6 +77,8 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define ACT_BLOW 13
 #define ACT_HIT 16
 #define HIT_FRAMES 24
+#define FLASH_FRAMES 12                 // light 2, white 8, light 2, then normal
+#define BLADE_END (ACT_HIT + 3)         // blade stays through the impact, then put away
 #define NUM_RISE 8
 #define NUM_T 24
 #define GAIN_T 29

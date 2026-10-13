@@ -66,3 +66,5 @@ __pycache__/
 /roms/
 # PS1 studies: the pcsx_rearmed libretro core (github.com/libretro/pcsx_rearmed)
 /tools/pcsx_rearmed/
+/games/fft/weapons.h
+/games/fft/fftw.bin
