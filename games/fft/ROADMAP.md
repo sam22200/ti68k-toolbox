@@ -41,7 +41,7 @@ Each milestone is tested headless (`make test`, `make xcheck`), the emulator at 
     the cursor's line 4 px per row, reach rings behind a building kept as 2-pixel dashes over it
     (computed with the scene, no cost per frame).
 
-## The battle (milestones 13-22)
+## The battle (milestones 13-29)
 
 Goal: the Gariland battle playable as in the game, from the deployment to the victory
 screen: the game's units, their stats, FFT's turn order, Move / Act / Wait, attacks and the
@@ -210,7 +210,58 @@ with `-pack` (decided at milestone 13).
     6,100 at 361-383k (an AI aim or facing panning over 8-9 units), the key scripts 6 of 2,375 up
     to 405k: a 68000 view copy would close the gap (asm: ask). Program 53,069 bytes, `fftu` 55.4
     KB, RAM ~92 KB.
-22. **The whole battle on the calculator.** Titanium then TI-89 HW2: one full battle in TiEmu
+
+Milestones 22-28 come from playing milestone 21 in TiEmu (grilling 2026-10-13). Every one keeps
+each frame <= 360k outside the allowed stalls, asm only after asking, `make test` and
+`make xcheck` passing, and a review sheet for every visible change.
+
+22. **Bugs and small fixes.** The cursor on stacked tiles: in every view 21-27 screen spots
+    are shared by two tiles (a canal tile at height 0 and the street tile 2 units higher one
+    tile diagonally in front draw their markers on the same pixels), so the player aimed at a
+    canal tile thinking it was the Squire's ("can't attack", "the farthest water tile can't be
+    clicked"; the reach and the attack were right, the "teleport" after F1 the correct turn of
+    a higher unit). Fixes: [2nd] on a tile that cannot be picked tries its screen twin; the
+    cursor dashed where the scenery is in front of it (worked out when it moves, ~6-15k); the
+    height shown (milestone 26). The turn order leaves the top strip for a window on APPS or
+    CATALOG; ESC asks "Quit? Yes / No" (No by default); HP above MP.
+23. **Pace.** The original's durations at 30 fps (ours were 2-3x faster: a walked tile 0.33 s
+    instead of 0.13, the blow ~0.7 s after the order, an attack with its EXP ~3.2 s instead of
+    1.6), measured more finely on the original (the hit pose, the menu's return). Before an AI
+    action, FFT's own pauses: the cursor gliding to the target, the ability's name ~1 s. The
+    AI's camera: before an action, the 4 views scored on how much of the actor and the target
+    the depth leaves visible; a turn only when one of them is more than half hidden, back to
+    the player's view on his turn. Then decide the asm view copy on the new numbers.
+24. **Move tiles.** All shown at once (a stall added to the allowed ones) instead of ~4 a
+    frame; a sheet of styles to choose from: A a white centre with a dark edge drawing the grid,
+    B a light grey centre with a black edge, C the grid lines only; a test without the depth
+    (no dashes: tiles drawn over the scenery in front), its cost measured, to compare.
+25. **Blows.** The hit flash on the target's inside (the 4th plane): its greys up to light
+    grey then white held ~8 frames, then back, the black outline kept; the target knocked back
+    a pixel or two; the sparkles of milestone 21 dropped. The sword and the dagger from
+    `BATTLE/WEP.SPR` (placed by `WEP1/WEP2.SHP` and `.SEQ`), outlined white, a blade at least
+    2 pixels wide, shown during the blow only as in FFT (Gariland: Broad Sword and Dagger; the
+    enemy Chemist unarmed). A frame-by-frame sheet of a blow.
+26. **FFTA-style interface** (captured on the original, `x/ffta_*.png`). Bottom left a light
+    grey band with a dark rule: the unit's portrait from its `.SPR` (19x29, rising above the
+    band), its name, HP above MP, a line with Lv and CT. The action menu bottom right with a
+    "MENU" tab and a ball cursor, sub-menus replacing it in place; while aiming, the target's
+    band mirrored bottom right. Band and menu hidden during moves and animations; the sideways
+    corner panels go. A large "2h" top right for the tile under the cursor, "depth 1" under it
+    on water. FFT's active-unit marker from `EVENT/FRAME.BIN` above the acting unit; the
+    enemies' diamonds kept. The generic units' names drawn at each battle from FFT's own name
+    lists read on the disc (deterministic in tests and scenarios); Ramza and Delita keep
+    theirs. Status full screen in FFTA's layout with FFT's fields (portrait, name, job, HP and
+    MP with bars, Lv/Exp, Brave, Faith, zodiac, Move/Jump/Speed, PA/MA; a second page for the
+    equipment and abilities). A review sheet before applying the layout everywhere.
+27. **Water.** Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
+    tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
+    the original does not sink them, ask.
+28. **Eight orientations** (not in FFT: four 45-degree yaws only). First an experiment: one
+    view at 22.5 degrees, scenery only, to judge it at 160x100; only then the four in-between
+    views (~45 KB more archive, the same RAM), the projection generalised (cursor, tiles,
+    slopes, paths, units, camera: the 24x12 diamond assumed today), units in FFT's nearest
+    facing, the rotation through the in-between angle.
+29. **The whole battle on the calculator.** Titanium then TI-89 HW2: one full battle in TiEmu
     (a GIF), the cycles per state, the program and data sizes, the free RAM.
 
 Engine, any time:

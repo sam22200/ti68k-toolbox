@@ -21,7 +21,9 @@ the battle's numbers come from the local disc (`tools/extract.py`, `tools/units.
 (`tools/art.py`). Its presentation: FFT's throw pose and hit burst (seen on the original), the
 cursor and reach rings drawn on each tile's real slope, a camera that frames the action, and
 every frame of the player's turns within the 360k budget (`ROADMAP.md` milestone 21). The whole
-battle on the calculator comes next (milestone 22). Study notes: `RE_NOTES.md`.
+Next, from playing it (`ROADMAP.md` milestones 22-28): the cursor on stacked tiles, the
+original's pace, the move tiles, the hit flash and the weapons, an FFTA-style interface, the
+water, eight orientations; then the whole battle on the calculator (milestone 29). Study notes: `RE_NOTES.md`.
 
 ## Controls
 
@@ -367,7 +369,7 @@ frame 370k, selection 3.8 M.
 - A crystal only restores HP and MP (FFT also offers its abilities); a chest's item is shown,
   not kept (no inventory); JP shared to a unit of another job are not kept (FFT stores them
   in that job); the results have no war trophies (FFT's Mythril Knife, Phoenix Down, Potion);
-  [ESC] does not save the battle yet (milestone 22).
+  [ESC] does not save the battle yet (milestone 29).
 - A battle the AI plays has 8 frames of 6,100 over the budget (361-383k: an AI aim or facing
   while the camera pans over 8-9 units; the key scripts 6 of 2,375, up to 405k); a faster view
   copy (68000 asm) would close the gap. The budget delays optional work by a frame or two: a
