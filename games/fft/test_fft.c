@@ -339,7 +339,88 @@ static void test_walk_keys(void)
     CHECK(st.cx == 3 && st.cz == 11);
     press(K_ESC);
     CHECKV(st.mode, M_BROWSE);
-    CHECKV(sw_step(K_ESC), 0);                            // ESC while looking around quits
+    press(K_ESC);                                         // ESC while looking around: "Quit?"
+    CHECK(st.mode == M_QUIT && st.quit == 1);             // No by default
+    press(K_ENTER);
+    CHECKV(st.mode, M_BROWSE);
+    press(K_ESC); press(K_ESC);                           // ESC again: No
+    CHECKV(st.mode, M_BROWSE);
+    press(K_ESC); press(K_UP);
+    CHECKV(st.quit, 0);
+    CHECKV(sw_step(K_ENTER), 0);                          // Yes quits
+}
+
+// ---------------------------------------------------------------- milestone 22: small fixes
+// [APPS] opens the turn order over any input mode, any key closes it; [2nd] on a tile drawn on
+// the same pixels as a higher one picks that one (Ramza in the canal at (1, 5), a Squire on the
+// street at (0, 5): in view E its tile hides the canal tile (1, 4), in reach but empty)
+static int hud_shown(void)                    // the active unit's panel edge, the height's text
+{
+    int x, y, ink = 0;
+    for (y = 1; y < 7; y++) for (x = 1; x < 16; x++) ink += sw_level(x, y) == 3;
+    return sw_level(15, RT_H - 10) == 3 && sw_level(8, RT_H - PANEL_H) == 3 && ink > 4;
+}
+
+static void test_fixes(void)
+{
+    u8 c, t, i, n = 0;
+    u16 hp;
+    sw_init(0);                                           // the HUD on the AI's turns: a turn
+    steps(0, 60);                                         // on, and the next unit's panel
+    CHECK(hud_shown());                                   // made within a few frames of its
+    while (st.act == 1) sw_step(0);                       // turn
+    for (i = 0; i < 20 && !hud_shown(); i++) sw_step(0);
+    CHECK(i < 20);
+    sw_init(10);
+    steps(0, 20);
+    CHECK(hud_shown());
+    press(K_APPS);
+    CHECK(st.mode == M_ORDER && st.back == M_MENU);
+    steps(0, 12);
+    press(K_LEFT);
+    CHECKV(st.mode, M_MENU);
+    CHECKV(st.menu, MN_MOVE);                             // the key only closed it
+    press(K_A);
+    CHECKV(st.mode, M_TARGET);
+    press(K_APPS); press(K_B);
+    CHECKV(st.mode, M_TARGET);
+    press(K_B);
+    st.unit[U_RAMZA].x = 1; st.unit[U_RAMZA].z = 5; st.unit[1].x = 0; st.unit[1].z = 5;
+    st.cx = 1; st.cz = 5; st.rot = 3;
+    steps(0, 30);
+    press(K_DOWN); press(K_A); press(K_A);                // Act, Attack
+    CHECKV(st.mode, M_AIM);
+    CHECK(st.reach[4 * MAP_W + 1] == 1 && st.reach[5 * MAP_W] == 1);
+    st.cx = 1; st.cz = 4; hp = st.unit[1].hp;
+    press(K_A);
+    CHECKV(st.mode, M_ACT);
+    CHECK(st.tgt == 1 && st.cx == 0 && st.cz == 5);
+    steps(0, 60);
+    CHECK(st.unit[1].hp < hp || !st.hit);
+    // Move: every unreachable tile whose twin is reachable walks to the twin
+    sw_init(10);
+    press(K_A);
+    CHECKV(st.mode, M_TARGET);
+    for (c = 0; c < MAP_W * MAP_H; c++) {
+        if (st.reach[c] != 0xFF && st.reach[c]) continue;
+        for (t = 0; t < MAP_W * MAP_H; t++) {
+            s16 u, v, x0, y0, x1, y1;
+            if (t == c || st.reach[t] == 0xFF || !st.reach[t]) continue;
+            view_of(st.rot, c % MAP_W, c / MAP_W, &u, &v); x0 = scene_x(st.rot, u, v); y0 = scene_y(u, v) - map_tiles[c].stand * (HU / 2);
+            view_of(st.rot, t % MAP_W, t / MAP_W, &u, &v); x1 = scene_x(st.rot, u, v); y1 = scene_y(u, v) - map_tiles[t].stand * (HU / 2);
+            if (x0 == x1 && y0 == y1) break;
+        }
+        if (t == MAP_W * MAP_H) continue;
+        st.cx = c % MAP_W; st.cz = c / MAP_W;
+        press(K_A);
+        CHECKV(st.mode, M_WALK);
+        CHECK(st.path[st.path_n - 1][0] == t % MAP_W && st.path[st.path_n - 1][1] == t / MAP_W);
+        for (i = 0; i < 60 && st.mode == M_WALK; i++) sw_step(0);
+        press(K_B); press(K_A);                           // undone, Move again
+        n++;
+    }
+    CHECK(n > 0);
+    printf("fixes: [APPS] order, \"Quit?\", twin picks: an attack, %d moves\n", n);
 }
 
 // ---------------------------------------------------------------- milestone 16: the turn menu
@@ -1091,6 +1172,7 @@ int main(int argc, char **argv)
     test_turn_keys();
     test_walk_keys();
     test_menu();
+    test_fixes();
     test_attack();
     test_skills();
     test_end();

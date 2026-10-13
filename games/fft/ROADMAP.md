@@ -215,7 +215,7 @@ Milestones 22-28 come from playing milestone 21 in TiEmu (grilling 2026-10-13). 
 each frame <= 360k outside the allowed stalls, asm only after asking, `make test` and
 `make xcheck` passing, and a review sheet for every visible change.
 
-22. **Bugs and small fixes.** The cursor on stacked tiles: in every view 21-27 screen spots
+22. **Bugs and small fixes** (done). The cursor on stacked tiles: in every view 21-27 screen spots
     are shared by two tiles (a canal tile at height 0 and the street tile 2 units higher one
     tile diagonally in front draw their markers on the same pixels), so the player aimed at a
     canal tile thinking it was the Squire's ("can't attack", "the farthest water tile can't be
@@ -224,6 +224,19 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     cursor dashed where the scenery is in front of it (worked out when it moves, ~6-15k); the
     height shown (milestone 26). The turn order leaves the top strip for a window on APPS or
     CATALOG; ESC asks "Quit? Yes / No" (No by default); HP above MP.
+    Done: `twin` (the tile with the same marker position, tried when [2nd] falls on one that
+    cannot be picked: in the tests the user's attack and 6 moves of Ramza's first reach);
+    `cursor_mask` (the view's depth bytes compared 8 pixels at a time, the hidden rings'
+    dashes; 8-19k when the cursor or the view changes, optional work, the cursor whole on AI
+    turns); `K_APPS` in the runtime ([APPS] row 5 bit 0, [CATALOG] row 3 bit 6; PC A) opening
+    the turn order in a window (enemies in dark grey), any key closing it; `M_QUIT`; the
+    panels' HP above MP; the strip keeps the height alone (until milestone 26), the view's
+    letter gone. Removing the strip moved the HUD's parts onto heavier frames: its turn-start
+    wait (nothing on a turn's first frame, then a frame with room) is kept without the strip.
+    Frames as before or better: the key scripts 280-319k, the AI battle 7 frames over 360k
+    (360-381k) instead of 8; program 53,806 bytes. TiEmu: the build ran, but typing in the
+    emulator on the desktop became unreliable before [APPS] could be checked on the keyboard
+    matrix.
 23. **Pace.** The original's durations at 30 fps (ours were 2-3x faster: a walked tile 0.33 s
     instead of 0.13, the blow ~0.7 s after the order, an attack with its EXP ~3.2 s instead of
     1.6), measured more finely on the original (the hit pose, the menu's return). Before an AI

@@ -20,9 +20,10 @@ the battle's numbers come from the local disc (`tools/extract.py`, `tools/units.
 `tools/battle.py`); the cursor, shadow, markers, hit sparks and rotation greys are ours
 (`tools/art.py`). Its presentation: FFT's throw pose and hit burst (seen on the original), the
 cursor and reach rings drawn on each tile's real slope, a camera that frames the action, and
-every frame of the player's turns within the 360k budget (`ROADMAP.md` milestone 21). The whole
-Next, from playing it (`ROADMAP.md` milestones 22-28): the cursor on stacked tiles, the
-original's pace, the move tiles, the hit flash and the weapons, an FFTA-style interface, the
+every frame of the player's turns within the 360k budget (`ROADMAP.md` milestone 21). From
+playing it: [2nd] on a tile drawn over by a higher one picks that one, the cursor dashed behind
+the scenery, the turn order on [APPS], "Quit?" on [ESC], HP above MP (milestone 22).
+Next (`ROADMAP.md` milestones 23-28): the original's pace, the move tiles, the hit flash and the weapons, an FFTA-style interface, the
 water, eight orientations; then the whole battle on the calculator (milestone 29). Study notes: `RE_NOTES.md`.
 
 ## Controls
@@ -31,8 +32,9 @@ water, eight orientations; then the whole battle on the calculator (milestone 29
 |---|---|
 | arrows | the menu's entry; the cursor (relative to the view: UP = up-right, RIGHT = down-right); at Wait, the facing |
 | [F5] / [F1] | rotate the camera 90 degrees clockwise / counter-clockwise |
-| [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it; at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
-| [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around quits |
+| [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can); at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
+| [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
+| [APPS] or [CATALOG] | the turn order (PC: A), closed by any key |
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.
@@ -62,13 +64,14 @@ at its next turn after 0 it becomes a crystal or a chest, which a unit walking o
 up (a crystal: HP and MP full; a chest: `Got Clothes`, one of the dead unit's items, shown
 only). The battle ends when every enemy is KO (`Victory!`) or when Ramza becomes a crystal or
 a chest or the whole party, Delita included, is KO (`Game Over`): the results list each of
-the player's units with its level, the EXP and JP it earned. The HUD shows the turn order at the top left (FFT's AT list: the
-active unit, then the next five turns; enemies on light grey, underlined), then the view (S,
-W, N, E: where the camera stands) and the height under the cursor in FFT units (`h2`, `h7.5`
-on a slope). At the bottom corners, as in Metal Gear Solid: Portable Ops, two thin panels
-read sideways: the active unit at the left, the unit under the cursor at the right (light
-grey: an enemy), each with its name, its HP and MP as `52/52` and `16/16` and a gauge beside
-each number (HP black, MP dark grey). Scenarios (`fft(n)`, `--scenario n`):
+the player's units with its level, the EXP and JP it earned. The HUD shows the height under
+the cursor at the top left in FFT units (`h2`, `h7.5` on a slope); [APPS] shows the turn order
+in a window (FFT's AT list: the active unit, then the next five turns; enemies in dark grey).
+The cursor is dashed where the scenery is in front of it, as the hidden reach rings. At the
+bottom corners, as in Metal Gear Solid: Portable Ops, two thin panels read sideways: the
+active unit at the left, the unit under the cursor at the right (light grey: an enemy), each
+with its name, its HP above its MP as `52/52` and `16/16` and a gauge beside each number (HP
+black, MP dark grey). Scenarios (`fft(n)`, `--scenario n`):
 0 the battle's start (a new draw each run: seeded from the clock; Delita's turn), and from Ramza's
 first turn (the six units before him waited): 1-4 an enemy moved behind a house seen from each
 view, 5 Ramza's reach, 6 mid-rotation, 7 Ramza walking, 8 an enemy in front of him aimed
@@ -302,25 +305,34 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   reach, an AI facing); the optional work (new rings, a HUD part, the screen's copy kept) waits
   for a frame with room for it, 8 frames at most (the copy 2), then is done anyway. Things
   appear a frame or two later; the frames keep within the budget.
-- **HUD.** Each part (the top strip, the menu or status window, the two panels) is drawn
+- **HUD.** Each part (the height, the menu, status, turn order or "Quit?" window, the two panels) is drawn
   into a work buffer when what it shows changes (as the frame's budget allows) and copied each
   frame by words (~5k cycles for all): drawn every frame with `draw_rect` and AMS text they cost ~40k and more (ExtGraph's
   fill and the ROM's `memcpy` have a high fixed cost per call, under `ti-cycles` at least). At
   most one part is rebuilt per frame, none on a turn's first frame (the camera starts its pan
   there, the heaviest frames), and a window one part a frame (its box, then each line: a
   status line of AMS text costs up to ~38k, the box ~30k); the menu's pointer is added at the copy, so the arrows
-  redraw nothing. What does not change is made once at the start: the turn labels (Ra, De, Sq,
-  Ch) ORed in at a bit offset, the names turned a quarter for the panels, the facing arrows;
+  redraw nothing. What does not change is made once at the start: the names turned a quarter
+  for the panels, the facing arrows;
   the panels' numbers come from a 3 x 5 digit table already turned. A panel costs ~21k to make
   (78k when its text was turned pixel by pixel). The scene is made again only when the reach
   rings appear or go, not at every change of mode.
+- **Stacked tiles** (milestone 22). In every view 21-27 screen spots are shared by two tiles: a
+  canal tile at height 0 and the street tile 2 units higher one tile diagonally in front draw
+  their markers on the same pixels (the user's "can't attack" and "teleport" reports: Ramza in
+  the canal, the Squire on the street beside him). [2nd] on a tile that cannot be picked
+  (`pickable`) tries the tile with the same marker position (`twin`). The cursor's mask is
+  dashed where the view's depth is in front of it (`cursor_mask`: the depth bytes compared
+  8 pixels at a time, the hidden rings' dashes), made again when the cursor or the view
+  changes (8-19k), as optional work; on an AI turn the cursor stays whole (its frames are the
+  fullest).
 
 ## Numbers (ti-cycles, Titanium, datasheet timings)
 
 | | cycles | at 12 MHz |
 |---|---|---|
 | a player's turn (menus, the reach, a tile picked, walks, attacks, abilities, Wait, the results; every frame of the five key scripts and of 15 scenarios) | 160-250k on average a state, 329k at most | 32 fps (frame-limited) |
-| a battle the AI plays both sides of (fft(16), every one of 6,100 frames: pans, rings, walks, blows, up to 11 units on screen) | 236k on average (343k before); 8 frames at 361-383k (an AI aim or facing while the camera pans over 8-9 units) | 32 fps |
+| a battle the AI plays both sides of (fft(16), every one of 6,100 frames: pans, rings, walks, blows, up to 11 units on screen) | 236k on average (343k before); 7 frames at 360-381k (an AI aim or facing while the camera pans over 8-9 units) | 32 fps |
 | its parts: the view copied (the camera moving) / its screen-aligned copy put back (still) | 107k / 25k | |
 | a unit on screen (its cover mask made again: +16k) | ~19k | |
 | a reach ring drawn into the scene | ~24k flat, ~45k sloped (as the budget allows) | |
@@ -328,7 +340,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 53,069 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 53,806 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus the units' sprites `fftu` (55.4 KB, read in place) and four view files of 9.1-10.3 KB (38.9 KB of archive; 209 KB
 unpacked, see the history below). RAM: the unpacked view 52 KB, the scene buffer 17 KB, 22 KB
 of work (the AI's and the moves' tables 7 KB, the screen's copy of the scene 4 KB; ~92 KB in
