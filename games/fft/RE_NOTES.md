@@ -855,6 +855,18 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   `x/compact_hud_details.png` (six portraits, empty bars, level 99 and three-digit values).
   Potion aiming also shows the inline positive prediction. No hardware path changes.
 
+### Gauge alignment refinement
+
+- TARGET / IMPLEMENTATION: align the gauge's visible left edge with the text anchor,
+  round its four outer corners through the opacity mask, and align the values' right
+  outline with the gauge's right outline. The two-row fill stays thin; width 40 leaves
+  a gap between the ten-pixel `MP` label and the 28-pixel `999/999` string.
+- CHECKED: native tests, 52 scenario comparisons and 203 UI/blow/replay PC/TI screens
+  pass; ordinary peak remains 357,410 cycles. Program 62,171 bytes, allocations unchanged.
+  Actual PC framebuffer review includes three-digit HP/MP on both panels at once;
+  rounded outer corner pixels remain transparent. Local review: `x/rounded_hud.png`
+  and `x/rounded_hud_999.png`.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible

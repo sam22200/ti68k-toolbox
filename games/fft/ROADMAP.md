@@ -330,6 +330,9 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     within the 29-pixel portrait height. Outer portraits face inward; a central chevron and
     inline damage/heal/chance prediction replace the TARGET popup. Review:
     `x/compact_attack_hud.png` and `x/compact_hud_details.png`.
+    Gauge refinement: rounded white ends, shared text/bar left anchor, values ending at
+    the bar's right edge; 40x2 fill keeps `MP 999/999` readable. Review `x/rounded_hud.png`
+    and `x/rounded_hud_999.png`; the 357,410-cycle peak is unchanged.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

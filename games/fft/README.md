@@ -89,7 +89,8 @@ The cursor is dashed behind the scenery. Transparent character details sit at th
 active unit left, hovered or aimed-at unit right, with the cutout 19x29 original portraits
 at the outer edges, facing inward. The small level overlays the portrait's lower corner;
 all details fit within its 29-pixel height. Name and HP above MP sit beside it. Each gauge
-is 34x2 pixels, with its label and right-aligned current/maximum values above it in the small font. Portraits,
+is 40x2 pixels with rounded white ends. Its left edge aligns with the name and HP/MP labels;
+the current/maximum values end at the gauge's right edge, with room for `MP 999/999` in the small font. Portraits,
 text and gauges have white outlines; the scenery remains visible between them. CT stays in
 Status and the turn-order logic. A valid attack/skill target replaces the actor's name with
 one compact prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status), with a white
@@ -432,7 +433,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 62,109 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 62,171 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
 unpacked view 52,320 bytes plus scene/work allocation 54,300 bytes (~107 KB of game buffers;
