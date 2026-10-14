@@ -50,12 +50,12 @@ def main():
             result = ti(scenario, frames)
             equal(scenario, frames, result)
         budget(scenario, 40, result)
-    for scenario, frames, keys in [(16, 14000, None), (10, 260, 'attack'), (10, 1000, 'turn'),
+    for scenario, frames, keys in [(16, 14000, None), (16, 6000, 'fast'), (10, 260, 'attack'), (10, 1000, 'turn'),
                                    (11, 300, 'skills'), (14, 250, 'victory'), (15, 2400, 'defeat')]:
         result = ti(scenario, frames, keys)
         equal(scenario, frames, result, keys)
         budget(scenario, frames, result, keys)
-    print('87 PC/TI screens and all replay frame budgets passed')
+    print('88 PC/TI screens and all replay frame budgets passed')
 
 
 if __name__ == '__main__': main()
