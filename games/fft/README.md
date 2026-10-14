@@ -58,8 +58,10 @@ Enemies and Delita (a guest) play as FFT's AI does: once the camera is on the un
 stands still for ~0.2 s while it thinks, then the cursor glides to the tile it goes to, its move
 range is shown, it walks; when it or its target is more than half hidden the view turns (back to
 the player's on the player's turn); the cursor glides to its target, the preview appears
-above the comparison arrow (0.5 s), an ability's name 1 s more, it acts and turns to face the nearest enemy; a
-unit hitting from its own tile backs off after. The pace is FFT's at 30 fps: a step 0.23 s (a
+above the comparison arrow (1 s once drawn), an ability's name 1.5 s more, it acts and turns to face the
+nearest enemy; a unit hitting from its own tile backs off after. The AI's glide and pauses are
+twice FFT's (a tile every 0.1 s, the move range 0.53 s: the user's pick, to follow it on the small
+screen). Otherwise the pace is FFT's at 30 fps: a step 0.23 s (a
 climb, a drop or a jump 0.33 s), an attack's blow 0.5 s after the order, the target hit 0.8 s,
 the user's EXP then its JP, the menu back 3.1 s after the order. A player's unit opens its
 menu at the bottom right: **Move** (once; the move can be undone with [shift] until it acts, which
@@ -108,8 +110,9 @@ Final Fantasy Adventure's Game Boy title screen: short index, rounded thumb and 
 palm, 18x14 pixels including the white outline. It moves three pixels sideways over a one-second cycle; at its
 rightmost position one pixel separates its tip from the text. Above the frame only the
 title tab is drawn, with scenery around it and no white horizontal highlight.
-Details and menus disappear
-during walking and action animations. A native FFT-style pointer marks the active unit above its
+Menus disappear during walking and action animations; the details stay: the walker's, the
+attacker's on the left and its target's on the right. An enemy's portrait has `Enemy` above it,
+a guest's `Guest`. After a move the menu comes back on **Act**. A native FFT-style pointer marks the active unit above its
 head: a ring, crossbar and pointed blade, eight pixels wide including its white outline,
 drawn in a padded 16x13 sprite with a smaller four-pixel round ring and two-pixel opening;
 enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
@@ -381,8 +384,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   first (the animation clock stops; once two frames in a row have the same checksum the frame is
   no longer drawn), then a step a frame within ~270k cycles (the setup's halves, 90 tiles of the
   spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most. Shown at FFT's
-  pace: the cursor glides a tile every 2 frames to where the unit goes and to its target, the
-  preview 15 frames, an ability's name 30 more. Its camera (`view_hides`, `ai_camera`): on the
+  pace slowed twice: the cursor glides a tile every 3 frames to where the unit goes and to its
+  target, the move range 16 frames, the preview 30 frames, an ability's name 45 more, counted
+  once the HUD is whole (`hud_ok`). Its camera (`view_hides`, `ai_camera`): on the
   plan's frame (not drawn) each view's hiding of the actor (on the tile it acts from) and of its
   target is read from the map's corner heights at four columns of the sprite (the other views'
   depth is not unpacked; as the view's depth on 558 of 560 tiles and views); more than half of
@@ -400,7 +404,12 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   reach, an AI facing); the optional work (new rings, a HUD part, the screen's copy kept) waits
   for a frame with room for it, 8 frames at most (the copy 2); mandatory completion of HUD,
   cursor masks and ring removal waits through a crowded camera pan. Things
-  appear a frame or two later; the frames keep within the budget.
+  appear a frame or two later; the frames keep within the budget. The HUD goes first: a part
+  every frame whose reckoning is not negative (the reckoning runs high: those frames measured
+  349k at most with it), more while 60k are left; a part measured 29k (a menu line, 48k at
+  most) or 32k (a panel's, 57k). The player's menu after a walk is made during it, unseen.
+  From a key: Ramza's details at once, a hovered unit's in 4 frames, the menu after a walk in
+  1 (`test_latency`; 13 and 96 before).
 - **Interface** (milestone 26, `tools/interface.py`). `ffti` (40,876 bytes, archived, read in
   place) holds six 19x29 portraits with their mirrors (32-wide padded planes), the original
   selection pointer (16x14, retained as a reference), 255 names per gender (12 bytes each), and 95 AMS small glyphs
@@ -414,7 +423,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   with a clear ring opening, wide crossbar and outlined blade. The camera's top margin
   covers its full height plus six pixels of headroom; facing selection keeps the camera still when the unit fits.
 - **HUD caches.** Each 80x29 transparent character panel is built in five parts (portrait,
-  name (and cached forecast), HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
+  name (and cached forecast), HP, MP, overlaid level) into a second buffer, the one shown
+  staying until the new one is whole (no gap when the HP change in a blow); `Enemy` / `Guest`
+  are made once (seven outlined rows) and shifted to the portrait's outer edge, the menu in a tab then a line per frame, and Status in nine parts while
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
   long operations and one word per row; portraits preserve their original palette-zero
   transparency. Text outlines are made once in the spare action-number scratch rows.
@@ -463,12 +474,12 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 64,525 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 65,361 bytes, ~150 below the 64 KB variable limit (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 53,730 bytes (~106 KB of game buffers;
-full-screen Status and transparent character caches add ~15 KB to milestone 25). Both blocks remain
-below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
+unpacked view 52,320 bytes plus scene/work allocation 60,248 bytes (~113 KB of game buffers;
+full-screen Status and transparent character caches add ~15 KB to milestone 25, the second
+panel buffers and the tags 6.5 KB). Both blocks remain below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a
 selection, local; milestone 21's build: a Chemist's turn with its rings, `x/emu_m21.png`). The first version drew

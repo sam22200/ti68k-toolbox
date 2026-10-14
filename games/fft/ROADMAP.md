@@ -352,6 +352,14 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     and the glove uses FFA's Game Boy title-screen silhouette and palm shading. Framing
     and animation stay; tests and the same cross-checks pass, peak 354,528 cycles.
     Review `x/adventure_menu.gif`; program 64,525 bytes, buffers 106,050 bytes.
+    Responsiveness revision (the user's TiEmu play): with eleven units on screen the reckoned
+    budget never left the 60k a HUD part reserves, so each part waited 8 frames: a hovered
+    unit's details 13 frames, the menu after a walk 96. Now a part every frame whose reckoning
+    is not negative, the menu after a walk made during it: 4 and 1 frames. Details stay during
+    walks and blows (attacker left, target right), double-buffered; `Enemy` / `Guest` above
+    those portraits; the menu after a move on Act; the AI's glide and pauses twice FFT's,
+    counted once the HUD is drawn. Tests, 48 xcheck doors, 177 UI and 87 blow / replay
+    screens pass; peak 359,242 (AI battle). Program 65,361 bytes, buffers 112,568 bytes.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.
