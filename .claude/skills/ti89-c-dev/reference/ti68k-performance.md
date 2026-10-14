@@ -210,6 +210,11 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
 - Hoist invariant work out of loops yourself: GCC 4.1 does not always do it, and at -O2 it may
   "optimise" in the wrong direction (the multiply above).
 - Unroll only the innermost, hottest loops, and only a little (×2/×4): code size is limited too.
+- **Keep a big struct's fields under 32 KB of offset** (measured, FFT Gariland's `Work`, GCC4TI
+  -Os, 2026-10-14): `p->field` uses `d16(An)` only up to +32,767; fields further down need a
+  computed address, at every access. Doubling a 5 KB HUD cache in the middle of the struct pushed
+  the AI's arrays past it and grew the code by 1.2 KB (`ai_think` alone +480 bytes); moving the
+  big caches to the struct's end gave it back. Put big buffers reached through a pointer last.
 - Keep hot globals together; ExtGraph's docs mention `-freg-relative-a4` / global register
   variables as the fastest way to reach globals (advanced: read the docs before using it).
 
