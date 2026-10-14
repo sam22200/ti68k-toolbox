@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Local FFT portraits, names and cursor plus AMS preshifted text -> ffti (never committed)."""
+"""Local FFT portraits, names and cursor plus AMS preshifted text, our sloped markers (art.py) and
+the map's tiles (extract.py, tiles.bin) -> ffti (never committed)."""
 from pathlib import Path
 import struct
 import sys
 import numpy as np
 from PIL import Image
+import art
 import extract
 from units import CHARS
 
@@ -131,6 +133,12 @@ def main():
         for raw in entries[first:first + 255]:
             s = decode(raw).encode('ascii'); assert len(s) <= 11, s
             out += s.ljust(12, b'\0')
+    section('SLOPES')                   # art.py's sloped markers: sl_l, sl_m, sc_l, sc_m
+    data = art.slopes()[3]
+    for n in ('sl_l', 'sl_m', 'sc_l', 'sc_m'):
+        out += struct.pack('>%dI' % len(data[n]), *data[n])
+    section('TILES')                    # extract.py's Tile array (12 bytes a tile)
+    out += Path('tiles.bin').read_bytes()
     Path('interface.h').write_text('// Generated locally by tools/interface.py; never committed.\n' + '\n'.join(defines) + '\n')
     Path('ffti.bin').write_bytes(out)
     Path('x').mkdir(exist_ok=True)
@@ -138,7 +146,7 @@ def main():
     tiles = [np.where(im < 0, 170, rgb[im.clip(0)]) for im in previews]
     Image.fromarray(np.concatenate(tiles, axis=1)).resize((19 * 6 * 4, 29 * 4), Image.Resampling.NEAREST).save('x/m26_portraits.png')
     Image.fromarray(np.where(marker < 0, 170, rgb[marker.clip(0)])).resize((64, 56), Image.Resampling.NEAREST).save('x/m26_marker.png')
-    print('ffti: %d bytes; six mirrored portraits, original marker, 510 names, preshifted AMS text' % len(out))
+    print('ffti: %d bytes; six mirrored portraits, original marker, 510 names, preshifted AMS text, sloped markers, tiles' % len(out))
 
 
 if __name__ == '__main__':

@@ -925,7 +925,7 @@ static void test_end(void)
     sw_init(15);
     press(K_DOWN); press(K_A); press(K_DOWN); press(K_A); press(K_A); press(K_UP); press(K_A);
     CHECKV(st.mode, M_ACT);
-    for (i = 0; i < 4000 && st.mode != M_END; i++) sw_step(0);
+    for (i = 0; i < 8000 && st.mode != M_END; i++) sw_step(0);
     CHECKV(st.end, END_DEFEAT); CHECK(DC_OBJ(st.unit[U_RAMZA].dc) || !st.unit[0].hp);
     printf("end: won by keys; lost after %d frames (%s)\n", i,
            DC_OBJ(st.unit[U_RAMZA].dc) ? "Ramza a crystal or a chest" : "Delita KO");
@@ -1537,6 +1537,7 @@ static void shots(void)
 
 int main(int argc, char **argv)
 {
+    sw_init(0);                                           // the map's tiles are read from ffti
     if (argc > 1 && !strcmp(argv[1], "--find")) { find_spots(); return 0; }
     if (argc > 1 && !strcmp(argv[1], "--latency")) { test_latency(); return fails != 0; }
     if (argc > 1 && !strcmp(argv[1], "--hides")) { verbose_hides = 1; test_hides(); return 0; }

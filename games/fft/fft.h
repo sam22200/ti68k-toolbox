@@ -37,6 +37,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #include "interface.h"
 #include "battle.h"
 #include "map.h"
+extern const Tile *map_tiles;           // read from ffti (fft.c)
 
 // Projection (scene pixels): a tile is a 24x12 diamond, one height unit is 6 px.
 #define HW 12                          // half tile width
@@ -59,6 +60,8 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define AI_SHOW 16                     // tile it moves to, then its move range shown; the preview
 #define AI_PREVIEW 30                  // on its target, then an ability's name (FFT: ~1 s; all
 #define AI_NAME 45                     // slowed down for the TI's small screen, the user's pick)
+#define AI_HOLD 48                     // a new AI turn: its unit shown 1.5 s, the world moving,
+                                       // before its plan (the user's pick)
 #define AI_NONE 0xFD                   // an AI plan without an action
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
 // the death counter (Unit.dc): 3..0 while KO, then the unit is a crystal or a chest on its tile,

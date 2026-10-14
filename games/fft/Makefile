@@ -1,7 +1,7 @@
 # Final Fantasy Tactics (PS1), Magic City Gariland: isometric tech demo with four camera
 # orientations (README.md). Our own engine, cursor and shadow (tools/art.py -> art.h,
 # committed); the battlefield's heights, its four textured views and the units' sprites come
-# from the local disc (tools/extract.py -> map.h, fftv0..3.bin ZX0-packed, .89y data variables
+# from the local disc (tools/extract.py -> map.h and tiles.bin, fftv0..3.bin ZX0-packed, .89y data variables
 # for the TI; tools/units.py -> units.h, fftu.bin; tools/battle.py -> battle.h, the battle's
 # units and FFT's numbers), never committed. The TI unpacks them with lib/unpack68k.s.
 NAME := fft
@@ -16,13 +16,13 @@ VIEWS := fftv0 fftv1 fftv2 fftv3
 map.h: tools/extract.py
 	@test -f $(DISC) || { echo "missing the local disc roms/ps1/Final Fantasy Tactics (USA) (not in git)"; exit 1; }
 	$(PY) tools/extract.py $(DISC)
-$(VIEWS:=.bin): map.h
+$(VIEWS:=.bin) tiles.bin: map.h
 %.89y: %.bin
 	$(TI)/tools/gcc4ti-bin/bin/ttbin2oth -89 dat $< $*
 fftu.bin: units.h
 fftw.bin: weapons.h
 ffti.bin: interface.h
-interface.h: tools/interface.py tools/units.py
+interface.h: tools/interface.py tools/units.py tools/art.py map.h
 	$(PY) tools/interface.py $(DISC)
 ti cycles: $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
 TI_FILES := $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
