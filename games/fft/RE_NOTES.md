@@ -891,6 +891,39 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   software arithmetic helpers. Program 62,733 bytes; allocations 52,320 and 54,930 bytes.
   Review: `x/target_hud_marker.png`, `x/target_hud_999.png`, `x/active_marker.png`.
 
+### FFT command hand and Status inspection refinement
+
+- OBSERVED IN FFT (ordinary pad input, `gariland_t1.state`, no RAM writes):
+  `DOWN:24 DOWN:24 DOWN:24 CIRCLE:120` opens Status; `SELECT:60` activates its
+  field cursor. Four `DOWN:30` presses followed by `CIRCLE:60` open the Move help
+  panel. The original uses a white glove outside the command frame and beside the
+  selected Status field. Local original captures: `x/ps1_status_overview.png`,
+  `x/ps1_status_select.png`, `x/ps1_status_down.png`, `x/ps1_status_help.png`.
+- OBSERVED (read in `fft_decomp`): `bunit_menu_update_node_cursor` handles directional
+  selection and confirmation/cancel for field explanations, including equipment and
+  ability nodes 18..27. `bunit_menu_equipment_and_ability_panel_thread` draws five
+  equipment slots and ability/skill-set entries. Actual gear swapping is a separate
+  Change Equipment action (`battle_menu_run_equip_thread`), outside native Gariland's
+  current action set. The pad capture above confirms field help, not a gear change.
+- TARGET / IMPLEMENTATION: a native padded 16x9 outlined white glove replaces the
+  internal ball, extending outside light-grey framed menus with black title tabs.
+  Status's second page selects each of its five equipment slots and learned abilities,
+  including learned Defend. Confirmation opens existing item bonuses or ability
+  range/height, JP, effect, stock and evasion; ESC returns to the list. Browsing never
+  changes equipment, HP, learned skills or inventory. Cursor movement reuses the cache;
+  detail opening/closing keeps the nine-part per-frame build.
+- TARGET / IMPLEMENTATION: active pointer reduced from 16x19 to padded 16x13, retaining
+  the ring/crossbar/blade and white silhouette outline. Camera framing stays at 39
+  pixels, now including six pixels of headroom. Reducing that margin with the sprite
+  caused a 363,120-cycle defeat frame; keeping established framing removes the overrun.
+  The terrain HUD draws height alone; removing the depth line saves 600 cache bytes.
+- CHECKED: unit tests (slot/ability navigation, detail/back, empty entries and unchanged
+  unit data), 58 PC/TI scenario screens, 177 partial/input UI screens and 87 blow/replay
+  screens pass. Ordinary peaks: UI 295,764, Status 202,426, 14,000-frame AI battle
+  349,634, defeat 356,322 cycles; no budget exemption added. Program 64,937 bytes;
+  allocations 52,320 and 54,332 bytes. Review: `x/m26_interface.png` and
+  `x/status_details.png`. No hardware path changed or TiEmu interaction.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible

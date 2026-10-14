@@ -338,6 +338,13 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     replaces the reduced source marker; top framing fits it and facing selection keeps
     the camera still when the actor fits. Tests, 52 scenario comparisons and 203 UI/replay
     screens pass; peak 357,400 cycles. Review `x/target_hud_marker.png` / `x/active_marker.png`.
+    Menu/Status refinement: the active pointer shrinks to padded 16x13; a white glove
+    extends beyond FFT-style framed menus. Equipment and ability rows can be selected
+    and inspected, with ESC returning to the list; the terrain HUD keeps height only.
+    Original Status field/help navigation observed through pad input and its decompiled
+    equipment nodes; equipment changing remains a separate action. Tests, 58 scenario
+    comparisons, 177 UI screens and 87 replay screens pass; peak 356,322 cycles.
+    Review `x/m26_interface.png` / `x/status_details.png`.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

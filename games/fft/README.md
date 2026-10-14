@@ -41,7 +41,8 @@ shadow, with a light surface edge, including wading and wet blows (milestone 27,
 | Key | Action |
 |---|---|
 | arrows | the menu's entry; the cursor (relative to the view: UP = up-right, RIGHT = down-right); at Wait, the facing |
-| Status: LEFT / RIGHT | switch stats and equipment / abilities pages |
+| Status: LEFT / RIGHT | move between stats, equipment and abilities |
+| Status: UP / DOWN, [2nd] | select an equipment slot or known ability, then inspect its details; [ESC] returns to the list |
 | [F5] / [F1] | rotate the camera 90 degrees clockwise / counter-clockwise |
 | [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can); at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
 | [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
@@ -76,13 +77,18 @@ of its HP or less kneels; then `EXP+12` rising above the user, `LvUp` for a leve
 `JP+10`), **Wait** (four arrows around the
 unit, the one it faces black: the arrows turn it, [2nd] ends the turn) and **Status** (its
 portrait, name, job, HP/MP with gauges, Lv/Exp, Brave/Faith, zodiac, Move/Jump/Speed,
-PA/MA, CT, JP and job level; LEFT / RIGHT switches to equipment and known abilities). A KO unit shows its death counter (3 to 0) above it;
+PA/MA, CT, JP and job level; LEFT / RIGHT reaches equipment and known abilities,
+UP / DOWN selects a row, [2nd] opens its details, [ESC] returns to the list).
+Equipment inspection shows the slot, item and stat bonuses; ability inspection shows
+range, height limit, learning JP, effect, item stock and evasion. Status inspects the
+current loadout; changing equipment is a separate original FFT action, outside this slice.
+A KO unit shows its death counter (3 to 0) above it;
 at its next turn after 0 it becomes a crystal or a chest, which a unit walking onto it picks
 up (a crystal: HP and MP full; a chest: `Got Clothes`, one of the dead unit's items, shown
 only). The battle ends when every enemy is KO (`Victory!`) or when Ramza becomes a crystal or
 a chest or the whole party, Delita included, is KO (`Game Over`): the results list each of
 the player's units with its level, the EXP and JP it earned. The HUD shows the height under
-its cursor at the top right (`2h`, `7.5h` on a slope; `depth 1` on canal water), as black
+its cursor at the top right (`2h`, `7.5h` on a slope, `0h` in the canal), as black
 text with a one-pixel white outline over the scenery; [APPS] shows
 FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
 The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
@@ -96,10 +102,11 @@ text and gauges have white outlines; the scenery remains visible between them. C
 Status and the turn-order logic. A valid attack/skill target shows one compact centered
 prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status) above the comparison arrow;
 both names stay visible. The prediction is outlined over the scenery, with a white outlined
-chevron between the two panels. The separate TARGET window is gone. The MENU tab and ball cursor
-sit bottom right; Act and skill lists replace the menu in place. Details and menus disappear
+chevron between the two panels. The separate TARGET window is gone. A black title tab,
+light-grey framed panel and white glove extending outside its left edge follow FFT's
+command menu; Act and skill lists replace the menu in place. Details and menus disappear
 during walking and action animations. A native FFT-style pointer marks the active unit above its
-head: a ring, crossbar and pointed blade, drawn in 16x19 with a white silhouette outline;
+head: a ring, crossbar and pointed blade, drawn in a padded 16x13 sprite with a white silhouette outline;
 enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
 without duplicates at each battle with a separate deterministic generator; Ramza and Delita
 keep their names. Scenarios (`fft(n)`, `--scenario n`):
@@ -116,13 +123,15 @@ dagger strike, 25 the enemy Chemist's unarmed strike; 26 menu, 27 Act, 28 Chemis
 34 water height, 35 hovered recruit, 36 walk, 37 blow, 38 turn order, 39 Quit, 40 Chemist's
 Status equipment/abilities; 41-44 six human sheets in canals in each view, 45 canal entry,
 46 wading, 47 exit, 48 wet sword strike, 49 wet KO, 50 crystal, 51 Critical, 52 wet throw;
-above 52 Ramza's turn drawn with seed n.
+53 weapon details, 54 helmet details, 55 empty shield, 56 Wish, 57 Potion, 58 Defend;
+above 58 Ramza's turn drawn with seed n.
 Key scripts: `keys/turn.txt` (a whole turn through the menu), `keys/attack.txt` (Ramza
 attacks, moves and waits) and `keys/skills.txt` (Ramza's Wish, then Wait), all from `fft(10)`;
 `keys/victory.txt` (from `fft(14)`: the last enemy knocked out, the results) and
 `keys/defeat.txt` (from `fft(15)`: Ramza's Wish knocks him out, the enemies knock Delita out:
 Game Over); `keys/interface.txt` starts at `fft(31)` and pages Status, returns to Act,
-then browse and the turn order.
+then browse and the turn order. `keys/status.txt` starts at `fft(32)` and inspects every
+equipment slot, a learned ability, then returns through stats to the command menu.
 
 ## Build
 
@@ -152,8 +161,8 @@ make ti           # fft.89z, fftu.89y, fftw.89y, ffti.89y, fftv0.89y .. fftv3.89
                   # data files (read in place), run fft()
 make xcheck       # the TI binary under ti-cycles = the PC, 40 scenarios
 make check-blows  # 87 PC/TI screens, frame costs for every blow phase and six complete replays
-make check-interface # 116 partial-build / page / input PC/TI screens; every UI frame <= 360k
-make review-interface # x/m26_interface.png: menus, targeting, both Status pages, motion
+make check-interface # 177 partial-build / page / inspection / input PC/TI screens; every UI frame <= 360k
+make review-interface # x/m26_interface.png and x/status_details.png: native menus / Status
 make review-blows # x/m25_blows.png: nine blows in eleven frames (original sword/dagger, bare hands)
 ../../tools/pyenv/bin/python tools/oracle.py DISC.cue ../../sources/fft_ps1/gariland_t1.state trace.txt
                   # the original at Ramza's first Gariland turn (30 s, RE_NOTES.md)
@@ -396,9 +405,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
   Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
   an independent 16-bit generator avoids changing combat/stat RNG draws.
-  The displayed active marker is our own 16x19 pixel redraw in `tools/art.py` / `art.h`,
+  The displayed active marker is our own padded 16x13 pixel redraw in `tools/art.py` / `art.h`,
   with a clear ring opening, wide crossbar and outlined blade. The camera's top margin
-  covers its full height; facing selection keeps the camera still when the unit fits.
+  covers its full height plus six pixels of headroom; facing selection keeps the camera still when the unit fits.
 - **HUD caches.** Each 80x29 transparent character panel is built in five parts (portrait,
   name (and cached forecast), HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
@@ -408,7 +417,8 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   aligned long operations per row above the HUD.
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
   Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
-  entering Status. Marker and ball cursor use ExtGraph sprites. The frame budget reserves
+  entering Status. Marker and white glove use ExtGraph sprites. Status cursor movement
+  overlays the cached list; opening or closing a detail rebuilds its nine parts. The frame budget reserves
   65k for base work and 60k for one optional UI part. A newly completed background cache
   cannot force HUD/cursor work in the expensive frame that created it; it saves work from
   the next frame. The scene is rebuilt only when reach tiles come or go.
@@ -426,6 +436,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| smaller marker / FFT hand menus / Status inspection: UI doors, AI battle and defeat replay | 295,764; 349,634 / 356,322 at most | 32 fps (frame-limited) |
 | target spacing / native active marker: UI doors, AI battle and defeat replay | 298,486; 350,712 / 357,400 at most | 32 fps (frame-limited) |
 | compact attack HUD: UI doors, AI battle and defeat replay | 317,566; 356,116 / 357,410 at most | 32 fps (frame-limited) |
 | transparent character HUD: UI doors, AI battle and defeat replay | 317,458; 356,014 / 357,308 at most | 32 fps (frame-limited) |
@@ -442,10 +453,10 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 62,733 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 64,937 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 54,930 bytes (~107 KB of game buffers;
+unpacked view 52,320 bytes plus scene/work allocation 54,332 bytes (~107 KB of game buffers;
 full-screen Status and transparent character caches add ~15 KB to milestone 25). Both blocks remain
 below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
