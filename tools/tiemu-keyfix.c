@@ -5,6 +5,10 @@
  * - keyboard: a release that never reaches the window (focus moved away, ...). Every 50 ms we
  *   compare the PC keys TiEmu saw go down with the X server's real keyboard (XQueryKeymap) and
  *   replay the missing releases through TiEmu's own handler;
+ * - event order: ignore a delayed release after the watchdog already replayed it; balance
+ *   repeated presses before forwarding autorepeat. TiEmu reference-counts ALPHA, including
+ *   the implicit ALPHA on PC letters: duplicate releases underflow it, repeated presses
+ *   without releases leave it held;
  * - mouse: TiEmu releases the skin key under the pointer at button release, none if the pointer
  *   slid off it. The release is moved back to where the button went down.
  * - keymap: TiEmu 3.04 matches hardware keycodes against the old XFree86 table (Up 98, Down 104,
@@ -39,9 +43,17 @@ static void on_event(GdkEvent *e, gpointer data)
         unsigned i;
         for (i = 0; i < sizeof evdev_to_xfree86 / sizeof evdev_to_xfree86[0]; i++)
             if (evdev_to_xfree86[i][0] == k) { e->key.hardware_keycode = evdev_to_xfree86[i][1]; break; }
-        if (e->type == GDK_KEY_PRESS && !held[k])
+        if (e->type == GDK_KEY_PRESS) {
+            if (held[k]) {
+                GdkEvent *previous = held[k];
+                held[k] = NULL;
+                previous->type = GDK_KEY_RELEASE;
+                real_func(previous, data);       /* preserve GTK autorepeat, with one key owner */
+                gdk_event_free(previous);
+            }
             held[k] = gdk_event_copy(e);
-        else if (e->type == GDK_KEY_RELEASE && held[k]) {
+        } else {
+            if (!held[k]) return;                /* delayed, duplicate or unmatched release */
             gdk_event_free(held[k]);
             held[k] = NULL;
         }
