@@ -31,8 +31,9 @@ The original sword and dagger, outlined and at least two pixels thick, appear th
 impact; the target recoils two pixels and flashes light/white inside its black contour
 (milestone 25, `x/m25_blows.png`). FFTA-style horizontal portrait bands, bottom-right
 menus, two full-screen Status pages, original generic names and active-unit marker
-(milestone 26, `x/m26_interface.png`). Next (`ROADMAP.md` milestones 27-28):
-the water, eight orientations; then the whole battle on the calculator
+(milestone 26, `x/m26_interface.png`). Depth-1 canal immersion hides the lower legs and
+shadow, with a light surface edge, including wading and wet blows (milestone 27,
+`x/m27_water.png`). Next (`ROADMAP.md` milestone 28): eight orientations; then the whole battle on the calculator
 (milestone 29). Study notes: `RE_NOTES.md`.
 
 ## Controls
@@ -102,7 +103,9 @@ itself: won in ~10,000 frames); 17-20 Ramza's sword strike in the four views, 21
 dagger strike, 25 the enemy Chemist's unarmed strike; 26 menu, 27 Act, 28 Chemist's items,
 29 attack preview, 30 Potion preview, 31 Status stats, 32 equipment, 33 enemy Status,
 34 water height, 35 hovered recruit, 36 walk, 37 blow, 38 turn order, 39 Quit, 40 Chemist's
-Status equipment/abilities; above 40 Ramza's turn drawn with seed n.
+Status equipment/abilities; 41-44 six human sheets in canals in each view, 45 canal entry,
+46 wading, 47 exit, 48 wet sword strike, 49 wet KO, 50 crystal, 51 Critical, 52 wet throw;
+above 52 Ramza's turn drawn with seed n.
 Key scripts: `keys/turn.txt` (a whole turn through the menu), `keys/attack.txt` (Ramza
 attacks, moves and waits) and `keys/skills.txt` (Ramza's Wish, then Wait), all from `fft(10)`;
 `keys/victory.txt` (from `fft(14)`: the last enemy knocked out, the results) and
@@ -281,6 +284,15 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   sliding 2 px right every 8 frames: a current. Only the positions the view shows (its depth:
   not under a bank or a roof) are kept, once per orientation (`make_glints`, ~100 per phase),
   and drawn on the screen after the view copy (~13k cycles). The views themselves stay still.
+  Grounded humans in depth 1 are cropped at the projected surface: 15 of the 26 stored
+  rows, removing the lower legs and the shadow. A light-grey cut edge follows the same
+  scenery/contour cover rule as the body. The weapon is clipped at the same height; hit
+  flashes stop there too. Wading stays cropped; a hop uses the full pose until landing.
+  Crystals and chests keep their full images. This is a fixed-height TI adaptation of
+  FFT's separate submerged SHP poses (six sheets, 60 idle/walk poses measured).
+  `make check-water-original` probes all 38 actual canals on the headless original and
+  a real pad-driven entry; `make check-water` compares 168 PC/TI phase screens and every
+  ordinary frame's budget. `make review-water` makes the twelve-state review sheet.
 - **Team at a glance.** Enemies have a black diamond with a white border above the head
   (`foe_gfx`, `art.py`), never covered (the user's pick of eight shapes,
   `x/bench_marqueurs_ennemis.png`, local): a hidden enemy shows its contour and its diamond over
@@ -397,6 +409,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | | cycles | at 12 MHz |
 |---|---|---|
 | milestone 26: menus / Status doors, AI battle and defeat replay | 313,278 / 357,270 / 359,840 at most | 32 fps (frame-limited) |
+| milestone 27: water doors / UI doors, AI battle and defeat replay | 254,232 / 316,910; 355,466 / 356,764 at most | 32 fps (frame-limited) |
 | milestone 25: five key replays (including the defeat) and nine armed/unarmed blow doors | 359,070 at most; blow doors at most 307,218 | 32 fps (frame-limited) |
 | milestone 25: a battle the AI plays both sides of (fft(16), its first 14,000 frames: pans, reach tiles, walks, blows, up to 11 units on screen) | 356,180 at most, 166 allowed stalls for its reach tiles and its camera turns (allowed stalls, as F1 / F5) | 32 fps |
 | an AI unit's view picked (its plan's frame, not drawn) | 6k, 93k when the other views are tried | |
@@ -407,10 +420,10 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 58,749 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 60,451 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 52,538 bytes (~105 KB of game buffers;
+unpacked view 52,320 bytes plus scene/work allocation 52,560 bytes (~105 KB of game buffers;
 full-screen Status and horizontal bands add ~13 KB to milestone 25). Both blocks remain
 below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a

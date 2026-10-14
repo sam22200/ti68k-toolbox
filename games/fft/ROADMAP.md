@@ -320,9 +320,21 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     creating the screen cache no longer forces optional HUD / cursor work as though it had
     already used it. Program 58,749 bytes; game buffers ~105 KB. No new hardware path;
     TiEmu remains milestone 29.
-27. **Water.** Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
+27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.
+    Measured: 38 depth-1 terrain records, six sheets / 60 source poses, 5,472 live submitted
+    pose checks and an ordinary pad-driven canal entry. The feet stay at the floor; the
+    submerged SHP removes 6..13 source rows from the lower opaque extent. Native adaptation:
+    fixed cut at the projected surface (15 of 26 stored rows), light-grey edge, hidden
+    shadow, wet flash/blade clipping, full hop poses until grounded, cached classification.
+    Twelve doors 41-52 and `x/m27_water.png` cover four views, entry/wading/exit, blows,
+    KO, Critical and a crystal. Tests, 52 xcheck doors and 371 additional phase/replay
+    screens pass. Peaks: water 254,232; AI battle 355,466; defeat 356,764; UI 316,910.
+    AI thinking uses the active pointer; its tile cursor returns with the plan. Reciprocal
+    CT products match 300 complete clock predictions. Removed units no longer mark cells
+    outside the reach grid. Program 60,451 bytes; buffers 104,880 bytes; banks unchanged.
+    No new hardware path; TiEmu stays at milestone 29.
 28. **Eight orientations** (not in FFT: four 45-degree yaws only). First an experiment: one
     view at 22.5 degrees, scenery only, to judge it at 160x100; only then the four in-between
     views (~45 KB more archive, the same RAM), the projection generalised (cursor, tiles,

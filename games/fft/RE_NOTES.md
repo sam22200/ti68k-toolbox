@@ -587,7 +587,7 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   player's units and the AI; the AI's spread from its focus uses the code's cost (the tile it
   spreads from: from the focus outwards, so a step out of water costs 2), which matched more of
   its moves. A jump's path is one step of two tiles (the walk slides over the gap). Units in
-  water stand on its bottom (their sprite is not sunk).
+  water stand on its bottom; milestone 27 adds depth-1 sprite immersion below.
 
 ### Enemy AI (milestone 20)
 
@@ -812,3 +812,52 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   whether the frame actually used the cheap cache. Budget also adjusts when scene edits
   invalidate a previously usable copy. Aligned long copies and cached preshifted text keep
   the native UI small; Status builds a part per frame, peaking at 173,440 cycles.
+
+### Canal immersion (milestone 27)
+
+- OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible
+  `gariland_t1.state`): all 38 canal records have surface 0x0E, floor height 0, depth 1.
+  Humans remain at that floor (`misc.screen.vy = 0`), but use the submerged SHP set.
+  TYPE1/TYPE2.SHP's first word points to its second 256-offset table; each table's frame
+  data starts 0x402 bytes after it. Across six sheets and ten idle/walk poses each, the
+  head stays at the same source row and the lower opaque extent loses 6..13 rows:
+  Ramza 8..12, Delita 6..11, male Squire 7..13, female Squire 8..11, male Chemist 7..10,
+  female Chemist 6..8. The submerged bottom is 4..8 source rows above the anchor.
+- OBSERVED IN FFT (live GPU packets): 5,472 complete submitted UV-part sets match the
+  disc's normal/submerged pose sets. Each of the 38 actual terrain records is copied
+  beneath a visible test unit, paired with depth cleared, for all six sheets; each pair
+  uses a fresh state, healthy idle, 24 settling frames and a 26-video-frame probe window.
+  This is a controlled display experiment, not 38 walked paths. Off-camera units are
+  culled; the shared display scratch can be overwritten by another unit; submitted GPU
+  packets lag the current animation record. The checker reads submitted CLUT/page packets
+  and matches the whole pose set, requiring a nonempty result for every pair.
+- OBSERVED IN FFT (ordinary pad-driven movement, no coordinate/terrain pokes): from
+  Ramza's first menu, `CIRCLE:60 CIRCLE:60 UP:30 CIRCLE:100` moves (4,11) -> (5,11).
+  His height falls -24 -> 0; the submitted submerged pose first appears after the floor
+  landing (video frame 185 of this sequence). Local evidence: `x/m27_original.txt`,
+  `x/m27_original_walk.txt`, `x/m27_original_water.png`, `x/m27_original_poses.png`.
+- OBSERVED (read in fft_decomp): `battle_gfx_select_unit_shp_frame` switches an ordinary
+  human to its submerged set when the surface is at least 12 world units above its feet;
+  a raised hop uses the normal set. `battle_gfx_calculate_screen_z_from_input_coords`
+  keeps ordinary humans on the floor; Float, Walk on Water, crystals and treasure have
+  their own exceptions. Gariland has no deeper canal case to reproduce here.
+- TARGET (`unit_in_water`, `draw_unit_water`): fixed-height native cropping at the projected
+  depth-1 surface, six pixels above the anchor: draw 15 of the 26 stored rows, hiding the
+  lower legs and shadow, with a light-grey edge following the existing contour/cover rule.
+  Wet flashes and blades stop at the same surface. Wading stays cropped; hopping into or
+  out of water uses the full pose until grounded. Crystals/chests retain their full images.
+  The original's separate submerged art and variable limb shapes are adapted to a fixed
+  cut; no new sprite bank or per-pixel operation is added. Terrain classification is cached
+  with each unit's cover; the dry shader keeps its existing fast path (22 extra RAM bytes).
+- TARGET (performance): the active-unit pointer identifies an AI actor while it thinks;
+  the tile cursor returns when the plan is shown. This avoids combining its drawing with
+  a new turn's clock/order update, uncached camera copy and eleven unit covers. CT order
+  uses `ti-table recip --n 51` products instead of repeated divides (numerator <=149,
+  table exact through 815); 300 predictions at Speed 1..50 equal full clock advances.
+  `compute_reach` skips removed units before marking occupied cells: the new traversal
+  fixtures exposed an out-of-range write that the TI binary caught as code corruption.
+- CHECKED: unit tests, 52 xcheck doors, 168 water phase screens, 116 UI screens and 87
+  blow/replay screens pass. Every ordinary measured frame remains <=360,000 cycles:
+  water doors 254,232, AI battle 355,466, defeat replay 356,764, UI doors 316,910.
+  Review: `x/m27_water.png` (twelve actual native scenes). Program 60,451 bytes, game
+  buffers 104,880 bytes; archived banks unchanged. No new hardware path or emulator run.
