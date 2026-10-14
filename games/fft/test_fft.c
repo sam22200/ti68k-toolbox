@@ -422,7 +422,7 @@ static int hud_shown(void)                    // the active unit's outlined HP b
 {
     int x, y, ink = 0;
     for (y = 1; y < 9; y++) for (x = 128; x < 155; x++) ink += sw_level(x, y) == 3;
-    return sw_level(21, 86) == C_WHITE && sw_level(22, 86) == C_BLACK && ink > 4;
+    return sw_level(22, 86) == C_WHITE && sw_level(23, 86) == C_BLACK && ink > 4;
 }
 
 static void test_fixes(void)

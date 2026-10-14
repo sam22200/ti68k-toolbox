@@ -123,6 +123,7 @@ static u8 *vbuf, vbuf_rot;
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
 #define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
+#define PANEL_GAUGE_W 40                // MP + gap + 999/999 in the existing small font
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
@@ -3290,13 +3291,17 @@ static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
 {
     void *sl = rt_light, *sd = rt_dark;
     s16 x = side ? 5 : 22;
-    u16 n = max ? (u16)((34U * v + max - 1) / max) : 0;
-    if (n > 34) n = 34;
-    draw_rect(x - 1, y - 1, 36, 4, C_WHITE);
-    draw_rect(x, y, 34, 2, C_LGRAY);
-    if (n) draw_rect(x, y, n, 2, color);
+    u16 n = max ? (u16)((PANEL_GAUGE_W * v + max - 1) / max) : 0;
+    if (n > PANEL_GAUGE_W) n = PANEL_GAUGE_W;
+    // Rounded white silhouette: the four outer corner pixels stay transparent.
+    // Its left edge shares the text anchor; the two-row fill starts one pixel inside.
+    draw_rect(x + 1, y - 1, PANEL_GAUGE_W, 4, C_WHITE);
+    draw_rect(x, y, PANEL_GAUGE_W + 2, 2, C_WHITE);
+    draw_rect(x + 1, y, PANEL_GAUGE_W, 2, C_LGRAY);
+    if (n) draw_rect(x + 1, y, n, 2, color);
     rt_light = rt_dark = W->pan[side][2];
-    draw_rect(x - 1, y - 1, 36, 4, C_BLACK);
+    draw_rect(x + 1, y - 1, PANEL_GAUGE_W, 4, C_BLACK);
+    draw_rect(x, y, PANEL_GAUGE_W + 2, 2, C_BLACK);
     rt_light = sl; rt_dark = sd;
 }
 
@@ -3362,7 +3367,7 @@ static void make_panel(u8 side, u8 i)
         n = put_n(s, 0, v); s[n++] = '/'; n = put_n(s, n, m); s[n] = 0;
         for (j = 0; j < n; j++) width += igfx[UI_ADV + (u8)s[j] - 32];
         panel_text(side, x, k == 2 ? 8 : 19, k == 2 ? "HP" : "MP", limit);
-        panel_text(side, limit - width, k == 2 ? 8 : 19, s, limit);
+        panel_text(side, x + PANEL_GAUGE_W + 1 - width, k == 2 ? 8 : 19, s, x + PANEL_GAUGE_W + 1);
         panel_gauge(side, k == 2 ? 15 : 26, v, m, k == 2 ? C_BLACK : C_DGRAY);
     }
     rt_light = sl; rt_dark = sd;
