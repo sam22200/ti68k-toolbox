@@ -366,6 +366,16 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     most; built with the name part, the medium-font try reached 77,620 and two AI frames went
     over; that font was too big). Tests, 48 xcheck doors, 177 UI and 87 blow / replay screens
     pass; peak 358,902 cycles. Program 64,739 bytes.
+    Then room in the program: the sloped markers' planes (3,216 bytes) and the map's tiles
+    (1,800) moved to the archived `ffti`, the markers' dark plane dropped (black and white: the
+    light one). Program 63,935 → 59,753 bytes; tests, 48 xcheck doors, 177 UI, 87 blow / replay
+    and 168 water screens pass.
+    Then, the user's asks after a TiEmu run: the picked tile drawn as the inverse of the reach
+    (a checkerboard was too faint), an attack's reach inverted (black, a white edge), an AI
+    turn's unit held 1.5 s with the world moving before its plan, and the active unit's pointer
+    bobbing as the glove sways. The held AI frames exposed a forced half-screen copy of the
+    scene (26k) over the budget (362k): the copy now goes a quarter a frame (13k). Peaks
+    348,956 (AI battle) and 358,266 (defeat); program 60,075 bytes.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

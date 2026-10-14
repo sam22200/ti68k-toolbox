@@ -112,6 +112,13 @@ u8 scene_rot;
 static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static const u8 *igfx;                  // portraits, names, marker and text (ffti)
+const Tile *map_tiles;                  // in ffti too: the map's tiles (extract.py) and the sloped
+static const u32 *sl_l, *sl_m, *sc_l, *sc_m;   // markers' planes (art.py), out of the program
+#define sl_d sl_l                       // black and white: one plane for both
+#define sc_d sc_l
+#ifndef __m68k__
+static u32 slope_pc[4 * SLOPE_ROWS];    // the PC's native copy (ffti is big-endian)
+#endif
 static const u8 *wgfx;                  // armed body poses and blades (fftw), read in place
 static u8 *vbuf, vbuf_rot;
 
@@ -208,7 +215,7 @@ typedef struct {
     u32 bg[2][RT_H * RT_W / 32];        // the scene as the screen shows it (copy_view's), from
     s16 bg_x, bg_y;                     // this camera and scene version (bg_ok): copied to the
     u16 bg_ver;                         // screen without shifts while the camera stands still;
-    u8 bg_ok, bg_part, bg_drawn;        // valid cache, next half, actually used this frame
+    u8 bg_ok, bg_part, bg_drawn;        // valid cache, next quarter, actually used this frame
     u8 drop_wait, hud_wait, bg_wait;    // frames the rings going, a HUD part, the copy, the cursor's
     u8 cur_wait;                        // dashes waited for room
     s16 left, upd_k;                    // the frame's budget left for optional work, the update's
@@ -236,7 +243,8 @@ static u8 bg_usable(void);
                                         // from the budget, the other optional work waits
 #define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
 #define HUD_K 60                        // a part of the HUD made
-#define SAVE_K 15                       // half the screen's copy kept
+#define SAVE_K 13                       // a quarter of the screen's copy kept (halves, 26k,
+                                        // went over the budget once forced)
 #define SAVE_WAIT 2                     // frames the copy waits at most once the camera stops,
 #define WAIT_MAX 8                      // the rings going or a HUD part (then done anyway)
 #define SUM_K 25                        // an AI unit's picture checked (planes_sum)
@@ -655,6 +663,8 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
 
 #define RINGS(m) ((m) == M_TARGET || (m) == M_AIM || ((m) == M_ORDER && (st.back == M_TARGET || st.back == M_AIM)))
                                                  // the modes that show st.reach
+#define AIMING(m) ((m) == M_AIM || ((m) == M_ORDER && st.back == M_AIM))   // its rings inverted:
+                                                 // black, a white edge (the user's pick)
 
 // A tile's marker (a reach ring, or the cursor: cur) in view rot: the flat diamond (hi_*,
 // cur_*, 24 x 12) at its standing height, or on a sloped tile the outline of its four corners
@@ -692,13 +702,13 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
     s16 r, k, w0 = mk->x >> 4, sh = mk->x & 15, yy = mk->y;
     u16 dd = (u16)(0x7F7F - (mk->depth | mk->depth << 8));
     u16 hp = (u16)~(hide_pat[yy & 1] * 0x0101), o = (u16)(yy * SC_BYTES + 2 * w0);
+    u32 inv = AIMING(st.mode) ? 0xFFFFFFFFUL : 0;   // black and white: one plane for both
     for (r = 0; r < mk->rows; r++, yy++, o += SC_BYTES, hp = (u16)~hp) {
-        u32 m = mk->m[r], l = mk->l[r], d = mk->d[r], a;
-        u16 m3[3], l3[3], d3[3];
+        u32 m = mk->m[r], l = (mk->l[r] ^ inv) & m, a;
+        u16 m3[3], l3[3];
         if ((u16)yy >= SC_H || !m) continue;
         a = m >> sh; m3[0] = (u16)(a >> 16); m3[1] = (u16)a; m3[2] = (u16)(m << (16 - sh));
         a = l >> sh; l3[0] = (u16)(a >> 16); l3[1] = (u16)a; l3[2] = (u16)(l << (16 - sh));
-        a = d >> sh; d3[0] = (u16)(a >> 16); d3[1] = (u16)a; d3[2] = (u16)(d << (16 - sh));
         for (k = 0; k < 3; k++) {
             u16 mw = m3[k], g1, g2, c, oo = (u16)(o + 2 * k);
             const u8 *t = vbuf + 2 * SC_PLANE + oo;     // depths, masks: constant offsets
@@ -711,7 +721,7 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
                 c = (u16)(((g1 & RD16(t + SC_PLANE, 0)) | (g2 & RD16(t + 3 * SC_PLANE, 0))) & mw & hp);
             }
             WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(vbuf + oo, 0) & c)));
-            WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (d3[k] & mw & ~c) | (RD16(vbuf + SC_PLANE + oo, 0) & c)));
+            WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(vbuf + SC_PLANE + oo, 0) & c)));
         }
     }
 }
@@ -744,9 +754,9 @@ static u8 seen(s16 x, s16 y, u8 depth)
 // byte (8 pixels) at a time, made again only when the cursor or the view changes (optional work:
 // without room in the frame's budget the cursor is drawn whole a frame or two); the player's
 // cursor only: the AI's frames are the fullest
-static const u32 *cursor_mask(const Marker *mk, u8 c)
+static const u32 *cursor_mask(const Marker *mk, u16 c)
 {
-    u16 k = (u16)(c | st.rot << 8 | 0x8000), o;
+    u16 k = (u16)(c | st.rot << 8 | 0x8000), o;   // c: the tile, | 0x1000 a reach tile's marker
     s16 r, b0 = mk->x >> 3, sh = mk->x & 7, yy = mk->y, j;
     const u8 *t1 = vbuf + 2 * SC_PLANE;
     u8 dp = mk->depth;
@@ -822,7 +832,7 @@ static void bg_patch(s16 x, s16 y, s16 w, s16 h)
 {
     s16 j, j0, j1, r, sh = st.camx & 15, wb = (st.camx >> 4) << 1;
     if (!(W->bg_ok || W->bg_part) || W->bg_x != st.camx || W->bg_y != st.camy) return;
-    x -= st.camx; y -= st.camy;                // (a copy half made: its other half comes after)
+    x -= st.camx; y -= st.camy;                // (a copy partly made: the rest comes after)
     if (y < 0) { h += y; y = 0; }
     if (y + h > RT_H) h = RT_H - y;
     if (h <= 0 || x + w <= 0 || x >= RT_W) return;
@@ -2517,6 +2527,15 @@ void game_init(void)
     ugfx = rt_file("fftu", RT_NULL);
     wgfx = rt_file("fftw", RT_NULL);
     igfx = rt_file("ffti", RT_NULL);
+    if (!igfx) { W = RT_NULL; return; }       // a message, ESC quits
+    map_tiles = (const Tile *)(igfx + UI_TILES);
+#ifdef __m68k__
+    sl_l = (const u32 *)(igfx + UI_SLOPES);
+#else
+    for (i = 0; i < 4 * SLOPE_ROWS; i++) slope_pc[i] = RD32(igfx + UI_SLOPES, 2 * i);
+    sl_l = slope_pc;
+#endif
+    sl_m = sl_l + SLOPE_ROWS; sc_l = sl_m + SLOPE_ROWS; sc_m = sc_l + SLOPE_ROWS;
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB
         vbuf = malloc(VIEW_BYTES);
         sbuf = vbuf ? malloc(2 * SC_PLANE + sizeof(Work)) : RT_NULL;
@@ -2887,6 +2906,7 @@ static void ai_next(void)
         compute_reach(st.act);
     } else if (st.acted && !st.moved && st.ai_first) {
         st.ai = AI_THINK; st.ai_first = 0;
+        st.ai_t = AI_HOLD;                      // thinking again after acting: no hold
         W->ai_k = 0;
     } else {
         st.ai = AI_FACE;
@@ -2919,11 +2939,12 @@ static void ai_step(void)
         if (W->frz || ++W->frz_n > 40) {        // (40 frames at most: the picture no longer
             u8 done;                            // drawn anyway)
             ZB(9); done = ai_think(); ZE(9);
-            if (done) st.ai = AI_GO;
+            if (done) st.ai = AI_GO;            // (this frame keeps the picture)
         }
-    } else if (st.ai == AI_GO) {                // the plan shown from the next frame (this one
-        ai_camera(); ai_next(); W->hold = 1;    // keeps the picture)
-    }
+    } else if (st.ai == AI_GO) {                // a new turn's plan made: its unit shown, the
+        if (st.ai_t < AI_HOLD) { st.ai_t++; W->frz = 0; }   // world moving, AI_HOLD frames;
+        else { ai_camera(); ai_next(); W->hold = 1; }   // then the plan shown from the next
+    }                                           // frame (this one keeps the picture)
     else if (st.ai == AI_FACE ? ++st.ai_t >= AI_SHOW / 2 : ai_shown()) {
         if (st.ai == AI_MOVE) {
             Unit *u = &st.unit[st.act];
@@ -3132,7 +3153,7 @@ u8 game_update(void)
         st.camx = ease(st.camx, tx);
         st.camy = ease(st.camy, ty);
     }
-    if (RINGS(st.mode) != RINGS(mode0)) hl_seq++;   // the reach rings
+    if (RINGS(st.mode) != RINGS(mode0) || AIMING(st.mode) != AIMING(mode0)) hl_seq++;   // the reach rings
     return 1;
 }
 
@@ -3204,8 +3225,8 @@ static void screen_scene(void)
 #endif
         return;
     }
-    copy_view();                               // kept once the camera stands still: half the
-    if (W->bg_x != st.camx || W->bg_y != st.camy || W->bg_ver != scene_ver) {   // rows a frame,
+    copy_view();                               // kept once the camera stands still: a quarter
+    if (W->bg_x != st.camx || W->bg_y != st.camy || W->bg_ver != scene_ver) {   // of the rows a frame,
         W->bg_wait = W->bg_part = W->bg_ok = 0;   // with room or anyway after a frame or two (it
         W->bg_x = st.camx; W->bg_y = st.camy; W->bg_ver = scene_ver;   // frees ~80k a frame)
         return;
@@ -3213,14 +3234,14 @@ static void screen_scene(void)
     if (!W->bg_part && W->left < SAVE_K && ++W->bg_wait <= SAVE_WAIT) return;
     W->left -= SAVE_K; W->bg_wait = 0;
     W->bg_ok = 0;                              // (the copy being remade)
-    y = W->bg_part ? RT_H / 2 : 0;
+    y = W->bg_part * (RT_H / 4);
     l += y * RT_PBYTES; d += y * RT_PBYTES; p += y * (RT_W / 32); q += y * (RT_W / 32);
-    for (y = 0; y < RT_H / 2; y++, l += RT_PBYTES, d += RT_PBYTES) {
+    for (y = 0; y < RT_H / 4; y++, l += RT_PBYTES, d += RT_PBYTES) {
         a = (u32 *)l; b = (u32 *)d;
         *p++ = a[0]; *p++ = a[1]; *p++ = a[2]; *p++ = a[3]; *p++ = a[4];
         *q++ = b[0]; *q++ = b[1]; *q++ = b[2]; *q++ = b[3]; *q++ = b[4];
     }
-    W->bg_ok = W->bg_part; W->bg_part ^= 1;
+    W->bg_part = (u8)((W->bg_part + 1) & 3); W->bg_ok = !W->bg_part;
 }
 
 const char *unit_name(u8 i)
@@ -3849,8 +3870,9 @@ static void draw_status(void)
 
 static void draw_active(const Feet *f)
 {
+    static const u8 bob[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };   // up and down as the glove sways
     RtSprite sp = { 16, ACTIVE_H, active_gfx[0], active_gfx[1], active_gfx[2] };
-    draw_sprite(f->x - st.camx - 8, f->y - st.camy - UNIT_FOOT - ACTIVE_H + 1, &sp);
+    draw_sprite(f->x - st.camx - 8, f->y - st.camy - UNIT_FOOT - ACTIVE_H + 1 - bob[(st.tick >> 2) & 7], &sp);
 }
 
 // A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP, 2 the JP): AMS
@@ -4057,8 +4079,15 @@ void game_render(void)
     // its frame on the clock, camera and unit covers.
     else if (st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
         Marker mk;
-        marker(st.rot, (u8)(st.cz * MAP_W + st.cx), 1, &mk);
-        blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, cursor_mask(&mk, (u8)(st.cz * MAP_W + st.cx)));
+        u8 c = (u8)(st.cz * MAP_W + st.cx), ring = RINGS(st.mode);
+        marker(st.rot, c, !ring, &mk);
+        if (ring && !AIMING(st.mode)) {         // over the rings: the tile as their inverse
+            u32 fl[24];                         // (the user's pick over a checkerboard): black,
+            for (n = 0; n < mk.rows; n++)       // a white edge; when aiming the plain ring
+                fl[n] = mk.m[n] & ~mk.l[n];     // (white, a black edge) over the black ones
+            mk.l = mk.d = fl;
+        }
+        blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, cursor_mask(&mk, (u16)(c | ring << 12)));
     }
     if (vis[st.act] && st.mode != M_WALK && st.mode != M_ACT) draw_active(&f[st.act]);
     draw_hud();

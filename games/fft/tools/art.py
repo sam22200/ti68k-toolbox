@@ -8,6 +8,7 @@ and so are the units (tools/units.py -> units.h); this file holds the rest:
 - The units' shadow (drawn into their frames by tools/units.py).
 - The cursor and the reach marker (24x12 diamonds); the diamond above enemies (team at a glance);
   enemy markers and ground shapes; a native ring/crossbar/point active-unit pointer.
+- The sloped markers' planes go to ffti instead (interface.py: out of the program).
 - The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
   the views (extract.py, map.h).
 """
@@ -165,6 +166,29 @@ def slope_marker(lift, cur):
     return pix
 
 
+def slopes():
+    """The sloped markers: keys, top rows, row counts and the planes sl_l, sl_m (reach) and sc_l,
+    sc_m (cursor), u32 rows (black and white only: the dark plane is the light one). The planes
+    live in ffti (interface.py, out of the program), the rest in art.h."""
+    keys, tops, rows, data = [], [], [], {n: [] for n in ('sl_l', 'sl_m', 'sc_l', 'sc_m')}
+    for a, b, d in SLOPES:
+        lift = [0] * 4
+        lift[a] = d
+        if b is not None:
+            lift[b] = d
+        rp, cp = slope_marker(lift, False), slope_marker(lift, True)
+        used = [y for y in range(26) if any(c is not None for c in rp[y] + cp[y])]
+        if not used:                    # seen edge-on (the front corner 2 up): the flat marker
+            continue
+        y0, y1 = used[0], used[-1] + 1
+        keys.append(sum(l << (2 * k) for k, l in enumerate(lift))); tops.append(y0); rows.append(y1 - y0)
+        for pre, pix in (('sl', rp), ('sc', cp)):
+            L, D, M = plane_rows(pix[y0:y1], 24, y1 - y0)
+            assert L == D
+            data[pre + '_l'] += L; data[pre + '_m'] += M
+    return keys, tops, rows, data
+
+
 # 8x8 polygon patterns (the rotation frames): rows of (light, dark) bytes,
 # written doubled as 16-bit words
 def pattern(f):
@@ -187,10 +211,12 @@ def main():
     def arr(name, rows, fmt='0x%08lXUL'):
         w('static const u32 %s[%d] = { %s };\n' % (name, len(rows), ', '.join(fmt % r for r in rows)))
 
-    L, D, M = plane_rows(overlay_hi(), 24, 12)
-    arr('hi_l', L); arr('hi_d', D); arr('hi_m', M)
-    L, D, M = plane_rows(cursor(), 24, 12)
-    arr('cur_l', L); arr('cur_d', D); arr('cur_m', M)
+    def bw(name, L, D, M):              # black and white only: one array for both planes
+        assert L == D
+        arr(name + '_l', L); w('#define %s_d %s_l\n' % (name, name)); arr(name + '_m', M)
+
+    bw('hi', *plane_rows(overlay_hi(), 24, 12))
+    bw('cur', *plane_rows(cursor(), 24, 12))
     # rotation frames (half resolution): solid greys (checkerboards between two greys were
     # tried: the user preferred solid faces)
     foe = [[None if c == '.' else int(c) for c in l] for l in FOE.strip('\n').split('\n')]
@@ -207,28 +233,13 @@ def main():
     w('#define HAND_H %d\n' % len(hand))
     w('static const u32 hand_gfx[3][HAND_H] = { { %s }, { %s }, { %s } };\n' %
       tuple(', '.join('0x%08lX' % v for v in P) for P in (L, D, [~m & 0xFFFFFFFF for m in M])))
-    keys, tops, rows, data = [], [], [], {n: [] for n in ('sl_l', 'sl_d', 'sl_m', 'sc_l', 'sc_d', 'sc_m')}
-    for a, b, d in SLOPES:
-        lift = [0] * 4
-        lift[a] = d
-        if b is not None:
-            lift[b] = d
-        rp, cp = slope_marker(lift, False), slope_marker(lift, True)
-        used = [y for y in range(26) if any(c is not None for c in rp[y] + cp[y])]
-        if not used:                    # seen edge-on (the front corner 2 up): the flat marker
-            continue
-        y0, y1 = used[0], used[-1] + 1
-        keys.append(sum(l << (2 * k) for k, l in enumerate(lift))); tops.append(y0); rows.append(y1 - y0)
-        for pre, pix in (('sl', rp), ('sc', cp)):
-            L, D, M = plane_rows(pix[y0:y1], 24, y1 - y0)
-            data[pre + '_l'] += L; data[pre + '_d'] += D; data[pre + '_m'] += M
+    keys, tops, rows, _ = slopes()
     w('#define NSLOPE %d\n' % len(keys))
     w('static const u8 slope_key[NSLOPE] = { %s };   // corner lifts, 2 bits each (top right bottom left)\n' % ', '.join(map(str, keys)))
     w('static const u8 slope_top[NSLOPE] = { %s };   // first row below 2 units over the lowest corner\n' % ', '.join(map(str, tops)))
     w('static const u8 slope_rows[NSLOPE] = { %s };\n' % ', '.join(map(str, rows)))
     w('static const u8 slope_off[NSLOPE] = { %s };   // its first row in sl_* and sc_*\n' % ', '.join(str(sum(rows[:k])) for k in range(len(rows))))
-    for n, r in data.items():
-        arr(n, r)
+    w('#define SLOPE_ROWS %d   // sl_l, sl_m, sc_l, sc_m: in ffti (interface.py), sl_d = sl_l\n' % sum(rows))
     w('#define SHADES 4\n')
     w('static const u16 turn_pat[SHADES][2][8] = {\n')
     for k in range(4):

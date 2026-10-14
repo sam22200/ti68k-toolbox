@@ -611,3 +611,9 @@ mapping), bulk copies not covered by ExtGraph.
 - **`-mno-bss` puts every static array in the program file**: 5.6 KB of work buffers (spans,
   half-resolution frame, sort keys) pushed the program over the TI-89's 24,576 bytes; one
   `malloc` of a struct holding them (macros keep the names) brought it back under.
+- **Shrinking a big program, measured on the FFT demo** (ti-cc flags, 63,935-byte build):
+  `--merge-constants` already merges identical `const` arrays (two equal 804-byte planes cost
+  once: dropping the copy saved 16 bytes, so an object file's sections overstate the data);
+  a 1 KB state struct referenced ~1,200 times costs **more** off the file: `section(".bss")`
+  +1.5 KB, accessed through a pointer +1 KB of code. What pays is moving `const` data to an
+  archived data file read in place: 5 KB of markers and map tiles → program −4.2 KB.
