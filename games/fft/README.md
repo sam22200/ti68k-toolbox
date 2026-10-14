@@ -26,7 +26,10 @@ the scenery, the turn order on [APPS], "Quit?" on [ESC], HP above MP (milestone 
 original's pace, measured on it: walks, blows, the EXP and the JP, the AI's cursor gliding to
 its target, its preview and its ability's name, its camera turned when a unit is more than half
 hidden (milestone 23). The reach as FFT's tiles (white, a 2-pixel black edge drawing the grid), all
-shown at once, [MODE] drawing them over the scenery in front (milestone 24).
+shown at once, [MODE] drawing them over the scenery in front (milestone 24); an attack's or an
+ability's reach inverted (black, a white edge), the picked tile drawn as the inverse of its reach's.
+An AI turn's unit is shown 1.5 s (`AI_HOLD`, the world moving) once its plan is made; the active
+unit's pointer bobs up and down.
 The original sword and dagger, outlined and at least two pixels thick, appear through the
 impact; the target recoils two pixels and flashes light/white inside its black contour
 (milestone 25, `x/m25_blows.png`). Transparent character details with outlined portraits and stacked HP/MP gauges, bottom-right
@@ -145,11 +148,12 @@ equipment slot, a learned ability, then returns through stats to the command men
 
 ```sh
 make map.h        # once: reads MAP/MAP022 from roms/ps1/Final Fantasy Tactics (USA)/ (local):
-                  # map.h and the four views fftv0.bin .. fftv3.bin, ZX0-packed (~2 min)
+                  # map.h, tiles.bin and the four views fftv0.bin .. fftv3.bin, ZX0-packed (~2 min)
 make units.h      # once: the units' sprites from BATTLE/*.SPR, TYPE1.SHP and TYPE2.SHP (a second):
                   # units.h and the data file fftu.bin (37.8 KB, big-endian rows, mirrored too;
                   # the crystal and the chest from BATTLE/OTHER.SPR)
-make interface.h  # portraits, names, marker and preshifted small text: ffti.bin (40.9 KB)
+make interface.h  # portraits, names, marker, preshifted small text, the sloped markers' planes
+                  # (art.py) and the map's tiles (tiles.bin): ffti.bin (45.9 KB)
 make weapons.h    # armed body poses and blades from WEP.SPR, WEP1/2.SHP/.SEQ: fftw.bin
 make battle.h     # once: the battle's units, jobs, items and weapons, generation tables, the
                   # zodiac table, the skill sets, abilities and the bag (SCUS_942.21, ENTD,
@@ -383,7 +387,8 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   others once per target from the safest tile. Spread over frames: the picture stands still
   first (the animation clock stops; once two frames in a row have the same checksum the frame is
   no longer drawn), then a step a frame within ~270k cycles (the setup's halves, 90 tiles of the
-  spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most. Shown at FFT's
+  spread from the focus, ~50 candidates): 5 frames a turn on average, 6 at most; then a new
+  turn's unit is shown 48 frames (1.5 s, the user's pick), the animations running. Shown at FFT's
   pace slowed twice: the cursor glides a tile every 3 frames to where the unit goes and to its
   target, the move range 16 frames, the preview 30 frames, an ability's name 45 more, counted
   once the HUD is whole (`hud_ok`). Its camera (`view_hides`, `ai_camera`): on the
@@ -410,10 +415,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   most) or 32k (a panel's, 57k). The player's menu after a walk is made during it, unseen.
   From a key: Ramza's details at once, a hovered unit's in 4 frames, the menu after a walk in
   1 (`test_latency`; 13 and 96 before).
-- **Interface** (milestone 26, `tools/interface.py`). `ffti` (40,876 bytes, archived, read in
+- **Interface** (milestone 26, `tools/interface.py`). `ffti` (45,892 bytes, archived, read in
   place) holds six 19x29 portraits with their mirrors (32-wide padded planes), the original
   selection pointer (16x14, retained as a reference), 255 names per gender (12 bytes each), and 95 AMS small glyphs
-  pre-shifted to every word alignment. Portrait UVs and palette 8 are from the `.SPR` raw
+  pre-shifted to every word alignment; then the sloped markers' planes (`art.py`, 3,216 bytes)
+  and the map's tiles (`extract.py`, 1,800 bytes), moved out of the program. Portrait UVs and palette 8 are from the `.SPR` raw
   rows at `0x8200`; marker UV `(64,128)..(80,152)` from `EVENT/FRAME.BIN`, palette from
   `BATTLE.BIN`. `interface.py --check DISC STATE` compares all six portrait sheets and the
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
@@ -475,9 +481,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 64,739 bytes, ~775 below the 64 KB variable limit (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 59,753 bytes, ~5.8 KB below the 64 KB variable limit (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
-`ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
+`ffti` (45.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
 unpacked view 52,320 bytes plus scene/work allocation 60,248 bytes (~113 KB of game buffers;
 full-screen Status and transparent character caches add ~15 KB to milestone 25, the second
 panel buffers and the tags 6.5 KB). Both blocks remain below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
