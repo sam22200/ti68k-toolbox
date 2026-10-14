@@ -106,6 +106,16 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
   the image) replays releases the X server says happened and moves mouse releases back to the
   press point (**verified**: a synthetic press without release sticks with `TI_KEYFIX=0`, is
   released within 50 ms with the fix). Debug a game's keys by printing `rt_keys` on screen.
+- **Modifier corruption (verified, Titanium, isolated TiEmu, 2026-10-14)**: TiEmu
+  reference-counts ALPHA, including the implicit ALPHA on PC letters. Replaying a
+  missing release then forwarding GTK's delayed release underflows that counter;
+  repeated presses without matching releases leave it held. The shim now ignores
+  unmatched releases and balances repeated presses while preserving GTK autorepeat.
+  `rtk proxy python3 tools/check_tiemu_keyfix.py` reproduces five failures before the
+  fix and checks event ordering, remapped keys, overlapping owners and skin releases
+  on a private X server. Actual skin clicks show `2ND`, Shift and diamond indicators;
+  raw `ti-key` codes type `fft()` correctly with the private server in French layout.
+  The test leaves the user's emulator and desktop keyboard layout untouched.
 - One instance at a time (container named `tiemu`): `ti-emu stop` before switching models.
 - **No digits in program names**: typing digits through the PC keyboard is unreliable (`int5rate()`
   came out as `tan(`, and the keypad keycodes opened MEMORY/2nd menus and left a modifier stuck).
