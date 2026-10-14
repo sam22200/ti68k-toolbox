@@ -50,14 +50,14 @@ shadow, with a light surface edge, including wading and wet blows (milestone 27,
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.
-While a unit walks the camera stays until the walker nears the screen's edge; while it aims or
+While a unit walks or chooses its facing the camera stays until it nears the screen's edge; while it aims or
 acts, it stays when the unit and its target are both on screen, else it centres the point
 between them.
 Enemies and Delita (a guest) play as FFT's AI does: once the camera is on the unit the picture
 stands still for ~0.2 s while it thinks, then the cursor glides to the tile it goes to, its move
 range is shown, it walks; when it or its target is more than half hidden the view turns (back to
-the player's on the player's turn); the cursor glides to its target, the preview shows at the
-right above the target band (0.5 s), an ability's name 1 s more, it acts and turns to face the nearest enemy; a
+the player's on the player's turn); the cursor glides to its target, the preview appears
+above the comparison arrow (0.5 s), an ability's name 1 s more, it acts and turns to face the nearest enemy; a
 unit hitting from its own tile backs off after. The pace is FFT's at 30 fps: a step 0.23 s (a
 climb, a drop or a jump 0.33 s), an attack's blow 0.5 s after the order, the target hit 0.8 s,
 the user's EXP then its JP, the menu back 3.1 s after the order. A player's unit opens its
@@ -88,16 +88,19 @@ FFT's AT list in a bottom-right window (active unit then five turns, enemies in 
 The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
 active unit left, hovered or aimed-at unit right, with the cutout 19x29 original portraits
 at the outer edges, facing inward. The small level overlays the portrait's lower corner;
-all details fit within its 29-pixel height. Name and HP above MP sit beside it. Each gauge
+the portrait/name/stats fit within its 29-pixel height. Name and HP above MP sit beside it. Each gauge
 is 40x2 pixels with rounded white ends. Its left edge aligns with the name and HP/MP labels;
-the current/maximum values end at the gauge's right edge, with room for `MP 999/999` in the small font. Portraits,
+the current/maximum values end at the gauge's right edge, with room for `MP 999/999` in the small font.
+The target's gauges and values meet its portrait, and its name aligns to that same right edge. Portraits,
 text and gauges have white outlines; the scenery remains visible between them. CT stays in
-Status and the turn-order logic. A valid attack/skill target replaces the actor's name with
-one compact prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status), with a white
-outlined chevron between the two panels. The separate TARGET window is gone. The MENU tab and ball cursor
+Status and the turn-order logic. A valid attack/skill target shows one compact centered
+prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status) above the comparison arrow;
+both names stay visible. The prediction is outlined over the scenery, with a white outlined
+chevron between the two panels. The separate TARGET window is gone. The MENU tab and ball cursor
 sit bottom right; Act and skill lists replace the menu in place. Details and menus disappear
-during walking and action animations. An original FFT pointer marks the active unit above its
-head; enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
+during walking and action animations. A native FFT-style pointer marks the active unit above its
+head: a ring, crossbar and pointed blade, drawn in 16x19 with a white silhouette outline;
+enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
 without duplicates at each battle with a separate deterministic generator; Ramza and Delita
 keep their names. Scenarios (`fft(n)`, `--scenario n`):
 0 the battle's start (a new draw each run: seeded from the clock; Delita's turn), and from Ramza's
@@ -386,18 +389,23 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   appear a frame or two later; the frames keep within the budget.
 - **Interface** (milestone 26, `tools/interface.py`). `ffti` (40,876 bytes, archived, read in
   place) holds six 19x29 portraits with their mirrors (32-wide padded planes), the original
-  selection pointer (16x14), 255 names per gender (12 bytes each), and 95 AMS small glyphs
+  selection pointer (16x14, retained as a reference), 255 names per gender (12 bytes each), and 95 AMS small glyphs
   pre-shifted to every word alignment. Portrait UVs and palette 8 are from the `.SPR` raw
   rows at `0x8200`; marker UV `(64,128)..(80,152)` from `EVENT/FRAME.BIN`, palette from
   `BATTLE.BIN`. `interface.py --check DISC STATE` compares all six portrait sheets and the
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
   Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
   an independent 16-bit generator avoids changing combat/stat RNG draws.
+  The displayed active marker is our own 16x19 pixel redraw in `tools/art.py` / `art.h`,
+  with a clear ring opening, wide crossbar and outlined blade. The camera's top margin
+  covers its full height; facing selection keeps the camera still when the unit fits.
 - **HUD caches.** Each 80x29 transparent character panel is built in five parts (portrait,
-  name/forecast, HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
+  name (and cached forecast), HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
   long operations and one word per row; portraits preserve their original palette-zero
   transparency. Text outlines are made once in the spare action-number scratch rows.
+  The centered prediction has its own seven-row planes and opacity mask, applied in two
+  aligned long operations per row above the HUD.
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
   Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
   entering Status. Marker and ball cursor use ExtGraph sprites. The frame budget reserves
@@ -418,6 +426,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| target spacing / native active marker: UI doors, AI battle and defeat replay | 298,486; 350,712 / 357,400 at most | 32 fps (frame-limited) |
 | compact attack HUD: UI doors, AI battle and defeat replay | 317,566; 356,116 / 357,410 at most | 32 fps (frame-limited) |
 | transparent character HUD: UI doors, AI battle and defeat replay | 317,458; 356,014 / 357,308 at most | 32 fps (frame-limited) |
 | terrain HUD outline: UI doors, AI battle and defeat replay | 317,474; 356,030 / 357,328 at most | 32 fps (frame-limited) |
@@ -433,10 +442,10 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 62,171 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 62,733 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 54,300 bytes (~107 KB of game buffers;
+unpacked view 52,320 bytes plus scene/work allocation 54,930 bytes (~107 KB of game buffers;
 full-screen Status and transparent character caches add ~15 KB to milestone 25). Both blocks remain
 below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a

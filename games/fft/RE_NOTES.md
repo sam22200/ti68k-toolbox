@@ -867,6 +867,30 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   rounded outer corner pixels remain transparent. Local review: `x/rounded_hud.png`
   and `x/rounded_hud_999.png`.
 
+### Target attachment and active-marker revision
+
+- TARGET / IMPLEMENTATION: enemy gauges and values now end against the portrait at
+  panel column 61; the target name aligns to the same edge. Both character names remain,
+  while the centered prediction uses a separate seven-row outlined cache above the
+  comparison arrow. Cache matching suppresses a stale prediction when target/ability
+  changes. All 510 source names fit: the longest measured string is 43 pixels, leaving
+  the target name's first pixel inside its panel. Three-digit HP/MP still fit both sides.
+- TARGET / IMPLEMENTATION: a native 16x19 active pointer replaces the unreadable reduced
+  source marker. `tools/art.py` draws a ring, wide crossbar and shaded pointed blade,
+  dilates the silhouette for a white outline, and emits three native word-row planes in
+  `art.h`. The original archived pointer stays as unused reference data, preserving the
+  existing bank layout. Its full body/marker top margin is 39 pixels. Facing selection
+  holds the camera when the actor fits, avoiding unnecessary repeated full-view copies.
+- CHECKED: tests, 52 PC/TI scenario screens, 116 UI partial/input screens and 87 blow/replay
+  screens pass. The AI finishes the same 80-turn native battle in 10,086 frames. Every
+  ordinary measured frame stays <=360k: the 14,000-frame AI replay peaks at 350,712, defeat
+  replay at 357,400. A 369,558-cycle facing frame during the initial camera-margin change
+  was mandatory work (budget already negative): profiling isolated the moving view copy,
+  eleven actors and the facing arrows. Holding the fitting camera removes that overrun;
+  no extra stall exemption or larger budget. Generated outlined-text/HUD loops have no
+  software arithmetic helpers. Program 62,733 bytes; allocations 52,320 and 54,930 bytes.
+  Review: `x/target_hud_marker.png`, `x/target_hud_999.png`, `x/active_marker.png`.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible

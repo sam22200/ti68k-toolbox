@@ -333,6 +333,11 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     Gauge refinement: rounded white ends, shared text/bar left anchor, values ending at
     the bar's right edge; 40x2 fill keeps `MP 999/999` readable. Review `x/rounded_hud.png`
     and `x/rounded_hud_999.png`; the 357,410-cycle peak is unchanged.
+    Target/pointer revision: enemy stats meet the portrait, both names stay, and the
+    centered prediction moves above the arrow. Native 16x19 ring/crossbar/blade marker
+    replaces the reduced source marker; top framing fits it and facing selection keeps
+    the camera still when the actor fits. Tests, 52 scenario comparisons and 203 UI/replay
+    screens pass; peak 357,400 cycles. Review `x/target_hud_marker.png` / `x/active_marker.png`.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.
