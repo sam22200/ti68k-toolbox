@@ -44,7 +44,8 @@ def plane_rows(pix, w, h, x0=0):
 
 
 def overlay_hi():
-    """The reach marker on a 24x12 tile: a white diamond with a dark grey edge 2 px a row, laid
+    """The reach marker on a 24x12 tile: a white diamond with a black edge 4 px a row (2 px
+    thick, black over dark grey: the user's picks), laid
     on the neighbours' own edges (the diamonds overlap by 2 px): the reach reads as a white area
     ruled by a grid (chosen on a sheet of styles: the earlier inset black and white rings, a
     light grey centre with a black edge, the edge alone in black or white)."""
@@ -52,7 +53,7 @@ def overlay_hi():
     pix = [[None] * 24 for _ in range(12)]
     for y, (x0, x1) in enumerate(rows):
         for x in range(x0, x1):
-            pix[y][x] = 2 if x < x0 + 2 or x >= x1 - 2 or y in (0, 11) else 0
+            pix[y][x] = 3 if x < x0 + 4 or x >= x1 - 4 or y in (0, 1, 10, 11) else 0
     return pix
 
 
@@ -131,8 +132,8 @@ SHADOW = """
 """                                     # 16 wide, the units' anchor at column 8 (units.py)
 
 # Markers on sloped tiles: the tile's four corners lifted (height units of 6 px; view corners
-# top, right, bottom, left), its outline drawn from them: the reach tile (white, its edge dark
-# grey up to 0.9 px inside) and the cursor (black 0-3 px, white 4-5 px), as on the flat
+# top, right, bottom, left), its outline drawn from them: the reach tile (white, its edge black
+# up to 1.8 px inside) and the cursor (black 0-3 px, white 4-5 px), as on the flat
 # diamond, by the distance to the edges (normal, so that the near-horizontal edges of a tilted tile get a line).
 # The shapes: a ramp (two adjacent corners up) or a single corner up, by 1 or 2 units. Box: 24
 # columns from the tile's left, rows from 2 units above its lowest corner.
@@ -160,7 +161,7 @@ def slope_marker(lift, cur):
             if cur:
                 pix[y][x] = 3 if d < 1.79 else 0 if d < 2.68 else None
             else:
-                pix[y][x] = 2 if d < .9 else 0
+                pix[y][x] = 3 if d < 1.8 else 0
     return pix
 
 

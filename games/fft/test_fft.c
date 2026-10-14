@@ -351,13 +351,13 @@ static void test_reach_tiles(void)
     s1 = scene_checksum(); w1 = scene_whites();
     steps(0, 10);
     CHECKV(scene_checksum(), s1);
-    CHECK(w1 > w0 + 2000);
+    CHECK(w1 > w0 + 800);                                 // (2-pixel dark edges: less white)
     press(K_MODE);
     CHECKV(st.over, 1);
     steps(0, 10);
     w2 = scene_whites();
     printf("reach tiles: %d white pixels in the scene, %d with the reach, %d over the scenery\n", w0, w1, w2);
-    CHECK(w2 > w1 + 500);
+    CHECK(w2 > w1 + 100);
     press(K_MODE);
     CHECKV(st.over, 0);
     steps(0, 10);
