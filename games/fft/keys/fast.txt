@@ -1,0 +1,3 @@
+# [2nd] held from the start of fft(16): the AI turns stepped up to three times a frame
+#   (game_update, AI_FAST), every frame within the budget (tools/check_blows.py)
+1 A
