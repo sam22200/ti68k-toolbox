@@ -293,7 +293,7 @@ static void test_team(void)
 {
     int foe, ally;
     sw_init(2);
-    steps(0, 40);                                         // all cached HUD parts settled
+    steps(0, 80);                                         // all cached HUD parts settled
     foe = shown(2);
     st.unit[2].team = TEAM_PLAYER;
     ally = shown(2);
@@ -1307,6 +1307,86 @@ static void test_interface(void)
     printf("interface: 510 disc names, deterministic unique draws, live bands, two Status pages, depth label, hidden during motion/blows\n");
 }
 
+static void test_water(void)
+{
+    u8 i, r, count = 0, base[UNIT_SH][16];
+    s16 u, v, sx, sy, x, y;
+    int upper = 0, edge = 0;
+    // Every actual canal is grounded water in every view; terrain and stats
+    // remain intact. Object markers are excluded from human immersion.
+    for (r = 0; r < 4; r++) {
+        sw_init((u16)(41 + r));
+        for (i = 0; i < MAP_W * MAP_H; i++) if (map_tiles[i].water) {
+            st.unit[U_RAMZA].x = i % MAP_W; st.unit[U_RAMZA].z = i / MAP_W;
+            CHECK(unit_in_water(U_RAMZA)); CHECKV(map_tiles[i].stand, 0);
+            if (!r) count++;
+        }
+    }
+    CHECKV(count, 38);
+    sw_init(50); CHECK(!unit_in_water(1)); CHECK(unit_in_water(U_RAMZA));
+    // A crop reveals the unmodified scene beneath it, including the old shadow.
+    // Freeze clocks/camera, suppress action UI and isolate one standing unit.
+    for (r = 0; r < 4; r++) {
+        sw_init((u16)(41 + r)); steps(0, 30);
+        for (i = 0; i < NUNIT; i++) st.unit[i].x = 200;
+        st.mode = M_ACT; st.atk = 1; st.tgt = 2; st.act_t = 0;
+        view_of(r, 5, 11, &u, &v);
+        sx = scene_x(r, u, v) - st.camx - 8;
+        sy = scene_y(u, v) + HH - st.camy - UNIT_FOOT;
+        game_render();
+        for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) base[y][x] = sw_level(sx + x, sy + y);
+        st.unit[U_RAMZA].x = 5; st.unit[U_RAMZA].z = 11;
+        game_render();
+        for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) {
+            u8 pix = sw_level(sx + x, sy + y);
+            if (y >= WATER_ROWS) CHECKV(pix, base[y][x]);
+            else if (pix != base[y][x]) {
+                if (y == WATER_ROWS - 1 && pix == C_LGRAY) edge++;
+                else upper++;
+            }
+        }
+    }
+    CHECK(upper > 30 && edge >= 2);
+    // Actual entry, wade and exit paths: a hop stays whole; the floor landing
+    // changes the pose without altering the movement's destination or duration.
+    sw_init(45); CHECKV(st.mode, M_WALK); CHECK(!unit_in_water(U_RAMZA));
+    steps(0, CLIMB_FRAMES - 1); CHECK(!unit_in_water(U_RAMZA));
+    steps(0, 1); CHECKV(st.mode, M_MENU); CHECK(unit_in_water(U_RAMZA));
+    CHECKV(st.unit[U_RAMZA].x, 5); CHECKV(st.unit[U_RAMZA].z, 11);
+    sw_init(46);
+    for (i = 0; i < WALK_FRAMES; i++) { CHECK(unit_in_water(U_RAMZA)); sw_step(0); }
+    CHECKV(st.mode, M_MENU); CHECK(unit_in_water(U_RAMZA));
+    sw_init(47); CHECK(unit_in_water(U_RAMZA));
+    sw_step(0); CHECK(!unit_in_water(U_RAMZA));
+    steps(0, CLIMB_FRAMES - 1); CHECKV(st.mode, M_MENU); CHECK(!unit_in_water(U_RAMZA));
+    CHECKV(st.unit[U_RAMZA].x, 4); CHECKV(st.unit[U_RAMZA].z, 11);
+    sw_init(48); steps(0, ACT_HIT + 1); CHECKV(st.mode, M_ACT); CHECK(unit_in_water(U_RAMZA));
+    CHECK(st.unit[1].hp < st.unit[1].max_hp);
+    printf("water: 38 canals x four views; scene exposed below cut, light edge, entry/wade/exit, wet attack and object graphics retained\n");
+}
+
+// The displayed prediction against complete clock advances, including ties,
+// every supported Speed and crossings just short of the 100 CT threshold.
+static void test_turn_prediction(void)
+{
+    u8 speed, i, predicted[ORDER_N];
+    for (speed = 1; speed <= 50; speed++) {
+        sw_init(10);
+        for (i = 0; i < NUNIT; i++) {
+            st.unit[i].sp = (u8)(1 + (speed + 7 * i) % 50);
+            st.unit[i].ct = (u8)((17 * speed + 29 * i) % 100);
+        }
+        st.act = ct_next();
+        turn_order(); memcpy(predicted, st.turns, sizeof predicted);
+        CHECKV(predicted[0], st.act);
+        for (i = 1; i < ORDER_N; i++) {
+            ct_end(st.act, 1, 1);
+            st.act = ct_next(); CHECKV(predicted[i], st.act);
+        }
+    }
+    printf("turn prediction: 300 displayed entries equal complete CT clock advances, Speed 1..50\n");
+}
+
 static void shots(void)
 {
     u8 n;
@@ -1425,6 +1505,8 @@ int main(int argc, char **argv)
     test_blows();
     test_defend();
     test_interface();
+    test_water();
+    test_turn_prediction();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;

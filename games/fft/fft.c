@@ -8,6 +8,7 @@
 // The rotation itself is animated with polygons projected at intermediate angles, each face in
 // the mean grey of its pixels in the views (map.h).
 #include "fft.h"
+#include "ct_recip.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -123,7 +124,7 @@ static u8 *vbuf, vbuf_rot;
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
-    u8 depth, rot, r0, r1;
+    u8 depth, rot, r0, r1, wet;
     u16 cm[COVER_H];
 } Cover;
 typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
@@ -214,7 +215,7 @@ static u8 bg_usable(void);
 // a frame with room for it: it shows a frame or two later, the frame stays within the budget
 #define FRAME_K 332
 #define BASE_K 65                       // glints, HUD copies, cursor, the units' sort
-#define UNIT_K 19                       // a unit on screen
+#define UNIT_K 20                       // a unit on screen, including its water check / surface edge
 #define COVER_K 16                      // its cover mask made again
 #define BG_K 25                         // the screen's copy of the scene put back
 #define VIEW_K 105                      // the view copied (the camera moved)
@@ -456,7 +457,8 @@ void ct_end(u8 who, u8 moved, u8 acted)
 
 // FFT's AT list: the active unit, then each living unit's next turns, its clock run alone
 // (no bonus at their end), sorted by tick then by the CT reached (the higher first), a tie in
-// unit order. At each turn change only (11 x ORDER_N divisions).
+// unit order. At each turn change only; reciprocal products replace the
+// repeated ceil-divides (numerator <= 149, table exact through 815).
 void turn_order(void)
 {
     u16 tk[ORDER_N];
@@ -469,7 +471,7 @@ void turn_order(void)
         for (t = 0; t < ORDER_N - 1; t++) {
             u16 k;
             if (ct < 100) {                        // the ticks to 100 at once
-                u16 k2 = (u16)((u16)(100 - ct + u->sp - 1) / u->sp);
+                u16 k2 = (u16)(((u32)(u16)(100 - ct + u->sp - 1) * ct_recip[u->sp]) >> 15);
                 tick += k2; ct += k2 * u->sp;
             }
             if (tick >= 256) break;
@@ -1017,7 +1019,8 @@ void compute_reach(u8 who)
     W->from_who = who + 1;
     W->upd_k += REACH_K;
     for (i = 0; i < NUNIT; i++)                   // can't stop on a unit (a crystal or a chest:
-        if (i != who && unit_at(st.unit[i].x, st.unit[i].z))       // can, it is picked up)
+        if (i != who && st.unit[i].x < MAP_W && st.unit[i].z < MAP_H
+            && unit_at(st.unit[i].x, st.unit[i].z))       // can, it is picked up)
             st.reach[st.unit[i].z * MAP_W + st.unit[i].x] = 0xFF;
     for (i = 0; i < MAP_W * MAP_H; i++)            // nor on a tree (crossed only)
         if (map_tiles[i].walk == 2) st.reach[i] = 0xFF;
@@ -1974,6 +1977,23 @@ static const u8 walk_q[WALK_FRAMES + CLIMB_FRAMES] = { 0, 9, 18, 27, 37, 46, 55,
     0, 6, 13, 19, 26, 32, 38, 45, 51, 58 };
 static const u8 walk_h[CLIMB_FRAMES] = { 0, 3, 5, 7, 8, 8, 8, 7, 5, 3 };
 
+// FFT keeps a grounded human at the canal floor and selects the submerged SHP.
+// At depth 1 a hop above that floor uses the ordinary pose. Both endpoints of
+// a flat canal step are wet; a drop into water becomes submerged on landing.
+u8 unit_in_water(u8 i)
+{
+    const Unit *u = &st.unit[i];
+    if (DC_OBJ(u->dc) || u->x >= MAP_W || u->z >= MAP_H) return 0;
+    if (st.mode == M_WALK && st.sel == i && st.path_i + 1 < st.path_n) {
+        const u8 *a = st.path[st.path_i], *b = st.path[st.path_i + 1];
+        if (step_frames(st.path_i) == CLIMB_FRAMES && st.walk_t) return 0;
+        // On a level step, change terrain at the tile edge.
+        if (st.walk_t >= (WALK_FRAMES + 1) / 2 && step_frames(st.path_i) == WALK_FRAMES) a = b;
+        return map_tiles[a[1] * MAP_W + a[0]].water;
+    }
+    return map_tiles[u->z * MAP_W + u->x].water;
+}
+
 // a unit's feet: scene position of its tile centre at its standing height, interpolated
 // while walking (with a hop on a climb, a drop or a jump); depth: the diagonal it is drawn
 // after (both tiles' while walking)
@@ -2108,8 +2128,47 @@ static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 
 // inside (its opaque pixels eroded twice, and the shadow's, made by units.py) is taken away
 // there (mask 1 = transparent). On the TI the rows it leaves alone are drawn straight from the data file,
 // the others copied first.
+// Depth-1 shader: a short, constant-height pass. The ordinary dry shader
+// stays unchanged; standing units reuse their cached terrain classification.
+static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
+{
+    RtSprite s;
+    u16 mk[WATER_ROWS], ml[WATER_ROWS], md[WATER_ROWS], l, d = 0, m;
+    const u8 *g = unit_frame(rot, i);
+    u8 r, flash = st.mode == M_ACT && i == st.tgt ? hit_flash(i) : 0;
+    for (r = 0; r < WATER_ROWS; r++) {
+        u16 in = RD16(g, 3 * UNIT_SH + r), k = c ? c->cm[r] & in : 0;
+        mk[r] = RD16(g, 2 * UNIT_SH + r) | k;
+        ml[r] = (flash ? (RD16(g, r) & ~in) | (flash == 1 ? in : 0) : RD16(g, r)) & ~k;
+        md[r] = RD16(g, UNIT_SH + r) & ~(k | (flash ? in : 0));
+    }
+    sy -= UNIT_FOOT;
+    s.w = 16; s.h = WATER_ROWS; s.light = ml; s.dark = md; s.mask = mk;
+    draw_sprite(sx - 8, sy, &s);
+    // The light edge follows the same contour cover rule as the body.
+    l = (u16)~RD16(g, 2 * UNIT_SH + WATER_ROWS - 1);
+    if (c) l &= (u16)~(c->cm[WATER_ROWS - 1] & RD16(g, 3 * UNIT_SH + WATER_ROWS - 1));
+    m = (u16)~l;
+    s.h = 1; s.light = &l; s.dark = &d; s.mask = &m;
+    draw_sprite(sx - 8, sy + WATER_ROWS - 1, &s);
+    sy += UNIT_FOOT;
+    if (DC_OBJ(st.unit[i].dc)) return;
+    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
+        s.h = FOE_H;                            // never covered (it shows a hidden one too)
+        s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
+        draw_sprite(sx - 8, sy - UNIT_FOOT - FOE_H + 1, &s);
+    }
+    if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
+        s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
+        draw_sprite(sx - 3, sy - DC_Y, &s);
+    }
+}
+
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
+    if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
+        draw_unit_water(sx, sy, rot, i, c); return;
+    }
     RtSprite s;
     u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
     u8 r, h0 = UNIT_SH, h1 = 0, flash = st.mode == M_ACT && i == st.tgt ? hit_flash(i) : 0;
@@ -2181,12 +2240,13 @@ markers:
 // Its 32-column cover is cached independently of the body's 16-column cover.
 static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
 {
-    u8 phase = armed_pose(i), dir, k, r;
+    u8 phase = armed_pose(i), dir, k, r, rows;
     const u8 *g;
     u32 l[WEAPON_SH], d[WEAPON_SH], m[WEAPON_SH];
     RtSprite sp;
     s16 bx, by, b0, sh;
     if (phase < 2) return;
+    rows = unit_in_water(i) ? WEAPON_FOOT - HU : WEAPON_SH;
     dir = unit_direction(st.rot, i);
     k = (u8)((st.unit[i].gfx >= UG_CHEMIST_M ? 24 : 0)
         + (items[st.unit[i].eq[EQ_WEAPON]].knife ? 0 : 12) + (dir >> 1) * 6 + (dir & 1) * 3 + phase - 2);
@@ -2214,12 +2274,12 @@ static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
         }
         W->wx = bx; W->wy = by; W->wrot = st.rot; W->wdepth = depth;
     }
-    for (r = 0; r < WEAPON_SH; r++) {
+    for (r = 0; r < rows; r++) {
         u32 c = W->wcover[r];
         l[r] = RD32(g, 2 * r) & ~c; d[r] = RD32(g, 2 * (WEAPON_SH + r)) & ~c;
         m[r] = RD32(g, 2 * (2 * WEAPON_SH + r)) | c;
     }
-    sp.w = 32; sp.h = WEAPON_SH; sp.light = l; sp.dark = d; sp.mask = m;
+    sp.w = 32; sp.h = rows; sp.light = l; sp.dark = d; sp.mask = m;
     draw_sprite(bx - st.camx, by - st.camy, &sp);
 }
 
@@ -2582,6 +2642,32 @@ void game_scenario(u16 n)
         if (n == 38) { st.mode = M_ORDER; st.back = M_MENU; }
         if (n == 39) { st.mode = M_QUIT; st.quit = 1; }
         if (n == 40) { st.act = U_CHEMIST; st.mode = M_STATUS; st.sel = U_CHEMIST; st.back = M_MENU; st.page = 1; }
+    }
+    if (n >= 41 && n <= 52) {              // milestone 27: canal display and traversal
+        static const u8 actors[6] = { U_RAMZA, 0, 1, 5, 3, U_CHEMIST };
+        static const u8 pos[6][2] = { {5, 10}, {5, 9}, {5, 8}, {5, 11}, {6, 11}, {7, 11} };
+        for (i = 0; i < NUNIT; i++) st.unit[i].x = 200;
+        st.ai = AI_OFF; st.mode = M_BROWSE; st.act = st.sel = U_RAMZA;
+        st.unit[U_RAMZA].x = 5; st.unit[U_RAMZA].z = 10;
+        st.cx = 5; st.cz = 10;
+        if (n <= 44) {
+            st.rot = (u8)(n - 41);
+            for (i = 0; i < 6; i++) { st.unit[actors[i]].x = pos[i][0]; st.unit[actors[i]].z = pos[i][1]; }
+        } else if (n <= 47) {
+            u8 x = 5, z = 11;
+            if (n == 45) { st.unit[U_RAMZA].x = 4; st.unit[U_RAMZA].z = 11; }
+            if (n == 47) { st.unit[U_RAMZA].z = 11; x = 4; }
+            if (make_path(U_RAMZA, x, z)) { st.mode = M_WALK; st.path_i = 0; st.walk_t = 0; }
+            st.cx = st.unit[U_RAMZA].x; st.cz = st.unit[U_RAMZA].z;
+        } else if (n == 48 || n == 49 || n == 52) {
+            st.unit[1].x = 5; st.unit[1].z = 9;
+            if (n == 49) st.unit[1].hp = 1;
+            if (n == 52) {
+                for (i = 0; i < NABIL; i++) if (abilities[i].flags & AF_EVADE && abilities[i].range > 1) break;
+                do skill(U_RAMZA, 1, i); while (!st.hit);
+            } else do attack(U_RAMZA, 1); while (!st.hit || st.push);
+        } else if (n == 50) { st.unit[1].x = 5; st.unit[1].z = 9; st.unit[1].hp = 0; st.unit[1].dc = DC_CRYSTAL; }
+        else if (n == 51) st.unit[U_RAMZA].hp = 1;
     }
     W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->win_k[0] = 0; W->hud_s[0] = 0;
     cam_target(&st.camx, &st.camy);
@@ -3626,6 +3712,7 @@ void game_render(void)
         if (c->x != f[k].x || c->y != f[k].y || c->depth != f[k].depth || c->rot != st.rot) {
             c->x = f[k].x; c->y = f[k].y; c->depth = f[k].depth; c->rot = st.rot;
             cover(c->cm, f[k].x, f[k].y, f[k].depth);
+            c->wet = unit_in_water(k);
             for (c->r0 = 2; c->r0 <= UNIT_SH - 3 && !c->cm[c->r0]; c->r0++) ;
             for (c->r1 = UNIT_SH - 3; c->r1 >= c->r0 && !c->cm[c->r1]; c->r1--) ;
         }
@@ -3638,7 +3725,10 @@ void game_render(void)
     view_of(st.rot, st.cx, st.cz, &u, &v);
     if (st.mode == M_ACT && st.act_t >= ACT_HIT) draw_number();
     if (st.mode == M_FACE) draw_arrows();
-    else if (st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
+    // During AI thinking the active-unit pointer identifies the actor. The
+    // tile cursor returns when the plan is shown; a new turn already spends
+    // its frame on the clock, camera and unit covers.
+    else if (st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
         Marker mk;
         marker(st.rot, (u8)(st.cz * MAP_W + st.cx), 1, &mk);
         blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, cursor_mask(&mk, (u8)(st.cz * MAP_W + st.cx)));

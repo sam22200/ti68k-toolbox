@@ -53,6 +53,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define TURN_FRAMES 3                  // rotation animation: frames between two views
 #define WALK_FRAMES 7                  // frames per tile when a unit walks (FFT: 14 at 60 Hz)
 #define CLIMB_FRAMES 10                // a step up, down or over a tile (FFT: ~21)
+#define WATER_ROWS (UNIT_FOOT - HU)    // depth 1: crop at the projected surface, clear edge above it
 #define PATH_MAX 16
 #define AI_GLIDE 2                     // AI turns: frames per tile of the cursor gliding to the
 #define AI_SHOW 8                      // tile it moves to, then its move range shown; the preview
@@ -195,6 +196,7 @@ void ct_end(u8 who, u8 moved, u8 acted);   // its CT when the turn ends
 void turn_order(void);                 // st.turns from the CTs
 void turn_end(u8 moved, u8 acted);     // the active unit's turn over, the next one starts
 void compute_reach(u8 who);            // st.reach from unit who (BFS, Move/Jump)
+u8 unit_in_water(u8 who);              // grounded in depth 1, including a walking step's position
 u8 make_path(u8 who, u8 tx, u8 tz);    // st.path to a reachable tile, its length
 // FFT's Attack (RE_NOTES.md § Attack): the tiles a weapon reaches (st.reach 1, else 0xFF), the
 // side an attack comes from, the hit chance and the damage (crit: XA + r * XA / 32768, r 0..32767)
