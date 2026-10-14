@@ -1214,6 +1214,7 @@ static void test_defend(void)
     u16 n, d[2] = { 0 }, all[2] = { 0 };
     u8 i;
     for (n = 1; n <= 500; n++) {
+        if (n == 58) continue;                  // inspection door explicitly grants Defend
         sw_init(n);
         for (i = 0; i < NUNIT; i++)
             if (i != U_RAMZA) { all[jobs[st.unit[i].job].row]++; d[jobs[st.unit[i].job].row] += st.unit[i].defend; }
@@ -1264,14 +1265,14 @@ static void test_turns(void)
 }
 
 // Milestone 26: names are stable by seed and unique by gender, two reversible Status
-// pages, character details hidden during action/motion, live HP and a canal depth label.
+// pages, character details hidden during action/motion, live HP and height without depth.
 static void test_interface(void)
 {
     State original;
     char names[NUNIT][12];
     u32 page0, page1, old;
     u8 i, j;
-    int x, y, ink0 = 0, ink1 = 0;
+    int x, y, ink1 = 0;
     sw_init(26);
     original = st;
     for (i = 0; i < NUNIT; i++) {
@@ -1295,21 +1296,52 @@ static void test_interface(void)
     press(K_LEFT); steps(0, 12); CHECKV(sw_checksum(), page0);
     press(K_ESC); CHECKV(st.mode, M_MENU);
     st.menu = MN_STATUS; press(K_A); steps(0, 12); CHECKV(sw_checksum(), page0);
-    // Portrait, numerical fields and equipment are inside the screen; the 2h top-right
-    // height changes to a depth-labelled 0h in water, even when no unit occupies the tile.
-    sw_init(34); steps(0, 30);
-    for (y = 11; y < 16; y++) for (x = 128; x < 160; x++) ink0 += sw_level(x, y) == C_BLACK;
-    st.cx = 4; st.cz = 11; steps(0, 30);
-    for (y = 11; y < 17; y++) for (x = 128; x < 160; x++) {
-        u16 o = (st.camy + y) * SC_BYTES + ((st.camx + x) >> 3);
-        u8 b = (u8)(0x80 >> ((st.camx + x) & 7));
-        u8 background = (scene_l[o] & b ? 1 : 0) | (scene_d[o] & b ? 2 : 0);
-        ink1 += sw_level(x, y) != background;   // old depth text clears back to the scenery
+    press(K_RIGHT); steps(0, 12);
+    for (i = 0; i < 5; i++) {
+        CHECKV(st.status_row, i); CHECKV(st.status_col, 0);
+        press(K_A); steps(0, 12); CHECK(st.status_info && st.mode == M_STATUS);
+        old = sw_checksum(); CHECK(old != page1);
+        press(K_DOWN); CHECKV(sw_checksum(), old); CHECKV(st.status_row, i);
+        press(K_ESC); steps(0, 12); CHECK(!st.status_info && st.mode == M_STATUS);
+        CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
+        CHECK(!memcmp(original.bag, st.bag, sizeof st.bag));
+        press(K_DOWN);
     }
-    CHECK(ink0 > 10 && ink1 == 0);
+    CHECKV(st.status_row, 0); press(K_UP); CHECKV(st.status_row, 4);
+    for (j = 0; known(st.sel, j) != NO_ABIL; j++) ;
+    press(K_RIGHT); CHECKV(st.status_col, 1); CHECK(st.status_row < j);
+    for (i = 0; i < j; i++) {
+        st.status_row = i; press(K_A); steps(0, 12); CHECK(st.status_info);
+        CHECK(known(st.sel, i) != NO_ABIL);
+        press(K_ESC); CHECK(!st.status_info); CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
+    }
+    press(K_RIGHT); CHECKV(st.page, 0); press(K_ESC); CHECKV(st.mode, M_MENU);
+    sw_init(58); steps(0, 12); CHECK(st.unit[st.sel].defend && known(st.sel, st.status_row) == NO_ABIL);
+    press(K_ESC); CHECK(!st.status_info); press(K_A); CHECK(st.status_info);
+    sw_init(55); steps(0, 12); CHECKV(st.unit[st.sel].eq[st.status_row], 0xFF);
+    sw_init(32); st.unit[st.sel].learned = 0; st.unit[st.sel].defend = 0;
+    st.status_col = 1; st.status_row = 0; press(K_A); steps(0, 12); CHECKV(known(st.sel, st.status_row), NO_ABIL);
+    sw_init(40); st.unit[st.sel].learned = 0xFF; st.unit[st.sel].defend = 1;
+    press(K_RIGHT); st.status_row = 4; press(K_DOWN); steps(0, 12); CHECKV(st.status_row, 5);
+    press(K_A); steps(0, 12); CHECK(st.status_info && known(st.sel, 5) == NO_ABIL);
+    press(K_ESC); press(K_DOWN); CHECKV(st.status_row, 0);
+    // Portrait, numerical fields and equipment are inside the screen; the 2h top-right
+    // height changes to 0h in water. There is no second HUD line on either kind of tile.
+    for (i = 0; i < 2; i++) {
+        sw_init(34); if (i) { st.cx = 4; st.cz = 11; }
+        for (j = 0; j < NUNIT; j++) st.unit[j].x = 200;  // no actor can cover the inspected scenery
+        steps(0, 30);
+        for (y = 11; y < 17; y++) for (x = 128; x < 160; x++) {
+            u16 o = (st.camy + y) * SC_BYTES + ((st.camx + x) >> 3);
+            u8 b = (u8)(0x80 >> ((st.camx + x) & 7));
+            u8 background = (scene_l[o] & b ? 1 : 0) | (scene_d[o] & b ? 2 : 0);
+            ink1 += sw_level(x, y) != background;
+        }
+    }
+    CHECK(ink1 == 0);
     sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
     sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());
-    printf("interface: 510 disc names, deterministic unique draws, live character details, two Status pages, depth label, hidden during motion/blows\n");
+    printf("interface: 510 disc names, live character details, selectable equipment/abilities, height only, hidden during motion/blows\n");
 }
 
 static void test_water(void)

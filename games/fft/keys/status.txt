@@ -1,0 +1,39 @@
+# All five equipment slots, ability selection, details/back, page/back.
+20 A
+21
+40 ESC
+41
+60 DOWN
+61
+80 A
+81
+100 ESC
+101
+120 DOWN
+121
+140 A
+141
+160 ESC
+161
+180 DOWN
+181
+200 A
+201
+220 ESC
+221
+240 DOWN
+241
+260 A
+261
+280 ESC
+281
+300 RIGHT
+301
+320 A
+321
+340 ESC
+341
+360 RIGHT
+361
+380 ESC
+381

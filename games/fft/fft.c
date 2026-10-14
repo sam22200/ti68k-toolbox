@@ -121,6 +121,7 @@ static u8 *vbuf, vbuf_rot;
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
+#define HEIGHT_ROWS 10                  // height only: eight glyph rows and their outline
 #define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
 #define PANEL_GAUGE_W 40                // MP + gap + 999/999 in the existing small font
@@ -148,7 +149,7 @@ typedef struct {
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
     u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined panel text (0-6) / action numbers (7-13)
-    char hud_s[2];                      // cached height + 1, water depth
+    char hud_s[2];                      // cached height + 1, alignment pad
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
     u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_ACTS: no ability
                                         // known; M_ACT: the ability), unit;
@@ -159,9 +160,10 @@ typedef struct {
     u16 pan_k[2][7];                    // actor/stats, compact forecast target + ability
     u8 pan_n[2];                        // cutout portrait, name, HP, MP, level
     u8 arrow[4][2][8];
-    u16 height[2][20 * RT_PBYTES / 2];   // terrain text, then its cached white outline mask
+    u16 height[2][HEIGHT_ROWS * RT_PBYTES / 2]; // terrain text, then its cached white outline mask
     u16 status[2][RT_PSIZE / 2];        // full-screen Status, assembled a line per frame
     u8 status_i, status_page, status_n;
+    u8 status_col, status_row, status_info;
     s16 ring_y0, ring_y1;               // the scene rows the reach rings are on
     s16 drop_y0, drop_y1;               // the rows still to put back (rings going)
     u8 from_who;                        // whose reach W->from holds the steps of (+ 1; 0: none)
@@ -2414,7 +2416,7 @@ static void draw_turn(void)
 
 // ---------------------------------------------------------------- camera
 #define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
-#define CAM_MT (UNIT_FOOT + ACTIVE_H - 1) // full body and active pointer above the feet
+#define CAM_MT 39                       // body, smaller pointer and six pixels of headroom
 #define CAM_MB 12                       // bottom margin while following the unit
 static void cam_clamp(s16 *x, s16 *y)
 {
@@ -2674,6 +2676,16 @@ void game_scenario(u16 n)
         } else if (n == 50) { st.unit[1].x = 5; st.unit[1].z = 9; st.unit[1].hp = 0; st.unit[1].dc = DC_CRYSTAL; }
         else if (n == 51) st.unit[U_RAMZA].hp = 1;
     }
+    if (n >= 53 && n <= 58) {                     // equipment and ability inspection
+        st.ai = AI_OFF; st.mode = M_STATUS; st.back = M_MENU; st.page = st.status_info = 1;
+        st.sel = U_RAMZA; st.status_row = n == 53 ? EQ_WEAPON : n == 55 ? 4 : 0;
+        if (n >= 56) {
+            st.status_col = 1;
+            if (n == 56) { for (i = 0; i < SET_N && known(st.sel, i) != NO_ABIL; i++) if (abilities[known(st.sel, i)].kind == AB_WISH) break; st.status_row = i; }
+            if (n == 57) st.sel = st.act = U_CHEMIST;
+            if (n == 58) { st.unit[st.sel].defend = 1; for (i = 0; i < SET_N && known(st.sel, i) != NO_ABIL; i++) ; st.status_row = i; }
+        }
+    }
     W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->win_k[0] = 0; W->hud_s[0] = 0;
     cam_target(&st.camx, &st.camy);
     hl_seq++;
@@ -2721,6 +2733,7 @@ static void menu_keys(void)
             st.mode = M_FACE; st.wface = u->face;
         } else if (st.menu == MN_STATUS) {
             st.mode = M_STATUS; W->status_i = 0; st.page = 0; st.sel = st.act; st.back = M_MENU;
+            st.status_col = st.status_row = st.status_info = 0;
         }
     } else if (input_pressed(K_ESC | K_B)) {
         if (st.moved && !st.acted && !st.pick_t) {   // the move undone (not after a pick-up)
@@ -2948,6 +2961,46 @@ static u8 twin(u8 c, u8 aim)
     return 0;
 }
 
+static u8 status_ability_count(void)
+{
+    u8 n = 0;
+    while (known(st.sel, n) != NO_ABIL) n++;
+    n += st.unit[st.sel].defend;
+    return n ? n : 1;
+}
+
+static u8 status_ability(void)
+{
+    u8 ab = known(st.sel, st.status_row);
+    return ab == NO_ABIL && st.unit[st.sel].defend ? ABIL_DEFEND : ab;
+}
+
+static void status_keys(void)
+{
+    if (st.status_info) {
+        if (input_pressed(K_A | K_ENTER | K_ESC | K_B)) st.status_info = 0;
+    } else if (!st.page) {
+        if (input_pressed(K_LEFT | K_RIGHT)) { st.page = 1; st.status_col = st.status_row = 0; }
+        if (input_pressed(K_A | K_ENTER | K_ESC | K_B)) st.mode = st.back;
+    } else {
+        u8 count;
+        if (input_pressed(K_LEFT)) {
+            if (st.status_col) st.status_col = 0;
+            else { st.page = 0; return; }
+        }
+        if (input_pressed(K_RIGHT)) {
+            if (!st.status_col) st.status_col = 1;
+            else { st.page = 0; return; }
+        }
+        count = st.status_col ? status_ability_count() : 5;
+        if (st.status_row >= count) st.status_row = count - 1;
+        if (input_pressed(K_UP)) st.status_row = st.status_row ? st.status_row - 1 : count - 1;
+        if (input_pressed(K_DOWN)) st.status_row = st.status_row + 1 < count ? st.status_row + 1 : 0;
+        if (input_pressed(K_A | K_ENTER)) st.status_info = 1;
+        if (input_pressed(K_ESC | K_B)) st.mode = st.back;
+    }
+}
+
 u8 game_update(void)
 {
     FRAME_BEGIN();
@@ -3025,8 +3078,7 @@ u8 game_update(void)
             if (input_pressed(K_A | K_ENTER)) turn_end(st.moved, st.acted);
             else if (input_pressed(K_ESC | K_B)) { u->face = st.wface; st.mode = M_MENU; }
         } else if (st.mode == M_STATUS) {
-            if (input_pressed(K_LEFT | K_RIGHT)) st.page ^= 1;
-            if (input_pressed(K_A | K_ENTER | K_ESC | K_B)) st.mode = st.back;
+            status_keys();
         } else {                                   // the cursor: looking around, or a tile
             u32 arrows = rt_keys & (K_UP | K_DOWN | K_LEFT | K_RIGHT);
             if (input_pressed(K_UP | K_DOWN | K_LEFT | K_RIGHT)) st.rep = 0;
@@ -3057,6 +3109,7 @@ u8 game_update(void)
                     }
                 } else if (o) {                    // a unit's numbers
                     st.mode = M_STATUS; W->status_i = 0; st.page = 0; st.sel = o - 1; st.back = M_BROWSE;
+                    st.status_col = st.status_row = st.status_info = 0;
                 } else to_menu();
             } else if (input_pressed(K_ESC | K_B)) {
                 if (st.mode == M_BROWSE && input_pressed(K_ESC)) { st.mode = M_QUIT; st.quit = 1; }
@@ -3188,7 +3241,7 @@ static void hud_labels(void)
         }
 }
 
-// Preshifted AMS small glyphs; bounded lines, five rows of plain word ORs per glyph.
+// Preshifted AMS small glyphs; bounded lines, five rows of word writes per glyph.
 static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit)
 {
     while (*s) {
@@ -3204,10 +3257,14 @@ static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit)
         for (r = 0; r < 5; r++, g += 4, l += RT_PBYTES, d += RT_PBYTES) {
             u16 a = RD16(g, 0), b = RD16(g, 1);
             if (color & 1) WR16(l, 0, RD16(l, 0) | a);
+            else WR16(l, 0, RD16(l, 0) & ~a);
             if (color & 2) WR16(d, 0, RD16(d, 0) | a);
+            else WR16(d, 0, RD16(d, 0) & ~a);
             if (b && x < 144) {
                 if (color & 1) WR16(l, 1, RD16(l, 1) | b);
+                else WR16(l, 1, RD16(l, 1) & ~b);
                 if (color & 2) WR16(d, 1, RD16(d, 1) | b);
+                else WR16(d, 1, RD16(d, 1) & ~b);
             }
         }
         x += adv;
@@ -3418,7 +3475,7 @@ static void draw_panel(u8 side)
 }
 
 // Bottom-right command menu and submenus, ability name, turn order or Quit.
-// Cached one part per frame: tab / box, then each line. Ball cursor added on the screen.
+// Cached one part per frame: raised title / framed box, then each line. Hand sits outside.
 static u8 win_lines(u8 m)
 {
     u8 n = 0;
@@ -3440,20 +3497,28 @@ static void make_window(void)
     char s[28];
     if (!k) {
         u8 h = win_lines(m) * 6 + 11, w = 4;
+        const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
+            : m == M_SKILLS ? "Skill" : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
         W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
         for (r = 0; r < WIN_ROWS; r++)
             for (i = 0; i < w; i++) {
-                u16 e = r == h - 1 ? 0xFFFF : r >= h || i ? 0 : 0x8000;     // the edge: black
-                WR16((u8 *)l, r * (RT_PBYTES / 2) + i, e);
+                u8 body = r >= 3 && r < h;
+                u16 e = body ? r == 3 || r == h - 1 ? 0xFFFF : i == 0 ? 0x8000 : i == 3 ? 1 : 0 : 0;
+                u16 light = body ? 0xFFFF : 0;
+                if (body && r > 3 && r < h - 1) {
+                    if (r == 4) light = e;
+                    else if (!i) light &= (u16)~0x4000;
+                }
+                WR16((u8 *)l, r * (RT_PBYTES / 2) + i, light);
                 WR16((u8 *)d, r * (RT_PBYTES / 2) + i, e);
             }
         {
             void *sl = rt_light, *sd = rt_dark;
             rt_light = l; rt_dark = d;
-            draw_rect(0, 0, 64, 8, C_LGRAY); draw_rect(0, 7, 64, 1, C_DGRAY);
+            draw_rect(0, 0, ui_width(title) + 6, 8, C_BLACK);
             rt_light = sl; rt_dark = sd;
         }
-        text_into(l, d, 3, 1, m == M_MENU ? "MENU" : m == M_ACTS ? "ACT" : m == M_SKILLS ? "SKILL" : m == M_ORDER ? "TURN ORDER" : "QUIT?", C_BLACK);
+        text_into(l, d, 3, 1, title, C_WHITE);
         return;
     }
     k--;
@@ -3467,17 +3532,17 @@ static void make_window(void)
         if (t->team == TEAM_ENEMY) c = C_DGRAY;
     } else if (m == M_MENU) {
         n = put_s(s, 0, entries[k]);
-        if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_LGRAY;
+        if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_DGRAY;
     } else if (m == M_ACTS) {
         n = put_s(s, 0, k == 2 ? st_names[0] : k ? skill_sets[u->set].name : "Attack");
-        if (k == 1 && W->win_k[1]) c = C_LGRAY;
+        if (k == 1 && W->win_k[1]) c = C_DGRAY;
     } else if (m == M_SKILLS) {                    // an item: how many are left
         u8 ab = known(W->win_k[2], k);
         n = put_s(s, 0, abilities[ab].name);
         if (abilities[ab].flags & AF_ITEM && u->team == TEAM_PLAYER) {
             s[n++] = ' '; n = put_n(s, n, st.bag[abilities[ab].bag]);
         }
-        if (!can_use(W->win_k[2], ab)) c = C_LGRAY;
+        if (!can_use(W->win_k[2], ab)) c = C_DGRAY;
     } else if (m == M_ACT) {
         n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : st.abil == ABIL_DEFEND ? st_names[0] : abilities[st.abil].name);
     } else if (m == M_PICK) {                      // a crystal or a chest picked up
@@ -3485,12 +3550,18 @@ static void make_window(void)
         else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
     }
     s[n] = 0;
-    text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS || (m == M_QUIT && k) ? 7 : 3, 10 + 6 * k, s, c);
+    text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 6 : 3, 10 + 6 * k, s, c);
+}
+
+static void draw_hand(s16 x, s16 y)
+{
+    RtSprite sp = { 16, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
+    draw_sprite(x, y, &sp);
 }
 
 // Terrain readout over the scenery: black glyphs with a one-pixel white outline.
 // The second scratch plane becomes the mask once the text has been rendered.
-static void make_height(u8 h, u8 water)
+static void make_height(u8 h)
 {
     void *sl = rt_light, *sd = rt_dark;
     char s[12]; u8 n, r;
@@ -3500,13 +3571,12 @@ static void make_height(u8 h, u8 water)
     if (h & 1) n = put_s(s, n, ".5");
     s[n++] = 'h'; s[n] = 0;
     draw_text(2, 1, s, F_MEDIUM, C_BLACK);
-    if (water) ui_text(1, 11, "depth 1", C_BLACK, 32);
     rt_light = sl; rt_dark = sd;
-    for (r = 0; r < 17; r++) {
+    for (r = 0; r < HEIGHT_ROWS; r++) {
         const u8 *p = (const u8 *)W->height[0] + r * RT_PBYTES;
         u32 m = RD32(p, 0);
         if (r) m |= RD32(p - RT_PBYTES, 0);
-        if (r < 16) m |= RD32(p + RT_PBYTES, 0);
+        if (r < HEIGHT_ROWS - 1) m |= RD32(p + RT_PBYTES, 0);
         WR32((u8 *)W->height[1] + r * RT_PBYTES, 0, m | m << 1 | m >> 1);
     }
 }
@@ -3515,7 +3585,7 @@ static void draw_height(void)
 {
     const u8 *p = (const u8 *)W->height[0], *q = (const u8 *)W->height[1];
     u8 *l = (u8 *)rt_light + 16, *d = (u8 *)rt_dark + 16, r;
-    for (r = 0; r < 17; r++, p += RT_PBYTES, q += RT_PBYTES, l += RT_PBYTES, d += RT_PBYTES) {
+    for (r = 0; r < HEIGHT_ROWS; r++, p += RT_PBYTES, q += RT_PBYTES, l += RT_PBYTES, d += RT_PBYTES) {
         u32 ink = RD32(p, 0), keep = ~RD32(q, 0);
         WR32(l, 0, (RD32(l, 0) & keep) | ink);
         WR32(d, 0, (RD32(d, 0) & keep) | ink);
@@ -3542,7 +3612,7 @@ static void draw_hud(void)
     u8 o, i, k[3], pk[2], forecast = 0, hidden = st.mode == M_WALK || st.mode == M_ACT || st.turn;
     u16 forecast_key;
     const Tile *tile = &map_tiles[st.cz * MAP_W + st.cx];
-    u8 h = tile->stand, water = tile->water, changed = 0;
+    u8 h = tile->stand, changed = 0;
     o = unit_at(st.cx, st.cz);
     pk[0] = hidden ? 0 : st.act + 1;
     pk[1] = !hidden && o && o - 1 != st.act && (st.mode == M_AIM || st.mode == M_BROWSE || st.mode == M_TARGET) ? o : 0;
@@ -3562,8 +3632,8 @@ static void draw_hud(void)
     if (W->left >= HUD_K || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) {
         W->hud_wait = 0;
         W->left -= HUD_K;
-        if ((u8)W->hud_s[0] != h + 1 || (u8)W->hud_s[1] != water) {
-            make_height(h, water); W->hud_s[0] = h + 1; W->hud_s[1] = water; changed = 1;
+        if ((u8)W->hud_s[0] != h + 1) {
+            make_height(h); W->hud_s[0] = h + 1; changed = 1;
         } else if (k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2])) {
             for (i = 0; i < 3; i++) W->win_k[i] = k[i];
             W->win_n = 0; make_window(); changed = 1;
@@ -3596,9 +3666,7 @@ static void draw_hud(void)
         copy_box(W->win[0], W->win[1], 12, y, W->win_w, W->win_h);
         if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
-            static const u8 ball[5] = { 0x60, 0xF0, 0xF0, 0xF0, 0x60 };
-            RtSprite sp = { 8, 5, ball, ball, RT_NULL };
-            draw_sprite(97, y + 10 + 6 * e, &sp);
+            draw_hand(82, y + 8 + 6 * e);
         }
     }
 }
@@ -3606,7 +3674,45 @@ static void draw_hud(void)
 static const char *const signs[12] = { "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces" };
 
-// FFTA Status: full screen, original FFT fields; equipment / abilities on page 2.
+static const char *const equip_labels[5] = { "Head", "Body", "Accessory", "Weapon", "Shield" };
+
+// Details describe the equipped item or learned ability; browsing never changes the loadout.
+static void status_detail(u8 k)
+{
+    char s[64];
+    u8 n = 0, id = st.status_col ? status_ability() : st.unit[st.sel].eq[st.status_row];
+    if (!st.status_col) {
+        const Item *it;
+        if (k == 3) { ui_text(6, 38, equip_labels[st.status_row], C_DGRAY, 159); return; }
+        if (k == 4) { ui_text(6, 47, id == 0xFF ? "No item" : items[id].name, C_BLACK, 159); return; }
+        if (id == 0xFF) return;
+        it = &items[id];
+        if (k == 5) { n = put_s(s, n, "HP +"); n = put_n(s, n, it->hp); n = put_s(s, n, "   MP +"); n = put_n(s, n, it->mp); }
+        else if (k == 6) { n = put_s(s, n, "PA +"); n = put_n(s, n, it->pa); n = put_s(s, n, "   MA +"); n = put_n(s, n, it->ma); n = put_s(s, n, "   Speed +"); n = put_n(s, n, it->sp); }
+        else if (k == 7) { n = put_s(s, n, "Move +"); n = put_n(s, n, it->move); n = put_s(s, n, "   Jump +"); n = put_n(s, n, it->jump); }
+        else if (it->wp) { n = put_s(s, n, "Weapon power "); n = put_n(s, n, it->wp); }
+    } else {
+        const Ability *ab;
+        if (k == 3) { ui_text(6, 38, id == NO_ABIL ? "No ability" : id == ABIL_DEFEND ? "Defend" : abilities[id].name, C_BLACK, 159); return; }
+        if (id == NO_ABIL) return;
+        if (id == ABIL_DEFEND) { if (k == 4) ui_text(6, 47, "Raises evasion until next turn", C_BLACK, 159); return; }
+        ab = &abilities[id];
+        if (k == 4) {
+            n = put_s(s, n, "Range "); n = put_n(s, n, ab->range); n = put_s(s, n, "   Height ");
+            if (ab->vert == 0xFF) n = put_s(s, n, "Any");
+            else { n = put_n(s, n, ab->vert >> 1); if (ab->vert & 1) n = put_s(s, n, ".5"); s[n++] = 'h'; }
+        }
+        else if (k == 5) { n = put_s(s, n, "JP to learn "); n = put_n(s, n, ab->jp); }
+        else if (k == 6) {
+            static const char *const effects[] = { "Physical damage", "Removes status ailments", "Give HP to an ally", "Restores HP", "Revives a KO ally", "Raises evasion" };
+            n = put_s(s, n, effects[ab->kind]);
+        } else if (k == 7 && ab->flags & AF_ITEM) { n = put_s(s, n, "In stock "); n = st.unit[st.sel].team == TEAM_PLAYER ? put_n(s, n, st.bag[ab->bag]) : put_s(s, n, "Unlimited"); }
+        else if (k == 8) n = put_s(s, n, ab->flags & AF_EVADE ? "Can be evaded" : "Cannot be evaded");
+    }
+    s[n] = 0; ui_text(6, 38 + 8 * (k - 3), s, C_BLACK, 159);
+}
+
+// Full-screen Status with original FFT fields and selectable equipment / abilities.
 // Building a line per frame keeps even entry and paging within the ordinary frame budget.
 static void draw_status(void)
 {
@@ -3614,8 +3720,10 @@ static void draw_status(void)
     const Unit *u = &st.unit[st.sel];
     u8 k, n = 0, i;
     char s[64];
-    if (W->status_i != st.sel + 1 || W->status_page != st.page) {
+    if (W->status_i != st.sel + 1 || W->status_page != st.page || W->status_info != st.status_info ||
+        (st.status_info && (W->status_col != st.status_col || W->status_row != st.status_row))) {
         W->status_i = st.sel + 1; W->status_page = st.page; W->status_n = 0;
+        W->status_info = st.status_info; W->status_col = st.status_col; W->status_row = st.status_row;
     }
     rt_light = W->status[0]; rt_dark = W->status[1];
     k = W->status_n;
@@ -3630,14 +3738,15 @@ static void draw_status(void)
             n = put_s(s, 0, "Lv "); n = put_n(s, n, u->level); n = put_s(s, n, " Exp "); n = put_n(s, n, u->exp); s[n] = 0;
             ui_text(24, 17, s, C_BLACK, 92);
             ui_text(24, 25, st.page ? "EQUIP / SKILLS" : "STATUS", C_DGRAY, 92);
-            ui_text(4, 94, "< > page", C_DGRAY, 64);
-            ui_text(94, 94, "[ESC] return", C_DGRAY, 159);
+            ui_text(4, 95, st.status_info ? "[ESC] back" : st.page ? "[2nd] details" : "< > page", C_DGRAY, 81);
+            if (!st.status_info) ui_text(94, 95, "[ESC] return", C_DGRAY, 159);
         } else if (k <= 2) {
             u16 v = k == 1 ? u->hp : u->mp, m = k == 1 ? u->max_hp : u->max_mp;
             n = put_s(s, 0, k == 1 ? "HP " : "MP "); n = put_n(s, n, v); s[n++] = '/'; n = put_n(s, n, m); s[n] = 0;
             ui_text(96, k == 1 ? 3 : 17, s, C_BLACK, 159);
             gauge(96, k == 1 ? 10 : 24, v, m, k == 1 ? C_BLACK : C_DGRAY, 60);
-        } else if (!st.page) {
+        } else if (st.status_info) status_detail(k);
+        else if (!st.page) {
             if (k == 3) { n = put_s(s, 0, "Brave "); n = put_n(s, n, u->brave); n = put_s(s, n, "   Faith "); n = put_n(s, n, u->faith); }
             else if (k == 4) { n = put_s(s, 0, "Zodiac "); n = put_s(s, n, signs[u->zodiac]); }
             else if (k == 5) { n = put_s(s, 0, "Move "); n = put_n(s, n, u->move); n = put_s(s, n, "   Jump "); n = put_n(s, n, u->jump); n = put_s(s, n, "   Speed "); n = put_n(s, n, u->sp); }
@@ -3647,20 +3756,20 @@ static void draw_status(void)
             s[n] = 0; ui_text(6, 38 + 8 * (k - 3), s, C_BLACK, 159);
         } else {
             if (k == 3) {
-                ui_text(4, 38, "EQUIPMENT", C_DGRAY, 78);
-                ui_text(84, 38, "ABILITIES", C_DGRAY, 159);
+                ui_text(18, 38, "EQUIPMENT", C_DGRAY, 81);
+                ui_text(98, 38, "ABILITIES", C_DGRAY, 159);
             } else {
-                static const char *const labels[5] = { "Head", "Body", "Acc", "Hand", "Shield" };
                 u8 slot = k - 4, ab = known(st.sel, slot);
-                ui_text(4, 47 + 8 * slot, labels[slot], C_DGRAY, 26);
-                ui_text(28, 47 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
-                ui_text(84, 47 + 8 * slot, ab == NO_ABIL ? "-" : abilities[ab].name, C_BLACK, 159);
-                if (!slot && u->defend) ui_text(84, 87, "Defend", C_BLACK, 159);
+                ui_text(18, 47 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
+                ui_text(98, 47 + 8 * slot, ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-" : abilities[ab].name, C_BLACK, 159);
+                if (!slot && u->defend && status_ability_count() == 6) ui_text(98, 87, "Defend", C_BLACK, 159);
             }
         }
     }
     rt_light = sl; rt_dark = sd;
     copy_box(W->status[0], W->status[1], 0, 0, 10, RT_H);
+    if (st.page && !st.status_info && W->status_n == 9)
+        draw_hand(st.status_col ? 82 : 0, 46 + 8 * st.status_row);
 }
 
 static void draw_active(const Feet *f)

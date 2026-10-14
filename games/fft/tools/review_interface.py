@@ -19,3 +19,13 @@ for i, (scenario, frames, name) in enumerate(CASES):
     x, y = i % 3 * 640, i // 3 * 428
     draw.text((x + 5, y + 5), name, fill='black'); sheet.paste(Image.open(path), (x, y + 23))
 sheet.save(OUT / 'm26_interface.png'); print(OUT / 'm26_interface.png')
+
+details = Image.new('RGB', (3 * 640, 2 * 428), 'white')
+draw = ImageDraw.Draw(details)
+for i, name in enumerate(('Weapon', 'Head', 'Empty shield', 'Wish', 'Potion', 'Defend')):
+    path = OUT / ('status_%d.png' % (53 + i))
+    subprocess.run(['./fft_pc', '--headless', '--scenario', str(53 + i), '--frames', '20',
+                    '--scale', '4', '--shot', str(path)], check=True, stdout=subprocess.DEVNULL)
+    x, y = i % 3 * 640, i // 3 * 428
+    draw.text((x + 5, y + 5), name, fill='black'); details.paste(Image.open(path), (x, y + 23))
+details.save(OUT / 'status_details.png'); print(OUT / 'status_details.png')

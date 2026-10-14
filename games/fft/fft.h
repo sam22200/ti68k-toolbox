@@ -152,6 +152,7 @@ typedef struct {
     u8 act;                            // the unit whose turn it is
     u8 turns[ORDER_N];                 // the next turns (FFT's AT list), turns[0] = act
     u8 page;                            // Status: stats (0), equipment / abilities (1)
+    u8 status_col, status_row, status_info; // equipment/ability selection, open inspection
     u8 menu, back;                     // the menu's entry; the mode M_STATUS, M_ORDER return to
     u8 quit;                           // M_QUIT's entry: 0 Yes, 1 No
     u8 moved, acted;                   // this turn so far
