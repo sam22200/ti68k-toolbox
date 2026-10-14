@@ -184,7 +184,7 @@ def views(disc, files, nx, nz, maxh, preview=None):
         if q is None:                                              # the whole map, view 0
             q = np.percentile(small[~bg], [25, 55, 82])
         g = np.where(small > q[2], 0, np.where(small > q[1], 1, np.where(small > q[0], 2, 3)))
-        g[bg] = 1
+        g[bg] = 0                                                  # white around the map (the user's pick over light grey)
         fc = face[K // 2::K, K // 2::K]                            # each face's mean grey
         seen = (fc >= 0) & ~bg
         gsum += np.bincount(fc[seen], g[seen], nx * nz * 5); gcnt += np.bincount(fc[seen], None, nx * nz * 5)

@@ -25,7 +25,7 @@ playing it: [2nd] on a tile drawn over by a higher one picks that one, the curso
 the scenery, the turn order on [APPS], "Quit?" on [ESC], HP above MP (milestone 22). The
 original's pace, measured on it: walks, blows, the EXP and the JP, the AI's cursor gliding to
 its target, its preview and its ability's name, its camera turned when a unit is more than half
-hidden (milestone 23). The reach as FFT's tiles (white, a dark edge drawing the grid), all
+hidden (milestone 23). The reach as FFT's tiles (white, a 2-pixel black edge drawing the grid), all
 shown at once, [MODE] drawing them over the scenery in front (milestone 24).
 The original sword and dagger, outlined and at least two pixels thick, appear through the
 impact; the target recoils two pixels and flashes light/white inside its black contour
@@ -102,8 +102,8 @@ The target's gauges and values meet its portrait, and its name aligns to that sa
 text and gauges have white outlines; the scenery remains visible between them. CT stays in
 Status and the turn-order logic. A valid attack/skill target shows one compact centered
 prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status) above the comparison arrow;
-both names stay visible. The prediction is outlined over the scenery, with a white outlined
-chevron between the two panels. The separate TARGET window is gone. A black title tab,
+both names stay visible. The prediction is black in a white box framed black (the medium
+font was tried: too big), with a white outlined chevron between the two panels. The separate TARGET window is gone. A black title tab,
 light-grey framed panel and white glove extending outside its left edge follow FFT's
 command menu; Act and skill lists replace the menu in place. The glove follows
 Final Fantasy Adventure's Game Boy title screen: short index, rounded thumb and shaded
@@ -429,8 +429,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
   long operations and one word per row; portraits preserve their original palette-zero
   transparency. Text outlines are made once in the spare action-number scratch rows.
-  The centered prediction has its own seven-row planes and opacity mask, applied in two
-  aligned long operations per row above the HUD.
+  The centered prediction has its own 9-row, 160-wide planes and opacity mask (made as a
+  HUD part of its own: 48k at most), applied in three aligned long operations
+  per row above the HUD.
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
   Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
   entering Status. Marker and white glove use ExtGraph sprites. An eight-byte lookup
@@ -474,7 +475,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 65,361 bytes, ~150 below the 64 KB variable limit (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 64,739 bytes, ~775 below the 64 KB variable limit (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
 unpacked view 52,320 bytes plus scene/work allocation 60,248 bytes (~113 KB of game buffers;

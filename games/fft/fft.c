@@ -15,7 +15,7 @@
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
 #include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking,
                                          // 9 an AI unit's thinking (a frame's step), 10 the new reach rings,
-                                         // 11 a menu part, 12 a panel part
+                                         // 11 a menu part, 12 a panel part, 13 the prediction
 #define ZB(n) BENCH_BEGIN(n)
 #define ZE(n) BENCH_END(n)
 #else
@@ -124,6 +124,7 @@ static u8 *vbuf, vbuf_rot;
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
 #define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
+#define FC_ROWS 9                       // the prediction: a white box, black frame, small font
 #define PANEL_GAUGE_W 40                // MP + gap + 999/999 in the existing small font
 #define TARGET_STATS_X (61 - PANEL_GAUGE_W - 2) // rounded gauge ends against the target portrait
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
@@ -154,8 +155,8 @@ typedef struct {
                                         // known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
-    u16 forecast[3][7 * RT_PBYTES / 2]; // centered outlined prediction above the comparison arrow
-    u16 pan_k[2][7], pan_fk[2][7];      // actor/stats, compact forecast target + ability: being made, shown
+    u16 forecast[3][FC_ROWS * RT_PBYTES / 2]; // the prediction's box, 160 wide, above the arrow
+    u16 pan_k[2][6], pan_fk[2][6];      // unit, HP, MP, level, maxima: being made, shown
     u16 fc_key;                         // the forecast made (target | ability << 8)
     u8 pan_n[2], pan_f[2], pan_ok[2];   // parts made (cutout portrait, name, HP, MP, level), the
                                         // buffer shown, one shown
@@ -3404,10 +3405,21 @@ static void make_forecast(u8 a, u8 t, u8 ab)
         n = put_s(s, n, "HP");
     }
     s[n++] = ' '; n = put_n(s, n, hit); s[n++] = '%'; s[n] = 0;
-    memset(W->forecast, 0, sizeof W->forecast);
-    j = ui_width(s);
-    outlined_text((u8 *)W->forecast[0], (u8 *)W->forecast[1], (u8 *)W->forecast[2],
-                  j < 62 ? (64 - j) >> 1 : 1, 1, s, 63);
+    {                                          // a white box framed black, black text,
+        void *sl = rt_light, *sd = rt_dark;    // centered; its corners left out
+        u8 w = (u8)(ui_width(s) + 5), x = (u8)((RT_W - w) >> 1);
+        memset(W->forecast, 0, sizeof W->forecast);
+        rt_light = rt_dark = W->forecast[2];
+        draw_rect(x, 0, w, FC_ROWS, C_BLACK);
+        draw_rect(x, 0, 1, 1, C_WHITE); draw_rect(x + w - 1, 0, 1, 1, C_WHITE);
+        draw_rect(x, FC_ROWS - 1, 1, 1, C_WHITE); draw_rect(x + w - 1, FC_ROWS - 1, 1, 1, C_WHITE);
+        rt_light = W->forecast[0]; rt_dark = W->forecast[1];
+        draw_rect(x + 1, 0, w - 2, FC_ROWS, C_BLACK);
+        draw_rect(x, 1, w, FC_ROWS - 2, C_BLACK);
+        draw_rect(x + 1, 1, w - 2, FC_ROWS - 2, C_WHITE);
+        rt_light = sl; rt_dark = sd;
+        text_into(W->forecast[0], W->forecast[1], x + 2, 2, s, C_BLACK);
+    }
 }
 
 static void make_panel(u8 side, u8 i)
@@ -3433,10 +3445,8 @@ static void make_panel(u8 side, u8 i)
             } else WR32(m, 0, bits);
         }
     } else if (k == 1) {
-        u16 f = W->pan_k[side][6];
         const char *name = unit_name(i);
         panel_text(side, side ? limit - ui_width(name) : x, 1, name, limit);
-        if (!side && f) { make_forecast(i, (u8)f - 1, (u8)((f >> 8) - 1)); W->fc_key = f; }
     }
     else if (k == 4) {
         n = put_s(s, 0, "Lv"); n = put_n(s, n, u->level); s[n] = 0;
@@ -3458,13 +3468,13 @@ static void make_panel(u8 side, u8 i)
 static void draw_forecast(void)
 {
     const u8 *l = (const u8 *)W->forecast[0], *d = (const u8 *)W->forecast[1], *m = (const u8 *)W->forecast[2];
-    u8 *p = (u8 *)rt_light + (PANEL_Y - 8) * RT_PBYTES + 6;
-    u8 *q = (u8 *)rt_dark + (PANEL_Y - 8) * RT_PBYTES + 6, r;
-    for (r = 0; r < 7; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
-        u32 a = ~RD32(m, 0), b = ~RD32(m, 2);
-        WR32(p, 0, (RD32(p, 0) & a) | RD32(l, 0)); WR32(q, 0, (RD32(q, 0) & a) | RD32(d, 0));
-        WR32(p, 2, (RD32(p, 2) & b) | RD32(l, 2)); WR32(q, 2, (RD32(q, 2) & b) | RD32(d, 2));
-    }
+    u8 *p = (u8 *)rt_light + (PANEL_Y - FC_ROWS - 1) * RT_PBYTES;
+    u8 *q = (u8 *)rt_dark + (PANEL_Y - FC_ROWS - 1) * RT_PBYTES, r, k;
+    for (r = 0; r < FC_ROWS; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES)
+        for (k = 2; k < 8; k += 2) {           // the box stays within bytes 4..15 (96 px)
+            u32 a = ~RD32(m, k);
+            WR32(p, k, (RD32(p, k) & a) | RD32(l, k)); WR32(q, k, (RD32(q, k) & a) | RD32(d, k));
+        }
 }
 
 // The cached panel is aligned to ten bytes on either screen side, so its mask needs no shifts.
@@ -3610,35 +3620,38 @@ static void draw_tag(u8 side, u8 t)
     }
 }
 
-// what a side's panel shows: the unit, its HP, MP, level and maxima, the forecast (side 0)
-static void panel_keys(u8 side, u8 who, u16 forecast_key, u16 *keys)
+// what a side's panel shows: the unit, its HP, MP, level and maxima
+static void panel_keys(u8 who, u16 *keys)
 {
     const Unit *u = &st.unit[who - 1];
     keys[0] = who; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->level;
     keys[4] = u->max_hp; keys[5] = u->max_mp;
-    keys[6] = side ? 0 : forecast_key;
 }
 
 // a part of a panel to make (the one shown stays until the new one is whole); any?
-static u8 panel_part(const u8 *pk, u16 forecast_key)
+static u8 panel_part(const u8 *pk)
 {
     u8 i, j;
     for (i = 0; i < 2; i++) if (pk[i]) {
-        u16 keys[7];
+        u16 keys[6];
         u8 diff = 0, shown = W->pan_ok[i];
-        panel_keys(i, pk[i], forecast_key, keys);
-        for (j = 0; j < 7; j++) { diff |= keys[j] != W->pan_k[i][j]; shown &= keys[j] == W->pan_fk[i][j]; }
-        if (diff) { for (j = 0; j < 7; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = shown ? 5 : 0; }
+        panel_keys(pk[i], keys);
+        for (j = 0; j < 6; j++) { diff |= keys[j] != W->pan_k[i][j]; shown &= keys[j] == W->pan_fk[i][j]; }
+        if (diff) {
+            for (j = 0; j < 6; j++) W->pan_k[i][j] = keys[j];
+            W->pan_n[i] = shown ? 5 : 0;
+            if (!i && !shown) W->fc_key = 0;   // the attacker changed: the prediction again
+        }
         if (W->pan_n[i] < 5) { ZB(12); make_panel(i, pk[i] - 1); ZE(12); return 1; }
     }
     return 0;
 }
 
 // a side's panel shown and up to date?
-static u8 panel_shown(u8 side, u8 who, u16 forecast_key)
+static u8 panel_shown(u8 side, u8 who)
 {
-    u16 keys[7];
-    panel_keys(side, who, forecast_key, keys);
+    u16 keys[6];
+    panel_keys(who, keys);
     return W->pan_ok[side] && !memcmp(keys, W->pan_fk[side], sizeof keys);
 }
 
@@ -3683,7 +3696,11 @@ static void draw_hud(void)
             }
             ZB(11); make_window(); ZE(11);
         } else if (!W->tag_ok) make_tags();
-        else if (panel_part(pk, forecast_key)) ;
+        else if (panel_part(pk)) ;
+        else if (forecast && W->fc_key != forecast_key) {   // its own part
+            ZB(13); make_forecast(pk[0] - 1, forecast - 1, (u8)((forecast_key >> 8) - 1)); ZE(13);
+            W->fc_key = forecast_key;
+        }
         else if (win) { ahead = 1; continue; }
         else break;
         W->left -= HUD_K;
@@ -3720,7 +3737,8 @@ static void draw_hud(void)
             draw_hand(80, y + 7 + 6 * e);
         }
     }
-    W->hud_ok = (!pk[0] || panel_shown(0, pk[0], forecast_key)) && (!pk[1] || panel_shown(1, pk[1], forecast_key))
+    W->hud_ok = (!pk[0] || panel_shown(0, pk[0])) && (!pk[1] || panel_shown(1, pk[1]))
+        && (!forecast || W->fc_key == forecast_key)
         && (hidden || pre || !k[0] || (W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m));
 }
 
