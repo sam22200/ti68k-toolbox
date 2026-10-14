@@ -519,6 +519,7 @@ static void turn_start(void)
     u8 me;
     if (W) W->upd_k += TURN_K;
     st.act = ct_next();
+    if (st.act == U_RAMZA) st.rounds++;
     st.pick_t = 0;
     if (outcome()) { end_battle(outcome()); return; }
     st.unit[st.act].status &= (u8)~ST_DEFEND;
@@ -661,6 +662,9 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
     fill_spans(ymin, rows, pl, pd);
 }
 
+#define DENY_FRAMES 16                  // the cursor's blinks when [2nd] cannot pick its tile
+#define AI_FAST 3                       // AI turn steps a frame while [2nd] is held
+#define FAST_K 10
 #define RINGS(m) ((m) == M_TARGET || (m) == M_AIM || ((m) == M_ORDER && (st.back == M_TARGET || st.back == M_AIM)))
                                                  // the modes that show st.reach
 #define AIMING(m) ((m) == M_AIM || ((m) == M_ORDER && st.back == M_AIM))   // its rings inverted:
@@ -2177,9 +2181,11 @@ static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
     if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
-        s.h = FOE_H;                            // never covered (it shows a hidden one too)
-        s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
-        draw_sprite(sx - 8, sy - UNIT_FOOT - FOE_H + 1, &s);
+        if (st.unit[i].hp) {                    // never covered (it shows a hidden one too); a
+            s.h = FOE_H;                        // small one above a KO enemy
+            s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
+        } else { s.h = FOE_KO_H; s.light = foe_ko_gfx[0]; s.dark = foe_ko_gfx[1]; s.mask = foe_ko_gfx[2]; }
+        draw_sprite(sx - 8, sy - UNIT_FOOT - s.h + 1, &s);
     }
     if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
         s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
@@ -2249,9 +2255,11 @@ markers:
     sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
     if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
-        s.h = FOE_H;                            // never covered (it shows a hidden one too)
-        s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
-        draw_sprite(sx - 8, sy - UNIT_FOOT - FOE_H + 1, &s);
+        if (st.unit[i].hp) {                    // never covered (it shows a hidden one too); a
+            s.h = FOE_H;                        // small one above a KO enemy
+            s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
+        } else { s.h = FOE_KO_H; s.light = foe_ko_gfx[0]; s.dark = foe_ko_gfx[1]; s.mask = foe_ko_gfx[2]; }
+        draw_sprite(sx - 8, sy - UNIT_FOOT - s.h + 1, &s);
     }
     if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
         s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
@@ -3029,15 +3037,16 @@ static void status_keys(void)
     }
 }
 
-u8 game_update(void)
+// a frame's update (fast: an extra step of a held [2nd], the keys already read)
+static u8 update(u8 fast)
 {
-    FRAME_BEGIN();
     if (W) W->upd_k = 0;
     s16 tx, ty;
     u8 mode0 = st.mode;
     if (!W || !ugfx || !wgfx || !igfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
     if (st.ai != AI_THINK) st.tick++;            // (a unit thinking: the picture stands still)
-    if (input_pressed(K_MODE)) { st.over ^= 1; hl_seq++; }  // the reach over the scenery, or not
+    if (st.deny) st.deny--;
+    if (!fast && input_pressed(K_MODE)) { st.over ^= 1; hl_seq++; }  // the reach over the scenery, or not
     if (st.turn) {                                 // rotating: nothing else moves the view
         if (++st.turn_t >= TURN_FRAMES) {          // done: the cursor stays where it was
             s16 u, v, px, py;
@@ -3049,7 +3058,7 @@ u8 game_update(void)
             st.camx = scene_x(st.rot, u, v) - px; st.camy = scene_y(u, v) - py;
             cam_clamp(&st.camx, &st.camy);
         }
-    } else if (input_pressed(K_F5 | K_F1)) {      // the player's view from now on
+    } else if (!fast && input_pressed(K_F5 | K_F1)) {   // the player's view from now on
         st.turn = input_pressed(K_F5) ? 1 : -1; st.turn_t = 0;
         st.want = st.prot = 0xFF;
     } else if (st.want != 0xFF) {                  // turning to the view an AI unit wants
@@ -3129,12 +3138,12 @@ u8 game_update(void)
                     if (st.reach[c] != 0xFF && st.reach[c] > 0 && make_path(st.sel, st.cx, st.cz)) {
                         st.mx = u->x; st.mz = u->z; st.mface = u->face;
                         st.mode = M_WALK; st.path_i = 0; st.walk_t = 0;
-                    }
+                    } else st.deny = DENY_FRAMES;
                 } else if (st.mode == M_AIM) {     // a unit in the weapon's or the ability's reach
                     if (st.reach[c] == 1 && o && aim_ok(o - 1)) {
                         st.acted = 1;
                         if (st.abil == NO_ABIL) attack(st.act, o - 1); else skill(st.act, o - 1, st.abil);
-                    }
+                    } else st.deny = DENY_FRAMES;
                 } else if (o) {                    // a unit's numbers
                     st.mode = M_STATUS; W->status_i = 0; st.page = 0; st.sel = o - 1; st.back = M_BROWSE;
                     st.status_col = st.status_row = st.status_info = 0;
@@ -3155,6 +3164,20 @@ u8 game_update(void)
     }
     if (RINGS(st.mode) != RINGS(mode0) || AIMING(st.mode) != AIMING(mode0)) hl_seq++;   // the reach rings
     return 1;
+}
+
+// [2nd] / [ENTER] held through an AI turn: AI_FAST steps a frame (its glides, holds, walks and
+// blows), not while it thinks (its frames are full), nor after a step with heavy work (W->upd_k),
+// nor when the last frame had less than FAST_K left (a step costs ~6k)
+u8 game_update(void)
+{
+    u8 r, k = st.ai == AI_THINK ? AI_FAST : 1;   // (thinking this frame: its last step too)
+    FRAME_BEGIN();
+    r = update(0);
+    for (; r && k < AI_FAST && st.ai && st.ai != AI_THINK && rt_keys & (K_A | K_ENTER) && !W->upd_k
+           && W->left >= FAST_K * k; k++)
+        r = update(1);
+    return r;
 }
 
 // the camera's window of the scene: 100 rows of 160 px from any pixel position, 32 bits at a
@@ -3407,25 +3430,38 @@ static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" }
 
 // One compact prediction line centered above the arrow; both character names stay visible.
 // The preview uses the combat formulas directly; no separate target window is needed.
-static void make_forecast(u8 a, u8 t, u8 ab)
+u8 forecast_text(u8 a, u8 t, u8 ab, char *s)
 {
     const Ability *b = ab == NO_ABIL ? RT_NULL : &abilities[ab];
     u8 hit = b ? skill_hit(a, t, ab) : hit_chance(a, t), n = 0, j;
-    char s[28];
     if (b && b->kind == AB_CURE) {
         if (hit) {
             for (j = 0; !(st.unit[t].status & b->y & (1 << j)); j++) ;
             s[n++] = '-'; n = put_s(s, n, st_names[j]);
         } else n = put_s(s, n, "Miss");
-    } else {
-        s[n++] = !b || b->kind == AB_DAMAGE ? '-' : '+';
-        n = put_n(s, n, b ? skill_amount(a, t, ab, 0) : attack_damage(a, t, 0, 0));
-        if (b && (b->kind == AB_DAMAGE || b->kind == AB_REVIVE)) {
-            s[n++] = '-'; n = put_n(s, n, skill_amount(a, t, ab, 32767));
+    } else {                                   // a sure KO (the least damage left): "KO";
+        const Unit *ut = &st.unit[t];          // a heal up to the HP the target can take
+        u8 harm = !b || b->kind == AB_DAMAGE;
+        u16 v = b ? skill_amount(a, t, ab, 0) : attack_damage(a, t, 0, 0);
+        if (harm && ut->hp && v >= ut->hp) n = put_s(s, n, "KO");
+        else {
+            if (!harm && (!b || b->kind != AB_REVIVE) && v > ut->max_hp - ut->hp) v = ut->max_hp - ut->hp;
+            s[n++] = harm ? '-' : '+';
+            n = put_n(s, n, v);
+            if (b && (b->kind == AB_DAMAGE || b->kind == AB_REVIVE)) {
+                s[n++] = '-'; n = put_n(s, n, skill_amount(a, t, ab, 32767));
+            }
+            n = put_s(s, n, "HP");
         }
-        n = put_s(s, n, "HP");
     }
     s[n++] = ' '; n = put_n(s, n, hit); s[n++] = '%'; s[n] = 0;
+    return n;
+}
+
+static void make_forecast(u8 a, u8 t, u8 ab)
+{
+    char s[28];
+    forecast_text(a, t, ab, s);
     {                                          // a white box framed black, black text,
         void *sl = rt_light, *sd = rt_dark;    // centered; its corners left out
         u8 w = (u8)(ui_width(s) + 5), x = (u8)((RT_W - w) >> 1);
@@ -3538,7 +3574,7 @@ static void make_window(void)
     if (!k) {
         u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
         const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
-            : m == M_SKILLS ? "Skill" : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
+            : m == M_SKILLS ? skill_sets[u->set].name : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
         W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
         for (r = 0; r < WIN_ROWS; r++)
             for (i = 0; i < w; i++) {
@@ -3963,8 +3999,8 @@ static void draw_arrows(void)
 static void draw_end(void)
 {
     u8 *l = scene_l, *d = scene_l + RT_PSIZE, k = W->end_n, i, j = 0, n;
-    char s[12];
-    if (k < 8) {
+    char s[16];
+    if (k < 9) {
         W->end_n++;
         if (!k) { memset(l, 0, RT_PSIZE); memset(d, 0, RT_PSIZE); }
         else if (k == 1) {
@@ -3986,6 +4022,19 @@ static void draw_end(void)
                 n = put_s(s, 0, "JP "); n = put_n(s, n, u->gjp); s[n] = 0;
                 text_into((u16 *)l, (u16 *)d, 120, y, s, C_BLACK);
             }
+        } else if (k == 7) {                       // the battle: Ramza's turns, the player's
+            u8 ko = 0, left = 0;                   // side's KOs, crystals and chests left
+            const Unit *u = st.unit;
+            for (i = 0; i < NUNIT; i++, u++) {
+                if (u->team == TEAM_PLAYER) ko += u->kos;
+                if (u->dc == DC_CRYSTAL || u->dc == DC_CHEST) left++;
+            }
+            n = put_s(s, 0, "Rounds "); n = put_n(s, n, st.rounds); s[n] = 0;
+            text_into((u16 *)l, (u16 *)d, 4, 78, s, C_BLACK);
+            n = put_s(s, 0, "Fallen "); n = put_n(s, n, ko); s[n] = 0;
+            text_into((u16 *)l, (u16 *)d, 52, 78, s, C_BLACK);
+            n = put_s(s, 0, "Loot left "); n = put_n(s, n, left); s[n] = 0;
+            text_into((u16 *)l, (u16 *)d, 92, 78, s, C_BLACK);
         } else text_into((u16 *)l, (u16 *)d, 8, 90, "[ENTER] again   [ESC] quit", C_BLACK);
     }
     memcpy(rt_light, l, RT_PSIZE); memcpy(rt_dark, d, RT_PSIZE);
@@ -3993,7 +4042,7 @@ static void draw_end(void)
 
 void game_render(void)
 {
-    u8 ord[NUNIT], vis[NUNIT], i, j, cached;
+    u8 ord[NUNIT], vis[NUNIT], i, j, cached, tg;
     s16 n;
     Feet f[NUNIT];
     s16 u, v;
@@ -4044,6 +4093,8 @@ void game_render(void)
             if (c->x != f[i].x || c->y != f[i].y || c->depth != f[i].depth || c->rot != st.rot) n += COVER_K;
         }
     }
+    if (AIMING(st.mode) && st.tick & 8 && (tg = unit_at(st.cx, st.cz)) && vis[tg - 1]) n += UNIT_K;
+    else tg = 0;
     if (st.ai == AI_THINK) n += SUM_K;
     n += W->upd_k;
     cached = bg_usable();
@@ -4068,6 +4119,10 @@ void game_render(void)
         if (st.mode == M_ACT && k == st.atk) draw_weapon(f[k].x, f[k].y, k, f[k].depth);
         draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, c);
     }
+    if (tg) {                                  // the aimed unit over the others, every other 8
+        tg--;                                  // frames: it blinks when one stands in front
+        draw_unit_covered(f[tg].x - st.camx, f[tg].y - st.camy, st.rot, tg, RT_NULL);
+    }
     ZE(4); ZB(5);
     // the cursor, above everything (blinking), dashed behind the scenery
     dst_screen(st.camx, st.camy);
@@ -4077,7 +4132,7 @@ void game_render(void)
     // During AI thinking the active-unit pointer identifies the actor. The
     // tile cursor returns when the plan is shown; a new turn already spends
     // its frame on the clock, camera and unit covers.
-    else if (st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode))) {
+    else if (st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)) && !(st.deny & 4)) {
         Marker mk;
         u8 c = (u8)(st.cz * MAP_W + st.cx), ring = RINGS(st.mode);
         marker(st.rot, c, !ring, &mk);

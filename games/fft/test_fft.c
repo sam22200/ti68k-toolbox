@@ -1535,6 +1535,37 @@ static void shots(void)
     }
 }
 
+// the user's asks after playing a battle through: [2nd] held speeds the AI's turns up without
+// changing them; [2nd] on a tile that cannot be picked blinks the cursor; the prediction says KO
+// and caps a heal at the HP the target can take; Ramza's turns counted for the results
+static void test_play(void)
+{
+    static Unit slow[NUNIT];
+    long n0, n1;
+    int i, potion = -1;
+    char s[28];
+    sw_init(0);                                   // Delita and three enemies before Ramza
+    for (n0 = 0; n0 < 5000 && !(st.mode == M_MENU && !st.ai); n0++) sw_step(0);
+    memcpy(slow, st.unit, sizeof slow);
+    sw_init(0);
+    for (n1 = 0; n1 < 5000 && !(st.mode == M_MENU && !st.ai); n1++) sw_step(K_A);
+    printf("play: the AI's first turns %ld frames, %ld with [2nd] held\n", n0, n1);
+    CHECK(n1 * 10 < n0 * 6); CHECK(!memcmp(slow, st.unit, sizeof slow)); CHECKV(st.act, U_RAMZA);
+    CHECKV(st.rounds, 1);
+    sw_init(5);                                   // Ramza's range: a tile out of it
+    for (i = 0; i < MAP_W * MAP_H && st.reach[i] != 0xFF; i++) ;
+    st.cx = (u8)(i % MAP_W); st.cz = (u8)(i / MAP_W);
+    press(K_A);
+    CHECKV(st.mode, M_TARGET); CHECK(st.deny > 0);
+    sw_init(14);                                  // the last enemy at 1 HP in front of Ramza
+    forecast_text(U_RAMZA, 1, NO_ABIL, s);
+    CHECK(!strncmp(s, "KO ", 3));
+    for (i = 0; i < NABIL; i++) if (!strcmp(abilities[i].name, "Potion")) potion = i;
+    st.unit[U_RAMZA].hp = st.unit[U_RAMZA].max_hp - 5;
+    forecast_text(U_CHEMIST, U_RAMZA, (u8)potion, s);
+    CHECK(!strncmp(s, "+5HP ", 5));
+}
+
 int main(int argc, char **argv)
 {
     sw_init(0);                                           // the map's tiles are read from ffti
@@ -1569,6 +1600,7 @@ int main(int argc, char **argv)
     test_latency();
     test_water();
     test_turn_prediction();
+    test_play();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;

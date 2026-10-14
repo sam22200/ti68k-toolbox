@@ -178,8 +178,11 @@ typedef struct {
     u8 ai_all;                         // the AI plays the player's units too (a test scenario)
     u8 ai_nosup;                       // FFT's sticky flag: the enemies have lost their support
                                        // (fewer than two, or all Critical): no more retreats
+    u8 deny;                           // [2nd] on a tile that cannot be picked: the cursor blinks
+    u8 rounds;                         // Ramza's turns so far (the results)
 } State;
 extern State st;
+u8 forecast_text(u8 a, u8 t, u8 ab, char *s);   // the prediction's line (fft.c)
 
 // rotation of world tile (x, z) into view tile (u, v) and back, view size
 void view_of(u8 rot, s16 x, s16 z, s16 *u, s16 *v);
