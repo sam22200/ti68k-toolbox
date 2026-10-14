@@ -953,6 +953,28 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   pass. Peaks: UI 296,338, AI battle 349,660, defeat 356,348 cycles. Program 65,109 bytes;
   allocations unchanged. Updated actual-framebuffer animation: `x/hand_menu.gif`.
 
+### FFA title-screen glove, smaller ring and removed terrain readout
+
+- OBSERVED (visual references, no local FFA ROM): Nintendo's Collection of Mana capture
+  at https://www.nintendo.com/us/store/products/collection-of-mana-switch/ shows the
+  original Game Boy title menu at five times its native pixels, viewport x=240..1039.
+  Its glove occupies native x=40..55, y=88..99: short index, rounded thumb and light-grey
+  shading along the lower palm. The independent title capture at
+  https://ocremix.org/game/115/final-fantasy-adventure-gb/ confirms the contour. Downloads
+  remain local in `sources/art/ffadventure/`; neither screenshots nor a ROM are committed.
+- TARGET / IMPLEMENTATION: hand pattern transcribed from that reference, with one-pixel
+  white outline and padding, 18x14 visible pixels. The detached title-screen ground shadow
+  is omitted. A 32-wide ExtGraph sprite preserves its native shape and existing sideways
+  animation. Command windows gain four bottom rows and Status entries move up three
+  pixels so even the last selected glove stays clear of the screen edge/footer.
+- TARGET / IMPLEMENTATION: ring diameter 6 -> 4 pixels, with a two-pixel opening; the
+  complete marker returns to 13 padded rows. The terrain readout, builder and cache are
+  deleted. Height/depth still drive terrain, movement, water, occlusion and ability reach.
+- CHECKED: tests include bare scenery across the entire former readout on dry/wet tiles;
+  58 PC/TI scenarios, 177 interface screens and 87 blow/replay screens pass. Peaks:
+  UI 293,956, AI battle 347,840, defeat 354,528 cycles. Program 64,525 bytes; allocations
+  52,320 + 53,730 bytes. Review: `x/adventure_menu.gif` and `x/m26_interface.png`.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible

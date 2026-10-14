@@ -348,6 +348,10 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     Pointer/glove refinement: outlined marker 8x15 with a round upper ring; glove 15x12,
     shorter and taller. Three-pixel sideways animation ends one pixel before the text; the white menu-top
     strip is removed. Same cross-checks pass, peak 356,348 cycles; `x/hand_menu.gif`.
+    Final refinement: the terrain readout is fully removed, ring diameter 6 -> 4 pixels,
+    and the glove uses FFA's Game Boy title-screen silhouette and palm shading. Framing
+    and animation stay; tests and the same cross-checks pass, peak 354,528 cycles.
+    Review `x/adventure_menu.gif`; program 64,525 bytes, buffers 106,050 bytes.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

@@ -87,9 +87,8 @@ at its next turn after 0 it becomes a crystal or a chest, which a unit walking o
 up (a crystal: HP and MP full; a chest: `Got Clothes`, one of the dead unit's items, shown
 only). The battle ends when every enemy is KO (`Victory!`) or when Ramza becomes a crystal or
 a chest or the whole party, Delita included, is KO (`Game Over`): the results list each of
-the player's units with its level, the EXP and JP it earned. The HUD shows the height under
-its cursor at the top right (`2h`, `7.5h` on a slope, `0h` in the canal), as black
-text with a one-pixel white outline over the scenery; [APPS] shows
+the player's units with its level, the EXP and JP it earned. The terrain height/depth
+readout is removed from the HUD. [APPS] shows
 FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
 The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
 active unit left, hovered or aimed-at unit right, with the cutout 19x29 original portraits
@@ -104,14 +103,15 @@ prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status) above the comp
 both names stay visible. The prediction is outlined over the scenery, with a white outlined
 chevron between the two panels. The separate TARGET window is gone. A black title tab,
 light-grey framed panel and white glove extending outside its left edge follow FFT's
-command menu; Act and skill lists replace the menu in place. The glove is 15 pixels wide
-and 12 pixels high including its outline, moving three pixels sideways over a one-second cycle; at its
+command menu; Act and skill lists replace the menu in place. The glove follows
+Final Fantasy Adventure's Game Boy title screen: short index, rounded thumb and shaded
+palm, 18x14 pixels including the white outline. It moves three pixels sideways over a one-second cycle; at its
 rightmost position one pixel separates its tip from the text. Above the frame only the
 title tab is drawn, with scenery around it and no white horizontal highlight.
 Details and menus disappear
 during walking and action animations. A native FFT-style pointer marks the active unit above its
 head: a ring, crossbar and pointed blade, eight pixels wide including its white outline,
-drawn in a padded 16x15 sprite with a round ring and rounded opening;
+drawn in a padded 16x13 sprite with a smaller four-pixel round ring and two-pixel opening;
 enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
 without duplicates at each battle with a separate deterministic generator; Ramza and Delita
 keep their names. Scenarios (`fft(n)`, `--scenario n`):
@@ -125,7 +125,7 @@ Delita in front of Ramza at 5 HP, 16 the AI on both sides from the start (a whol
 itself: won in ~10,000 frames); 17-20 Ramza's sword strike in the four views, 21-24 his
 dagger strike, 25 the enemy Chemist's unarmed strike; 26 menu, 27 Act, 28 Chemist's items,
 29 attack preview, 30 Potion preview, 31 Status stats, 32 equipment, 33 enemy Status,
-34 water height, 35 hovered recruit, 36 walk, 37 blow, 38 turn order, 39 Quit, 40 Chemist's
+34 water browse, 35 hovered recruit, 36 walk, 37 blow, 38 turn order, 39 Quit, 40 Chemist's
 Status equipment/abilities; 41-44 six human sheets in canals in each view, 45 canal entry,
 46 wading, 47 exit, 48 wet sword strike, 49 wet KO, 50 crystal, 51 Critical, 52 wet throw;
 53 weapon details, 54 helmet details, 55 empty shield, 56 Wish, 57 Potion, 58 Defend;
@@ -167,7 +167,7 @@ make ti           # fft.89z, fftu.89y, fftw.89y, ffti.89y, fftv0.89y .. fftv3.89
 make xcheck       # the TI binary under ti-cycles = the PC, 40 scenarios
 make check-blows  # 87 PC/TI screens, frame costs for every blow phase and six complete replays
 make check-interface # 177 partial-build / page / inspection / input PC/TI screens; every UI frame <= 360k
-make review-interface # x/m26_interface.png, x/status_details.png and animated x/hand_menu.gif
+make review-interface # x/m26_interface.png, x/status_details.png and animated x/adventure_menu.gif
 make review-blows # x/m25_blows.png: nine blows in eleven frames (original sword/dagger, bare hands)
 ../../tools/pyenv/bin/python tools/oracle.py DISC.cue ../../sources/fft_ps1/gariland_t1.state trace.txt
                   # the original at Ramza's first Gariland turn (30 s, RE_NOTES.md)
@@ -410,9 +410,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
   Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
   an independent 16-bit generator avoids changing combat/stat RNG draws.
-  The displayed active marker is our own padded 16x15 pixel redraw in `tools/art.py` / `art.h`,
+  The displayed active marker is our own padded 16x13 pixel redraw in `tools/art.py` / `art.h`,
   with a clear ring opening, wide crossbar and outlined blade. The camera's top margin
-  covers its full height plus four pixels of headroom; facing selection keeps the camera still when the unit fits.
+  covers its full height plus six pixels of headroom; facing selection keeps the camera still when the unit fits.
 - **HUD caches.** Each 80x29 transparent character panel is built in five parts (portrait,
   name (and cached forecast), HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
@@ -423,7 +423,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
   Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
   entering Status. Marker and white glove use ExtGraph sprites. An eight-byte lookup
-  moves the 16-wide padded glove without rebuilding the menu; the title's first row
+  moves the 32-wide padded glove without rebuilding the menu; the title's first row
   masks its three rows above the frame so the scenery stays visible. Status cursor movement
   overlays the cached list; opening or closing a detail rebuilds its nine parts. The frame budget reserves
   65k for base work and 60k for one optional UI part. A newly completed background cache
@@ -443,6 +443,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| FFA glove / smaller ring / no terrain readout: UI doors, AI battle and defeat replay | 293,956; 347,840 / 354,528 at most | 32 fps (frame-limited) |
 | shorter / taller glove and round pointer: UI doors, AI battle and defeat replay | 296,338; 349,660 / 356,348 at most | 32 fps (frame-limited) |
 | narrower marker / animated glove / transparent menu top: UI doors, AI battle and defeat replay | 295,790; 349,660 / 356,348 at most | 32 fps (frame-limited) |
 | smaller marker / FFT hand menus / Status inspection: UI doors, AI battle and defeat replay | 295,764; 349,634 / 356,322 at most | 32 fps (frame-limited) |
@@ -462,10 +463,10 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 65,109 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 64,525 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 54,332 bytes (~107 KB of game buffers;
+unpacked view 52,320 bytes plus scene/work allocation 53,730 bytes (~106 KB of game buffers;
 full-screen Status and transparent character caches add ~15 KB to milestone 25). Both blocks remain
 below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
