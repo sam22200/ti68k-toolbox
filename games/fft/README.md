@@ -33,7 +33,18 @@ unit's pointer bobs up and down. From a play-through on the PC: [2nd] held speed
 (`AI_FAST` steps a frame, never while thinking or over the budget), the aimed unit is drawn over
 the others every other 8 frames, the prediction says "KO" for a sure kill and caps a heal, a KO
 enemy keeps a smaller diamond, the item list is titled with its skill set, and the results add
-Ramza's rounds, the player's side's KOs and the crystals or chests left.
+Ramza's rounds, the player's side's KOs and the crystals or chests left. Banners drawn by a tiny
+vector engine on the calculator: "BATTLE START / DEFEAT ALL ENEMIES!" at a battle's start,
+"VICTORY!" or "DEFEAT" before the results, wiped in from the left over the moving units ([2nd]
+skips); while the objective shows, the camera frames the enemies and they pulse white as when
+hit (FFT lights up the units an objective names). The glyphs are Lato Black's outlines
+(`tools/banner.py`: Inkscape's text to path, curves flattened, 696 bytes in `ffti`), filled
+even-odd on 2 x 2 samples a pixel (four greys of coverage: smooth edges, the cap line on a
+pixel), the white outline the coverage grown a pixel; rows of samples are filled while the frame
+has room (~5k, 11.5k with a pixel row written), the wipe waiting for them. As in FFT, the
+scenery is first shaded a grey darker behind a diagonal edge coming from the top left, the units
+left bright; the words leave with the shade, which goes on toward the bottom right (~45k a frame,
+80k with the edge's rows).
 The original sword and dagger, outlined and at least two pixels thick, appear through the
 impact; the target recoils two pixels and flashes light/white inside its black contour
 (milestone 25, `x/m25_blows.png`). Transparent character details with outlined portraits and stacked HP/MP gauges, bottom-right
