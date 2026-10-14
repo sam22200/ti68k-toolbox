@@ -121,7 +121,6 @@ static u8 *vbuf, vbuf_rot;
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
-#define HEIGHT_ROWS 10                  // height only: eight glyph rows and their outline
 #define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
 #define PANEL_GAUGE_W 40                // MP + gap + 999/999 in the existing small font
@@ -149,7 +148,6 @@ typedef struct {
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
     u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined panel text (0-6) / action numbers (7-13)
-    char hud_s[2];                      // cached height + 1, alignment pad
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
     u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_ACTS: no ability
                                         // known; M_ACT: the ability), unit;
@@ -160,7 +158,6 @@ typedef struct {
     u16 pan_k[2][7];                    // actor/stats, compact forecast target + ability
     u8 pan_n[2];                        // cutout portrait, name, HP, MP, level
     u8 arrow[4][2][8];
-    u16 height[2][HEIGHT_ROWS * RT_PBYTES / 2]; // terrain text, then its cached white outline mask
     u16 status[2][RT_PSIZE / 2];        // full-screen Status, assembled a line per frame
     u8 status_i, status_page, status_n;
     u8 status_col, status_row, status_info;
@@ -2416,7 +2413,7 @@ static void draw_turn(void)
 
 // ---------------------------------------------------------------- camera
 #define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
-#define CAM_MT 39                       // body, round pointer and four pixels of headroom
+#define CAM_MT 39                       // body, smaller round pointer and six pixels of headroom
 #define CAM_MB 12                       // bottom margin while following the unit
 static void cam_clamp(s16 *x, s16 *y)
 {
@@ -2686,7 +2683,7 @@ void game_scenario(u16 n)
             if (n == 58) { st.unit[st.sel].defend = 1; for (i = 0; i < SET_N && known(st.sel, i) != NO_ABIL; i++) ; st.status_row = i; }
         }
     }
-    W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->win_k[0] = 0; W->hud_s[0] = 0;
+    W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->win_k[0] = 0;
     cam_target(&st.camx, &st.camy);
     hl_seq++;
 }
@@ -3496,7 +3493,7 @@ static void make_window(void)
     u8 r, i, n, k = W->win_n++, m = W->win_k[0], c = C_BLACK;
     char s[28];
     if (!k) {
-        u8 h = win_lines(m) * 6 + 11, w = 4;
+        u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
         const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
             : m == M_SKILLS ? "Skill" : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
         W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
@@ -3555,41 +3552,8 @@ static void make_window(void)
 static void draw_hand(s16 x, s16 y)
 {
     static const u8 sway[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
-    RtSprite sp = { 16, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
+    RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
     draw_sprite(x + sway[(st.tick >> 2) & 7], y, &sp);
-}
-
-// Terrain readout over the scenery: black glyphs with a one-pixel white outline.
-// The second scratch plane becomes the mask once the text has been rendered.
-static void make_height(u8 h)
-{
-    void *sl = rt_light, *sd = rt_dark;
-    char s[12]; u8 n, r;
-    rt_light = W->height[0]; rt_dark = W->height[1];
-    memset(W->height, 0, sizeof W->height);
-    n = put_n(s, 0, h >> 1);
-    if (h & 1) n = put_s(s, n, ".5");
-    s[n++] = 'h'; s[n] = 0;
-    draw_text(2, 1, s, F_MEDIUM, C_BLACK);
-    rt_light = sl; rt_dark = sd;
-    for (r = 0; r < HEIGHT_ROWS; r++) {
-        const u8 *p = (const u8 *)W->height[0] + r * RT_PBYTES;
-        u32 m = RD32(p, 0);
-        if (r) m |= RD32(p - RT_PBYTES, 0);
-        if (r < HEIGHT_ROWS - 1) m |= RD32(p + RT_PBYTES, 0);
-        WR32((u8 *)W->height[1] + r * RT_PBYTES, 0, m | m << 1 | m >> 1);
-    }
-}
-
-static void draw_height(void)
-{
-    const u8 *p = (const u8 *)W->height[0], *q = (const u8 *)W->height[1];
-    u8 *l = (u8 *)rt_light + 16, *d = (u8 *)rt_dark + 16, r;
-    for (r = 0; r < HEIGHT_ROWS; r++, p += RT_PBYTES, q += RT_PBYTES, l += RT_PBYTES, d += RT_PBYTES) {
-        u32 ink = RD32(p, 0), keep = ~RD32(q, 0);
-        WR32(l, 0, (RD32(l, 0) & keep) | ink);
-        WR32(d, 0, (RD32(d, 0) & keep) | ink);
-    }
 }
 
 static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
@@ -3611,8 +3575,7 @@ static void draw_hud(void)
 {
     u8 o, i, k[3], pk[2], forecast = 0, hidden = st.mode == M_WALK || st.mode == M_ACT || st.turn;
     u16 forecast_key;
-    const Tile *tile = &map_tiles[st.cz * MAP_W + st.cx];
-    u8 h = tile->stand, changed = 0;
+    u8 changed = 0;
     o = unit_at(st.cx, st.cz);
     pk[0] = hidden ? 0 : st.act + 1;
     pk[1] = !hidden && o && o - 1 != st.act && (st.mode == M_AIM || st.mode == M_BROWSE || st.mode == M_TARGET) ? o : 0;
@@ -3632,9 +3595,7 @@ static void draw_hud(void)
     if (W->left >= HUD_K || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) {
         W->hud_wait = 0;
         W->left -= HUD_K;
-        if ((u8)W->hud_s[0] != h + 1) {
-            make_height(h); W->hud_s[0] = h + 1; changed = 1;
-        } else if (k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2])) {
+        if (k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2])) {
             for (i = 0; i < 3; i++) W->win_k[i] = k[i];
             W->win_n = 0; make_window(); changed = 1;
         } else if (k[0] && W->win_n < W->win_m) { make_window(); changed = 1; }
@@ -3649,7 +3610,6 @@ static void draw_hud(void)
             if (W->pan_n[i] < 5) { make_panel(i, pk[i] - 1); break; }
         }
     }
-    draw_height();
     for (i = 0; i < 2; i++) if (pk[i] && W->pan_k[i][0] == pk[i] && W->pan_n[i] == 5)
         draw_panel(i);
     if (forecast && W->pan_n[0] == 5 && W->pan_k[0][0] == pk[0] && W->pan_k[0][6] == forecast_key)
@@ -3676,7 +3636,7 @@ static void draw_hud(void)
         copy_box(W->win[0] + 3 * (RT_PBYTES / 2), W->win[1] + 3 * (RT_PBYTES / 2), 12, y + 3, W->win_w, W->win_h - 3);
         if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
-            draw_hand(82, y + 5 + 6 * e);
+            draw_hand(80, y + 7 + 6 * e);
         }
     }
 }
@@ -3770,16 +3730,16 @@ static void draw_status(void)
                 ui_text(103, 38, "ABILITIES", C_DGRAY, 159);
             } else {
                 u8 slot = k - 4, ab = known(st.sel, slot);
-                ui_text(23, 47 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
-                ui_text(103, 47 + 8 * slot, ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-" : abilities[ab].name, C_BLACK, 159);
-                if (!slot && u->defend && status_ability_count() == 6) ui_text(103, 87, "Defend", C_BLACK, 159);
+                ui_text(23, 44 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
+                ui_text(103, 44 + 8 * slot, ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-" : abilities[ab].name, C_BLACK, 159);
+                if (!slot && u->defend && status_ability_count() == 6) ui_text(103, 84, "Defend", C_BLACK, 159);
             }
         }
     }
     rt_light = sl; rt_dark = sd;
     copy_box(W->status[0], W->status[1], 0, 0, 10, RT_H);
     if (st.page && !st.status_info && W->status_n == 9)
-        draw_hand(st.status_col ? 83 : 3, 43 + 8 * st.status_row);
+        draw_hand(st.status_col ? 81 : 1, 41 + 8 * st.status_row);
 }
 
 static void draw_active(const Feet *f)

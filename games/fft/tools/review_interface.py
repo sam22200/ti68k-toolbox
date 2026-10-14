@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 CASES = [(26, 40, 'Turn / MENU'), (27, 40, 'Act submenu'), (28, 40, 'Chemist / Items'),
          (29, 40, 'Attack target'), (30, 40, 'Potion target'), (35, 40, 'Hover recruit'),
          (31, 40, 'Status / stats'), (32, 40, 'Status / equipment'), (40, 40, 'Chemist / abilities'),
-         (33, 40, 'Enemy status'), (34, 40, 'Water / height'), (38, 40, 'Turn order'),
+         (33, 40, 'Enemy status'), (34, 40, 'Water / browse'), (38, 40, 'Turn order'),
          (36, 5, 'Walk / bands hidden'), (37, 18, 'Blow / bands hidden'), (39, 40, 'Quit / default No')]
 OUT = Path('x'); OUT.mkdir(exist_ok=True)
 sheet = Image.new('RGB', (3 * 640, 5 * 428), 'white')
@@ -30,13 +30,13 @@ for i, name in enumerate(('Weapon', 'Head', 'Empty shield', 'Wish', 'Potion', 'D
     draw.text((x + 5, y + 5), name, fill='black'); details.paste(Image.open(path), (x, y + 23))
 details.save(OUT / 'status_details.png'); print(OUT / 'status_details.png')
 
-# One second of the real framebuffer: wider glove moving up to the text and back.
+# One second of the real framebuffer: FFA title-screen glove moving up to the text and back.
 frames = []
 for frame in range(40, 72, 4):
     path = OUT / ('hand_%d.png' % frame)
     subprocess.run(['./fft_pc', '--headless', '--scenario', '28', '--frames', str(frame),
                     '--scale', '4', '--shot', str(path)], check=True, stdout=subprocess.DEVNULL)
     frames.append(Image.open(path).copy())
-frames[0].save(OUT / 'hand_menu.gif', save_all=True, append_images=frames[1:],
+frames[0].save(OUT / 'adventure_menu.gif', save_all=True, append_images=frames[1:],
                duration=125, loop=0, disposal=2)
-print(OUT / 'hand_menu.gif')
+print(OUT / 'adventure_menu.gif')

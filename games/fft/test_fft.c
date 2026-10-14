@@ -418,11 +418,9 @@ static void test_walk_keys(void)
 // [APPS] opens the turn order over any input mode, any key closes it; [2nd] on a tile drawn on
 // the same pixels as a higher one picks that one (Ramza in the canal at (1, 5), a Squire on the
 // street at (0, 5): in view E its tile hides the canal tile (1, 4), in reach but empty)
-static int hud_shown(void)                    // the active unit's outlined HP bar, terrain text
+static int hud_shown(void)                    // the active unit's outlined HP bar
 {
-    int x, y, ink = 0;
-    for (y = 1; y < 9; y++) for (x = 128; x < 155; x++) ink += sw_level(x, y) == 3;
-    return sw_level(22, 86) == C_WHITE && sw_level(23, 86) == C_BLACK && ink > 4;
+    return sw_level(22, 86) == C_WHITE && sw_level(23, 86) == C_BLACK;
 }
 
 static void test_fixes(void)
@@ -1265,7 +1263,7 @@ static void test_turns(void)
 }
 
 // Milestone 26: names are stable by seed and unique by gender, two reversible Status
-// pages, character details hidden during action/motion, live HP and height without depth.
+// pages, character details hidden during action/motion, live HP and no terrain readout.
 static void test_interface(void)
 {
     State original;
@@ -1325,13 +1323,12 @@ static void test_interface(void)
     press(K_RIGHT); st.status_row = 4; press(K_DOWN); steps(0, 12); CHECKV(st.status_row, 5);
     press(K_A); steps(0, 12); CHECK(st.status_info && known(st.sel, 5) == NO_ABIL);
     press(K_ESC); press(K_DOWN); CHECKV(st.status_row, 0);
-    // Portrait, numerical fields and equipment are inside the screen; the 2h top-right
-    // height changes to 0h in water. There is no second HUD line on either kind of tile.
+    // The old height/depth area shows only scenery, on both canal and dry tiles.
     for (i = 0; i < 2; i++) {
         sw_init(34); if (i) { st.cx = 4; st.cz = 11; }
         for (j = 0; j < NUNIT; j++) st.unit[j].x = 200;  // no actor can cover the inspected scenery
         steps(0, 30);
-        for (y = 11; y < 17; y++) for (x = 128; x < 160; x++) {
+        for (y = 0; y < 17; y++) for (x = 128; x < 160; x++) {
             u16 o = (st.camy + y) * SC_BYTES + ((st.camx + x) >> 3);
             u8 b = (u8)(0x80 >> ((st.camx + x) & 7));
             u8 background = (scene_l[o] & b ? 1 : 0) | (scene_d[o] & b ? 2 : 0);
@@ -1341,7 +1338,7 @@ static void test_interface(void)
     CHECK(ink1 == 0);
     sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
     sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());
-    printf("interface: 510 disc names, live character details, selectable equipment/abilities, height only, hidden during motion/blows\n");
+    printf("interface: 510 disc names, live character details, selectable equipment/abilities, no terrain readout, hidden during motion/blows\n");
 }
 
 static void test_water(void)
