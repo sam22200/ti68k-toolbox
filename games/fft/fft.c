@@ -2416,7 +2416,7 @@ static void draw_turn(void)
 
 // ---------------------------------------------------------------- camera
 #define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
-#define CAM_MT 39                       // body, smaller pointer and six pixels of headroom
+#define CAM_MT 39                       // body, round pointer and four pixels of headroom
 #define CAM_MB 12                       // bottom margin while following the unit
 static void cam_clamp(s16 *x, s16 *y)
 {
@@ -3555,7 +3555,7 @@ static void make_window(void)
 static void draw_hand(s16 x, s16 y)
 {
     static const u8 sway[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
-    RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
+    RtSprite sp = { 16, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
     draw_sprite(x + sway[(st.tick >> 2) & 7], y, &sp);
 }
 
@@ -3676,7 +3676,7 @@ static void draw_hud(void)
         copy_box(W->win[0] + 3 * (RT_PBYTES / 2), W->win[1] + 3 * (RT_PBYTES / 2), 12, y + 3, W->win_w, W->win_h - 3);
         if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
-            draw_hand(79, y + 8 + 6 * e);
+            draw_hand(82, y + 5 + 6 * e);
         }
     }
 }
@@ -3779,7 +3779,7 @@ static void draw_status(void)
     rt_light = sl; rt_dark = sd;
     copy_box(W->status[0], W->status[1], 0, 0, 10, RT_H);
     if (st.page && !st.status_info && W->status_n == 9)
-        draw_hand(st.status_col ? 80 : 0, 46 + 8 * st.status_row);
+        draw_hand(st.status_col ? 83 : 3, 43 + 8 * st.status_row);
 }
 
 static void draw_active(const Feet *f)
