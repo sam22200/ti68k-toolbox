@@ -940,6 +940,19 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   Program 65,133 bytes; RAM allocations unchanged. `make review-interface` now writes
   `x/hand_menu.gif` from eight real framebuffer captures over one full animation cycle.
 
+### Shorter, taller glove and round active ring
+
+- TARGET / IMPLEMENTATION (user correction): glove width 18 -> 15 pixels, height 9 -> 12,
+  increasing its palm vertically instead of lengthening its index finger. Restore the
+  16-wide sprite primitive; reposition it so the existing three-pixel sway still leaves
+  one pixel before the text and the full glove fits even the bottom menu row.
+- TARGET / IMPLEMENTATION: upper marker ring uses a six-by-six round contour and rounded
+  four-by-four opening. Outlined width stays eight pixels; padded height becomes 15.
+  Established camera framing stays unchanged, with four pixels of headroom.
+- CHECKED: tests, 58 PC/TI scenarios, 177 interface screens and 87 blow/replay screens
+  pass. Peaks: UI 296,338, AI battle 349,660, defeat 356,348 cycles. Program 65,109 bytes;
+  allocations unchanged. Updated actual-framebuffer animation: `x/hand_menu.gif`.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible

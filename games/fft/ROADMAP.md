@@ -345,8 +345,8 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     equipment nodes; equipment changing remains a separate action. Tests, 58 scenario
     comparisons, 177 UI screens and 87 replay screens pass; peak 356,322 cycles.
     Review `x/m26_interface.png` / `x/status_details.png`.
-    Pointer/glove refinement: outlined marker width 10 -> 8 pixels, glove 15 -> 18.
-    Three-pixel sideways animation ends one pixel before the text; the white menu-top
+    Pointer/glove refinement: outlined marker 8x15 with a round upper ring; glove 15x12,
+    shorter and taller. Three-pixel sideways animation ends one pixel before the text; the white menu-top
     strip is removed. Same cross-checks pass, peak 356,348 cycles; `x/hand_menu.gif`.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if

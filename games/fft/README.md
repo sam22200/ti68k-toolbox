@@ -104,14 +104,14 @@ prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status) above the comp
 both names stay visible. The prediction is outlined over the scenery, with a white outlined
 chevron between the two panels. The separate TARGET window is gone. A black title tab,
 light-grey framed panel and white glove extending outside its left edge follow FFT's
-command menu; Act and skill lists replace the menu in place. The glove is 18 pixels wide
-including its outline, moving three pixels sideways over a one-second cycle; at its
+command menu; Act and skill lists replace the menu in place. The glove is 15 pixels wide
+and 12 pixels high including its outline, moving three pixels sideways over a one-second cycle; at its
 rightmost position one pixel separates its tip from the text. Above the frame only the
 title tab is drawn, with scenery around it and no white horizontal highlight.
 Details and menus disappear
 during walking and action animations. A native FFT-style pointer marks the active unit above its
 head: a ring, crossbar and pointed blade, eight pixels wide including its white outline,
-drawn in a padded 16x13 sprite;
+drawn in a padded 16x15 sprite with a round ring and rounded opening;
 enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
 without duplicates at each battle with a separate deterministic generator; Ramza and Delita
 keep their names. Scenarios (`fft(n)`, `--scenario n`):
@@ -410,9 +410,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
   Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
   an independent 16-bit generator avoids changing combat/stat RNG draws.
-  The displayed active marker is our own padded 16x13 pixel redraw in `tools/art.py` / `art.h`,
+  The displayed active marker is our own padded 16x15 pixel redraw in `tools/art.py` / `art.h`,
   with a clear ring opening, wide crossbar and outlined blade. The camera's top margin
-  covers its full height plus six pixels of headroom; facing selection keeps the camera still when the unit fits.
+  covers its full height plus four pixels of headroom; facing selection keeps the camera still when the unit fits.
 - **HUD caches.** Each 80x29 transparent character panel is built in five parts (portrait,
   name (and cached forecast), HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
@@ -423,7 +423,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
   Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
   entering Status. Marker and white glove use ExtGraph sprites. An eight-byte lookup
-  moves the 32-wide padded glove without rebuilding the menu; the title's first row
+  moves the 16-wide padded glove without rebuilding the menu; the title's first row
   masks its three rows above the frame so the scenery stays visible. Status cursor movement
   overlays the cached list; opening or closing a detail rebuilds its nine parts. The frame budget reserves
   65k for base work and 60k for one optional UI part. A newly completed background cache
@@ -443,6 +443,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| shorter / taller glove and round pointer: UI doors, AI battle and defeat replay | 296,338; 349,660 / 356,348 at most | 32 fps (frame-limited) |
 | narrower marker / animated glove / transparent menu top: UI doors, AI battle and defeat replay | 295,790; 349,660 / 356,348 at most | 32 fps (frame-limited) |
 | smaller marker / FFT hand menus / Status inspection: UI doors, AI battle and defeat replay | 295,764; 349,634 / 356,322 at most | 32 fps (frame-limited) |
 | target spacing / native active marker: UI doors, AI battle and defeat replay | 298,486; 350,712 / 357,400 at most | 32 fps (frame-limited) |
@@ -461,7 +462,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 65,133 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 65,109 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
 unpacked view 52,320 bytes plus scene/work allocation 54,332 bytes (~107 KB of game buffers;
