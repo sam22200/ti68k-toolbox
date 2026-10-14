@@ -124,6 +124,7 @@ static u8 *vbuf, vbuf_rot;
 #define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
 #define PANEL_GAUGE_W 40                // MP + gap + 999/999 in the existing small font
+#define TARGET_STATS_X (61 - PANEL_GAUGE_W - 2) // rounded gauge ends against the target portrait
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
@@ -154,6 +155,7 @@ typedef struct {
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
     u16 pan[2][3][PANEL_ROWS * RT_PBYTES / 2]; // 80-wide planes and opacity mask; scene shows through
+    u16 forecast[3][7 * RT_PBYTES / 2]; // centered outlined prediction above the comparison arrow
     u16 pan_k[2][7];                    // actor/stats, compact forecast target + ability
     u8 pan_n[2];                        // cutout portrait, name, HP, MP, level
     u8 arrow[4][2][8];
@@ -2412,8 +2414,8 @@ static void draw_turn(void)
 
 // ---------------------------------------------------------------- camera
 #define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
-#define CAM_MT 32                       // for the camera to stay (its sprite above them, the
-#define CAM_MB 12                       // HUD's top strip)
+#define CAM_MT (UNIT_FOOT + ACTIVE_H - 1) // full body and active pointer above the feet
+#define CAM_MB 12                       // bottom margin while following the unit
 static void cam_clamp(s16 *x, s16 *y)
 {
     if (*x < 0) *x = 0;
@@ -2429,8 +2431,8 @@ static u8 cam_sees(s16 x, s16 y)
     return x >= CAM_MX && x < RT_W - CAM_MX && y >= CAM_MT && y < RT_H - CAM_MB;
 }
 
-// Where the camera goes: the cursor centred; while a unit walks, it stays until the walker
-// nears the edge, then centres it; while a unit aims or acts, it stays when the unit and its
+// Where the camera goes: the cursor centred; while walking or choosing a facing, it stays
+// until the unit nears the edge, then centres it; while a unit aims or acts, it stays when the unit and its
 // target are both on screen, else centres the point between them
 static void cam_target(s16 *tx, s16 *ty)
 {
@@ -2438,8 +2440,8 @@ static void cam_target(s16 *tx, s16 *ty)
     view_of(st.rot, st.cx, st.cz, &u, &v);
     x = scene_x(st.rot, u, v);
     y = scene_y(u, v) + HH - map_tiles[st.cz * MAP_W + st.cx].stand * (HU / 2);
-    if (st.mode == M_WALK) {
-        Feet f = unit_feet(st.rot, st.sel);
+    if (st.mode == M_WALK || st.mode == M_FACE) {
+        Feet f = unit_feet(st.rot, st.mode == M_FACE ? st.act : st.sel);
         if (cam_sees(f.x, f.y)) { *tx = st.camx; *ty = st.camy; return; }
         x = f.x; y = f.y;
     } else if (st.mode == M_AIM || st.mode == M_ACT) {
@@ -3255,13 +3257,11 @@ static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width)
 }
 
 // Outlined small text built into the transparent panel, never redrawn glyph by glyph on screen.
-static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
+static void outlined_text(u8 *l, u8 *d, u8 *mask, s16 x, s16 y, const char *s, s16 limit)
 {
     void *sl = rt_light, *sd = rt_dark;
     u8 r;
-    u8 *l = (u8 *)W->pan[side][0] + (y - 1) * RT_PBYTES;
-    u8 *d = (u8 *)W->pan[side][1] + (y - 1) * RT_PBYTES;
-    u8 *mask = (u8 *)W->pan[side][2] + (y - 1) * RT_PBYTES;
+    l += (y - 1) * RT_PBYTES; d += (y - 1) * RT_PBYTES; mask += (y - 1) * RT_PBYTES;
     for (r = 0; r < 7; r++) memset(HUD_L + r * RT_PBYTES, 0, 10);
     rt_light = HUD_L; rt_dark = HUD_D;
     ui_text(x, 1, s, C_BLACK, limit);
@@ -3287,10 +3287,22 @@ static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
     }
 }
 
+static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
+{
+    outlined_text((u8 *)W->pan[side][0], (u8 *)W->pan[side][1], (u8 *)W->pan[side][2], x, y, s, limit);
+}
+
+static u8 ui_width(const char *s)
+{
+    u8 width = 0;
+    while (*s) width += igfx[UI_ADV + (u8)*s++ - 32];
+    return width;
+}
+
 static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
 {
     void *sl = rt_light, *sd = rt_dark;
-    s16 x = side ? 5 : 22;
+    s16 x = side ? TARGET_STATS_X : 22;
     u16 n = max ? (u16)((PANEL_GAUGE_W * v + max - 1) / max) : 0;
     if (n > PANEL_GAUGE_W) n = PANEL_GAUGE_W;
     // Rounded white silhouette: the four outer corner pixels stay transparent.
@@ -3307,9 +3319,9 @@ static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
 
 static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };   // ST_*
 
-// One compact prediction line, like FFT's damage/chance beside the attacking portrait.
+// One compact prediction line centered above the arrow; both character names stay visible.
 // The preview uses the combat formulas directly; no separate target window is needed.
-static void panel_forecast(u8 side, u8 a, u8 t, u8 ab)
+static void make_forecast(u8 a, u8 t, u8 ab)
 {
     const Ability *b = ab == NO_ABIL ? RT_NULL : &abilities[ab];
     u8 hit = b ? skill_hit(a, t, ab) : hit_chance(a, t), n = 0, j;
@@ -3328,7 +3340,10 @@ static void panel_forecast(u8 side, u8 a, u8 t, u8 ab)
         n = put_s(s, n, "HP");
     }
     s[n++] = ' '; n = put_n(s, n, hit); s[n++] = '%'; s[n] = 0;
-    panel_text(side, 22, 1, s, 74);
+    memset(W->forecast, 0, sizeof W->forecast);
+    j = ui_width(s);
+    outlined_text((u8 *)W->forecast[0], (u8 *)W->forecast[1], (u8 *)W->forecast[2],
+                  j < 62 ? (64 - j) >> 1 : 1, 1, s, 63);
 }
 
 static void make_panel(u8 side, u8 i)
@@ -3336,7 +3351,7 @@ static void make_panel(u8 side, u8 i)
     void *sl = rt_light, *sd = rt_dark;
     const Unit *u = &st.unit[i];
     u8 k = W->pan_n[side]++, n;
-    s16 x = side ? 5 : 22, limit = side ? 59 : 74;
+    s16 x = side ? TARGET_STATS_X : 22, limit = side ? 60 : 74;
     char s[24];
     rt_light = W->pan[side][0]; rt_dark = W->pan[side][1];
     if (!k) {
@@ -3355,22 +3370,35 @@ static void make_panel(u8 side, u8 i)
         }
     } else if (k == 1) {
         u16 f = W->pan_k[side][6];
-        if (!side && f) panel_forecast(side, i, (u8)f - 1, (u8)((f >> 8) - 1));
-        else panel_text(side, x, 1, unit_name(i), limit);
+        const char *name = unit_name(i);
+        panel_text(side, side ? limit - ui_width(name) : x, 1, name, limit);
+        if (!side && f) make_forecast(i, (u8)f - 1, (u8)((f >> 8) - 1));
     }
     else if (k == 4) {
         n = put_s(s, 0, "Lv"); n = put_n(s, n, u->level); s[n] = 0;
         panel_text(side, side ? 62 : 1, 23, s, side ? 80 : 20);
     } else {
         u16 v = k == 2 ? u->hp : u->mp, m = k == 2 ? u->max_hp : u->max_mp;
-        u8 j, width = 0;
+        u8 width;
         n = put_n(s, 0, v); s[n++] = '/'; n = put_n(s, n, m); s[n] = 0;
-        for (j = 0; j < n; j++) width += igfx[UI_ADV + (u8)s[j] - 32];
+        width = ui_width(s);
         panel_text(side, x, k == 2 ? 8 : 19, k == 2 ? "HP" : "MP", limit);
         panel_text(side, x + PANEL_GAUGE_W + 1 - width, k == 2 ? 8 : 19, s, x + PANEL_GAUGE_W + 1);
         panel_gauge(side, k == 2 ? 15 : 26, v, m, k == 2 ? C_BLACK : C_DGRAY);
     }
     rt_light = sl; rt_dark = sd;
+}
+
+static void draw_forecast(void)
+{
+    const u8 *l = (const u8 *)W->forecast[0], *d = (const u8 *)W->forecast[1], *m = (const u8 *)W->forecast[2];
+    u8 *p = (u8 *)rt_light + (PANEL_Y - 8) * RT_PBYTES + 6;
+    u8 *q = (u8 *)rt_dark + (PANEL_Y - 8) * RT_PBYTES + 6, r;
+    for (r = 0; r < 7; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
+        u32 a = ~RD32(m, 0), b = ~RD32(m, 2);
+        WR32(p, 0, (RD32(p, 0) & a) | RD32(l, 0)); WR32(q, 0, (RD32(q, 0) & a) | RD32(d, 0));
+        WR32(p, 2, (RD32(p, 2) & b) | RD32(l, 2)); WR32(q, 2, (RD32(q, 2) & b) | RD32(d, 2));
+    }
 }
 
 // The cached panel is aligned to ten bytes on either screen side, so its mask needs no shifts.
@@ -3512,6 +3540,7 @@ static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
 static void draw_hud(void)
 {
     u8 o, i, k[3], pk[2], forecast = 0, hidden = st.mode == M_WALK || st.mode == M_ACT || st.turn;
+    u16 forecast_key;
     const Tile *tile = &map_tiles[st.cz * MAP_W + st.cx];
     u8 h = tile->stand, water = tile->water, changed = 0;
     o = unit_at(st.cx, st.cz);
@@ -3529,6 +3558,7 @@ static void draw_hud(void)
         }
     }
     if (k[0] == M_AIM) { forecast = k[2] + 1; k[0] = 0; }
+    forecast_key = forecast ? (u16)((u16)(u8)(st.abil + 1) << 8 | forecast) : 0;
     if (W->left >= HUD_K || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) {
         W->hud_wait = 0;
         W->left -= HUD_K;
@@ -3543,7 +3573,7 @@ static void draw_hud(void)
             u16 keys[7]; u8 j, diff = 0;
             keys[0] = pk[i]; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->level;
             keys[4] = u->max_hp; keys[5] = u->max_mp;
-            keys[6] = !i && forecast ? (u16)((u16)(u8)(st.abil + 1) << 8 | forecast) : 0;
+            keys[6] = i ? 0 : forecast_key;
             for (j = 0; j < 7; j++) diff |= keys[j] != W->pan_k[i][j];
             if (diff) { for (j = 0; j < 7; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = 0; }
             if (W->pan_n[i] < 5) { make_panel(i, pk[i] - 1); break; }
@@ -3552,7 +3582,9 @@ static void draw_hud(void)
     draw_height();
     for (i = 0; i < 2; i++) if (pk[i] && W->pan_k[i][0] == pk[i] && W->pan_n[i] == 5)
         draw_panel(i);
-    if (forecast && W->pan_n[0] == 5 && W->pan_n[1] == 5
+    if (forecast && W->pan_n[0] == 5 && W->pan_k[0][0] == pk[0] && W->pan_k[0][6] == forecast_key)
+        draw_forecast();
+    if (forecast && W->pan_k[0][6] == forecast_key && W->pan_n[0] == 5 && W->pan_n[1] == 5
         && W->pan_k[0][0] == pk[0] && W->pan_k[1][0] == pk[1]) {
         static const u8 arrow[11] = { 0, 0x60, 0x30, 0x18, 0x0C, 0x06, 0x0C, 0x18, 0x30, 0x60, 0 };
         static const u8 mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 0x81, 0x03, 0x07, 0x0F };
@@ -3633,15 +3665,8 @@ static void draw_status(void)
 
 static void draw_active(const Feet *f)
 {
-    const u8 *p = igfx + UI_MARKER;
-#ifdef __m68k__
-    RtSprite sp = { 16, 14, p, p + 28, p + 56 };
-#else
-    u16 rows[3][14]; u8 k, r;
-    RtSprite sp = { 16, 14, rows[0], rows[1], rows[2] };
-    for (k = 0; k < 3; k++) for (r = 0; r < 14; r++) rows[k][r] = RD16(p + k * 28, r);
-#endif
-    draw_sprite(f->x - st.camx - 8, f->y - st.camy - UNIT_FOOT - 13, &sp);
+    RtSprite sp = { 16, ACTIVE_H, active_gfx[0], active_gfx[1], active_gfx[2] };
+    draw_sprite(f->x - st.camx - 8, f->y - st.camy - UNIT_FOOT - ACTIVE_H + 1, &sp);
 }
 
 // A number rising NUM_RISE pixels above a unit (k: 0 the target's, 1 the EXP, 2 the JP): AMS

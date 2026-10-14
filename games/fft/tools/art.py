@@ -7,7 +7,7 @@ The scenery is the game's own (tools/extract.py: the map's textured mesh drawn p
 and so are the units (tools/units.py -> units.h); this file holds the rest:
 - The units' shadow (drawn into their frames by tools/units.py).
 - The cursor and the reach marker (24x12 diamonds); the diamond above enemies (team at a glance);
-  enemy markers and ground shapes.
+  enemy markers and ground shapes; a native ring/crossbar/point active-unit pointer.
 - The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
   the views (extract.py, map.h).
 """
@@ -76,6 +76,39 @@ FOE = """
 ......00300.....
 .......000......
 """                                     # above an enemy's head: a black diamond, white border
+
+ACTIVE = """
+................
+......3333......
+.....330033.....
+....33000033....
+....33000033....
+.....330033.....
+......3333......
+..333333333333..
+..311111111113..
+..333333333333..
+...3333333333...
+...3300002233...
+....33002233....
+....33002233....
+.....300223.....
+.....330033.....
+......3003......
+.......33.......
+................
+"""                                     # ring, crossbar and blade; source rows before white outline
+
+def active_marker():
+    pix = [[None if c == '.' else int(c) for c in row] for row in ACTIVE.strip('\n').split('\n')]
+    assert all(len(row) == 16 for row in pix)
+    solid = [[p is not None for p in row] for row in pix]
+    for y, row in enumerate(pix):
+        for x, p in enumerate(row):
+            if p is None and any(solid[yy][xx] for yy in range(max(0, y - 1), min(len(pix), y + 2))
+                                for xx in range(max(0, x - 1), min(16, x + 2))):
+                row[x] = 0
+    return pix
 
 SHADOW = """
 ....222222222.
@@ -149,6 +182,11 @@ def main():
     L, D, M = plane_rows(foe, 16, len(foe))
     w('#define FOE_H %d\n' % len(foe))
     w('static const u16 foe_gfx[3][FOE_H] = { { %s }, { %s }, { %s } };\n' % tuple(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M])))
+    active = active_marker()
+    L, D, M = plane_rows(active, 16, len(active))
+    w('#define ACTIVE_H %d\n' % len(active))
+    w('static const u16 active_gfx[3][ACTIVE_H] = { { %s }, { %s }, { %s } };\n' %
+      tuple(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M])))
     keys, tops, rows, data = [], [], [], {n: [] for n in ('sl_l', 'sl_d', 'sl_m', 'sc_l', 'sc_d', 'sc_m')}
     for a, b, d in SLOPES:
         lift = [0] * 4
