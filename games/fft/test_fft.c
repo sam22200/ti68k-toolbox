@@ -202,7 +202,7 @@ static int shown(u8 i)
     mid = 0;
     for (y = 8; y < RT_H; y++)                            // exclude the height and bottom details
         for (x = 0; x < RT_W; x++)
-            if ((y < 64 && (y >= 17 || x < 128)) && with[y][x] != sw_level(x, y)) {
+            if ((y < 71 && (y >= 17 || x < 128)) && with[y][x] != sw_level(x, y)) {
                 n++; mid += with[y][x] == 1 || with[y][x] == 2;
             }
     st = save;
@@ -422,7 +422,7 @@ static int hud_shown(void)                    // the active unit's outlined HP b
 {
     int x, y, ink = 0;
     for (y = 1; y < 9; y++) for (x = 128; x < 155; x++) ink += sw_level(x, y) == 3;
-    return sw_level(21, 80) == C_WHITE && sw_level(22, 80) == C_BLACK && ink > 4;
+    return sw_level(21, 86) == C_WHITE && sw_level(22, 86) == C_BLACK && ink > 4;
 }
 
 static void test_fixes(void)

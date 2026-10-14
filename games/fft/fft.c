@@ -121,7 +121,7 @@ static u8 *vbuf, vbuf_rot;
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
-#define PANEL_ROWS 36                   // cutout portrait, level, name and two stacked gauges
+#define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
@@ -148,12 +148,12 @@ typedef struct {
     u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined panel text (0-6) / action numbers (7-13)
     char hud_s[2];                      // cached height + 1, water depth
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
-    u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_AIM: the attacker;
-                                        // M_ACTS: no ability known; M_ACT: the ability), unit;
+    u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_ACTS: no ability
+                                        // known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
     u16 pan[2][3][PANEL_ROWS * RT_PBYTES / 2]; // 80-wide planes and opacity mask; scene shows through
-    u16 pan_k[2][6];
+    u16 pan_k[2][7];                    // actor/stats, compact forecast target + ability
     u8 pan_n[2];                        // cutout portrait, name, HP, MP, level
     u8 arrow[4][2][8];
     u16 height[2][20 * RT_PBYTES / 2];   // terrain text, then its cached white outline mask
@@ -3289,15 +3289,41 @@ static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
 static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
 {
     void *sl = rt_light, *sd = rt_dark;
-    u16 n = max ? (u16)((54U * v + max - 1) / max) : 0;
-    if (n > 54) n = 54;
-    draw_rect(21, y - 1, 58, 6, C_WHITE);
-    draw_rect(22, y, 56, 4, C_BLACK);
-    draw_rect(23, y + 1, 54, 2, C_LGRAY);
-    if (n) draw_rect(23, y + 1, n, 2, color);
+    s16 x = side ? 5 : 22;
+    u16 n = max ? (u16)((34U * v + max - 1) / max) : 0;
+    if (n > 34) n = 34;
+    draw_rect(x - 1, y - 1, 36, 4, C_WHITE);
+    draw_rect(x, y, 34, 2, C_LGRAY);
+    if (n) draw_rect(x, y, n, 2, color);
     rt_light = rt_dark = W->pan[side][2];
-    draw_rect(21, y - 1, 58, 6, C_BLACK);
+    draw_rect(x - 1, y - 1, 36, 4, C_BLACK);
     rt_light = sl; rt_dark = sd;
+}
+
+static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };   // ST_*
+
+// One compact prediction line, like FFT's damage/chance beside the attacking portrait.
+// The preview uses the combat formulas directly; no separate target window is needed.
+static void panel_forecast(u8 side, u8 a, u8 t, u8 ab)
+{
+    const Ability *b = ab == NO_ABIL ? RT_NULL : &abilities[ab];
+    u8 hit = b ? skill_hit(a, t, ab) : hit_chance(a, t), n = 0, j;
+    char s[28];
+    if (b && b->kind == AB_CURE) {
+        if (hit) {
+            for (j = 0; !(st.unit[t].status & b->y & (1 << j)); j++) ;
+            s[n++] = '-'; n = put_s(s, n, st_names[j]);
+        } else n = put_s(s, n, "Miss");
+    } else {
+        s[n++] = !b || b->kind == AB_DAMAGE ? '-' : '+';
+        n = put_n(s, n, b ? skill_amount(a, t, ab, 0) : attack_damage(a, t, 0, 0));
+        if (b && (b->kind == AB_DAMAGE || b->kind == AB_REVIVE)) {
+            s[n++] = '-'; n = put_n(s, n, skill_amount(a, t, ab, 32767));
+        }
+        n = put_s(s, n, "HP");
+    }
+    s[n++] = ' '; n = put_n(s, n, hit); s[n++] = '%'; s[n] = 0;
+    panel_text(side, 22, 1, s, 74);
 }
 
 static void make_panel(u8 side, u8 i)
@@ -3305,26 +3331,39 @@ static void make_panel(u8 side, u8 i)
     void *sl = rt_light, *sd = rt_dark;
     const Unit *u = &st.unit[i];
     u8 k = W->pan_n[side]++, n;
+    s16 x = side ? 5 : 22, limit = side ? 59 : 74;
     char s[24];
     rt_light = W->pan[side][0]; rt_dark = W->pan[side][1];
     if (!k) {
         memset(W->pan[side], 0, sizeof W->pan[side]);
-        const u8 *p = igfx + UI_PORTRAITS + (u16)(u->gfx * 2) * 348 + 232;
+        u8 mirror = !side;
+        const u8 *p = igfx + UI_PORTRAITS + (u16)(u->gfx * 2 + mirror) * 348 + 232;
         u8 r;
-        portrait(u->gfx, 0, 0, 0);
-        for (r = 0; r < 29; r++) WR32((u8 *)W->pan[side][2] + r * RT_PBYTES, 0, ~RD32(p, r * 2));
-    } else if (k == 1) panel_text(side, 22, 1, unit_name(i), 78);
+        portrait(u->gfx, mirror, side ? 61 : 0, 0);
+        for (r = 0; r < 29; r++) {
+            u8 *m = (u8 *)W->pan[side][2] + r * RT_PBYTES;
+            u32 bits = ~RD32(p, r * 2);
+            if (side) {
+                WR16(m, 3, (u16)(bits >> 29));
+                WR16(m, 4, (u16)(bits >> 13));
+            } else WR32(m, 0, bits);
+        }
+    } else if (k == 1) {
+        u16 f = W->pan_k[side][6];
+        if (!side && f) panel_forecast(side, i, (u8)f - 1, (u8)((f >> 8) - 1));
+        else panel_text(side, x, 1, unit_name(i), limit);
+    }
     else if (k == 4) {
         n = put_s(s, 0, "Lv"); n = put_n(s, n, u->level); s[n] = 0;
-        panel_text(side, 1, 30, s, 20);
+        panel_text(side, side ? 62 : 1, 23, s, side ? 80 : 20);
     } else {
         u16 v = k == 2 ? u->hp : u->mp, m = k == 2 ? u->max_hp : u->max_mp;
         u8 j, width = 0;
         n = put_n(s, 0, v); s[n++] = '/'; n = put_n(s, n, m); s[n] = 0;
         for (j = 0; j < n; j++) width += igfx[UI_ADV + (u8)s[j] - 32];
-        panel_text(side, 22, k == 2 ? 9 : 23, k == 2 ? "HP" : "MP", 78);
-        panel_text(side, 78 - width, k == 2 ? 9 : 23, s, 78);
-        panel_gauge(side, k == 2 ? 16 : 30, v, m, k == 2 ? C_BLACK : C_DGRAY);
+        panel_text(side, x, k == 2 ? 8 : 19, k == 2 ? "HP" : "MP", limit);
+        panel_text(side, limit - width, k == 2 ? 8 : 19, s, limit);
+        panel_gauge(side, k == 2 ? 15 : 26, v, m, k == 2 ? C_BLACK : C_DGRAY);
     }
     rt_light = sl; rt_dark = sd;
 }
@@ -3345,10 +3384,8 @@ static void draw_panel(u8 side)
     }
 }
 
-// Bottom-right command menu and submenus, target preview above its details, turn order or Quit.
+// Bottom-right command menu and submenus, ability name, turn order or Quit.
 // Cached one part per frame: tab / box, then each line. Ball cursor added on the screen.
-static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };   // ST_*
-
 static u8 win_lines(u8 m)
 {
     u8 n = 0;
@@ -3356,7 +3393,6 @@ static u8 win_lines(u8 m)
     if (m == M_QUIT) return 3;
     if (m == M_ORDER) { while (n < ORDER_N && st.turns[n] != 0xFF) n++; return n; }
     if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend);
-    if (m == M_AIM) return 2;
     if (m == M_ACT || m == M_PICK) return 1;
     while (known(W->win_k[2], n) != 0xFF) n++;    // M_SKILLS
     return n;
@@ -3384,7 +3420,7 @@ static void make_window(void)
             draw_rect(0, 0, 64, 8, C_LGRAY); draw_rect(0, 7, 64, 1, C_DGRAY);
             rt_light = sl; rt_dark = sd;
         }
-        text_into(l, d, 3, 1, m == M_MENU ? "MENU" : m == M_ACTS ? "ACT" : m == M_SKILLS ? "SKILL" : m == M_AIM ? "TARGET" : m == M_ORDER ? "TURN ORDER" : "QUIT?", C_BLACK);
+        text_into(l, d, 3, 1, m == M_MENU ? "MENU" : m == M_ACTS ? "ACT" : m == M_SKILLS ? "SKILL" : m == M_ORDER ? "TURN ORDER" : "QUIT?", C_BLACK);
         return;
     }
     k--;
@@ -3414,25 +3450,6 @@ static void make_window(void)
     } else if (m == M_PICK) {                      // a crystal or a chest picked up
         if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");
         else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
-    } else if (m == M_AIM) {                       // the attacker is win_k[1]; Dash, Throw Stone
-        u8 a = W->win_k[1], t = W->win_k[2];       // and Phoenix Down: their range of amounts
-        const Ability *b = st.abil == NO_ABIL ? RT_NULL : &abilities[st.abil];
-        if (k == 0) {
-            n = put_s(s, 0, "Hit "); n = put_n(s, n, b ? skill_hit(a, t, st.abil) : hit_chance(a, t)); s[n++] = '%';
-        } else if (!b) {
-            n = put_s(s, 0, "Dmg "); n = put_n(s, n, attack_damage(a, t, 0, 0));
-        } else if (b->kind == AB_CURE) {
-            if (skill_hit(a, t, st.abil)) {
-                for (i = 0; !(u->status & b->y & (1 << i)); i++) ;
-                n = put_s(s, 0, "- "); n = put_s(s, n, st_names[i]);
-            }
-        } else {
-            n = put_s(s, 0, b->kind == AB_DAMAGE ? "Dmg " : "HP +");
-            n = put_n(s, n, skill_amount(a, t, st.abil, 0));
-            if (b->kind == AB_DAMAGE || b->kind == AB_REVIVE) {
-                s[n++] = '-'; n = put_n(s, n, skill_amount(a, t, st.abil, 32767));
-            }
-        }
     }
     s[n] = 0;
     text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS || (m == M_QUIT && k) ? 7 : 3, 10 + 6 * k, s, c);
@@ -3489,7 +3506,7 @@ static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
 
 static void draw_hud(void)
 {
-    u8 o, i, k[3], pk[2], hidden = st.mode == M_WALK || st.mode == M_ACT || st.turn;
+    u8 o, i, k[3], pk[2], forecast = 0, hidden = st.mode == M_WALK || st.mode == M_ACT || st.turn;
     const Tile *tile = &map_tiles[st.cz * MAP_W + st.cx];
     u8 h = tile->stand, water = tile->water, changed = 0;
     o = unit_at(st.cx, st.cz);
@@ -3506,6 +3523,7 @@ static void draw_hud(void)
             k[0] = M_ACT; k[1] = st.abil; k[2] = st.act;
         }
     }
+    if (k[0] == M_AIM) { forecast = k[2] + 1; k[0] = 0; }
     if (W->left >= HUD_K || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) {
         W->hud_wait = 0;
         W->left -= HUD_K;
@@ -3517,19 +3535,27 @@ static void draw_hud(void)
         } else if (k[0] && W->win_n < W->win_m) { make_window(); changed = 1; }
         if (!changed) for (i = 0; i < 2; i++) if (pk[i]) {
             const Unit *u = &st.unit[pk[i] - 1];
-            u16 keys[6]; u8 j, diff = 0;
+            u16 keys[7]; u8 j, diff = 0;
             keys[0] = pk[i]; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->level;
             keys[4] = u->max_hp; keys[5] = u->max_mp;
-            for (j = 0; j < 6; j++) diff |= keys[j] != W->pan_k[i][j];
-            if (diff) { for (j = 0; j < 6; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = 0; }
+            keys[6] = !i && forecast ? (u16)((u16)(u8)(st.abil + 1) << 8 | forecast) : 0;
+            for (j = 0; j < 7; j++) diff |= keys[j] != W->pan_k[i][j];
+            if (diff) { for (j = 0; j < 7; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = 0; }
             if (W->pan_n[i] < 5) { make_panel(i, pk[i] - 1); break; }
         }
     }
     draw_height();
     for (i = 0; i < 2; i++) if (pk[i] && W->pan_k[i][0] == pk[i] && W->pan_n[i] == 5)
         draw_panel(i);
+    if (forecast && W->pan_n[0] == 5 && W->pan_n[1] == 5
+        && W->pan_k[0][0] == pk[0] && W->pan_k[1][0] == pk[1]) {
+        static const u8 arrow[11] = { 0, 0x60, 0x30, 0x18, 0x0C, 0x06, 0x0C, 0x18, 0x30, 0x60, 0 };
+        static const u8 mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 0x81, 0x03, 0x07, 0x0F };
+        RtSprite sp = { 8, 11, arrow, arrow, mask };
+        draw_sprite(76, PANEL_Y + 9, &sp);
+    }
     if (!hidden && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
-        u8 y = k[0] == M_AIM || k[0] == M_ACT ? PANEL_Y - W->win_h : RT_H - W->win_h;
+        u8 y = k[0] == M_ACT ? PANEL_Y - W->win_h : RT_H - W->win_h;
         copy_box(W->win[0], W->win[1], 12, y, W->win_w, W->win_h);
         if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
