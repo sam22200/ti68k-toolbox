@@ -7,6 +7,7 @@ import sys
 import numpy as np
 from PIL import Image
 import art
+import banner
 import extract
 from units import CHARS
 
@@ -139,6 +140,11 @@ def main():
         out += struct.pack('>%dI' % len(data[n]), *data[n])
     section('TILES')                    # extract.py's Tile array (12 bytes a tile)
     out += Path('tiles.bin').read_bytes()
+    section('BNFONT')                   # the banners' font (banner.py: Lato Black's outlines)
+    font, _ = banner.font_bytes()
+    out += font
+    defines += ['#define BN_CHARS "%s"' % banner.CHARS, '#define BN_CAP %d' % banner.CAP,
+                '#define BN_Y0 %d' % banner.Y0, '#define BN_SPACE %d' % banner.SPACE]
     Path('interface.h').write_text('// Generated locally by tools/interface.py; never committed.\n' + '\n'.join(defines) + '\n')
     Path('ffti.bin').write_bytes(out)
     Path('x').mkdir(exist_ok=True)

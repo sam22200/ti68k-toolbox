@@ -384,6 +384,27 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     above KO enemies, "Item" as the item list's title, rounds / fallen / loot left in the
     results. Tests, 48 xcheck doors, 177 UI, 88 blow / replay and 168 water screens pass;
     program 60,937 bytes.
+    Then banners rendered on the calculator, the user's pick over pictures made on the PC: a
+    vector font (strokes as `fill_poly` quads, ~15k each; outline by dilation), a wipe that
+    waits for the strokes, drawn while the frame has room. The water's glints skip the frames
+    whose view is copied (the camera panning): ~10k back, the defeat replay's walk at 360,772
+    went to 348,924. Scenarios 59 / 60 show the outcome banners; tests, 50 xcheck doors, 177
+    UI, 88 blow / replay and 168 water screens pass; program 62,811 bytes.
+    The objective then lights up its enemies as FFT does: the camera frames them below the
+    banner (moved to the top) and they pulse with the blow's white flash; start banner frames
+    peak at 317,616; program 63,119 bytes.
+    The stroke font looked crude (the user's word): the glyphs became Lato Black's outlines
+    (Inkscape text to path, `tools/banner.py`, in `ffti`), filled even-odd with 2 x 2 samples
+    a pixel (antialiased in four greys); a row of samples costs ~5k (11.5k when a pixel row is
+    written), charged to the frame's budget: banner frames peak at 337,062; program 63,415
+    bytes. Tests, 50 xcheck doors, 177 UI, 88 blow / replay and 168 water screens pass.
+    Then FFT's darkening around the banners: the scenery a grey darker (white light, light
+    dark, dark black: two ORs a long) behind a diagonal edge from the top left (16 pixels a
+    frame), the words, then the shade leaving the same way ([2nd] starts it); the units stay
+    bright. Its first version, masks and shifts per word, cost 144k a frame; whole longs in a
+    tight loop, masks only at the edge, 45-80k. The second line had stolen the first's fill
+    (both lines filled the same glyph state): fixed, "BATTLE START" shows again. Banner frames
+    peak at 346,224; program 63,833 bytes; the same checks pass.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

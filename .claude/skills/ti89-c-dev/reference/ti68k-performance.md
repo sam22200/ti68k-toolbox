@@ -611,6 +611,15 @@ mapping), bulk copies not covered by ExtGraph.
 - **`-mno-bss` puts every static array in the program file**: 5.6 KB of work buffers (spans,
   half-resolution frame, sort keys) pushed the program over the TI-89's 24,576 bytes; one
   `malloc` of a struct holding them (macros keep the names) brought it back under.
+- **Small filled polygons are not cheap** (FFT banners, ti-cycles): `fill_poly` on 2-4 px wide
+  stroke quads costs ~15k each (edge setup, a span per row, word RMW); a 16-quad glyph ~236k. Draw
+  the outline by dilating the black (shift-or of the rows, ~4k a glyph) instead of a second set
+  of wider quads, and spread strokes over frames by the frame budget. Smoother and no dearer: a
+  real font's outlines (Inkscape text to path offline, byte points) filled even-odd on 2 x 2
+  samples a pixel, four greys of coverage: ~5k a row of samples with ~40 edges (11.5k when its
+  pixel row is written).
+- **ti-cycles does not emulate every ROM call**: AMS `strchr` (ROM 0x274) stops the run ("not
+  emulated"); a small C loop is cheaper anyway.
 - **Shrinking a big program, measured on the FFT demo** (ti-cc flags, 63,935-byte build):
   `--merge-constants` already merges identical `const` arrays (two equal 804-byte planes cost
   once: dropping the copy saved 16 bytes, so an object file's sections overstate the data);
