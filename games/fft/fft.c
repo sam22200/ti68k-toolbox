@@ -154,7 +154,7 @@ typedef struct {
     u16 pan_k[2][7];
     u8 pan_n[2];                        // box / portrait, name, HP, MP, Lv / CT
     u8 arrow[4][2][8];
-    u16 height[2][20 * RT_PBYTES / 2];
+    u16 height[2][20 * RT_PBYTES / 2];   // terrain text, then its cached white outline mask
     u16 status[2][RT_PSIZE / 2];        // full-screen Status, assembled a line per frame
     u8 status_i, status_page, status_n;
     s16 ring_y0, ring_y1;               // the scene rows the reach rings are on
@@ -3370,11 +3370,12 @@ static void make_window(void)
     text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS || (m == M_QUIT && k) ? 7 : 3, 10 + 6 * k, s, c);
 }
 
-// The height under the cursor: a large number and h, depth 1 on canal tiles.
+// Terrain readout over the scenery: black glyphs with a one-pixel white outline.
+// The second scratch plane becomes the mask once the text has been rendered.
 static void make_height(u8 h, u8 water)
 {
     void *sl = rt_light, *sd = rt_dark;
-    char s[12]; u8 n;
+    char s[12]; u8 n, r;
     rt_light = W->height[0]; rt_dark = W->height[1];
     memset(W->height, 0, sizeof W->height);
     n = put_n(s, 0, h >> 1);
@@ -3383,6 +3384,24 @@ static void make_height(u8 h, u8 water)
     draw_text(2, 1, s, F_MEDIUM, C_BLACK);
     if (water) ui_text(1, 11, "depth 1", C_BLACK, 32);
     rt_light = sl; rt_dark = sd;
+    for (r = 0; r < 17; r++) {
+        const u8 *p = (const u8 *)W->height[0] + r * RT_PBYTES;
+        u32 m = RD32(p, 0);
+        if (r) m |= RD32(p - RT_PBYTES, 0);
+        if (r < 16) m |= RD32(p + RT_PBYTES, 0);
+        WR32((u8 *)W->height[1] + r * RT_PBYTES, 0, m | m << 1 | m >> 1);
+    }
+}
+
+static void draw_height(void)
+{
+    const u8 *p = (const u8 *)W->height[0], *q = (const u8 *)W->height[1];
+    u8 *l = (u8 *)rt_light + 16, *d = (u8 *)rt_dark + 16, r;
+    for (r = 0; r < 17; r++, p += RT_PBYTES, q += RT_PBYTES, l += RT_PBYTES, d += RT_PBYTES) {
+        u32 ink = RD32(p, 0), keep = ~RD32(q, 0);
+        WR32(l, 0, (RD32(l, 0) & keep) | ink);
+        WR32(d, 0, (RD32(d, 0) & keep) | ink);
+    }
 }
 
 static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
@@ -3438,7 +3457,7 @@ static void draw_hud(void)
             if (W->pan_n[i] < 5) { make_panel(i, pk[i] - 1); break; }
         }
     }
-    copy_box(W->height[0], W->height[1], 16, 0, 2, 17);
+    draw_height();
     for (i = 0; i < 2; i++) if (pk[i] && W->pan_k[i][0] == pk[i] && W->pan_n[i] == 5)
         copy_box(W->pan[i][0], W->pan[i][1], i ? 10 : 0, 71, 5, 29);
     if (!hidden && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {

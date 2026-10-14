@@ -1300,7 +1300,12 @@ static void test_interface(void)
     sw_init(34); steps(0, 30);
     for (y = 11; y < 16; y++) for (x = 128; x < 160; x++) ink0 += sw_level(x, y) == C_BLACK;
     st.cx = 4; st.cz = 11; steps(0, 30);
-    for (y = 11; y < 16; y++) for (x = 128; x < 160; x++) ink1 += sw_level(x, y) == C_BLACK;
+    for (y = 11; y < 17; y++) for (x = 128; x < 160; x++) {
+        u16 o = (st.camy + y) * SC_BYTES + ((st.camx + x) >> 3);
+        u8 b = (u8)(0x80 >> ((st.camx + x) & 7));
+        u8 background = (scene_l[o] & b ? 1 : 0) | (scene_d[o] & b ? 2 : 0);
+        ink1 += sw_level(x, y) != background;   // old depth text clears back to the scenery
+    }
     CHECK(ink0 > 10 && ink1 == 0);
     sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
     sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());

@@ -82,7 +82,8 @@ up (a crystal: HP and MP full; a chest: `Got Clothes`, one of the dead unit's it
 only). The battle ends when every enemy is KO (`Victory!`) or when Ramza becomes a crystal or
 a chest or the whole party, Delita included, is KO (`Game Over`): the results list each of
 the player's units with its level, the EXP and JP it earned. The HUD shows the height under
-its cursor at the top right (`2h`, `7.5h` on a slope; `depth 1` on canal water); [APPS] shows
+its cursor at the top right (`2h`, `7.5h` on a slope; `depth 1` on canal water), as black
+text with a one-pixel white outline over the scenery; [APPS] shows
 FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
 The cursor is dashed behind the scenery. FFTA-style light grey bands sit at the bottom:
 active unit left, hovered or aimed-at unit mirrored right, each with a 19x29 original
@@ -408,6 +409,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| terrain HUD outline: UI doors, AI battle and defeat replay | 317,474; 356,030 / 357,328 at most | 32 fps (frame-limited) |
 | milestone 26: menus / Status doors, AI battle and defeat replay | 313,278 / 357,270 / 359,840 at most | 32 fps (frame-limited) |
 | milestone 27: water doors / UI doors, AI battle and defeat replay | 254,232 / 316,910; 355,466 / 356,764 at most | 32 fps (frame-limited) |
 | milestone 25: five key replays (including the defeat) and nine armed/unarmed blow doors | 359,070 at most; blow doors at most 307,218 | 32 fps (frame-limited) |
@@ -420,7 +422,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 60,451 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 60,551 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
 unpacked view 52,320 bytes plus scene/work allocation 52,560 bytes (~105 KB of game buffers;
