@@ -180,7 +180,9 @@ typedef struct {
                                        // (fewer than two, or all Critical): no more retreats
     u8 deny;                           // [2nd] on a tile that cannot be picked: the cursor blinks
     u8 rounds;                         // Ramza's turns so far (the results)
+    u8 banner, banner_t;               // BN_*: the battle's objective, its outcome; its frame
 } State;
+enum { BN_NONE, BN_START, BN_VICTORY, BN_DEFEAT };
 extern State st;
 u8 forecast_text(u8 a, u8 t, u8 ab, char *s);   // the prediction's line (fft.c)
 

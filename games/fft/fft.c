@@ -15,7 +15,8 @@
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
 #include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking,
                                          // 9 an AI unit's thinking (a frame's step), 10 the new reach rings,
-                                         // 11 a menu part, 12 a panel part, 13 the prediction
+                                         // 11 a menu part, 12 a panel part, 13 the prediction,
+                                         // 14 a banner's glyph
 #define ZB(n) BENCH_BEGIN(n)
 #define ZE(n) BENCH_END(n)
 #else
@@ -183,6 +184,10 @@ typedef struct {
     u32 num[3][2][7];                   // an attack's number (or Miss), the EXP and the JP its user
     u8 num_w[3], num_ok;                // earned: black, its white outline; their widths; drawn (bits)
     u8 end_n;                           // M_END: the results' next line to draw
+    u8 bn_n, bn_end, bn_t0[2], bn_ne;   // the banner: glyphs drawn; its frames; its lines' first
+    s16 bn_j, bn_gx, bn_x[2];           // frames; the glyph's edges, next row of samples, x; the
+    s16 bn_e[40][4];                    // lines' left x; the edges (quarter pixels: x0 y0 x1 y1)
+    u8 bn_cov[32];                      // a pixel row's samples covered (0..4) a column
     u8 dcg[4][2][7];                    // the death counter's digits: black, mask (8 wide)
     // the movement spread (spread_start, spread_go): its tiles to go on from by cost & 3, where it
     // stands; the mover's enemies' tiles; each tile's x, z, standing height, height out of it
@@ -243,6 +248,9 @@ static u8 bg_usable(void);
                                         // from the budget, the other optional work waits
 #define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
 #define HUD_K 60                        // a part of the HUD made
+#define DK_K 80                         // a banner's shade (ti-cycles: up to 80k, its edge rows)
+#define DK_SPEED 16                     // the shade's diagonal edge (x + y), pixels a frame
+#define DK_N ((RT_W + RT_H) / DK_SPEED + 1)   // its frames, coming then leaving
 #define SAVE_K 13                       // a quarter of the screen's copy kept (halves, 26k,
                                         // went over the budget once forced)
 #define SAVE_WAIT 2                     // frames the copy waits at most once the camera stops,
@@ -509,6 +517,7 @@ void turn_order(void)
 }
 
 static void end_battle(u8 e);
+static void bn_start(u8 kind);
 static void ai_next(void);
 
 // the next turn: the cursor and the camera go to its unit (its Defending ends); enemies and the
@@ -1378,8 +1387,7 @@ void pick_up(u8 who, u8 obj)
 static void end_battle(u8 e)
 {
     st.end = e; st.mode = M_END; st.ai = AI_OFF;
-    scene_rot = 0xFF;                               // the scene buffer holds the results
-    if (W) W->end_n = 0;
+    bn_start(e == END_VICTORY ? BN_VICTORY : BN_DEFEAT);   // then the results
 }
 
 // M_ACT, once per frame: the outcome lands at ACT_HIT (HP lost or healed, statuses removed, the
@@ -2095,6 +2103,16 @@ static u8 hit_flash(u8 i)
     return t < 2 || t >= 10 ? 1 : 2;
 }
 
+// a unit's flash: a blow's, or the enemies pulsing as a hit while the objective shows (FFT
+// lights up the units it names)
+static u8 unit_flash(u8 i)
+{
+    u8 t = (u8)(st.banner_t & 15);
+    if (st.banner == BN_START && st.unit[i].team == TEAM_ENEMY && st.unit[i].hp)
+        return t < 2 || (t >= 10 && t < 12) ? 1 : t < 10 ? 2 : 0;
+    return st.mode == M_ACT && i == st.tgt ? hit_flash(i) : 0;
+}
+
 // View facing: 0 front, 1 back, 2 mirrored front, 3 mirrored back.
 static u8 unit_direction(u8 rot, u8 i)
 {
@@ -2162,7 +2180,7 @@ static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     RtSprite s;
     u16 mk[WATER_ROWS], ml[WATER_ROWS], md[WATER_ROWS], l, d = 0, m;
     const u8 *g = unit_frame(rot, i);
-    u8 r, flash = st.mode == M_ACT && i == st.tgt ? hit_flash(i) : 0;
+    u8 r, flash = unit_flash(i);
     for (r = 0; r < WATER_ROWS; r++) {
         u16 in = RD16(g, 3 * UNIT_SH + r), k = c ? c->cm[r] & in : 0;
         mk[r] = RD16(g, 2 * UNIT_SH + r) | k;
@@ -2200,7 +2218,7 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     }
     RtSprite s;
     u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
-    u8 r, h0 = UNIT_SH, h1 = 0, flash = st.mode == M_ACT && i == st.tgt ? hit_flash(i) : 0;
+    u8 r, h0 = UNIT_SH, h1 = 0, flash = unit_flash(i);
     const u8 *g = unit_frame(rot, i);
     s.w = 16;
     if (c) {
@@ -2470,6 +2488,11 @@ static void cam_target(s16 *tx, s16 *ty)
         Feet f = unit_feet(st.rot, st.mode == M_FACE ? st.act : st.sel);
         if (cam_sees(f.x, f.y)) { *tx = st.camx; *ty = st.camy; return; }
         x = f.x; y = f.y;
+    } else if (st.banner == BN_START) {           // the objective: the enemies it lights up
+        s16 sx = 0, sy = 0, n = 0, i;
+        for (i = 0; i < NUNIT; i++)
+            if (st.unit[i].team == TEAM_ENEMY && st.unit[i].hp) { Feet f = unit_feet(st.rot, (u8)i); sx += f.x; sy += f.y; n++; }
+        if (n) { *tx = sx / n - RT_W / 2; *ty = sy / n - 68; cam_clamp(tx, ty); return; }
     } else if (st.mode == M_AIM || st.mode == M_ACT) {
         Feet a = unit_feet(st.rot, st.mode == M_ACT ? st.atk : st.act);
         if (st.mode == M_ACT) { Feet t = unit_feet(st.rot, st.tgt); x = t.x; y = t.y; }
@@ -2719,7 +2742,9 @@ void game_scenario(u16 n)
             if (n == 58) { st.unit[st.sel].defend = 1; for (i = 0; i < SET_N && known(st.sel, i) != NO_ABIL; i++) ; st.status_row = i; }
         }
     }
+    if (n == 59 || n == 60) end_battle(n == 59 ? END_VICTORY : END_DEFEAT);   // their banners
     W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->pan_ok[0] = W->pan_ok[1] = 0; W->fc_key = 0; W->win_k[0] = 0;
+    if (!n) bn_start(BN_START);                  // a battle: its objective first
     cam_target(&st.camx, &st.camy);
     hl_seq++;
 }
@@ -3044,8 +3069,19 @@ static u8 update(u8 fast)
     s16 tx, ty;
     u8 mode0 = st.mode;
     if (!W || !ugfx || !wgfx || !igfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
-    if (st.ai != AI_THINK) st.tick++;            // (a unit thinking: the picture stands still)
+    if (st.ai != AI_THINK || st.banner) st.tick++;   // (a unit thinking: the picture stands still)
     if (st.deny) st.deny--;
+    if (st.banner) {                               // a banner: the units move, the battle waits
+        if (input_pressed(K_A | K_ENTER))          // skipped: the shade leaves, or it ends
+            st.banner_t = st.banner_t < W->bn_end - DK_N ? (u8)(W->bn_end - DK_N - 1) : W->bn_end;
+        if (++st.banner_t >= W->bn_end) {
+            st.banner = 0; W->status_i = 0;
+            if (st.mode == M_END) { scene_rot = 0xFF; W->end_n = 0; }   // the scene buffer: the results
+        }
+        cam_target(&tx, &ty);
+        st.camx = ease(st.camx, tx); st.camy = ease(st.camy, ty);
+        return 1;
+    }
     if (!fast && input_pressed(K_MODE)) { st.over ^= 1; hl_seq++; }  // the reach over the scenery, or not
     if (st.turn) {                                 // rotating: nothing else moves the view
         if (++st.turn_t >= TURN_FRAMES) {          // done: the cursor stays where it was
@@ -3993,6 +4029,213 @@ static void draw_arrows(void)
     }
 }
 
+// The banners: a small SVG-style engine. A glyph is Lato Black's outline (tools/banner.py:
+// contours of byte points, the cap height BN_CAP units, in ffti), filled even-odd on 2 x 2
+// samples a pixel: the coverage gives four greys (smooth edges); the mask is the coverage grown
+// a pixel (a white outline). Sample rows are filled while the frame has room, into the banner's
+// planes (the full-screen Status's memory, unused meanwhile), shown through a left-to-right
+// wipe that waits for them; the units go on moving, the battle waits
+#define BN_ROWS 32                      // the banner's planes: light, dark, mask (RT_PBYTES a row)
+#define BN_Y (st.banner == BN_START ? 2 : 34)   // its top on the screen (the objective: above
+                                                // the enemies it lights up)
+#define BN_SPEED 6                      // the wipe, pixels a frame
+#define BN_HOLD 40                      // frames a banner stays whole
+#define BN_K 30                         // the masked lines and a glyph's mask, thousands
+#define BN_ROW_K 12                     // a row of samples ending a pixel row (its greys written;
+                                        // ti-cycles: up to 11.5k), half that for the other one
+#define BN_EDGES 40                     // a glyph's edges at most ('S': 39)
+static const char *const bn_text[3][2] = { { "BATTLE START", "DEFEAT ALL ENEMIES!" },
+                                           { "VICTORY!", RT_NULL }, { "DEFEAT", RT_NULL } };
+static const u8 bn_cap[3][2] = { { 12, 9 }, { 18, 0 }, { 18, 0 } };   // cap heights, pixels
+static const u8 bn_top[3][2] = { { 1, 17 }, { 4, 0 }, { 4, 0 } };     // rows in the planes
+
+static const u8 *bn_glyph(char c)      // a glyph: advance, contours, then (points, x y...) each
+{
+    u8 k;
+    for (k = 0; BN_CHARS[k] && BN_CHARS[k] != c; k++) ;
+    return BN_CHARS[k] ? igfx + UI_BNFONT + RD16(igfx + UI_BNFONT, k) : RT_NULL;   // (a space)
+}
+static s16 bn_adv(char c, u8 cap)      // pixels (BN_CAP 64 units: >> 6)
+{
+    const u8 *g = bn_glyph(c);
+    return (s16)(((g ? g[0] : BN_SPACE) * cap >> 6) + 1);
+}
+static s16 bn_rows(u8 cap) { return (s16)(((BN_CAP + 2 * BN_Y0) * cap >> 6) + 1); }
+
+// a banner from now: its lines laid out (centred), each wiped after the one before
+static void __attribute__((noinline)) bn_start(u8 kind)
+{
+    u8 l, t = DK_N;                     // the shade first
+    st.banner = kind; st.banner_t = 0;
+    if (!W) return;
+    W->bn_n = 0; W->bn_j = 0;
+    for (l = 0; l < 2; l++) {
+        const char *s = bn_text[kind - 1][l];
+        s16 w = 0;
+        for (; s && *s; s++) w += bn_adv(*s, bn_cap[kind - 1][l]);
+        W->bn_x[l] = (s16)((RT_W - w) >> 1); W->bn_t0[l] = t;
+        if (w) t = (u8)(t + w / BN_SPEED + 1);
+    }
+    W->bn_end = (u8)(t + BN_HOLD + DK_N);
+}
+
+// the scenery shaded a grey darker (white light, light dark, dark black) behind a diagonal edge
+// x + y = c coming from the top left: before it (in), or past it (out: it leaves the same way)
+static void bn_shade1(u8 *l, u8 *d, u32 k)    // a long of both planes (k: its pixels)
+{
+    u32 L = RD32(l, 0), D = RD32(d, 0);
+    WR32(l, 0, (L & ~k) | ((~L | D) & k));
+    WR32(d, 0, D | (L & k));
+}
+static void bn_shade(void)
+{
+    u8 *l = rt_light, *d = rt_dark, out = st.banner_t >= W->bn_end - DK_N;
+    s16 c = (s16)(out ? st.banner_t - (W->bn_end - DK_N) : st.banner_t + 1) * DK_SPEED, y;
+    for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
+        s16 e = c - y, a, b;
+        u8 *pl, *pd, *pe;
+        if (e < 0) e = 0;
+        if (e > RT_W) e = RT_W;
+        a = out ? e : 0; b = out ? RT_W : e;
+        if (a >= b) continue;
+        pl = l + (a >> 5) * 4; pd = d + (a >> 5) * 4; pe = l + (b >> 5) * 4;
+        if (a & 31) {                          // the edge's long, then the whole ones
+            u32 k = 0xFFFFFFFFUL >> (a & 31);
+            if (pl == pe) k &= ~(0xFFFFFFFFUL >> (b & 31));
+            bn_shade1(pl, pd, k);
+            if (pl == pe) continue;
+            pl += 4; pd += 4;
+        }
+        for (; pl < pe; pl += 4, pd += 4) {
+#ifdef __m68k__
+            u32 L = *(u32 *)pl, D = *(u32 *)pd;
+            *(u32 *)pl = ~L | D; *(u32 *)pd = D | L;
+#else
+            bn_shade1(pl, pd, 0xFFFFFFFFUL);
+#endif
+        }
+        if (b & 31) bn_shade1(pl, pd, ~(0xFFFFFFFFUL >> (b & 31)));
+    }
+}
+
+// the mask of a glyph's box: its greys grown a pixel (the white outline), or'ed in
+static void bn_dilate(u8 *pl, s16 x0, s16 x1, s16 r0, s16 r1)
+{
+    u8 *m = pl + 2 * BN_ROWS * RT_PBYTES;
+    s16 r, w, dr;
+    if (x0 < 0) x0 = 0;
+    if (r0 < 1) r0 = 1;
+    if (r1 > BN_ROWS - 1) r1 = BN_ROWS - 1;
+    for (r = r0; r < r1; r++)
+        for (w = x0 >> 4; w <= x1 >> 4 && w < RT_W / 16; w++) {
+            u16 v = 0;
+            for (dr = -1; dr <= 1; dr++) {
+                const u8 *l = pl + (r + dr) * RT_PBYTES, *d = l + BN_ROWS * RT_PBYTES;
+                u16 c = (u16)(RD16(l, w) | RD16(d, w));
+                v |= (u16)(c | c >> 1 | c << 1);
+                if (w) v |= (u16)((RD16(l, w - 1) | RD16(d, w - 1)) << 15);
+                if (w < RT_W / 16 - 1) v |= (u16)((RD16(l, w + 1) | RD16(d, w + 1)) >> 15);
+            }
+            WR16(m + r * RT_PBYTES, w, (u16)(RD16(m + r * RT_PBYTES, w) | v));
+        }
+}
+
+// a glyph at pixel x x0, rows from ty: its edges scaled once (quarter pixels), then its rows of
+// samples from W->bn_j while the frame has room (one at least), then its mask; done?
+static u8 bn_fill(u8 *pl, const u8 *g, s16 x0, s16 ty, u8 cap)
+{
+    s16 h = bn_rows(cap), j, i;
+    s16 (*e)[4] = W->bn_e;
+    u8 *cov = W->bn_cov;
+    if (!W->bn_j) {
+        const u8 *p = g + 2;
+        u8 c, k, n = 0, yo = (u8)(-(BN_Y0 * cap >> 4) & 3);   // the cap line on a pixel's edge
+        for (c = g[1]; c; c--, p += 2 * p[0] + 1) {
+            const u8 *q = p + 1;
+            for (k = 0; k < p[0] && n < BN_EDGES; k++) {
+                const u8 *a = q + 2 * k, *b = q + 2 * (k + 1 < p[0] ? k + 1 : 0);
+                e[n][1] = (s16)((a[1] * cap >> 4) + yo); e[n][3] = (s16)((b[1] * cap >> 4) + yo);
+                if (e[n][1] == e[n][3]) continue;
+                e[n][0] = (s16)(a[0] * cap >> 4); e[n][2] = (s16)(b[0] * cap >> 4);
+                n++;
+            }
+        }
+        W->bn_ne = n;
+        memset(cov, 0, sizeof W->bn_cov);
+    }
+    for (j = W->bn_j; j < 2 * h; j++) {
+        s16 xs[8], m = 0, yc = 2 * j + 1;
+        if (j > W->bn_j && W->left < BN_ROW_K) break;
+        W->left -= j & 1 ? BN_ROW_K : BN_ROW_K / 2;
+        for (i = 0; i < W->bn_ne; i++) {       // the crossings, sorted
+            s16 y0 = e[i][1], y1 = e[i][3], x, k;
+            if ((y0 <= yc) == (y1 <= yc) || m >= 8) continue;
+            x = (s16)(e[i][0] + divs32_16(muls16((s16)(yc - y0), (s16)(e[i][2] - e[i][0])), (s16)(y1 - y0)));
+            for (k = m++; k > 0 && xs[k - 1] > x; k--) xs[k] = xs[k - 1];
+            xs[k] = x;
+        }
+        for (i = 0; i + 1 < m; i += 2) {       // even-odd: the samples inside
+            s16 k = xs[i] >> 1, kb = xs[i + 1] >> 1;
+            if (k < 0) k = 0;
+            if (kb > 2 * (s16)sizeof W->bn_cov) kb = 2 * (s16)sizeof W->bn_cov;
+            for (; k < kb; k++) cov[k >> 1]++;
+        }
+        if (j & 1) {                           // a pixel row done: its greys into the planes
+            s16 y = ty + (j >> 1), p;
+            u8 *l = pl + y * RT_PBYTES, *d = l + BN_ROWS * RT_PBYTES;
+            for (p = 0; p < (s16)sizeof W->bn_cov && y < BN_ROWS; p++) {
+                u8 v = cov[p], bit;
+                s16 x = x0 + p;
+                if (!v || x < 0 || x >= RT_W) continue;
+                bit = (u8)(0x80 >> (x & 7));
+                if (v != 2 && v != 3) l[x >> 3] |= bit;   // 1 light, 2-3 dark, 4 black
+                if (v >= 2) d[x >> 3] |= bit;
+            }
+            memset(cov, 0, sizeof W->bn_cov);
+        }
+    }
+    W->bn_j = j;
+    if (j < 2 * h) return 0;
+    bn_dilate(pl, x0 - 1, x0 + (s16)sizeof W->bn_cov, ty - 1, ty + h + 1);
+    W->bn_j = 0;
+    return 1;
+}
+
+// the banner: its next glyph's rows filled, then each line shown up to its wipe (masked)
+static void bn_draw(void)
+{
+    u8 *pl = (u8 *)W->status[0], k = st.banner - 1, line, done = W->bn_n, sum = 0;
+    if (!done && !W->bn_j) memset(pl, 0, 3 * BN_ROWS * RT_PBYTES);
+    for (line = 0; line < 2; line++) {
+        const char *s = bn_text[k][line];
+        u8 cap = bn_cap[k][line], len = s ? (u8)strlen(s) : 0, n = done > sum ? (u8)(done - sum) : 0;
+        s16 ty = bn_top[k][line], h = bn_rows(cap), c, r;
+        if (n > len) n = len;
+        if (done >= sum && n < len && W->bn_n == done) {   // the glyph being drawn (this line's)
+            const u8 *g = bn_glyph(s[n]);
+            if (!n && !W->bn_j) W->bn_gx = W->bn_x[line];
+            if (!g || bn_fill(pl, g, W->bn_gx, ty, cap)) { W->bn_gx += bn_adv(s[n], cap); W->bn_n++; n++; }
+        }
+        sum = (u8)(sum + len);
+        c = (s16)(st.banner_t - W->bn_t0[line]) * BN_SPEED;   // the wipe, up to the glyphs drawn
+        if (!n || c <= 0 || st.banner_t >= W->bn_end - DK_N) continue;   // (gone with the shade)
+        c += W->bn_x[line];
+        if (n < len && c > W->bn_gx) c = W->bn_gx;
+        if (c > RT_W) c = RT_W;
+        for (r = ty - 1; r < ty + h + 1 && r < BN_ROWS; r++) {
+            const u8 *l = pl + r * RT_PBYTES, *d = l + BN_ROWS * RT_PBYTES, *m = d + BN_ROWS * RT_PBYTES;
+            u8 *sl = (u8 *)rt_light + (BN_Y + r) * RT_PBYTES, *sd = (u8 *)rt_dark + (BN_Y + r) * RT_PBYTES;
+            s16 w;
+            for (w = 0; w * 16 < c; w++) {
+                u16 km = RD16(m, w);
+                if (c < w * 16 + 16) km &= (u16)(0xFFFFU << (w * 16 + 16 - c));
+                if (!km) continue;
+                RMW16(sl + 2 * w, km, RD16(l, w) & km); RMW16(sd + 2 * w, km, RD16(d, w) & km);
+            }
+        }
+    }
+}
+
 // the results (M_END): the outcome, then each of the player's units with its level (before >
 // after), the EXP and JP it earned, and the keys; drawn into the scene buffer one line a frame
 // (AMS text), copied to the screen
@@ -4046,7 +4289,7 @@ void game_render(void)
     s16 n;
     Feet f[NUNIT];
     s16 u, v;
-    if (W && (W->hold || ((st.ai == AI_THINK || st.ai == AI_GO) && W->frz))) {   // the same picture in
+    if (W && (W->hold || (!st.banner && (st.ai == AI_THINK || st.ai == AI_GO) && W->frz))) {   // the same picture in
         W->hold = 0;                                                           // both buffers: the
         FRAME_END(); return;                                                                // AI thinks
     }
@@ -4055,7 +4298,7 @@ void game_render(void)
         draw_text(4, 40, W ? "missing fftu/w/i/fftv0-3" : "not enough memory", F_SMALL, C_BLACK);
         FRAME_END(); return;
     }
-    if (st.mode == M_END) { draw_end(); FRAME_END(); return; }
+    if (st.mode == M_END && !st.banner) { draw_end(); FRAME_END(); return; }
     if (st.mode == M_STATUS) { draw_status(); FRAME_END(); return; }
     if (st.turn) {                                 // the view it turns to, unpacked meanwhile
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
@@ -4086,8 +4329,8 @@ void game_render(void)
         if (vis[i]) {
             const Cover *c = &W->cover[i];
             n += UNIT_K;
+            if (unit_flash(i)) n += 7;
             if (st.mode == M_ACT) {
-                if (i == st.tgt && hit_flash(i)) n += 7;
                 if (i == st.atk && armed_pose(i) >= 2) n += 45;
             }
             if (c->x != f[i].x || c->y != f[i].y || c->depth != f[i].depth || c->rot != st.rot) n += COVER_K;
@@ -4096,6 +4339,7 @@ void game_render(void)
     if (AIMING(st.mode) && st.tick & 8 && (tg = unit_at(st.cx, st.cz)) && vis[tg - 1]) n += UNIT_K;
     else tg = 0;
     if (st.ai == AI_THINK) n += SUM_K;
+    if (st.banner) n += BN_K + DK_K - HUD_K;   // the banner and its shade instead of the HUD
     n += W->upd_k;
     cached = bg_usable();
     W->left = (s16)(FRAME_K - BASE_K - n - (cached ? BG_K : VIEW_K));
@@ -4103,7 +4347,10 @@ void game_render(void)
     ensure_scene(st.rot);
     ZE(6);
     if (cached && !bg_usable()) W->left -= VIEW_K - BG_K;
-    ZB(3); screen_scene(); draw_glints(); ZE(3);
+    ZB(3); screen_scene();
+    if (W->bg_drawn) draw_glints();            // (not while the camera pans: the view copied, ~105k)
+    if (st.banner) bn_shade();                 // (the scenery only: the units stay bright)
+    ZE(3);
     ZB(4);
     for (i = 0; i < NUNIT; i++) {
         u8 k = ord[i];
@@ -4132,7 +4379,7 @@ void game_render(void)
     // During AI thinking the active-unit pointer identifies the actor. The
     // tile cursor returns when the plan is shown; a new turn already spends
     // its frame on the clock, camera and unit covers.
-    else if (st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)) && !(st.deny & 4)) {
+    else if (!st.banner && st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)) && !(st.deny & 4)) {
         Marker mk;
         u8 c = (u8)(st.cz * MAP_W + st.cx), ring = RINGS(st.mode);
         marker(st.rot, c, !ring, &mk);
@@ -4144,10 +4391,10 @@ void game_render(void)
         }
         blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, cursor_mask(&mk, (u16)(c | ring << 12)));
     }
-    if (vis[st.act] && st.mode != M_WALK && st.mode != M_ACT) draw_active(&f[st.act]);
-    draw_hud();
+    if (vis[st.act] && st.mode != M_WALK && st.mode != M_ACT && !st.banner) draw_active(&f[st.act]);
+    if (st.banner) bn_draw(); else draw_hud();
     ZE(5);
-    if (st.ai == AI_THINK) {                    // two pictures in a row the same: stop drawing
+    if (st.ai == AI_THINK && !st.banner) {      // two pictures in a row the same: stop drawing
         s16 tx, ty;
         cam_target(&tx, &ty);
         if (tx != st.camx || ty != st.camy) W->frz_h = 0;   // still panning: not checked

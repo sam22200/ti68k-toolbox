@@ -918,6 +918,8 @@ static void test_end(void)
     for (i = 0; i < 100 && st.mode == M_ACT; i++) sw_step(0);
     CHECKV(st.mode, M_END); CHECKV(st.end, END_VICTORY);
     CHECKV(st.unit[U_RAMZA].gexp, 20); CHECKV(st.unit[U_RAMZA].gjp, 10);
+    CHECKV(st.banner, BN_VICTORY);                        // "VICTORY!", then the results
+    while (st.banner) sw_step(0);
     press(K_A);
     CHECK(st.mode != M_END && !st.end && st.unit[1].hp == st.unit[1].max_hp);
     // lost by keys (fft(15): Ramza's Wish knocks him out, the recruits KO): the enemies knock
@@ -1239,6 +1241,8 @@ static void test_turns(void)
 {
     u8 i;
     sw_init(0);
+    CHECKV(st.banner, BN_START);                          // the objective first, the battle waits
+    while (st.banner) sw_step(0);
     CHECKV(st.act, 0);                                    // all at CT 102: Delita, index 0
     CHECKV(st.ai, AI_THINK);                              // the guest's AI
     for (i = 0; i < ORDER_N; i++) CHECKV(st.turns[i], i);
