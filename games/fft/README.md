@@ -86,11 +86,14 @@ its cursor at the top right (`2h`, `7.5h` on a slope; `depth 1` on canal water),
 text with a one-pixel white outline over the scenery; [APPS] shows
 FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
 The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
-active unit left, hovered or aimed-at unit right, each with a cutout 19x29 original portrait
-on its left, a small level below it, name, and HP above MP. Each gauge is 56 pixels wide;
-its label and right-aligned current/maximum values sit above it in the small font. Portraits,
+active unit left, hovered or aimed-at unit right, with the cutout 19x29 original portraits
+at the outer edges, facing inward. The small level overlays the portrait's lower corner;
+all details fit within its 29-pixel height. Name and HP above MP sit beside it. Each gauge
+is 34x2 pixels, with its label and right-aligned current/maximum values above it in the small font. Portraits,
 text and gauges have white outlines; the scenery remains visible between them. CT stays in
-Status and the turn-order logic. The MENU tab and ball cursor
+Status and the turn-order logic. A valid attack/skill target replaces the actor's name with
+one compact prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status), with a white
+outlined chevron between the two panels. The separate TARGET window is gone. The MENU tab and ball cursor
 sit bottom right; Act and skill lists replace the menu in place. Details and menus disappear
 during walking and action animations. An original FFT pointer marks the active unit above its
 head; enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
@@ -389,13 +392,13 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
   Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
   an independent 16-bit generator avoids changing combat/stat RNG draws.
-- **HUD caches.** Each 80x36 transparent character panel is built in five parts (portrait,
-  name, HP, MP, level), the menu in a tab then a line per frame, and Status in nine parts while
+- **HUD caches.** Each 80x29 transparent character panel is built in five parts (portrait,
+  name/forecast, HP, MP, overlaid level), the menu in a tab then a line per frame, and Status in nine parts while
   simulation pauses. The panel's two planes and opacity mask are applied with two aligned
   long operations and one word per row; portraits preserve their original palette-zero
   transparency. Text outlines are made once in the spare action-number scratch rows.
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
-  Only changed HP/MP, maxima, level or unit rebuild a panel; cached fields are reset at a new battle or on
+  Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
   entering Status. Marker and ball cursor use ExtGraph sprites. The frame budget reserves
   65k for base work and 60k for one optional UI part. A newly completed background cache
   cannot force HUD/cursor work in the expensive frame that created it; it saves work from
@@ -414,6 +417,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| compact attack HUD: UI doors, AI battle and defeat replay | 317,566; 356,116 / 357,410 at most | 32 fps (frame-limited) |
 | transparent character HUD: UI doors, AI battle and defeat replay | 317,458; 356,014 / 357,308 at most | 32 fps (frame-limited) |
 | terrain HUD outline: UI doors, AI battle and defeat replay | 317,474; 356,030 / 357,328 at most | 32 fps (frame-limited) |
 | milestone 26: menus / Status doors, AI battle and defeat replay | 313,278 / 357,270 / 359,840 at most | 32 fps (frame-limited) |
@@ -428,11 +432,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 62,075 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 62,109 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 55,556 bytes (~108 KB of game buffers;
-full-screen Status and transparent character caches add ~16 KB to milestone 25). Both blocks remain
+unpacked view 52,320 bytes plus scene/work allocation 54,300 bytes (~107 KB of game buffers;
+full-screen Status and transparent character caches add ~15 KB to milestone 25). Both blocks remain
 below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a

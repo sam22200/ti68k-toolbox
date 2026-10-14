@@ -326,6 +326,10 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     outline over the scenery. Current review: `x/character_hud.png`, all six portraits and
     empty/999-value bars in `x/character_hud_details.png`. Tests, 52 scenario comparisons,
     116 UI and 87 blow/replay screens pass; peak 357,308 cycles, program 62,075 bytes.
+    Further compact revision: level overlaid on the portrait, gauges 34x2, complete details
+    within the 29-pixel portrait height. Outer portraits face inward; a central chevron and
+    inline damage/heal/chance prediction replace the TARGET popup. Review:
+    `x/compact_attack_hud.png` and `x/compact_hud_details.png`.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

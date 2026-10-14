@@ -834,6 +834,27 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   `x/character_hud_details.png`; active/target scenes are in `x/character_hud.png`.
   No hardware path changes or emulator run.
 
+### Compact attack HUD revision (2026-10-14)
+
+- TARGET (second user reference): level over the portrait, shorter/thinner gauges, two
+  opposing character panels during an attack, with the portrait defining the HUD's height.
+- IMPLEMENTATION: complete 80x29 panels, level over the lower portrait corner, gauges
+  34x2 with a one-pixel white border. Left portrait mirrors inward, right portrait sits
+  at the outer right edge and looks inward. Name/forecast, HP and MP fit in the portrait's
+  height, with no panel background. Palette-zero portrait cutouts and archived data stay
+  unchanged. The valid target's cached inline damage/heal/status and chance replace the
+  actor's name, with an outlined central chevron; the old TARGET window is removed.
+  The forecast calls the existing combat formulas, including skill amount ranges, and
+  caches its target/ability together with the actor's stats. Target name remains visible.
+- CHECKED: native tests, 52 PC/TI scenario screens, 116 UI partial/input screens and 87
+  blow/replay screens pass. Every ordinary measured frame stays <=360k: UI doors 317,566,
+  14,000-frame AI replay 356,116, defeat replay 357,410. Native HUD/text loops have no
+  software multiply/divide or floating-point helpers. Program 62,109 bytes; allocations
+  52,320 and 54,300 bytes, saving 1,256 RAM bytes from the preceding panel layout.
+  Actual framebuffer review: `x/compact_attack_hud.png` (menu and attack),
+  `x/compact_hud_details.png` (six portraits, empty bars, level 99 and three-digit values).
+  Potion aiming also shows the inline positive prediction. No hardware path changes.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible
