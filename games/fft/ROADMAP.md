@@ -360,6 +360,12 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     those portraits; the menu after a move on Act; the AI's glide and pauses twice FFT's,
     counted once the HUD is drawn. Tests, 48 xcheck doors, 177 UI and 87 blow / replay
     screens pass; peak 359,242 (AI battle). Program 65,361 bytes, buffers 112,568 bytes.
+    Then, the user's asks: reach tiles with 2-pixel black edges (4 px a row, `art.py`; dark grey
+    first), white around the map instead of light grey (`extract.py`), and the
+    prediction black in a white box framed black, made as its own HUD part (48,230 cycles at
+    most; built with the name part, the medium-font try reached 77,620 and two AI frames went
+    over; that font was too big). Tests, 48 xcheck doors, 177 UI and 87 blow / replay screens
+    pass; peak 358,902 cycles. Program 64,739 bytes.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.
