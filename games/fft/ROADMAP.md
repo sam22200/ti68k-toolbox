@@ -376,6 +376,14 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     bobbing as the glove sways. The held AI frames exposed a forced half-screen copy of the
     scene (26k) over the budget (362k): the copy now goes a quarter a frame (13k). Peaks
     348,956 (AI battle) and 358,266 (defeat); program 60,075 bytes.
+    Then a battle played through on the PC (a replay tool driving `fft_pc`): 26 notes, and the
+    user's picks: [2nd] held through AI turns (843 -> 446 frames to Ramza's first turn, the
+    same outcome; an extra step only with 10k left in the last frame: a held battle peaks at
+    350,344), the cursor blinking on a tile [2nd] cannot pick, the aimed unit drawn over the
+    others every other 8 frames, "KO" and capped heals in the prediction, a smaller diamond
+    above KO enemies, "Item" as the item list's title, rounds / fallen / loot left in the
+    results. Tests, 48 xcheck doors, 177 UI, 88 blow / replay and 168 water screens pass;
+    program 60,937 bytes.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

@@ -29,7 +29,11 @@ hidden (milestone 23). The reach as FFT's tiles (white, a 2-pixel black edge dra
 shown at once, [MODE] drawing them over the scenery in front (milestone 24); an attack's or an
 ability's reach inverted (black, a white edge), the picked tile drawn as the inverse of its reach's.
 An AI turn's unit is shown 1.5 s (`AI_HOLD`, the world moving) once its plan is made; the active
-unit's pointer bobs up and down.
+unit's pointer bobs up and down. From a play-through on the PC: [2nd] held speeds AI turns up
+(`AI_FAST` steps a frame, never while thinking or over the budget), the aimed unit is drawn over
+the others every other 8 frames, the prediction says "KO" for a sure kill and caps a heal, a KO
+enemy keeps a smaller diamond, the item list is titled with its skill set, and the results add
+Ramza's rounds, the player's side's KOs and the crystals or chests left.
 The original sword and dagger, outlined and at least two pixels thick, appear through the
 impact; the target recoils two pixels and flashes light/white inside its black contour
 (milestone 25, `x/m25_blows.png`). Transparent character details with outlined portraits and stacked HP/MP gauges, bottom-right
@@ -47,7 +51,7 @@ shadow, with a light surface edge, including wading and wet blows (milestone 27,
 | Status: LEFT / RIGHT | move between stats, equipment and abilities |
 | Status: UP / DOWN, [2nd] | select an equipment slot or known ability, then inspect its details; [ESC] returns to the list |
 | [F5] / [F1] | rotate the camera 90 degrees clockwise / counter-clockwise |
-| [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can); at Wait: end the turn; looking around: a unit's numbers, or back to the menu |
+| [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can, else the cursor blinks); at Wait: end the turn; looking around: a unit's numbers, or back to the menu; held through an AI turn: up to three times as fast |
 | [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
 | [APPS] or [CATALOG] | the turn order (PC: A), closed by any key |
 | [MODE] | the reach tiles drawn over the scenery in front of them, or hidden by it but for dashes (PC: M) |
