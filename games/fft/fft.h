@@ -33,6 +33,8 @@ typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 j
 typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
 #include "units.h"
+#include "weapons.h"
+#include "interface.h"
 #include "battle.h"
 #include "map.h"
 
@@ -51,6 +53,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define TURN_FRAMES 3                  // rotation animation: frames between two views
 #define WALK_FRAMES 7                  // frames per tile when a unit walks (FFT: 14 at 60 Hz)
 #define CLIMB_FRAMES 10                // a step up, down or over a tile (FFT: ~21)
+#define WATER_ROWS (UNIT_FOOT - HU)    // depth 1: crop at the projected surface, clear edge above it
 #define PATH_MAX 16
 #define AI_GLIDE 2                     // AI turns: frames per tile of the cursor gliding to the
 #define AI_SHOW 8                      // tile it moves to, then its move range shown; the preview
@@ -66,7 +69,6 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define DC_OBJ(d) ((d) >= DC_CRYSTAL)          // out of the battle: its clock stopped
 #define EXP_LEVEL 100                  // EXP to the next level
 #define PICK_FRAMES 30                 // M_PICK: the message about what was picked up
-#define PANEL_H 46                     // a unit's panel against a side of the screen, at the bottom
 // an attack's frames, FFT's at 30 fps (RE_NOTES.md § Pace): the attacker standing, its wind-up
 // from ACT_WIND, the blow from ACT_BLOW, the target hit (its HP lost, the number shown) at
 // ACT_HIT, its hit pose for HIT_FRAMES, the number rising NUM_RISE pixels and shown NUM_T frames,
@@ -76,6 +78,8 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define ACT_BLOW 13
 #define ACT_HIT 16
 #define HIT_FRAMES 24
+#define FLASH_FRAMES 12                 // light 2, white 8, light 2, then normal
+#define BLADE_END (ACT_HIT + 3)         // blade stays through the impact, then put away
 #define NUM_RISE 8
 #define NUM_T 24
 #define GAIN_T 29
@@ -114,6 +118,7 @@ enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD, EQ_N };
 typedef struct {
     u8 x, z, gfx, team, face;          // face: world +x, -x, +z, -z
     u8 job, level, brave, faith, zodiac;   // job: index in jobs[]; zodiac 0 Aries .. 11 Pisces
+    u8 name;                             // generic name index in its gender's disc table
     u8 female, set, learned, status;   // skill set, the abilities it knows (bit k: the set's
                                        // k-th), ST_* bits
     u8 eq[EQ_N];                       // index in items[], 0xFF none
@@ -146,6 +151,8 @@ typedef struct {
     u8 reach[MAP_W * MAP_H];           // M_TARGET: steps to each tile, 0xFF unreachable
     u8 act;                            // the unit whose turn it is
     u8 turns[ORDER_N];                 // the next turns (FFT's AT list), turns[0] = act
+    u8 page;                            // Status: stats (0), equipment / abilities (1)
+    u8 status_col, status_row, status_info; // equipment/ability selection, open inspection
     u8 menu, back;                     // the menu's entry; the mode M_STATUS, M_ORDER return to
     u8 quit;                           // M_QUIT's entry: 0 Yes, 1 No
     u8 moved, acted;                   // this turn so far
@@ -182,6 +189,7 @@ const Tile *tile_at(s16 x, s16 z);     // world tile or RT_NULL outside
 s16 scene_x(u8 rot, s16 u, s16 v);     // scene position of view corner (u, v) at height 0
 s16 scene_y(s16 u, s16 v);
 u8 unit_at(s16 x, s16 z);              // unit index + 1, 0 = none
+const char *unit_name(u8 i);            // fixed heroes, a disc name for each generic unit
 void battle_units(void);               // the battle's units drawn and computed (rt_rand)
 void unit_stats(Unit *u);              // FFT's stats from the raw ones, the job, the equipment
 u8 ct_next(void);                      // FFT's clock to the next turn: its unit
@@ -189,6 +197,7 @@ void ct_end(u8 who, u8 moved, u8 acted);   // its CT when the turn ends
 void turn_order(void);                 // st.turns from the CTs
 void turn_end(u8 moved, u8 acted);     // the active unit's turn over, the next one starts
 void compute_reach(u8 who);            // st.reach from unit who (BFS, Move/Jump)
+u8 unit_in_water(u8 who);              // grounded in depth 1, including a walking step's position
 u8 make_path(u8 who, u8 tx, u8 tz);    // st.path to a reachable tile, its length
 // FFT's Attack (RE_NOTES.md § Attack): the tiles a weapon reaches (st.reach 1, else 0xFF), the
 // side an attack comes from, the hit chance and the damage (crit: XA + r * XA / 32768, r 0..32767)

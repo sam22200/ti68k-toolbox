@@ -1,0 +1,19 @@
+# Both Status pages, Act, browse, turn order; same script for PC and TI.
+20 RIGHT
+21
+40 LEFT
+41
+60 ESC
+61
+80 DOWN
+81
+82 A
+83
+100 ESC
+101
+120 ESC
+121
+140 APPS
+141
+160 ESC
+161

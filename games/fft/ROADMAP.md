@@ -277,13 +277,25 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     297-345k (defeat 371k, 6 frames over), the AI battle 359k at most in its first 14,000
     frames (6 over 360k before), 114 reach stalls. Program 56,226 bytes. Not done: pre-shifted
     flat tiles (~5k a tile without the depth, ~12k with it), left for later.
-25. **Blows.** The hit flash on the target's inside (the 4th plane): its greys up to light
+25. **Blows** (done). The hit flash on the target's inside (the 4th plane): its greys up to light
     grey then white held ~8 frames, then back, the black outline kept; the target knocked back
     a pixel or two; the sparkles of milestone 21 dropped. The sword and the dagger from
     `BATTLE/WEP.SPR` (placed by `WEP1/WEP2.SHP` and `.SEQ`), outlined white, a blade at least
     2 pixels wide, shown during the blow only as in FFT (Gariland: Broad Sword and Dagger; the
     enemy Chemist unarmed). A frame-by-frame sheet of a blow.
-26. **FFTA-style interface** (captured on the original, `x/ffta_*.png`). Bottom left a light
+    Done: original armed hands/body plus WEP1/2 level-strike blades, all four facings,
+    sampled/rotated offline into archived `fftw` (40,704 bytes); weapon script, body frame,
+    rotation and UV records checked on the original for both weapons. Two-pixel blades with
+    a white outline, their own cached cover, drawn behind the body at its depth. Visible at
+    frames 13-18, then put away; unarmed/skills show no blade. Successful damage flashes
+    the fourth-plane interior: light 2, white 8, light 2; black contour/shadow stay. Visual
+    recoil 2/1 pixels, then 1/1, then zero; no gameplay changes. Burst/sparkles removed.
+    `make test`, 25 xcheck scenarios, 87 phase/replay PC/TI screens (`make check-blows`) pass.
+    Every ordinary measured frame <= 360k: blow doors 307,218, AI battle 356,180, defeat
+    replay 359,070 (its six old overruns removed by deferring optional work through crowded
+    pans). Review: `make review-blows`, `x/m25_blows.png`, nine blows in eleven frames.
+    Program 56,297 bytes. No new hardware path; TiEmu left for milestone 29.
+26. **FFTA-style interface** (done; captured on the original, `x/ffta_*.png`). Bottom left a light
     grey band with a dark rule: the unit's portrait from its `.SPR` (19x29, rising above the
     band), its name, HP above MP, a line with Lv and CT. The action menu bottom right with a
     "MENU" tab and a ball cursor, sub-menus replacing it in place; while aiming, the target's
@@ -295,9 +307,66 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     theirs. Status full screen in FFTA's layout with FFT's fields (portrait, name, job, HP and
     MP with bars, Lv/Exp, Brave, Faith, zodiac, Move/Jump/Speed, PA/MA; a second page for the
     equipment and abilities). A review sheet before applying the layout everywhere.
-27. **Water.** Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
+    Done: six original 19x29 mirrored portraits, 510 generic names and the FRAME pointer in
+    archived `ffti` (40,876 bytes), with pre-shifted AMS text. FFTA-style bands / MENU tab /
+    ball cursor, target preview above the mirrored target band, height and canal depth top
+    right; bands and menus hidden through movement / blows. Status fills the screen, LEFT /
+    RIGHT switches stats and equipment / learned abilities. Names use separate seeded draws,
+    unique by gender, heroes fixed. Original check: six VRAM portrait sheets (9,216 source
+    pixels), pointer texture / palette and nine names match. Review before completion:
+    `make review-interface`, `x/m26_interface.png` (15 states). Tests, 40 xcheck scenarios,
+    116 UI phase / key screens and 87 blow / replay screens pass. Ordinary frame peaks:
+    UI doors 313,278; full AI battle 357,270; defeat replay 359,840. The expensive frame
+    creating the screen cache no longer forces optional HUD / cursor work as though it had
+    already used it. Program 58,749 bytes; game buffers ~105 KB. No new hardware path;
+    TiEmu remains milestone 29.
+    Presentation revision requested after milestone 27: transparent 80x36 character details,
+    cutout portrait left, small level below, name and stacked outlined HP/MP gauges with
+    right-aligned values above; CT removed from the HUD. Height/depth text also has a white
+    outline over the scenery. Current review: `x/character_hud.png`, all six portraits and
+    empty/999-value bars in `x/character_hud_details.png`. Tests, 52 scenario comparisons,
+    116 UI and 87 blow/replay screens pass; peak 357,308 cycles, program 62,075 bytes.
+    Further compact revision: level overlaid on the portrait, gauges 34x2, complete details
+    within the 29-pixel portrait height. Outer portraits face inward; a central chevron and
+    inline damage/heal/chance prediction replace the TARGET popup. Review:
+    `x/compact_attack_hud.png` and `x/compact_hud_details.png`.
+    Gauge refinement: rounded white ends, shared text/bar left anchor, values ending at
+    the bar's right edge; 40x2 fill keeps `MP 999/999` readable. Review `x/rounded_hud.png`
+    and `x/rounded_hud_999.png`; the 357,410-cycle peak is unchanged.
+    Target/pointer revision: enemy stats meet the portrait, both names stay, and the
+    centered prediction moves above the arrow. Native 16x19 ring/crossbar/blade marker
+    replaces the reduced source marker; top framing fits it and facing selection keeps
+    the camera still when the actor fits. Tests, 52 scenario comparisons and 203 UI/replay
+    screens pass; peak 357,400 cycles. Review `x/target_hud_marker.png` / `x/active_marker.png`.
+    Menu/Status refinement: the active pointer shrinks to padded 16x13; a white glove
+    extends beyond FFT-style framed menus. Equipment and ability rows can be selected
+    and inspected, with ESC returning to the list; the terrain HUD keeps height only.
+    Original Status field/help navigation observed through pad input and its decompiled
+    equipment nodes; equipment changing remains a separate action. Tests, 58 scenario
+    comparisons, 177 UI screens and 87 replay screens pass; peak 356,322 cycles.
+    Review `x/m26_interface.png` / `x/status_details.png`.
+    Pointer/glove refinement: outlined marker 8x15 with a round upper ring; glove 15x12,
+    shorter and taller. Three-pixel sideways animation ends one pixel before the text; the white menu-top
+    strip is removed. Same cross-checks pass, peak 356,348 cycles; `x/hand_menu.gif`.
+    Final refinement: the terrain readout is fully removed, ring diameter 6 -> 4 pixels,
+    and the glove uses FFA's Game Boy title-screen silhouette and palm shading. Framing
+    and animation stay; tests and the same cross-checks pass, peak 354,528 cycles.
+    Review `x/adventure_menu.gif`; program 64,525 bytes, buffers 106,050 bytes.
+27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.
+    Measured: 38 depth-1 terrain records, six sheets / 60 source poses, 5,472 live submitted
+    pose checks and an ordinary pad-driven canal entry. The feet stay at the floor; the
+    submerged SHP removes 6..13 source rows from the lower opaque extent. Native adaptation:
+    fixed cut at the projected surface (15 of 26 stored rows), light-grey edge, hidden
+    shadow, wet flash/blade clipping, full hop poses until grounded, cached classification.
+    Twelve doors 41-52 and `x/m27_water.png` cover four views, entry/wading/exit, blows,
+    KO, Critical and a crystal. Tests, 52 xcheck doors and 371 additional phase/replay
+    screens pass. Peaks: water 254,232; AI battle 355,466; defeat 356,764; UI 316,910.
+    AI thinking uses the active pointer; its tile cursor returns with the plan. Reciprocal
+    CT products match 300 complete clock predictions. Removed units no longer mark cells
+    outside the reach grid. Program 60,451 bytes; buffers 104,880 bytes; banks unchanged.
+    No new hardware path; TiEmu stays at milestone 29.
 28. **Eight orientations** (not in FFT: four 45-degree yaws only). First an experiment: one
     view at 22.5 degrees, scenery only, to judge it at 160x100; only then the four in-between
     views (~45 KB more archive, the same RAM), the projection generalised (cursor, tiles,

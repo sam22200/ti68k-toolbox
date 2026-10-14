@@ -7,7 +7,7 @@ The scenery is the game's own (tools/extract.py: the map's textured mesh drawn p
 and so are the units (tools/units.py -> units.h); this file holds the rest:
 - The units' shadow (drawn into their frames by tools/units.py).
 - The cursor and the reach marker (24x12 diamonds); the diamond above enemies (team at a glance);
-  a hit's spark (FFT's white burst, then sparkles).
+  enemy markers and ground shapes; a native ring/crossbar/point active-unit pointer.
 - The 4 solid greys of the rotation frames (8x8 polygon patterns); each face's grey comes from
   the views (extract.py, map.h).
 """
@@ -77,6 +77,53 @@ FOE = """
 .......000......
 """                                     # above an enemy's head: a black diamond, white border
 
+ACTIVE = """
+................
+.......33.......
+......3003......
+......3003......
+.......33.......
+.....333333.....
+.....311113.....
+......3333......
+......3023......
+......3023......
+......3003......
+.......33.......
+................
+"""                                     # ring, crossbar and blade; source rows before white outline
+
+HAND = """
+..................
+......3333........
+....3300003.......
+...3000033333333..
+..330000000000003.
+.3010000000000003.
+.3000000000111133.
+.30100000001333...
+.30100000013......
+.31110000133......
+.3133111113.......
+..313311133.......
+.....33333........
+..................
+"""                                     # FFA title-screen glove: short index, rounded thumb, shaded palm
+
+def outlined_pattern(pattern, width=16):
+    pix = [[None if c == '.' else int(c) for c in row.ljust(width, '.')] for row in pattern.strip('\n').split('\n')]
+    assert all(len(row) == width for row in pix)
+    solid = [[p is not None for p in row] for row in pix]
+    for y, row in enumerate(pix):
+        for x, p in enumerate(row):
+            if p is None and any(solid[yy][xx] for yy in range(max(0, y - 1), min(len(pix), y + 2))
+                                for xx in range(max(0, x - 1), min(width, x + 2))):
+                row[x] = 0
+    return pix
+
+def active_marker():
+    return outlined_pattern(ACTIVE)
+
 SHADOW = """
 ....222222222.
 ...22222222222
@@ -117,40 +164,6 @@ def slope_marker(lift, cur):
     return pix
 
 
-SPARK_W, SPARK_H, SPARK_N = 32, 22, 8
-
-
-def spark():
-    """A hit on a unit, as FFT draws it (seen on the original run headless: a white burst over
-    the target for ~4 of its frames, then white sparkles flying apart for ~12): here a white
-    blob for 2 frames, then 8 white sparkles for 6, everything outlined black (white alone
-    vanishes on the light floors). Centre (16, 11)."""
-    import math
-    frames = []
-    for f in range(SPARK_N):
-        pix = [[None] * SPARK_W for _ in range(SPARK_H)]
-        if f < 2:
-            rx, ry = (8, 5) if f == 0 else (11, 7)
-            inside = lambda x, y: ((x + .5 - 16) / rx) ** 2 + ((y + .5 - 11) / ry) ** 2 <= 1
-            for y in range(SPARK_H):
-                for x in range(SPARK_W):
-                    if inside(x, y):
-                        pix[y][x] = 0
-                    elif any(inside(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                        pix[y][x] = 3
-        else:
-            r = 6 + 2 * (f - 2)
-            for k in range(8):
-                a = k * math.pi / 4 + math.pi / 8
-                cx = int(round(16 + r * math.cos(a) - 1)); cy = int(round(11 + r * .65 * math.sin(a) - 1))
-                for y in range(cy - 1, cy + 3):
-                    for x in range(cx - 1, cx + 3):
-                        if 0 <= x < SPARK_W and 0 <= y < SPARK_H and pix[y][x] is None:
-                            pix[y][x] = 0 if cx <= x <= cx + 1 and cy <= y <= cy + 1 else 3
-        frames.append(pix)
-    return frames
-
-
 # 8x8 polygon patterns (the rotation frames): rows of (light, dark) bytes,
 # written doubled as 16-bit words
 def pattern(f):
@@ -183,6 +196,16 @@ def main():
     L, D, M = plane_rows(foe, 16, len(foe))
     w('#define FOE_H %d\n' % len(foe))
     w('static const u16 foe_gfx[3][FOE_H] = { { %s }, { %s }, { %s } };\n' % tuple(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M])))
+    active = active_marker()
+    L, D, M = plane_rows(active, 16, len(active))
+    w('#define ACTIVE_H %d\n' % len(active))
+    w('static const u16 active_gfx[3][ACTIVE_H] = { { %s }, { %s }, { %s } };\n' %
+      tuple(', '.join('0x%04lX' % (v >> 16) for v in P) for P in (L, D, [~m & 0xFFFF0000 for m in M])))
+    hand = outlined_pattern(HAND, 32)
+    L, D, M = plane_rows(hand, 32, len(hand))
+    w('#define HAND_H %d\n' % len(hand))
+    w('static const u32 hand_gfx[3][HAND_H] = { { %s }, { %s }, { %s } };\n' %
+      tuple(', '.join('0x%08lX' % v for v in P) for P in (L, D, [~m & 0xFFFFFFFF for m in M])))
     keys, tops, rows, data = [], [], [], {n: [] for n in ('sl_l', 'sl_d', 'sl_m', 'sc_l', 'sc_d', 'sc_m')}
     for a, b, d in SLOPES:
         lift = [0] * 4
@@ -205,14 +228,6 @@ def main():
     w('static const u8 slope_off[NSLOPE] = { %s };   // its first row in sl_* and sc_*\n' % ', '.join(str(sum(rows[:k])) for k in range(len(rows))))
     for n, r in data.items():
         arr(n, r)
-    w('#define SPARK_N %d\n#define SPARK_H %d\n' % (SPARK_N, SPARK_H))
-    sp = [plane_rows(f, SPARK_W, SPARK_H) for f in spark()]
-    for name, k in (('spark_l', 0), ('spark_d', 1), ('spark_m', 2)):
-        w('static const u32 %s[SPARK_N][SPARK_H] = {\n' % name)
-        for P in sp:
-            rows = P[k] if k < 2 else [~m & 0xFFFFFFFF for m in P[2]]   # mask: 1 = transparent
-            w('    { %s },\n' % ', '.join('0x%08lXUL' % v for v in rows))
-        w('};\n')
     w('#define SHADES 4\n')
     w('static const u16 turn_pat[SHADES][2][8] = {\n')
     for k in range(4):

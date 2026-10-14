@@ -587,7 +587,7 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   player's units and the AI; the AI's spread from its focus uses the code's cost (the tile it
   spreads from: from the focus outwards, so a step out of water costs 2), which matched more of
   its moves. A jump's path is one step of two tiles (the walk slides over the gap). Units in
-  water stand on its bottom (their sprite is not sunk).
+  water stand on its bottom; milestone 27 adds depth-1 sprite immersion below.
 
 ### Enemy AI (milestone 20)
 
@@ -715,6 +715,38 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   map's corner heights (the top faces' upper edges at four columns of the sprite): as the
   view's depth says half hidden or not on 558 of 560 tiles and views (`make test`).
 
+## Blows (milestone 25)
+
+- OBSERVED IN FFT (disc plus `tools/weapons.py --check DISC STATE`): the level strike uses
+  unit SEQ 130/131, body wind-up 86/135, blades with body 87/136, 89/138, 90/139. Weapon
+  scripts 2/3 in WEP1 (TYPE1 units) and WEP2 (Chemists) select their own shapes. WEP SHP
+  has 32 weapon-type offsets at +4, 512 frame offsets at +0x44, data at +0x846; its header
+  rotation indexes `BATTLE.BIN`'s table at 0x80094508. This is a screen rotation, applied by
+  `battle_gfx_construct_polygon_data_for_units`. WEP.SPR's first palette block and sheet at
+  +0x200 supply the blade; `g_battle_gfx_item_graphic_data` at 0x800943e4 supplies its palette
+  and row. Dagger type 1, Broad Sword type 3. On the original's back-facing level swings,
+  frames 34/35/36 and 74/75/76 match our body frames, weapon animation, rotation and part
+  position/size/UV exactly. The fixture updates the initialized display weapon as well as
+  battle stats; a stats-only poke leaves the original's graphics stale.
+- TARGET: existing 0.6 scale and original palettes, a blade thickened horizontally and
+  vertically to at least two pixels, white outline. Rotation and sampling are offline;
+  separate archived `fftw` (40,704 bytes), no RAM sprite copies except the covered blade.
+  Armed hands/body use the original level-strike frames; low/high swings remain adapted to
+  the level swing. Blade drawn behind the body (the ordering table prepends the original's
+  weapon layer), hidden during wind-up, visible at 13-18, put away at 19.
+- TARGET (user's explicit choice): the earlier burst/sparkles removed. Successful damage
+  flashes only the sprite's fourth-plane interior: light grey 2 frames, white 8, light 2,
+  then normal; black contour and dark shadow stay. Rendered recoil away from the attacker:
+  horizontal 2 px/vertical 1 for 6 frames, then 1/1 for 4, then 0. The logical tile, HP,
+  hit/miss, abilities and critical gameplay knockback are unchanged.
+- CHECKED: 91 interior pixels light/white, 32 black contour pixels unchanged, misses/heals/
+  Defend unflashed; `make test`; 25 default xcheck scenarios, 87 additional PC/TI screens at
+  blow phases and replay ends (`make check-blows`). Every measured ordinary frame <= 360k:
+  blow doors 307,218 max, 14,000-frame AI run 356,180, defeat replay 359,070. Initial/view
+  loads, rotations and all-at-once reach creation are the allowed stalls. Optional HUD,
+  cursor mask and ring removal no longer force themselves into a crowded camera pan.
+  Review sheet: `make review-blows` -> `x/m25_blows.png` (local).
+
 ## Numbers
 
 | | FFT | TI | how |
@@ -731,5 +763,263 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
 | rewards | 10 EXP (kill 20 / KOs) + level difference, 100 a level; JP 8 + 2 x job level + level / 4, a quarter shared; death counter 3, then crystal (enemy 1/2, player 3/4) or chest | same (the share to the same job only) | decomp, six actions of `oracle.py --rewards` |
 | moving | canals waded (water to water 2), jumps over one tile, trees crossed | same, the two measured ranges exact | 2 ranges of `oracle.py --ai`, decomp |
 | AI | scores the field (HP x 128 / max, KO -192, Critical -32), ranks 8, draws on hit chance; danger 10 - steps; hit and back off | same, 129 of 136 turns the same action, 125 the same tile | decomp, 136 turns of `oracle.py --ai` |
-| a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | an outlined blob 2 frames, sparkles 6 (30 Hz) | a picture every 2 frames of a Throw Stone |
+| a hit | a white burst ~4 frames, sparkles ~12 (60 Hz) | interior flash 2 light / 8 white / 2 light, small visual recoil, no sparkles | user choice, milestone 25 pixel checks |
 | pace (60 Hz / ours 30) | a tile 14, a jump ~21; Execute to hit 31, menu +188; AI glide ~12, preview ~30 | 7, 10; 16, +78 after the hit; 2 a tile, 15 | movement records and pictures, § Pace |
+
+## FFTA-style interface (milestone 26, 2026-10-13)
+
+- OBSERVED IN FFTA: the local original captures `x/ffta_*.png` show bottom portrait bands,
+  bottom-right MENU and ball cursor, target band mirrored, full-screen Status with a second
+  equipment page. These are layout references; the numbers and rules remain FFT's.
+- OBSERVED IN FFT: portrait raw pixels are `.SPR +0x8200..0x9200`, a 256x32 texture.
+  The original quad maps UV `(128,0),(128,31),(80,0),(80,31)` to the portrait's four corners:
+  the 48x32 patch is rotated into a 32x48 bust. Portrait palette 8 matches player CLUTs in
+  the oracle's VRAM; enemy recolour palette 11 is adapted to the same four-greys portrait.
+  `battle_gfx_load_spritesheet_into_vram_slot` and
+  `battle_menu_build_unit_portrait_poly` establish the texture and UVs.
+- OBSERVED IN FFT: the floating selection pointer uses FRAME.BIN UV `(64,128)..(80,152)`,
+  CLUT `(64,0x1E2)`. Its palette is `BATTLE.BIN` at loaded address `0x80094B64`. Texture
+  pixels start at FRAME.BIN `0x1000`. The original points at its cursor; the target uses
+  this shape over the active unit, as requested, keeping native tile targeting rings.
+- OBSERVED IN FFT: `EVENT/SMALL.OUT` loaded at `0x801D7000` binds name sections through
+  offsets at `+0x70` and string base `+0xEC`; the names start at `+0xED`. Entries
+  `0x100..0x1FE` are 255 male names; `0x200..0x2FE` are 255 female names. Name records use
+  digits `0..9`, capitals `0x0A..0x23`, lowercase `0x24..0x3D`; `FA` is a space,
+  `D9 C1` an apostrophe, `D9 B6` a period, `FE/FF` terminate a record. Names are at most
+  11 characters. `main_unit_store_character_names` excludes used names of the same gender.
+- TARGET IMPLEMENTATION: `tools/interface.py` creates archived `ffti` (40,876 bytes),
+  generated `interface.h`, six mirrored 19x29 busts with white outlines, a 16x14 pointer,
+  two fixed-width name tables and AMS small glyphs pre-shifted offline. Portraits use
+  nearest-neighbour scaling, four greys by the existing palette-luminance thresholds.
+  Generic names are unique by gender, drawn once per battle by an independent 16-bit
+  generator seeded from that battle; existing combat/stat RNG streams stay unchanged.
+- TARGET IMPLEMENTATION: 80-pixel horizontal bands, light grey with a dark rule, portrait
+  rising above the band, name / HP / MP / Lv-CT. Menus replace one another bottom right
+  under a tab, ball cursor; a valid target gets its mirrored band and the hit/amount
+  preview above it. Motion and action animations hide bands and menu. Height `2h` / `0h`
+  and canal `depth 1` appear top right. Status pauses simulation: stats on page 1, equipment
+  and learned skills on page 2; LEFT / RIGHT pages, ESC / shift returns.
+- CHECKED: `interface.py --check DISC gariland_t1.state` matches all six portrait sheets
+  against the original's VRAM (9,216 source portrait pixels), pointer texture/palette and
+  all nine generic oracle names. Native tests cover seeded name stability/uniqueness,
+  HP/CT updates, page reversal with unchanged units, depth label and hidden motion bands.
+  40 xcheck scenarios, 116 additional UI partial-build/page/input screens and 87 existing
+  blow/replay screens agree between PC and TI. Fifteen review states are in local
+  `x/m26_interface.png`. No new hardware path; no emulator run for this milestone.
+- CHECKED: all ordinary measured frames <=360,000 cycles: UI doors 313,278, the 14,000-frame
+  AI replay 357,270, defeat replay 359,840. Profiling found a just-completed background cache
+  was permitting forced HUD work in the expensive frame that built it: `bg_drawn` records
+  whether the frame actually used the cheap cache. Budget also adjusts when scene edits
+  invalidate a previously usable copy. Aligned long copies and cached preshifted text keep
+  the native UI small; Status builds a part per frame, peaking at 173,440 cycles.
+
+### Character HUD revision (2026-10-14)
+
+- TARGET (user reference): transparent character details, with a cutout portrait on the
+  left, name to its right, HP and MP stacked with small current/maximum values above
+  their gauges, and only a small level under the portrait. No zodiac badge or CT field.
+  Both active and target panels use this layout; Status keeps its full statistical pages.
+- IMPLEMENTATION: the original portrait's palette-zero mask already removes its background;
+  the previous grey band hid that transparency. Reuse the same six outlined 19x29 assets,
+  with no new bank or extraction. Five cached parts compose an 80x36 panel, including an
+  opacity plane for the portrait, outlined glyphs and 56-pixel gauges. HP is black, MP dark
+  grey, empty gauge interiors light grey. Values align to the right above each gauge.
+  CT no longer invalidates the panel cache. Motion and blows still hide the details.
+- CHECKED: existing native tests, 52 scenario PC/TI screens, 116 UI phase/input screens and
+  87 blow/replay screens pass. Every ordinary measured frame remains <=360k: UI doors
+  317,458, 14,000-frame AI replay 356,014, defeat replay 357,308. The generated panel text
+  and HUD loops have no software multiply/divide or floating-point helpers. Program 62,075
+  bytes; allocations 52,320 and 55,556 bytes, both below 64 KB. Actual framebuffer review
+  covers all six portraits, empty HP/MP, 500/999 HP, 999/999 MP and level 99, in local
+  `x/character_hud_details.png`; active/target scenes are in `x/character_hud.png`.
+  No hardware path changes or emulator run.
+
+### Compact attack HUD revision (2026-10-14)
+
+- TARGET (second user reference): level over the portrait, shorter/thinner gauges, two
+  opposing character panels during an attack, with the portrait defining the HUD's height.
+- IMPLEMENTATION: complete 80x29 panels, level over the lower portrait corner, gauges
+  34x2 with a one-pixel white border. Left portrait mirrors inward, right portrait sits
+  at the outer right edge and looks inward. Name/forecast, HP and MP fit in the portrait's
+  height, with no panel background. Palette-zero portrait cutouts and archived data stay
+  unchanged. The valid target's cached inline damage/heal/status and chance replace the
+  actor's name, with an outlined central chevron; the old TARGET window is removed.
+  The forecast calls the existing combat formulas, including skill amount ranges, and
+  caches its target/ability together with the actor's stats. Target name remains visible.
+- CHECKED: native tests, 52 PC/TI scenario screens, 116 UI partial/input screens and 87
+  blow/replay screens pass. Every ordinary measured frame stays <=360k: UI doors 317,566,
+  14,000-frame AI replay 356,116, defeat replay 357,410. Native HUD/text loops have no
+  software multiply/divide or floating-point helpers. Program 62,109 bytes; allocations
+  52,320 and 54,300 bytes, saving 1,256 RAM bytes from the preceding panel layout.
+  Actual framebuffer review: `x/compact_attack_hud.png` (menu and attack),
+  `x/compact_hud_details.png` (six portraits, empty bars, level 99 and three-digit values).
+  Potion aiming also shows the inline positive prediction. No hardware path changes.
+
+### Gauge alignment refinement
+
+- TARGET / IMPLEMENTATION: align the gauge's visible left edge with the text anchor,
+  round its four outer corners through the opacity mask, and align the values' right
+  outline with the gauge's right outline. The two-row fill stays thin; width 40 leaves
+  a gap between the ten-pixel `MP` label and the 28-pixel `999/999` string.
+- CHECKED: native tests, 52 scenario comparisons and 203 UI/blow/replay PC/TI screens
+  pass; ordinary peak remains 357,410 cycles. Program 62,171 bytes, allocations unchanged.
+  Actual PC framebuffer review includes three-digit HP/MP on both panels at once;
+  rounded outer corner pixels remain transparent. Local review: `x/rounded_hud.png`
+  and `x/rounded_hud_999.png`.
+
+### Target attachment and active-marker revision
+
+- TARGET / IMPLEMENTATION: enemy gauges and values now end against the portrait at
+  panel column 61; the target name aligns to the same edge. Both character names remain,
+  while the centered prediction uses a separate seven-row outlined cache above the
+  comparison arrow. Cache matching suppresses a stale prediction when target/ability
+  changes. All 510 source names fit: the longest measured string is 43 pixels, leaving
+  the target name's first pixel inside its panel. Three-digit HP/MP still fit both sides.
+- TARGET / IMPLEMENTATION: a native 16x19 active pointer replaces the unreadable reduced
+  source marker. `tools/art.py` draws a ring, wide crossbar and shaded pointed blade,
+  dilates the silhouette for a white outline, and emits three native word-row planes in
+  `art.h`. The original archived pointer stays as unused reference data, preserving the
+  existing bank layout. Its full body/marker top margin is 39 pixels. Facing selection
+  holds the camera when the actor fits, avoiding unnecessary repeated full-view copies.
+- CHECKED: tests, 52 PC/TI scenario screens, 116 UI partial/input screens and 87 blow/replay
+  screens pass. The AI finishes the same 80-turn native battle in 10,086 frames. Every
+  ordinary measured frame stays <=360k: the 14,000-frame AI replay peaks at 350,712, defeat
+  replay at 357,400. A 369,558-cycle facing frame during the initial camera-margin change
+  was mandatory work (budget already negative): profiling isolated the moving view copy,
+  eleven actors and the facing arrows. Holding the fitting camera removes that overrun;
+  no extra stall exemption or larger budget. Generated outlined-text/HUD loops have no
+  software arithmetic helpers. Program 62,733 bytes; allocations 52,320 and 54,930 bytes.
+  Review: `x/target_hud_marker.png`, `x/target_hud_999.png`, `x/active_marker.png`.
+
+### FFT command hand and Status inspection refinement
+
+- OBSERVED IN FFT (ordinary pad input, `gariland_t1.state`, no RAM writes):
+  `DOWN:24 DOWN:24 DOWN:24 CIRCLE:120` opens Status; `SELECT:60` activates its
+  field cursor. Four `DOWN:30` presses followed by `CIRCLE:60` open the Move help
+  panel. The original uses a white glove outside the command frame and beside the
+  selected Status field. Local original captures: `x/ps1_status_overview.png`,
+  `x/ps1_status_select.png`, `x/ps1_status_down.png`, `x/ps1_status_help.png`.
+- OBSERVED (read in `fft_decomp`): `bunit_menu_update_node_cursor` handles directional
+  selection and confirmation/cancel for field explanations, including equipment and
+  ability nodes 18..27. `bunit_menu_equipment_and_ability_panel_thread` draws five
+  equipment slots and ability/skill-set entries. Actual gear swapping is a separate
+  Change Equipment action (`battle_menu_run_equip_thread`), outside native Gariland's
+  current action set. The pad capture above confirms field help, not a gear change.
+- TARGET / IMPLEMENTATION: a native padded 16x9 outlined white glove replaces the
+  internal ball, extending outside light-grey framed menus with black title tabs.
+  Status's second page selects each of its five equipment slots and learned abilities,
+  including learned Defend. Confirmation opens existing item bonuses or ability
+  range/height, JP, effect, stock and evasion; ESC returns to the list. Browsing never
+  changes equipment, HP, learned skills or inventory. Cursor movement reuses the cache;
+  detail opening/closing keeps the nine-part per-frame build.
+- TARGET / IMPLEMENTATION: active pointer reduced from 16x19 to padded 16x13, retaining
+  the ring/crossbar/blade and white silhouette outline. Camera framing stays at 39
+  pixels, now including six pixels of headroom. Reducing that margin with the sprite
+  caused a 363,120-cycle defeat frame; keeping established framing removes the overrun.
+  The terrain HUD draws height alone; removing the depth line saves 600 cache bytes.
+- CHECKED: unit tests (slot/ability navigation, detail/back, empty entries and unchanged
+  unit data), 58 PC/TI scenario screens, 177 partial/input UI screens and 87 blow/replay
+  screens pass. Ordinary peaks: UI 295,764, Status 202,426, 14,000-frame AI battle
+  349,634, defeat 356,322 cycles; no budget exemption added. Program 64,937 bytes;
+  allocations 52,320 and 54,332 bytes. Review: `x/m26_interface.png` and
+  `x/status_details.png`. No hardware path changed or TiEmu interaction.
+
+### Animated glove and narrower pointer refinement
+
+- TARGET / IMPLEMENTATION (user's marked-up native screenshot): active marker outline
+  width 10 -> 8 pixels, keeping its 13-row height and existing camera framing. Glove
+  outline width 15 -> 18 pixels, padded to 32 for the existing ExtGraph sprite primitive.
+  An eight-byte lookup gives a three-pixel sideways motion in 32 native frames; the
+  maximum-right tip leaves a one-pixel gap before menu and Status text. This cadence is
+  a native visual adaptation, not an original FFT timing measurement.
+- TARGET / IMPLEMENTATION: remove the horizontal white highlight and draw only the
+  title tab above the frame. Its cached first row masks the three upper rows, preserving
+  scenery in the rest of that strip without another cache or background redraw.
+- CHECKED: tests, 58 PC/TI scenarios, 177 interface screens and 87 blow/replay screens
+  pass. Peaks: UI 295,790, AI battle 349,660, defeat 356,348 cycles; all <=360,000.
+  Program 65,133 bytes; RAM allocations unchanged. `make review-interface` now writes
+  `x/hand_menu.gif` from eight real framebuffer captures over one full animation cycle.
+
+### Shorter, taller glove and round active ring
+
+- TARGET / IMPLEMENTATION (user correction): glove width 18 -> 15 pixels, height 9 -> 12,
+  increasing its palm vertically instead of lengthening its index finger. Restore the
+  16-wide sprite primitive; reposition it so the existing three-pixel sway still leaves
+  one pixel before the text and the full glove fits even the bottom menu row.
+- TARGET / IMPLEMENTATION: upper marker ring uses a six-by-six round contour and rounded
+  four-by-four opening. Outlined width stays eight pixels; padded height becomes 15.
+  Established camera framing stays unchanged, with four pixels of headroom.
+- CHECKED: tests, 58 PC/TI scenarios, 177 interface screens and 87 blow/replay screens
+  pass. Peaks: UI 296,338, AI battle 349,660, defeat 356,348 cycles. Program 65,109 bytes;
+  allocations unchanged. Updated actual-framebuffer animation: `x/hand_menu.gif`.
+
+### FFA title-screen glove, smaller ring and removed terrain readout
+
+- OBSERVED (visual references, no local FFA ROM): Nintendo's Collection of Mana capture
+  at https://www.nintendo.com/us/store/products/collection-of-mana-switch/ shows the
+  original Game Boy title menu at five times its native pixels, viewport x=240..1039.
+  Its glove occupies native x=40..55, y=88..99: short index, rounded thumb and light-grey
+  shading along the lower palm. The independent title capture at
+  https://ocremix.org/game/115/final-fantasy-adventure-gb/ confirms the contour. Downloads
+  remain local in `sources/art/ffadventure/`; neither screenshots nor a ROM are committed.
+- TARGET / IMPLEMENTATION: hand pattern transcribed from that reference, with one-pixel
+  white outline and padding, 18x14 visible pixels. The detached title-screen ground shadow
+  is omitted. A 32-wide ExtGraph sprite preserves its native shape and existing sideways
+  animation. Command windows gain four bottom rows and Status entries move up three
+  pixels so even the last selected glove stays clear of the screen edge/footer.
+- TARGET / IMPLEMENTATION: ring diameter 6 -> 4 pixels, with a two-pixel opening; the
+  complete marker returns to 13 padded rows. The terrain readout, builder and cache are
+  deleted. Height/depth still drive terrain, movement, water, occlusion and ability reach.
+- CHECKED: tests include bare scenery across the entire former readout on dry/wet tiles;
+  58 PC/TI scenarios, 177 interface screens and 87 blow/replay screens pass. Peaks:
+  UI 293,956, AI battle 347,840, defeat 354,528 cycles. Program 64,525 bytes; allocations
+  52,320 + 53,730 bytes. Review: `x/adventure_menu.gif` and `x/m26_interface.png`.
+
+### Canal immersion (milestone 27)
+
+- OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible
+  `gariland_t1.state`): all 38 canal records have surface 0x0E, floor height 0, depth 1.
+  Humans remain at that floor (`misc.screen.vy = 0`), but use the submerged SHP set.
+  TYPE1/TYPE2.SHP's first word points to its second 256-offset table; each table's frame
+  data starts 0x402 bytes after it. Across six sheets and ten idle/walk poses each, the
+  head stays at the same source row and the lower opaque extent loses 6..13 rows:
+  Ramza 8..12, Delita 6..11, male Squire 7..13, female Squire 8..11, male Chemist 7..10,
+  female Chemist 6..8. The submerged bottom is 4..8 source rows above the anchor.
+- OBSERVED IN FFT (live GPU packets): 5,472 complete submitted UV-part sets match the
+  disc's normal/submerged pose sets. Each of the 38 actual terrain records is copied
+  beneath a visible test unit, paired with depth cleared, for all six sheets; each pair
+  uses a fresh state, healthy idle, 24 settling frames and a 26-video-frame probe window.
+  This is a controlled display experiment, not 38 walked paths. Off-camera units are
+  culled; the shared display scratch can be overwritten by another unit; submitted GPU
+  packets lag the current animation record. The checker reads submitted CLUT/page packets
+  and matches the whole pose set, requiring a nonempty result for every pair.
+- OBSERVED IN FFT (ordinary pad-driven movement, no coordinate/terrain pokes): from
+  Ramza's first menu, `CIRCLE:60 CIRCLE:60 UP:30 CIRCLE:100` moves (4,11) -> (5,11).
+  His height falls -24 -> 0; the submitted submerged pose first appears after the floor
+  landing (video frame 185 of this sequence). Local evidence: `x/m27_original.txt`,
+  `x/m27_original_walk.txt`, `x/m27_original_water.png`, `x/m27_original_poses.png`.
+- OBSERVED (read in fft_decomp): `battle_gfx_select_unit_shp_frame` switches an ordinary
+  human to its submerged set when the surface is at least 12 world units above its feet;
+  a raised hop uses the normal set. `battle_gfx_calculate_screen_z_from_input_coords`
+  keeps ordinary humans on the floor; Float, Walk on Water, crystals and treasure have
+  their own exceptions. Gariland has no deeper canal case to reproduce here.
+- TARGET (`unit_in_water`, `draw_unit_water`): fixed-height native cropping at the projected
+  depth-1 surface, six pixels above the anchor: draw 15 of the 26 stored rows, hiding the
+  lower legs and shadow, with a light-grey edge following the existing contour/cover rule.
+  Wet flashes and blades stop at the same surface. Wading stays cropped; hopping into or
+  out of water uses the full pose until grounded. Crystals/chests retain their full images.
+  The original's separate submerged art and variable limb shapes are adapted to a fixed
+  cut; no new sprite bank or per-pixel operation is added. Terrain classification is cached
+  with each unit's cover; the dry shader keeps its existing fast path (22 extra RAM bytes).
+- TARGET (performance): the active-unit pointer identifies an AI actor while it thinks;
+  the tile cursor returns when the plan is shown. This avoids combining its drawing with
+  a new turn's clock/order update, uncached camera copy and eleven unit covers. CT order
+  uses `ti-table recip --n 51` products instead of repeated divides (numerator <=149,
+  table exact through 815); 300 predictions at Speed 1..50 equal full clock advances.
+  `compute_reach` skips removed units before marking occupied cells: the new traversal
+  fixtures exposed an out-of-range write that the TI binary caught as code corruption.
+- CHECKED: unit tests, 52 xcheck doors, 168 water phase screens, 116 UI screens and 87
+  blow/replay screens pass. Every ordinary measured frame remains <=360,000 cycles:
+  water doors 254,232, AI battle 355,466, defeat replay 356,764, UI doors 316,910.
+  Review: `x/m27_water.png` (twelve actual native scenes). Program 60,451 bytes, game
+  buffers 104,880 bytes; archived banks unchanged. No new hardware path or emulator run.

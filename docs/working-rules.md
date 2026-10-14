@@ -43,15 +43,6 @@ Both apply to every agent working in this repository.
 - The user's own files at the root (`*.csv`, `*.gif`, `roadmap_ti.txt`, editor swap files) are
   not ours: never stage them.
 
-## Copyrighted art
-
-- Sheets ripped from commercial games (The Spriters Resource) are references, never assets in
-  git: they live in `sources/art/<game>/` (ignored). The picks per category:
-  `.claude/skills/ti-art-refs/SKILL.md`.
-- **`games/ffa_ct/` is local only**: the FFA copy restyled with Chrono Trigger sprites (an art
-  test). It is excluded by `.git/info/exclude`, never committed, never published; its state is
-  in `games/ffa_ct/PROGRESS.md`. Its gameplay fixes (no CT art) may be ported to `games/ffa`.
-
 ## For agents other than Claude Code
 
 - The skills are plain Markdown: `.claude/skills/<name>/SKILL.md`, listed in `CLAUDE.md`

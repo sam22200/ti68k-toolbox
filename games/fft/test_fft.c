@@ -200,9 +200,9 @@ static int shown(u8 i)
     st.unit[i].x = 200;                                   // out of the map: not drawn
     sw_step(0);
     mid = 0;
-    for (y = 8; y < RT_H; y++)                            // not the HUD: the top strip and
-        for (x = 0; x < RT_W; x++)                        // the units' panels
-            if ((y < RT_H - PANEL_H || (x >= 16 && x < RT_W - 16)) && with[y][x] != sw_level(x, y)) {
+    for (y = 8; y < RT_H; y++)                            // exclude the height and bottom details
+        for (x = 0; x < RT_W; x++)
+            if ((y < 71 && (y >= 17 || x < 128)) && with[y][x] != sw_level(x, y)) {
                 n++; mid += with[y][x] == 1 || with[y][x] == 2;
             }
     st = save;
@@ -293,7 +293,7 @@ static void test_team(void)
 {
     int foe, ally;
     sw_init(2);
-    steps(0, 10);                                         // the HUD drawn: one part per frame
+    steps(0, 80);                                         // all cached HUD parts settled
     foe = shown(2);
     st.unit[2].team = TEAM_PLAYER;
     ally = shown(2);
@@ -418,25 +418,15 @@ static void test_walk_keys(void)
 // [APPS] opens the turn order over any input mode, any key closes it; [2nd] on a tile drawn on
 // the same pixels as a higher one picks that one (Ramza in the canal at (1, 5), a Squire on the
 // street at (0, 5): in view E its tile hides the canal tile (1, 4), in reach but empty)
-static int hud_shown(void)                    // the active unit's panel edge, the height's text
+static int hud_shown(void)                    // the active unit's outlined HP bar
 {
-    int x, y, ink = 0;
-    for (y = 1; y < 7; y++) for (x = 1; x < 16; x++) ink += sw_level(x, y) == 3;
-    return sw_level(15, RT_H - 10) == 3 && sw_level(8, RT_H - PANEL_H) == 3 && ink > 4;
+    return sw_level(22, 86) == C_WHITE && sw_level(23, 86) == C_BLACK;
 }
 
 static void test_fixes(void)
 {
     u8 c, t, i, n = 0;
     u16 hp;
-    sw_init(0);                                           // the HUD on the AI's turns: a
-    for (i = 0; i < 60 && st.mode != M_WALK; i++) sw_step(0);   // unit walking (its reach's
-    for (i = 0; i < 8 && !hud_shown(); i++) sw_step(0);        // rows put back first), and the
-    CHECK(hud_shown());                                   // next unit's panel made within a few
-    c = st.act;                                           // frames of its turn
-    while (st.act == c) sw_step(0);
-    for (i = 0; i < 20 && !hud_shown(); i++) sw_step(0);
-    CHECK(i < 20);
     sw_init(10);
     steps(0, 20);
     CHECK(hud_shown());
@@ -1161,6 +1151,60 @@ static void test_pace(void)
     CHECK(back);
 }
 
+// The flash changes visible flesh/clothes and keeps the black contour. Compare pixels
+// in the actual hit pose, with the recoil's screen displacement removed; HP/tiles stay put.
+static void test_blows(void)
+{
+    u8 normal[UNIT_SH][16], light[UNIT_SH][16];
+    const u8 *data;
+    u16 size, lit = 0, edges = 0;
+    s16 u, v, sx, sy, x, y;
+    u8 k;
+    State before;
+    sw_init(17);
+    for (k = 0; k < NUNIT; k++) if (k != 1) st.unit[k].x = 200;
+    st.unit[1].x = 9; st.unit[1].z = 14; st.unit[1].face = 2;
+    st.unit[st.atk].face = 3; st.rot = 0; st.abil = NO_ABIL; st.hit = 1;
+    st.unit[1].hp = st.unit[1].max_hp;
+    view_of(0, 9, 14, &u, &v);
+    sx = scene_x(0, u, v); sy = scene_y(u, v) + HH - map_tiles[149].stand * (HU / 2);
+    st.camx = sx - 80; st.camy = sy - 65; sx = 80; sy = 65;
+    data = rt_file("fftu", &size) + (st.unit[1].gfx * 2 * UNIT_FRAMES + P_HIT) * UNIT_FB;
+    st.act_t = ACT_HIT + FLASH_FRAMES;
+    game_render(); game_render();
+    for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) normal[y][x] = sw_level(sx - 8 + x, sy - UNIT_FOOT + y);
+    before = st;
+    st.act_t = ACT_HIT + 10;
+    game_render();
+    for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) light[y][x] = sw_level(sx - 8 + x, sy - UNIT_FOOT + y);
+    st.act_t = ACT_HIT + 8;
+    game_render();
+    for (y = 2; y < UNIT_FOOT - 1; y++) for (x = 0; x < 16; x++) {
+        u16 bit = (u16)(0x8000 >> x), in = (u16)(data[2 * (3 * UNIT_SH + y)] << 8 | data[2 * (3 * UNIT_SH + y) + 1]);
+        u16 mask = (u16)(data[2 * (2 * UNIT_SH + y)] << 8 | data[2 * (2 * UNIT_SH + y) + 1]);
+        u8 white = sw_level(sx - 8 + x + 1, sy - UNIT_FOOT + y - 1);
+        if (in & bit) { CHECKV(light[y][x], C_LGRAY); CHECKV(white, C_WHITE); lit++; }
+        else if (!(mask & bit) && normal[y][x] == C_BLACK) { CHECKV(light[y][x], C_BLACK); CHECKV(white, C_BLACK); edges++; }
+    }
+    CHECK(lit >= 20 && edges >= 10);
+    CHECKV(st.unit[1].x, before.unit[1].x); CHECKV(st.unit[1].z, before.unit[1].z); CHECKV(st.unit[1].hp, before.unit[1].hp);
+    // Misses, healing and Defend keep the normal idle sprite, even during the flash window.
+    st.mode = M_BROWSE;
+    game_render(); game_render();
+    for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) normal[y][x] = sw_level(sx - 8 + x, sy - UNIT_FOOT + y);
+    for (k = 0; k < NABIL && abilities[k].kind != AB_HEAL; k++) ;
+    CHECK(k < NABIL);
+    for (u8 which = 0; which < 3; which++) {
+        st.mode = M_ACT; st.act_t = ACT_HIT + 10; st.hit = which != 0;
+        st.abil = which == 0 ? NO_ABIL : which == 1 ? k : ABIL_DEFEND;
+        game_render();
+        for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) CHECKV(sw_level(sx - 8 + x, sy - UNIT_FOOT + y), normal[y][x]);
+        CHECKV(st.unit[1].hp, before.unit[1].hp);
+    }
+    for (k = 17; k <= 25; k++) { sw_init(k); steps(0, BLADE_END + 1); CHECKV(st.mode, M_ACT); }
+    printf("blows: %u interior pixels light/white, %u black contour pixels kept; nine armed/unarmed doors\n", lit, edges);
+}
+
 // Defend: drawn as FFT draws a support ability; a command after the skill set, Defending until
 // the unit's next turn
 static void test_defend(void)
@@ -1168,6 +1212,7 @@ static void test_defend(void)
     u16 n, d[2] = { 0 }, all[2] = { 0 };
     u8 i;
     for (n = 1; n <= 500; n++) {
+        if (n == 58) continue;                  // inspection door explicitly grants Defend
         sw_init(n);
         for (i = 0; i < NUNIT; i++)
             if (i != U_RAMZA) { all[jobs[st.unit[i].job].row]++; d[jobs[st.unit[i].job].row] += st.unit[i].defend; }
@@ -1215,6 +1260,165 @@ static void test_turns(void)
     for (i = 0; i < 4; i++) wait_turn();
     CHECKV(st.act, 0);
     CHECKV(st.unit[0].ct, 2);
+}
+
+// Milestone 26: names are stable by seed and unique by gender, two reversible Status
+// pages, character details hidden during action/motion, live HP and no terrain readout.
+static void test_interface(void)
+{
+    State original;
+    char names[NUNIT][12];
+    u32 page0, page1, old;
+    u8 i, j;
+    int x, y, ink1 = 0;
+    sw_init(26);
+    original = st;
+    for (i = 0; i < NUNIT; i++) {
+        CHECK(strlen(unit_name(i)) > 0 && strlen(unit_name(i)) <= 11);
+        strcpy(names[i], unit_name(i));
+        for (j = 0; j < i; j++) if (st.unit[i].gfx > UG_DELITA && st.unit[j].gfx > UG_DELITA
+            && st.unit[i].female == st.unit[j].female) CHECK(strcmp(names[j], names[i]));
+    }
+    CHECK(!strcmp(names[U_RAMZA], "Ramza") && !strcmp(names[0], "Delita"));
+    sw_init(26); CHECK(!memcmp(&original, &st, sizeof st));
+    for (i = 0; i < NUNIT; i++) CHECK(!strcmp(names[i], unit_name(i)));
+    sw_init(27); CHECK(strcmp(names[1], unit_name(1)));
+    sw_init(26); steps(0, 30); CHECK(hud_shown());
+    old = sw_checksum(); st.unit[st.act].hp--; st.unit[st.act].ct++;
+    steps(0, 30); CHECK(sw_checksum() != old); CHECK(hud_shown());
+    sw_init(31); steps(0, 12); original = st; page0 = sw_checksum();
+    CHECK(st.page == 0 && st.mode == M_STATUS);
+    press(K_RIGHT); steps(0, 12); page1 = sw_checksum();
+    CHECK(st.page == 1 && st.mode == M_STATUS && page0 != page1);
+    CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
+    press(K_LEFT); steps(0, 12); CHECKV(sw_checksum(), page0);
+    press(K_ESC); CHECKV(st.mode, M_MENU);
+    st.menu = MN_STATUS; press(K_A); steps(0, 12); CHECKV(sw_checksum(), page0);
+    press(K_RIGHT); steps(0, 12);
+    for (i = 0; i < 5; i++) {
+        CHECKV(st.status_row, i); CHECKV(st.status_col, 0);
+        press(K_A); steps(0, 12); CHECK(st.status_info && st.mode == M_STATUS);
+        old = sw_checksum(); CHECK(old != page1);
+        press(K_DOWN); CHECKV(sw_checksum(), old); CHECKV(st.status_row, i);
+        press(K_ESC); steps(0, 12); CHECK(!st.status_info && st.mode == M_STATUS);
+        CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
+        CHECK(!memcmp(original.bag, st.bag, sizeof st.bag));
+        press(K_DOWN);
+    }
+    CHECKV(st.status_row, 0); press(K_UP); CHECKV(st.status_row, 4);
+    for (j = 0; known(st.sel, j) != NO_ABIL; j++) ;
+    press(K_RIGHT); CHECKV(st.status_col, 1); CHECK(st.status_row < j);
+    for (i = 0; i < j; i++) {
+        st.status_row = i; press(K_A); steps(0, 12); CHECK(st.status_info);
+        CHECK(known(st.sel, i) != NO_ABIL);
+        press(K_ESC); CHECK(!st.status_info); CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
+    }
+    press(K_RIGHT); CHECKV(st.page, 0); press(K_ESC); CHECKV(st.mode, M_MENU);
+    sw_init(58); steps(0, 12); CHECK(st.unit[st.sel].defend && known(st.sel, st.status_row) == NO_ABIL);
+    press(K_ESC); CHECK(!st.status_info); press(K_A); CHECK(st.status_info);
+    sw_init(55); steps(0, 12); CHECKV(st.unit[st.sel].eq[st.status_row], 0xFF);
+    sw_init(32); st.unit[st.sel].learned = 0; st.unit[st.sel].defend = 0;
+    st.status_col = 1; st.status_row = 0; press(K_A); steps(0, 12); CHECKV(known(st.sel, st.status_row), NO_ABIL);
+    sw_init(40); st.unit[st.sel].learned = 0xFF; st.unit[st.sel].defend = 1;
+    press(K_RIGHT); st.status_row = 4; press(K_DOWN); steps(0, 12); CHECKV(st.status_row, 5);
+    press(K_A); steps(0, 12); CHECK(st.status_info && known(st.sel, 5) == NO_ABIL);
+    press(K_ESC); press(K_DOWN); CHECKV(st.status_row, 0);
+    // The old height/depth area shows only scenery, on both canal and dry tiles.
+    for (i = 0; i < 2; i++) {
+        sw_init(34); if (i) { st.cx = 4; st.cz = 11; }
+        for (j = 0; j < NUNIT; j++) st.unit[j].x = 200;  // no actor can cover the inspected scenery
+        steps(0, 30);
+        for (y = 0; y < 17; y++) for (x = 128; x < 160; x++) {
+            u16 o = (st.camy + y) * SC_BYTES + ((st.camx + x) >> 3);
+            u8 b = (u8)(0x80 >> ((st.camx + x) & 7));
+            u8 background = (scene_l[o] & b ? 1 : 0) | (scene_d[o] & b ? 2 : 0);
+            ink1 += sw_level(x, y) != background;
+        }
+    }
+    CHECK(ink1 == 0);
+    sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
+    sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());
+    printf("interface: 510 disc names, live character details, selectable equipment/abilities, no terrain readout, hidden during motion/blows\n");
+}
+
+static void test_water(void)
+{
+    u8 i, r, count = 0, base[UNIT_SH][16];
+    s16 u, v, sx, sy, x, y;
+    int upper = 0, edge = 0;
+    // Every actual canal is grounded water in every view; terrain and stats
+    // remain intact. Object markers are excluded from human immersion.
+    for (r = 0; r < 4; r++) {
+        sw_init((u16)(41 + r));
+        for (i = 0; i < MAP_W * MAP_H; i++) if (map_tiles[i].water) {
+            st.unit[U_RAMZA].x = i % MAP_W; st.unit[U_RAMZA].z = i / MAP_W;
+            CHECK(unit_in_water(U_RAMZA)); CHECKV(map_tiles[i].stand, 0);
+            if (!r) count++;
+        }
+    }
+    CHECKV(count, 38);
+    sw_init(50); CHECK(!unit_in_water(1)); CHECK(unit_in_water(U_RAMZA));
+    // A crop reveals the unmodified scene beneath it, including the old shadow.
+    // Freeze clocks/camera, suppress action UI and isolate one standing unit.
+    for (r = 0; r < 4; r++) {
+        sw_init((u16)(41 + r)); steps(0, 30);
+        for (i = 0; i < NUNIT; i++) st.unit[i].x = 200;
+        st.mode = M_ACT; st.atk = 1; st.tgt = 2; st.act_t = 0;
+        view_of(r, 5, 11, &u, &v);
+        sx = scene_x(r, u, v) - st.camx - 8;
+        sy = scene_y(u, v) + HH - st.camy - UNIT_FOOT;
+        game_render();
+        for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) base[y][x] = sw_level(sx + x, sy + y);
+        st.unit[U_RAMZA].x = 5; st.unit[U_RAMZA].z = 11;
+        game_render();
+        for (y = 0; y < UNIT_SH; y++) for (x = 0; x < 16; x++) {
+            u8 pix = sw_level(sx + x, sy + y);
+            if (y >= WATER_ROWS) CHECKV(pix, base[y][x]);
+            else if (pix != base[y][x]) {
+                if (y == WATER_ROWS - 1 && pix == C_LGRAY) edge++;
+                else upper++;
+            }
+        }
+    }
+    CHECK(upper > 30 && edge >= 2);
+    // Actual entry, wade and exit paths: a hop stays whole; the floor landing
+    // changes the pose without altering the movement's destination or duration.
+    sw_init(45); CHECKV(st.mode, M_WALK); CHECK(!unit_in_water(U_RAMZA));
+    steps(0, CLIMB_FRAMES - 1); CHECK(!unit_in_water(U_RAMZA));
+    steps(0, 1); CHECKV(st.mode, M_MENU); CHECK(unit_in_water(U_RAMZA));
+    CHECKV(st.unit[U_RAMZA].x, 5); CHECKV(st.unit[U_RAMZA].z, 11);
+    sw_init(46);
+    for (i = 0; i < WALK_FRAMES; i++) { CHECK(unit_in_water(U_RAMZA)); sw_step(0); }
+    CHECKV(st.mode, M_MENU); CHECK(unit_in_water(U_RAMZA));
+    sw_init(47); CHECK(unit_in_water(U_RAMZA));
+    sw_step(0); CHECK(!unit_in_water(U_RAMZA));
+    steps(0, CLIMB_FRAMES - 1); CHECKV(st.mode, M_MENU); CHECK(!unit_in_water(U_RAMZA));
+    CHECKV(st.unit[U_RAMZA].x, 4); CHECKV(st.unit[U_RAMZA].z, 11);
+    sw_init(48); steps(0, ACT_HIT + 1); CHECKV(st.mode, M_ACT); CHECK(unit_in_water(U_RAMZA));
+    CHECK(st.unit[1].hp < st.unit[1].max_hp);
+    printf("water: 38 canals x four views; scene exposed below cut, light edge, entry/wade/exit, wet attack and object graphics retained\n");
+}
+
+// The displayed prediction against complete clock advances, including ties,
+// every supported Speed and crossings just short of the 100 CT threshold.
+static void test_turn_prediction(void)
+{
+    u8 speed, i, predicted[ORDER_N];
+    for (speed = 1; speed <= 50; speed++) {
+        sw_init(10);
+        for (i = 0; i < NUNIT; i++) {
+            st.unit[i].sp = (u8)(1 + (speed + 7 * i) % 50);
+            st.unit[i].ct = (u8)((17 * speed + 29 * i) % 100);
+        }
+        st.act = ct_next();
+        turn_order(); memcpy(predicted, st.turns, sizeof predicted);
+        CHECKV(predicted[0], st.act);
+        for (i = 1; i < ORDER_N; i++) {
+            ct_end(st.act, 1, 1);
+            st.act = ct_next(); CHECKV(predicted[i], st.act);
+        }
+    }
+    printf("turn prediction: 300 displayed entries equal complete CT clock advances, Speed 1..50\n");
 }
 
 static void shots(void)
@@ -1332,7 +1536,11 @@ int main(int argc, char **argv)
     test_ai();
     test_ai_battle();
     test_pace();
+    test_blows();
     test_defend();
+    test_interface();
+    test_water();
+    test_turn_prediction();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
     return fails != 0;

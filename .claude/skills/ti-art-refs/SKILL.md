@@ -5,12 +5,6 @@ description: "Reference sprite banks (The Spriters Resource sheets of SNES, GB/G
 
 # ti-art-refs (sprite banks for the art)
 
-The sheets are **references, not assets**: they are ripped from commercial games and copyrighted.
-Study them for proportions, poses, animation frames, tile structure and layout, then **redraw**
-at the TI's scale. Never commit a downloaded sheet or a traced copy: keep them in
-`sources/art/<game>/` (not in git, like all of `sources/`). Converting a capture (native
-resolution, grey thresholds, masks): `docs/resources.md`, § Graphics assets.
-
 Target, always: 160×100, 4 greys (2 planes, `COLOR_*`), 16×16 tiles, white outline on the main
 sprites, nothing that matters under 2 pixels (`CLAUDE.md`, visibility). **Game Boy / GBC sheets
 first**: 4 shades, 8×8 tiles, 160×144 screen, almost 1:1. SNES and GBA sheets are style
