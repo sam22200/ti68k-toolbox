@@ -55,10 +55,10 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define CLIMB_FRAMES 10                // a step up, down or over a tile (FFT: ~21)
 #define WATER_ROWS (UNIT_FOOT - HU)    // depth 1: crop at the projected surface, clear edge above it
 #define PATH_MAX 16
-#define AI_GLIDE 2                     // AI turns: frames per tile of the cursor gliding to the
-#define AI_SHOW 8                      // tile it moves to, then its move range shown; the preview
-#define AI_PREVIEW 15                  // on its target, then an ability's name (FFT: ~1 s)
-#define AI_NAME 30
+#define AI_GLIDE 3                     // AI turns: frames per tile of the cursor gliding to the
+#define AI_SHOW 16                     // tile it moves to, then its move range shown; the preview
+#define AI_PREVIEW 30                  // on its target, then an ability's name (FFT: ~1 s; all
+#define AI_NAME 45                     // slowed down for the TI's small screen, the user's pick)
 #define AI_NONE 0xFD                   // an AI plan without an action
 #define ORDER_N 6                      // turns shown in the HUD, the active one first
 // the death counter (Unit.dc): 3..0 while KO, then the unit is a crystal or a chest on its tile,
@@ -238,6 +238,7 @@ u8 ai_facing(u8 a);
 u8 view_hides(u8 rot, u8 i);           // rows of unit i's sprite view rot hides (4 columns, 0..88):
 #ifndef __m68k__                        // from the map's heights; from the current view's depth
 u8 view_hides_now(u8 i);
+u8 hud_ready(void);                     // every panel and menu due this frame drawn
 #endif
 u16 scene_checksum(void);              // the scene buffer (tests)
 extern u8 *scene_l, *scene_d;          // the scene buffer planes (SC_BYTES x SC_H)
