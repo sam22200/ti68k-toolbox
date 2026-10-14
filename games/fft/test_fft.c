@@ -378,11 +378,11 @@ static void test_walk_keys(void)
     press(K_A);
     CHECKV(st.mode, M_WALK);
     for (k = 0; k < 40 && st.mode == M_WALK; k++) sw_step(0);
-    CHECKV(st.mode, M_MENU);                              // back to the menu, on Wait
-    CHECKV(st.menu, MN_WAIT);
+    CHECKV(st.mode, M_MENU);                              // back to the menu, on Act
+    CHECKV(st.menu, MN_ACT);
     CHECK(st.unit[U_RAMZA].x == 4 && st.unit[U_RAMZA].z == 9);
     CHECKV(st.unit[U_RAMZA].face, 3);                     // facing its last step: -z
-    press(K_A);                                           // Wait: the facing
+    press(K_DOWN); press(K_A);                            // Wait: the facing
     CHECKV(st.mode, M_FACE);
     press(K_RIGHT);                                       // view +u = world +x at r 0
     CHECKV(st.unit[U_RAMZA].face, 0);
@@ -504,7 +504,8 @@ static void test_menu(void)
     press(K_A); press(K_UP); press(K_UP); press(K_A);     // Move to (4, 9)
     for (k = 0; k < 40 && st.mode == M_WALK; k++) sw_step(0);
     CHECK(st.unit[U_RAMZA].z == 9 && st.moved);
-    press(K_UP); press(K_UP);                             // Move is greyed: nothing
+    CHECKV(st.menu, MN_ACT);                              // on Act
+    press(K_UP);                                          // Move is greyed: nothing
     CHECKV(st.menu, MN_MOVE);
     press(K_A);
     CHECKV(st.mode, M_MENU);
@@ -1336,9 +1337,33 @@ static void test_interface(void)
         }
     }
     CHECK(ink1 == 0);
-    sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
-    sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());
-    printf("interface: 510 disc names, live character details, selectable equipment/abilities, no terrain readout, hidden during motion/blows\n");
+    sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(hud_shown()); CHECK(hud_ready());
+    sw_init(37); steps(0, 24); CHECKV(st.mode, M_ACT); CHECK(hud_shown()); CHECK(hud_ready());
+    printf("interface: 510 disc names, live character details, selectable equipment/abilities, no terrain readout, shown during motion/blows\n");
+}
+
+// frames until the HUD due is drawn, from now (keys k pressed on the first)
+static int hud_frames(u32 k)
+{
+    int n = 1;
+    press(k);
+    while (!hud_ready() && n < 200) { sw_step(0); n++; }
+    return n;
+}
+
+static void test_latency(void)
+{
+    int a, b, c, d;
+    sw_init(26); steps(0, 40);
+    a = hud_frames(K_ESC);                       // menu -> looking around: Ramza's portrait
+    st.cx = st.unit[7].x; st.cz = st.unit[7].z;  // onto a unit: its portrait too
+    b = hud_frames(0);
+    sw_init(26); steps(0, 40);
+    c = hud_frames(K_A);                         // Move: the reach and the portrait
+    sw_init(36); while (st.mode == M_WALK) sw_step(0);
+    d = hud_frames(0);                           // after a walk: the menu again
+    CHECK(a <= 2); CHECK(b <= 6); CHECK(c <= 2); CHECK(d <= 6);
+    printf("latency: esc %d, browse onto a unit %d, move %d, menu after a walk %d frames\n", a, b, c, d);
 }
 
 static void test_water(void)
@@ -1513,6 +1538,7 @@ static void shots(void)
 int main(int argc, char **argv)
 {
     if (argc > 1 && !strcmp(argv[1], "--find")) { find_spots(); return 0; }
+    if (argc > 1 && !strcmp(argv[1], "--latency")) { test_latency(); return fails != 0; }
     if (argc > 1 && !strcmp(argv[1], "--hides")) { verbose_hides = 1; test_hides(); return 0; }
     ai_diff = argc > 1 && !strcmp(argv[1], "--ai");
     test_rotations();
@@ -1539,6 +1565,7 @@ int main(int argc, char **argv)
     test_blows();
     test_defend();
     test_interface();
+    test_latency();
     test_water();
     test_turn_prediction();
     shots();

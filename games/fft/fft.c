@@ -14,7 +14,8 @@
 
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
 #include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking,
-                                         // 9 an AI unit's thinking (a frame's step), 10 the new reach rings
+                                         // 9 an AI unit's thinking (a frame's step), 10 the new reach rings,
+                                         // 11 a menu part, 12 a panel part
 #define ZB(n) BENCH_BEGIN(n)
 #define ZE(n) BENCH_END(n)
 #else
@@ -153,10 +154,13 @@ typedef struct {
                                         // known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
-    u16 pan[2][3][PANEL_ROWS * RT_PBYTES / 2]; // 80-wide planes and opacity mask; scene shows through
     u16 forecast[3][7 * RT_PBYTES / 2]; // centered outlined prediction above the comparison arrow
-    u16 pan_k[2][7];                    // actor/stats, compact forecast target + ability
-    u8 pan_n[2];                        // cutout portrait, name, HP, MP, level
+    u16 pan_k[2][7], pan_fk[2][7];      // actor/stats, compact forecast target + ability: being made, shown
+    u16 fc_key;                         // the forecast made (target | ability << 8)
+    u8 pan_n[2], pan_f[2], pan_ok[2];   // parts made (cutout portrait, name, HP, MP, level), the
+                                        // buffer shown, one shown
+    u8 tag_w[2], tag_ok;                // the tags' widths, made
+    u8 hud_ok;                          // every panel and menu due this frame drawn (tests)
     u8 arrow[4][2][8];
     u16 status[2][RT_PSIZE / 2];        // full-screen Status, assembled a line per frame
     u8 status_i, status_page, status_n;
@@ -209,6 +213,10 @@ typedef struct {
     s16 left, upd_k;                    // the frame's budget left for optional work, the update's
                                         // heavy work this frame (k cycles)
                                         // the last one's checksum
+    // last: the big HUD caches (the fields above keep 16-bit offsets)
+    u16 pan[2][2][3][PANEL_ROWS * RT_PBYTES / 2]; // per side, two 80-wide planes and opacity masks:
+                                        // the one shown, the one being made (scene shows through)
+    u16 tag[2][3][7 * RT_PBYTES / 2];   // "Enemy" / "Guest" above a portrait, made once
 } Work;
 static Work *W;
 static u8 bg_usable(void);
@@ -2683,7 +2691,7 @@ void game_scenario(u16 n)
             if (n == 58) { st.unit[st.sel].defend = 1; for (i = 0; i < SET_N && known(st.sel, i) != NO_ABIL; i++) ; st.status_row = i; }
         }
     }
-    W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->win_k[0] = 0;
+    W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->pan_ok[0] = W->pan_ok[1] = 0; W->fc_key = 0; W->win_k[0] = 0;
     cam_target(&st.camx, &st.camy);
     hl_seq++;
 }
@@ -2900,6 +2908,7 @@ static u8 ai_shown(void)
         }
         return 0;
     }
+    if (!W->hud_ok) return 0;                   // the time shown counts once the HUD is drawn
     return ++st.ai_t >= (st.ai == AI_MOVE ? AI_SHOW : st.ai_ab == NO_ABIL ? AI_PREVIEW : AI_PREVIEW + AI_NAME);
 }
 
@@ -3035,9 +3044,9 @@ u8 game_update(void)
             st.unit[st.sel].x = st.path[st.path_i][0];
             st.unit[st.sel].z = st.path[st.path_i][1];
             st.cx = st.unit[st.sel].x; st.cz = st.unit[st.sel].z;
-            if (st.path_i + 1 >= st.path_n) {      // back to the menu, on Wait (no Act yet), or
-                u8 i;                              // a crystal or a chest there picked up
-                st.mode = M_MENU; st.moved = 1; st.menu = MN_WAIT;
+            if (st.path_i + 1 >= st.path_n) {      // back to the menu, on Act (Wait once acted),
+                u8 i;                              // or a crystal or a chest there picked up
+                st.mode = M_MENU; st.moved = 1; st.menu = st.acted ? MN_WAIT : MN_ACT;
                 for (i = 0; i < NUNIT; i++)
                     if (st.unit[i].x == st.cx && st.unit[i].z == st.cz && DC_OBJ(st.unit[i].dc)) pick_up(st.sel, i);
                 if (st.ai && st.mode == M_MENU) ai_next();
@@ -3341,9 +3350,10 @@ static void outlined_text(u8 *l, u8 *d, u8 *mask, s16 x, s16 y, const char *s, s
     }
 }
 
+#define PAN_MAKE(side) W->pan[side][W->pan_f[side] ^ 1]   // the panel being made
 static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
 {
-    outlined_text((u8 *)W->pan[side][0], (u8 *)W->pan[side][1], (u8 *)W->pan[side][2], x, y, s, limit);
+    outlined_text((u8 *)PAN_MAKE(side)[0], (u8 *)PAN_MAKE(side)[1], (u8 *)PAN_MAKE(side)[2], x, y, s, limit);
 }
 
 static u8 ui_width(const char *s)
@@ -3365,7 +3375,7 @@ static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
     draw_rect(x, y, PANEL_GAUGE_W + 2, 2, C_WHITE);
     draw_rect(x + 1, y, PANEL_GAUGE_W, 2, C_LGRAY);
     if (n) draw_rect(x + 1, y, n, 2, color);
-    rt_light = rt_dark = W->pan[side][2];
+    rt_light = rt_dark = PAN_MAKE(side)[2];
     draw_rect(x + 1, y - 1, PANEL_GAUGE_W, 4, C_BLACK);
     draw_rect(x, y, PANEL_GAUGE_W + 2, 2, C_BLACK);
     rt_light = sl; rt_dark = sd;
@@ -3407,15 +3417,15 @@ static void make_panel(u8 side, u8 i)
     u8 k = W->pan_n[side]++, n;
     s16 x = side ? TARGET_STATS_X : 22, limit = side ? 60 : 74;
     char s[24];
-    rt_light = W->pan[side][0]; rt_dark = W->pan[side][1];
+    rt_light = PAN_MAKE(side)[0]; rt_dark = PAN_MAKE(side)[1];
     if (!k) {
-        memset(W->pan[side], 0, sizeof W->pan[side]);
+        memset(PAN_MAKE(side), 0, sizeof PAN_MAKE(side));
         u8 mirror = !side;
         const u8 *p = igfx + UI_PORTRAITS + (u16)(u->gfx * 2 + mirror) * 348 + 232;
         u8 r;
         portrait(u->gfx, mirror, side ? 61 : 0, 0);
         for (r = 0; r < 29; r++) {
-            u8 *m = (u8 *)W->pan[side][2] + r * RT_PBYTES;
+            u8 *m = (u8 *)PAN_MAKE(side)[2] + r * RT_PBYTES;
             u32 bits = ~RD32(p, r * 2);
             if (side) {
                 WR16(m, 3, (u16)(bits >> 29));
@@ -3426,11 +3436,13 @@ static void make_panel(u8 side, u8 i)
         u16 f = W->pan_k[side][6];
         const char *name = unit_name(i);
         panel_text(side, side ? limit - ui_width(name) : x, 1, name, limit);
-        if (!side && f) make_forecast(i, (u8)f - 1, (u8)((f >> 8) - 1));
+        if (!side && f) { make_forecast(i, (u8)f - 1, (u8)((f >> 8) - 1)); W->fc_key = f; }
     }
     else if (k == 4) {
         n = put_s(s, 0, "Lv"); n = put_n(s, n, u->level); s[n] = 0;
         panel_text(side, side ? 62 : 1, 23, s, side ? 80 : 20);
+        W->pan_f[side] ^= 1; W->pan_ok[side] = 1;  // made: shown from now on
+        memcpy(W->pan_fk[side], W->pan_k[side], sizeof W->pan_fk[side]);
     } else {
         u16 v = k == 2 ? u->hp : u->mp, m = k == 2 ? u->max_hp : u->max_mp;
         u8 width;
@@ -3458,8 +3470,8 @@ static void draw_forecast(void)
 // The cached panel is aligned to ten bytes on either screen side, so its mask needs no shifts.
 static void draw_panel(u8 side)
 {
-    const u8 *l = (const u8 *)W->pan[side][0], *d = (const u8 *)W->pan[side][1];
-    const u8 *m = (const u8 *)W->pan[side][2];
+    const u8 *l = (const u8 *)W->pan[side][W->pan_f[side]][0], *d = (const u8 *)W->pan[side][W->pan_f[side]][1];
+    const u8 *m = (const u8 *)W->pan[side][W->pan_f[side]][2];
     u8 *p = (u8 *)rt_light + PANEL_Y * RT_PBYTES + (side ? 10 : 0);
     u8 *q = (u8 *)rt_dark + PANEL_Y * RT_PBYTES + (side ? 10 : 0), r;
     for (r = 0; r < PANEL_ROWS; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
@@ -3571,17 +3583,81 @@ static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
     }
 }
 
+// "Enemy" and "Guest", outlined, once: drawn above a portrait of that team
+static void make_tags(void)
+{
+    static const char *const names[2] = { "Enemy", "Guest" };
+    u8 t;
+    memset(W->tag, 0, sizeof W->tag);
+    for (t = 0; t < 2; t++) {
+        outlined_text((u8 *)W->tag[t][0], (u8 *)W->tag[t][1], (u8 *)W->tag[t][2], 1, 1, names[t], 31);
+        W->tag_w[t] = ui_width(names[t]);
+    }
+    W->tag_ok = 1;
+}
+
+// the tag over the outer edge of a side's portrait: left-aligned on the left, right on the right
+static void draw_tag(u8 side, u8 t)
+{
+    u8 r, sh = side ? (u8)(30 - W->tag_w[t]) : 0;
+    const u8 *l = (const u8 *)W->tag[t][0], *d = (const u8 *)W->tag[t][1], *m = (const u8 *)W->tag[t][2];
+    u8 *p = (u8 *)rt_light + (PANEL_Y - 7) * RT_PBYTES + (side ? 16 : 0);
+    u8 *q = (u8 *)rt_dark + (PANEL_Y - 7) * RT_PBYTES + (side ? 16 : 0);
+    for (r = 0; r < 7; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
+        u32 k = ~(RD32(m, 0) >> sh);
+        WR32(p, 0, (RD32(p, 0) & k) | RD32(l, 0) >> sh);
+        WR32(q, 0, (RD32(q, 0) & k) | RD32(d, 0) >> sh);
+    }
+}
+
+// what a side's panel shows: the unit, its HP, MP, level and maxima, the forecast (side 0)
+static void panel_keys(u8 side, u8 who, u16 forecast_key, u16 *keys)
+{
+    const Unit *u = &st.unit[who - 1];
+    keys[0] = who; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->level;
+    keys[4] = u->max_hp; keys[5] = u->max_mp;
+    keys[6] = side ? 0 : forecast_key;
+}
+
+// a part of a panel to make (the one shown stays until the new one is whole); any?
+static u8 panel_part(const u8 *pk, u16 forecast_key)
+{
+    u8 i, j;
+    for (i = 0; i < 2; i++) if (pk[i]) {
+        u16 keys[7];
+        u8 diff = 0, shown = W->pan_ok[i];
+        panel_keys(i, pk[i], forecast_key, keys);
+        for (j = 0; j < 7; j++) { diff |= keys[j] != W->pan_k[i][j]; shown &= keys[j] == W->pan_fk[i][j]; }
+        if (diff) { for (j = 0; j < 7; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = shown ? 5 : 0; }
+        if (W->pan_n[i] < 5) { ZB(12); make_panel(i, pk[i] - 1); ZE(12); return 1; }
+    }
+    return 0;
+}
+
+// a side's panel shown and up to date?
+static u8 panel_shown(u8 side, u8 who, u16 forecast_key)
+{
+    u16 keys[7];
+    panel_keys(side, who, forecast_key, keys);
+    return W->pan_ok[side] && !memcmp(keys, W->pan_fk[side], sizeof keys);
+}
+
+// The HUD's parts are made one a frame at least (more while the budget has room): a menu, then
+// the panels; the active unit (or the attacker) on the left, the unit under the cursor (or the
+// target) on the right, during moves and blows too
 static void draw_hud(void)
 {
-    u8 o, i, k[3], pk[2], forecast = 0, hidden = st.mode == M_WALK || st.mode == M_ACT || st.turn;
+    u8 o, i, k[3], pk[2], forecast = 0, hidden = st.turn, parts;
+    u8 pre = st.mode == M_WALK && !st.ai, ahead = 0;   // the menu after the walk made during it
     u16 forecast_key;
-    u8 changed = 0;
     o = unit_at(st.cx, st.cz);
-    pk[0] = hidden ? 0 : st.act + 1;
-    pk[1] = !hidden && o && o - 1 != st.act && (st.mode == M_AIM || st.mode == M_BROWSE || st.mode == M_TARGET) ? o : 0;
+    pk[0] = hidden ? 0 : st.mode == M_ACT ? st.atk + 1 : st.act + 1;
+    pk[1] = hidden ? 0 : st.mode == M_ACT ? (st.tgt != st.atk ? st.tgt + 1 : 0)
+        : o && o - 1 != st.act && (st.mode == M_AIM || st.mode == M_BROWSE || st.mode == M_TARGET) ? o : 0;
     k[0] = st.mode == M_MENU || st.mode == M_ACTS || st.mode == M_SKILLS
         || st.mode == M_PICK || st.mode == M_ORDER || st.mode == M_QUIT ? st.mode : 0;
-    k[1] = k[0] == M_MENU ? (u8)(st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == 0xFF
+    if (pre) k[0] = M_MENU;
+    k[1] = k[0] == M_MENU ? (u8)(pre | st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == 0xFF
         : k[0] == M_PICK ? st.pick : k[0] == M_ORDER ? st.turns[1] : 0;
     k[2] = st.act;
     if (st.mode == M_AIM && o && st.reach[st.cz * MAP_W + st.cx] == 1 && aim_ok(o - 1)) {
@@ -3592,36 +3668,41 @@ static void draw_hud(void)
     }
     if (k[0] == M_AIM) { forecast = k[2] + 1; k[0] = 0; }
     forecast_key = forecast ? (u16)((u16)(u8)(st.abil + 1) << 8 | forecast) : 0;
-    if (W->left >= HUD_K || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) {
-        W->hud_wait = 0;
+    // one part even without room (the budget reckons high), but not in a frame already full,
+    // unless it waited WAIT_MAX frames
+#ifdef LEFT_TRACE
+    BENCH_VALUE((u32)(u16)W->left);
+#endif
+    if (W->left >= 0 || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) W->hud_wait = 0;
+    for (parts = W->hud_wait ? 1 : 0; parts == 0 || W->left >= HUD_K; parts++) {
+        u8 win = k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2] || W->win_n < W->win_m);
+        if (win && (!pre || ahead)) {              // a menu first; one made ahead after the panels
+            if (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2]) {
+                for (i = 0; i < 3; i++) W->win_k[i] = k[i];
+                W->win_n = 0;
+            }
+            ZB(11); make_window(); ZE(11);
+        } else if (!W->tag_ok) make_tags();
+        else if (panel_part(pk, forecast_key)) ;
+        else if (win) { ahead = 1; continue; }
+        else break;
         W->left -= HUD_K;
-        if (k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2])) {
-            for (i = 0; i < 3; i++) W->win_k[i] = k[i];
-            W->win_n = 0; make_window(); changed = 1;
-        } else if (k[0] && W->win_n < W->win_m) { make_window(); changed = 1; }
-        if (!changed) for (i = 0; i < 2; i++) if (pk[i]) {
-            const Unit *u = &st.unit[pk[i] - 1];
-            u16 keys[7]; u8 j, diff = 0;
-            keys[0] = pk[i]; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->level;
-            keys[4] = u->max_hp; keys[5] = u->max_mp;
-            keys[6] = i ? 0 : forecast_key;
-            for (j = 0; j < 7; j++) diff |= keys[j] != W->pan_k[i][j];
-            if (diff) { for (j = 0; j < 7; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = 0; }
-            if (W->pan_n[i] < 5) { make_panel(i, pk[i] - 1); break; }
-        }
     }
-    for (i = 0; i < 2; i++) if (pk[i] && W->pan_k[i][0] == pk[i] && W->pan_n[i] == 5)
+    for (i = 0; i < 2; i++) if (pk[i] && W->pan_ok[i] && W->pan_fk[i][0] == pk[i]) {
+        u8 team = st.unit[pk[i] - 1].team;
         draw_panel(i);
-    if (forecast && W->pan_n[0] == 5 && W->pan_k[0][0] == pk[0] && W->pan_k[0][6] == forecast_key)
+        if (team != TEAM_PLAYER) draw_tag(i, team == TEAM_GUEST);
+    }
+    if (forecast && W->fc_key == forecast_key && W->pan_ok[0] && W->pan_fk[0][0] == pk[0])
         draw_forecast();
-    if (forecast && W->pan_k[0][6] == forecast_key && W->pan_n[0] == 5 && W->pan_n[1] == 5
-        && W->pan_k[0][0] == pk[0] && W->pan_k[1][0] == pk[1]) {
+    if (forecast && W->fc_key == forecast_key && W->pan_ok[0] && W->pan_ok[1]
+        && W->pan_fk[0][0] == pk[0] && W->pan_fk[1][0] == pk[1]) {
         static const u8 arrow[11] = { 0, 0x60, 0x30, 0x18, 0x0C, 0x06, 0x0C, 0x18, 0x30, 0x60, 0 };
         static const u8 mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 0x81, 0x03, 0x07, 0x0F };
         RtSprite sp = { 8, 11, arrow, arrow, mask };
         draw_sprite(76, PANEL_Y + 9, &sp);
     }
-    if (!hidden && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
+    if (!hidden && !pre && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
         u8 y = k[0] == M_ACT ? PANEL_Y - W->win_h : RT_H - W->win_h;
         u8 r;
         u16 *l = (u16 *)rt_light + y * (RT_PBYTES / 2) + 6;
@@ -3639,7 +3720,13 @@ static void draw_hud(void)
             draw_hand(80, y + 7 + 6 * e);
         }
     }
+    W->hud_ok = (!pk[0] || panel_shown(0, pk[0], forecast_key)) && (!pk[1] || panel_shown(1, pk[1], forecast_key))
+        && (hidden || pre || !k[0] || (W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m));
 }
+
+#ifndef __m68k__
+u8 hud_ready(void) { return W && W->hud_ok; }
+#endif
 
 static const char *const signs[12] = { "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces" };
