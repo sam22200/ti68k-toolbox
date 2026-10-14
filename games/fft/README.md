@@ -104,9 +104,14 @@ prediction (`-24HP 95%`, `+30HP 100%`, or an amount range/status) above the comp
 both names stay visible. The prediction is outlined over the scenery, with a white outlined
 chevron between the two panels. The separate TARGET window is gone. A black title tab,
 light-grey framed panel and white glove extending outside its left edge follow FFT's
-command menu; Act and skill lists replace the menu in place. Details and menus disappear
+command menu; Act and skill lists replace the menu in place. The glove is 18 pixels wide
+including its outline, moving three pixels sideways over a one-second cycle; at its
+rightmost position one pixel separates its tip from the text. Above the frame only the
+title tab is drawn, with scenery around it and no white horizontal highlight.
+Details and menus disappear
 during walking and action animations. A native FFT-style pointer marks the active unit above its
-head: a ring, crossbar and pointed blade, drawn in a padded 16x13 sprite with a white silhouette outline;
+head: a ring, crossbar and pointed blade, eight pixels wide including its white outline,
+drawn in a padded 16x13 sprite;
 enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
 without duplicates at each battle with a separate deterministic generator; Ramza and Delita
 keep their names. Scenarios (`fft(n)`, `--scenario n`):
@@ -162,7 +167,7 @@ make ti           # fft.89z, fftu.89y, fftw.89y, ffti.89y, fftv0.89y .. fftv3.89
 make xcheck       # the TI binary under ti-cycles = the PC, 40 scenarios
 make check-blows  # 87 PC/TI screens, frame costs for every blow phase and six complete replays
 make check-interface # 177 partial-build / page / inspection / input PC/TI screens; every UI frame <= 360k
-make review-interface # x/m26_interface.png and x/status_details.png: native menus / Status
+make review-interface # x/m26_interface.png, x/status_details.png and animated x/hand_menu.gif
 make review-blows # x/m25_blows.png: nine blows in eleven frames (original sword/dagger, bare hands)
 ../../tools/pyenv/bin/python tools/oracle.py DISC.cue ../../sources/fft_ps1/gariland_t1.state trace.txt
                   # the original at Ramza's first Gariland turn (30 s, RE_NOTES.md)
@@ -417,7 +422,9 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   aligned long operations per row above the HUD.
   Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
   Only changed HP/MP, maxima, level, unit or forecast target/ability rebuild a panel; cached fields are reset at a new battle or on
-  entering Status. Marker and white glove use ExtGraph sprites. Status cursor movement
+  entering Status. Marker and white glove use ExtGraph sprites. An eight-byte lookup
+  moves the 32-wide padded glove without rebuilding the menu; the title's first row
+  masks its three rows above the frame so the scenery stays visible. Status cursor movement
   overlays the cached list; opening or closing a detail rebuilds its nine parts. The frame budget reserves
   65k for base work and 60k for one optional UI part. A newly completed background cache
   cannot force HUD/cursor work in the expensive frame that created it; it saves work from
@@ -436,6 +443,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| narrower marker / animated glove / transparent menu top: UI doors, AI battle and defeat replay | 295,790; 349,660 / 356,348 at most | 32 fps (frame-limited) |
 | smaller marker / FFT hand menus / Status inspection: UI doors, AI battle and defeat replay | 295,764; 349,634 / 356,322 at most | 32 fps (frame-limited) |
 | target spacing / native active marker: UI doors, AI battle and defeat replay | 298,486; 350,712 / 357,400 at most | 32 fps (frame-limited) |
 | compact attack HUD: UI doors, AI battle and defeat replay | 317,566; 356,116 / 357,410 at most | 32 fps (frame-limited) |
@@ -453,7 +461,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 64,937 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 65,133 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
 unpacked view 52,320 bytes plus scene/work allocation 54,332 bytes (~107 KB of game buffers;

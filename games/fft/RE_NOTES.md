@@ -924,6 +924,22 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   allocations 52,320 and 54,332 bytes. Review: `x/m26_interface.png` and
   `x/status_details.png`. No hardware path changed or TiEmu interaction.
 
+### Animated glove and narrower pointer refinement
+
+- TARGET / IMPLEMENTATION (user's marked-up native screenshot): active marker outline
+  width 10 -> 8 pixels, keeping its 13-row height and existing camera framing. Glove
+  outline width 15 -> 18 pixels, padded to 32 for the existing ExtGraph sprite primitive.
+  An eight-byte lookup gives a three-pixel sideways motion in 32 native frames; the
+  maximum-right tip leaves a one-pixel gap before menu and Status text. This cadence is
+  a native visual adaptation, not an original FFT timing measurement.
+- TARGET / IMPLEMENTATION: remove the horizontal white highlight and draw only the
+  title tab above the frame. Its cached first row masks the three upper rows, preserving
+  scenery in the rest of that strip without another cache or background redraw.
+- CHECKED: tests, 58 PC/TI scenarios, 177 interface screens and 87 blow/replay screens
+  pass. Peaks: UI 295,790, AI battle 349,660, defeat 356,348 cycles; all <=360,000.
+  Program 65,133 bytes; RAM allocations unchanged. `make review-interface` now writes
+  `x/hand_menu.gif` from eight real framebuffer captures over one full animation cycle.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible
