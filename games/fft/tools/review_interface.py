@@ -29,3 +29,14 @@ for i, name in enumerate(('Weapon', 'Head', 'Empty shield', 'Wish', 'Potion', 'D
     x, y = i % 3 * 640, i // 3 * 428
     draw.text((x + 5, y + 5), name, fill='black'); details.paste(Image.open(path), (x, y + 23))
 details.save(OUT / 'status_details.png'); print(OUT / 'status_details.png')
+
+# One second of the real framebuffer: wider glove moving up to the text and back.
+frames = []
+for frame in range(40, 72, 4):
+    path = OUT / ('hand_%d.png' % frame)
+    subprocess.run(['./fft_pc', '--headless', '--scenario', '28', '--frames', str(frame),
+                    '--scale', '4', '--shot', str(path)], check=True, stdout=subprocess.DEVNULL)
+    frames.append(Image.open(path).copy())
+frames[0].save(OUT / 'hand_menu.gif', save_all=True, append_images=frames[1:],
+               duration=125, loop=0, disposal=2)
+print(OUT / 'hand_menu.gif')

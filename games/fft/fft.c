@@ -3506,8 +3506,7 @@ static void make_window(void)
                 u16 e = body ? r == 3 || r == h - 1 ? 0xFFFF : i == 0 ? 0x8000 : i == 3 ? 1 : 0 : 0;
                 u16 light = body ? 0xFFFF : 0;
                 if (body && r > 3 && r < h - 1) {
-                    if (r == 4) light = e;
-                    else if (!i) light &= (u16)~0x4000;
+                    if (!i) light &= (u16)~0x4000;
                 }
                 WR16((u8 *)l, r * (RT_PBYTES / 2) + i, light);
                 WR16((u8 *)d, r * (RT_PBYTES / 2) + i, e);
@@ -3555,8 +3554,9 @@ static void make_window(void)
 
 static void draw_hand(s16 x, s16 y)
 {
-    RtSprite sp = { 16, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
-    draw_sprite(x, y, &sp);
+    static const u8 sway[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
+    RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
+    draw_sprite(x + sway[(st.tick >> 2) & 7], y, &sp);
 }
 
 // Terrain readout over the scenery: black glyphs with a one-pixel white outline.
@@ -3663,10 +3663,20 @@ static void draw_hud(void)
     }
     if (!hidden && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
         u8 y = k[0] == M_ACT ? PANEL_Y - W->win_h : RT_H - W->win_h;
-        copy_box(W->win[0], W->win[1], 12, y, W->win_w, W->win_h);
+        u8 r;
+        u16 *l = (u16 *)rt_light + y * (RT_PBYTES / 2) + 6;
+        u16 *d = (u16 *)rt_dark + y * (RT_PBYTES / 2) + 6;
+        // Above the frame, copy only the title tab; the scenery fills the rest.
+        for (r = 0; r < 3; r++, l += RT_PBYTES / 2, d += RT_PBYTES / 2)
+            for (i = 0; i < W->win_w; i++) {
+                u16 keep = (u16)~W->win[0][i];
+                l[i] = (l[i] & keep) | W->win[0][r * (RT_PBYTES / 2) + i];
+                d[i] = (d[i] & keep) | W->win[1][r * (RT_PBYTES / 2) + i];
+            }
+        copy_box(W->win[0] + 3 * (RT_PBYTES / 2), W->win[1] + 3 * (RT_PBYTES / 2), 12, y + 3, W->win_w, W->win_h - 3);
         if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
-            draw_hand(82, y + 8 + 6 * e);
+            draw_hand(79, y + 8 + 6 * e);
         }
     }
 }
@@ -3756,20 +3766,20 @@ static void draw_status(void)
             s[n] = 0; ui_text(6, 38 + 8 * (k - 3), s, C_BLACK, 159);
         } else {
             if (k == 3) {
-                ui_text(18, 38, "EQUIPMENT", C_DGRAY, 81);
-                ui_text(98, 38, "ABILITIES", C_DGRAY, 159);
+                ui_text(23, 38, "EQUIPMENT", C_DGRAY, 81);
+                ui_text(103, 38, "ABILITIES", C_DGRAY, 159);
             } else {
                 u8 slot = k - 4, ab = known(st.sel, slot);
-                ui_text(18, 47 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
-                ui_text(98, 47 + 8 * slot, ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-" : abilities[ab].name, C_BLACK, 159);
-                if (!slot && u->defend && status_ability_count() == 6) ui_text(98, 87, "Defend", C_BLACK, 159);
+                ui_text(23, 47 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
+                ui_text(103, 47 + 8 * slot, ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-" : abilities[ab].name, C_BLACK, 159);
+                if (!slot && u->defend && status_ability_count() == 6) ui_text(103, 87, "Defend", C_BLACK, 159);
             }
         }
     }
     rt_light = sl; rt_dark = sd;
     copy_box(W->status[0], W->status[1], 0, 0, 10, RT_H);
     if (st.page && !st.status_info && W->status_n == 9)
-        draw_hand(st.status_col ? 82 : 0, 46 + 8 * st.status_row);
+        draw_hand(st.status_col ? 80 : 0, 46 + 8 * st.status_row);
 }
 
 static void draw_active(const Feet *f)
