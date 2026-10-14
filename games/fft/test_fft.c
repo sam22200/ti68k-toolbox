@@ -200,9 +200,9 @@ static int shown(u8 i)
     st.unit[i].x = 200;                                   // out of the map: not drawn
     sw_step(0);
     mid = 0;
-    for (y = 8; y < RT_H; y++)                            // exclude the height and bottom bands
+    for (y = 8; y < RT_H; y++)                            // exclude the height and bottom details
         for (x = 0; x < RT_W; x++)
-            if ((y < 71 && (y >= 17 || x < 128)) && with[y][x] != sw_level(x, y)) {
+            if ((y < 64 && (y >= 17 || x < 128)) && with[y][x] != sw_level(x, y)) {
                 n++; mid += with[y][x] == 1 || with[y][x] == 2;
             }
     st = save;
@@ -418,11 +418,11 @@ static void test_walk_keys(void)
 // [APPS] opens the turn order over any input mode, any key closes it; [2nd] on a tile drawn on
 // the same pixels as a higher one picks that one (Ramza in the canal at (1, 5), a Squire on the
 // street at (0, 5): in view E its tile hides the canal tile (1, 4), in reach but empty)
-static int hud_shown(void)                    // the active unit's panel edge, the height's text
+static int hud_shown(void)                    // the active unit's outlined HP bar, terrain text
 {
     int x, y, ink = 0;
     for (y = 1; y < 9; y++) for (x = 128; x < 155; x++) ink += sw_level(x, y) == 3;
-    return sw_level(35, 74) == C_DGRAY && ink > 4;
+    return sw_level(21, 80) == C_WHITE && sw_level(22, 80) == C_BLACK && ink > 4;
 }
 
 static void test_fixes(void)
@@ -1264,7 +1264,7 @@ static void test_turns(void)
 }
 
 // Milestone 26: names are stable by seed and unique by gender, two reversible Status
-// pages, horizontal bands hidden during action/motion, live HP/CT and a canal depth label.
+// pages, character details hidden during action/motion, live HP and a canal depth label.
 static void test_interface(void)
 {
     State original;
@@ -1309,7 +1309,7 @@ static void test_interface(void)
     CHECK(ink0 > 10 && ink1 == 0);
     sw_init(36); steps(0, 5); CHECKV(st.mode, M_WALK); CHECK(!hud_shown());
     sw_init(37); steps(0, 18); CHECKV(st.mode, M_ACT); CHECK(!hud_shown());
-    printf("interface: 510 disc names, deterministic unique draws, live bands, two Status pages, depth label, hidden during motion/blows\n");
+    printf("interface: 510 disc names, deterministic unique draws, live character details, two Status pages, depth label, hidden during motion/blows\n");
 }
 
 static void test_water(void)

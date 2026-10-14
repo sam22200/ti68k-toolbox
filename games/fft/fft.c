@@ -121,6 +121,8 @@ static u8 *vbuf, vbuf_rot;
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
 #define GLINTS 250                      // glints per phase at most
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
+#define PANEL_ROWS 36                   // cutout portrait, level, name and two stacked gauges
+#define PANEL_Y (RT_H - PANEL_ROWS)
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
@@ -143,16 +145,16 @@ typedef struct {
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
-    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined-number scratch
+    u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined panel text (0-6) / action numbers (7-13)
     char hud_s[2];                      // cached height + 1, water depth
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
     u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_AIM: the attacker;
                                         // M_ACTS: no ability known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
-    u16 pan[2][2][29 * RT_PBYTES / 2]; // 80-wide horizontal bands, portrait rises 3 rows
-    u16 pan_k[2][7];
-    u8 pan_n[2];                        // box / portrait, name, HP, MP, Lv / CT
+    u16 pan[2][3][PANEL_ROWS * RT_PBYTES / 2]; // 80-wide planes and opacity mask; scene shows through
+    u16 pan_k[2][6];
+    u8 pan_n[2];                        // cutout portrait, name, HP, MP, level
     u8 arrow[4][2][8];
     u16 height[2][20 * RT_PBYTES / 2];   // terrain text, then its cached white outline mask
     u16 status[2][RT_PSIZE / 2];        // full-screen Status, assembled a line per frame
@@ -3229,7 +3231,7 @@ static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color)
     rt_light = sl; rt_dark = sd;
 }
 
-// FFTA's horizontal band, 80 pixels per side, a 19x29 original portrait above its rule.
+// Original portrait with palette-zero transparency and an offline white silhouette outline.
 static void portrait(u8 gfx, u8 mirror, s16 x, s16 y)
 {
     const u8 *p = igfx + UI_PORTRAITS + (u16)(gfx * 2 + mirror) * 348;
@@ -3251,33 +3253,99 @@ static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width)
     if (n) draw_rect(x, y, n, 2, color);
 }
 
+// Outlined small text built into the transparent panel, never redrawn glyph by glyph on screen.
+static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
+{
+    void *sl = rt_light, *sd = rt_dark;
+    u8 r;
+    u8 *l = (u8 *)W->pan[side][0] + (y - 1) * RT_PBYTES;
+    u8 *d = (u8 *)W->pan[side][1] + (y - 1) * RT_PBYTES;
+    u8 *mask = (u8 *)W->pan[side][2] + (y - 1) * RT_PBYTES;
+    for (r = 0; r < 7; r++) memset(HUD_L + r * RT_PBYTES, 0, 10);
+    rt_light = HUD_L; rt_dark = HUD_D;
+    ui_text(x, 1, s, C_BLACK, limit);
+    rt_light = sl; rt_dark = sd;
+    for (r = 0; r < 7; r++, l += RT_PBYTES, d += RT_PBYTES, mask += RT_PBYTES) {
+        const u8 *p = HUD_L + r * RT_PBYTES;
+        u32 a = RD32(p, 0), b = RD32(p, 2), oa, ob;
+        u16 c = RD16(p, 4), oc;
+        if (r) { a |= RD32(p - RT_PBYTES, 0); b |= RD32(p - RT_PBYTES, 2); c |= RD16(p - RT_PBYTES, 4); }
+        if (r < 6) { a |= RD32(p + RT_PBYTES, 0); b |= RD32(p + RT_PBYTES, 2); c |= RD16(p + RT_PBYTES, 4); }
+        oa = a | a << 1 | a >> 1 | b >> 31;
+        ob = b | b << 1 | b >> 1 | a << 31 | c >> 15;
+        oc = (u16)(c | c << 1 | c >> 1 | b << 15);
+        WR32(l, 0, (RD32(l, 0) & ~oa) | RD32(p, 0));
+        WR32(d, 0, (RD32(d, 0) & ~oa) | RD32(p, 0));
+        WR32(l, 2, (RD32(l, 2) & ~ob) | RD32(p, 2));
+        WR32(d, 2, (RD32(d, 2) & ~ob) | RD32(p, 2));
+        WR16(l, 4, (u16)((RD16(l, 4) & ~oc) | RD16(p, 4)));
+        WR16(d, 4, (u16)((RD16(d, 4) & ~oc) | RD16(p, 4)));
+        WR32(mask, 0, RD32(mask, 0) | oa);
+        WR32(mask, 2, RD32(mask, 2) | ob);
+        WR16(mask, 4, RD16(mask, 4) | oc);
+    }
+}
+
+static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
+{
+    void *sl = rt_light, *sd = rt_dark;
+    u16 n = max ? (u16)((54U * v + max - 1) / max) : 0;
+    if (n > 54) n = 54;
+    draw_rect(21, y - 1, 58, 6, C_WHITE);
+    draw_rect(22, y, 56, 4, C_BLACK);
+    draw_rect(23, y + 1, 54, 2, C_LGRAY);
+    if (n) draw_rect(23, y + 1, n, 2, color);
+    rt_light = rt_dark = W->pan[side][2];
+    draw_rect(21, y - 1, 58, 6, C_BLACK);
+    rt_light = sl; rt_dark = sd;
+}
+
 static void make_panel(u8 side, u8 i)
 {
     void *sl = rt_light, *sd = rt_dark;
     const Unit *u = &st.unit[i];
     u8 k = W->pan_n[side]++, n;
-    s16 x = side ? 2 : 22;
     char s[24];
     rt_light = W->pan[side][0]; rt_dark = W->pan[side][1];
     if (!k) {
         memset(W->pan[side], 0, sizeof W->pan[side]);
-        draw_rect(0, 3, 80, 26, C_LGRAY); draw_rect(0, 3, 80, 1, C_DGRAY);
-        portrait(u->gfx, side, side ? 61 : 0, 0);
-    } else if (k == 1) ui_text(x, 4, unit_name(i), C_BLACK, side ? 60 : 79);
+        const u8 *p = igfx + UI_PORTRAITS + (u16)(u->gfx * 2) * 348 + 232;
+        u8 r;
+        portrait(u->gfx, 0, 0, 0);
+        for (r = 0; r < 29; r++) WR32((u8 *)W->pan[side][2] + r * RT_PBYTES, 0, ~RD32(p, r * 2));
+    } else if (k == 1) panel_text(side, 22, 1, unit_name(i), 78);
     else if (k == 4) {
-        n = put_s(s, 0, "Lv "); n = put_n(s, n, u->level);
-        n = put_s(s, n, " CT "); n = put_n(s, n, u->ct); s[n] = 0;
-        ui_text(x, 22, s, C_BLACK, side ? 60 : 79);
+        n = put_s(s, 0, "Lv"); n = put_n(s, n, u->level); s[n] = 0;
+        panel_text(side, 1, 30, s, 20);
     } else {
         u16 v = k == 2 ? u->hp : u->mp, m = k == 2 ? u->max_hp : u->max_mp;
-        n = put_s(s, 0, k == 2 ? "HP " : "MP "); n = put_n(s, n, v); s[n++] = '/'; n = put_n(s, n, m); s[n] = 0;
-        ui_text(x, k == 2 ? 10 : 16, s, C_BLACK, side ? 48 : 67);
-        gauge(side ? 49 : 68, k == 2 ? 12 : 18, v, m, k == 2 ? C_BLACK : C_DGRAY, 10);
+        u8 j, width = 0;
+        n = put_n(s, 0, v); s[n++] = '/'; n = put_n(s, n, m); s[n] = 0;
+        for (j = 0; j < n; j++) width += igfx[UI_ADV + (u8)s[j] - 32];
+        panel_text(side, 22, k == 2 ? 9 : 23, k == 2 ? "HP" : "MP", 78);
+        panel_text(side, 78 - width, k == 2 ? 9 : 23, s, 78);
+        panel_gauge(side, k == 2 ? 16 : 30, v, m, k == 2 ? C_BLACK : C_DGRAY);
     }
     rt_light = sl; rt_dark = sd;
 }
 
-// Bottom-right command menu and submenus, target preview above its band, turn order or Quit.
+// The cached panel is aligned to ten bytes on either screen side, so its mask needs no shifts.
+static void draw_panel(u8 side)
+{
+    const u8 *l = (const u8 *)W->pan[side][0], *d = (const u8 *)W->pan[side][1];
+    const u8 *m = (const u8 *)W->pan[side][2];
+    u8 *p = (u8 *)rt_light + PANEL_Y * RT_PBYTES + (side ? 10 : 0);
+    u8 *q = (u8 *)rt_dark + PANEL_Y * RT_PBYTES + (side ? 10 : 0), r;
+    for (r = 0; r < PANEL_ROWS; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
+        u32 a = ~RD32(m, 0), b = ~RD32(m, 2);
+        u16 c = (u16)~RD16(m, 4);
+        WR32(p, 0, (RD32(p, 0) & a) | RD32(l, 0)); WR32(q, 0, (RD32(q, 0) & a) | RD32(d, 0));
+        WR32(p, 2, (RD32(p, 2) & b) | RD32(l, 2)); WR32(q, 2, (RD32(q, 2) & b) | RD32(d, 2));
+        WR16(p, 4, (u16)((RD16(p, 4) & c) | RD16(l, 4))); WR16(q, 4, (u16)((RD16(q, 4) & c) | RD16(d, 4)));
+    }
+}
+
+// Bottom-right command menu and submenus, target preview above its details, turn order or Quit.
 // Cached one part per frame: tab / box, then each line. Ball cursor added on the screen.
 static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };   // ST_*
 
@@ -3449,19 +3517,19 @@ static void draw_hud(void)
         } else if (k[0] && W->win_n < W->win_m) { make_window(); changed = 1; }
         if (!changed) for (i = 0; i < 2; i++) if (pk[i]) {
             const Unit *u = &st.unit[pk[i] - 1];
-            u16 keys[7]; u8 j, diff = 0;
-            keys[0] = pk[i]; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->ct;
-            keys[4] = u->level; keys[5] = u->max_hp; keys[6] = u->max_mp;
-            for (j = 0; j < 7; j++) diff |= keys[j] != W->pan_k[i][j];
-            if (diff) { for (j = 0; j < 7; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = 0; }
+            u16 keys[6]; u8 j, diff = 0;
+            keys[0] = pk[i]; keys[1] = u->hp; keys[2] = u->mp; keys[3] = u->level;
+            keys[4] = u->max_hp; keys[5] = u->max_mp;
+            for (j = 0; j < 6; j++) diff |= keys[j] != W->pan_k[i][j];
+            if (diff) { for (j = 0; j < 6; j++) W->pan_k[i][j] = keys[j]; W->pan_n[i] = 0; }
             if (W->pan_n[i] < 5) { make_panel(i, pk[i] - 1); break; }
         }
     }
     draw_height();
     for (i = 0; i < 2; i++) if (pk[i] && W->pan_k[i][0] == pk[i] && W->pan_n[i] == 5)
-        copy_box(W->pan[i][0], W->pan[i][1], i ? 10 : 0, 71, 5, 29);
+        draw_panel(i);
     if (!hidden && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
-        u8 y = k[0] == M_AIM || k[0] == M_ACT ? 71 - W->win_h : RT_H - W->win_h;
+        u8 y = k[0] == M_AIM || k[0] == M_ACT ? PANEL_Y - W->win_h : RT_H - W->win_h;
         copy_box(W->win[0], W->win[1], 12, y, W->win_w, W->win_h);
         if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
