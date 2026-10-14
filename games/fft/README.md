@@ -29,7 +29,7 @@ hidden (milestone 23). The reach as FFT's tiles (white, a dark edge drawing the 
 shown at once, [MODE] drawing them over the scenery in front (milestone 24).
 The original sword and dagger, outlined and at least two pixels thick, appear through the
 impact; the target recoils two pixels and flashes light/white inside its black contour
-(milestone 25, `x/m25_blows.png`). FFTA-style horizontal portrait bands, bottom-right
+(milestone 25, `x/m25_blows.png`). Transparent character details with outlined portraits and stacked HP/MP gauges, bottom-right
 menus, two full-screen Status pages, original generic names and active-unit marker
 (milestone 26, `x/m26_interface.png`). Depth-1 canal immersion hides the lower legs and
 shadow, with a light surface edge, including wading and wet blows (milestone 27,
@@ -85,10 +85,13 @@ the player's units with its level, the EXP and JP it earned. The HUD shows the h
 its cursor at the top right (`2h`, `7.5h` on a slope; `depth 1` on canal water), as black
 text with a one-pixel white outline over the scenery; [APPS] shows
 FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
-The cursor is dashed behind the scenery. FFTA-style light grey bands sit at the bottom:
-active unit left, hovered or aimed-at unit mirrored right, each with a 19x29 original
-portrait, name, HP above MP with numbers and gauges, Lv and CT. The MENU tab and ball cursor
-sit bottom right; Act and skill lists replace the menu in place. Bands and menus disappear
+The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
+active unit left, hovered or aimed-at unit right, each with a cutout 19x29 original portrait
+on its left, a small level below it, name, and HP above MP. Each gauge is 56 pixels wide;
+its label and right-aligned current/maximum values sit above it in the small font. Portraits,
+text and gauges have white outlines; the scenery remains visible between them. CT stays in
+Status and the turn-order logic. The MENU tab and ball cursor
+sit bottom right; Act and skill lists replace the menu in place. Details and menus disappear
 during walking and action animations. An original FFT pointer marks the active unit above its
 head; enemy diamonds remain. Generic names come from the disc's male/female lists, redrawn
 without duplicates at each battle with a separate deterministic generator; Ramza and Delita
@@ -386,11 +389,13 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   pointer texture/palette with the original's VRAM, plus the oracle's nine generic names.
   Names come from `EVENT/SMALL.OUT`, its name table entries `0x100..0x1FE` / `0x200..0x2FE`;
   an independent 16-bit generator avoids changing combat/stat RNG draws.
-- **HUD caches.** Each horizontal band is built in five parts (background/portrait, name,
-  HP, MP, Lv/CT), the menu in a tab then a line per frame, and Status in nine parts while
-  simulation pauses. The screen receives aligned long copies. Small text uses pre-shifted
-  glyph words; no text rotation or run-time shifting per glyph row. Only changed HP/MP,
-  maxima, level, CT or unit rebuild a band; cached fields are reset at a new battle or on
+- **HUD caches.** Each 80x36 transparent character panel is built in five parts (portrait,
+  name, HP, MP, level), the menu in a tab then a line per frame, and Status in nine parts while
+  simulation pauses. The panel's two planes and opacity mask are applied with two aligned
+  long operations and one word per row; portraits preserve their original palette-zero
+  transparency. Text outlines are made once in the spare action-number scratch rows.
+  Small text uses pre-shifted glyph words; no text rotation or run-time shifting per glyph row.
+  Only changed HP/MP, maxima, level or unit rebuild a panel; cached fields are reset at a new battle or on
   entering Status. Marker and ball cursor use ExtGraph sprites. The frame budget reserves
   65k for base work and 60k for one optional UI part. A newly completed background cache
   cannot force HUD/cursor work in the expensive frame that created it; it saves work from
@@ -409,6 +414,7 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 
 | | cycles | at 12 MHz |
 |---|---|---|
+| transparent character HUD: UI doors, AI battle and defeat replay | 317,458; 356,014 / 357,308 at most | 32 fps (frame-limited) |
 | terrain HUD outline: UI doors, AI battle and defeat replay | 317,474; 356,030 / 357,328 at most | 32 fps (frame-limited) |
 | milestone 26: menus / Status doors, AI battle and defeat replay | 313,278 / 357,270 / 359,840 at most | 32 fps (frame-limited) |
 | milestone 27: water doors / UI doors, AI battle and defeat replay | 254,232 / 316,910; 355,466 / 356,764 at most | 32 fps (frame-limited) |
@@ -422,11 +428,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 | one rotation frame (half resolution) | 2.1-2.3 M | 3 frames + the next view unpacked (2.2 M): 0.75 s per turn |
 | start (the first view unpacked) | 2.5 M | 0.2 s |
 
-Program: `fft.89z` 60,551 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
+Program: `fft.89z` 62,075 bytes (over the TI-89's 24,576 since the menu: Titanium first, the
 TI-89 by `-pack` later, as decided at milestone 13), plus `fftu` (55.3 KB), `fftw` (40.7 KB),
 `ffti` (40.9 KB) and four packed views (38.9 KB), all archived and read in place. RAM: the
-unpacked view 52,320 bytes plus scene/work allocation 52,560 bytes (~105 KB of game buffers;
-full-screen Status and horizontal bands add ~13 KB to milestone 25). Both blocks remain
+unpacked view 52,320 bytes plus scene/work allocation 55,556 bytes (~108 KB of game buffers;
+full-screen Status and transparent character caches add ~16 KB to milestone 25). Both blocks remain
 below the AMS 64 KB allocation limit. Earlier builds were checked in TiEmu (Titanium, `ti-run`, the four views archived
 at the transfer: attribute byte 3, see the `ti89-emulator` skill): the views, F5, a
 selection with its rings (`x/emu_real.png`; packed views: `x/emu_zx0.png`, S, W, N and a

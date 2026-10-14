@@ -320,6 +320,12 @@ each frame <= 360k outside the allowed stalls, asm only after asking, `make test
     creating the screen cache no longer forces optional HUD / cursor work as though it had
     already used it. Program 58,749 bytes; game buffers ~105 KB. No new hardware path;
     TiEmu remains milestone 29.
+    Presentation revision requested after milestone 27: transparent 80x36 character details,
+    cutout portrait left, small level below, name and stacked outlined HP/MP gauges with
+    right-aligned values above; CT removed from the HUD. Height/depth text also has a white
+    outline over the scenery. Current review: `x/character_hud.png`, all six portraits and
+    empty/999-value bars in `x/character_hud_details.png`. Tests, 52 scenario comparisons,
+    116 UI and 87 blow/replay screens pass; peak 357,308 cycles, program 62,075 bytes.
 27. **Water** (done). Measure on the original how deep a unit sinks in depth-1 water (all 38 canal
     tiles at Gariland), then cut the sprite's bottom by as much with a light water line; if
     the original does not sink them, ask.

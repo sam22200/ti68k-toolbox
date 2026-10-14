@@ -813,6 +813,27 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   invalidate a previously usable copy. Aligned long copies and cached preshifted text keep
   the native UI small; Status builds a part per frame, peaking at 173,440 cycles.
 
+### Character HUD revision (2026-10-14)
+
+- TARGET (user reference): transparent character details, with a cutout portrait on the
+  left, name to its right, HP and MP stacked with small current/maximum values above
+  their gauges, and only a small level under the portrait. No zodiac badge or CT field.
+  Both active and target panels use this layout; Status keeps its full statistical pages.
+- IMPLEMENTATION: the original portrait's palette-zero mask already removes its background;
+  the previous grey band hid that transparency. Reuse the same six outlined 19x29 assets,
+  with no new bank or extraction. Five cached parts compose an 80x36 panel, including an
+  opacity plane for the portrait, outlined glyphs and 56-pixel gauges. HP is black, MP dark
+  grey, empty gauge interiors light grey. Values align to the right above each gauge.
+  CT no longer invalidates the panel cache. Motion and blows still hide the details.
+- CHECKED: existing native tests, 52 scenario PC/TI screens, 116 UI phase/input screens and
+  87 blow/replay screens pass. Every ordinary measured frame remains <=360k: UI doors
+  317,458, 14,000-frame AI replay 356,014, defeat replay 357,308. The generated panel text
+  and HUD loops have no software multiply/divide or floating-point helpers. Program 62,075
+  bytes; allocations 52,320 and 55,556 bytes, both below 64 KB. Actual framebuffer review
+  covers all six portraits, empty HP/MP, 500/999 HP, 999/999 MP and level 99, in local
+  `x/character_hud_details.png`; active/target scenes are in `x/character_hud.png`.
+  No hardware path changes or emulator run.
+
 ### Canal immersion (milestone 27)
 
 - OBSERVED IN FFT (`make check-water-original`, `tools/water.py`, the reproducible
