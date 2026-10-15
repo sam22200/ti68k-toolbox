@@ -75,7 +75,7 @@ def main():
                 print(f'{a.phase}: {row["scene"]} {row["resolution"]} {sprites} sprites: {row["average_cycles"]} cyc, {row["cpu_fps_12mhz"]} estimated fps; TI=PC')
     target=HERE/f'BENCHMARK_{a.label}.csv'
     with target.open('w',newline='') as f:
-        w=csv.DictWriter(f,fieldnames=rows[0]);w.writeheader();w.writerows(rows)
+        w=csv.DictWriter(f,fieldnames=rows[0],lineterminator='\n');w.writeheader();w.writerows(rows)
     (out/'manifest.json').write_text(json.dumps(dict(binary_bytes=(HERE/a.binary).stat().st_size,binary_sha256=hashlib.sha256((HERE/a.binary).read_bytes()).hexdigest(),phase=a.phase,frames=a.frames,keys=a.keys,sprite_mode=a.sprite_mode,style=a.style,clock='MC68000 datasheet, ROM costs estimated; no interrupts or LCD measured'),indent=2)+'\n')
     print(target)
 if __name__=='__main__':main()
