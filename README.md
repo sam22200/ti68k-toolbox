@@ -18,6 +18,13 @@ ExtGraph 2, NOSTUB. Roadmap: [`TI68K_Game_Development_Toolbox.pdf`](TI68K_Game_D
 
 **Install**: [docs/INSTALL.md](docs/INSTALL.md) (Ubuntu / Linux, macOS).
 
+[Tenchu training / perspective laboratory](games/tenchu/README.md): five C
+rendering paths, four common benchmark scenes and locally extracted PS1 training
+geometry. Original TI-89 HW2 / stock AMS launch checked; PC/TI framebuffers and
+datasheet-cycle profiles compared. Walking, jumping and adapted ledge traversal
+are prototypes, not a complete training mission. See the measured
+[renderer comparison](games/tenchu/BENCHMARK.md) and fidelity limits.
+
 [Sonic 1 traversal prototype](games/sonic/README.md): the first 4.8 Mega Drive
 view widths of Green Hill, half scale, C physics and real collision terrain,
 rigid bridge, rings, three enemy types and damage, with PC/TI checks.

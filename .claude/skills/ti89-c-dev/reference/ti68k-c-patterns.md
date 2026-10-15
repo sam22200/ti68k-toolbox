@@ -626,6 +626,8 @@ reports that AMS size, including the extension/tag trailer; the PC reports the
 raw `.bin` length. A 23,046-byte payload with extension `dat` reports 23,052
 on TI. Validate a declared payload end with `end <= size`, plus magic and
 internal offsets; exact equality with the raw payload length rejects valid TI data.
+Also **verified** on original HW2 / stock AMS 2.09 in TiEmu (Tenchu, 2026-10-14):
+archived `dat` geometry/sprite banks load in place with this trailer-aware validation.
 **Verified** round trip on HW2 and HW3 (`experiments/files/savetest.c`), including the archived case:
 
 ```c

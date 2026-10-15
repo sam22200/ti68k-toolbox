@@ -1,0 +1,13 @@
+tenchu_pc
+tenchu_test
+*_pc
+*_test
+__pycache__/
+*.89z
+*.89y
+*.o
+*.s
+bench-output/
+local/
+*.bin
+core
