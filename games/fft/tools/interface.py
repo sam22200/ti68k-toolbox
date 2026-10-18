@@ -89,15 +89,14 @@ def main():
     def section(name):
         if len(out) & 1: out.append(0)
         defines.append('#define UI_%s %dUL' % (name, len(out)))
-    # Each 5-row glyph pre-shifted to all 16 word positions. No variable shifts in the blit.
+    # Five canonical byte rows per glyph; shift only when rebuilding a cached UI part.
     osfile = Path(__file__).resolve().parents[3] / 'tools/rom/TI89Titanium_OS.89u'
     font = osfile.read_bytes()[1023838:1023838 + 1536]
     section('ADV')
     out += bytes(font[6 * c] for c in range(32, 127))
     section('FONT')
     for c in range(32, 127):
-        for sh in range(16):
-            out += struct.pack('>5I', *(int(v) << (24 - sh) for v in font[c * 6 + 1:c * 6 + 6]))
+        out += font[c * 6 + 1:c * 6 + 6]
     section('PORTRAITS')
     previews = []
     for _, name, _ in CHARS:
@@ -114,9 +113,7 @@ def main():
         outline(im)
         previews.append(im[:, :19].copy())
         out += planes(im, 32)
-        mirrored = np.full_like(im, -1); mirrored[:, :19] = im[:, :19][:, ::-1]
-        out += planes(mirrored, 32)
-    section('MARKER')
+    # Keep the original marker preview as a development artifact; it has no runtime reader.
     frame = disc.read(*files['EVENT/FRAME.BIN'])
     packed = np.frombuffer(frame[0x1000:0x9000], np.uint8).reshape(256, 128)
     sheet = np.empty((256, 256), np.uint8); sheet[:, ::2] = packed & 15; sheet[:, 1::2] = packed >> 4
@@ -125,26 +122,30 @@ def main():
     marker = np.full((14, 16), -1, dtype=int)
     px = sheet[128:152, 64:80][::2, ::2]
     marker[1:13, 4:12] = greys(px, pal)
-    outline(marker); out += planes(marker, 16)
+    outline(marker)
     small = disc.read(*files['EVENT/SMALL.OUT'])
     base = 0xec + struct.unpack_from('<I', small, 0x70)[0]
     entries = small[base:].replace(b'\xff', b'\xfe').split(b'\xfe')
     for name, first in (('MALE', 256), ('FEMALE', 512)):
         section(name)
-        for raw in entries[first:first + 255]:
-            s = decode(raw).encode('ascii'); assert len(s) <= 11, s
-            out += s.ljust(12, b'\0')
+        names = bytearray(255*2); offsets = {}
+        for i, raw in enumerate(entries[first:first + 255]):
+            text = decode(raw).encode('ascii') + b'\0'; assert len(text) <= 12, text
+            if text not in offsets:
+                offsets[text] = len(names); names += text
+            struct.pack_into('>H',names,2*i,offsets[text])
+        out += names
     section('SLOPES')                   # art.py's sloped markers: sl_l, sl_m, sc_l, sc_m
     data = art.slopes()[3]
     for n in ('sl_l', 'sl_m', 'sc_l', 'sc_m'):
         out += struct.pack('>%dI' % len(data[n]), *data[n])
     section('TILES')                    # extract.py's Tile array (12 bytes a tile)
     out += Path('tiles.bin').read_bytes()
-    section('BNFONT')                   # the banners' font (banner.py: Lato Black's outlines)
-    font, _ = banner.font_bytes()
-    out += font
-    defines += ['#define BN_CHARS "%s"' % banner.CHARS, '#define BN_CAP %d' % banner.CAP,
-                '#define BN_Y0 %d' % banner.Y0, '#define BN_SPACE %d' % banner.SPACE]
+    section('BANNERS')                  # small antialiased Lato strips, no full-screen images
+    strips, widths = banner.strip_bytes()
+    out += strips
+    defines += ['#define BN_WIDTHS { %s }' % ', '.join(map(str, widths)),
+                '#define BN_STRIP_BYTES %d' % len(strips)]
     Path('interface.h').write_text('// Generated locally by tools/interface.py; never committed.\n' + '\n'.join(defines) + '\n')
     Path('ffti.bin').write_bytes(out)
     Path('x').mkdir(exist_ok=True)
@@ -152,7 +153,7 @@ def main():
     tiles = [np.where(im < 0, 170, rgb[im.clip(0)]) for im in previews]
     Image.fromarray(np.concatenate(tiles, axis=1)).resize((19 * 6 * 4, 29 * 4), Image.Resampling.NEAREST).save('x/m26_portraits.png')
     Image.fromarray(np.where(marker < 0, 170, rgb[marker.clip(0)])).resize((64, 56), Image.Resampling.NEAREST).save('x/m26_marker.png')
-    print('ffti: %d bytes; six mirrored portraits, original marker, 510 names, preshifted AMS text, sloped markers, tiles' % len(out))
+    print('ffti: %d bytes; six single-facing portraits, 510 names, canonical AMS text, sloped markers, tiles' % len(out))
 
 
 if __name__ == '__main__':

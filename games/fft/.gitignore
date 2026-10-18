@@ -7,3 +7,11 @@ fftv*.bin
 x/
 fftu.bin
 tiles.bin
+
+fftmesh.bin
+fftbg.bin
+fftshot.bin
+
+ffttex.bin
+
+fftiso.bin

@@ -24,6 +24,56 @@ Both apply to every agent working in this repository.
 
 ## The emulator (TiEmu)
 
+- FFT perspective: the user explicitly authorized TiEmu FPS tests after visual review.
+  Compare flat and textured scenery with actors in both; separate cached replay from
+  offline texture preparation. Headless TI checks and an isolated TiEmu run are authorized.
+  For camera changes, report complete transition/attack durations and cold preparation,
+  as well as warmed animation FPS. List native TI feature gaps explicitly: PC textured
+  GIFs do not validate TI travelling textures or usable camera latency. The native audit
+  and feature matrix are in `games/fft/CAMERA_AUDIT.md`.
+  The user subsequently rejected animated perspective travelling and automatic attack
+  shots: fixed close/wide inspection now uses direct cuts by default; motion requires
+  explicit `FFT_CAMERA_MOTION` research builds. For future rendering work, native cold
+  and consecutive moving frames must be measured before promising animation speed.
+  GIF export cadence is never measured FPS. See `games/fft/CAMERA_CUTS.md` for the
+  PC/native implementation mismatch, cache-invalidation failure and prevention rules.
+  F1/F5 isometric rotations must remain animated: the no-transition decision applies
+  only to close/wide perspective entry, zoom and return. Use the native low-poly turn
+  fallback when moving textures are unavailable/too expensive; do not substitute a
+  hold/switch. Current implementation and measurements: `games/fft/ROTATION_LOWPOLY.md`.
+  An opt-in native affine-textured turn mapper now exists (`FFT_TURN_TEXTURE`), initially
+  measured at 3.312-3.535 s per turn in Titanium TiEmu. Its surface/visibility follow-up
+  retains 80x50 textures and three angles, measured at 2.281-2.480 s; see
+  `games/fft/SURFACE_TURNS.md`. It maps runtime UVs, not cached angle
+  pictures. It does not restore perspective travelling or make the PC filtered mapper
+  portable. Keep low-poly as default pending the user's review; details and same-mesh
+  texture-off control: `games/fft/NATIVE_TEXTURED_TURNS.md`.
+  The user has now selected **80x25** as the preferred textured moving-view resolution;
+  use it for future textured previews. Preserve the other variants as controls. Their
+  requested low-poly 160x100 comparison is genuinely native resolution, not an enlarged
+  80x50 render; see `games/fft/TURN_COMPARISON.md`. Do not infer an original-TI-89
+  full-game packaging result from these bounded review executables.
+  **Rotation capture correction:** the original comparison GIF presents low-poly
+  steps as 2,1,3 despite correct angular math and PC/TI memory checksums. Native
+  numbered-frame checks reproduce it; extra swap waits do not cure it. The local
+  fixed-address plane-copy presentation control restores order. See the direction
+  audit in `games/fft/TURN_COMPARISON.md`; verify actual captured steps, and do not
+  silently reorder footage or reuse old timings for a changed presenter.
+  The CATALOG configuration build now exposes three unchecked defaults: low-poly
+  rotation, wide perspective and textured scenery. Checked values are80x25 textured
+  rotation, close perspective and filled untextured mesh (the user's "filled wireframe"). CATALOG is handled before
+  its legacy APPS alias; APPS retains the turn list. See `games/fft/CONFIGURATION.md`.
+  Its selected forward inspection view now has an optional20,284-byte cooperative
+  geometry cache prepared during menu idle time. Completed geometry survives ISO return;
+  actors/masks remain live. Distinguish background preparation, prepared entry and fully
+  warmed animation. Native CPU/latency evidence and limits: `games/fft/PREFETCH.md`.
+  **Current storage decision (2026-10-17):** textured rotations are retired from
+  the active configuration/native package, including their atlases, UV and surface
+  banks. F1/F5 keep native160x100 low-poly animation. CATALOG now exposes only the
+  two perspective options. Disabled attack fixture banks are also retired. Earlier
+  textured-turn scripts/captures are historical controls, not shipping assets.
+  Current formats, savings and measured costs: `games/fft/STORAGE_CLEANUP.md`.
+
 - **Every TI run is a clean restart**: `ti-run prog.89z [data.89y]` (or `ti-emu restart
   file...` to send without running). Never quit a running game to HOME to resend a build,
   never type paths into the file chooser (`ti-send` is a last resort).

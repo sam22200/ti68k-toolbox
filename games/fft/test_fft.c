@@ -285,7 +285,9 @@ static void test_occlusion(void)
     CHECK(alone > 80);                                    // ~100 pixels with the outline
     CHECK(m[0] * 5 < inside);                             // hidden from the south...
     CHECK(s[0] > alone / 3);                              // ...but its contour drawn over the house
-    CHECK(s[1] > alone * 9 / 10);                         // seen once turned with F5
+    // White silhouettes can change more scenery pixels than an exposed sprite.
+    // Its actual mid-grey body detail, rather than that total, proves it is revealed.
+    CHECK(m[1] > inside * 9 / 10);                        // seen once turned with F5
 }
 
 // the diamond above enemies: the enemy seen (west view) shows ~30 pixels more than as an ally
@@ -1073,7 +1075,8 @@ static void test_ai_battle(void)
 }
 
 // milestone 23, the original's pace (RE_NOTES.md § Pace): a walked step WALK_FRAMES frames, a
-// climb, a drop or a jump CLIMB_FRAMES; an attack's menu back at ACT_GAIN_END after a hit (the
+// climb, a drop or a jump CLIMB_FRAMES; reward presentation is adapted to twice its original
+// speed; an attack's menu returns at ACT_GAIN_END after a hit (the
 // EXP and the JP shown), at ACT_END after a miss; on the AI's turns the cursor gliding a tile
 // every AI_GLIDE frames to its target, the preview AI_PREVIEW frames (an ability's name AI_NAME
 // more), the view turned when the actor or its target is more than half hidden and the player's

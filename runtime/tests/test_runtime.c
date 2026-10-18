@@ -49,6 +49,8 @@ static void test_input_and_script(void)
     static SwScript sc;
     FILE *f = fopen("/tmp/rt_test_keys.txt", "w");
     CHECK(sw_parse_keys("UP A 5 # comment") == (K_UP | K_A | K_DIGIT(5)));
+    CHECK(sw_parse_keys("CATALOG") == (K_CATALOG | K_APPS));
+    CHECK(sw_parse_keys("APPS") == K_APPS);
     CHECK(K_DIGIT(1) == 0x10000UL && K_DIGIT(9) == 0x1000000UL);
     fputs("# test\n0 RIGHT\n10 RIGHT A\n12\n20 ESC\n", f);
     fclose(f);

@@ -76,6 +76,7 @@ extern u16 rt_state_size;
 #define K_F5     0x0800UL              // [F5]       PC: F5
 #define K_APPS   0x1000UL              // [APPS] or [CATALOG]  PC: A
 #define K_MODE   0x2000UL              // [MODE]     PC: M
+#define K_CATALOG 0x4000UL             // [CATALOG]  PC: F4; also sets legacy K_APPS
 #define K_DIGIT(n) (0x8000UL << (n))   // [1]..[9] = bits 16..24, keypad grid for gestures
 #define K_DIGITS 0x01FF0000UL          //            PC: keypad or number row 1..9
 extern u32 rt_keys, rt_prev;           // this frame, previous frame

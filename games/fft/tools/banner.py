@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""The banners' font (fft.c bn_*): Lato Black's outlines, smooth on the calculator.
+"""The banners' font (fft.c bn_*): Lato Black's outlines, sampled offline.
 
 Inkscape turns each glyph into SVG paths (text to path); the curves are flattened and simplified
 into contours of byte points, the cap height 64 units (y + 8: the overshoots and '!' stay in a
-byte). fft.c fills them on the calculator (even-odd, 2 x 2 samples a pixel: four greys of
-coverage), its mask the coverage grown a pixel (a white outline). raster() is the same
-algorithm in Python, for previews (python3 tools/banner.py preview.png).
+byte). strip_bytes() reproduces the original C vector rasterizer exactly (even-odd,
+2 x 2 samples a pixel, DIVS rounding). Its four small text strips are copied from the
+archived UI bank through a runtime wipe. raster() remains a Python visual preview.
 
 font_bytes() -> (bytes for ffti, advances): per glyph of CHARS, its offset (u16) in the table,
 then [advance, contours, (points, x y ...) per contour].
@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import struct
 
 FONT = 'Lato Black'
 TTF = '/usr/share/fonts/truetype/lato/Lato-Black.ttf'
@@ -22,6 +23,66 @@ CHARS = 'ABCDEFILMNORSTVY!'
 CAP = 64                                # units of the cap height
 Y0 = 8                                  # added to y (overshoots above the cap line)
 SPACE = 22                              # a space's advance, units
+
+# Only these small text strips are stored, never full-screen scenery. Integer sampling
+# matches the former on-calculator vector fill (including DIVS truncation toward zero).
+LINES = [('BATTLE START', 12, 1), ('DEFEAT ALL ENEMIES!', 9, 17),
+         ('VICTORY!', 18, 4), ('DEFEAT', 18, 4)]
+
+
+def strip_bytes(glyphs=None):
+    g = glyphs or outlines()
+    records, widths = [], []
+    for text, cap, top in LINES:
+        width = sum((g[c][0] if c != ' ' else SPACE) * cap // CAP + 1 for c in text)
+        left = (160 - width) // 2
+        assert left > 0 and left + width < 160
+        h = (CAP + 2 * Y0) * cap // CAP + 1
+        # Full word-aligned strip, including the one-pixel outline.
+        x0, x1 = (left - 1) & ~15, min(160, (left + width + 16) & ~15)
+        rows, stride = h + 2, (x1 - x0) // 8
+        image = [[0] * 160 for _ in range(rows)]
+        ox = left
+        for c in text:
+            advance = (g[c][0] if c != ' ' else SPACE) * cap // CAP + 1
+            if c != ' ':
+                edges = []
+                yo = -(Y0 * cap // 16) & 3
+                for contour in g[c][1]:
+                    pts = [(x * cap // 16, y * cap // 16 + yo) for x, y in contour]
+                    edges += [(x0, y0, x1, y1) for (x0, y0), (x1, y1)
+                              in zip(pts, pts[1:] + pts[:1]) if y0 != y1]
+                cov = [[0] * 32 for _ in range(h)]
+                for j in range(2 * h):
+                    yc = 2 * j + 1
+                    def trunc(n, d):
+                        return (abs(n) // abs(d)) * (-1 if (n < 0) != (d < 0) else 1)
+                    xs = sorted(xa + trunc((yc - ya) * (xb - xa), yb - ya)
+                                for xa, ya, xb, yb in edges if (ya <= yc) != (yb <= yc))
+                    assert len(xs) <= 8
+                    for xa, xb in zip(xs[::2], xs[1::2]):
+                        for k in range(max(0, xa >> 1), min(64, xb >> 1)):
+                            cov[j >> 1][k >> 1] += 1
+                for y, row in enumerate(cov):
+                    for x, v in enumerate(row):
+                        if v and ox + x < 160:
+                            image[y + 1][ox + x] |= 1 if v == 1 else 2 if v < 4 else 3
+            ox += advance
+        mask = [[any(image[yy][xx] for yy in range(max(0, y-1), min(rows, y+2))
+                     for xx in range(max(0, x-1), min(160, x+2))) for x in range(160)]
+                for y in range(rows)]
+        body = bytearray([x0, top - 1, rows, stride])
+        for plane in (1, 2, 0):
+            for y in range(rows):
+                for x in range(x0, x1, 8):
+                    body.append(sum(0x80 >> k for k in range(8)
+                                    if image[y][x+k] & plane) if plane else
+                                sum(0x80 >> k for k in range(8) if mask[y][x+k]))
+        records.append(body); widths.append(width)
+    data, offsets = bytearray(), []
+    for record in records:
+        offsets.append(2 * len(records) + len(data)); data += record
+    return struct.pack('>4H', *offsets) + data, widths
 
 
 def _parse(d):

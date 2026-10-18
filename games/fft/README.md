@@ -1,5 +1,98 @@
 # Final Fantasy Tactics: Magic City Gariland (tech demo)
 
+[Applied storage cleanup](STORAGE_CLEANUP.md) and [bounded blade cache](BLADE_CACHE.md):
+active camera data399,328 ->158,468 bytes.
+Textured rotations and disabled attack images are removed; canonical text, compact
+names, shared blade frames and compressed inspection fixtures retain the same art.
+
+[CATALOG camera configuration](CONFIGURATION.md): `make camera-config` adds a paused
+menu with two perspective choices: close/wide and textured/filled untextured mesh.
+Defaults are wide and textured. F1/F5 always animate in native160x100 low poly,
+with [live height contours](TURN_EDGES.md) for readable relief;
+textured rotations and their banks are retired. PC F4 opens the menu; APPS retains
+the turn list. The native interactive review and484-picture PC/TI check are under
+`x/config/`; the full tactical TI packaging limit
+is documented in that note. [Idle perspective preparation](PREFETCH.md) caches the
+selected front geometry cooperatively, preserves ISO buffers and reuses matching work
+on entry; `make camera-prefetch-check` measures the native CPU cost.
+
+**Current fixed-camera decision (2026-10-16):** keep close/wide inspection with direct
+entry, zoom switch and return. Automatic attack shots are disabled; combat stays ISO.
+Animated perspective travelling is retained only under `FFT_CAMERA_MOTION` for research.
+[F1/F5 rotation stays animated](ROTATION_LOWPOLY.md) using native low-poly intermediate
+frames, then the textured destination; the direct-cut policy applies to perspective only.
+[Native textured F1/F5 experiment](NATIVE_TEXTURED_TURNS.md): `make turn-texture-bench`
+builds an integer affine mapper and compares the same angles against a flat detailed-mesh
+control. This is now a historical control, excluded from the active configuration package.
+`make turn-texture-opt-bench` checks a lossless pointer optimization and an optional
+80x25 moving-scenery concession: 4.93% / 26.31% less datasheet CPU respectively;
+these follow-up variants have no new TiEmu elapsed-time measurements.
+[Surface/visibility optimization](SURFACE_TURNS.md): `make turn-surface-bench`
+keeps the three textured angles at 80x50, merges compatible planar pairs and skips
+conservatively invisible faces. The native benchmark and optional 80x25 control
+include broad camera parity checks; measured emulator results are in that note.
+[40x100 moving scenery experiment](HORIZONTAL_TURNS.md): `make turn-horizontal-bench`
+preserves vertical detail and native actors while stretching scenery columns fourfold;
+compares against the same optimized 80x50 geometry and textures.
+[80x25 textures versus native 160x100 low poly](TURN_COMPARISON.md):
+`make turn-comparison-bench`; the real TiEmu GIF preserves each side's playback
+speed, with the faster destination held until both finish.
+[Direct camera policy and PC/TI discrepancy](CAMERA_CUTS.md) explains the cause, native
+feature limits and reproducible checks (`make camera-cuts-demo`). Historical preview
+descriptions below do not override this decision or establish TI animation speed.
+
+[Target-centered attack camera](ATTACK_CAMERA.md): `make attack-camera-review`,
+`make attack-camera`, then `./fftcam_pc --scenario 65` (melee) or `--scenario 66` (Throw Stone).
+The historical PC exploration textures camera motion and settled views. Cinematic entry/return
+last 0.5 seconds each at the 20 FPS preview cadence; attack/damage stays accelerated.
+`[7]` toggles shots only in the explicit motion research build. Calculator packaging and texture performance remain outstanding.
+Previous [free perspective gameplay](WIDE_PLAY.md) was rejected; inspection remains paused.
+
+[Isometric contrast and height contours](ISOMETRIC_STYLE.md): `make isometric-style-review`
+compares original scenery, perspective-style contrast and adaptive black/white ledge outlines
+in the actual PC game. Contrast + contours is the selected default. `[8]` cycles styles in the ordinary ISO menu/browse view. Original
+character art, canal tones and depth masks are retained. Contours are generated offline
+from visible geometric height boundaries; no per-frame edge processing or TiEmu test.
+
+Refined [close shoulder view](FIXED_SHOULDER.md): `make fixed`, then `fftfix(62)`.
+Native 160×100 geometry, clearer materials/roof edges, closer Ramza and F5 for the opposite
+view. The latest [PC-only visibility proposal](PERSPECTIVE_REVIEW.md) selects dotted
+structures from their actual visible pixels and depth, preserving peripheral buildings.
+ALPHA (PC: V) cycles Auto / Solid / Dotted. Run `make fixed-review` for the animated
+comparison; visual approval is pending and this revision has no TI build or measurements.
+The previous [elevated wide camera](PERSPECTIVE_CAMERA.md) and
+[bounding-box cutaway](PERSPECTIVE_DASHED.md) results describe older revisions.
+[Animated water and MODE close/wide zoom](PERSPECTIVE_WATER.md) also include a fresh
+original-game enemy-placement audit and four-view GIFs. That revision's animation reaches the estimated
+32 FPS limiter once its visibility/pose caches are populated;
+the first view construction still stalls. GIFs, cycle measurements and limitations are
+documented in that note.
+
+[Original-resolution sprite review](PERSPECTIVE_SPRITES.md): `make fixed-original-sprites`
+compares the reduced isometric bank with direct source sampling, in four greys and original
+colours. This is a PC-only visual compositor using the renderer's actual poses and depth;
+it does not change the production sprite bank or provide new TI performance measurements.
+
+[Scenery texture review](PERSPECTIVE_TEXTURES.md): `make fixed-scenery-textures` maps the
+same ground/wall/roof artwork as the isometric view onto the perspective geometry, keeping
+the current TI character sprites and cutaway. PC-only flat/textured and filtering comparisons;
+calculator-side texturing and its performance remain unimplemented and unmeasured.
+`make fixed-texture-contrast` compares three offline contrast conversions in the same
+four cameras, with identical background sizes and no added runtime contrast pass.
+[Textured grey canal and smooth camera modes](PERSPECTIVE_MOTION.md): `make fixed-modes-review`
+demonstrates direct close/wide entry, remembered zoom, entry/exit and smooth zoom changes
+on PC. `make fixed-scenery-bench-prepare` compares flat/textured scenery with characters
+in both. `make fixed-scenery-ti-benchmark` builds the TiEmu timer benchmark and validates
+the matching TI binary against those PC frames; cached replay is distinct from texturing.
+[Actual TiEmu FPS comparison](SCENERY_FPS.md): flat/textured cached scenery with actors
+in both runs measures 32 FPS in two cameras and about 28.3–28.5 FPS in the others. Initial
+construction takes 1.7–4.4 seconds; texture projection itself remains offline.
+
+Optional exploration: [Ramza shoulder cameras](PERSPECTIVE.md), built with `make perspective`.
+`fftp()` starts directly on Ramza; DIAMOND opens fixed, lateral or 360-degree inspection,
+with the battle paused and actors animated. `fft(61)` also starts directly on Ramza in the
+standard build. Measurements and reproducible GIFs are documented separately.
+
 An isometric battlefield on the TI-89 / Titanium in the style of Final Fantasy Tactics (PS1,
 1997): the real Gariland map (10 x 15 tiles, heights 0 to 10) seen from four camera
 orientations, an animated 90-degree rotation, the Gariland battle's eleven units at their
@@ -112,7 +205,7 @@ readout is removed from the HUD. [APPS] shows
 FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
 The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
 active unit left, hovered or aimed-at unit right, with the cutout 19x29 original portraits
-at the outer edges, facing inward. The small level overlays the portrait's lower corner;
+at the outer edges, using one shared portrait facing. The small level overlays the portrait's lower corner;
 the portrait/name/stats fit within its 29-pixel height. Name and HP above MP sit beside it. Each gauge
 is 40x2 pixels with rounded white ends. Its left edge aligns with the name and HP/MP labels;
 the current/maximum values end at the gauge's right edge, with room for `MP 999/999` in the small font.
@@ -167,7 +260,7 @@ make map.h        # once: reads MAP/MAP022 from roms/ps1/Final Fantasy Tactics (
 make units.h      # once: the units' sprites from BATTLE/*.SPR, TYPE1.SHP and TYPE2.SHP (a second):
                   # units.h and the data file fftu.bin (37.8 KB, big-endian rows, mirrored too;
                   # the crystal and the chest from BATTLE/OTHER.SPR)
-make interface.h  # portraits, names, marker, preshifted small text, the sloped markers' planes
+make interface.h  # single-facing portraits, compact names/font, sloped markers and banners
                   # (art.py) and the map's tiles (tiles.bin): ffti.bin (45.9 KB)
 make weapons.h    # armed body poses and blades from WEP.SPR, WEP1/2.SHP/.SEQ: fftw.bin
 make battle.h     # once: the battle's units, jobs, items and weapons, generation tables, the
@@ -291,9 +384,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
 - **Blows** (milestone 25, `tools/weapons.py`): armed body frames 86/87/89/90 and
   135/136/138/139, then their mirrors; `WEP1/2.SEQ` level strikes 2/3, their `SHP`
   weapon-type offsets, screen rotations and `WEP.SPR` palettes/rows. Composed offline,
-  archived in `fftw` (40,704 bytes); weapon/body/UV/rotation records checked on the running
+  archived in `fftw` (22,992 bytes after blade compression); weapon/body/UV/rotation records checked on the running
   original for Broad Sword and Dagger (`weapons.py --check DISC STATE`). A blade has its own
   cached 32-column cover and is drawn behind its body, at the actor's sorted depth. No blade
+  image is decoded more than once per cached phase/context; three bounded432-byte slots
+  are prepared progressively in the wind-up. Details and costs: [BLADE_CACHE.md](BLADE_CACHE.md). No blade
   on bare hands or abilities. Three blade phases at frames 13, 14, 15-18, then put away.
   Successful damage: the fourth plane's interior becomes light grey for two frames, white
   for eight, light for two, then normal. Black contour and dark shadow stay; recoil is two
@@ -430,10 +525,11 @@ and never committed: without the disc the game does not build. `art.h` is ours a
   most) or 32k (a panel's, 57k). The player's menu after a walk is made during it, unseen.
   From a key: Ramza's details at once, a hovered unit's in 4 frames, the menu after a walk in
   1 (`test_latency`; 13 and 96 before).
-- **Interface** (milestone 26, `tools/interface.py`). `ffti` (45,892 bytes, archived, read in
-  place) holds six 19x29 portraits with their mirrors (32-wide padded planes), the original
-  selection pointer (16x14, retained as a reference), 255 names per gender (12 bytes each), and 95 AMS small glyphs
-  pre-shifted to every word alignment; then the sloped markers' planes (`art.py`, 3,216 bytes)
+- **Interface** (milestone 26 and storage follow-ups, `tools/interface.py`). `ffti`
+  (16,284 bytes, archived, read in place) holds six single-facing19x29 portraits
+  (32-wide padded planes),255 names per gender through offset directories, and95
+  canonical five-row AMS small glyphs. It also holds the four banner strips,
+  the sloped markers' planes (`art.py`, 3,216 bytes)
   and the map's tiles (`extract.py`, 1,800 bytes), moved out of the program. Portrait UVs and palette 8 are from the `.SPR` raw
   rows at `0x8200`; marker UV `(64,128)..(80,152)` from `EVENT/FRAME.BIN`, palette from
   `BATTLE.BIN`. `interface.py --check DISC STATE` compares all six portrait sheets and the
@@ -544,3 +640,47 @@ frame 370k, selection 3.8 M.
   The frame budget delays optional work while the camera pans over a crowd; the defeat
   replay now stays within 359,840 cycles (the six earlier overruns removed).
 - The interior flash is drawn for damage only (FFT has other effects for heals and statuses).
+
+
+The historical motion-enabled attack-camera PC exploration uses original scenery textures throughout its
+cinematics, manual perspective entry/exit, close/wide zoom and F1/F5 turns. Build with
+`make attack-camera`, launch `./fftcam_pc --scenario 61`, and generate the GIFs with
+`make attack-camera-review`. This PC texture reference is not a TI mapper; details and
+headless TI scope are in `ATTACK_CAMERA.md`.
+
+Cinematic research transitions use ten samples in each direction (0.5 seconds each at the
+20 FPS preview cadence), while the attack stays accelerated. A rewarded shot lasts 55
+frames / 2.75 seconds; damage and gains are unchanged. Review GIFs and source logs are
+in `x/textured-transitions/`. `make textured-transitions-test` checks the actual PC texture
+path; `make attack-camera-check` checks the portable fixed-point path under headless 68000.
+
+Current PC F1/F5 motion is twice as long (six intermediate angles); cinematic EXP/JP notices
+follow the attacker. ISO contours add 2,397 packed bytes over contrast alone across all four
+views, with no added production render-buffer RAM or per-frame contour work. Headless ZX0
+load timing adds 1.685 ms/view on average at 12 MHz; full measurements: `ISOMETRIC_STYLE.md`.
+
+`make tiemu-camera-demo` prepares a bounded real-TI demonstration with automatic wide/close
+inspection and an enabled melee cinematic. It retains native actor/combat rendering,
+uses a compact ISO UI, and passes 470 PC/TI frame comparisons. Fixed inspection/attack
+backgrounds are textured offline; moving camera frames remain flat geometry on TI.
+Build/capture details: `TIEMU_CAMERA_DEMO.md`.
+
+Native camera audit: `make camera-audit` prepares a 13-case TiEmu timer program and checks
+468 timed PC/TI frames first. `CAMERA_AUDIT.md` distinguishes the PC-only moving textures,
+the historical TI hold/switch, slow flat travelling geometry and cached fixed-view
+animation. These experimental camera effects are not a validated calculator release.
+The accepted fixed build now has animated low-poly F1/F5, direct close/wide inspection
+and ISO combat (`make turn-audit`, `make camera-cuts-demo`); see `ROTATION_LOWPOLY.md`.
+
+The banner/loot presentation follow-up is complete: text reveals twice as fast, shade
+wipes half as fast, `VICTORY!` displays in full, KO units visibly dissolve into loot,
+and crystals animate through eight source images. The existing depth/cover path is
+retained. `make events-check` compares 101 PC/native screens and replay budgets;
+`make events-review` creates PC preview GIFs. Rebuild/resend fftu and ffti with the
+program; costs, injection doors, native sizes and validation scope: [EVENTS.md](EVENTS.md).
+
+The original data inventory, native ABI RAM breakdown, verified compression costs and
+lossless storage candidates are in [STORAGE_AUDIT.md](STORAGE_AUDIT.md); applied formats
+and current totals are in [STORAGE_CLEANUP.md](STORAGE_CLEANUP.md).
+`make storage-audit` reproduces the read-only audit without launching TiEmu or changing
+game asset formats; local disc-derived banks and the selected camera-review banks are required.

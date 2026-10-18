@@ -104,7 +104,7 @@ K = 4                                           # supersampling
 SC_W, SC_OY, BG = 320, 64, 40.0                 # fft.h: SC_BYTES * 8, SC_OY; background marker
 
 
-def render(polys, tex, pal, rot, nx, nz, sc_h):
+def render(polys, tex, pal, rot, nx, nz, sc_h, return_depth=False):
     """One view at K x the TI's pixels: luminance (BG outside the map), the view diagonal of
     the tile each pixel belongs to (-1 outside) and its face: world tile * 5 + 0 top, 1 +x,
     2 -x, 3 +z, 4 -z wall (-1 outside the grid)."""
@@ -161,7 +161,7 @@ def render(polys, tex, pal, rot, nx, nz, sc_h):
             col = lpal[pl][idx]
         zb[y0:y1, x0:x1][m] = D[m]; lum[y0:y1, x0:x1][m] = col[m]; diag[y0:y1, x0:x1][m] = td
         face[y0:y1, x0:x1][m] = fc
-    return lum, diag, face
+    return (lum, diag, face, zb) if return_depth else (lum, diag, face)
 
 
 def views(disc, files, nx, nz, maxh, preview=None):

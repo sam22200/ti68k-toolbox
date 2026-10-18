@@ -10,6 +10,22 @@ pathfinding, networking, data encoding) are in `ti68k-game-techniques.md`.
 
 ## 1. Program skeleton and global directives
 
+**Serialize GCC4TI builds sharing sources (observed on the host):** the driver
+creates/removes `.s` and `.o` beside input files, including shared `runtime/core`
+and TI backend sources. Concurrent `ti-cc` invocations can delete each other's
+intermediates or link an object built with different flags. Run native builds
+sequentially, or give each build isolated source/object paths. Host-only tests and
+independent asset reads may still run concurrently.
+
+**Runtime data length (verified headlessly and in TiEmu, FFT affine textures):**
+`rt_file(name, &size)` on TI reports the AMS variable's payload length including the
+OTH/dat trailer (six bytes in generated `.89y` banks), while the PC backend reports
+the raw `.bin` length. Validate a format header and require `size >= expected_data`,
+rather than equality to the raw file size. Exact equality silently disabled a native
+atlas and fell back to low-poly while the PC loaded textures. Requiring the intended
+backend in tests and comparing PC/TI framebuffers caught it; a successful fallback
+is not proof that the renderer being benchmarked ran.
+
 ```c
 #define USE_TI89              // target TI-89 + Titanium → .89z (add USE_TI92PLUS / USE_V200 for others)
 #define OPTIMIZE_ROM_CALLS    // keeps the ROM-call table in a register: smaller/faster calls
@@ -216,6 +232,127 @@ GrayOff();                                       // BEFORE freeing anything it u
   `DUMMY_HANDLER`/the old one before `GrayOff()`): a counting handler there gives a **free 256 Hz
   clock** that leaves int 5 and the AMS timers alone (**verified**: still 256 Hz with grayscale on,
   HW2 and HW3).
+
+### Offline sprite contrast and outlines
+
+Use this for character, object and scenery-tile conversion to four greys. Perform the
+colour work offline, before packing the two planes; avoid a per-frame contrast pass.
+The tested FFT scenery contrast pass leaves actor artwork unchanged: its threshold
+factor is an example for dry textures, not a validated universal character preset.
+
+- **Keep luminance and opacity separate until the final conversion.** Downsample/filter
+  source art before four-grey quantization. Exclude transparent samples from colour
+  averages/votes so the transparent sheet background does not darken/lighten the border.
+  Keep an explicit opacity mask: white clothing, eye glints and the white outline must
+  remain opaque. Deriving transparency from `light | dark` would erase them.
+- **Strengthen tone separation at conversion time.** Given ascending luminance thresholds
+  `t0,t1,t2`, tightening them with `t_new = t1 + k * (t - t1)`, `0 < k < 1`, makes more
+  pixels black/white while retaining both greys. FFT selected `k=0.65` for dry scenery;
+  compare original and stronger variants before choosing a sprite's thresholds. Start
+  from source luminance/palette, not an already quantized two-bit image; lost shades
+  cannot be recovered. Avoid crushing faces, weapons or pose-defining details into black.
+- **Separate the silhouette from both light and dark backgrounds.** For final-size opaque
+  shape `S`, a four-neighbour example is `inner = S & ~erode4(S)` (black inside the shape)
+  and `ring = dilate4(S) & ~S` (white outside). Pack opacity as `S | ring`. Existing masked
+  drawing clears both planes under the opaque mask, then writes the sprite colours.
+  Use the external white ring for main actors; the extra black inner contour is useful
+  when it does not erase thin limbs or small faces. Reserve padding and a stable foot
+  anchor across all animation poses; generate the contour after scaling to final size.
+- **Repair only the details that matter at native size.** FFT's actor converter uses
+  opaque-sample votes, excludes the source black line from interior colour voting,
+  draws a fresh black silhouette/white ring, lightens face tones and places separated
+  eyes after reduction. Its palette thresholds and face/eye rules are source-specific;
+  do not apply them blindly to a different sheet. Prefer readable shapes over blanket
+  dithering inside small actors.
+
+**Cost boundary:** remapping colours and changing an existing mask add no runtime filter
+or new draw pass when the sprite dimensions/format stay the same. A required width-class
+increase (e.g. 16 to 32 pixels), added mask, larger bounds or changed compression can cost
+RAM, Flash and cycles. Measure those changes rather than calling every outline free.
+Do not confuse the normal external white ring with an occluded actor's x-ray silhouette:
+retain the existing cover test and mask exposed/hidden parts separately, as below.
+
+**Evidence and review:** FFT's existing actor pipeline is
+[`units.py`](../../../../games/fft/tools/units.py) (`sprite`); its separate dry-scenery
+threshold comparison is
+[`texture_contrast_review.py`](../../../../games/fft/tools/texture_contrast_review.py).
+Compare identical poses/cameras over white, black and textured backgrounds, including
+water, overlap and partial cover. Review at 160x100; use headless PC/TI pixel comparisons
+to check transparency and occlusion. The scenery review's GIF cadence is not measured FPS.
+
+### Offline scenery contrast and height contours (FFT, 2026-10-16)
+
+**Reusable method, implemented and visually selected in FFT:** stronger scenery contrast
+plus one-pixel contours at real height boundaries. PC comparisons preserve tactical state
+and occlusion data; a bounded Titanium TiEmu demo also displays the selected ISO assets.
+This changes asset colours, not the calculator's LCD contrast register.
+
+1. **Filter before four-grey quantization.** Keep source luminance until after downsampling
+   (FFT uses 4x4 samples per output pixel). Start from established thresholds `t0,t1,t2`;
+   tighten them around the middle: `ti_new = t1 + k * (ti - t1)`. FFT's selected `k = 0.65`
+   puts more dry scenery into black/white while keeping both greys. This is a reviewed
+   art parameter, not a universal value for every palette or game. Retain the background
+   mask so an empty sky does not affect threshold selection or acquire texture noise.
+2. **Treat materials separately.** Applying the dry-surface contrast to FFT's canal made
+   the water too white. ISO keeps the original water colours; perspective uses light/dark
+   grey water, with sparse animated glints drawn separately. Preserve the actors' existing
+   white silhouette outlines instead of applying a final contrast filter to the whole LCD.
+3. **Find structural edges from geometry, not texture pixels.** Canonicalize each mesh
+   edge's endpoint pair and gather its adjacent faces. FFT keeps a top/sloping face meeting
+   a vertical wall: ledges, stairs, banks, roof and platform lips. This excludes coplanar
+   seams, triangulation diagonals and the grid between equal-height tiles. Its normal
+   tests are `abs(ny)/length > 0.5` for tops and `< 0.2` for walls; adapt these heuristics
+   to the game's slopes and coordinate convention. They do not detect every possible crease.
+4. **Test visibility before painting.** Project each edge through the same camera as the
+   scenery, interpolate its depth and compare samples to the existing offline depth image.
+   Reject samples hidden by a roof or foreground wall; use only a small tolerance for the
+   edge's own face/slope. FFT samples four times per output-pixel extent. Its depth sign
+   and `0.15` tolerance belong to its projection; do not copy them into a different depth
+   representation without checking. Paint the final stroke at native output resolution.
+5. **Use opposite extreme tones.** With logical levels `0=white .. 3=black`, choose black
+   over levels 0/1 and white over 2/3. One visible pixel is enough for a height boundary;
+   doubling it can hide small stairs or actors. Review mixed-material edges: local colour
+   switching may look broken, even when every pixel has strong contrast.
+6. **Bake only into scenery colour planes.** Preserve collision, height, depth and cover
+   masks byte-for-byte. Draw actors, cursor, reach and effects afterwards. Any background
+   restoration/cache must use the same styled colours, or moving a cursor restores an
+   unstyled patch. Ship only the selected variant in place of the old asset; the PC's
+   all-style comparison bank is not a requirement for production.
+
+**Cost boundary:** baked contours need no per-frame detection/drawing and no additional
+view buffer when they replace the existing colours. Compressed bytes and decode time can
+still increase; measurements are in `ti68k-performance.md`, "FFT isometric contours".
+
+**Actor occlusion readability (PC/native68000 checked, 2026-10-17):** hollow x-ray
+contours over busy high-contrast scenery can look like normally filled actors because
+the roof texture shows through their masked interiors. FFT now makes covered body
+interiors opaque white while keeping the black/white contour and exposed artwork;
+covered shadows remain transparent. Reuse the existing interior/cover masks, not a
+new per-pixel world-depth pass. The correction adds no asset/RAM allocation (+80 B
+in the bounded native config binary). `make -C games/fft iso-silhouette-check` checks
+768 cases and38,166 hidden body pixels on PC and native68000. Distinguish a lost
+occlusion mask from poor silhouette contrast; total changed-pixel area is no longer
+a useful proxy for exposed body detail after white fill is introduced.
+A freely moving 3D camera needs projected, visibility-tested edges again: the offline
+zero-per-frame-cost result does not apply to that renderer. For a 2D height grid, deriving
+candidate boundaries from unequal neighbour heights is now implemented in FFT's
+low-poly F1/F5 rotation (headless PC/native 68000 checked, 2026-10-17). Reuse projected
+tile corners, collect top lips against lower neighbours, draw after that column's fill,
+then let nearer columns overwrite hidden strokes in the existing painter order. Select
+the opposite extreme from the known flat top shade rather than reading every pixel.
+This is approximate column visibility, not the fixed-view mesh depth test. Native
+160x100 turns add 125.269 ms mean CPU (+11.55%), 552 code bytes and no Work/assets;
+the 608-picture checks and scope are in [TURN_EDGES.md](../../../../games/fft/TURN_EDGES.md).
+
+**Review recipe:** replay identical cameras, inputs and actor animation for original,
+contrast-only and contrast+contours; check unchanged depth/state and that new contour
+pixels stay inside the geometry mask. Compare at 160x100 and check water, crowded stairs,
+dark roofs, sprite outlines and occluded ledges. Pack/decode the complete production
+asset, not just its colour preview, to measure real storage/load overhead.
+
+Source recipe: [FFT style notes](../../../../games/fft/ISOMETRIC_STYLE.md),
+[`isometric_style.py`](../../../../games/fft/tools/isometric_style.py) (`ledges`, `outline`,
+`prepare_iso`), [bounded TiEmu capture](../../../../games/fft/TIEMU_CAMERA_DEMO.md).
 
 ### Double buffering with GrayDBuf (preferred for grayscale games)
 
