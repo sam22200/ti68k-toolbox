@@ -67,11 +67,14 @@ native geometry renderer. The menu does not remove these pre-existing prototype
 limits or claim a full tactical calculator release.
 
 The full tactical+camera native packaging remains separate work; the earlier
-79,380-byte link log predates storage cleanup. The bounded review is now 61,971 file
+79,380-byte link log predates storage cleanup. After Auto-battle, the bounded review is 62,515 file
 bytes and sends 158,468 raw data bytes in nine banks. See the
 [single-facing portraits and bounded blade cache](BLADE_CACHE.md).
 The [live rotation contours](TURN_EDGES.md) add 552 executable bytes without new banks
 or Work allocation; their CPU cost is measured separately from the historical turns.
+Auto-battle's tactical UI is available in the full PC build; the compact native camera
+review remains a presentation fixture. See [Auto-battle](AUTO_BATTLE.md) for the separate
+ordinary tactical TI executable and tests.
 It is built and checked independently. To avoid the
 previous TiEmu frame-order issue, it opts into `RT_GRAY_COPY_PRESENT`: draw in the
 existing hidden allocation, copy finished planes to fixed grayscale addresses.
