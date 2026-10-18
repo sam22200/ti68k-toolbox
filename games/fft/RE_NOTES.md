@@ -1,5 +1,43 @@
 # Final Fantasy Tactics (PS1): study notes
 
+## Management/font exploration — 2026-10-18
+
+**OBSERVED IN FFT:** `EVENT/FONT.BIN` contains 2,200 glyphs, each 35 bytes,
+10x14 pixels in packed 2bpp. All 77,000 bytes match WORLD's font bitmap symbol.
+Proportional widths are at WORLD offset 0x733e0. Formation context/Item/Ability hierarchy and
+the job wheel were inspected in the local community source study; original
+deployment/status was also captured through the existing boot door. Five unit
+snapshots and listed JP costs are read from the original state/disc.
+
+**OBSERVED IN FFT (dialogue/title follow-up):** a static scan of2230 referenced
+TEST.EVT entries yields3573 pages without decoder errors. The largest portrait
+page measured contains103 glyphs/spaces (event425/text10, tutorial explanation).
+This excludes a universal bound on substituted names and other WORLD windows.
+Portrait boxes force three source lines; width is measured from text. Source
+MAPTITLE strips and ATTACK's palette match the original title-load/show routines:
+bitmap reveal, shaded leading edge, hold and erase. The five player records unlock
+Squire/Chemist only (`c0 00 00`); Knight/Archer both require Squire level2.
+
+**TARGET IMPLEMENTATION:** separate portable menus, three adapted rosters,
+small/comfort AMS glyphs, original actors/portraits, original equipment icons and
+sample dialogue. Dialogue now returns to5-row ink so the103-character source page
+fits at once. Both window dimensions follow the used text; the portrait sits above
+it. The FFA dark gradient and grey-to-white frontier remain, without any text/window
+shadow. The CATALOG density control selects10x16 actors in4x3 or5x3 cells. Dense
+12/15-slot visual fixtures repeat the five original records and are labelled as tests.
+The dialogue speaker name retains an extra pixel of top padding; its badge
+now fits the actual name width plus8 pixels and loses the extra bottom row.
+A configurable White dialogue option inverts body/name/gradient/bevel exactly;
+future text goes light-grey to dark-grey to black, with no added assets or RAM.
+The black default and session-local preference share the existing theme flag. Change Job offers
+animated cards and a reversible Squire/Chemist confirmation in the current menu
+session; original raw stats and legal retained equipment provide its derived values.
+No campaign/battle saves change. Orbonne/Gariland lettering uses the actual narrow
+source artwork with a feathered reveal rather than a substitute font. Header numbers
+share the labels' baselines. Equipment icons retain the1280-pixel/512-palette-byte
+PS1 VRAM proof. The200-JP Learn balance remains illustrative; full job progression,
+inventory and story playback remain future work. See `MANAGEMENT.md`.
+
 `roms/ps1/Final Fantasy Tactics (USA)/` (SCUS-94221, one MODE2/2352 track, 2,464 files, local).
 Labels: **OBSERVED IN FFT** (read or measured), **LIKELY INTERPRETATION**, **TARGET
 IMPLEMENTATION** (what the TI does, and why).
@@ -1410,3 +1448,15 @@ no intermediate rotation. The full PC texture sampler has not been ported to TI.
 smooth perspective travel and automatic cinematics off for a production TI build.
 Fixed-view animation FPS does not establish usable camera latency. The audit leaves the
 experimental defaults unchanged. Details/evidence: `CAMERA_AUDIT.md`, `x/camera-audit/`.
+
+## Auto-battle controls — 2026-10-18
+
+**OBSERVED IN FFT (manual/source study, not a new running-game oracle):** the PS1
+manual lists Manual, Fight for Life, Protect Allies, Save Fading Life and Run Like a
+Rabbit. The local `battle_menu_store_auto_battle_main_target_id.c` stores behavior
+and target per unit; `battle_ai_init_target_consideration.c` keeps player-unit orders
+separate from team affiliation. Source URL and adaptation limits: `AUTO_BATTLE.md`.
+
+**TARGET ADAPTATION:** this unit / all allies delegate to our existing general AI;
+Manual or Shift/ESC restores player control. Existing Move/Act, CT, inventory,
+damage and reward rules apply. No specialized-order fidelity is claimed.

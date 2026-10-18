@@ -1,5 +1,16 @@
 # Final Fantasy Tactics: Magic City Gariland (tech demo)
 
+[Management/font prototypes](MANAGEMENT.md): three navigable Formation layouts,
+small shadow-free menu/dialogue text, fitted103-character dialogue windows, original
+equipment icons, configurable black/inverse-white dialogue themes, session-local job-change previews, a configurable4x3/5x3 small actor grid
+and original location-title reveals.
+`make management-review` generates the PC comparison GIF; this separate application
+does not yet modify campaign equipment or JP.
+
+[Auto-battle](AUTO_BATTLE.md) in the turn menu delegates this unit or all allies to
+the existing AI. Shift/ESC stops automation safely; the current walk/blow finishes.
+`make test auto-battle-check` checks turn ownership, cancellation and a full native replay.
+
 [Applied storage cleanup](STORAGE_CLEANUP.md) and [bounded blade cache](BLADE_CACHE.md):
 active camera data399,328 ->158,468 bytes.
 Textured rotations and disabled attack images are removed; canonical text, compact
@@ -159,6 +170,7 @@ shadow, with a light surface edge, including wading and wet blows (milestone 27,
 | [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
 | [APPS] or [CATALOG] | the turn order (PC: A), closed by any key |
 | [MODE] | the reach tiles drawn over the scenery in front of them, or hidden by it but for dashes (PC: M) |
+| Auto-battle (turn menu) | Manual / This unit / All allies; Shift/ESC during AI turns stops player automation |
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
 
 The turns come as FFT deals them; the cursor and the camera go to the unit whose turn it is.

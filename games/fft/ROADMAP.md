@@ -458,3 +458,37 @@ Portrait/cache follow-up (completed 2026-10-17; [details and checks](BLADE_CACHE
   save14,304 additional archive bytes with1,300 bytes of tactical Work.
 - [x] Check cold/warm replacement, crowded attacks, fast-forward and the original
   full-battle frame budget; retain the current single-facing HUD images as intended.
+
+## Auto-battle follow-up — 2026-10-18
+
+- [x] Expose the existing AI for this player unit or all allies; retain manual control by default.
+- [x] Stop automation safely with Shift/ESC, keeping committed movement, damage and rewards.
+- [x] Retain partial-turn Move/Act limits, per-unit ownership and inventory rules.
+- [x] Check menu/cancellation and a full automatic battle on PC and native68000.
+
+See `AUTO_BATTLE.md`. Original specialized orders and their target selectors remain unimplemented.
+
+## Management/font exploration — 2026-10-18
+
+- [x] Extract the original proportional font; compare native-height/compact variants.
+- [x] Build three portable Formation prototypes with shared actors, portraits and cursor.
+- [x] Reuse original context/equipment/ability hierarchy and original JP costs.
+- [x] Export PC tours; cross-check native68000 screens and measure cache costs.
+- [x] Keep smaller menu fonts/five visible slots; remove all text shadows and add
+  FFA's dark gradient and grey-to-white dialogue progression/page continuation.
+- [x] Extract original equipment icons, verify source crops/palettes against PS1 VRAM,
+  and show their compact native conversions beside each equipped item.
+- [x] Audit referenced original dialogue pages (largest measured103 characters), use
+  smaller dialogue glyphs, and fit width/height to actual text without reserved rows.
+- [x] Add configurable10x16 animated actors on three named Formation rows (4 or5 columns);
+  align header values and pad dialogue speaker names. Check dense12/15-slot visual fixtures.
+- [x] Add animated job cards and reversible session-local Squire/Chemist confirmation;
+  preserve the original fixture's Knight/Archer requirements.
+- [x] Extract original Orbonne/Gariland title strips and adapt their feathered reveal/erase.
+- [x] Add configurable inverse-white dialogue bodies/name badges, retaining the gradient,
+  typewriter frontier and session preference; check exact palette inversion and PC/native replay.
+- [x] Fit speaker badges to proportional name widths and trim the extra bottom row.
+- [ ] Select a layout, then implement persistent party/inventory, equipment, learning and saves.
+
+See `MANAGEMENT.md`; menus are separate from the battle executable. Job previews change
+only the current menu session; campaign management is not connected yet.

@@ -73,7 +73,7 @@ Existing textured research variants bypass this terrain drawing path.
 
 ## Interactive Titanium verification — 2026-10-17
 
-The exact current `x/config/fftcfg.89z` (61,971 file bytes) was launched from a clean
+At this checkpoint, `x/config/fftcfg.89z` (61,971 file bytes) was launched from a clean
 boot in Docker TiEmu, Titanium / AMS 3.10, with all nine data banks archived. The
 unaccelerated capture shows F5 twice, F1 twice, visible relief contours during motion,
 the four ISO destinations, CATALOG's two-option menu and ESC returning to the map.
@@ -84,3 +84,5 @@ Local evidence: `x/turn-edges/tiemu-rotations.gif` (25 seconds sampled at 20 Hz)
 `tiemu-contact.png`, `tiemu-keys.json` and `tiemu-checked.json` with binary/source/bank
 provenance. Capture cadence is not measured game FPS; this run did not time individual
 rotations. The separate CPU measurements above remain the performance evidence.
+The later Auto-battle build changes the configuration executable; the captured binary
+is retained at `x/turn-edges/edges/fftcfg.89z`, with its recorded hash in `tiemu-checked.json`.

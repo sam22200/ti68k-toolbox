@@ -64,6 +64,18 @@ $(NAME)_test: oracle.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h weapons.h interface.h battle.h art.h fft.h ct_recip.h $(VIEWS:=.bin) fftu.bin fftw.bin ffti.bin
 XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60
 FRAMES := 40
+.PHONY: auto-battle-test
+.PHONY: management-review management-check management-pc management-ti
+management-review management-check management-pc management-ti: units.h interface.h fftu.bin ffti.bin $(ORACLE).state
+	$(MAKE) -C management $(patsubst management-%,%,$@)
+test: auto-battle-test
+auto-battle-test: map.h units.h weapons.h interface.h battle.h art.h
+	@mkdir -p x/auto-battle
+	$(CC) $(PC_CFLAGS) -o x/auto-battle/test test_autobattle.c $(RT_CORE) $(RT_SW)
+	./x/auto-battle/test x/auto-battle/menu.png
+.PHONY: auto-battle-check
+auto-battle-check: auto-battle-test ti
+	$(PY) tools/check_auto_battle.py
 .PHONY: events-test events-review events-check
 events-test: map.h units.h weapons.h interface.h battle.h art.h
 	@mkdir -p x/events
