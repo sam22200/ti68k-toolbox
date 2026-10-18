@@ -50,7 +50,7 @@ static u32 read_keys(void)
     u16 pad = spread[(r4 >> 1) & 7] | spread[(r3 >> 1) & 7] << 1 | spread[(r2 >> 1) & 7] << 2;
     return (r0 & 0xFF) | (r1 & 1) << 8 | (r6 & 1) << 9 | (r5 & 0x80) << 3 | (r1 & 0x80) << 4
            | (r5 & 1) << 12 | (r3 & 0x40) << 6 | (r4 & 0x40) << 7
-           | (u32)pad << 16;
+           | (r3 & 0x40) << 8 | (u32)pad << 16;
 }
 #endif
 
@@ -363,7 +363,14 @@ void _main(void)
 #ifdef RT_MONO
         FastCopyScreen_R(scr, LCD_MEM);
 #else
+#ifdef RT_GRAY_COPY_PRESENT
+        // Opt-in native review control: fixed source addresses for TiEmu grayscale inference.
+        GrayWaitNSwitches(1);
+        FastCopyScreen_R(rt_light,GrayGetPlane(LIGHT_PLANE));
+        FastCopyScreen_R(rt_dark,GrayGetPlane(DARK_PLANE));
+#else
         GrayDBufToggleSync();                      // swap at a plane switch: no tearing
+#endif
         rt_light = GrayDBufGetHiddenPlane(LIGHT_PLANE);
         rt_dark = GrayDBufGetHiddenPlane(DARK_PLANE);
 #endif

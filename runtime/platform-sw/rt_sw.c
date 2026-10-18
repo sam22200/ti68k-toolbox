@@ -250,7 +250,8 @@ static void chunk(FILE *f, const char *type, const u8 *data, u32 n)
     u8 h[8];
     u32 c;
     be32(h, n); memcpy(h + 4, type, 4);
-    fwrite(h, 1, 8, f); fwrite(data, 1, n, f);
+    fwrite(h, 1, 8, f);
+    if (n) fwrite(data, 1, n, f);       // IEND has no payload; its pointer may be NULL
     c = crc(0xFFFFFFFFUL, h + 4, 4);
     c = crc(c, data, n) ^ 0xFFFFFFFFUL;
     be32(h, c); fwrite(h, 1, 4, f);
@@ -316,6 +317,7 @@ u32 sw_parse_keys(const char *s)
         { "UP", K_UP }, { "LEFT", K_LEFT }, { "DOWN", K_DOWN }, { "RIGHT", K_RIGHT }, { "A", K_A },
         { "B", K_B }, { "C", K_C }, { "D", K_D }, { "ENTER", K_ENTER }, { "ESC", K_ESC },
         { "F1", K_F1 }, { "F5", K_F5 }, { "APPS", K_APPS }, { "MODE", K_MODE },
+        { "CATALOG", K_CATALOG | K_APPS },
     };
     u32 keys = 0;
     char w[16];
