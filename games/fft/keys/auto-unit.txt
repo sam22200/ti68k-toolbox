@@ -1,0 +1,13 @@
+# Ramza's turn (scenario 10): Move -> Auto-battle -> This unit.
+0 DOWN
+1
+2 DOWN
+3
+4 DOWN
+5
+6 DOWN
+7
+8 ENTER
+9
+10 ENTER
+11

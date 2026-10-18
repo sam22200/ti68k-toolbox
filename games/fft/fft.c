@@ -578,7 +578,7 @@ static void turn_start(void)
     if (outcome()) { end_battle(outcome()); return; }
     st.unit[st.act].status &= (u8)~ST_DEFEND;
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
-    me = st.unit[st.act].team == TEAM_PLAYER && !st.ai_all;
+    me = st.unit[st.act].team == TEAM_PLAYER && !st.ai_all && !(st.auto_units & (1U << st.act));
     st.ai = me ? AI_OFF : AI_THINK; st.ai_t = 0;
     if (me && st.prot != 0xFF) { st.want = st.prot; st.prot = 0xFF; }   // the player's view back
     if (W) { W->ai_k = 0; W->frz = W->frz_n = 0; W->frz_h = 0; }
@@ -3100,6 +3100,24 @@ static void to_menu(void)
     st.cx = st.unit[st.act].x; st.cz = st.unit[st.act].z;
 }
 
+// Manual / this unit / all allies. Never reset Move/Act or advance the CT clock.
+// Cancellation lets a committed walk, blow or loot message complete normally.
+static void auto_control(u8 choice)
+{
+    u8 i;
+    if (!choice) {
+        st.auto_units=0; st.ai_all=0;
+        if (st.unit[st.act].team!=TEAM_PLAYER || !st.ai) return;
+    } else if (choice==2) {
+        for (i=0;i<NUNIT;i++) if (st.unit[i].team==TEAM_PLAYER) st.auto_units|=(u16)(1U<<i);
+    } else st.auto_units|=(u16)(1U<<st.act);
+    st.ai=choice ? AI_THINK:AI_OFF; st.ai_t=0;
+    W->ai_k=W->frz=W->frz_n=W->hold=0; W->frz_h=0;
+    if (choice) st.mode=M_BROWSE;
+    else if (st.mode!=M_WALK && st.mode!=M_ACT && st.mode!=M_PICK) to_menu();
+    hl_seq++;
+}
+
 // the turn menu: Move and Act once each (a move undone with [shift] before acting), Wait
 // (then the facing), Status
 static void menu_keys(void)
@@ -3118,6 +3136,8 @@ static void menu_keys(void)
         } else if (st.menu == MN_STATUS) {
             st.mode = M_STATUS; W->status_i = 0; st.page = 0; st.sel = st.act; st.back = M_MENU;
             st.status_col = st.status_row = st.status_info = 0;
+        } else if (st.menu == MN_AUTO) {
+            st.mode=M_AUTO; st.sub=1;
         }
     } else if (input_pressed(K_ESC | K_B)) {
         if (st.moved && !st.acted && !st.pick_t) {   // the move undone (not after a pick-up)
@@ -3395,6 +3415,9 @@ static u8 update(u8 fast)
     s16 tx, ty;
     u8 mode0 = st.mode;
     if (!W || !ugfx || !wgfx || !igfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
+    if (!fast && st.ai && st.mode!=M_END && (st.auto_units || st.ai_all) && input_pressed(K_ESC | K_B)) {
+        auto_control(0); return 1;                 // consume cancellation, including during animation
+    }
     if (st.ai != AI_THINK || st.banner || st.morph_mask) st.tick++;   // (a unit thinking: the picture stands still)
     if (st.deny) st.deny--;
     if (st.morph_mask) {
@@ -3474,6 +3497,13 @@ static u8 update(u8 fast)
             if (input_pressed(K_UP | K_DOWN)) st.quit ^= 1;
             if (input_pressed(K_A | K_ENTER)) { if (!st.quit) return 0; st.mode = M_BROWSE; }
             else if (input_pressed(K_ESC | K_B)) st.mode = M_BROWSE;
+        } else if (st.mode == M_AUTO) {
+            if (input_pressed(K_UP)) st.sub=st.sub ? st.sub-1:2;
+            if (input_pressed(K_DOWN)) st.sub=st.sub<2 ? st.sub+1:0;
+            if (input_pressed(K_A | K_ENTER)) {
+                auto_control(st.sub);
+                if (!st.sub) to_menu();
+            } else if (input_pressed(K_ESC | K_B)) to_menu();
         } else if (st.mode == M_MENU) {
             menu_keys();
         } else if (st.mode == M_ACTS || st.mode == M_SKILLS) {
@@ -3984,7 +4014,8 @@ static void draw_panel(u8 side)
 static u8 win_lines(u8 m)
 {
     u8 n = 0;
-    if (m == M_MENU) return 4;
+    if (m == M_MENU) return MN_N;
+    if (m == M_AUTO) return 3;
     if (m == M_QUIT) return 3;
     if (m == M_ORDER) { while (n < ORDER_N && st.turns[n] != 0xFF) n++; return n; }
     if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend);
@@ -3995,15 +4026,16 @@ static u8 win_lines(u8 m)
 
 static void make_window(void)
 {
-    static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status" };
+    static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status", "Auto-battle" };
+    static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
     u16 *l = W->win[0], *d = W->win[1];
     const Unit *u = &st.unit[W->win_k[2]];
     u8 r, i, n, k = W->win_n++, m = W->win_k[0], c = C_BLACK;
     char s[28];
     if (!k) {
-        u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
+        u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_AUTO || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
         const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
-            : m == M_SKILLS ? skill_sets[u->set].name : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
+            : m == M_AUTO ? "Auto-battle" : m == M_SKILLS ? skill_sets[u->set].name : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
         W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
         for (r = 0; r < WIN_ROWS; r++)
             for (i = 0; i < w; i++) {
@@ -4034,6 +4066,8 @@ static void make_window(void)
         s[0] = (char)('1' + k); s[1] = ' ';
         n = put_s(s, 2, unit_name(st.turns[k]));
         if (t->team == TEAM_ENEMY) c = C_DGRAY;
+    } else if (m == M_AUTO) {
+        n = put_s(s, 0, automatic[k]);
     } else if (m == M_MENU) {
         n = put_s(s, 0, entries[k]);
         if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_DGRAY;
@@ -4054,7 +4088,7 @@ static void make_window(void)
         else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
     }
     s[n] = 0;
-    text_into(l, d, m == M_MENU || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 6 : 3, 10 + 6 * k, s, c);
+    text_into(l, d, m == M_MENU || m == M_AUTO || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 6 : 3, 10 + 6 * k, s, c);
 }
 
 static void draw_hand(s16 x, s16 y)
@@ -4153,7 +4187,7 @@ static void draw_hud(void)
     pk[0] = hidden ? 0 : st.mode == M_ACT ? st.atk + 1 : st.act + 1;
     pk[1] = hidden ? 0 : st.mode == M_ACT ? (st.tgt != st.atk ? st.tgt + 1 : 0)
         : o && o - 1 != st.act && (st.mode == M_AIM || st.mode == M_BROWSE || st.mode == M_TARGET) ? o : 0;
-    k[0] = st.mode == M_MENU || st.mode == M_ACTS || st.mode == M_SKILLS
+    k[0] = st.mode == M_MENU || st.mode == M_AUTO || st.mode == M_ACTS || st.mode == M_SKILLS
         || st.mode == M_PICK || st.mode == M_ORDER || st.mode == M_QUIT ? st.mode : 0;
     if (pre) k[0] = M_MENU;
     k[1] = k[0] == M_MENU ? (u8)(pre | st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == 0xFF
@@ -4218,8 +4252,8 @@ static void draw_hud(void)
                 d[i] = (d[i] & keep) | W->win[1][r * (RT_PBYTES / 2) + i];
             }
         copy_box(W->win[0] + 3 * (RT_PBYTES / 2), W->win[1] + 3 * (RT_PBYTES / 2), 12, y + 3, W->win_w, W->win_h - 3);
-        if (k[0] == M_MENU || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
-            u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
+        if (k[0] == M_MENU || k[0] == M_AUTO || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
+            u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS || k[0] == M_AUTO ? st.sub : k[0] == M_SKILLS ? st.skill : st.quit + 1;
             draw_hand(80, y + 7 + 6 * e);
         }
     }

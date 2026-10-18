@@ -1,0 +1,15 @@
+# Ramza's turn (scenario 10): Auto-battle -> All allies.
+0 DOWN
+1
+2 DOWN
+3
+4 DOWN
+5
+6 DOWN
+7
+8 ENTER
+9
+10 DOWN
+11
+12 ENTER
+13

@@ -104,9 +104,10 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 // chosen at Wait; M_STATUS: a unit's numbers; M_AIM: the weapon's or the ability's reach
 // shown, a target to pick; M_ACT: the attack or the ability played; M_ACTS: Act's list (Attack,
 // the skill set); M_SKILLS: the abilities the unit knows; M_PICK: a crystal or a chest picked
-// up; M_END: the battle over, its results; M_ORDER: the turn order ([APPS]); M_QUIT: "Quit?"
+// up; M_END: the battle over, its results; M_ORDER: the turn order ([APPS]); M_QUIT: "Quit?";
+// M_AUTO: Manual / This unit / All allies, reusing the ordinary AI
 enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END,
-       M_ORDER, M_QUIT };
+       M_ORDER, M_QUIT, M_AUTO };
 enum { END_NONE, END_VICTORY, END_DEFEAT };
 // an AI unit's turn (st.ai): thinking (a few frames), its move range shown, its target shown,
 // its facing shown; between them the walk and the act run as a player's (M_WALK, M_ACT)
@@ -119,7 +120,7 @@ typedef struct { s16 pri; u8 hit, ab, o, t, f; } AiAct;   // a ranked action: FF
 #define NO_ABIL 0xFF                   // st.abil: the weapon's Attack
 #define ABIL_DEFEND 0xFE               // st.abil: Defend (the support ability's command)
 enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
-enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_N };   // the turn menu's entries
+enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_AUTO, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
 #define U_RAMZA 6                      // in battle.h's order: Delita, five enemies, Ramza, recruits
 #define U_CHEMIST 8                    // the female Chemist
@@ -184,6 +185,7 @@ typedef struct {
                                        // tile to act from, the target's tile, to act before moving
     u8 ai_view;                        // the view it acts in (0xFF: the current one)
     u8 ai_all;                         // the AI plays the player's units too (a test scenario)
+    u16 auto_units;                    // player-unit bits delegated to the ordinary AI
     u8 ai_nosup;                       // FFT's sticky flag: the enemies have lost their support
                                        // (fewer than two, or all Critical): no more retreats
     u8 deny;                           // [2nd] on a tile that cannot be picked: the cursor blinks

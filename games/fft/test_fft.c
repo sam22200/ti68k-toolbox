@@ -501,6 +501,10 @@ static void test_menu(void)
     steps(0, 4);
     press(K_B);
     CHECKV(st.mode, M_MENU);
+    press(K_DOWN);                                        // the fifth command is Auto-battle
+    CHECKV(st.menu, MN_AUTO);
+    press(K_A); CHECKV(st.mode, M_AUTO);
+    press(K_B); CHECKV(st.mode, M_MENU); CHECKV(st.auto_units, 0);
     press(K_DOWN);                                        // the entries wrap
     CHECKV(st.menu, MN_MOVE);
     press(K_A); press(K_UP); press(K_UP); press(K_A);     // Move to (4, 9)
