@@ -1,5 +1,7 @@
 #!/bin/sh
-# Animated GIF of the TiEmu LCD: ti-gif OUT.gif [SECONDS] [FPS]   (default 10 s at 15 fps, x2)
+# Animated GIF of the TiEmu LCD: ti-gif OUT.gif [SECONDS] [FPS] (default 10 s at 15 fps)
+# Use SECONDS=0 to record until Ctrl+C. Writes a 160x100, four-grey GIF directly,
+# with unchanged pixels encoded transparently; no intermediate video file.
 # Records the LCD area of the window with ffmpeg x11grab while you (or ti-key) play; run it in
 # the background: `ti-gif out.gif 20 & ti-key ...; wait`. The window must stay uncovered.
 OUT=$1; SEC=${2:-10}; FPS=${3:-15}
@@ -18,10 +20,10 @@ TI_GIF_LEFT=$((TI_GIF_L * TI_GIF_W / TI_GIF_BW))
 TI_GIF_TOP=$((TI_GIF_T * TI_GIF_H / TI_GIF_BH))
 TI_GIF_WIDTH=$(((TI_GIF_R * TI_GIF_W + TI_GIF_BW - 1) / TI_GIF_BW - TI_GIF_LEFT))
 TI_GIF_HEIGHT=$(((TI_GIF_B * TI_GIF_H + TI_GIF_BH - 1) / TI_GIF_BH - TI_GIF_TOP))
-TMP=$OUT.tmp.mp4
-ffmpeg -loglevel error -y -f x11grab -framerate "$FPS" -video_size "${TI_GIF_WIDTH}x${TI_GIF_HEIGHT}" \
-  -i "$DISPLAY+$((TI_GIF_X + TI_GIF_LEFT)),$((TI_GIF_Y + TI_GIF_TOP))" -t "$SEC" -c:v libx264rgb -crf 0 -preset ultrafast "$TMP" || exit 1
-# written to a temp name and renamed: ti-view never serves a half-written GIF
-ffmpeg -loglevel error -y -i "$TMP" -vf "scale=iw*2:ih*2:flags=neighbor,split[a][b];[a]palettegen=max_colors=16[p];[b][p]paletteuse=dither=none" \
-  -f gif "$OUT.part" && mv "$OUT.part" "$OUT"
-rm -f "$TMP"
+set --
+[ "$SEC" = 0 ] || set -- -t "$SEC"
+# Replace the shell so Ctrl+C reaches ffmpeg, which flushes the GIF trailer.
+exec ffmpeg -loglevel error -y -f x11grab -framerate "$FPS" -video_size "${TI_GIF_WIDTH}x${TI_GIF_HEIGHT}" \
+  -i "$DISPLAY+$((TI_GIF_X + TI_GIF_LEFT)),$((TI_GIF_Y + TI_GIF_TOP))" "$@" \
+  -vf "scale=160:100:flags=neighbor,format=gray,lut=y='floor(val/64)*85'" \
+  -c:v gif -gifflags +offsetting+transdiff -loop 0 -f gif "$OUT"
