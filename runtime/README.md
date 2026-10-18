@@ -34,9 +34,11 @@ void game_render(void);      // draw the whole frame
   cart's 30 fps (`games/celeste`); the PC's virtual clock follows it.
 - Input: `input_held(K_UP)`, `input_pressed(K_A)`, `input_released(...)`, one snapshot per
   frame. Keys: arrows, `K_A` [2nd], `K_B` [shift], `K_C` [◆], `K_D` [alpha], `K_ENTER`, `K_ESC`,
-  `K_F1`, `K_F5`, `K_APPS` [APPS] or [CATALOG], `K_MODE` [MODE], `K_DIGIT(1..9)` (keypad grid,
+  `K_F1`, `K_F5`, `K_APPS` [APPS] or [CATALOG], `K_CATALOG` [CATALOG], `K_MODE` [MODE], `K_DIGIT(1..9)` (keypad grid,
   for gestures). PC: arrows, Ctrl/Space/Z, Shift/X, C, V, Enter, Esc, F1, F5, A, M, keypad or
-  number row (key scripts: `F1`, `F5`, `APPS`, `MODE`). The macros return the `u32` key bits: `K_ENTER`, `K_ESC` and the
+  number row (key scripts: `F1`, `F5`, `APPS`, `MODE`). CATALOG maps to F4 on PC and `CATALOG`
+  in scripts; it also sets legacy `K_APPS`. Games that distinguish them must handle CATALOG first.
+  The macros return the `u32` key bits: `K_ENTER`, `K_ESC` and the
   digits are above bit 7, so `u8 go = input_pressed(K_A | K_ENTER)` loses them; write `!= 0`.
 - Drawing (hidden planes, double-buffered): `draw_clear`, `draw_rect(x, y, w, h, C_*)`,
   `draw_sprite(x, y, &RtSprite)` (8/16/32 wide, masked or opaque, clipped), `draw_text(x, y, s,

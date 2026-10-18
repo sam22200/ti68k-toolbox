@@ -12,6 +12,9 @@ description: Write, compile, optimise or port C code (GCC4TI/TIGCC) for the TI-8
   ExtGraph, TileMap, `experiments/` benchmarks), benchmark any new hot path. Visibility = 4 greys
   on 160×100: white outline (dilated mask) on the hero, NPCs and enemies, sprites contrasted
   against the scenery (`ti68k-c-patterns.md` § sprites).
+  For asset readability, see [sprite contrast and outlines](reference/ti68k-c-patterns.md#offline-sprite-contrast-and-outlines)
+  and [scenery contrast and height contours](reference/ti68k-c-patterns.md#offline-scenery-contrast-and-height-contours-fft-2026-10-16):
+  offline four-grey remapping, black/white separation and visibility-tested relief edges.
 - **NOSTUB only** (no kernel): the `.89z` runs as `name()` from HOME.
 - **ASM** (68000): only for very heavy computation, rarely, and **always ask first**. Exception:
   frequent operations with a verified asm version (table at the top of `ti68k-asm.md`) are always called in

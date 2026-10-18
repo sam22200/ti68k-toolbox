@@ -185,6 +185,21 @@ are the author's (CodeWalrus thread, `sources/web/codewalrus-570-x3d.txt`).
   once clipping was fast. He also saw TiEmu grayscale glitches absent on the real calculator: do
   not over-trust grayscale screenshots of fast plane switching.
 
+### Readable relief on four-grey scenery — FFT asset pipeline
+
+For fixed/isometric views, generate **geometry-aware height contours offline**: keep shared
+top/wall edges, depth-test them with the scenery camera, then bake a one-pixel black-on-light
+or white-on-dark stroke into the colour planes. Strengthen dry-material contrast separately;
+retain established water tones and actor outlines. Avoid texture-edge filters or outlining
+every tile: both turn the background into noise at 160x100.
+
+The reusable recipe, visibility checks, material exceptions and validation steps are in
+`ti68k-c-patterns.md` §3, "Offline scenery contrast and height contours". Measured FFT cost:
++2,397 packed bytes for four views versus contrast alone, unchanged view-buffer size and
+no per-frame contour work. The decode overhead is measured separately in
+`ti68k-performance.md`. This zero-per-frame result applies to **replacing existing fixed-view
+assets**, not to arbitrary live 3D camera motion; runtime edges need their own benchmark.
+
 ## 6. Raycasting and texture strips — from TICT S2P1/S2P2
 
 - Grid squares of **64 units**: map cell = `pos >> 6`, texture column = `pos & 63`.

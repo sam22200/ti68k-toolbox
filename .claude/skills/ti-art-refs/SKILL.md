@@ -62,4 +62,19 @@ Other sprite sites (Sprite Database, VideoGameSprites, VGMaps for whole maps): `
    keep only the winner (`ti-port-sdl` step 5, `ti-port-tibasic` §2).
 5. Measure the cost without UI (`make cycles`, `make xcheck`), then the TI last.
 
+## Contrast and readable relief
+
+When adapting sprites or scenery, use the shared implementation recipes:
+
+- [Offline sprite contrast and outlines](../ti89-c-dev/reference/ti68k-c-patterns.md#offline-sprite-contrast-and-outlines):
+  choose four-grey thresholds before packing, preserve opaque white pixels, and separate
+  an actor from busy scenery with a black inner contour and a white outer ring.
+- [Offline scenery contrast and height contours](../ti89-c-dev/reference/ti68k-c-patterns.md#offline-scenery-contrast-and-height-contours-fft-2026-10-16):
+  mark real ledges/stairs/roof lips with black-on-light or white-on-dark strokes; reject
+  hidden edges and preserve depth/cover masks. Treat water separately from dry textures.
+
+These are asset-pipeline techniques, not an LCD-wide contrast filter. Review the same
+animation against light, dark and busy backgrounds at native size; keep actor occlusion
+readable after strengthening scenery. Costs and verified examples are in the linked recipes.
+
 A new bank worth keeping: add a row above, in its category (game, where its sprites shine, URL).

@@ -1,5 +1,72 @@
 # TI-68k performance: writing fast code for a very slow machine
 
+FFT native turn follow-up (2026-10-17, **datasheet CPU only**, not a new TiEmu run):
+projected triangle/edge structs referenced through pointers avoid GCC4TI's per-corner
+AMS `memcpy` calls. Eight full textured turns drop from a 2.564 s mean to 2.438 s
+at 12 MHz (4.93%); all 32 PC/TI pictures stay identical. An opt-in 80x25 moving
+scenery buffer, duplicated backwards into the existing 80x50 color/depth buffers
+before native-resolution actors, reaches 1.890 s mean (26.31% total reduction),
+with coarser vertical scenery/cover edges and unchanged settled views. No bulk RAM
+increase. Simply making the triangle routine `noinline` was 2.6% slower and was
+rejected. These are compiler/scene-specific results, not general speed guarantees.
+Reproduction and scope: `games/fft/NATIVE_TEXTURED_TURNS.md`,
+`make -C games/fft turn-texture-opt-bench`.
+
+FFT planar/visibility follow-up (**verified in Titanium TiEmu**, 2026-10-17):
+357 compatible affine triangle pairs become quads, 866 triangles to 509 candidate
+surfaces; collapsed/nonconvex rounded quads fall back. Conservative facing lists
+enumerate every legal pivot and anchor rounding phase. Direct left/right edge
+assignment replaces scanline clear/min/max for convex contours. With native actors,
+the same three textured 80x50 intermediate angles average 1.995 s datasheet CPU
+(22.21% below the initial texture port), and **2.281-2.480 s elapsed in TiEmu**
+(2.379 s mean, 30.27% below the initial 3.412 s). An optional 80x25 variant averages
+1.571 s CPU and **1.847-1.964 s in TiEmu** (1.896 s mean), visibly coarser vertically.
+Surface tables add 31,270 archived bytes read in place; no bulk TI heap increase.
+Visibility-only is pixel-identical in 576 broad camera checks; merged interpolation
+changes up to 499/16,000 moving pixels, settled views identical. The raster zone
+falls from 7.99M to 5.71M cycles per intermediate frame. A trial gradient cache
+was slower and removed. These are bounded MAP022 results, not hardware FPS or
+general speed guarantees. Reproduction: `make -C games/fft turn-surface-bench`,
+details `games/fft/SURFACE_TURNS.md`.
+
+**Anisotropic sampling is not automatically faster** (**verified in Titanium TiEmu**,
+FFT, 2026-10-17): 40x100 and 80x50 both draw 4,000 scenery pixels. Keeping identical
+geometry/UVs/actors/three angles, 40x100 costs 2.291 s mean datasheet CPU versus
+1.995 s (+14.86%), and 2.632-2.902 s in TiEmu versus 2.281-2.480 s (means 2.773 /
+2.379 s, +16.6%). More rows raise scanline start/clip/gradient setup costs; raster work
+is 6.81M versus 5.71M cycles per picture, expansion 0.192M versus 0.086M. Native actors
+remain sharp; 4x1 scenery pixels keep vertical detail and lose horizontal detail.
+Reuses the 500-byte color planes and 4,000-byte depth; 100-row edge scratch fits in
+the background tail after projected vertices. The horizontal expand LUT was checked
+against all 32,000 plane bits PC/TI; 576 camera pictures and 512 sequential frames
+match. Reproduce `make -C games/fft turn-horizontal-bench`, see
+`games/fft/HORIZONTAL_TURNS.md`. These are MAP022-specific observations, not FPS
+predictions from pixel count alone.
+
+FFT low-poly full-resolution control (**verified in Titanium TiEmu**, 2026-10-17):
+the historical terrain turn rasterized 80x50 then expanded. A genuine 160x100 path
+draws directly to the hidden planes, doubles projection/corner-height precision
+and keeps depth-sort keys in the original world scale. Grow span bounds from 58 to
+108 rows (+200 B work RAM), otherwise polygons spanning the LCD overflow the old
+scratch. No extra frame/Z buffer or asset bank. Mean datasheet CPU is1.083 s per
+three-angle/full-endpoint turn; internal 256 Hz TiEmu timing is1.273-1.355 s versus
+selected 80x25 textured1.847-1.964 s. Terrain representation and moving actor cover
+differ, so this is not an identical-mesh texture-off comparison. Both pass32 turn,
+576 camera and512 sequential PC/TI pictures. See `games/fft/TURN_COMPARISON.md`.
+
+**Presentation audit correction (verified in Titanium TiEmu, 2026-10-17):** matching
+native framebuffer checksums and correct endpoints did not guarantee correct visible
+animation order. The original low-poly recording shows steps2,1,3; its textured
+comparison shows only1,2 before the destination. Numbered-frame native controls
+reproduce the low-poly reversal, including with extra post-swap waits. Keeping fixed
+grayscale plane addresses and copying finished planes with existing ExtGraph routines
+restores1,2,3 in both comparison variants. The original timer totals remain measurements
+of that original code path, not proof that its presentation was correct; do not reuse
+them as timings of the copy control. No physical-calculator driver fault is established.
+An independent42,240-corner oracle confirms both angular directions, and the original
+32 PC/TI pictures and binary hash remain unchanged. Review native frame order separately
+from rendering math; the GIF compositor now rejects missing or reversed moving pictures.
+
 The TI-89 is a **Motorola 68000 at ~12 MHz** (HW2/HW3; 10 MHz on HW1), with no cache, no FPU, no
 barrel shifter and a **16-bit data bus**. At 30 fps a frame has about **400,000 cycles**, shared
 with the grayscale interrupt and AMS (on HW2+ the grayscale driver alone takes ~9 %, ~35k per
@@ -328,6 +395,22 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   scrolling world, scroll by redrawing tiles (tilemap engine) or scroll in 8-pixel steps and draw
   only the new edge (Tunnel, Falldown).
 - **Grayscale double buffering: GrayDBuf** (patterns §3) instead of copying two planes per frame.
+  **Verified in TiEmu, FFT cached inspection (2026-10-16):** a 32 FPS frame limiter plus
+  `GrayDBufToggleSync` displayed only 28.3–28.5 FPS in views whose raw animated render
+  capacity was 36.4–40.9 FPS. Two faster views displayed 32.0 FPS. Therefore
+  `min(frame_cap, CPU_capacity)` is only a ceiling: measure the complete loop, including
+  synchronization waits and input. Flat/textured cached backgrounds had identical raw
+  rates and datasheet cycle counts with the same actors. Evidence: `games/fft/SCENERY_FPS.md`.
+- **Cached attack shots do not make camera travel cheap** (FFT, verified with `ti-cycles`,
+  not TiEmu, 2026-10-16): cached attack frames average 271–305k cycles, but rebuilding each
+  half-resolution camera sample costs ~16.7M. A target-centered rectangle transition can
+  keep one 20.8–27.4M-cycle view preparation under its closed title card and reuse that view
+  through the attack. Report the remaining 1.9–2.5 s CPU-estimated preparation delay as
+  well as the warm frame rate; a uniform-speed PC GIF would hide it. The diagnostic omits
+  ISO UI restoration, so its return timing cannot establish full-game cadence.
+  The rectangle alternative was later rejected for the FFT visual review; the user chose
+  geometric low-poly movement again. Its cost still needs addressing before release.
+  Evidence: `games/fft/ATTACK_CAMERA.md`.
 - **Scrolling tile worlds: ExtGraph's TileMap engine** (J. Richard-Foy, `tools/extgraph/lib/tilemap.h`
   + `tilemap.a`, docs `tools/extgraph/DOCS/Tilemap/English/`; **verified** HW2 and HW3,
   `experiments/tilemap/tmdemo.c`: a 512×320 grey map scrolling diagonally plus 6 sprites at 81 fps,
@@ -626,3 +709,217 @@ mapping), bulk copies not covered by ExtGraph.
   a 1 KB state struct referenced ~1,200 times costs **more** off the file: `section(".bss")`
   +1.5 KB, accessed through a pointer +1 KB of code. What pays is moving `const` data to an
   archived data file read in place: 5 KB of markers and map tiles → program −4.2 KB.
+
+
+## Fixed UI artwork and independent expiry timers (FFT, headless 68000, 2026-10-17)
+
+Do not let an animation's lifetime expire independently of budgeted asset preparation.
+FFT's incrementally rasterized victory glyphs could show only `VIC` before disappearing.
+For a few immutable words, sampling the exact vector outlines offline and storing small
+packed text strips removes that variable work: four strips cost 4,128 archive bytes,
+versus 696 bytes of outlines, and preserve every old C-rendered colour/mask byte. The
+runtime still reveals the strips and shades the scenery. Avoid full-screen UI pictures.
+
+Hoist a reveal's full-word count and final partial-word mask outside the row/word loop.
+This removed a roughly 25k-cycle cost on FFT's victory fixture; a crowded defeat replay
+then stays under 360k. Final ordinary scene/replay peaks are 318,842/357,096 cycles. The
+same work-array simplification plus a 208-byte KO/object dissolve scratch reduces Work
+by 154 bytes; queue State adds 4. Archived seven extra crystal phases cost 1,456 bytes,
+with no per-frame scaling. These are datasheet-cycle checks, not a TiEmu verification.
+Reproduction, 101 PC/TI images and full replays: `games/fft/EVENTS.md`.
+
+## FFT isometric contours baked into scenery (headless 68000, 2026-10-16)
+
+**Live low-poly rotation follow-up (headless 68000, 2026-10-17):** reuse projected
+height-column corners and neighbour-height comparisons to draw top lips immediately
+after each column's fill. Nearer columns cover earlier strokes in painter order; choose
+black/white from the known flat top shade, with no contrast readback or full Z buffer.
+Across eight native 160x100 turns, mean CPU time rises from 1,084.154 to 1,209.423 ms
+(+125.269 ms / +11.55%). Byte-pointer/mask stepping and an unclipped on-screen fast path
+save 11.685 ms versus the initial generic line loop, retaining 608 image checksums.
+Code grows 552 B; compact Work stays 22,762 B, assets unchanged. Both controls pass
+32 turn and 576 broad-camera PC/TI images. Exact mesh creases and moving actor cover
+are still absent from this simplified renderer. This live cost is separate from the
+zero per-frame cost of the baked ISO assets below; no new TiEmu timing is claimed.
+Reproduce: `make -C games/fft turn-edge-review`, `games/fft/TURN_EDGES.md`.
+
+The four Gariland six-plane views stay 52,320 raw bytes each when height contours are
+painted offline into their colour planes; all depth bytes are retained. ZX0 totals:
+original 38,869 B, contrast 39,108 B, contrast + contours 41,505 B. Contours add 2,397 B
+versus contrast, with no additional production view-buffer RAM or per-frame contour draw
+calls. The larger multi-style PC review bank is not production overhead.
+
+Measured with `ti-cycles` and existing `lib/unpack68k.s`: mean view decode is 2,168,873
+cycles for contrast, 2,189,089.5 with contours (+20,216.5 cycles, 1.685 ms at 12 MHz).
+Original mean is 2,187,966.5 cycles, so the combined style is +1,123 cycles over original.
+All twelve view/style output lengths and checksums match. These are datasheet CPU-only
+load counts, not TiEmu/hardware FPS. Reproduce via `games/fft/ISOMETRIC_STYLE.md`.
+
+Reuse guidance: `ti68k-c-patterns.md` §3, "Offline scenery contrast and height contours",
+records threshold tightening, material-specific water handling, top/wall edge selection,
+offline depth rejection, opposite-tone strokes and background-cache consistency. The
+constant view-buffer/per-frame cost depends on **replacing** existing colour assets with
+one selected style. It is not a claim that computing edges for a moving camera is free,
+or that another scene will have the same ZX0 size/time change. Measure its packed asset
+and decoder again. The later bounded Titanium TiEmu demo displays these assets; it does
+not turn the headless load timings above into hardware measurements.
+
+## Cached perspective FPS versus camera latency (verified in TiEmu, FFT, 2026-10-16)
+
+The bounded native Gariland camera audit (scenario 65/66, Titanium profile configured
+12 MHz, grayscale + swaps + 32 FPS cap) measures prepared close/wide actor animation at
+28.4/32.0 FPS, but first view construction at 1.582/1.605 seconds. Reconstructing every
+intermediate camera costs 28.441/28.570 seconds per ISO-to-close/wide entry, 18.796 seconds
+per zoom, and 36.292/36.808 seconds per full melee/ranged cinematic. Moving geometry is
+already flat 80x50: this is not the cost of the absent native travel texture mapper.
+F1/F5 takes 0.386/0.398 seconds with a hold/decode/switch path, not an animated rotation.
+
+**General lesson:** measure complete interactions and cache invalidation, not just warmed
+frame replay. A high fixed-camera FPS says nothing about moving the camera if every step
+rebuilds depth, occlusion masks and scaled sprites. PC texture-reference GIF playback is
+not a calculator frame rate. Budget cold preparation and entry/action/return separately.
+The matching headless audit checks 468 frames and agrees that the current geometry path
+is too slow. These are emulator results, not physical-hardware measurements; details,
+feature gaps and reproduction: `games/fft/CAMERA_AUDIT.md`.
+
+**Preview versus target validation rule (FFT postmortem):** a PC GIF exported with
+50 ms per frame only specifies playback. It measures neither host rendering nor native
+rendering. Before promising camera animation, compile the actual TI path, measure a cold
+frame and consecutive moving frames with `ti-cycles`, then the whole input-to-visible-
+result interaction. Report total latency and worst frame alongside warm FPS. Include
+cache invalidations, geometry/depth/masks/pose generation, endpoint preparation and
+return. Cross-check the same scene/input/state/pixels; list renderer and asset differences
+(offline endpoint copy is not runtime texture mapping). Check code/bank/RAM limits early.
+Only after those checks record ordinary-speed TiEmu; do not accelerate a native capture.
+Clearly distinguish PC visual preview, cycle-paced estimate and real emulator capture.
+In FFT, the general PC double/UV sampler and textured intermediate rotations were absent
+on TI; warmed 28-32 FPS did not validate cold 1.6-second frames or 28-second entries.
+The user rejected animated travelling and automatic attack shots: direct fixed inspection
+is now the default, motion an explicit `FFT_CAMERA_MOTION` research flag. Full cause,
+current policy and reproducible checks: `games/fft/CAMERA_CUTS.md`.
+
+### Cooperative fixed-camera preparation (FFT, verified in Titanium TiEmu,2026-10-17)
+
+Prepare immutable geometry in bounded idle-menu slices; keep actors/masks live. Finish
+matching partial work before inspection, retain complete geometry across ISO return,
+and reject stale camera/position/style keys. This shifts work before the input; it does
+not make moving cameras cheap. The same native picture/occlusion must match cold output.
+
+FFT's final job uses20,284 heap bytes: only rows8..92 (the others are covered by HUD),
+packed colour/water rows, full8-bit depth, and inactive Status as temporary vertices.
+Recompute projected vertices per visible face instead of retaining another3 KB array.
+Cancel partial work before Status/AT-list/turn depth overwrites that scratch, and finish
+it before clearing Status for inspection metadata. ISO scene/depth/cover stay intact.
+
+**Check the largest executable in AMS.** An initial33.5 KB job passed a smaller timer
+but the real interactive program had only about21 KB free and silently rendered cold.
+A prior single-block attempt also failed with33,806 free bytes but HeapMax10,418. Removing
+unused compact-review UI stores saves20,630 bytes; final job sizes, largest free block and
+startup compaction before capturing pointers resolve actual limits. Host malloc cannot
+establish calculator feasibility. Bank snapshots must not race asset regeneration.
+
+On16 native/PC cases, entry CPU falls from1.24-1.74 s to0.15-0.37 s at12 MHz;34 cold/
+prepared/moved-actor pictures match. **Actual TiEmu, final cache, grey/copies/32 FPS cap:**
+close1,804 ->453 ms; wide1,871 ->207 ms. Idle preparation8.97/10.75 seconds, maximum
+menu frame42/39 ms; warmed re-entry457/199 ms. The larger interactive binary is checked
+separately through its real DIAMOND input and unaccelerated LCD capture. These are bounded
+camera-review results, not a full tactical native release or physical-hardware timings.
+Source, reproduction, memory guards and evidence: `games/fft/PREFETCH.md`.
+
+### Coarse transition proxy (verified in TiEmu, FFT, 2026-10-16)
+
+Replacing the 866-triangle travelling mesh with 46 convex faces (151 vertices,
+1,670-byte archived bank), painter ordering and word span fills at 80x50 reduces
+actual TiEmu ISO-to-close/wide totals to 4.886/5.074 s from 28.441/28.570 s,
+with the same 18 frames and trajectory. Wide-to-ISO drops from 27.257 to 3.761 s;
+full melee/ranged shots from 36.292/36.808 to 8.472/7.382 s. This bypasses per-pixel
+depth and detailed actor mask/pose preparation **during travel**. Actors become
+outlined rectangle silhouettes and lack exact scenery occlusion in those frames;
+convex proxies omit trim and can close holes. This is a visual tradeoff, not an
+equivalent detailed renderer. The renderer adds 232 B of persistent span RAM, reusing
+existing view scratch; peak stack was not measured.
+
+Cold detailed endpoint construction remains 1.582/1.605 s: simplifying travel alone
+cannot deliver a 0.5-second total entry. All 468 game-state/RNG hashes and 343 settled
+framebuffers match the baseline; each variant also matches its TI/PC rendering on
+468 frames. Physical hardware was not measured. Protocol, limits and evidence:
+`games/fft/ULTRA_TRANSITION.md`.
+
+### Separate ISO turn policy from perspective travelling (verified in TiEmu, FFT)
+
+The user retained animated F1/F5 even after rejecting perspective entry/zoom/return.
+Restoring the existing coarse terrain `draw_turn` in fixed exploration produces three
+80x50 intermediate angles followed by the textured destination, with actual outlined
+TI actor sprites. Eight orientation/direction cases match 32 native TI/PC pictures and
+preserve units/RNG. A full turn takes 0.849-0.899 CPU seconds at 12 MHz (datasheet),
+or 1.015-1.074 s in Titanium TiEmu with grayscale/swaps/32 FPS cap; worst emulated frame
+0.406-0.441 s. Destination decode and final ISO rendering are included. The old ~0.4 s
+hold/switch measured no animation and is not a performance-equivalent comparison.
+
+Fixed builds regain 2,748 B of heap work buffers, with no additional art bank or Z-buffer.
+Terrain is deliberately coarse and actors have no exact scenery occlusion during the
+turn; detailed scenery/occlusion return at the endpoint. Keep the policies independent:
+direct close/wide inspection does not imply removing isometric rotation. Physical
+hardware was not measured. See `games/fft/ROTATION_LOWPOLY.md` and `make turn-audit`.
+
+### Native affine rotation textures (verified in TiEmu, FFT, 2026-10-17)
+
+An orthographic isometric turn can interpolate UVs affinely: solve 8.8 gradients per
+triangle with native 16-bit multiply/divide wrappers, then add UV/depth increments in
+the pixel loop. The FFT experiment uses original 866-triangle geometry at 80x50, a
+4 KB byte depth buffer and 2,874 B of projected vertices reused from Status/background
+scratch, with native outlined actors. No float, per-pixel divide/multiply or new asm.
+Original palette/page textures are filtered/quantized offline into packed grey/alpha
+nibbles; three atlas banks plus UV records consume 138,008 archive bytes, read in place.
+No camera images are stored. The comparison is nearest sampling, not the PC filtered mapper.
+
+Eight direction/orientation cases match 32 PC/TI framebuffers; a sequential inspection
+demo matches 512. At 12 MHz, a three-angle complete turn takes 2.482-2.662 CPU seconds,
+versus 1.929-2.037 s with the **same detailed geometry/depth/actors** but no texture
+sampling. Texturing adds 0.553-0.625 CPU seconds. The old coarse terrain 0.849-0.899 s
+renderer is a different geometry/occlusion workload; its entire gap is not texture cost.
+Rasterization dominates (~7.99 M cycles per intermediate frame), with projection ~0.48 M,
+expansion ~0.086 M and actors ~0.46 M. Generated mapper code has no 32-bit multiply/divide
+or float helpers; this does not make the entire detailed renderer cheap.
+
+Actual Titanium TiEmu with grayscale/swaps/32 FPS cap measures 3.312-3.535 s per textured
+turn, worst frame 1.191-1.308 s, including destination decode/render. Physical hardware
+and native flat-control elapsed time were not measured. The mapper is optional; coarse
+low-poly stays default. Protocol, limits and artifacts: `games/fft/NATIVE_TEXTURED_TURNS.md`.
+
+### Compact archive data versus expansion RAM (FFT, headless 68000, 2026-10-17)
+
+`games/fft/STORAGE_AUDIT.md` and `make -C games/fft storage-audit` separate shared
+read-in-place banks, native ABI work sizes and alternative compression layouts.
+The existing ZX0 asm decoder takes 592,620 datasheet cycles for an 8,192-byte texture
+page (49.39 CPU ms at 12 MHz), 689,182 for a 9,152-byte actor class (57.43 ms), and
+15,502 for one sampled 208-byte frame (1.29 ms). These exclude allocation, checksum,
+grayscale and waits; they are not TiEmu results or averages across all assets.
+Whole-bank compression of units/UI saves Flash but requires 107,220 extra output
+RAM bytes if both are expanded. Prefer bounded cache misses or random-access compact
+layouts; benchmark misses before relying on their frame budget.
+
+Verified offline redundancies include 30,400 preshifted font bytes exactly generated
+from 475 canonical glyph bytes and 12,644 bytes of duplicate ordered facing lists,
+which can share offsets without bulk RAM expansion. Every actor frame is distinct;
+ordinary equality deduplication does not replace symmetry-aware storage. No proposed
+format has been integrated into the game by this audit.
+
+The subsequent applied cleanup (`games/fft/STORAGE_CLEANUP.md`) replaces the30,400-byte
+font table with475 canonical bytes plus alignment, shifts only when building cached
+UI parts, and adds no font heap. The crowded defeat replay peak increases by about
+2,200 cycles (~0.18 ms at12 MHz) and remains below360k. Compact string offset tables
+retain Flash pointers; exact blade deduplication adds only an archived byte index.
+Two6,000-byte inspection images compress to3,902 bytes and decode directly into
+existing scene storage in290,468 /388,112 cycles (24.21 /32.34 ms). These are native
+datasheet CPU counts, not fresh TiEmu elapsed measurements.
+
+The subsequent FFT blade-cache integration (`games/fft/BLADE_CACHE.md`) packs forty
+432-byte blade pictures into2,894 bytes plus offsets, and retains three fixed phase
+slots (1,300 bytes of Work including keys/alignment). Across48 logical poses the
+actual native lookup peaks at23,018 cold /344 warm cycles. A single-slot prototype
+missed when fast-forward skipped to a different first phase; prepare all three
+incrementally after HUD work in the wind-up. Crowded sword/dagger frames peak at
+355,524 /354,286, full battle350,092, fast-forward355,730 and defeat359,688 cycles.
+The credit heuristic alone is not proof: check normal and accelerated complete
+replays, source-art equality and covered/water paths before shipping a sprite cache.
