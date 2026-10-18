@@ -1,0 +1,150 @@
+{
+  "scope": "Native 80x50 affine texture mapping, original 866-triangle mesh, depth-aware TI actors.",
+  "matched_pc_ti_frames": 32,
+  "checks": "Distinct intermediate pictures; correct final view; unchanged units/RNG; no perspective travelling or attack shot.",
+  "work_bytes": 43346,
+  "cases": [
+    {
+      "case": 0,
+      "source_orientation": 0,
+      "key": "F5",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 31108642,
+      "worst_cycles": 11282204,
+      "cpu_only_ms_at_12mhz": 2592.3868333333335,
+      "frame_cycles": [
+        11282204,
+        8487198,
+        9844624,
+        1494616
+      ]
+    },
+    {
+      "case": 1,
+      "source_orientation": 0,
+      "key": "F1",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 29854238,
+      "worst_cycles": 11208352,
+      "cpu_only_ms_at_12mhz": 2487.8531666666668,
+      "frame_cycles": [
+        11208352,
+        7741818,
+        9359726,
+        1544342
+      ]
+    },
+    {
+      "case": 2,
+      "source_orientation": 1,
+      "key": "F5",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 31940778,
+      "worst_cycles": 12355330,
+      "cpu_only_ms_at_12mhz": 2661.7315,
+      "frame_cycles": [
+        12355330,
+        8236660,
+        9816448,
+        1532340
+      ]
+    },
+    {
+      "case": 3,
+      "source_orientation": 1,
+      "key": "F1",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 30990014,
+      "worst_cycles": 11943614,
+      "cpu_only_ms_at_12mhz": 2582.5011666666664,
+      "frame_cycles": [
+        11943614,
+        8487230,
+        9055004,
+        1504166
+      ]
+    },
+    {
+      "case": 4,
+      "source_orientation": 2,
+      "key": "F5",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 30265000,
+      "worst_cycles": 11433804,
+      "cpu_only_ms_at_12mhz": 2522.0833333333335,
+      "frame_cycles": [
+        11433804,
+        8279020,
+        9007768,
+        1544408
+      ]
+    },
+    {
+      "case": 5,
+      "source_orientation": 2,
+      "key": "F1",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 31827654,
+      "worst_cycles": 12042012,
+      "cpu_only_ms_at_12mhz": 2652.3045,
+      "frame_cycles": [
+        12042012,
+        8236694,
+        10054266,
+        1494682
+      ]
+    },
+    {
+      "case": 6,
+      "source_orientation": 3,
+      "key": "F5",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 29781478,
+      "worst_cycles": 11458562,
+      "cpu_only_ms_at_12mhz": 2481.7898333333333,
+      "frame_cycles": [
+        11458562,
+        7741866,
+        9076868,
+        1504182
+      ]
+    },
+    {
+      "case": 7,
+      "source_orientation": 3,
+      "key": "F1",
+      "frames": 4,
+      "intermediate_frames": 3,
+      "total_cycles": 30421416,
+      "worst_cycles": 11308978,
+      "cpu_only_ms_at_12mhz": 2535.118,
+      "frame_cycles": [
+        11308978,
+        8279002,
+        9301080,
+        1532356
+      ]
+    }
+  ],
+  "build_flags": [
+    "-DFFT_EXPLORATION",
+    "-DFFT_FIXED",
+    "-DFFT_CINEMA",
+    "-DFFT_CAMERA_CUT_DEMO",
+    "-DFFT_CAMERA_AUDIT",
+    "-DFFT_TURN_TEXTURE"
+  ],
+  "binary_bytes": 62165,
+  "binary_sha256": "c4b008e417d3472d6721e8c0fd5fcb9d077fdb7a3a705004f1b88128c778c9fa",
+  "timing": "Datasheet CPU only, excludes grayscale/interrupts/swaps/waits. Not measured hardware FPS.",
+  "provenance": "Frozen pre-optimization native benchmark, 2026-10-17. Historical CPU-only counts; do not overwrite with new-build results.",
+  "turn_mapper_source_sha256": "37278aff7b0a0dcc7a8e541fee46cd7d38c11730c75aade997894e5c722077e8",
+  "pc_csv": "0,1,2A52\n0,2,1D79\n0,3,2988\n0,4,6AD8\n1,1,9EB9\n1,2,C10F\n1,3,FB4A\n1,4,58EC\n2,1,B705\n2,2,4AA8\n2,3,D71E\n2,4,49D4\n3,1,95BF\n3,2,1D79\n3,3,4F23\n3,4,20EC\n4,1,F1AB\n4,2,9BDE\n4,3,B79A\n4,4,58EC\n5,1,6D12\n5,2,4AA8\n5,3,1518\n5,4,6AD8\n6,1,1917\n6,2,C10F\n6,3,01E2\n6,4,20EC\n7,1,F06B\n7,2,9BDE\n7,3,8990\n7,4,49D4\n"
+}

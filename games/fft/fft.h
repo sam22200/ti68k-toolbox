@@ -51,7 +51,13 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define SC_OY (HU * MAXH + 4)          // scene y of the top vertex of view tile (0, 0) at h 0
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane
 
-#define TURN_FRAMES 3                  // rotation animation: frames between two views
+// Fixed inspection uses direct cuts. FFT_CAMERA_MOTION explicitly opts into the
+// rejected smooth/cinematic research paths; it is never implied by FFT_CINEMA alone.
+#if defined(FFT_TEXTURE_PREVIEW) && !defined(FFT_CONFIG)
+#define TURN_FRAMES 6                  // PC textured turns: twice the previous duration
+#else
+#define TURN_FRAMES 3                  // existing portable / TI turn path
+#endif
 #define WALK_FRAMES 7                  // frames per tile when a unit walks (FFT: 14 at 60 Hz)
 #define CLIMB_FRAMES 10                // a step up, down or over a tile (FFT: ~21)
 #define WATER_ROWS (UNIT_FOOT - HU)    // depth 1: crop at the projected surface, clear edge above it
@@ -72,11 +78,13 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define DC_OBJ(d) ((d) >= DC_CRYSTAL)          // out of the battle: its clock stopped
 #define EXP_LEVEL 100                  // EXP to the next level
 #define PICK_FRAMES 30                 // M_PICK: the message about what was picked up
+#define MORPH_FRAMES 32                // visible KO-to-loot dissolve; tactics pause meanwhile
 // an attack's frames, FFT's at 30 fps (RE_NOTES.md § Pace): the attacker standing, its wind-up
 // from ACT_WIND, the blow from ACT_BLOW, the target hit (its HP lost, the number shown) at
 // ACT_HIT, its hit pose for HIT_FRAMES, the number rising NUM_RISE pixels and shown NUM_T frames,
 // the EXP the user gained from ACT_HIT + GAIN_T, its JP from ACT_HIT + JP_T (GAIN_N frames
-// each), the menu back at ACT_END (ACT_GAIN_END after a gain)
+// each), the menu back at ACT_END (ACT_GAIN_END after a gain). Reward display runs
+// at twice the original pace; reward amounts and the hit animation are unchanged.
 #define ACT_WIND 5
 #define ACT_BLOW 13
 #define ACT_HIT 16
@@ -86,10 +94,10 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define NUM_RISE 8
 #define NUM_T 24
 #define GAIN_T 29
-#define JP_T 51
-#define GAIN_N 18
+#define JP_T 40
+#define GAIN_N 9
 #define ACT_END (ACT_HIT + 28)
-#define ACT_GAIN_END (ACT_HIT + 78)
+#define ACT_GAIN_END (ACT_HIT + 54)
 
 // M_BROWSE: the cursor free (enemies' turns, or the player looking around); M_MENU: the
 // player's turn menu; M_TARGET: the reach shown, a tile to pick; M_WALK; M_FACE: the facing
@@ -180,7 +188,28 @@ typedef struct {
                                        // (fewer than two, or all Critical): no more retreats
     u8 deny;                           // [2nd] on a tile that cannot be picked: the cursor blinks
     u8 rounds;                         // Ramza's turns so far (the results)
+#ifdef FFT_EXPLORATION
+    u8 perspective, pyaw, pbase, pdist; // exploration camera: 0 off, 1 fixed, 2 lateral, 3 orbit
+    s8 ppitch, pside;
+    u8 psolid;                         // fixed inspection: 0 actual-pixel auto, 1 solid, 2 dotted
+#ifdef FFT_FIXED
+    u8 ptrans, ptrans_t;               // 0 idle, 1 enter, 2 exit, 3 close/wide motion
+    u8 pzoom, pfrom;                   // remembered zoom (0 close, 1 wide), transient zoom source
+#ifdef FFT_CONFIG
+    u8 config, config_row, pwire; // pwire: filled untextured mesh, otherwise textures
+#endif
+#ifdef FFT_CINEMA
+    u8 cphase, cframe, cenabled;      // attack camera: enter, action, return; optional at [7]
+    u8 cax, caz, cah, cyaw, cdist, ceye, cpitch;
+    s8 cside;
+    s16 ciso_x, ciso_y;
+    u8 ciso_rot;
+#endif
+#endif
+#endif
     u8 banner, banner_t;               // BN_*: the battle's objective, its outcome; its frame
+    u16 morph_mask;                    // converted units awaiting their visible transformation
+    u8 morph_t;                        // current lowest set bit's animation frame, 0..31
 } State;
 enum { BN_NONE, BN_START, BN_VICTORY, BN_DEFEAT };
 extern State st;

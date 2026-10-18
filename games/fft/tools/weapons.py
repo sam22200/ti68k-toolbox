@@ -111,7 +111,7 @@ def build(cue, header, preview=None):
         body, shapes = read('BATTLE/%s.SPR' % name), units.shp_frames(read('BATTLE/%s.SHP' % typ))
         poses = [units.sprite(body, shapes[k]) for k in (86, 87, 89, 90, 135, 136, 138, 139)]
         for s in poses + [s[:, ::-1] for s in poses]: store(s.copy(), inside=True)
-    blade_off = len(out)
+    body_bytes = len(out)
     # Blade-only sprites: TYPE1/2, knife/sword, mirror, front/back, three blade phases.
     for wep in ('WEP1', 'WEP2'):
         shp, seq = read('BATTLE/%s.SHP' % wep), read('BATTLE/%s.SEQ' % wep)
@@ -125,11 +125,26 @@ def build(cue, header, preview=None):
                     offsets.append(left - W // 2)
                     # Same anchor as the body, two spare rows above and below.
                     store(s[2:, left:left + 32])
+    # Exact blade records share storage; keep original per-pose horizontal anchors.
+    frame_bytes = 12 * (H - 2)
+    blades = [bytes(out[i:i+frame_bytes]) for i in range(body_bytes, len(out), frame_bytes)]
+    unique = list(dict.fromkeys(blades)); lookup = {frame:i for i,frame in enumerate(unique)}
+    ids = bytes(lookup[frame] for frame in blades)
+    assert len(unique) < 256 and all(unique[ids[i]] == frame for i,frame in enumerate(blades))
+    packed = [extract.zx0pack.pack(frame) for frame in unique]
+    starts = [0]
+    for frame in packed: starts.append(starts[-1] + len(frame))
+    directory = struct.pack('>%dH' % len(starts), *starts)
+    index_off = body_bytes + len(ids)
+    blade_off = index_off + len(directory)
+    out = out[:body_bytes] + ids + directory + b''.join(packed)
     assert len(out) < 65520
     with open(header, 'w') as f:
         f.write('// Disc-derived armed poses, tools/weapons.py; never committed.\n'
-                '#define WEAPON_SH %d\n#define WEAPON_FOOT %d\n#define WEAPON_FB %d\n#define WEAPON_OFF %dUL\n'
-                % (H - 2, FOOT - 2, 12 * (H - 2), blade_off))
+                '#define WEAPON_SH %d\n#define WEAPON_FOOT %d\n#define WEAPON_FB %d\n'
+                '#define WEAPON_INDEX %dUL\n#define WEAPON_ZOFF %dUL\n#define WEAPON_OFF %dUL\n'
+                '#define WEAPON_UNIQUE %d\n'
+                % (H - 2, FOOT - 2, frame_bytes, body_bytes, index_off, blade_off, len(unique)))
         f.write('static const s8 weapon_x[48] = { %s };\n' % ', '.join(map(str, offsets)))
     open(os.path.join(os.path.dirname(header), 'fftw.bin'), 'wb').write(out)
     if preview:

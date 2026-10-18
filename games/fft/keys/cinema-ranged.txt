@@ -1,0 +1,19 @@
+# Scenario 66: Act, Guts, Throw Stone, target the original enemy at (6,5), confirm.
+0
+24 A
+25
+40 DOWN
+41
+56 A
+57
+72 A
+73
+88 RIGHT
+89
+100 RIGHT
+101
+112 UP
+113
+136 A
+137
+310

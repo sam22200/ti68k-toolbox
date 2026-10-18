@@ -1,0 +1,4 @@
+camera,internal_resolution,source_frames,mean_render_cycles,mean_geometry_cycles,mean_sprite_cycles,mean_present_cycles,average_fps,moving_rebuild_fps,cached_geometry_fps,worst_frame_ms,minimum_fps,first_frame_ms,program_transfer_bytes,mesh_bytes,table_bytes,extra_heap_bytes
+fixed,80x50,311,1204909,6706,943799,132582,9.058,,9.058,148.822,6.719,772.126,64023,12522,2112,0
+lateral,80x50,311,3039642,1664642,1115615,132582,3.592,1.339,7.876,836.924,1.195,772.582,64023,12522,2112,0
+orbit,80x50,311,3869583,2722404,890993,132582,2.822,1.495,10.313,823.881,1.214,772.289,64023,12522,2112,0

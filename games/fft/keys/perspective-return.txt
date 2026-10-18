@@ -1,0 +1,24 @@
+# Switch inspection cameras, return to tactics, select Move and walk three tiles.
+0 LEFT
+8
+12 MODE
+14
+16 RIGHT
+24
+28 MODE
+30
+32 UP
+40
+44 B
+46
+52 A
+54
+56 UP
+58
+60 UP
+62
+64 UP
+66
+68 A
+70
+110

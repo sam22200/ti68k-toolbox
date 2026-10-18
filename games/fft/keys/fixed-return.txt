@@ -1,0 +1,31 @@
+# Both fixed directions, reset, return to tactics and walk three tiles.
+0
+2 D
+4
+6 D
+7
+8 F5
+10
+16 F5
+18
+20 MODE
+22
+24 F5
+26
+28 MODE
+30
+32 ENTER
+34
+40 B
+42
+48 A
+50
+52 UP
+54
+56 UP
+58
+60 UP
+62
+64 A
+66
+110

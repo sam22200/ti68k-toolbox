@@ -11,6 +11,17 @@
 #include "ct_recip.h"
 #include <stdlib.h>
 #include <string.h>
+#if defined(__m68k__) && defined(FFT_CONFIG) && !defined(RT_CYCLES)
+#include <alloc.h>
+#endif
+
+// LCD rows are 30 bytes: long accesses are only word-aligned on alternating rows.
+// 68000 permits this. Tell the host compiler as well, without changing TI code generation.
+#ifdef __m68k__
+typedef u32 PlaneWord;
+#else
+typedef u32 PlaneWord __attribute__((aligned(2), may_alias));
+#endif
 
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
 #include "../../tools/m68kbench/bench.h" // and HUD, 6 scene, 7 rotation frame, 8 view unpacking,
@@ -27,9 +38,14 @@
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
 static u32 frame_begin;
 static u8 frame_stall;
+#ifdef FFT_CINEMA
+#define FRAME_SHOT() BENCH_SHOT(rt_dark)
+#else
+#define FRAME_SHOT()
+#endif
 #define FRAME_BEGIN() (frame_begin = BENCH_CYCLES, frame_stall = st.turn != 0)
 #define FRAME_END() do { BENCH_VALUE(((u32)frame_stall << 31) | ((u32)st.mode << 24) | ((u32)st.act_t << 16) | (u16)rt_frame); \
-    BENCH_VALUE(BENCH_CYCLES - frame_begin); } while (0)
+    BENCH_VALUE(BENCH_CYCLES - frame_begin); FRAME_SHOT(); } while (0)
 #else
 #define FRAME_BEGIN()
 #define FRAME_END()
@@ -40,8 +56,8 @@ static u8 frame_stall;
 #ifdef __m68k__
 #define RD16(p, i) (((const u16 *)(p))[i])
 #define WR16(p, i, v) (((u16 *)(p))[i] = (v))
-#define RD32(p, i) (*(const u32 *)((const u8 *)(p) + 2 * (i)))
-#define WR32(p, i, v) (*(u32 *)((u8 *)(p) + 2 * (i)) = (v))
+#define RD32(p, i) (*(const PlaneWord *)((const u8 *)(p) + 2 * (i)))
+#define WR32(p, i, v) (*(PlaneWord *)((u8 *)(p) + 2 * (i)) = (v))
 #define RMW16(p, k, v) (*(u16 *)(p) = (*(u16 *)(p) & ~(k)) | (v))
 // 16 x 16 -> 32 multiply and 32 / 16 division in one instruction (ti68k-performance.md §4,
 // verified): plain C widens shared shorts and calls __mulsi3 / __divsi3
@@ -114,7 +130,7 @@ static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static const u8 *igfx;                  // portraits, names, marker and text (ffti)
 const Tile *map_tiles;                  // in ffti too: the map's tiles (extract.py) and the sloped
-static const u32 *sl_l, *sl_m, *sc_l, *sc_m;   // markers' planes (art.py), out of the program
+static const PlaneWord *sl_l, *sl_m, *sc_l, *sc_m;   // markers' planes (art.py), out of the program
 #define sl_d sl_l                       // black and white: one plane for both
 #define sc_d sc_l
 #ifndef __m68k__
@@ -147,9 +163,17 @@ typedef struct {
     u32 wcover[WEAPON_SH];              // the blade's cover, kept while its anchor stands
     s16 wx, wy;
     u8 wrot, wdepth;
+#ifndef FFT_COMPACT_UI
+    u8 blade_k[3];                      // one unique frame + 1 per swing phase; zero invalid
+    u32 blade[3][3][WEAPON_SH];         // three decoded blades, big-endian bytes on both hosts
+#endif
     Feet feet[NUNIT];                   // its feet (unit_feet) for its tile and the
     u16 feet_k[NUNIT];                  // view (x | z << 8 | rot << 12 | 0x8000; 0: none)
+#ifdef FFT_TURN_LOWPOLY_NATIVE
+    s16 span_l[RT_H + 8], span_r[RT_H + 8];
+#else
     s16 span_l[TH + 8], span_r[TH + 8];
+#endif
     u8 from[MAP_W * MAP_H];
     u8 half[2][TW / 8 * TH];
     u16 dbl[256];                       // byte -> its bits doubled
@@ -157,13 +181,24 @@ typedef struct {
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
     u8 glints[4];
     s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
+#ifdef FFT_COMPACT_UI
+    // No backing tactical panels in the bounded camera renderer. Its full-UI render
+    // entry point is excluded below; legacy panel helpers are never called.
+    u16 (*hud)[HUD_ROWS * RT_PBYTES / 2];
+    u16 (*win)[WIN_ROWS * RT_PBYTES / 2];
+#else
     u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined panel text (0-6) / action numbers (7-13)
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
+#endif
     u8 win_k[3], win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_ACTS: no ability
                                         // known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
+#ifdef FFT_COMPACT_UI
+    u16 (*forecast)[FC_ROWS * RT_PBYTES / 2];
+#else
     u16 forecast[3][FC_ROWS * RT_PBYTES / 2]; // the prediction's box, 160 wide, above the arrow
+#endif
     u16 pan_k[2][6], pan_fk[2][6];      // unit, HP, MP, level, maxima: being made, shown
     u16 fc_key;                         // the forecast made (target | ability << 8)
     u8 pan_n[2], pan_f[2], pan_ok[2];   // parts made (cutout portrait, name, HP, MP, level), the
@@ -171,7 +206,11 @@ typedef struct {
     u8 tag_w[2], tag_ok;                // the tags' widths, made
     u8 hud_ok;                          // every panel and menu due this frame drawn (tests)
     u8 arrow[4][2][8];
+#ifdef FFT_COMPACT_UI
+    u16 status[2][800];                 // fixed inspection FWork only; no full-screen Status
+#else
     u16 status[2][RT_PSIZE / 2];        // full-screen Status, assembled a line per frame
+#endif
     u8 status_i, status_page, status_n;
     u8 status_col, status_row, status_info;
     s16 ring_y0, ring_y1;               // the scene rows the reach rings are on
@@ -184,10 +223,8 @@ typedef struct {
     u32 num[3][2][7];                   // an attack's number (or Miss), the EXP and the JP its user
     u8 num_w[3], num_ok;                // earned: black, its white outline; their widths; drawn (bits)
     u8 end_n;                           // M_END: the results' next line to draw
-    u8 bn_n, bn_end, bn_t0[2], bn_ne;   // the banner: glyphs drawn; its frames; its lines' first
-    s16 bn_j, bn_gx, bn_x[2];           // frames; the glyph's edges, next row of samples, x; the
-    s16 bn_e[40][4];                    // lines' left x; the edges (quarter pixels: x0 y0 x1 y1)
-    u8 bn_cov[32];                      // a pixel row's samples covered (0..4) a column
+    u8 bn_end, bn_t0[2];                // banner end and each line's first reveal frame
+    u16 morph_g[4][UNIT_SH];           // one animated KO/object frame, shared across draws
     u8 dcg[4][2][7];                    // the death counter's digits: black, mask (8 wide)
     // the movement spread (spread_start, spread_go): its tiles to go on from by cost & 3, where it
     // stands; the mover's enemies' tiles; each tile's x, z, standing height, height out of it
@@ -227,9 +264,14 @@ typedef struct {
                                         // heavy work this frame (k cycles)
                                         // the last one's checksum
     // last: the big HUD caches (the fields above keep 16-bit offsets)
+#ifdef FFT_COMPACT_UI
+    u16 (*pan)[2][3][PANEL_ROWS * RT_PBYTES / 2];
+    u16 (*tag)[3][7 * RT_PBYTES / 2];
+#else
     u16 pan[2][2][3][PANEL_ROWS * RT_PBYTES / 2]; // per side, two 80-wide planes and opacity masks:
                                         // the one shown, the one being made (scene shows through)
     u16 tag[2][3][7 * RT_PBYTES / 2];   // "Enemy" / "Guest" above a portrait, made once
+#endif
 } Work;
 static Work *W;
 static u8 bg_usable(void);
@@ -249,7 +291,7 @@ static u8 bg_usable(void);
 #define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
 #define HUD_K 60                        // a part of the HUD made
 #define DK_K 80                         // a banner's shade (ti-cycles: up to 80k, its edge rows)
-#define DK_SPEED 16                     // the shade's diagonal edge (x + y), pixels a frame
+#define DK_SPEED 8                     // the shade's diagonal edge (x + y), pixels a frame
 #define DK_N ((RT_W + RT_H) / DK_SPEED + 1)   // its frames, coming then leaving
 #define SAVE_K 13                       // a quarter of the screen's copy kept (halves, 26k,
                                         // went over the budget once forced)
@@ -472,7 +514,10 @@ u8 ct_next(void)
         if (u->hp) return best;
         if (u->team == TEAM_GUEST) continue;
         if (u->dc) u->dc--;
-        else u->dc = rand15() & (u->team == TEAM_PLAYER ? 0x110 : 0x10) ? DC_CRYSTAL : DC_CHEST;
+        else {
+            u->dc = rand15() & (u->team == TEAM_PLAYER ? 0x110 : 0x10) ? DC_CRYSTAL : DC_CHEST;
+            st.morph_mask |= (u16)(1U << best); // retain all events even if one clock pass converts several
+        }
     }
 }
 
@@ -568,7 +613,7 @@ static void dst_screen(s16 camx, s16 camy)
 
 // A masked sprite of up to 24 columns (u32 rows, bit 31 = column 0): dest = dest & ~m | src & m,
 // written as three 16-bit words per plane and row, each clipped
-static void blit24(s16 x, s16 y, s16 rows, const u32 *l, const u32 *d, const u32 *m)
+static void blit24(s16 x, s16 y, s16 rows, const PlaneWord *l, const PlaneWord *d, const PlaneWord *m)
 {
     s16 w, sh, r = 0, k;
     u16 ck[3];
@@ -602,6 +647,7 @@ static void blit24(s16 x, s16 y, s16 rows, const u32 *l, const u32 *d, const u32
 // Convex polygon (n <= 4 points, target coordinates) filled with an 8x8 pattern aligned to the
 // target. Pixel (x, y) is inside when its centre is. Spans in 16-bit words.
 
+#if !defined(FFT_EXPLORATION) || defined(FFT_FIXED) || defined(FFT_ULTRA_TRANSITION)
 static const u16 lmask[16] = { 0xFFFF, 0x7FFF, 0x3FFF, 0x1FFF, 0x0FFF, 0x07FF, 0x03FF, 0x01FF,
     0x00FF, 0x007F, 0x003F, 0x001F, 0x000F, 0x0007, 0x0003, 0x0001 };   // pixels >= x & 15
 
@@ -670,6 +716,7 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
     }
     fill_spans(ymin, rows, pl, pd);
 }
+#endif
 
 #define DENY_FRAMES 16                  // the cursor's blinks when [2nd] cannot pick its tile
 #define AI_FAST 3                       // AI turn steps a frame while [2nd] is held
@@ -682,7 +729,7 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
 // A tile's marker (a reach ring, or the cursor: cur) in view rot: the flat diamond (hi_*,
 // cur_*, 24 x 12) at its standing height, or on a sloped tile the outline of its four corners
 // at their heights (art.py slope_*), scene box left x, top y, its rows
-typedef struct { const u32 *l, *d, *m; s16 x, y, rows; u8 depth; } Marker;
+typedef struct { const PlaneWord *l, *d, *m; s16 x, y, rows; u8 depth; } Marker;
 static void marker(u8 rot, u8 i, u8 cur, Marker *k)
 {
     s16 u, v, lo = 255, n;
@@ -746,10 +793,16 @@ static u16 scene_ver;                   // bumped when the scene is made again w
                                         // changed otherwise are patched into W->bg)
 static u8 hl_seq;                       // bumped when the highlights may have changed
 
+#ifdef FFT_TEXTURE_PREVIEW
+static void preview_iso_apply(u8 rot);
+#endif
 static void unpack_view(u8 rot)
 {
     if (vbuf_rot == rot) return;
     zx0_unpack(views[rot], vbuf);
+#ifdef FFT_TEXTURE_PREVIEW
+    preview_iso_apply(rot);
+#endif
     vbuf_rot = rot;
 }
 
@@ -767,7 +820,7 @@ static u8 seen(s16 x, s16 y, u8 depth)
 // byte (8 pixels) at a time, made again only when the cursor or the view changes (optional work:
 // without room in the frame's budget the cursor is drawn whole a frame or two); the player's
 // cursor only: the AI's frames are the fullest
-static const u32 *cursor_mask(const Marker *mk, u16 c)
+static const PlaneWord *cursor_mask(const Marker *mk, u16 c)
 {
     u16 k = (u16)(c | st.rot << 8 | 0x8000), o;   // c: the tile, | 0x1000 a reach tile's marker
     s16 r, b0 = mk->x >> 3, sh = mk->x & 7, yy = mk->y, j;
@@ -873,8 +926,8 @@ static u8 bg_usable(void)
 // scene rows [y, y + n) put back from the view (u32 copies: ~0.6k a row)
 static void scene_rows(s16 y, s16 n)
 {
-    u32 *a = (u32 *)(scene_l + y * SC_BYTES), *b = (u32 *)(scene_d + y * SC_BYTES);
-    const u32 *p = (const u32 *)(vbuf + y * SC_BYTES), *q = (const u32 *)(vbuf + SC_PLANE + y * SC_BYTES);
+    PlaneWord *a = (PlaneWord *)(scene_l + y * SC_BYTES), *b = (PlaneWord *)(scene_d + y * SC_BYTES);
+    const PlaneWord *p = (const PlaneWord *)(vbuf + y * SC_BYTES), *q = (const PlaneWord *)(vbuf + SC_PLANE + y * SC_BYTES);
     u16 k = (u16)(n * (SC_BYTES / 4));
     while (k--) { *a++ = *p++; *b++ = *q++; }
 }
@@ -2015,6 +2068,9 @@ static const u8 walk_h[CLIMB_FRAMES] = { 0, 3, 5, 7, 8, 8, 8, 7, 5, 3 };
 // FFT keeps a grounded human at the canal floor and selects the submerged SHP.
 // At depth 1 a hop above that floor uses the ordinary pose. Both endpoints of
 // a flat canal step are wet; a drop into water becomes submerged on landing.
+#ifdef FFT_EXPLORATION
+__attribute__((noinline))                       // GCC4TI register allocation workaround
+#endif
 u8 unit_in_water(u8 i)
 {
     const Unit *u = &st.unit[i];
@@ -2137,6 +2193,54 @@ static u8 unit_pose(u8 i)
     return (u16)(un->hp * 5) <= un->max_hp ? P_KNEEL : 0;
 }
 
+// The clock changes loot logically at once. Present pending events in unit order;
+// the dissolve is purely visual, with the same sprite cover and no random draws.
+static u8 morph_first(void)
+{
+    u8 i = 0;
+    u16 m = st.morph_mask;
+    while (m && !(m & 1)) { m >>= 1; i++; }
+    return i;
+}
+
+static const u8 *object_frame(u8 i)
+{
+    static const u8 chest_bob[8] = {
+        OBJ_CHEST, OBJ_CHEST, OBJ_CHEST_UP1, OBJ_CHEST_UP1,
+        OBJ_CHEST_UP2, OBJ_CHEST_UP2, OBJ_CHEST_UP1, OBJ_CHEST_UP1
+    };
+    u8 phase = (u8)(((st.tick >> 2) + i) & (CRYSTAL_FRAMES - 1));
+    // Keep the conversion's target steady; then float at most two sprite pixels.
+    u8 obj = st.unit[i].dc == DC_CHEST
+        ? (st.morph_mask & (u16)(1U << i) ? OBJ_CHEST : chest_bob[(st.tick >> 3) & 7])
+        : phase ? (u8)(phase + 1) : OBJ_CRYSTAL;
+    return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * UNIT_FB + (u16)obj * UNIT_FB;
+}
+
+static const u8 *morph_frame(const u8 *old, const u8 *obj)
+{
+    static const u16 dissolve[5][4] = {
+        { 0, 0, 0, 0 }, { 0xAAAA, 0, 0xAAAA, 0 },
+        { 0xAAAA, 0x5555, 0xAAAA, 0x5555 },
+        { 0xFFFF, 0x5555, 0xFFFF, 0x5555 }, { 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF }
+    };
+    u8 r, plane, t = st.morph_t, phase = t < 8 ? 0 : t < 24 ? (u8)((t - 8) >> 2) : 4;
+    u8 *out = (u8 *)W->morph_g;
+    for (plane = 0; plane < 4; plane++, old += 2 * UNIT_SH, obj += 2 * UNIT_SH, out += 2 * UNIT_SH)
+        for (r = 0; r < UNIT_SH; r++) {
+            u16 a = RD16(old, r), b = RD16(obj, r);
+            WR16(out, r, a ^ ((a ^ b) & dissolve[phase][r & 3]));
+        }
+    out = (u8 *)W->morph_g;
+    if (t >= 4 && t < 24)
+        for (r = 0; r < UNIT_FOOT - 1; r++) {
+            u16 in = RD16(out, 3 * UNIT_SH + r);
+            WR16(out, r, RD16(out, r) & ~in);
+            WR16(out, UNIT_SH + r, RD16(out, UNIT_SH + r) & ~in);
+        }
+    return out;
+}
+
 // a unit's frame (units.h) seen from orientation rot: its facing turned into the view, front
 // frames looking down-left (+v), back ones up-left (-u), mirrored for +u and -v as in FFT (the
 // mirrored frames are stored after the others)
@@ -2144,9 +2248,14 @@ static const u8 *unit_frame(u8 rot, u8 i)
 {
     const Unit *un = &st.unit[i];
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
-    if (DC_OBJ(un->dc))                                // a crystal or a chest, after the units (a
-        return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * UNIT_FB   // (u16) cast here, under
-            + (u8)(un->dc - DC_CRYSTAL) * UNIT_FB;  // the test, was folded to a wrong constant)
+    if (DC_OBJ(un->dc)) {
+        if (st.morph_mask & (u16)(1U << i)) {
+            const u8 *ko = ugfx + (u32)(u16)(un->gfx * (2 * UNIT_FRAMES)
+                + P_KO + (dir & 1) + (dir & 2 ? UNIT_FRAMES : 0)) * UNIT_FB;
+            return morph_first() == i ? morph_frame(ko, object_frame(i)) : ko;
+        }
+        return object_frame(i);
+    }
     armed = st.mode == M_ACT && i == st.atk ? armed_pose(i) : 0;
     if (armed) return wgfx + (u32)(u16)(un->gfx * 16 + (dir >> 1) * 8 + (dir & 1) * 4 + armed - 1) * UNIT_FB;
     k = unit_pose(i);
@@ -2167,11 +2276,10 @@ static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 
 
 #define DC_Y 18                         // a death counter's top above the feet
 
-// a unit with its shadow (in its frames) through its cover mask, the unit's contour drawn over
-// the cover, an enemy's diamond above it; c RT_NULL: uncovered (the rotation frames). Under the
-// cover only the contour stays (the white outline and the black line inside it): the frame's
-// inside (its opaque pixels eroded twice, and the shadow's, made by units.py) is taken away
-// there (mask 1 = transparent). On the TI the rows it leaves alone are drawn straight from the data file,
+// A covered body's interior is white, preserving its white/black contour: letting a busy
+// roof texture show through made the hollow silhouette look like ordinary sprite detail.
+// Covered shadows stay transparent. c RT_NULL draws the ordinary unoccluded sprite.
+// On the TI the rows it leaves alone are drawn straight from the data file,
 // the others copied first.
 // Depth-1 shader: a short, constant-height pass. The ordinary dry shader
 // stays unchanged; standing units reuse their cached terrain classification.
@@ -2183,7 +2291,7 @@ static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     u8 r, flash = unit_flash(i);
     for (r = 0; r < WATER_ROWS; r++) {
         u16 in = RD16(g, 3 * UNIT_SH + r), k = c ? c->cm[r] & in : 0;
-        mk[r] = RD16(g, 2 * UNIT_SH + r) | k;
+        mk[r] = RD16(g, 2 * UNIT_SH + r); // covered body pixels are opaque white, not terrain
         ml[r] = (flash ? (RD16(g, r) & ~in) | (flash == 1 ? in : 0) : RD16(g, r)) & ~k;
         md[r] = RD16(g, UNIT_SH + r) & ~(k | (flash ? in : 0));
     }
@@ -2231,7 +2339,7 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
         for (r = 0; r < UNIT_SH; r++) {
             u16 k = c ? c->cm[r] & RD16(g, 3 * UNIT_SH + r) : 0;
             u16 in = r < UNIT_FOOT - 1 ? RD16(g, 3 * UNIT_SH + r) : 0;   // leave the shadow dark
-            mk[r] = RD16(g, 2 * UNIT_SH + r) | k;
+            mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
             ml[r] = ((RD16(g, r) & ~in) | (flash == 1 ? in : 0)) & ~k;
             md[r] = RD16(g, UNIT_SH + r) & ~(in | k);
         }
@@ -2249,7 +2357,8 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
         u8 e = h1 + 1;
         for (r = h0; r < e; r++) {
             u16 k = h[r];
-            mk[r] = RD16(g, 2 * UNIT_SH + r) | k; ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
+            mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
+            ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
         }
         s.h = e - h0;
         s.light = ml + h0; s.dark = md + h0; s.mask = mk + h0;
@@ -2263,7 +2372,8 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 #else                                          // the PC copies every row (byte order)
     for (r = 0; r < UNIT_SH; r++) {
         u16 k = r >= h0 && r <= h1 ? h[r] : 0;
-        mk[r] = RD16(g, 2 * UNIT_SH + r) | k; ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
+        mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
+        ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
     }
     s.h = UNIT_SH;
     s.light = ml; s.dark = md; s.mask = mk;
@@ -2285,21 +2395,41 @@ markers:
     }
 }
 
+#ifndef FFT_COMPACT_UI
+static u8 weapon_pose(u8 i, u8 phase)
+{
+    u8 dir = unit_direction(st.rot, i);
+    return (u8)((st.unit[i].gfx >= UG_CHEMIST_M ? 24 : 0)
+        + (items[st.unit[i].eq[EQ_WEAPON]].knife ? 0 : 12)
+        + (dir >> 1) * 6 + (dir & 1) * 3 + phase - 2);
+}
+
+// Three fixed swing-phase slots; duplicate logical poses in a slot share the same key.
+static const u8 *weapon_frame(u8 pose, u8 slot)
+{
+    u8 id = wgfx[WEAPON_INDEX + pose], cache_key = id + 1;
+    if (W->blade_k[slot] != cache_key) {
+        ZB(19);
+        zx0_unpack(wgfx + WEAPON_OFF + RD16(wgfx + WEAPON_ZOFF, id), (u8 *)W->blade[slot]);
+        ZE(19);
+        W->blade_k[slot] = cache_key;
+    }
+    return (const u8 *)W->blade[slot];
+}
+
 // The original blade behind the armed body, at the same sorted depth, through scenery.
 // Its 32-column cover is cached independently of the body's 16-column cover.
 static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
 {
-    u8 phase = armed_pose(i), dir, k, r, rows;
+    u8 phase = armed_pose(i), k, r, rows;
     const u8 *g;
     u32 l[WEAPON_SH], d[WEAPON_SH], m[WEAPON_SH];
     RtSprite sp;
     s16 bx, by, b0, sh;
     if (phase < 2) return;
     rows = unit_in_water(i) ? WEAPON_FOOT - HU : WEAPON_SH;
-    dir = unit_direction(st.rot, i);
-    k = (u8)((st.unit[i].gfx >= UG_CHEMIST_M ? 24 : 0)
-        + (items[st.unit[i].eq[EQ_WEAPON]].knife ? 0 : 12) + (dir >> 1) * 6 + (dir & 1) * 3 + phase - 2);
-    g = wgfx + WEAPON_OFF + (u32)k * WEAPON_FB;
+    k = weapon_pose(i, phase);
+    g = weapon_frame(k, phase - 2);
     bx = sx + weapon_x[k]; by = sy - WEAPON_FOOT;
     b0 = bx >> 3; sh = bx & 7;
     if (W->wx != bx || W->wy != by || W->wrot != st.rot || W->wdepth != depth) {
@@ -2331,6 +2461,7 @@ static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
     sp.w = 32; sp.h = rows; sp.light = l; sp.dark = d; sp.mask = m;
     draw_sprite(bx - st.camx, by - st.camy, &sp);
 }
+#endif
 
 // the death counter's digits 0-3 as sprites (black, a white outline), made once
 static void make_counters(void)
@@ -2348,15 +2479,97 @@ static void make_counters(void)
     }
 }
 
+// Shared world and original sprite frames; no second tactical engine.
+#ifdef FFT_EXPLORATION
+#include "perspective.inc"
+#endif
+
 // ---------------------------------------------------------------- the rotation animation
+#if !defined(FFT_EXPLORATION) || defined(FFT_FIXED)
 // 32 angles per turn: S = round(6 sqrt2 sin a * 256), view r is at 45 + 90 r degrees (index
 // 4 + 8 r), where the projection equals the cardinal one exactly (6 * 256)
 static const s16 sin32[32] = { 0, 424, 831, 1207, 1536, 1806, 2007, 2130, 2172, 2130, 2007,
     1806, 1536, 1207, 831, 424, 0, -424, -831, -1207, -1536, -1806, -2007, -2130, -2172, -2130,
     -2007, -1806, -1536, -1207, -831, -424 };
 
+#if !defined(FFT_TURN_LOWPOLY_NATIVE) || defined(FFT_TURN_TEXTURE)
+static void __attribute__((noinline)) turn_expand(void)
+{
+    const u8 *hl=half[0],*hd=half[1]; u8 *dl=rt_light,*dd=rt_dark; s16 i,j;
+    for(i=0;i<TH;i++,dl+=2*RT_PBYTES,dd+=2*RT_PBYTES)
+        for(j=0;j<TW/8;j++) {
+            u16 l=dbl[*hl++],d=dbl[*hd++];
+            WR16(dl,j,l); WR16(dl+RT_PBYTES,j,l);
+            WR16(dd,j,d); WR16(dd+RT_PBYTES,j,d);
+        }
+}
+#endif
+
 // Drawn at half resolution (80 x 50, every size halved, a level = 3 px) then doubled onto the
 // screen: the rows are what costs (ti-cycles: ~9k per polygon at full size)
+#ifdef FFT_TURN_LOWPOLY_NATIVE
+#define TURN_W RT_W
+#define TURN_H RT_H
+#define TURN_PIVOT_SHIFT 0
+#define TURN_X_SHIFT 8
+#define TURN_Y_SHIFT 9
+#define TURN_HEIGHT HU
+#define TURN_SORT_BIAS 1024
+#define TURN_SORT_SHIFT 3
+#else
+#define TURN_W TW
+#define TURN_H TH
+#define TURN_PIVOT_SHIFT 1
+#define TURN_X_SHIFT 9
+#define TURN_Y_SHIFT 10
+#define TURN_HEIGHT (HU / 2)
+#define TURN_SORT_BIAS 512
+#define TURN_SORT_SHIFT 2
+#endif
+
+#ifndef FFT_TURN_NO_EDGES
+// Short tile-top segments. Step the byte address/mask; no per-pixel multiply/divide.
+// Bounds checks also cover partially off-screen tiles without another clip buffer.
+static void turn_edge(s16 x, s16 y, s16 xb, s16 yb, u8 white)
+{
+    s16 dx, dy, sy, err, off, rowstep;
+    u8 mask;
+    if (x > xb) { s16 t=x; x=xb; xb=t; t=y; y=yb; yb=t; }
+    if (xb < 0 || x >= D.x1 || (y < 0 && yb < 0) || (y >= D.y1 && yb >= D.y1)) return;
+    dx=xb-x; dy=yb-y; sy=dy<0 ? -1:1; if (dy<0) dy=-dy;
+    err=dx-dy; rowstep=sy*D.stride; off=y*D.stride+(x>>3);
+    mask=(u8)(0x80U>>(x&7));
+    if (x>=0 && xb<D.x1 && y>=0 && y<D.y1 && yb>=0 && yb<D.y1) {
+        // Most lips are wholly inside the LCD: keep plane pointers and skip pixel clipping.
+        u8 *l=D.l+off, *d=D.d+off;
+        s16 count=(dx>dy ? dx:dy)+1;
+        for (;;) {
+            s16 twice;
+            if (white) { *l&=(u8)~mask; *d&=(u8)~mask; }
+            else { *l|=mask; *d|=mask; }
+            if (!--count) return;
+            twice=err+err;
+            if (twice > -dy) {
+                err-=dy; mask>>=1; if (!mask) { mask=0x80; l++; d++; }
+            }
+            if (twice < dx) { err+=dx; l+=rowstep; d+=rowstep; }
+        }
+    }
+    for (;;) {
+        s16 twice;
+        if ((u16)x < (u16)D.x1 && (u16)y < (u16)D.y1) {
+            if (white) { D.l[off]&=(u8)~mask; D.d[off]&=(u8)~mask; }
+            else { D.l[off]|=mask; D.d[off]|=mask; }
+        }
+        if (x==xb && y==yb) break;
+        twice=err+err;
+        if (twice > -dy) {
+            err-=dy; x++; mask>>=1; if (!mask) { mask=0x80; off++; }
+        }
+        if (twice < dx) { err+=dx; y+=sy; off+=rowstep; }
+    }
+}
+#endif
 
 static void draw_turn(void)
 {
@@ -2368,21 +2581,26 @@ static void draw_turn(void)
     view_of(st.rot, st.cx, st.cz, &cu, &cv);
     pvx = scene_x(st.rot, cu, cv) - st.camx;
     pvy = scene_y(cu, cv) + HH - st.camy;
+#ifdef FFT_TURN_LOWPOLY_NATIVE
+    draw_clear(); D.l=rt_light; D.d=rt_dark; D.stride=RT_PBYTES;
+#else
     memset(half, 0, sizeof half);
-    D.l = half[0]; D.d = half[1]; D.stride = TW / 8; D.ox = D.oy = 0;
-    D.x0 = 0; D.x1 = TW; D.y0 = 0; D.y1 = TH;
+    D.l = half[0]; D.d = half[1]; D.stride = TW / 8;
+#endif
+    D.ox = D.oy = 0;
+    D.x0 = 0; D.x1 = TURN_W; D.y0 = 0; D.y1 = TURN_H;
     for (z = 0; z <= MAP_H; z++)                                   // grid corners at height 0
         for (x = 0; x <= MAP_W; x++) {
             s16 x2 = 2 * (x - st.cx) - 1, z2 = 2 * (z - st.cz) - 1;
-            gx[x][z] = (pvx >> 1) + (s16)((muls16(x2, C) - muls16(z2, S)) >> 9);
-            gy[x][z] = (pvy >> 1) + (s16)((muls16(x2, S) + muls16(z2, C)) >> 10);
+            gx[x][z] = (pvx >> TURN_PIVOT_SHIFT) + (s16)((muls16(x2, C) - muls16(z2, S)) >> TURN_X_SHIFT);
+            gy[x][z] = (pvy >> TURN_PIVOT_SHIFT) + (s16)((muls16(x2, S) + muls16(z2, C)) >> TURN_Y_SHIFT);
         }
     {                                           // counting sort by the centre's depth
         u8 *cnt = W->count;
         memset(cnt, 0, sizeof W->count);
         for (z = 0, i = 0; z < MAP_H; z++)
             for (x = 0; x < MAP_W; x++, i++) {
-                s16 k = (gy[x][z] + gy[x + 1][z + 1] + 512) >> 2;
+                s16 k = (gy[x][z] + gy[x + 1][z + 1] + TURN_SORT_BIAS) >> TURN_SORT_SHIFT;
                 key[i] = k = k < 0 ? 0 : k > 255 ? 255 : k;
                 cnt[k]++;
             }
@@ -2392,6 +2610,9 @@ static void draw_turn(void)
     }
     for (i = 0; i < n; i++) {
         u8 o = order[i], f;
+#ifndef FFT_TURN_NO_EDGES
+        u8 ledges=0;
+#endif
         const Tile *t = &map_tiles[o];
         s16 tx = o % MAP_W, tz = o / MAP_W, cx[4], cy[4], px[4], py[4];
         cx[0] = gx[tx][tz]; cx[1] = gx[tx + 1][tz]; cx[2] = gx[tx + 1][tz + 1]; cx[3] = gx[tx][tz + 1];
@@ -2405,10 +2626,10 @@ static void draw_turn(void)
                 if (cy[c] < ya) ya = cy[c];
                 if (cy[c] > yb) yb = cy[c];
             }
-            if (xb < 0 || xa >= TW || yb < 0 || ya - MAXH * (HU / 2) >= TH) continue;
+            if (xb < 0 || xa >= TURN_W || yb < 0 || ya - MAXH * TURN_HEIGHT >= TURN_H) continue;
         }
-        cy[0] -= t->c[0] * (HU / 2); cy[1] -= t->c[1] * (HU / 2);
-        cy[2] -= t->c[2] * (HU / 2); cy[3] -= t->c[3] * (HU / 2);
+        cy[0] -= t->c[0] * TURN_HEIGHT; cy[1] -= t->c[1] * TURN_HEIGHT;
+        cy[2] -= t->c[2] * TURN_HEIGHT; cy[3] -= t->c[3] * TURN_HEIGHT;
         // faces towards the viewer: +x (corners 1, 2) if S > 0, -x (3, 0) if S < 0,
         // +z (2, 3) if C > 0, -z (0, 1) if C < 0; lit when facing left
         for (f = 0; f < 4; f++) {
@@ -2418,32 +2639,38 @@ static void draw_turn(void)
             s16 facing = f == 0 ? S : f == 1 ? -S : f == 2 ? C : -C, lit;
             const Tile *nt;
             u8 ha, hb, na = 0, nb = 0, k;
+#ifdef FFT_TURN_NO_EDGES
             if (facing <= 0) continue;
+#endif
             nt = tile_at(tx + fdx[f], tz + fdz[f]);
             ha = t->c[fa[f]]; hb = t->c[fb[f]];
             if (nt) { na = nt->c[mir[f][fa[f]]]; nb = nt->c[mir[f][fb[f]]]; }
             if (na >= ha && nb >= hb) continue;
+#ifndef FFT_TURN_NO_EDGES
+            ledges|=(u8)(1<<f);
+            if (facing <= 0) continue;
+#endif
             px[0] = cx[fa[f]]; py[0] = cy[fa[f]];
             px[1] = cx[fb[f]]; py[1] = cy[fb[f]];
-            px[2] = cx[fb[f]]; py[2] = cy[fb[f]] + (hb > nb ? (hb - nb) * (HU / 2) : 0);
-            px[3] = cx[fa[f]]; py[3] = cy[fa[f]] + (ha > na ? (ha - na) * (HU / 2) : 0);
+            px[2] = cx[fb[f]]; py[2] = cy[fb[f]] + (hb > nb ? (hb - nb) * TURN_HEIGHT : 0);
+            px[3] = cx[fa[f]]; py[3] = cy[fa[f]] + (ha > na ? (ha - na) * TURN_HEIGHT : 0);
             lit = f == 0 ? C : f == 1 ? -C : f == 2 ? -S : S;      // normal's screen x < 0
             k = t->look[1 + f] + (lit >= 0);                       // the views' grey, one
             if (k >= SHADES) k = SHADES - 1;                       // darker facing right
             fill_poly(px, py, 4, turn_pat[k][0], turn_pat[k][1]);
         }
         fill_poly(cx, cy, 4, turn_pat[t->look[0]][0], turn_pat[t->look[0]][1]);
+#ifndef FFT_TURN_NO_EDGES
+        // Top lips only; painter order lets nearer terrain cover earlier strokes.
+        if (ledges&1) turn_edge(cx[1],cy[1],cx[2],cy[2],t->look[0]>=2);
+        if (ledges&2) turn_edge(cx[3],cy[3],cx[0],cy[0],t->look[0]>=2);
+        if (ledges&4) turn_edge(cx[2],cy[2],cx[3],cy[3],t->look[0]>=2);
+        if (ledges&8) turn_edge(cx[0],cy[0],cx[1],cy[1],t->look[0]>=2);
+#endif
     }
-    {                                                             // doubled onto the screen
-        const u8 *hl = half[0], *hd = half[1];
-        u8 *dl = rt_light, *dd = rt_dark;
-        for (i = 0; i < TH; i++, dl += 2 * RT_PBYTES, dd += 2 * RT_PBYTES)
-            for (j = 0; j < TW / 8; j++) {
-                u16 l = dbl[*hl++], d = dbl[*hd++];
-                WR16(dl, j, l); WR16(dl + RT_PBYTES, j, l);
-                WR16(dd, j, d); WR16(dd + RT_PBYTES, j, d);
-            }
-    }
+#ifndef FFT_TURN_LOWPOLY_NATIVE
+    turn_expand();
+#endif
    
     // units on top, at their projected feet (no occlusion while turning)
     for (i = 0; i < NUNIT; i++) {
@@ -2455,6 +2682,19 @@ static void draw_turn(void)
         draw_unit_covered(sx, sy, st.rot, (u8)i, RT_NULL);
     }
 }
+#ifdef FFT_TURN_TEXTURE
+#include "turn_texture.inc"
+#endif
+#ifdef FFT_FIXED
+static void render_turn(void)
+{
+#ifdef FFT_TURN_TEXTURE
+    if(tt_ready) {tt_turn(); return;}
+#endif
+    draw_turn();
+}
+#endif
+#endif
 
 // ---------------------------------------------------------------- camera
 #define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
@@ -2481,6 +2721,11 @@ static u8 cam_sees(s16 x, s16 y)
 static void cam_target(s16 *tx, s16 *ty)
 {
     s16 u, v, x, y;
+    if (st.morph_mask) {
+        Feet f = unit_feet(st.rot, morph_first());
+        *tx = f.x - RT_W / 2; *ty = f.y - RT_H / 2 - 6;
+        cam_clamp(tx, ty); return;
+    }
     view_of(st.rot, st.cx, st.cz, &u, &v);
     x = scene_x(st.rot, u, v);
     y = scene_y(u, v) + HH - map_tiles[st.cz * MAP_W + st.cx].stand * (HU / 2);
@@ -2522,7 +2767,7 @@ static u32 planes_sum(void)
     u32 a = 0, b = 0;
     u16 y;
     for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
-        const u32 *p = (const u32 *)l, *q = (const u32 *)d;
+        const PlaneWord *p = (const PlaneWord *)l, *q = (const PlaneWord *)d;
         a += p[0]; b += a; a += p[1]; b += a; a += p[2]; b += a; a += p[3]; b += a; a += p[4]; b += a;
         a += q[0]; b += a; a += q[1]; b += a; a += q[2]; b += a; a += q[3]; b += a; a += q[4]; b += a;
     }
@@ -2536,6 +2781,9 @@ __attribute__((__stkparm__))
 #endif
 release(void)
 {
+#ifdef FFT_CONFIG
+    pidle_free();
+#endif
     if (sbuf) free(sbuf);
     if (vbuf) free(vbuf);
     sbuf = vbuf = RT_NULL;
@@ -2549,6 +2797,14 @@ void game_init(void)
     rt_state_size = sizeof(st);
 #ifdef __m68k__
     sbuf = vbuf = RT_NULL;
+#ifdef FFT_CONFIG
+    pidle=RT_NULL;
+#endif
+#endif
+#if defined(__m68k__) && defined(FFT_CONFIG) && !defined(RT_CYCLES)
+    // Compact movable AMS variables before our large malloc blocks lock their layout.
+    // Take all archive/data pointers only afterwards. The cycle runner has no AMS heap.
+    HeapCompress();
 #endif
     for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
         char name[6] = "fftv0";                // again each run, the archive may have moved
@@ -2561,7 +2817,7 @@ void game_init(void)
     if (!igfx) { W = RT_NULL; return; }       // a message, ESC quits
     map_tiles = (const Tile *)(igfx + UI_TILES);
 #ifdef __m68k__
-    sl_l = (const u32 *)(igfx + UI_SLOPES);
+    sl_l = (const PlaneWord *)(igfx + UI_SLOPES);
 #else
     for (i = 0; i < 4 * SLOPE_ROWS; i++) slope_pc[i] = RD32(igfx + UI_SLOPES, 2 * i);
     sl_l = slope_pc;
@@ -2597,6 +2853,30 @@ void game_init(void)
         (void)release;
 #endif
     }
+#ifdef FFT_EXPLORATION
+    perspective_init();
+#ifdef FFT_CONFIG
+    pidle_init(); // allocation failure preserves the cold renderer
+    pidle_active=0;
+#endif
+#ifdef FFT_TURN_TEXTURE
+    tt_init();
+#endif
+#ifdef FFT_ULTRA_TRANSITION
+    ultra_assets();
+#endif
+#ifdef FFT_CINEMA
+    cinema_assets();
+#ifdef FFT_TEXTURE_PREVIEW
+    preview_assets();
+    preview_iso_assets();
+#endif
+#endif
+
+#endif
+#ifndef FFT_COMPACT_UI
+    memset(W->blade_k, 0, sizeof W->blade_k); // rt_file may reload the bank on the PC
+#endif
     scene_rot = vbuf_rot = 0xFF;
     for (i = 0; i < 256; i++) {
         u16 d = 0;
@@ -2625,17 +2905,29 @@ static void aim(u8 ab)
 
 void game_scenario(u16 n)
 {
+#ifndef FFT_EXPLORATION
     u8 i;
+#endif
+#ifdef FFT_EXPLORATION
+    if (!n) n = 61;                            // exploration launcher: Ramza immediately
+#endif
     memset(&st, 0, sizeof st);
+#ifdef FFT_CONFIG
+    st.pzoom = 1; st.psolid = 1;      // unchecked options: low-poly, wide, filled
+#endif
     st.want = st.prot = st.ai_view = 0xFF;
     if (!W) return;
     rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
+#ifdef FFT_EXPLORATION
+    if (n >= 61 && n <= 68) rt_seed = 61;         // identical actors/equipment for all cameras
+#endif
     rand_seed(rt_seed);
     battle_units();                               // Gariland's eleven units at their start tiles
     memcpy(st.bag, bag_init, NBAG);
     st.ai_all = n == 16;                          // the AI plays both sides to the end
     turn_start();
     while (n && n != 16 && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
+#ifndef FFT_EXPLORATION
     if (n >= 1 && n <= 4) {                       // an enemy behind a building, each view
         st.unit[U_HIDE].x = 1; st.unit[U_HIDE].z = 11;    // (fft_test --find)
         st.rot = (u8)(n - 1);
@@ -2742,7 +3034,41 @@ void game_scenario(u16 n)
             if (n == 58) { st.unit[st.sel].defend = 1; for (i = 0; i < SET_N && known(st.sel, i) != NO_ABIL; i++) ; st.status_row = i; }
         }
     }
-    if (n == 59 || n == 60) end_battle(n == 59 ? END_VICTORY : END_DEFEAT);   // their banners
+    if (n == 59 || n == 60) end_battle(n == 59 ? END_VICTORY : END_DEFEAT);
+#endif
+    if (n >= 61 && n <= 68) {                 // direct Ramza; the three shoulder views
+        st.ai = AI_OFF; st.mode = M_MENU; st.act = st.sel = U_RAMZA;
+        st.cx = st.unit[U_RAMZA].x; st.cz = st.unit[U_RAMZA].z;
+        st.want = st.prot = 0xFF; st.turn = 0;
+#ifdef FFT_EXPLORATION
+        if (n >= 62 && n <= 64) perspective_enter((u8)(n - 61));
+#ifdef FFT_CINEMA
+#ifdef FFT_CAMERA_MOTION
+        st.cenabled = 1;
+#endif
+        if (n >= 65) {
+            // Native combat fixtures: original enemies, Ramza already in attack range.
+            st.unit[U_RAMZA].x = n == 66 ? 4 : 5;
+            st.unit[U_RAMZA].z = n == 66 ? 6 : 5;
+            if (n == 66) st.unit[U_RAMZA].learned |= 2; // Throw Stone for the ranged review
+            st.cx = st.unit[U_RAMZA].x; st.cz = st.unit[U_RAMZA].z;
+            st.menu = MN_ACT;
+        }
+#endif
+#endif
+    }
+    if (n >= 69 && n <= 72) {                 // loot presentation: crystal, chest, queue, covered
+        st.ai = AI_OFF; st.mode = M_MENU; st.act = st.sel = U_RAMZA;
+        st.want = st.prot = 0xFF; st.turn = st.banner = 0;
+        st.unit[1].x = n == 72 ? 1 : 5; st.unit[1].z = n == 72 ? 11 : 9;
+        st.unit[1].hp = 0; st.unit[1].dc = n == 70 ? DC_CHEST : DC_CRYSTAL;
+        st.morph_mask = 1U << 1; st.morph_t = 0;
+        if (n == 71) {
+            st.unit[2].x = 6; st.unit[2].z = 9; st.unit[2].hp = 0; st.unit[2].dc = DC_CHEST;
+            st.morph_mask |= 1U << 2;
+        }
+        st.cx = st.unit[U_RAMZA].x; st.cz = st.unit[U_RAMZA].z;
+    }
     W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->pan_ok[0] = W->pan_ok[1] = 0; W->fc_key = 0; W->win_k[0] = 0;
     if (!n) bn_start(BN_START);                  // a battle: its objective first
     cam_target(&st.camx, &st.camy);
@@ -3069,8 +3395,18 @@ static u8 update(u8 fast)
     s16 tx, ty;
     u8 mode0 = st.mode;
     if (!W || !ugfx || !wgfx || !igfx || !views[0] || !views[1] || !views[2] || !views[3]) return !input_pressed(K_ESC);
-    if (st.ai != AI_THINK || st.banner) st.tick++;   // (a unit thinking: the picture stands still)
+    if (st.ai != AI_THINK || st.banner || st.morph_mask) st.tick++;   // (a unit thinking: the picture stands still)
     if (st.deny) st.deny--;
+    if (st.morph_mask) {
+        W->frz = W->hold = 0;
+        // Keep the KO visible during the pan, then play the whole effect on screen.
+        cam_target(&tx, &ty);
+        st.camx = ease(st.camx, tx); st.camy = ease(st.camy, ty);
+        if (st.camx == tx && st.camy == ty && ++st.morph_t >= MORPH_FRAMES) {
+            st.morph_mask &= (u16)~(1U << morph_first()); st.morph_t = 0;
+        }
+        return 1;
+    }
     if (st.banner) {                               // a banner: the units move, the battle waits
         if (input_pressed(K_A | K_ENTER))          // skipped: the shade leaves, or it ends
             st.banner_t = st.banner_t < W->bn_end - DK_N ? (u8)(W->bn_end - DK_N - 1) : W->bn_end;
@@ -3164,7 +3500,8 @@ static u8 update(u8 fast)
             st.rep = arrows ? (u8)(st.rep < 255 ? st.rep + 1 : st.rep) : 0;
             if (input_pressed(K_A | K_ENTER)) {
                 u8 o, c = (u8)(st.cz * MAP_W + st.cx);
-                if ((st.mode == M_TARGET || st.mode == M_AIM) && !pickable(c, st.mode == M_AIM)) {
+                if (
+                    (st.mode == M_TARGET || st.mode == M_AIM) && !pickable(c, st.mode == M_AIM)) {
                     u8 t = twin(c, st.mode == M_AIM);
                     if (t) { c = t - 1; st.cx = c % MAP_W; st.cz = c / MAP_W; }
                 }
@@ -3205,14 +3542,67 @@ static u8 update(u8 fast)
 // [2nd] / [ENTER] held through an AI turn: AI_FAST steps a frame (its glides, holds, walks and
 // blows), not while it thinks (its frames are full), nor after a step with heavy work (W->upd_k),
 // nor when the last frame had less than FAST_K left (a step costs ~6k)
+#ifdef FFT_CONFIG
+#include "config.inc"
+#endif
+
 u8 game_update(void)
 {
     u8 r, k = st.ai == AI_THINK ? AI_FAST : 1;   // (thinking this frame: its last step too)
     FRAME_BEGIN();
+#ifdef FFT_CONFIG
+    if (config_update()) return 1;
+#endif
+#ifdef FFT_CINEMA
+    if (st.cphase) { cinema_update(); return 1; }
+#ifdef FFT_TEXTURE_PREVIEW
+    if (!st.perspective && !st.turn && (st.mode == M_MENU || st.mode == M_BROWSE)
+        && input_pressed(K_DIGIT(8))) preview_iso_set((preview_iso_style+1)%3);
+#endif
+#ifdef FFT_CAMERA_MOTION
+    if (!st.perspective && st.mode != M_ACT && input_pressed(K_DIGIT(7))) st.cenabled ^= 1;
+#endif
+#endif
+#ifdef FFT_EXPLORATION
+#if defined(FFT_FIXED) && defined(FFT_CAMERA_MOTION)
+    if (st.ptrans) {
+        st.tick++;
+        if (st.ptrans == 1 || st.ptrans == 3) {
+            if (++st.ptrans_t > 16) { st.ptrans = st.ptrans_t = st.pfrom = 0; plow = 0; }
+        } else if (st.ptrans_t) st.ptrans_t--;
+        else {
+            st.ptrans = st.ptrans_t = st.pfrom = st.perspective = 0; plow = 0;
+            scene_rot = vbuf_rot = 0xFF; W->bg_ok = 0; W->status_i = 0;
+        }
+        pvalid = 0;
+        return 1;
+    }
+#endif
+    if (st.perspective) { perspective_keys(); return 1; }
+    if (W && !st.ai && !st.banner && !st.morph_mask && !st.turn && st.want == 0xFF
+        && (st.mode == M_MENU || st.mode == M_BROWSE) && input_pressed(K_C)) {
+#ifdef FFT_FIXED
+        if (input_held(K_MODE)) st.pzoom = 1;
+#endif
+        perspective_enter(1);
+#if defined(FFT_FIXED) && defined(FFT_CAMERA_MOTION)
+        st.ptrans = 1; st.ptrans_t = 0;
+#endif
+        return 1;
+    }
+#endif
     r = update(0);
-    for (; r && k < AI_FAST && st.ai && st.ai != AI_THINK && rt_keys & (K_A | K_ENTER) && !W->upd_k
+#ifdef FFT_CINEMA
+    if (r && cinema_eligible()) { cinema_begin(); return r; }
+#endif
+    for (; r && k < AI_FAST && !st.morph_mask && !st.banner && st.ai && st.ai != AI_THINK && rt_keys & (K_A | K_ENTER) && !W->upd_k
            && W->left >= FAST_K * k; k++)
+    {
         r = update(1);
+#ifdef FFT_CINEMA
+        if (r && cinema_eligible()) { cinema_begin(); break; }
+#endif
+    }
     return r;
 }
 
@@ -3227,15 +3617,15 @@ static void __attribute__((noinline)) copy_view(void)   // its own registers (in
 #ifdef __m68k__                                 // a row: 5 longs, each a long and the next word
     for (y = 0; y < RT_H; y++, sl += SC_BYTES, sd += SC_BYTES, dl += RT_PBYTES, dd += RT_PBYTES) {
         const u16 *a = (const u16 *)sl, *b = (const u16 *)sd;
-        u32 *p = (u32 *)dl, *q = (u32 *)dd;
+        PlaneWord *p = (PlaneWord *)dl, *q = (PlaneWord *)dd;
         if (!sh) {
-            const u32 *c = (const u32 *)a, *e = (const u32 *)b;
+            const PlaneWord *c = (const PlaneWord *)a, *e = (const PlaneWord *)b;
             p[0] = c[0]; p[1] = c[1]; p[2] = c[2]; p[3] = c[3]; p[4] = c[4];
             q[0] = e[0]; q[1] = e[1]; q[2] = e[2]; q[3] = e[3]; q[4] = e[4];
             continue;
         }
-#define CV(k) p[k] = *(const u32 *)(a + 2 * k) << sh | a[2 * k + 2] >> rs; \
-              q[k] = *(const u32 *)(b + 2 * k) << sh | b[2 * k + 2] >> rs
+#define CV(k) p[k] = *(const PlaneWord *)(a + 2 * k) << sh | a[2 * k + 2] >> rs; \
+              q[k] = *(const PlaneWord *)(b + 2 * k) << sh | b[2 * k + 2] >> rs
         CV(0); CV(1); CV(2); CV(3); CV(4);
 #undef CV
     }
@@ -3262,14 +3652,14 @@ u32 bg_used, bg_bad;                           // the tests: frames from the cop
 static void screen_scene(void)
 {
     u8 *l = rt_light, *d = rt_dark;
-    u32 *p = W->bg[0], *q = W->bg[1], *a, *b;
+    PlaneWord *p = W->bg[0], *q = W->bg[1], *a, *b;
     s16 y;
     // A cache completed below saves work from the next frame only. Optional HUD / cursor
     // work must not force itself into this frame as though it had used the cheap copy.
     W->bg_drawn = bg_usable();
     if (W->bg_drawn) {
         for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
-            a = (u32 *)l; b = (u32 *)d;
+            a = (PlaneWord *)l; b = (PlaneWord *)d;
             a[0] = *p++; a[1] = *p++; a[2] = *p++; a[3] = *p++; a[4] = *p++;
             b[0] = *q++; b[1] = *q++; b[2] = *q++; b[3] = *q++; b[4] = *q++;
         }
@@ -3296,7 +3686,7 @@ static void screen_scene(void)
     y = W->bg_part * (RT_H / 4);
     l += y * RT_PBYTES; d += y * RT_PBYTES; p += y * (RT_W / 32); q += y * (RT_W / 32);
     for (y = 0; y < RT_H / 4; y++, l += RT_PBYTES, d += RT_PBYTES) {
-        a = (u32 *)l; b = (u32 *)d;
+        a = (PlaneWord *)l; b = (PlaneWord *)d;
         *p++ = a[0]; *p++ = a[1]; *p++ = a[2]; *p++ = a[3]; *p++ = a[4];
         *q++ = b[0]; *q++ = b[1]; *q++ = b[2]; *q++ = b[3]; *q++ = b[4];
     }
@@ -3308,7 +3698,10 @@ const char *unit_name(u8 i)
     const Unit *u = &st.unit[i];
     if (u->gfx == UG_RAMZA) return "Ramza";
     if (u->gfx == UG_DELITA) return "Delita";
-    return (const char *)igfx + (u->female ? UI_FEMALE : UI_MALE) + (u16)u->name * 12;
+    {
+        const u8 *names = igfx + (u->female ? UI_FEMALE : UI_MALE);
+        return (const char *)names + RD16(names, u->name);
+    }
 }
 
 static void hud_labels(void)
@@ -3328,21 +3721,22 @@ static void hud_labels(void)
         }
 }
 
-// Preshifted AMS small glyphs; bounded lines, five rows of word writes per glyph.
+// Canonical AMS small glyphs; shift five byte rows while building cached UI parts.
 static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit)
 {
     while (*s) {
-        u8 c = (u8)*s++, adv, r;
+        u8 c = (u8)*s++, adv, r, shift = 24 - (x & 15);
         const u8 *g;
         u8 *l, *d;
         if (c < 32 || c > 126) c = '?';
         c -= 32; adv = igfx[UI_ADV + c];
         if (x + adv > limit) break;
-        g = igfx + UI_FONT + (u16)c * 320 + (u16)(x & 15) * 20;
+        g = igfx + UI_FONT + (u16)c * 5;
         l = (u8 *)rt_light + y * RT_PBYTES + ((x >> 3) & ~1);
         d = (u8 *)rt_dark + y * RT_PBYTES + ((x >> 3) & ~1);
-        for (r = 0; r < 5; r++, g += 4, l += RT_PBYTES, d += RT_PBYTES) {
-            u16 a = RD16(g, 0), b = RD16(g, 1);
+        for (r = 0; r < 5; r++, l += RT_PBYTES, d += RT_PBYTES) {
+            u32 bits = (u32)*g++ << shift;
+            u16 a = (u16)(bits >> 16), b = (u16)bits;
             if (color & 1) WR16(l, 0, RD16(l, 0) | a);
             else WR16(l, 0, RD16(l, 0) & ~a);
             if (color & 2) WR16(d, 0, RD16(d, 0) | a);
@@ -3379,9 +3773,9 @@ static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color)
 }
 
 // Original portrait with palette-zero transparency and an offline white silhouette outline.
-static void portrait(u8 gfx, u8 mirror, s16 x, s16 y)
+static void portrait(u8 gfx, s16 x, s16 y)
 {
-    const u8 *p = igfx + UI_PORTRAITS + (u16)(gfx * 2 + mirror) * 348;
+    const u8 *p = igfx + UI_PORTRAITS + (u16)gfx * 348;
 #ifdef __m68k__
     RtSprite sp = { 32, 29, p, p + 116, p + 232 };
 #else
@@ -3525,10 +3919,9 @@ static void make_panel(u8 side, u8 i)
     rt_light = PAN_MAKE(side)[0]; rt_dark = PAN_MAKE(side)[1];
     if (!k) {
         memset(PAN_MAKE(side), 0, sizeof PAN_MAKE(side));
-        u8 mirror = !side;
-        const u8 *p = igfx + UI_PORTRAITS + (u16)(u->gfx * 2 + mirror) * 348 + 232;
+        const u8 *p = igfx + UI_PORTRAITS + (u16)u->gfx * 348 + 232;
         u8 r;
-        portrait(u->gfx, mirror, side ? 61 : 0, 0);
+        portrait(u->gfx, side ? 61 : 0, 0);
         for (r = 0; r < 29; r++) {
             u8 *m = (u8 *)PAN_MAKE(side)[2] + r * RT_PBYTES;
             u32 bits = ~RD32(p, r * 2);
@@ -3676,8 +4069,8 @@ static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
     u8 r;
     u8 *al = (u8 *)rt_light + y * RT_PBYTES + x, *ad = (u8 *)rt_dark + y * RT_PBYTES + x;
     for (r = 0; r < rows; r++, al += RT_PBYTES, ad += RT_PBYTES, l += RT_PBYTES / 2, d += RT_PBYTES / 2) {
-        u32 *a = (u32 *)al, *b = (u32 *)ad;
-        const u32 *p = (const u32 *)l, *q = (const u32 *)d;
+        PlaneWord *a = (PlaneWord *)al, *b = (PlaneWord *)ad;
+        const PlaneWord *p = (const PlaneWord *)l, *q = (const PlaneWord *)d;
         a[0] = p[0]; b[0] = q[0];
         if (words == 2) continue;
         a[1] = p[1]; b[1] = q[1];
@@ -3900,7 +4293,7 @@ static void draw_status(void)
         if (!k) {
             memset(W->status, 0, sizeof W->status);
             draw_rect(0, 0, RT_W, 32, C_LGRAY); draw_rect(0, 32, RT_W, 1, C_DGRAY);
-            portrait(u->gfx, 0, 2, 1);
+            portrait(u->gfx, 2, 1);
             ui_text(24, 2, unit_name(st.sel), C_BLACK, 92);
             ui_text(24, 9, u->gfx >= UG_CHEMIST_M ? "Chemist" : "Squire", C_BLACK, 92);
             n = put_s(s, 0, "Lv "); n = put_n(s, n, u->level); n = put_s(s, n, " Exp "); n = put_n(s, n, u->exp); s[n] = 0;
@@ -4000,6 +4393,7 @@ static void draw_number(void)
         make_number(k, s);
         W->num_ok |= (u8)(1 << k);
     }
+    if (k) t <<= 1;                         // reward rise follows the doubled display pace
     sp.w = 32; sp.h = 7; sp.light = sp.dark = W->num[k][0]; sp.mask = W->num[k][1];
     draw_sprite(f.x - st.camx - ((W->num_w[k] + 2) >> 1), f.y - st.camy - UNIT_FOOT - 6 - (t < NUM_RISE ? t : NUM_RISE), &sp);
 }
@@ -4029,52 +4423,25 @@ static void draw_arrows(void)
     }
 }
 
-// The banners: a small SVG-style engine. A glyph is Lato Black's outline (tools/banner.py:
-// contours of byte points, the cap height BN_CAP units, in ffti), filled even-odd on 2 x 2
-// samples a pixel: the coverage gives four greys (smooth edges); the mask is the coverage grown
-// a pixel (a white outline). Sample rows are filled while the frame has room, into the banner's
-// planes (the full-screen Status's memory, unused meanwhile), shown through a left-to-right
-// wipe that waits for them; the units go on moving, the battle waits
-#define BN_ROWS 32                      // the banner's planes: light, dark, mask (RT_PBYTES a row)
-#define BN_Y (st.banner == BN_START ? 2 : 34)   // its top on the screen (the objective: above
-                                                // the enemies it lights up)
-#define BN_SPEED 6                      // the wipe, pixels a frame
-#define BN_HOLD 40                      // frames a banner stays whole
-#define BN_K 30                         // the masked lines and a glyph's mask, thousands
-#define BN_ROW_K 12                     // a row of samples ending a pixel row (its greys written;
-                                        // ti-cycles: up to 11.5k), half that for the other one
-#define BN_EDGES 40                     // a glyph's edges at most ('S': 39)
-static const char *const bn_text[3][2] = { { "BATTLE START", "DEFEAT ALL ENEMIES!" },
-                                           { "VICTORY!", RT_NULL }, { "DEFEAT", RT_NULL } };
-static const u8 bn_cap[3][2] = { { 12, 9 }, { 18, 0 }, { 18, 0 } };   // cap heights, pixels
-static const u8 bn_top[3][2] = { { 1, 17 }, { 4, 0 }, { 4, 0 } };     // rows in the planes
+// Lato Black's exact former vector fill is sampled offline into four small text strips
+// in ffti. Reveal those packed rows at runtime: no glyph rasterization can overrun the
+// banner timer, and the same four greys/white outline remain. No full-screen images.
+#define BN_Y (st.banner == BN_START ? 2 : 34)
+#define BN_SPEED 12                     // twice the previous six-pixel reveal speed
+#define BN_HOLD 40                      // the complete message stays visible before the shade leaves
+#define BN_K 20                         // packed masked strips (measured with ti-cycles)
+static const u8 bn_width[4] = BN_WIDTHS;
 
-static const u8 *bn_glyph(char c)      // a glyph: advance, contours, then (points, x y...) each
-{
-    u8 k;
-    for (k = 0; BN_CHARS[k] && BN_CHARS[k] != c; k++) ;
-    return BN_CHARS[k] ? igfx + UI_BNFONT + RD16(igfx + UI_BNFONT, k) : RT_NULL;   // (a space)
-}
-static s16 bn_adv(char c, u8 cap)      // pixels (BN_CAP 64 units: >> 6)
-{
-    const u8 *g = bn_glyph(c);
-    return (s16)(((g ? g[0] : BN_SPACE) * cap >> 6) + 1);
-}
-static s16 bn_rows(u8 cap) { return (s16)(((BN_CAP + 2 * BN_Y0) * cap >> 6) + 1); }
+static u8 bn_line(u8 kind, u8 line) { return kind == BN_START ? line : (u8)(kind); }
 
-// a banner from now: its lines laid out (centred), each wiped after the one before
 static void __attribute__((noinline)) bn_start(u8 kind)
 {
-    u8 l, t = DK_N;                     // the shade first
+    u8 l, t = DK_N;
     st.banner = kind; st.banner_t = 0;
     if (!W) return;
-    W->bn_n = 0; W->bn_j = 0;
-    for (l = 0; l < 2; l++) {
-        const char *s = bn_text[kind - 1][l];
-        s16 w = 0;
-        for (; s && *s; s++) w += bn_adv(*s, bn_cap[kind - 1][l]);
-        W->bn_x[l] = (s16)((RT_W - w) >> 1); W->bn_t0[l] = t;
-        if (w) t = (u8)(t + w / BN_SPEED + 1);
+    for (l = 0; l < (kind == BN_START ? 2 : 1); l++) {
+        W->bn_t0[l] = t;
+        t += (u8)((bn_width[bn_line(kind, l)] + BN_SPEED - 1) / BN_SPEED);
     }
     W->bn_end = (u8)(t + BN_HOLD + DK_N);
 }
@@ -4108,8 +4475,8 @@ static void bn_shade(void)
         }
         for (; pl < pe; pl += 4, pd += 4) {
 #ifdef __m68k__
-            u32 L = *(u32 *)pl, D = *(u32 *)pd;
-            *(u32 *)pl = ~L | D; *(u32 *)pd = D | L;
+            u32 L = *(PlaneWord *)pl, D = *(PlaneWord *)pd;
+            *(PlaneWord *)pl = ~L | D; *(PlaneWord *)pd = D | L;
 #else
             bn_shade1(pl, pd, 0xFFFFFFFFUL);
 #endif
@@ -4118,119 +4485,41 @@ static void bn_shade(void)
     }
 }
 
-// the mask of a glyph's box: its greys grown a pixel (the white outline), or'ed in
-static void bn_dilate(u8 *pl, s16 x0, s16 x1, s16 r0, s16 r1)
-{
-    u8 *m = pl + 2 * BN_ROWS * RT_PBYTES;
-    s16 r, w, dr;
-    if (x0 < 0) x0 = 0;
-    if (r0 < 1) r0 = 1;
-    if (r1 > BN_ROWS - 1) r1 = BN_ROWS - 1;
-    for (r = r0; r < r1; r++)
-        for (w = x0 >> 4; w <= x1 >> 4 && w < RT_W / 16; w++) {
-            u16 v = 0;
-            for (dr = -1; dr <= 1; dr++) {
-                const u8 *l = pl + (r + dr) * RT_PBYTES, *d = l + BN_ROWS * RT_PBYTES;
-                u16 c = (u16)(RD16(l, w) | RD16(d, w));
-                v |= (u16)(c | c >> 1 | c << 1);
-                if (w) v |= (u16)((RD16(l, w - 1) | RD16(d, w - 1)) << 15);
-                if (w < RT_W / 16 - 1) v |= (u16)((RD16(l, w + 1) | RD16(d, w + 1)) >> 15);
-            }
-            WR16(m + r * RT_PBYTES, w, (u16)(RD16(m + r * RT_PBYTES, w) | v));
-        }
-}
-
-// a glyph at pixel x x0, rows from ty: its edges scaled once (quarter pixels), then its rows of
-// samples from W->bn_j while the frame has room (one at least), then its mask; done?
-static u8 bn_fill(u8 *pl, const u8 *g, s16 x0, s16 ty, u8 cap)
-{
-    s16 h = bn_rows(cap), j, i;
-    s16 (*e)[4] = W->bn_e;
-    u8 *cov = W->bn_cov;
-    if (!W->bn_j) {
-        const u8 *p = g + 2;
-        u8 c, k, n = 0, yo = (u8)(-(BN_Y0 * cap >> 4) & 3);   // the cap line on a pixel's edge
-        for (c = g[1]; c; c--, p += 2 * p[0] + 1) {
-            const u8 *q = p + 1;
-            for (k = 0; k < p[0] && n < BN_EDGES; k++) {
-                const u8 *a = q + 2 * k, *b = q + 2 * (k + 1 < p[0] ? k + 1 : 0);
-                e[n][1] = (s16)((a[1] * cap >> 4) + yo); e[n][3] = (s16)((b[1] * cap >> 4) + yo);
-                if (e[n][1] == e[n][3]) continue;
-                e[n][0] = (s16)(a[0] * cap >> 4); e[n][2] = (s16)(b[0] * cap >> 4);
-                n++;
-            }
-        }
-        W->bn_ne = n;
-        memset(cov, 0, sizeof W->bn_cov);
-    }
-    for (j = W->bn_j; j < 2 * h; j++) {
-        s16 xs[8], m = 0, yc = 2 * j + 1;
-        if (j > W->bn_j && W->left < BN_ROW_K) break;
-        W->left -= j & 1 ? BN_ROW_K : BN_ROW_K / 2;
-        for (i = 0; i < W->bn_ne; i++) {       // the crossings, sorted
-            s16 y0 = e[i][1], y1 = e[i][3], x, k;
-            if ((y0 <= yc) == (y1 <= yc) || m >= 8) continue;
-            x = (s16)(e[i][0] + divs32_16(muls16((s16)(yc - y0), (s16)(e[i][2] - e[i][0])), (s16)(y1 - y0)));
-            for (k = m++; k > 0 && xs[k - 1] > x; k--) xs[k] = xs[k - 1];
-            xs[k] = x;
-        }
-        for (i = 0; i + 1 < m; i += 2) {       // even-odd: the samples inside
-            s16 k = xs[i] >> 1, kb = xs[i + 1] >> 1;
-            if (k < 0) k = 0;
-            if (kb > 2 * (s16)sizeof W->bn_cov) kb = 2 * (s16)sizeof W->bn_cov;
-            for (; k < kb; k++) cov[k >> 1]++;
-        }
-        if (j & 1) {                           // a pixel row done: its greys into the planes
-            s16 y = ty + (j >> 1), p;
-            u8 *l = pl + y * RT_PBYTES, *d = l + BN_ROWS * RT_PBYTES;
-            for (p = 0; p < (s16)sizeof W->bn_cov && y < BN_ROWS; p++) {
-                u8 v = cov[p], bit;
-                s16 x = x0 + p;
-                if (!v || x < 0 || x >= RT_W) continue;
-                bit = (u8)(0x80 >> (x & 7));
-                if (v != 2 && v != 3) l[x >> 3] |= bit;   // 1 light, 2-3 dark, 4 black
-                if (v >= 2) d[x >> 3] |= bit;
-            }
-            memset(cov, 0, sizeof W->bn_cov);
-        }
-    }
-    W->bn_j = j;
-    if (j < 2 * h) return 0;
-    bn_dilate(pl, x0 - 1, x0 + (s16)sizeof W->bn_cov, ty - 1, ty + h + 1);
-    W->bn_j = 0;
-    return 1;
-}
-
-// the banner: its next glyph's rows filled, then each line shown up to its wipe (masked)
+// Reveal word-aligned strips directly from the archived bank. Outlined text is all
+// present before its first frame; the complete word always gets BN_HOLD frames.
 static void bn_draw(void)
 {
-    u8 *pl = (u8 *)W->status[0], k = st.banner - 1, line, done = W->bn_n, sum = 0;
-    if (!done && !W->bn_j) memset(pl, 0, 3 * BN_ROWS * RT_PBYTES);
-    for (line = 0; line < 2; line++) {
-        const char *s = bn_text[k][line];
-        u8 cap = bn_cap[k][line], len = s ? (u8)strlen(s) : 0, n = done > sum ? (u8)(done - sum) : 0;
-        s16 ty = bn_top[k][line], h = bn_rows(cap), c, r;
-        if (n > len) n = len;
-        if (done >= sum && n < len && W->bn_n == done) {   // the glyph being drawn (this line's)
-            const u8 *g = bn_glyph(s[n]);
-            if (!n && !W->bn_j) W->bn_gx = W->bn_x[line];
-            if (!g || bn_fill(pl, g, W->bn_gx, ty, cap)) { W->bn_gx += bn_adv(s[n], cap); W->bn_n++; n++; }
-        }
-        sum = (u8)(sum + len);
-        c = (s16)(st.banner_t - W->bn_t0[line]) * BN_SPEED;   // the wipe, up to the glyphs drawn
-        if (!n || c <= 0 || st.banner_t >= W->bn_end - DK_N) continue;   // (gone with the shade)
-        c += W->bn_x[line];
-        if (n < len && c > W->bn_gx) c = W->bn_gx;
+    const u8 *bank = igfx + UI_BANNERS;
+    u8 line;
+    for (line = 0; line < (st.banner == BN_START ? 2 : 1); line++) {
+        u8 k = bn_line(st.banner, line), r;
+        const u8 *g = bank + RD16(bank, k), *l = g + 4;
+        u16 size = (u16)(g[2] * g[3]);
+        const u8 *d = l + size, *m = d + size;
+        s16 c = (s16)(st.banner_t - W->bn_t0[line]) * BN_SPEED + ((RT_W - bn_width[k]) >> 1);
+        u8 full;
+        u16 tail = 0;
+        if (st.banner_t <= W->bn_t0[line] || st.banner_t >= W->bn_end - DK_N) continue;
         if (c > RT_W) c = RT_W;
-        for (r = ty - 1; r < ty + h + 1 && r < BN_ROWS; r++) {
-            const u8 *l = pl + r * RT_PBYTES, *d = l + BN_ROWS * RT_PBYTES, *m = d + BN_ROWS * RT_PBYTES;
-            u8 *sl = (u8 *)rt_light + (BN_Y + r) * RT_PBYTES, *sd = (u8 *)rt_dark + (BN_Y + r) * RT_PBYTES;
+        c -= g[0];
+        if (c <= 0) continue;
+        full = (u8)(c >> 4);
+        if (full >= g[3] / 2) full = g[3] / 2;
+        else if (c & 15) tail = (u16)(0xFFFFU << (16 - (c & 15)));
+        for (r = 0; r < g[2]; r++, l += g[3], d += g[3], m += g[3]) {
+            u8 *sl = (u8 *)rt_light + (BN_Y + g[1] + r) * RT_PBYTES + (g[0] >> 3);
+            u8 *sd = (u8 *)rt_dark + (BN_Y + g[1] + r) * RT_PBYTES + (g[0] >> 3);
             s16 w;
-            for (w = 0; w * 16 < c; w++) {
+            for (w = 0; w < full; w++) {
                 u16 km = RD16(m, w);
-                if (c < w * 16 + 16) km &= (u16)(0xFFFFU << (w * 16 + 16 - c));
                 if (!km) continue;
-                RMW16(sl + 2 * w, km, RD16(l, w) & km); RMW16(sd + 2 * w, km, RD16(d, w) & km);
+                RMW16(sl + 2 * w, km, RD16(l, w) & km);
+                RMW16(sd + 2 * w, km, RD16(d, w) & km);
+            }
+            if (tail) {
+                u16 km = RD16(m, w) & tail;
+                RMW16(sl + 2 * w, km, RD16(l, w) & km);
+                RMW16(sd + 2 * w, km, RD16(d, w) & km);
             }
         }
     }
@@ -4285,11 +4574,20 @@ static void draw_end(void)
 
 void game_render(void)
 {
+#ifndef FFT_COMPACT_UI
     u8 ord[NUNIT], vis[NUNIT], i, j, cached, tg;
     s16 n;
     Feet f[NUNIT];
     s16 u, v;
-    if (W && (W->hold || (!st.banner && (st.ai == AI_THINK || st.ai == AI_GO) && W->frz))) {   // the same picture in
+#ifdef FFT_CONFIG
+    pidle_interrupt();
+    if (st.config) { config_draw(); pidle_tick(PIDLE_BUDGET); FRAME_END(); return; }
+#endif
+    if (W &&
+#ifdef FFT_CINEMA
+        !st.cphase &&
+#endif
+        (!st.morph_mask && (W->hold || (!st.banner && (st.ai == AI_THINK || st.ai == AI_GO) && W->frz)))) {   // the same picture in
         W->hold = 0;                                                           // both buffers: the
         FRAME_END(); return;                                                                // AI thinks
     }
@@ -4298,13 +4596,30 @@ void game_render(void)
         draw_text(4, 40, W ? "missing fftu/w/i/fftv0-3" : "not enough memory", F_SMALL, C_BLACK);
         FRAME_END(); return;
     }
-    if (st.mode == M_END && !st.banner) { draw_end(); FRAME_END(); return; }
+#ifdef FFT_EXPLORATION
+#ifdef FFT_CINEMA
+    if (st.cphase && st.perspective) { cinema_render(); FRAME_END(); return; }
+#endif
+    if (st.perspective) { perspective_render(); FRAME_END(); return; }
+#endif
+    if (st.mode == M_END && !st.banner && !st.morph_mask) { draw_end(); FRAME_END(); return; }
     if (st.mode == M_STATUS) { draw_status(); FRAME_END(); return; }
     if (st.turn) {                                 // the view it turns to, unpacked meanwhile
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
         frame_stall = 1;
 #endif
+#ifdef FFT_CONFIG
+        ZB(7); render_turn(); ZE(7);
+#elif defined(FFT_TEXTURE_PREVIEW)
+        ZB(7); if (pbank && preview_ready) preview_turn(); else copy_view(); ZE(7);
+#elif defined(FFT_FIXED) && !defined(FFT_TURN_HOLD)
+        ZB(7); render_turn(); ZE(7);     // native rotation, independent of perspective cuts
+#elif defined(FFT_EXPLORATION)
+        copy_view();                            // exploration fits one TI variable: retain the
+                                                // old view while the next one unpacks
+#else
         ZB(7); draw_turn(); ZE(7);
+#endif
         ZB(8); unpack_view((st.rot + st.turn) & 3); ZE(8);
         FRAME_END(); return;
     }
@@ -4338,7 +4653,8 @@ void game_render(void)
     }
     if (AIMING(st.mode) && st.tick & 8 && (tg = unit_at(st.cx, st.cz)) && vis[tg - 1]) n += UNIT_K;
     else tg = 0;
-    if (st.ai == AI_THINK) n += SUM_K;
+    if (st.ai == AI_THINK && !st.morph_mask) n += SUM_K;
+    if (st.morph_mask) n += 20;
     if (st.banner) n += BN_K + DK_K - HUD_K;   // the banner and its shade instead of the HUD
     n += W->upd_k;
     cached = bg_usable();
@@ -4349,7 +4665,7 @@ void game_render(void)
     if (cached && !bg_usable()) W->left -= VIEW_K - BG_K;
     ZB(3); screen_scene();
     if (W->bg_drawn) draw_glints();            // (not while the camera pans: the view copied, ~105k)
-    if (st.banner) bn_shade();                 // (the scenery only: the units stay bright)
+    if (st.banner && !st.morph_mask) bn_shade();                 // (the scenery only: the units stay bright)
     ZE(3);
     ZB(4);
     for (i = 0; i < NUNIT; i++) {
@@ -4379,22 +4695,34 @@ void game_render(void)
     // During AI thinking the active-unit pointer identifies the actor. The
     // tile cursor returns when the plan is shown; a new turn already spends
     // its frame on the clock, camera and unit covers.
-    else if (!st.banner && st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)) && !(st.deny & 4)) {
+    else if (!st.banner && !st.morph_mask && st.ai != AI_THINK && st.mode != M_ACT && (st.tick & 8 || RINGS(st.mode)) && !(st.deny & 4)) {
         Marker mk;
+        u32 fl[24];                            // alive through blit24, including return from inspection
         u8 c = (u8)(st.cz * MAP_W + st.cx), ring = RINGS(st.mode);
         marker(st.rot, c, !ring, &mk);
         if (ring && !AIMING(st.mode)) {         // over the rings: the tile as their inverse
-            u32 fl[24];                         // (the user's pick over a checkerboard): black,
+                                                // (the user's pick over a checkerboard): black,
             for (n = 0; n < mk.rows; n++)       // a white edge; when aiming the plain ring
                 fl[n] = mk.m[n] & ~mk.l[n];     // (white, a black edge) over the black ones
             mk.l = mk.d = fl;
         }
         blit24(mk.x, mk.y, mk.rows, mk.l, mk.d, cursor_mask(&mk, (u16)(c | ring << 12)));
     }
-    if (vis[st.act] && st.mode != M_WALK && st.mode != M_ACT && !st.banner) draw_active(&f[st.act]);
-    if (st.banner) bn_draw(); else draw_hud();
+    if (vis[st.act] && st.mode != M_WALK && st.mode != M_ACT && !st.banner && !st.morph_mask) draw_active(&f[st.act]);
+    if (st.banner && !st.morph_mask) bn_draw(); else if (!st.morph_mask) draw_hud();
     ZE(5);
-    if (st.ai == AI_THINK && !st.banner) {      // two pictures in a row the same: stop drawing
+    // Prepare at most one swing phase after ordinary UI work during each wind-up
+    // frame. Fast-forward may expose any of the three phases first.
+    if (st.mode == M_ACT && st.act_t < ACT_BLOW && armed_pose(st.atk) == 1 && W->left >= 0) {
+        u8 slot;
+        for (slot = 0; slot < 3; slot++) {
+            u8 pose = weapon_pose(st.atk, slot + 2);
+            if (W->blade_k[slot] != wgfx[WEAPON_INDEX + pose] + 1) {
+                weapon_frame(pose, slot); W->left -= 25; break;
+            }
+        }
+    }
+    if (st.ai == AI_THINK && !st.banner && !st.morph_mask) {      // two pictures in a row the same: stop drawing
         s16 tx, ty;
         cam_target(&tx, &ty);
         if (tx != st.camx || ty != st.camy) W->frz_h = 0;   // still panning: not checked
@@ -4404,5 +4732,9 @@ void game_render(void)
             W->frz_h = h;
         }
     }
+#ifdef FFT_CONFIG
+    if(W->left>=60) pidle_tick(48);
+#endif
     FRAME_END();
+#endif
 }
