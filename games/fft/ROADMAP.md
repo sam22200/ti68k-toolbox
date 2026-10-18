@@ -432,3 +432,29 @@ Engine, any time:
 - the TI-89 HW2 (AMS 2.09) run and its free RAM (single-buffer fallback);
 - a faster rotation (fewer, larger polygons per column, or a 68000 span filler: ask first);
 - FFT's second camera elevation;
+
+
+Presentation follow-up (completed 2026-10-17; [details and checks](EVENTS.md)):
+
+- [x] Reveal banner letters twice as fast (12 instead of 6 pixels/tick).
+- [x] Slow the darkening animation to half speed (8 instead of 16 pixels/tick).
+- [x] Show the complete victory message, not only `VIC`; hold every complete message.
+- [x] Animate KO-to-crystal/chest conversions, framing and queuing each event.
+- [x] Animate crystals using the eight original source images.
+
+Storage follow-up (completed 2026-10-17; [details and checks](STORAGE_CLEANUP.md)):
+
+- [x] Retire textured rotations, their configuration option and169,278 bytes of banks.
+- [x] Remove disabled attack-fixture dependencies and12,028 bytes of images.
+- [x] Compact font/names, remove unused marker and deduplicate exact blade frames.
+- [x] Compress fixed inspection colours into existing scene RAM; no new output allocation.
+- [x] Explore per-frame sprite compression and bounded/lazy mirror caches; record size,
+  sampled native decode CPU and RAM tradeoffs without enabling an unmeasured game cache.
+
+Portrait/cache follow-up (completed 2026-10-17; [details and checks](BLADE_CACHE.md)):
+
+- [x] Keep one portrait facing, saving2,088 archive bytes without a RAM mirror.
+- [x] Compress blade frames and keep three fixed phase slots, prepared during wind-up;
+  save14,304 additional archive bytes with1,300 bytes of tactical Work.
+- [x] Check cold/warm replacement, crowded attacks, fast-forward and the original
+  full-battle frame budget; retain the current single-facing HUD images as intended.

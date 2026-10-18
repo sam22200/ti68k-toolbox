@@ -1023,3 +1023,390 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
   water doors 254,232, AI battle 355,466, defeat replay 356,764, UI doors 316,910.
   Review: `x/m27_water.png` (twelve actual native scenes). Program 60,451 bytes, game
   buffers 104,880 bytes; archived banks unchanged. No new hardware path or emulator run.
+
+
+## Shoulder inspection exploration (2026-10-15)
+
+- OBSERVED (local MAP022 decoder): 479 unique original mesh vertices, 866 triangles and
+  75 supporting planes. All 300 nonvertical faces have upward normals after converting
+  PS1 y to height. Original winding supports plane-based backface rejection.
+- TARGET: three optional cameras share this mesh and the existing unit/terrain records.
+  Inspection pauses tactical updates and RNG while retaining original idle selection.
+  Direct Ramza entry skips the opening AI actions rather than simulating their results.
+- CHECKED: 936 TI framebuffer checksums equal portable C along the same 312-frame input
+  sequence in each camera; tactical-state/RNG conservation, full orbit, bounded lateral
+  motion, cache rebuild equality and return to Move pass. Standard FFT tests and the
+  existing 60 cross-check doors pass. Timing methodology, limitations and results are
+  in PERSPECTIVE.md and PERSPECTIVE_BENCHMARK.csv.
+- CHECKED: a conservative block-depth rejection experiment preserved those 936 images
+  but reduced measured performance, so it was discarded. The fixed shoulder camera is
+  currently the practical choice; continuous original-mesh orbit needs geometry reduction.
+
+
+## Close fixed shoulder refinement (2026-10-15)
+
+- OBSERVED: the old fixed geometry cache cost 6,706 cycles per warmed frame; sprites
+  cost about 944,466. A different floor renderer would not address that dominant cost.
+- TARGET: native-resolution polygon background, world-depth masks baked per actor,
+  byte-aligned cached idle poses; two temporary RAM backgrounds for opposite directions.
+  The viewpoint moves closer (56 -> 40 world units) and F5 selects the opposite angle
+  without changing Ramza's tactical facing. Version-3 mesh data adds 451 creases/ledges
+  and directional material shades, retaining legacy face shades for the old experiment.
+- CHECKED: 384 old/new TI source frames equal portable C, 24 cached/rebuilt street/roof
+  images across four facings, preserved tactical/RNG state and a 110-frame return-to-Move
+  replay. Old three-mode tests/replays pass. The new 320-frame demo estimates 23.54 FPS
+  including cold frames, and 32 FPS warmed (limiter), at 12 MHz with 9% grayscale reserve.
+  First forward/reverse frames take 1.43/1.14 s. These are datasheet-emulator estimates.
+  The 24 KB pose pool peaks at 23,730 bytes, with no reset; actor masks use 1,582 bytes.
+  No extra heap allocation. Details: FIXED_SHOULDER.md and FIXED_BENCHMARK.csv.
+
+### Fixed perspective water / zoom / placement audit
+
+- OBSERVED IN FFT (fresh original run, `make check-placement`): all eleven initial unit
+  positions match the disc/deployment definitions and the actual quick-start exploration
+  state, with every original CT zero. X is unchanged and PS1 Y is world Z. By the original's
+  first Ramza turn all five enemies and Delita have moved; the quick-start deliberately
+  skips those turns and retains their initial positions. Evidence is local in
+  `x/placement/placements.csv`, `report.json`, `trace.txt` and the original save states.
+- OBSERVED (MAP022 mesh/terrain): the 76 visible water triangles are at height 12, above
+  the submerged height-zero standing floor. Water must be selected by terrain type/depth
+  and surface height, not merely by low polygon height.
+- TARGET / CHECKED: MODE toggles close/wide distance 40/80 while F5 retains opposite-side
+  inspection; four-phase white canal glints are precomputed from final water visibility
+  and drawn behind actors. No additional heap allocation. 512 PC/TI demo frames agree;
+  four warmed views reach the estimated 32 FPS limiter, with cold zoom reconstruction
+  1.3–1.9 s. Full measurements and sprite reuse discussion: `PERSPECTIVE_WATER.md`.
+
+### Elevated wide inspection and camera cutaway
+
+- TARGET / CHECKED: wide inspection keeps distance 80 but raises eye height 28 -> 76
+  world units above Ramza's feet and pitch 5.625 -> 33.75 degrees down. Close framing is
+  retained. MODE changes both zoom/pitch, F5 retains them for the opposite direction.
+- TARGET / CHECKED: offline version-4 mesh data adds six architectural components;
+  five samples through a short camera corridor suppress a nearby obstructing component's
+  faces and edges together. Close mode extends 56 units forward beyond Ramza. ALPHA
+  restores solid buildings. This is a presentation bounding-box heuristic, not a game
+  visibility/collision rule. Real terrain and unit positions/heights remain unchanged.
+- CHECKED: 768 source frames match PC/TI, including all four solid/cutaway cameras;
+  pitch/toggle/conservation/cache/water/Move tests and sanitizers pass. Four warmed views
+  meet the estimated 32 FPS limiter at 12 MHz with 9% grayscale reserve. The 512-frame
+  demo including cold construction averages 18.83 FPS. No additional heap allocation or
+  new assembly. Before/after GIFs and detailed limits: `PERSPECTIVE_CAMERA.md`.
+- CHECKED (normal-build preparation): the initial normal TiEmu launch showed insufficient
+  RAM despite passing the headless runner. Omitting fixed-view-inactive isometric rotation
+  scratch saves 2,748 bytes of Work; the two game allocations are now 110,358 bytes. The
+  standard and legacy three-mode builds retain their original work layouts. The reduced
+  normal build then launched successfully on the same clean private Titanium profile.
+
+### Camera-near removal and dotted architectural edges
+
+- TARGET / CHECKED: component state 2 removes geometry at the eye with an eight-unit
+  horizontal bounding-box margin; further corridor hits (state 1, margin 20) omit fills
+  and retain two-on/two-off black architectural edges. Unaffected components stay solid.
+  ALPHA retains the full-solid override. This refines presentation, never game LOS.
+- CHECKED: synthetic inside/near/outside/above/distant cases and an actual edge-rendering
+  fixture pass; dotted edges respect foreground opaque depth and write no depth. Existing
+  tactical/cache/water tests and 768 PC/TI frames pass, as do both sanitizer suites.
+  Warmed views still meet the estimated 32 FPS limiter; the 512-frame demo including cold
+  construction averages 18.65 FPS. No new asset or heap allocation. Details and GIFs:
+  `PERSPECTIVE_DASHED.md`.
+
+### Conservative visible-pixel cutaway (PC review, TI pending)
+
+- TARGET: replace broad component bounds with winning pixel ownership and reciprocal
+  depth in small protected screen regions. Keep the close/front left house and the
+  wide/back right structure filled; dot the wide/front foreground structure. No entire
+  component disappears solely because the camera is nearby. ALPHA (PC: V) cycles
+  Auto / Solid / Dotted.
+- CHECKED ON PC: real Gariland component regressions, synthetic foreground/background
+  samples, localized near clipping and depth-tested dotted edges pass, as do the existing
+  fixed-camera/cache/water/state tests and both sanitizer suites. Across 384 captured
+  frames, Auto equals Solid outside the HUD in close/front and wide/back, and differs
+  in wide/front. Reviewed GIFs and reproduction: `PERSPECTIVE_REVIEW.md`.
+- TARGET / UNMEASURED ON TI: temporary 16 KB ownership reuses the pose-pool scratch;
+  Auto may require a second cold geometry pass. No added heap allocation or asset change.
+  At the user's request this iteration stays PC-only until visual approval and an explicit
+  request for calculator validation. Existing TI binary, FPS and size results are historical.
+
+### Original sprite source sampling (PC visual review)
+
+- OBSERVED: perspective already scales the isometric 16x26 bank from FFT's source SPR/SHP
+  frames. That bank was reduced to 0.6 scale with LCD-specific outline/face changes before
+  perspective enlargement. Direct original-frame sampling retains more close-view detail.
+- TARGET / CHECKED ON PC: an offline source-sprite compositor uses actual C-exported poses,
+  feet anchors, actor ordering and scenery depth. Compare the current sprites, direct four
+  greys and original palette colours across four views. One-screen-pixel white outlines
+  remain; the reduced bank's synthetic shadows are omitted. Details: `PERSPECTIVE_SPRITES.md`.
+- LIMIT: this is a visual experiment, not a new calculator rendering path. Source art and
+  captures stay local; production code/banks are unchanged. No TI build or validation, and
+  10 FPS GIF playback is not a measured execution speed.
+
+### Scenery textures in perspective (PC visual review)
+
+- OBSERVED: the user's requested sprites were the ground/building/roof artwork, not the
+  characters. The TI isometric banks contain composed views; MAP022's original atlas,
+  UVs and palettes are their reusable source. All 866 source triangles match the indexed
+  perspective bank, and the review uses the original isometric four-grey thresholds.
+- TARGET / CHECKED ON PC: a diagnostic exports exact winning face IDs and edge pixels.
+  Offline ray/triangle UV mapping textures those surfaces; the existing C cache then draws
+  the unchanged TI-style actors and animations over them with the same depth masks.
+  128 diagnostic flat frames match the previous review; 256 textured replay frames cover
+  nearest sampling and light filtering. Sky/cutaway gaps and black edges are preserved.
+- LIMIT: source transparency retains the flat underlying surface (41/32 filtered pixels
+  in forward close/wide views). This is a PC-only visual prototype. The diagnostic is
+  rejected for 68000 builds; no TI build or testing and no new performance claims.
+  Visuals, reproduction and limitations: `PERSPECTIVE_TEXTURES.md`.
+
+### Low-cost texture contrast (PC review)
+
+- TARGET / CHECKED ON PC: retain filtered source luminance and compare the existing
+  four-grey conversion with middle-grey intervals narrowed to 65% and 35%. More source
+  highlights become white and shadows black without changing geometry, actor sprites,
+  cutaway, edge coverage or the C renderer. The baseline reconstructs byte for byte;
+  all cached backgrounds retain the same 6,000 bytes. Two new profiles cover 256 replay
+  frames. More extreme texture pixels and identical camera transforms are checked.
+- INTERPRETATION: offline conversion adds no runtime contrast pass when one chosen variant
+  replaces the existing data. This is independent of the still-unimplemented TI texture
+  mapping path; there are no new TI measurements or tests. The 65% variant preserves more
+  roof detail than 35%. GIFs and reproduction: `PERSPECTIVE_TEXTURES.md`.
+
+### Grey canal, real low-poly entry/exit, sprite benchmark preparation
+
+- TARGET / CHECKED ON PC: exclude original surface-water materials from texture/contrast
+  conversion, restoring the exact old light-grey canal and its C glint animation. All
+  128 camera/pose water regions match the old flat-water renders, including sprite occlusion.
+- TARGET / CHECKED ON PC: interactive fixed inspection enters/exits through 17 flat-shaded
+  half-resolution geometry steps, interpolating camera/projection via an integer smoothstep
+  table. Battle updates are frozen and actor poses continue. Existing scratch is reused;
+  no heap allocation. A 136-frame real-key replay and stepwise tests preserve units, turn,
+  mode, AI and RNG. Fixed-camera, cutaway and legacy perspective PC tests and sanitizers pass.
+- PREPARED ON PC: eight matched with/without-sprite camera cases and 1024 checksum frames,
+  using the reviewed contrast-plus cached backgrounds. Cold geometry and masks remain
+  common; only billboard draws differ. This is cached replay, not a TI texture mapper.
+- LIMIT: animation GIFs run at an illustrative cadence. No new TI build or FPS measurement;
+  headless timing authorization has been requested under the user's PC-only restriction.
+  Reproduction and limits: `PERSPECTIVE_MOTION.md`.
+
+### Intermediate canal, remembered/direct wide entry, smooth zoom
+
+- TARGET / CHECKED ON PC: retain the original water motif but clamp it to light/dark grey;
+  white comes from the existing C animated glints. Dry scenery retains contrast-plus.
+  Relative to the flat grey version, all image changes stay within the canal, across
+  four cameras and 32 poses. This replaces the exact flat-water restoration above.
+- TARGET / CHECKED ON PC: DIAMOND opens the remembered zoom; MODE + DIAMOND selects wide
+  directly. Entry and exit animate in either mode. MODE animates close/wide distance,
+  eye height and pitch without changing view direction. All transitions have 17 low-poly
+  steps. Tests cover direct/remembered entry, four facings/both sides, intermediate zoom
+  pictures and exact final cache reconstruction. A 544-frame C replay verifies all paths
+  and tactical/RNG conservation; fixed/legacy tests and sanitizers pass.
+- CORRECTED SCOPE: the requested FPS comparison is textured versus flat scenery with
+  characters kept in both. Eight such cases and 1024 PC checksum frames are prepared.
+  Warm replay uses the same background copy and actor pipeline; actual texture mapping
+  is still offline. No new TI FPS measurement or real-time texture-mapping claim.
+  Controls, visual evidence and reproducible targets: `PERSPECTIVE_MOTION.md`.
+
+### Authorized TiEmu FPS comparison: flat/textured scenery, actors in both
+
+- CHECKED IN TIEMU (Titanium HW3, AMS 3.10, configured 360000 cycles/30 ms): close/front
+  and wide/back display 32.0 FPS in both variants; close/back displays 28.4 flat / 28.3
+  textured; wide/front 28.5 in both. Raw animated render capacity is respectively
+  51.5, 36.4, 40.9 and 52.2 FPS, identical to printed precision. Grayscale active;
+  32 warm-up frames, 512 raw iterations, 128 displayed frames per case, 256 Hz timer.
+- CHECKED IN TIEMU: first-frame construction/cache loading is about 1.7–4.4 s. This
+  includes geometry/cutaway, masks and initial poses; the texture map itself is prepared
+  on PC. Camera transitions and actual runtime texture mapping are not measured here.
+- CHECKED WITH TI-CYCLES: 1024 PC/TI source frames match. Corresponding warmed means
+  match exactly: 202906 / 273424 / 247228 / 200579 cycles. Loading a prepared texture
+  background adds 36268 cold cycles. A CPU-only capped estimate omits actual display-sync
+  waits and therefore cannot replace the displayed TiEmu cadence.
+- LIMIT: emulation results, not hardware FPS. Reproduction, binaries, timers, screenshot,
+  hashes and CSVs: `SCENERY_FPS.md`. Private emulator/display stopped; user session untouched.
+## Playable wide perspective (2026-10-16)
+
+- **OBSERVED (native C / headless 68000):** `FFT_PLAY` routes wide-perspective input through
+  the existing tactical update. Move/undo, Attack, Wait/facing/turn change, enemy planning
+  and Potion consumption/healing pass 555 differential state/RNG updates. Both RNG states
+  matter: FFT's `rng32` is independent of the runtime's `rt_seed`.
+- **OBSERVED (TI binary):** 810 consecutive source framebuffer hashes match PC for two
+  key replays. Neither sprite motion nor menus rebuild the cached scenery/depth image.
+  Mean walking costs are 464k cycles near Ramza's start and 341k farther away; Attack costs
+  300k. Move's first range-overlay frame still peaks at 3.24M cycles. These are datasheet
+  cycle counts, not TiEmu or physical-device FPS. Full report: `WIDE_PLAY.md`.
+- **OBSERVED:** the textured bank represents four specific camera samples. Re-entry at a
+  different anchor/facing or a changed cutaway style must use the actual flat geometry.
+  Dynamic actor masks need the current direction's depth image, so a cached opposite
+  background alone is insufficient when actors move.
+- **INTERPRETATION:** a fixed cached perspective supports real tactical actions with modest
+  dynamic work. Comfortable whole-battle play still needs visibility/framing decisions and
+  an incremental reachable-tile overlay; merely reducing floor resolution does not solve
+  those interaction limits.
+
+## Target-centered attack camera (2026-10-16)
+
+- **USER DECISION:** remove free tactical play from wide perspective. Keep normal isometric
+  selection/movement; use an automatic perspective shot only after a valid attack confirmation.
+- **OBSERVED (PC):** melee and Throw Stone flow through target transition, native attack
+  poses/blade or flight cue, hit flash, damage/HP, EXP/JP, then the complete isometric UI.
+  Twelve shot tests conserve the original combat's tactical state and both RNGs; entry
+  and return freeze action timing, commands are ignored, damage is applied once.
+- **OBSERVED (headless TI diagnostic):** 560 frames match PC; 222 native perspective frames
+  also match the complete PC game. The diagnostic excludes the full isometric UI. Rebuilding
+  geometric transitions cost about 16.7M cycles per frame; the rectangle target transition
+  reduces this to one 20.8M/27.4M-cycle preparation under a title card, then 305k/271k mean
+  action frames. No new TiEmu or hardware run.
+- **LIMIT:** the complete TI game exceeds one variable (73,108 bytes). The complete PC flow
+  is ready for review; the headless TI binary measures the real camera/logic, not a complete
+  playable calculator package. Initial preparation and full ISO restoration remain material
+  timing concerns. See `ATTACK_CAMERA.md` for reproduction, GIF timing and fixture placement.
+
+## Attack-camera visual revision (2026-10-16, latest user steering)
+
+- **USER DECISION:** restore low-poly geometric camera movement; remove the white attack
+  title/rectangle transition. Use a close view for melee, wide for ranged, with the original
+  ground/wall/roof artwork and the approved contrast treatment.
+- **OBSERVED (current PC):** 560 source frames cover two valid confirmations, 17-frame camera
+  entries/returns, 188 textured action frames, 12/6 HP loss and the complete isometric menus
+  restored. Close distance 48 / eye 40 / pitch 5; ranged fixture distance 96 / eye 84 / pitch 6.
+- **IMPLEMENTATION:** two exact target-camera texture records are generated offline from
+  winning C face IDs and MAP022 UVs; 12,028 bytes, no depth/rule change. Unmatched shots remain
+  flat. This is a review asset bank, not general real-time texture mapping.
+- **LIMIT:** earlier TI timings and the 73,108-byte package blocker belong to older revisions;
+  the current textured/close geometric flow is PC-reviewed only. Existing measured geometric
+  travelling costs remain unresolved. No new TiEmu run. See `ATTACK_CAMERA.md`.
+
+
+## Reward pace, direct attack zoom and textured turns (2026-10-16)
+
+- **USER DECISION:** double EXP/JP presentation speed, favor direct zoom over attack-camera
+  orbiting, and review original scenery textures during F1/F5 rotations.
+- **OBSERVED (PC / headless TI):** rewarded actions last 70 rather than 94 updates; hit timing,
+  reward values, damage and RNG are unchanged. ISO reward labels last 9 rather than 18 updates; cinematic slots last 11/14 rather than
+  22/27 updates.
+  All existing tests and twelve shot tests pass. 560 diagnostic TI framebuffer hashes match
+  PC, including 208 complete-game camera frames. No TiEmu or hardware run.
+- **FIX:** the view/world transforms require ISO yaw `56 - 16*rot`, not `56 + 16*rot`.
+  The old sign reversed orientations 1/3. A mesh/ISO axis alignment regression covers all
+  four views. Attack framing now preserves yaw unless separation needs adjustment; the
+  correction is capped at eight 64th-turn units (45 degrees).
+- **OBSERVED (PC visual feasibility):** 160 real F1/F5 input/state frames, including 24
+  textured intermediate mesh views. Four clockwise turns and four reverse turns restore
+  the starting orientation; units, RNG and tactical mode remain unchanged. Original UVs,
+  grey canal textures and outlined TI actor pixels survive. No rotation-image bank is
+  incorporated into the game. See `ROTATION_TEXTURES.md` for limitations.
+- **LIMIT:** headless attack-camera geometry still costs roughly 15M cycles per travelling
+  sample. These measurements do not establish smooth calculator playback. Offline F1/F5
+  texturing demonstrates appearance only; runtime affine mapping and its TI cost remain
+  separate work. Current diagnostic numbers are in `ATTACK_CAMERA.md`.
+
+
+## Short cinematic attacks (2026-10-16)
+
+- **USER DECISION:** remove about three seconds from the approximately five-second PC
+  cinematic preview by shortening transitions and damage presentation.
+- **IMPLEMENTATION:** entry/return sample the same eased geometric path at 0/4/8/12/16
+  rather than all 17 indices. Cinematic action runs two consecutive original combat
+  updates per displayed frame and stops on the first exit from `M_ACT`. No logical
+  impact/reward/KO update is skipped; ordinary ISO and manual inspection timing is intact.
+- **OBSERVED (PC):** twelve differential shot tests conserve complete tactical state and
+  both RNGs, with a single HP change, locked input and automatic camera restoration.
+  Rewarded shots use 5+35+5 = 45 display frames rather than 17+70+17 = 104: 2.25 versus
+  5.2 seconds at the 20 FPS GIF cadence, saving 2.95 seconds. Damage/Miss lasts twelve
+  displayed frames rather than twenty-four. ASan/UBSan pass.
+- **OBSERVED (headless TI):** 560 diagnostic framebuffer hashes match PC, including all
+  90 current camera frames from the complete PC game. Total cinematic work falls from
+  571.3M to 191.1M cycles in melee and 569.1M to 183.0M ranged (66.6%/67.9% less). The
+  diagnostic omits the ISO UI and is 45,625 bytes. This is not a full TI release.
+- **LIMIT:** this count describes the PC preview cadence. Fewer geometry rebuilds reduce
+  TI work, but do not establish a smooth 2.25-second hardware animation. No TiEmu run.
+
+
+## Textured motion and gentler transitions (2026-10-16)
+
+- **USER DECISION:** slow camera motion slightly, retain the faster attack/damage, and use
+  the original ground/wall/roof art throughout all transitions.
+- **IMPLEMENTATION (PC reference):** seven eased cinematic samples per direction rather
+  than five, giving 7+35+7 = 49 display frames / 2.45 seconds at the review cadence. A
+  general C filtered-UV sampler now handles geometric entry/exit, both close/wide zoom
+  directions, settled perspective and F1/F5 turns in the full PC game. It uses the original
+  138,532-byte atlas/UV/luminance bank, not a bank of full-screen camera images.
+- **OBSERVED (PC):** 754 real-key frames cover both attacks and both entry presets with
+  three zoom changes, exit and F5/F1. Original unit records, rules and both RNGs survive.
+  Twelve differential shot tests pass with textures; eight additional quarter-turns cover
+  all four orientations and return to the start. Native melee pixels match the preceding
+  filtered endpoint; ranged differs at twelve quantized luminance pixels. ASan/UBSan pass.
+- **OBSERVED (headless TI, separate portable build):** 560 framebuffer matches, including
+  98 cinematic frames. Current diagnostic is 45,687 bytes; total cinematic geometry/actor
+  work is 248.9M cycles melee / 245.0M ranged. This excludes the general PC texture sampler.
+- **LIMIT:** the new reference sampler uses doubles and filtered per-pixel sampling on PC;
+  a compile-time guard rejects TI inclusion. Its appearance is ready for visual review,
+  but a fast fixed-point TI texture mapper and a complete TI package remain outstanding.
+  No TiEmu run. Reproduction and scope: `ATTACK_CAMERA.md`.
+
+
+## Half-second cinematic motion and ISO height contours (2026-10-16)
+
+- **USER DECISION:** use approximately 0.5-second cinematic transitions; try the perspective
+  contrast treatment on ISO scenery, and mark height boundaries black on light / white
+  on dark areas for easier reading.
+- **IMPLEMENTATION:** ten eased cinematic samples per direction; the 35-frame accelerated
+  action stays intact. Preview duration is 10+35+10 = 55 frames / 2.75 seconds at 20 FPS.
+- **OBSERVED (offline art):** four original colour images reproduced byte-for-byte before
+  conversion. Original ISO canal tones retained. A 302-edge geometric candidate set selects
+  top/slope-to-wall boundaries, excludes coplanar triangulation seams, and is visibility
+  tested against the original supersampled mesh depth. Each orientation has 2,328–2,908
+  one-pixel strokes, using black/white according to underlying tone.
+- **OBSERVED (full PC game):** 432 frames compare original, contrast, and contrast+contours
+  under identical inputs, actor state, RNG and camera logs. All four original occlusion
+  planes are checked on every settled frame. `[8]` cycles the three visual variants; the
+  contour variant is the preview default. Character sprites and tactical rules are unchanged.
+- **IMPLEMENTATION:** offline colour variants load only when changing the ISO view; no edge
+  detection/drawing each frame. A production asset build can substitute the selected colour
+  planes before packing and retain the original view count, raw size and all depth data.
+  The 139,528-byte two-style comparison bank is PC-only and leaves original files intact.
+- **LIMIT:** visual trial, no TiEmu run, no newly claimed TI style performance. See
+  `ISOMETRIC_STYLE.md` and `ATTACK_CAMERA.md` for reproduction and scope.
+
+- **VALIDATION:** the ordinary game suite, twelve texture-enabled cinematic attacks and
+  the 560-frame portable PC/TI diagnostic pass. ASan/UBSan additionally exercise the ISO
+  contour replay. The host PNG writer now avoids a zero-length `fwrite(NULL,...)` for IEND;
+  PNG bytes remain unchanged. This small host-only fix does not touch the TI backend.
+
+
+## Selected ISO style, slower turns and attacker rewards (2026-10-16)
+
+- **USER DECISION:** select contrast + contours; double F1/F5 rotation duration; place
+  cinematic EXP/JP beside the attacking unit; quantify contour storage and CPU cost.
+- **IMPLEMENTATION:** PC textured F1/F5 uses six intermediate angles rather than three.
+  The camera/state loop advances through those frames; this is not a GIF timing trick.
+  Original portable/TI turn timing is unchanged. Cinematic EXP/JP anchors to `st.atk`'s
+  projected rectangle with viewport clipping; damage numbers remain associated with target.
+- **OBSERVED (PC):** twelve shot tests preserve combat state and both RNGs, including
+  reward-notice independence from target motion and dependence on attacker position. Both
+  inspection replays assert six F5 and six F1 moving frames. Current PC GIFs come from the
+  actual game. The portable TI diagnostic still matches 560 PC framebuffers.
+- **OBSERVED (ZX0):** four original views total 38,869 compressed bytes; contrast 39,108;
+  contrast+contours 41,505. Contours alone add 2,397 bytes; combined style adds 2,636 versus
+  original. Raw sizes and all occlusion data are unchanged; all eight new streams round-trip.
+- **OBSERVED (headless 68000):** all twelve style/view decoder sizes and checksums match.
+  Mean original/contrast/contour load costs are 2,187,966.5 / 2,168,873 / 2,189,089.5 cycles.
+  At 12 MHz, contours add 1.685 ms per view load over contrast, 0.094 ms over original.
+- **INTERPRETATION:** baking selected contours into the four existing colour images needs
+  no additional production render-buffer RAM and no contour computation each frame. The
+  larger PC multi-style comparison bank is separate review scaffolding. No TiEmu/hardware
+  timing claim; full data and reproduction in `ISOMETRIC_STYLE.md`.
+# Native camera audit (2026-10-16)
+
+**OBSERVED — actual TiEmu Titanium timer, scenario 65/66:** F1/F5 hold/decode/switch
+0.386/0.398 s; ISO to close/wide 28.441/28.570 s; both zoom directions 18.796 s;
+wide return 27.257 s; full melee/ranged cinematic 36.292/36.808 s. Prepared fixed
+views animate at 28.4/32.0 FPS after warmup, but first preparation costs 1.582/1.605 s.
+The shared case driver passes 468 PC/TI framebuffer checks and all completion/HP checks.
+
+**IMPLEMENTATION GAP:** the approved moving textures are PC-only. The native path uses
+flat 80x50 travelling geometry and exact offline-textured endpoints; native F1/F5 has
+no intermediate rotation. The full PC texture sampler has not been ported to TI.
+
+**RECOMMENDATION:** retain ISO contrast/contours and cheap view switches; keep the current
+smooth perspective travel and automatic cinematics off for a production TI build.
+Fixed-view animation FPS does not establish usable camera latency. The audit leaves the
+experimental defaults unchanged. Details/evidence: `CAMERA_AUDIT.md`, `x/camera-audit/`.
