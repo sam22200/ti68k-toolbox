@@ -696,3 +696,16 @@ lossless storage candidates are in [STORAGE_AUDIT.md](STORAGE_AUDIT.md); applied
 and current totals are in [STORAGE_CLEANUP.md](STORAGE_CLEANUP.md).
 `make storage-audit` reproduces the read-only audit without launching TiEmu or changing
 game asset formats; local disc-derived banks and the selected camera-review banks are required.
+
+The playable **Orbonne opening** is a content variant in [`opening/`](opening/README.md),
+on `feat/fft-opening`: chapel dialogue, the preceding first combat and its ending,
+sharing this tactical engine. It has separate local source-disc banks, packed TI
+output and native CPU/pixel/state checks. Its campaign handoff reaches the Academy
+and Gariland; exact original special-skill/cutscene fidelity remains incomplete.
+
+
+Opening review and playable continuation: `campaign/README.md` describes the
+local-disc package launched with `fftstory()`: Orbonne, the Academy bridge,
+then the existing Gariland combat. `opening/BUGFIXES.md` records delayed
+Archer actions, camera handedness and source scene-pose corrections. This
+package uses separate archived chapters rather than keeping two maps in RAM.

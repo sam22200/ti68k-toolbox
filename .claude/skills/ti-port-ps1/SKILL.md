@@ -443,3 +443,22 @@ only: nothing extracted from the disc).
 - **Scale as a parameter**: keep every size and speed in one macro of the reference scale
   (`SC(v)`), computed in `long` (`int` is 16 bits on the TI: `128 * 22 * 42` overflowed and
   only the TI binary differed, caught by `make xcheck`).
+
+### FFT opening / multi-level source stats (2026-10-18)
+
+Verified on the original headless US run and the native 68000 model (not TiEmu):
+`games/fft/opening/` shares the existing tactical engine for Orbonne. Source unit
+raw stats at +0x72 are already level-grown; a level-1 oracle alone does not prove
+that a runtime model can ingest level-9 raw fields directly. Invert each integer
+growth step exactly offline before a model which recomputes growth from a base.
+Read source resolved sprite IDs/file extents rather than guessing filenames from
+job identities (guest Gafgarion maps to H61.SPR here).
+
+For small scripted scenes, deduplicate only required poses, canonicalize mirrors
+and keep one decompressed frame per actor. Preserve masks/interior planes when
+packing: silhouettes must remain the same shader. Cache scene coverage per
+position; a seemingly tiny 16-pixel-per-row visibility loop cost the opening
+~0.9M cycles. Reuse inactive UI buffers for dialogue/Status, invalidate their
+owners on return, and budget a bounded number of pose misses/text preparations
+per frame. `opening/BENCHMARK.md` records the measured savings and the remaining
+outlier frames. PC presentation GIFs are explicitly not hardware FPS evidence.

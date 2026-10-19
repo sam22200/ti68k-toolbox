@@ -1460,3 +1460,98 @@ separate from team affiliation. Source URL and adaptation limits: `AUTO_BATTLE.m
 **TARGET ADAPTATION:** this unit / all allies delegate to our existing general AI;
 Manual or Shift/ESC restores player control. Existing Move/Act, CT, inventory,
 damage and reward rules apply. No specialized-order fidelity is claimed.
+
+## Opening / Orbonne (2026-10-18)
+
+**VERIFIED, PC / HEADLESS 68000 (initial tone correction)** — Map 56's former camera-0 percentile thresholds
+bleached 71.1% of the initial camera's lit scenery to white. Per-view 1/50/96
+percentiles after mild offline filtering reduce this to 4.0%. Black cutaway
+sides and sky do not calibrate the thresholds. All four depth/mask layers,
+terrain/collision and actor banks remain unchanged. Ten replay states and
+ordinary average cycle counts match the previous build; packed view storage
+changes by only +3 bytes. Details: `opening/README.md` and `opening/BENCHMARK.md`.
+
+**VERIFIED, PC / HEADLESS 68000 (presentation follow-up)** — Gariland's same
+`ledges`/`outline` pass is baked into the four Orbonne views. Depths/masks remain
+byte-identical. The former render-order pose quota permanently starved some
+visible actors. Walking/action priority plus a round-robin idle queue, shared
+decoded records and actual miss/copy budget charges retain the one-decode limit.
+All 11 idle actors and 648 exact displayed walking poses pass the PC controls;
+the native replay retains PC pixel/state agreement. Cold target panels take
+5–12 frames instead of 45, and their opacity mask now uses the trimmed portrait
+index. The actor bank is unchanged. Archive growth is 4,421 bytes; RAM +2 bytes.
+Neither `FFT_CONFIG` nor `FFT_EXPLORATION` is compiled, so there is no idle
+perspective prefetch to remove from this build.
+
+**OBSERVED / ADAPTATION** — Map-56 source animation row 0 uses mode 4, palette
+row 5, three frames, duration 15; the original active runtime row agrees.
+Surface 0x11 has 20 depth-four water cells, missed by the earlier 0x0E-only
+check. The original pathfinder rejects depth >=4 for sinking human units
+(`battle_move_set_tile_flags_for_pathfinding.c`). These cells are now blocked.
+The native visual adaptation uses sparse four-phase glints on visible palette-5
+pixels, not the original palette sequence. Even-x/2,y coordinates occupy 1,948
+archived bytes and are read in place. No depth-one immersion is required here.
+
+**OBSERVED** — `tools/opening_oracle.py --story` cold-boots the US disc without
+writing EVENT/NEXT. Event 2 uses chapel map 62; events 3–6 use map 56 / ENTD
+0x183. Event 5 is the first combat. Only the player-control flag is cleared
+there to let the original AI finish for observation. Active text-window message
+IDs/actor placements establish 37 distinct dialogue beats through event 6.
+Generated reference states, frames and text remain local.
+
+**OBSERVED** — Orbonne's Ramza is battle slot 0, level 9, character identity 2.
+Agrias is slot 1/job 0x34, Gafgarion slot 2/job 0x17. Their resolved SPR IDs
+are 2, 52, 23; the latter reads H61.SPR, not the other Gafgarion sheet. Eleven
+unit records' HP/MP/SP/PA/MA/Move/Jump agree with the common stat model.
+
+**OBSERVED** — Raw stat fields at unit +0x72 have already grown to the source
+unit's level. Gariland's level-1 fixture did not expose this. The asset tool
+inverts each `v += v/(growth+level-1)` step exactly (asserted per step) before
+feeding our base-stat/level model. Applying growth again to source level-9
+Ramza overestimated his HP (197 rather than the observed 154).
+
+**OBSERVED** — Both maps contain 140 tiles, so second-layer terrain addressing
+must retain the original fixed 256-tile stride. Map 56 has no depth-one canals;
+its depth-four water is described above. All four
+mesh projections end at y=190 with the existing native origin. Removing rows
+192–211 preserves the bottom of the mesh and saves 6,400 buffer bytes. Tall
+upper decoration is still outside the fixed origin; this is not a renderer of
+all map-56 tower heights.
+
+**TARGET / ADAPTATION** — `opening/` shares `fft.c` instead of forking its battle
+logic. The chapel uses one offline source-mesh cutaway and six interpolated
+actors, with the common interior-eroded silhouette rule. The abduction uses
+compact native staging. Bow/Charge presentation, extra sword effects/statuses
+and AI decisions remain adaptations (opening README), not measured claims of
+full original fidelity. The Academy/campaign handoff remains future work.
+
+**VERIFIED, HEADLESS 68000** — The full adapted encounter reaches victory without
+forcing HP or outcome, then the original ending dialogue sequence. Ten PC/TI
+pixel/state checkpoints agree. `opening/BENCHMARK.md` separates actual native
+CPU costs, decode/turn stalls, and illustrative PC GIF playback. The preceding
+softened-map packed build was cold-launched in Titanium TiEmu and handed back
+at Ramza's turn; these later corrections have not replaced that live session.
+
+
+### OBSERVED / TARGET: opening review, 2026-10-18
+
+The source camera matrix at Orbonne has screen X (+x,-z) and screen Y
+(-x,-z,+PS1-y). Our old equivalent-front projection reflected X. This was a
+camera-handedness defect, despite the earlier correct tile-coordinate audit.
+The active opening/campaign projections, masks, marker slopes, facings and
+turns are corrected together. Historical research fixtures remain controls.
+
+OBSERVED: the US Charge table at 0x80061044 is (4,1),(5,2),(6,3),(8,4),
+(10,5),(14,7),(20,10),(35,20): CT ticks, then primary-stat bonus. Potion's
+item ability 0x170 has Y=3; Hi-Potion 0x171 has Y=7. Source functions and
+native targeting/clock choices are documented in `opening/BUGFIXES.md`.
+
+OBSERVED: chapel actors use event frames >=210 from shared event artwork,
+not TYPE1/TYPE2 indices. `tools/opening_scene_oracle.py` records original
+VRAM parts/pages and actor facings without event or victory writes, through
+Academy event 8 (map 24). Source KO bodies are still observable after Orbonne;
+the native story omits death-counter overlays. TARGET: a fixed shot, source
+poses and text, a short native punch/collapse/Chocobo substitute for movie
+choreography, then a separately loaded Academy/Gariland chapter. The rear
+shot draws actors in the foreground because its static battle mesh lacks
+original event visibility changes; tactical terrain occlusion is unchanged.

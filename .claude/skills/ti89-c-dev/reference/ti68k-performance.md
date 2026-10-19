@@ -923,3 +923,66 @@ incrementally after HUD work in the wind-up. Crowded sword/dagger frames peak at
 355,524 /354,286, full battle350,092, fast-forward355,730 and defeat359,688 cycles.
 The credit heuristic alone is not proof: check normal and accelerated complete
 replays, source-art equality and covered/water paths before shipping a sprite cache.
+
+### Scripted-scene caches sharing tactical memory (FFT opening, 2026-10-18)
+
+Verified with the actual 68000 binary under `ti-cycles` (not a hardware launch):
+`games/fft/opening/BENCHMARK.md`. One scripted 160x100 room can reuse the tactical
+view buffer; dialogue/Status pixels can alias idle portrait-panel storage if
+panel-valid flags are reset on return. Together with a dry-map glint-list
+specialization and removal of provably empty scene rows, Orbonne's allocated
+game buffers fell from 114,880 to 96,958 bytes. No extra room framebuffer.
+
+For streamed compressed actors, retain mask and eroded-interior planes with the
+pixels, deduplicate logical poses/mirrors offline, and bound ordinary cache
+misses per render. A shared object slot must decode its requested object even
+when the ordinary animation quota is spent, otherwise a chest can borrow a
+crystal's frame. Prewarm actors when changing content. Preparing future dialogue
+one line at a time and applying a gradient with word masks avoids a large text/
+per-pixel initialization burst. Always measure complete scene-entry and dialogue
+advance frames, not only a stationary warm loop; this opening still records
+outliers, documented separately from native average costs.
+
+**A decode quota also needs fairness (FFT Orbonne, PC/native68000 checked,
+2026-10-18):** one compressed-pose miss per frame in painter order permanently
+froze some actors. Prioritize the walker/action, then rotate the visible idle
+queue. Reuse another actor's identical decoded pose before spending the quota;
+this needs no additional frame cache. Idle poses can lag, but every visible actor
+must advance. The control checks all 11 idle actors and 648 exact walking poses.
+Charging a possible miss for *every* visible actor also starved optional HUD
+work: cold enemy panels took45 frames. Charging actual misses/copies reduces
+that to5–12 frames (PC update counts, not TiEmu elapsed time). Keep the portrait
+pixel and opacity-mask indices consistent when compacting asset tables.
+
+Orbonne's water was also missed by a surface-0x0E-only check: source0x11 has
+depth-four cells and palette5 animates its artwork. Precompute only visible
+glint locations, store even-x/2,y as two archived bytes, and read them in place.
+Four views/four phases need1,948 archived bytes and no RAM point arrays. Combined
+with offline height contours, archive growth is4,421 bytes, Work +2 bytes to
+35,520. Correct animation/water add actual rendering work versus the broken
+version; current timings and occasional budget overruns are recorded in
+`games/fft/opening/BENCHMARK.md`. No perspective idle cache is compiled into that
+variant, so removing one cannot improve its HUD latency.
+
+
+### Chapter heap lifetime and UI storage aliasing (FFT, 2026-10-18)
+
+**Verified in isolated Titanium TiEmu, AMS 3.10:** opening -> Academy worked,
+but loading the full Gariland runtime failed its scene/work allocation despite
+passing PC/actual-68000 framebuffer checks. A headless allocator does not prove
+AMS free/contiguous heap with the supervisor, packed launcher, grayscale buffers
+and archived variables present. Share mutually exclusive UI storage: Gariland's
+Status planes with its inactive portrait caches save **7,680 RAM bytes**, without
+removing menu functions. Invalidate the portrait owners on Status exit; exact
+three-plane restoration and native Status/return checks pass. The fresh archived
+23-variable package then reaches Gariland's Ramza menu through both prior packed
+chapters. This is a chapter-lifetime check, not a full hardware playthrough or an
+HW2 performance claim. See `games/fft/campaign/README.md`.
+
+Moving read-only C tables into archive can also unblock TTPack's **64,936-byte
+input** limit. Keep byte fields direct, but explicitly read embedded u16 birthday
+and JP fields big-endian on the PC as well as the calculator. Identical pixels
+on both targets and a separate initial-stat check are preferable to assuming
+that a serialized struct is host-native. Production-only builds may omit the
+large research scenario initializer while retaining precise manual/AI doors;
+keep the original fixture build for regressions.

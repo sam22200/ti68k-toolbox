@@ -492,3 +492,40 @@ See `AUTO_BATTLE.md`. Original specialized orders and their target selectors rem
 
 See `MANAGEMENT.md`; menus are separate from the battle executable. Job previews change
 only the current menu session; campaign management is not connected yet.
+
+## Opening content — Orbonne (branch feat/fft-opening)
+
+- [x] Observe the original chapel → battle → abduction flow from cold boot.
+- [x] Generate map 62's single-camera scene and map 56's four tactical views.
+- [x] Extract eleven source battle units and validate their level-grown stats.
+- [x] Share the Gariland battle engine; manual Ramza, AI guests/enemies, victory/loss.
+- [x] Add bounded native bow/sword effects and usable opening techniques.
+- [x] Play the chapel conversations, outside confrontation and conclusion.
+- [x] Deduplicate/compress actors, compute mirrors on misses, trim one-off poses.
+- [x] Reuse dialogue/Status buffers, read water-effect points in archive, trim empty rows.
+- [x] Restore Gariland's geometric contours and animate visible source-palette water.
+- [x] Fair pose decoding, walker priority, portrait-mask indexing and bounded HUD latency.
+- [x] Compare complete PC/TI framebuffer/state checkpoints and record native cycles.
+- [x] Produce local PC presentation GIFs and packed TI launcher/data files.
+- [x] User-requested Titanium TiEmu packed launch and initial grayscale review (soft-map build).
+- [ ] Interactive keyboard/playthrough/exit review; launch the corrected presentation when requested.
+- [ ] Full original special-skill/status/Charge behavior and abduction choreography.
+- [ ] Academy scene and an integrated campaign handoff into Gariland.
+
+Build, controls, local assets and scope: `opening/README.md`.
+Measured tradeoffs and remaining stalls: `opening/BENCHMARK.md`.
+
+
+### Opening review corrections and chapter handoff (2026-10-18)
+
+- [x] Remove damage intervals; source Potion 30 HP and CT-delayed Archer Charge.
+- [x] Correct source camera handedness in Orbonne and the campaign Gariland variant.
+- [x] Static source scene poses, prayer/kneeling/alarm, depth order and white dialogue borders.
+- [x] Source location title, black fades, non-repeating abduction and adapted Chocobo escape.
+- [x] Reuse Gariland wood/stone artwork offline; static management roster/job actors.
+- [x] Academy bridge and Gariland continuation instead of restarting the prologue.
+- [x] PC/68000 scene/combat/continuation checks; native archive metadata is endian-safe.
+- [ ] Remaining jobs: distinct Jump, magic targeting and periodic song/dance semantics.
+
+The native supervisor's heap-lifetime check is documented separately in
+`campaign/README.md`; this milestone is not a full campaign or PS1 movie port.

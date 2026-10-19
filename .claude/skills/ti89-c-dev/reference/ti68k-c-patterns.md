@@ -293,6 +293,14 @@ This changes asset colours, not the calculator's LCD contrast register.
    puts more dry scenery into black/white while keeping both greys. This is a reviewed
    art parameter, not a universal value for every palette or game. Retain the background
    mask so an empty sky does not affect threshold selection or acquire texture noise.
+   **Orbonne counterexample (PC/native68000 checked, 2026-10-18):** thresholds from
+   one shaded orientation bleached 71.1% of lit scenery in the opposite view. Per-view
+   1/50/96 percentiles excluding sky/black cutaway sides, after mild offline texture
+   filtering, leave 4.0% white there. Most scenery uses the middle greys; actors keep
+   their contrast. Four packed views cost only +3 B, with unchanged depths/masks,
+   RAM and ordinary average cycle counts. See `games/fft/opening/BENCHMARK.md`.
+   The subsequent Orbonne contour/water/animation fix costs +4,421 archive bytes
+   and +2 RAM bytes. Do not reuse the colour-only timing/size result for it.
 2. **Treat materials separately.** Applying the dry-surface contrast to FFT's canal made
    the water too white. ISO keeps the original water colours; perspective uses light/dark
    grey water, with sparse animated glints drawn separately. Preserve the actors' existing
@@ -887,3 +895,14 @@ Unarchive first and archive after if needed, as above.
   (leaks the error frame: leave through `ENDTRY`/`ENDFINAL`), fonts pulled out of the ROM at
   hard-coded AMS offsets (embed or pre-render your own, §2), ExtGraph 1.x colour values (§3).
 - Heavy maths loops: C first. Only consider 68000 ASM after profiling, and **ask first** (project rule).
+
+### Data-variable names when packaging banks (2026-10-18)
+
+Verified from the generated TI headers and a `ti-cycles` VAT lookup: the final
+`ttbin2oth` argument supplies the **calculator variable name**, not just a host
+output path. Passing `data/ffov0` made the internal name `data/ffo`, so all banks
+collided and `rt_file("ffov0")` failed. Run the converter inside the destination
+directory with a bare variable name (`cd data; ttbin2oth -89 dat ffov0.bin ffov0`).
+The eight-bank opening fixture in `games/fft/opening/` checks actual VAT loading.
+Archive attributes are set in the TI file header at 0x49, outside the payload
+checksum. This packaging check is headless; it does not validate a Flash transfer.
