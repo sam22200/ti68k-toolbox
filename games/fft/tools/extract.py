@@ -102,6 +102,7 @@ def polygons(mesh):
 
 K = 4                                           # supersampling
 SC_W, SC_OY, BG = 320, 64, 40.0                 # fft.h: SC_BYTES * 8, SC_OY; background marker
+SOURCE_CAMERA = False                          # historical controls retain their archived views
 
 
 def render(polys, tex, pal, rot, nx, nz, sc_h, return_depth=False):
@@ -118,7 +119,9 @@ def render(polys, tex, pal, rot, nx, nz, sc_h, return_depth=False):
     for v, uv, pl, pg in polys:
         x, z, h = v[:, 0] / 28, v[:, 2] / 28, -v[:, 1] / 12
         u, w = [(x, z), (nz - z, x), (nx - x, nz - z), (z, nx - x)][rot]
-        sx = (u - w + vh) * 12 * K; sy = (SC_OY + (u + w) * 6 - h * 6) * K; d = u + w + 2 * h
+        sx = (u - w + vh) * 12 * K
+        if SOURCE_CAMERA: sx = SC_W * K - sx
+        sy = (SC_OY + (u + w) * 6 - h * 6) * K; d = u + w + 2 * h
         # the tile of a face: its centre pushed into the solid (a wall belongs to the tile
         # behind it, whose side it is)
         p3 = np.stack([u, w, h * 12 / 28], 1)
@@ -164,7 +167,10 @@ def render(polys, tex, pal, rot, nx, nz, sc_h, return_depth=False):
     return (lum, diag, face, zb) if return_depth else (lum, diag, face)
 
 
-def views(disc, files, nx, nz, maxh, preview=None):
+def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None):
+    """Pack four views. An optional offline quantizer changes colours only;
+    coverage/depth packing and the default Gariland conversion stay identical.
+    """
     recs = gns_records(disc, files)
     tex_rec = next(r for r in recs if r[0] == 0x1701)              # the first: day, no weather
     mesh_rec = next(r for r in recs if r[0] == 0x2E01)
@@ -178,13 +184,20 @@ def views(disc, files, nx, nz, maxh, preview=None):
     out, q = [], None
     gsum, gcnt = np.zeros(nx * nz * 5), np.zeros(nx * nz * 5)
     for rot in range(4):
-        lum, diag, face = render(polys, tex, pal, rot, nx, nz, sc_h)
+        rendered = render(polys, tex, pal, rot, nx, nz, sc_h, return_depth=decorate is not None)
+        lum, diag, face = rendered[:3]
         small = lum.reshape(sc_h, K, SC_W, K).mean((1, 3))
         bg = (lum == BG).reshape(sc_h, K, SC_W, K).mean((1, 3)) > .5
-        if q is None:                                              # the whole map, view 0
-            q = np.percentile(small[~bg], [25, 55, 82])
-        g = np.where(small > q[2], 0, np.where(small > q[1], 1, np.where(small > q[0], 2, 3)))
+        if quantize is None:
+            if q is None:                                          # the whole map, view 0
+                q = np.percentile(small[~bg], [25, 55, 82])
+            g = np.where(small > q[2], 0, np.where(small > q[1], 1, np.where(small > q[0], 2, 3)))
+        else:
+            g = quantize(small, bg)
         g[bg] = 0                                                  # white around the map (the user's pick over light grey)
+        if decorate is not None:
+            g = decorate(g, bg, rendered[3], rot, polys, tex, pal)
+            g[bg] = 0
         fc = face[K // 2::K, K // 2::K]                            # each face's mean grey
         seen = (fc >= 0) & ~bg
         gsum += np.bincount(fc[seen], g[seen], nx * nz * 5); gcnt += np.bincount(fc[seen], None, nx * nz * 5)
