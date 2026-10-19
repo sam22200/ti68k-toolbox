@@ -133,6 +133,28 @@ def equipment_icons(disc,files,d):
                 bank_bytes=len(data),records=records)
 
 
+def title_strip(disc,files,index):
+    """Shared retail location-title conversion; no duplicate font or title artwork."""
+    title_raw=disc.read(*files['EVENT/MAPTITLE.BIN'])
+    attack=disc.read(*files['EVENT/ATTACK.OUT'])
+    pal=np.frombuffer(attack[0x801d5ff0-0x801bf000:][:32],'<u2').astype(int)
+    lum=((pal&31)*299+((pal>>5)&31)*587+((pal>>10)&31)*114)//1000
+    b=np.frombuffer(title_raw[index*2560:(index+1)*2560],np.uint8).reshape(20,128)
+    px=np.empty((20,256),np.uint8);px[:,::2]=b&15;px[:,1::2]=b>>4
+    yy,xx=np.nonzero(px);crop=px[yy.min():yy.max()+1,xx.min():xx.max()+1]
+    levels=lum[crop];im=Image.fromarray(np.uint8(levels*255//31))
+    if im.width>144 or im.height>14:
+        ratio=min(144/im.width,14/im.height);im=im.resize((round(im.width*ratio),round(im.height*ratio)),Image.Resampling.BOX)
+    a=np.array(im);g=np.where(a>=205,0,np.where(a>=110,1,np.where(a>=42,2,-1)))
+    canvas=np.full((14,144),-1);x=(144-im.width)//2;canvas[:im.height,x:x+im.width]=g
+    data=bytearray()
+    for col in range(18):
+        part=canvas[:,col*8:col*8+8]
+        data+=b''.join(np.packbits(m,axis=1).tobytes() for m in
+                      ((part>=0)&((part&1)!=0),(part>=0)&((part&2)!=0),part<0))
+    return bytes(data),canvas,list(crop.shape)
+
+
 def visual_bank(disc,files):
     """Only idle poses at a second scale and two narrow original title strips."""
     data=bytearray(b'FFMV\x01\x10\x10\x00');definitions=[]
@@ -163,21 +185,9 @@ def visual_bank(disc,files):
     lum=((pal&31)*299+((pal>>5)&31)*587+((pal>>10)&31)*114)//1000
     contacts=[];titles=[]
     for index,name in ((55,'Orbonne Monastery'),(21,'Magic City Gariland')):
-        b=np.frombuffer(title_raw[index*2560:(index+1)*2560],np.uint8).reshape(20,128)
-        px=np.empty((20,256),np.uint8);px[:,::2]=b&15;px[:,1::2]=b>>4
-        yy,xx=np.nonzero(px);crop=px[yy.min():yy.max()+1,xx.min():xx.max()+1]
-        levels=lum[crop];im=Image.fromarray(np.uint8(levels*255//31))
-        if im.width>144 or im.height>14:
-            ratio=min(144/im.width,14/im.height);im=im.resize((round(im.width*ratio),round(im.height*ratio)),Image.Resampling.BOX)
-        a=np.array(im);g=np.where(a>=205,0,np.where(a>=110,1,np.where(a>=42,2,-1)))
-        canvas=np.full((14,144),-1);x=(144-im.width)//2;canvas[:im.height,x:x+im.width]=g
-        # Eight-pixel chunks allow a reveal/fade with small masked sprites, no font shadow.
-        for col in range(18):
-            part=canvas[:,col*8:col*8+8]
-            data+=b''.join(np.packbits(m,axis=1).tobytes() for m in
-                          ((part>=0)&((part&1)!=0),(part>=0)&((part&2)!=0),part<0))
+        strip,canvas,shape=title_strip(disc,files,index);data+=strip
         contacts.append(Image.fromarray(np.uint8(np.where(canvas<0,0,255-canvas.clip(0)*85))))
-        titles.append(dict(name=name,index=index,source_shape=list(crop.shape),stored_shape=[14,144]))
+        titles.append(dict(name=name,index=index,source_shape=shape,stored_shape=[14,144]))
     (OUT/'fftmvis.bin').write_bytes(data)
     Image.fromarray(np.concatenate([np.array(i) for i in contacts],axis=0)).resize((720,140),Image.Resampling.NEAREST).save(OUT.parent/'location-source.png')
     return definitions,dict(bank_bytes=len(data),small_idle_bytes=5*5*96,job_idle_bytes=4*5*156,

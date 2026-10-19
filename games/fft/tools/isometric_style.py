@@ -42,7 +42,9 @@ def ledges(polys):
 def project(v,rot,nx,nz):
     x,z,h = v[:,0]/28,v[:,2]/28,-v[:,1]/12
     u,w = [(x,z),(nz-z,x),(nx-x,nz-z),(z,nx-x)][rot]
-    return np.stack([(u-w+(nx if rot & 1 else nz))*12,
+    sx=(u-w+(nx if rot & 1 else nz))*12
+    if extract.SOURCE_CAMERA:sx=320-sx
+    return np.stack([sx,
                      extract.SC_OY+(u+w)*6-h*6,u+w+2*h],axis=1)
 
 

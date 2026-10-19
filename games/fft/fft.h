@@ -25,18 +25,30 @@ typedef struct {
 // tiles at most `range` steps away (any path), within `vert` half units of the user's height
 // (0xFF: any); AF_SELF: the user's own tile too, AF_EVADE: evaded as an attack, AF_ITEM: from
 // the bag (slot `bag`; the enemies' items do not run out, those of their level `lv` or less).
-enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND };   // AB_DEFEND: the command
-enum { AF_SELF = 1, AF_EVADE = 2, AF_ITEM = 4 };
+enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND, AB_RAISE, AB_BREAK };   // AB_DEFEND: the command
+enum { AF_SELF = 1, AF_EVADE = 2, AF_ITEM = 4, AF_WEAPON = 8, AF_DRAIN = 16, AF_AREA = 32, AF_CHARGE = 64 };
 enum { ST_DEFEND = 1, ST_POISON = 2, ST_DARK = 4, ST_SILENCE = 8 };   // Dead: 0 HP
 typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 jp; u8 lv; } Ability;
 #define SET_N 6                                // abilities per skill set at most
 typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
+#ifdef FFT_OPENING
+#include "opening/data/units.h"
+#include "opening/data/weapons.h"
+#include "opening/data/interface.h"
+#include "opening/data/battle.h"
+#include "opening/data/map.h"
+#else
 #include "units.h"
 #include "weapons.h"
 #include "interface.h"
+#ifdef FFT_STORY_GAR
+#include "campaign/data/battle.h"
+#else
 #include "battle.h"
+#endif
 #include "map.h"
+#endif
 extern const Tile *map_tiles;           // read from ffti (fft.c)
 
 // Projection (scene pixels): a tile is a 24x12 diamond, one height unit is 6 px.
@@ -47,7 +59,11 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 // Scene: the whole map for one orientation (fftv0..3 and the buffer the current one is copied to)
 #define SC_BYTES 40                    // 320 px
 #define SC_W (SC_BYTES * 8)
+#ifdef FFT_OPENING
+#define SC_H 192                       // exact mesh bottom 190; no cropped walkable terrain
+#else
 #define SC_H (HH * (MAP_W + MAP_H) + HU * MAXH + 8)
+#endif
 #define SC_OY (HU * MAXH + 4)          // scene y of the top vertex of view tile (0, 0) at h 0
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane
 
@@ -122,7 +138,11 @@ typedef struct { s16 pri; u8 hit, ab, o, t, f; } AiAct;   // a ranked action: FF
 enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
 enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_AUTO, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
+#ifdef FFT_OPENING
+#define U_RAMZA 0
+#else
 #define U_RAMZA 6                      // in battle.h's order: Delita, five enemies, Ramza, recruits
+#endif
 #define U_CHEMIST 8                    // the female Chemist
 #define U_HIDE 2                       // the enemy the occlusion scenarios move behind a house
 enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD, EQ_N };
@@ -208,6 +228,15 @@ typedef struct {
     u8 ciso_rot;
 #endif
 #endif
+#endif
+#ifdef FFT_OPENING
+    // Deferred actions are separate from the active unit's turn. Only Archer
+    // Charge is currently exposed; Jump and performances need their own rules.
+    struct { u8 state, ticks, ability, tile, origin, weapon; } pending[NUNIT];
+    u8 open_resolving, open_ct_phase;
+    u8 open_stage, open_beat, open_clock, open_white;
+    u16 open_reveal, open_offset, open_seen;
+    u8 open_pan, open_fade, open_next, open_handoff;
 #endif
     u8 banner, banner_t;               // BN_*: the battle's objective, its outcome; its frame
     u16 morph_mask;                    // converted units awaiting their visible transformation

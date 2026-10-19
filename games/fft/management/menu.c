@@ -33,7 +33,6 @@ static const char *const jobs[] = { "Squire", "Chemist", "Knight", "Archer" };
 static const char *const slot_name[] = { "Action", "Second", "React", "Support", "Move" };
 static const char *const titles[] = { "Formation", "Formation", "Item", "Equip", "Ability", "Learn",
                                      "Change Job", "Status", "Gariland", "Set Ability", "Configuration", "Location" };
-static const u8 idle[8] = { 2,1,0,1,2,3,4,3 };
 void game_cleanup(void);
 
 // Dense visual fixtures repeat the five source records; never index beyond the party.
@@ -193,7 +192,7 @@ static void portrait(s16 x,s16 y,u8 gfx)
 
 static void actor_gfx(s16 x,s16 y,u8 gfx)
 {
-    u8 frame=idle[(menu.tick>>3)&7];
+    u8 frame=0;
     const u8 *p=actors+(u16)gfx*(UNIT_FRAMES*2*UNIT_FB)+(u16)frame*UNIT_FB;
 #ifdef __m68k__
     RtSprite sp={16,UNIT_SH,p,p+52,p+104};
@@ -223,7 +222,7 @@ static void small_actor(s16 x,s16 y,u8 u)
     u8 gfx=unit_data(u)->v[0];
     // Delita has no player-party slot: the compact bank omits his unused variant.
     if(gfx)gfx--;
-    const u8 *p=visuals+MV_SMALL+(u16)gfx*480+(u16)idle[(menu.tick>>3)&7]*96;
+    const u8 *p=visuals+MV_SMALL+(u16)gfx*480;
     visual_actor(x,y,p,1);
 }
 static void job_actor(s16 x,s16 y,u8 job)
@@ -235,7 +234,7 @@ static void job_actor(s16 x,s16 y,u8 job)
         actor_gfx(x,y,gfx);
     } else {
         u8 gfx=(job-2)*2+female;
-        visual_actor(x,y,visuals+MV_JOB+(u16)gfx*780+(u16)idle[(menu.tick>>3)&7]*156,0);
+        visual_actor(x,y,visuals+MV_JOB+(u16)gfx*780,0);
     }
 }
 static void formation_actors(void)
