@@ -21,6 +21,12 @@ Both apply to every agent working in this repository.
 - Tests without UI first (`make test`, PC headless runs, `ti-cycles`, `make xcheck`), the emulator
   last of all (`CLAUDE.md`, development flow). Titanium only; the TI-89 HW2 only for a release.
 - Every game with state has an injection door (`game_scenario(n)`, `--scenario N`, `name(N)`).
+- **The user validates every visual change** before it is kept or built on. This covers
+  rendering, art, palette, asset pipelines, and compression or format experiments that change
+  the picture. Show before/after or A/B variants side by side, at the same scale and view,
+  as image files with absolute paths. Wait for the verdict before optimising, integrating
+  or benchmarking further. A pixel-difference metric is no substitute. Exempt: output proven
+  identical to the reference (same checksums/planes). Details: `ti89-c-dev/SKILL.md`.
 
 ## The emulator (TiEmu)
 
