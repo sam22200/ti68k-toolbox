@@ -19,6 +19,14 @@ description: Write, compile, optimise or port C code (GCC4TI/TIGCC) for the TI-8
 - **ASM** (68000): only for very heavy computation, rarely, and **always ask first**. Exception:
   frequent operations with a verified asm version (table at the top of `ti68k-asm.md`) are always called in
   that asm version from C, never rewritten in C.
+- **Visual changes are validated by the user**: any change that alters what is drawn needs the
+  user's approval before it is kept or built on. This includes a new renderer, asset pipeline,
+  art, palette, compression or format experiment, with a different picture as the outcome.
+  Show before/after or the A/B variants side by side, at the same scale and view, as
+  image files. Give their absolute paths and say what to look at. Wait for the verdict
+  before optimising, integrating or benchmarking further: a fast or compact result is
+  worthless if it looks wrong. A metric (pixel difference %) is no substitute.
+  Exempt: changes proven identical in output (same checksums/planes as the reference).
 - Graphics, sprites, grayscale: **ExtGraph 2** (`tools/extgraph/lib/extgraph.h`,
   docs in `tools/extgraph/DOCS/extgraph.html`).
 - **New games: the Portable Game Runtime** (`runtime/README.md`): the game is portable C against
