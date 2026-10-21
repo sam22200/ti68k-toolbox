@@ -29,6 +29,8 @@ typedef u32 PlaneWord __attribute__((aligned(2), may_alias));
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #include "contour_art.inc"
+#define ct_recip CONTOUR_REF_ct_recip           // archived; the headers' copies go unused
+#define weapon_x CONTOUR_REF_weapon_x
 #endif
 
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
@@ -150,10 +152,35 @@ u8 scene_rot;
 // the four views (fftv0..3, ZX0, read in place), unpacked one at a time into vbuf: light and
 // dark planes, then twice (the frontmost pixels of each byte, then the next ones) their view
 // diagonal and their mask (SC_PLANE each)
-#define VIEW_BYTES (6UL * SC_PLANE)          // 52,320: above a 16-bit int
+#define VIEW_BYTES (6UL * SC_PLANE)          // 52,320 (Gariland 48,480): above a 16-bit int
 static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static const u8 *igfx;                  // portraits, names, marker and text (ffti)
+#ifdef FFT_ACTOR_BANK
+static const u8 *abank[2];              // the common actor frames (ffca, ffcb: common_actors.py)
+static u16 abank_n0;                    // frames in ffca
+// Decoded frames shared by every actor: 48 hold Gariland's AI battle at 0.06 decodes
+// a frame (1.8 with one pose per actor). Its own block: Gariland's Work + planes
+// block (57,006 bytes) cannot grow by 7 KB under AMS's ~64 KB block limit.
+#ifndef AC_N
+#define AC_N 48
+#endif
+static u16 (*acache)[UNIT_FB / 2];      // AC_N frames, then ac_key and ac_age
+static u16 *ac_key, *ac_age;            // frame key (0xFFFF: free), last frame drawn
+                                        // (in the block: -mno-bss globals cost program bytes)
+#ifdef __m68k__                         // ExtGraph (verified, ti68k-c-patterns.md: sprites)
+void SpriteX8_MIRROR_H_R(unsigned short height asm("%d0"), const unsigned char *src asm("%a0"),
+                         unsigned short bytewidth asm("%d1"), unsigned char *dest asm("%a1"))
+                         __attribute__((__regparm__(4)));
+#endif
+static void actor_reset(void);
+#endif
+#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
+#define UI_SHARED(s) (cgfx + UIC_##s)
+#else
+#define UI_SHARED(s) (igfx + UI_##s)
+#endif
 const Tile *map_tiles;                  // in ffti too: the map's tiles (extract.py) and the sloped
 static const PlaneWord *sl_l, *sl_m, *sc_l, *sc_m;   // markers' planes (art.py), out of the program
 #define sl_d sl_l                       // black and white: one plane for both
@@ -188,10 +215,12 @@ typedef struct {                        // a unit's cover mask, and its covered 
 } Cover;
 typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
 typedef struct {
+#ifdef FFT_ACTOR_BANK
+    u8 actor_budget, actor_misses, actor_next;
+    u16 actor_key[NUNIT + 2], ac_now;   // each slot's pose; frames drawn so far
+    u8 actor_ent[NUNIT + 2];            // its acache entry
+#endif
 #ifdef FFT_OPENING
-    u8 actor_budget, actor_misses, actor_next, actor_copies;
-    u16 actor_key[NUNIT + 2];
-    u16 actor_gfx[NUNIT + 2][UNIT_FB / 2];
     char dialog[6][48];
     u8 dialog_n, dialog_w, dialog_h, dialog_next;
     u16 dialog_total, dialog_key, dialog_drawn;
@@ -485,8 +514,6 @@ static void opening_units(void);
 static void opening_start(u16 n);
 static u8 opening_update(void);
 static void opening_render(void);
-static const u8 *opening_frame(u16 logical, u8 slot);
-static void opening_animate(const u8 *visible);
 static u8 opening_attack_range(u8 a, u8 o, u8 c);
 static void opening_damage(void);
 static u8 opening_hit(u8 a,u8 t);
@@ -948,10 +975,26 @@ static u8 hl_seq;                       // bumped when the highlights may have c
 #ifdef FFT_TEXTURE_PREVIEW
 static void preview_iso_apply(u8 rot);
 #endif
+#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+// Chapter views store each occlusion mask row XORed with the row above (extract.py
+// rowxor_masks: ~3 KB less archive per map); undone here a long at a time.
+static void unxor_masks(u8 *v)
+{
+    u8 k;
+    for (k = 3; k <= 5; k += 2) {
+        u32 *p = (u32 *)(v + k * SC_PLANE + SC_BYTES), *e = (u32 *)(v + (k + 1) * SC_PLANE);
+        do *p ^= p[-SC_BYTES / 4]; while (++p < e);
+    }
+}
+#endif
+
 static void unpack_view(u8 rot)
 {
     if (vbuf_rot == rot) return;
     zx0_unpack(views[rot], vbuf);
+#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+    unxor_masks(vbuf);
+#endif
 #ifdef FFT_TEXTURE_PREVIEW
     preview_iso_apply(rot);
 #endif
@@ -2566,6 +2609,86 @@ static u8 morph_first(void)
     return i;
 }
 
+#ifdef FFT_ACTOR_BANK
+static const u8 *unit_frame(u8 rot, u8 i);
+// A logical frame (units.h / actors.h) of the common actor bank, decoded into its
+// unit's slot of the frame cache: at most one ordinary decode a frame (actor_budget).
+static const u8 *actor_frame(u16 logical, u8 slot)
+{
+    u16 frame_key = RD16(ugfx, logical), id = frame_key & 0x7FFF, best = 0;
+    u8 e, victim = 0;
+    for (e = 0; e < AC_N && ac_key[e] != frame_key; e++) ;
+    if (e == AC_N) {
+        // Animation alone can wait a frame (its pose still cached); a new actor never
+        // borrows another's appearance. One ordinary miss per frame bounds decompression.
+        e = W->actor_ent[slot];
+        if (!W->actor_budget && W->actor_key[slot] != 0xFFFF && slot < NUNIT && ac_key[e] == W->actor_key[slot]) {
+            ac_age[e] = W->ac_now;
+            return (const u8 *)acache[e];
+        }
+        if (W->actor_budget) W->actor_budget--;
+        ZB(20);
+        // The least recently drawn entry: never one drawn this frame (48 > 13 actors).
+        for (e = 0; e < AC_N; e++) {
+            u16 unused = (u16)(W->ac_now - ac_age[e]);   // (not "idle": a TIGCC ROM call)
+            if (ac_key[e] == 0xFFFF) { victim = e; break; }
+            if (unused >= best) { best = unused; victim = e; }
+        }
+        e = victim;
+        {   // frames are numbered across ffca then ffcb (tools/common_actors.py)
+            const u8 *b = abank[0]; u16 r = id;
+            if (r >= abank_n0) { b = abank[1]; r -= abank_n0; }
+            zx0_unpack(b + 2 + 2 * RD16(b, 0) + RD16(b + 2, r), (u8 *)acache[e]);
+        }
+        if (frame_key & 0x8000) {               // every 16-pixel row of the four planes
+#ifdef __m68k__
+            SpriteX8_MIRROR_H_R(UNIT_FB / 2, (const u8 *)acache[e], 2, (u8 *)acache[e]);
+#else
+            static const u8 rev[16] = {0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
+            u8 *p = (u8 *)acache[e], *end = p + UNIT_FB;
+            for (; p < end; p += 2) {
+                u8 a = p[0], c = p[1];
+                p[0] = (u8)(rev[c & 15] << 4 | rev[c >> 4]);
+                p[1] = (u8)(rev[a & 15] << 4 | rev[a >> 4]);
+            }
+#endif
+        }
+        ac_key[e] = frame_key;
+        W->actor_misses++;
+        ZE(20);
+    }
+    ac_age[e] = W->ac_now;
+    W->actor_key[slot] = frame_key; W->actor_ent[slot] = e;
+    return (const u8 *)acache[e];
+}
+
+// Forget every slot's pose and every cached frame (a new battle or chapter scene).
+static void actor_reset(void)
+{
+    memset(W->actor_key, 255, sizeof W->actor_key);
+    memset(ac_key, 255, AC_N * 2);
+    W->actor_budget = 255; W->actor_misses = W->actor_next = 0;
+}
+
+// Walking/action poses have priority; rotate the remaining decode opportunities
+// among visible actors so the frontmost unit cannot starve the other animations.
+static void actor_animate(const u8 *visible)
+{
+    u8 i,k;
+    if(st.mode==M_WALK && visible[st.sel])unit_frame(st.rot,st.sel);
+    if(st.mode==M_ACT) {
+        if(visible[st.atk])unit_frame(st.rot,st.atk);
+        if(visible[st.tgt])unit_frame(st.rot,st.tgt);
+    }
+    for(i=0;i<NUNIT && W->actor_budget;i++) {
+        k=W->actor_next;
+        if(++W->actor_next==NUNIT)W->actor_next=0;
+        if(visible[k])unit_frame(st.rot,k);
+    }
+    W->actor_budget=0;
+}
+#endif
+
 static const u8 *object_frame(u8 i)
 {
     static const u8 chest_bob[8] = {
@@ -2577,8 +2700,8 @@ static const u8 *object_frame(u8 i)
     u8 obj = st.unit[i].dc == DC_CHEST
         ? (st.morph_mask & (u16)(1U << i) ? OBJ_CHEST : chest_bob[(st.tick >> 3) & 7])
         : phase ? (u8)(phase + 1) : OBJ_CRYSTAL;
-#ifdef FFT_OPENING
-    return opening_frame((u16)(ACTOR_OBJECTS + obj), NUNIT);
+#ifdef FFT_ACTOR_BANK
+    return actor_frame((u16)(ACTOR_OBJECTS + obj), NUNIT);
 #else
     return ugfx + (u32)UNIT_GFX_N * 2 * UNIT_FRAMES * UNIT_FB + (u16)obj * UNIT_FB;
 #endif
@@ -2621,8 +2744,8 @@ static const u8 *unit_frame(u8 rot, u8 i)
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
     if (DC_OBJ(un->dc)) {
         if (st.morph_mask & (u16)(1U << i)) {
-#ifdef FFT_OPENING
-            const u8 *ko = opening_frame((u16)(un->gfx * 44 + P_KO + (dir & 1) + (dir & 2 ? 22 : 0)), i);
+#ifdef FFT_ACTOR_BANK
+            const u8 *ko = actor_frame((u16)(un->gfx * 44 + P_KO + (dir & 1) + (dir & 2 ? 22 : 0)), i);
 #else
             const u8 *ko = ugfx + (u32)(u16)(un->gfx * (2 * UNIT_FRAMES)
                 + P_KO + (dir & 1) + (dir & 2 ? UNIT_FRAMES : 0)) * UNIT_FB;
@@ -2632,8 +2755,8 @@ static const u8 *unit_frame(u8 rot, u8 i)
         return object_frame(i);
     }
     armed = st.mode == M_ACT && i == st.atk ? armed_pose(i) : 0;
-#ifdef FFT_OPENING
-    if (armed) return opening_frame((u16)(ACTOR_ARMED + un->gfx * 16 + (dir >> 1) * 8 + (dir & 1) * 4 + armed - 1), i);
+#ifdef FFT_ACTOR_BANK
+    if (armed) return actor_frame((u16)(ACTOR_ARMED + un->gfx * 16 + (dir >> 1) * 8 + (dir & 1) * 4 + armed - 1), i);
 #else
     if (armed) return wgfx + (u32)(u16)(un->gfx * 16 + (dir >> 1) * 8 + (dir & 1) * 4 + armed - 1) * UNIT_FB;
 #endif
@@ -2644,8 +2767,8 @@ static const u8 *unit_frame(u8 rot, u8 i)
         if (dir & 1) k += 5;
     }
     if (dir & 2) k += UNIT_FRAMES;
-#ifdef FFT_OPENING
-    return opening_frame((u16)(un->gfx * (2 * UNIT_FRAMES) + k), i);
+#ifdef FFT_ACTOR_BANK
+    return actor_frame((u16)(un->gfx * (2 * UNIT_FRAMES) + k), i);
 #else
     return ugfx + (u32)(u16)(un->gfx * (2 * UNIT_FRAMES) + k) * UNIT_FB;
 #endif
@@ -3194,6 +3317,10 @@ release(void)
 #ifdef FFT_CONFIG
     pidle_free();
 #endif
+#ifdef FFT_ACTOR_BANK
+    if (acache) free(acache);
+    acache = RT_NULL;
+#endif
     if (sbuf) free(sbuf);
     if (vbuf) free(vbuf);
     sbuf = vbuf = RT_NULL;
@@ -3211,6 +3338,9 @@ void game_init(void)
     rt_state_size = sizeof(st);
 #ifdef __m68k__
     sbuf = vbuf = RT_NULL;
+#ifdef FFT_ACTOR_BANK
+    acache = RT_NULL;                          // statics survive between runs
+#endif
 #ifdef FFT_CONFIG
     pidle=RT_NULL;
 #endif
@@ -3257,29 +3387,46 @@ void game_init(void)
 #endif
 #ifdef FFT_OPENING
     ugfx = rt_file("ffoa", RT_NULL);
-    wgfx = rt_file("ffow", RT_NULL);
     igfx = rt_file("ffoi", RT_NULL);
+#elif defined(FFT_STORY_GAR) && !defined(FFT_RAW_ACTORS)
+    ugfx = rt_file("ffga", RT_NULL);
+    igfx = rt_file("ffgi", RT_NULL);
+#elif defined(FFT_STORY_GAR)                    // control: the raw banks read in place
+    ugfx = rt_file("fftu", RT_NULL);
+    wgfx = rt_file("fftw", RT_NULL);
+    igfx = rt_file("ffgi", RT_NULL);
 #else
     ugfx = rt_file("fftu", RT_NULL);
     wgfx = rt_file("fftw", RT_NULL);
-#ifdef FFT_STORY_GAR
-    igfx = rt_file("ffgi", RT_NULL);
-#else
     igfx = rt_file("ffti", RT_NULL);
 #endif
+#ifdef FFT_ACTOR_BANK
+    wgfx = rt_file("ffcw", RT_NULL);           // the blades both chapters share
+    abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
+    if (!abank[0] || !abank[1]) igfx = RT_NULL;
+    else abank_n0 = RD16(abank[0], 0);
+#endif
+#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+    cgfx = rt_file("ffcu", RT_NULL);
+    if (!cgfx) igfx = RT_NULL;
 #endif
     if (!igfx) { W = RT_NULL; return; }       // a message, ESC quits
     map_tiles = (const Tile *)(igfx + UI_TILES);
 #ifdef __m68k__
-    sl_l = (const PlaneWord *)(igfx + UI_SLOPES);
+    sl_l = (const PlaneWord *)UI_SHARED(SLOPES);
 #else
-    for (i = 0; i < 4 * SLOPE_ROWS; i++) slope_pc[i] = RD32(igfx + UI_SLOPES, 2 * i);
+    for (i = 0; i < 4 * SLOPE_ROWS; i++) slope_pc[i] = RD32(UI_SHARED(SLOPES), 2 * i);
     sl_l = slope_pc;
 #endif
     sl_m = sl_l + SLOPE_ROWS; sc_l = sl_m + SLOPE_ROWS; sc_m = sc_l + SLOPE_ROWS;
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB
         vbuf = malloc(VIEW_BYTES);
         sbuf = vbuf ? malloc(2 * SC_PLANE + sizeof(Work)) : RT_NULL;
+#ifdef FFT_ACTOR_BANK
+        acache = sbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
+        if (!acache && sbuf) { free(sbuf); sbuf = RT_NULL; }
+        ac_key = (u16 *)acache[AC_N]; ac_age = ac_key + AC_N;
+#endif
         if (!sbuf) {                           // not enough memory: a message, ESC quits
             if (vbuf) free(vbuf);
             vbuf = RT_NULL; W = RT_NULL;
@@ -3380,6 +3527,9 @@ void game_scenario(u16 n)
 #endif
     st.want = st.prot = st.ai_view = 0xFF;
     if (!W) return;
+#ifdef FFT_ACTOR_BANK
+    actor_reset();                                // every actor decoded again, at once
+#endif
     rt_seed = n ? n : rt_ticks();                 // a new draw each battle; the tests: fixed
 #ifdef FFT_EXPLORATION
     if (n >= 61 && n <= 68) rt_seed = 61;         // identical actors/equipment for all cameras
@@ -4066,8 +4216,13 @@ u8 game_update(void)
 {
     u8 r, k = st.ai == AI_THINK ? AI_FAST : 1;   // (thinking this frame: its last step too)
     FRAME_BEGIN();
+#ifdef FFT_ACTOR_BANK
+#ifndef ACTOR_BUDGET
+#define ACTOR_BUDGET 1                     // new poses decoded per frame (255: all, the raw-bank look)
+#endif
+    if(W){W->actor_budget=ACTOR_BUDGET;W->actor_misses=0;W->ac_now++;}
+#endif
 #ifdef FFT_OPENING
-    if(W){W->actor_budget=1;W->actor_misses=W->actor_copies=0;}
     if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner)) return opening_update();
 #endif
 #if defined(FFT_CONFIG) || defined(FFT_REACH_CONTOUR)
@@ -4257,9 +4412,9 @@ static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit)
         const u8 *g;
         u8 *l, *d;
         if (c < 32 || c > 126) c = '?';
-        c -= 32; adv = igfx[UI_ADV + c];
+        c -= 32; adv = UI_SHARED(ADV)[c];
         if (x + adv > limit) break;
-        g = igfx + UI_FONT + (u16)c * 5;
+        g = UI_SHARED(FONT) + (u16)c * 5;
         l = (u8 *)rt_light + y * RT_PBYTES + ((x >> 3) & ~1);
         d = (u8 *)rt_dark + y * RT_PBYTES + ((x >> 3) & ~1);
         for (r = 0; r < 5; r++, l += RT_PBYTES, d += RT_PBYTES) {
@@ -4367,7 +4522,7 @@ static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
 static u8 ui_width(const char *s)
 {
     u8 width = 0;
-    while (*s) width += igfx[UI_ADV + (u8)*s++ - 32];
+    while (*s) width += UI_SHARED(ADV)[(u8)*s++ - 32];
     return width;
 }
 
@@ -5110,7 +5265,7 @@ static void bn_shade(void)
 // present before its first frame; the complete word always gets BN_HOLD frames.
 static void bn_draw(void)
 {
-    const u8 *bank = igfx + UI_BANNERS;
+    const u8 *bank = UI_SHARED(BANNERS);
     u8 line;
     for (line = 0; line < (st.banner == BN_START ? 2 : 1); line++) {
         u8 k = bn_line(st.banner, line), r;
@@ -5300,8 +5455,8 @@ void game_render(void)
     if (st.banner && !st.morph_mask) bn_shade();                 // (the scenery only: the units stay bright)
     ZE(3);
     ZB(4);
-#ifdef FFT_OPENING
-    opening_animate(vis);
+#ifdef FFT_ACTOR_BANK
+    actor_animate(vis);
 #endif
     for (i = 0; i < NUNIT; i++) {
         u8 k = ord[i];
@@ -5321,8 +5476,8 @@ void game_render(void)
         tg--;                                  // frames: it blinks when one stands in front
         draw_unit_covered(f[tg].x - st.camx, f[tg].y - st.camy, st.rot, tg, RT_NULL);
     }
-#ifdef FFT_OPENING
-    W->left-=(s16)W->actor_misses*32+(s16)W->actor_copies*3;
+#ifdef FFT_ACTOR_BANK
+    W->left-=(s16)W->actor_misses*32;
 #endif
     ZE(4); ZB(5);
 #ifdef FFT_OPENING

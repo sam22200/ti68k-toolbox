@@ -14,8 +14,8 @@ def main():
     run([ROOT/'tools/pyenv/bin/python',GAME/'tools/contour_assets.py','--attach',GAME/'opening/data/ffov0.bin',GAME/'campaign/data/ffgv0.bin'])
     results=[]
     for scene,folder,scenario,banks in (
-        ('orbonne','opening',1,['ffov0','ffov1','ffov2','ffov3','ffoa','ffow','ffoi','ffost']),
-        ('gariland','campaign',61,['ffgv0','ffgv1','ffgv2','ffgv3','fftu','fftw','ffgi'])):
+        ('orbonne','opening',1,['ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffcu','ffcw','ffca','ffcb']),
+        ('gariland','campaign',61,['ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffcu','ffcw','ffca','ffcb'])):
         source=GAME/folder;template=(source/'check_native.c').read_text()
         include='#include "opening.c"' if folder=='opening' else '#include "gariland.c"'
         adapter='#define game_scenario cost_scenario\n'+include+'\n#undef game_scenario\nvoid game_scenario(u16 n){cost_scenario('+str(scenario)+');st.rot=(u8)n;st.want=255;cam_target(&st.camx,&st.camy);scene_rot=vbuf_rot=255;W->bg_ok=0;}\n'

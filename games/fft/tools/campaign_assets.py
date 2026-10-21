@@ -62,13 +62,16 @@ def main():
     Image.fromarray(np.uint8(255-canvas*85)).save(OUT/'academy.png')
     # Flip colours and masks bitwise; depth values are reversed in byte order only.
     # No retail texture is replaced or recomputed, preserving reviewed relief art.
+    TOP=16                                     # fft.h SC_TOP: rows above every view's scenery
     rev=np.array([int(f'{i:08b}'[::-1],2) for i in range(256)],np.uint8)
     def mirror_view(rot):
         raw=OUT/('view%d.raw'%rot)
         subprocess.run([HERE/'../../tools/bin/dzx0','-f',HERE/f'fftv{rot}.bin',raw],check=True,capture_output=True)
         planes=np.frombuffer(raw.read_bytes(),np.uint8).reshape(6,-1,40)[:,:,::-1].copy()
         for i in (0,1,3,5):planes[i]=rev[planes[i]]
-        (OUT/f'ffgv{rot}.bin').write_bytes(extract.zx0pack.pack(planes.tobytes()));raw.unlink()
+        assert not planes[:,:TOP].any(),('scenery above the crop',rot)
+        planes=planes[:,TOP:].copy()
+        (OUT/f'ffgv{rot}.bin').write_bytes(extract.zx0pack.pack(extract.rowxor_masks(planes.tobytes())));raw.unlink()
     if not args.reuse_views:
         with ThreadPoolExecutor(4) as pool:list(pool.map(mirror_view,range(4)))
     # Move unchanged byte tables out of the 64K executable, as in Orbonne.
@@ -105,3 +108,5 @@ if __name__=='__main__':
     main()
     import subprocess
     subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffgv0.bin'],check=True)
+    subprocess.run([sys.executable,HERE/'tools/common_ui.py','campaign'],check=True)  # ffcu, shared with the other chapter
+    subprocess.run([sys.executable,HERE/'tools/common_actors.py'],check=True)  # ffca/ffcb/ffcw, shared

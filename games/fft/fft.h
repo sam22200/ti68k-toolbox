@@ -10,6 +10,9 @@
 #define FFT_REACH_CONTOUR
 #endif
 #endif
+#if defined(FFT_OPENING) || (defined(FFT_STORY_GAR) && !defined(FFT_RAW_ACTORS))
+#define FFT_ACTOR_BANK                // chapter packages: actor frames from the common ffca/ffcb
+#endif
 
 typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py (walk 2:
                                                                     // crossed, not stopped on)
@@ -45,14 +48,26 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #include "opening/data/map.h"
 #else
 #include "units.h"
-#include "weapons.h"
+#if defined(FFT_STORY_GAR) && !defined(FFT_RAW_ACTORS)
+#include "campaign/data/weapons.h"            // blades alone: ffcw
+#include "campaign/data/actors.h"             // ffga: logical frames of ffca/ffcb
+#else
+#include "weapons.h"                          // FFT_RAW_ACTORS: the earlier raw fftu/fftw control
+#endif
+#ifdef FFT_STORY_GAR
+#include "campaign/data/interface.h"
+#else
 #include "interface.h"
+#endif
 #ifdef FFT_STORY_GAR
 #include "campaign/data/battle.h"
 #else
 #include "battle.h"
 #endif
 #include "map.h"
+#endif
+#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#include "ui_common.h"                     // ffcu: the interface both chapters share (tools/common_ui.py)
 #endif
 extern const Tile *map_tiles;           // read from ffti (fft.c)
 
@@ -64,12 +79,21 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 // Scene: the whole map for one orientation (fftv0..3 and the buffer the current one is copied to)
 #define SC_BYTES 40                    // 320 px
 #define SC_W (SC_BYTES * 8)
+// Per map: its views' rows (SC_H) once the rows above every view's scenery (SC_TOP) are cut.
 #ifdef FFT_OPENING
 #define SC_H 192                       // exact mesh bottom 190; no cropped walkable terrain
+#elif defined(FFT_STORY_GAR)
+#ifndef SC_TOP
+#define SC_TOP 16                      // Gariland: tools/campaign_assets.py crops and checks them
+#endif
+#define SC_H (HH * (MAP_W + MAP_H) + HU * MAXH + 8 - SC_TOP)
 #else
 #define SC_H (HH * (MAP_W + MAP_H) + HU * MAXH + 8)
 #endif
-#define SC_OY (HU * MAXH + 4)          // scene y of the top vertex of view tile (0, 0) at h 0
+#ifndef SC_TOP
+#define SC_TOP 0
+#endif
+#define SC_OY (HU * MAXH + 4 - SC_TOP) // scene y of the top vertex of view tile (0, 0) at h 0
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane
 
 // Fixed inspection uses direct cuts. FFT_CAMERA_MOTION explicitly opts into the

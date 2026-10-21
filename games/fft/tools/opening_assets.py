@@ -181,7 +181,7 @@ def map_assets(disc,files,number,prefix,chapel=False):
     (OUT/'map.h').write_text('// Local disc-generated; never committed.\n#define MAP_W %d\n#define MAP_H %d\n'%(nx,nz))
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(4) as ex:
-        for rot,data in enumerate(ex.map(extract.zx0pack.pack,raw)):(OUT/('ffov%d.bin'%rot)).write_bytes(data)
+        for rot,data in enumerate(ex.map(lambda r:extract.zx0pack.pack(extract.rowxor_masks(r)),raw)):(OUT/('ffov%d.bin'%rot)).write_bytes(data)
     return tiles,(nx,nz)
 
 def source_title(disc,files):
@@ -425,14 +425,7 @@ def main():
     blob=struct.pack('>%dH'%len(mapping),*mapping)+directory+data
     (OUT/'ffoa.bin').write_bytes(blob)
     (OUT/'units.h').write_text('// Generated locally; never committed.\nenum {'+','.join('UG_'+n for n,_,_ in CHARS)+',UNIT_GFX_N};\n#define UNIT_FRAMES 22\n#define UNIT_SH 26\n#define UNIT_FOOT 21\n#define UNIT_FB 208\nenum {P_HIT=10,P_WIND=12,P_BLOW=14,P_KNEEL=16,P_KO=18,P_THROW=20};\nenum {OBJ_CRYSTAL,OBJ_CHEST,OBJ_CHEST_UP1=9,OBJ_CHEST_UP2,OBJ_N};\n#define CRYSTAL_FRAMES 8\n#define UG_CHEMIST_F UG_CHEMIST_M\n#define UG_SQUIRE_F UG_KNIGHT_F\n#define ACTOR_ARMED %d\n#define ACTOR_OBJECTS %d\n#define ACTOR_DIR %d\n#define ACTOR_DATA %d\n'%(base,objbase,2*len(mapping),2*(len(mapping)+len(records))))
-    # The existing bounded blade cache reads unchanged blade records. Bodies are elsewhere.
-    oldw=(HERE/'fftw.bin').read_bytes();wh=(HERE/'weapons.h').read_text();(OUT/'weapons.h').write_text(wh)
-    import re
-    body=19968
-    for name in ('WEAPON_INDEX','WEAPON_ZOFF','WEAPON_OFF'):
-        wh=re.sub(r'(#define '+name+r' )(\d+)UL',lambda m:m[1]+str(int(m[2])-body)+'UL',wh)
-    (OUT/'weapons.h').write_text(wh)
-    (OUT/'ffow.bin').write_bytes(oldw[body:])
+    # Blades: tools/common_actors.py writes the shared ffcw and its weapons.h.
     # Only eight battle portraits and no unused 510-name dictionary. Scripted
     # characters use the fitted name badge, never their own portrait image.
     import re
@@ -491,3 +484,5 @@ if __name__=='__main__':
     main()
     import subprocess
     subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffov0.bin'],check=True)
+    subprocess.run([sys.executable,HERE/'tools/common_ui.py','opening'],check=True)  # ffcu, shared with the other chapter
+    subprocess.run([sys.executable,HERE/'tools/common_actors.py'],check=True)  # ffca/ffcb/ffcw, shared

@@ -48,58 +48,6 @@ static const char *opening_text(void)
     return s + st.open_offset;
 }
 
-static const u8 *opening_frame(u16 logical, u8 slot)
-{
-    static const u8 rev[16] = {0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
-    u16 frame_key = RD16(ugfx, logical), id = frame_key & 0x7FFF;
-    u8 *out = (u8 *)W->actor_gfx[slot];
-    if (W->actor_key[slot] != frame_key) {
-        u8 other;
-        // Shared job sprites often request a pose another actor already decoded.
-        // Reuse it without adding a second cache or consuming the decode quota.
-        for(other=0;other<NUNIT+2;other++)if(W->actor_key[other]==frame_key) {
-            memcpy(out,W->actor_gfx[other],UNIT_FB);W->actor_key[slot]=frame_key;
-            W->actor_copies++;return out;
-        }
-        // Animation alone can wait a frame; a new actor never borrows another's
-        // cached appearance. One ordinary miss per frame bounds decompression.
-        if(!W->actor_budget && W->actor_key[slot]!=0xFFFF && slot<NUNIT)return out;
-        if(W->actor_budget)W->actor_budget--;
-        ZB(20);
-        zx0_unpack(ugfx + ACTOR_DATA + RD16(ugfx + ACTOR_DIR, id), out);
-        if (frame_key & 0x8000) {
-            u8 *p = out, *end = out + UNIT_FB;
-            for (; p < end; p += 2) {
-                u8 a = p[0], b = p[1];
-                p[0] = (u8)(rev[b & 15] << 4 | rev[b >> 4]);
-                p[1] = (u8)(rev[a & 15] << 4 | rev[a >> 4]);
-            }
-        }
-        W->actor_key[slot] = frame_key;
-        W->actor_misses++;
-        ZE(20);
-    }
-    return out;
-}
-
-// Walking/action poses have priority; rotate the remaining decode opportunities
-// among visible actors so the frontmost unit cannot starve the other animations.
-static void opening_animate(const u8 *visible)
-{
-    u8 i,k;
-    if(st.mode==M_WALK && visible[st.sel])unit_frame(st.rot,st.sel);
-    if(st.mode==M_ACT) {
-        if(visible[st.atk])unit_frame(st.rot,st.atk);
-        if(visible[st.tgt])unit_frame(st.rot,st.tgt);
-    }
-    for(i=0;i<NUNIT && W->actor_budget;i++) {
-        k=W->actor_next;
-        if(++W->actor_next==NUNIT)W->actor_next=0;
-        if(visible[k])unit_frame(st.rot,k);
-    }
-    W->actor_budget=0;
-}
-
 static void opening_units(void)
 {
     u8 i,k;
@@ -218,7 +166,7 @@ static void opening_start(u16 n)
     opening_chapel=opening_story ? opening_story+RD16(opening_story,0):RT_NULL;
     if(opening_story)opening_story+=2;
     opening_units();memcpy(st.bag,bag_init,NBAG);
-    memset(W->actor_key,255,sizeof W->actor_key);W->actor_budget=255;W->actor_misses=W->actor_next=W->actor_copies=0;W->dialog_key=0xFFFF;
+    actor_reset();W->dialog_key=0xFFFF;
     W->bg_ok=W->hold=W->frz=W->status_i=0;W->pan_ok[0]=W->pan_ok[1]=0;
     W->win_k[0]=0;W->pan_k[0][0]=W->pan_k[1][0]=W->fc_key=0;
     scene_rot=vbuf_rot=0xFF;
@@ -247,7 +195,7 @@ static void opening_layout(void)
     while(s[at] && row<6){
         u16 start=at,last=at;u8 width=0,col=0,lastcol=0,lastwidth=0;
         while(s[at] && col<47){
-            u8 ch=(u8)s[at],adv=igfx[UI_ADV+(ch>=32&&ch<=126?ch-32:'?'-32)];
+            u8 ch=(u8)s[at],adv=UI_SHARED(ADV)[ch>=32&&ch<=126?ch-32:'?'-32];
             if(width+adv>146)break;
             if(ch==' '){last=at;lastcol=col;lastwidth=width;}
             width+=adv;at++;col++;
@@ -374,7 +322,7 @@ static u8 opening_update(void)
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical)
 {
     u8 pose=W->feet_k[slot]?walk_seq[st.tick&15]:0;
-    const u8 *g=opening_frame(W->feet_k[slot]&&gfx<11&&!(st.open_stage==OPEN_AFTER&&opening_beat()[3])?(u16)(gfx*44+(face&1?5:0)+pose+(face&2?22:0)):logical,slot);
+    const u8 *g=actor_frame(W->feet_k[slot]&&gfx<11&&!(st.open_stage==OPEN_AFTER&&opening_beat()[3])?(u16)(gfx*44+(face&1?5:0)+pose+(face&2?22:0)):logical,slot);
     RtSprite sp;u16 l[UNIT_SH],d[UNIT_SH],m[UNIT_SH];u8 r;
     Cover *c=&W->cover[slot<NUNIT?slot:0];u8 depth=face>>2;
     // Cached per-byte depth sampling, the tactical cover algorithm at stride 20.
@@ -430,7 +378,7 @@ static void opening_dialog_draw(void)
     u16 visible=st.open_reveal,from=cold?0:W->dialog_drawn;
     if(visible>from+8)visible=from+8;
     rt_light=W->status[0];rt_dark=W->status[1];
-    for(col=0;name[col];col++)nw+=igfx[UI_ADV+(u8)name[col]-32];
+    for(col=0;name[col];col++)nw+=UI_SHARED(ADV)[(u8)name[col]-32];
     if(nw>156)nw=156;
     if(cold){
         draw_rect(x,y,w,h,st.open_white?C_BLACK:C_WHITE);
@@ -459,7 +407,7 @@ static void opening_dialog_draw(void)
                     u8 color=n<visible?(st.open_white?C_BLACK:C_WHITE):n<visible+3?(st.open_white?C_DGRAY:C_LGRAY):(st.open_white?C_LGRAY:C_DGRAY);
                     ui_text(sx,y+4+row*7,ch,color,156);
                 }
-                sx+=igfx[UI_ADV+(u8)ch[0]-32];
+                sx+=UI_SHARED(ADV)[(u8)ch[0]-32];
             }
         }
         if(W->dialog_part<W->dialog_n)W->dialog_part++;
