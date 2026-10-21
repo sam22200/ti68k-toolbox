@@ -29,16 +29,25 @@ the title/chapel code moved to `fftscn`.
 ## Milestones (each checked: PC/TI checksums equal to the current references, unless a
 visual change is shown and validated)
 
-1. **M1 run-time chapter description.** The bank directory replaces `battle.h`,
-   `interface.h`, `units.h`/`actors.h` offsets, counts and small tables; map size, unit count
-   and scene crop are read at load. No behaviour change.
-2. **M2 general mechanics.** Orbonne's rule variants become data-driven paths of one
+1. **M1 run-time chapter description** (done). A descriptor (`ffod`, `ffgd`,
+   `tools/chapter_desc.py`) replaces `battle.h`/`interface.h`/actor offsets, counts and small
+   tables. It already carries map rows and the scene crop (`MAP_H`, `SC_H`, `SC_TOP`).
+2. **M2 scripts out of the program.** Beat/scene script format; `fftscn` replaces
+   `academy.c` and the title/chapel part of `opening.inc`; battle-map beats run in the engine
+   from the script. Frees most of Orbonne's ~4.9 KB of scenario code.
+3. **M3 general mechanics.** Orbonne's rule variants become data-driven paths of one
    implementation; Gariland must stay bit-identical.
-3. **M3 scripts.** Beat/scene script format; `fftscn` replaces `academy.c` and the title/
-   chapel part of `opening.inc`; battle-map beats run in the engine.
-4. **M4 one battle program.** `FFT_OPENING`/`FFT_STORY_GAR` disappear from `fft.c`; size cuts;
-   launcher; then one TiEmu run of the whole chain.
+4. **M4 one battle program.** Map rows and scene size become run-time values,
+   `FFT_OPENING`/`FFT_STORY_GAR` disappear from `fft.c`; size cuts; launcher; then one TiEmu
+   run of the whole chain.
+
+Measured: reading `MAP_H` and the plane size from variables costs ~400 bytes of code (~75
+uses, each an absolute address plus a relocation instead of an immediate), more than
+Orbonne's program can spare before M2; so it waits for M4. Table pointers (`jobs`, `items`,
+`abilities`, `skill_sets`, `unit_defs`) are globals set at load: smaller than the former
+constant offsets.
 
 ## Status
 
-- M1: in progress.
+- M1: done (descriptor; dimensions deferred to M4).
+- M2: next.

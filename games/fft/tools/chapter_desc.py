@@ -12,14 +12,21 @@ byte offset from the start of the descriptor (0: the chapter has none).
 from pathlib import Path
 import re
 import struct
+import subprocess
 import sys
+import tempfile
 
 HERE = Path(__file__).resolve().parents[1]
 # Numbers: header #define name (None: computed here)
 NUMBERS = [('NJOB', 'NJOB'), ('NITEM', 'NITEM'), ('NABIL', 'NABIL'), ('NSET', 'NSET'),
            ('SET_BASIC', 'SET_BASIC'), ('NRSM_PRE', 'NRSM_PRE'), ('DEFEND_JP', 'DEFEND_JP'),
            ('DEFEND_RATE', 'DEFEND_RATE'), ('NBAG', 'NBAG'), ('MAP_H', 'MAP_H'),
-           ('ACTOR_ARMED', 'ACTOR_ARMED'), ('ACTOR_OBJECTS', 'ACTOR_OBJECTS')]
+           ('ACTOR_ARMED', 'ACTOR_ARMED'), ('ACTOR_OBJECTS', 'ACTOR_OBJECTS'),
+           ('SC_H', None), ('SC_TOP', None)]
+# Rows cut above the scenery of every view (tools/campaign_assets.py TOP); SC_H is measured
+# on the views themselves (Orbonne's are cut at the bottom by tools/opening_assets.py).
+SC_TOP = {'opening': 0, 'campaign': 16}
+VIEW = {'opening': 'ffov1', 'campaign': 'ffgv1'}
 # Offsets into the chapter's interface bank (igfx): header names
 IGFX = [('JOBS', 'jobs'), ('ITEMS', 'items'), ('ABILITIES', 'abilities'), ('SKILL_SETS', 'skill_sets'),
         ('UNIT_DEFS', 'unit_defs'), ('PORTRAITS', 'UI_PORTRAITS'), ('MALE', 'UI_MALE'),
@@ -33,6 +40,13 @@ TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE
           ('CHARGE_TICKS', 'opening_charge_ticks', 'B')]
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES]
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
+
+
+def unzx0(stream):
+    with tempfile.TemporaryDirectory() as d:
+        src = Path(d) / 'i'; dst = Path(d) / 'o'; src.write_bytes(stream)
+        subprocess.run([HERE.parents[1] / 'tools/bin/dzx0', '-f', src, dst], check=True, capture_output=True)
+        return dst.read_bytes()
 
 
 def numbers(text, values):
@@ -118,8 +132,10 @@ def build(chapter):
     head = b'FCD1' + bytes(2 * len(FIELDS))
     body = bytearray(head)
     fields = {}
+    values['SC_TOP'] = SC_TOP[chapter]
+    values['SC_H'] = len(unzx0((folder / (VIEW[chapter] + '.bin')).read_bytes())) // (6 * 40)
     for f, name in NUMBERS:
-        fields[f] = values[name]
+        fields[f] = values[name or f]
     for f, name in IGFX:
         fields[f] = offsets.get(name, 0)
     text = '\n'.join(texts)

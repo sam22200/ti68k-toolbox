@@ -76,11 +76,11 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define NBAG CD(NBAG)
 #define ACTOR_ARMED CD(ACTOR_ARMED)
 #define ACTOR_OBJECTS CD(ACTOR_OBJECTS)
-#define jobs ((const Job *)(igfx + CD(JOBS)))
-#define items ((const Item *)(igfx + CD(ITEMS)))
-#define abilities ((const Ability *)(igfx + CD(ABILITIES)))
-#define skill_sets ((const SkillSet *)(igfx + CD(SKILL_SETS)))
-#define unit_defs ((const UnitDef *)(igfx + CD(UNIT_DEFS)))
+extern const Job *jobs;                       // in the chapter's igfx, set at load: one global
+extern const Item *items;                     // pointer, as small as the former constant offsets
+extern const Ability *abilities;
+extern const SkillSet *skill_sets;
+extern const UnitDef *unit_defs;
 #define UI_PORTRAITS CD(PORTRAITS)
 #define UI_MALE CD(MALE)
 #define UI_FEMALE CD(FEMALE)

@@ -177,6 +177,8 @@ static void actor_reset(void);
 #endif
 #ifdef FFT_CHAPTER
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
+const Job *jobs; const Item *items; const Ability *abilities;   // its tables in igfx
+const SkillSet *skill_sets; const UnitDef *unit_defs;
 static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
 #define UI_SHARED(s) (cgfx + UIC_##s)
 #else
@@ -3421,6 +3423,12 @@ void game_init(void)
     cdesc = rt_file("ffgd", RT_NULL);
 #endif
     if (!cgfx || !cdesc || RD16(cdesc, 0) != 0x4643 || RD16(cdesc, 1) != 0x4431) igfx = RT_NULL;
+    else {
+        jobs = (const Job *)(igfx + CD(JOBS)); items = (const Item *)(igfx + CD(ITEMS));
+        abilities = (const Ability *)(igfx + CD(ABILITIES));
+        skill_sets = (const SkillSet *)(igfx + CD(SKILL_SETS));
+        unit_defs = (const UnitDef *)(igfx + CD(UNIT_DEFS));
+    }
 #endif
     if (!igfx) { W = RT_NULL; return; }       // a message, ESC quits
     map_tiles = (const Tile *)(igfx + UI_TILES);
