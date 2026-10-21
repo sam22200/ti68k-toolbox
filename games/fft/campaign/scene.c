@@ -62,10 +62,10 @@ static u16 pic_stride, pic_plane;
 #define UI_SHARED(s) (cgfx + UIC_##s)
 static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 };
 
-static void cover(u16 *cm, s16 x, s16 y, u8 depth) { (void)cm; (void)x; (void)y; (void)depth; }
 #include "../actors.inc"
 #include "../text.inc"
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
+#define BEATS_PICTURE
 #include "../beats.inc"
 
 static const u8 *step_at(u8 i) { return set + 12 + 8 * i; }
@@ -143,12 +143,14 @@ void game_scenario(u16 n)
     if (!W || !set || !cgfx || !abank[0] || !abank[1] || RD16(set, 0) != 0x4653) { set = RT_NULL; return; }
     {
         char map[7]; memcpy(map, set + 4, 6); map[6] = 0;
-        amap = rt_file(map, RT_NULL);
-        if (!amap) { set = RT_NULL; return; }
+        amap = *map ? rt_file(map, RT_NULL) : RT_NULL;   // (no actors: no pose table)
+        if (*map && !amap) { set = RT_NULL; return; }
     }
     memset(W, 0, sizeof *W);
     actor_reset(); W->dialog_key = 0xFFFF;
     step_start();
+    if (!st.done && step_at(st.step)[0] == STEP_CARD && step_at(st.step)[1] & 1)
+        st.open_fade = 9;               // the previous program faded out: this card fades in
 }
 
 u8 game_update(void)
@@ -156,8 +158,9 @@ u8 game_update(void)
     if (!set) return !input_pressed(K_ESC);
     W->actor_budget = 1; W->actor_misses = 0; W->ac_now++;
     st.tick++; if (st.open_clock < 250) st.open_clock++;
-    if (st.open_fade) {
-        if (++st.open_fade == 9) { st.open_fade = 0; next_step(); return !st.done; }
+    if (st.open_fade) {                 // out over 8 frames, the next step in over 8 more
+        if (++st.open_fade == 9) { next_step(); if (st.done) return 0; st.open_fade = 9; }
+        else if (st.open_fade >= 17) st.open_fade = 0;
         return !input_pressed(K_ESC);
     }
     if (st.open_stage == OPEN_TITLE) {

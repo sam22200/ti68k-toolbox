@@ -50,4 +50,14 @@ constant offsets.
 ## Status
 
 - M1: done (descriptor; dimensions deferred to M4).
-- M2: next.
+- M2: in progress. The scene player (`campaign/scene.c`, fftscn, 12,029 bytes) plays
+  Orbonne's title and chapel (`ffs0`) and the chapter card (`ffs1`); their screens equal
+  the opening program's former ones (title/chapel checksums, card 1523). The opening
+  program starts at the gate (the end of the scene player's fade) and hands over after the
+  aftermath: its packed core is 45,215 bytes and now passes TTPack. The aftermath is
+  identical frame by frame; from the gate, only frame-counter phases differ (the dialogue's
+  continuation blink, banner sweep, idle poses), the counter restarting with the program.
+  The chain: fftscn(0), fftopen, fftscn(1), fftacad, fftgar (test door 99: fftopen(5),
+  fftscn(1), fftacad(14), fftgar(61)). Next: the Academy as a scene set, then the map
+  beats as a generic script in the engine.
+- Known limit: the white dialogue palette (CATALOG) does not carry over between programs.

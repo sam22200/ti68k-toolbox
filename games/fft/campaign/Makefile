@@ -4,7 +4,7 @@ TESTS := test_academy.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffac ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcu ffcw ffca ffcb
+BANKS := ffac ffs1 ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle
@@ -12,6 +12,11 @@ check: pc test $(TI_FILES)
 	$(PY) check.py
 test: status-test
 test: dialogue-test
+test: scene-test
+.PHONY: scene-test
+scene-test: data/ffs1.bin
+	$(CC) $(PC_CFLAGS) -o fftscn_test test_scene.c $(RT_CORE) $(RT_SW)
+	./fftscn_test
 .PHONY: dialogue-test
 dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftacad_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
@@ -36,11 +41,12 @@ packed: $(TI_FILES)
 	$(MAKE) -C ../opening packed
 	$(ROOT)/tools/bin/ti-cc -o fftacad -pack ffacore native_academy.c $(RT_CORE) $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftgar -pack ffgcore gariland.c $(RT_CORE) $(RT)platform-ti68k/rt_ti.c $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
+	$(ROOT)/tools/bin/ti-cc -o fftscn native_scene.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftstory launcher.c
 	python3 -c "from pathlib import Path; files=[Path('ffacore.89y'),Path('ffgcore.89y')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
 bundle: packed
 	@mkdir -p x
-	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod)) fftacad.89z ffacore.89y fftgar.89z ffgcore.89y $(TI_FILES)
+	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0)) fftscn.89z fftacad.89z ffacore.89y fftgar.89z ffgcore.89y $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:
@@ -55,3 +61,6 @@ fftintro_pc fftgar_pc fftgar_status_test fftacad_dialogue_test: | contour-assets
 
 data/ffgd.bin: ../tools/chapter_desc.py data/battle.h data/interface.h ../map.h data/actors.h
 	$(PY) ../tools/chapter_desc.py campaign
+
+data/ffs1.bin: ../tools/scenes.py
+	$(PY) ../tools/scenes.py

@@ -20,12 +20,13 @@ def main():
     results=[]
     for name,flags,banks,cases in (
         ('academy',[],['ffac'],[('text',0,90,empty),('complete',0,1000,advance)]),
+        ('scene',['-DCHECK_SCENE'],['ffs1','ffcu','ffca','ffcb'],[('card',1,30,empty),('card-enter',1,40,advance)]),
         ('gariland',['-DCHECK_GAR'],['ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcu','ffcw','ffca','ffcb'],
          [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']
             if not cases:continue
-        if '--academy-only' in sys.argv and name!='academy':continue
+        if '--academy-only' in sys.argv and name not in ('academy','scene'):continue
         common=[HERE/'check_native.c',ROOT/'runtime/core/rt_core.c']
         run(['cc','-std=gnu99','-O1',*flags,'-o',OUT/name,*common,ROOT/'runtime/platform-sw/rt_sw.c'])
         run([ROOT/'tools/bin/ti-cc','-o',OUT/(name+'c'),'-DRT_CYCLES',*flags,*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])

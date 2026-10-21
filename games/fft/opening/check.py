@@ -23,7 +23,7 @@ def main():
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     base=[ROOT/'tools/bin/ti-cycles','--max',10000]
     for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
-    cases=[('title',0,30,empty),('launch-title',0,30,launch),('title-complete',0,120,empty),('prayer',0,240,empty),('prayer-white',0,240,palette),('chapel-long',0,420,intro),('story-to-fight',0,1200,intro),('player',1,60,empty),('rotations',1,100,rotations),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,950,intro)]
+    cases=[('gate',0,60,empty),('story-to-fight',0,700,intro),('player',1,60,empty),('rotations',1,100,rotations),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,400,intro)]
     checks=[]
     for name,scenario,frames,keys in cases:
         pc=run([OUT/'oracle',scenario,frames,keys,OUT/(name+'-pc.png')])
@@ -46,17 +46,17 @@ def main():
                 native_game_heap_bytes=8*40*192+checks[0]['native_work_bytes'],native_grayscale_heap_bytes=3840+7688,
                 native_checked_binary_bytes=(OUT/'openchk.89z').stat().st_size,archive_bytes=sum((DATA/(n+'.bin')).stat().st_size for n in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb')))
     (OUT/'checked.json').write_text(json.dumps(report,indent=2)+'\n');print('Opening: %d complete PC/TI pixels + tactical-state checkpoints passed'%len(checks))
-    # The scene player (campaign/scene.c) plays the same title and chapel from ffs0: every
-    # screen must equal the opening program's at the same frame, on the PC and the 68000.
+    # The scene player (campaign/scene.c) plays the title and chapel from ffs0. These screens
+    # are the ones the opening program showed before they moved (same frames and keys).
     run(['cc','-std=gnu99','-O1','-DCHECK_SCENE','-o',OUT/'scene',HERE/'../campaign/check_native.c',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     run([ROOT/'tools/bin/ti-cc','-o',OUT/'scenechk','-DRT_CYCLES','-DCHECK_SCENE',HERE/'../campaign/check_native.c',*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     sbase=[ROOT/'tools/bin/ti-cycles','--max',10000]
     for name in ('ffs0','ffoa','ffca','ffcb','ffcu'):sbase+=['--file',DATA/(name+'.89y')]
-    shown={c['case']:c['checksum'] for c in checks}
-    for name,scenario,frames,keys in cases[:6]:
+    shown={'title':'AFE4','launch-title':'AFE4','title-complete':'B16A','prayer':'3AA3','prayer-white':'38F6','chapel-long':'C903'}
+    for name,scenario,frames,keys in (('title',0,30,empty),('launch-title',0,30,launch),('title-complete',0,120,empty),('prayer',0,240,empty),('prayer-white',0,240,palette),('chapel-long',0,420,intro)):
         pc=run([OUT/'scene',scenario,frames,keys,OUT/(name+'-scene-pc.png')])
         ti=run([*sbase,'--arg',scenario,'--frames',frames,'--keys',keys,'--png',OUT/(name+'-scene-ti.png'),OUT/'scenechk.89z'])
         a=re.search(r'checksum (\w+)',pc)[1];b=re.search(r'checksum\s+(\w+)',ti)[1]
         assert a.lower()==b.lower()==shown[name].lower(),(name,'scene',a,b,shown[name])
-    print('Scene player: %d title/chapel screens equal the opening program\'s, PC and 68000'%6)
+    print('Scene player: %d title/chapel screens as before they moved, PC and 68000'%len(shown))
 if __name__=='__main__':main()

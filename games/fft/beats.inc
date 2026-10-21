@@ -1,6 +1,13 @@
 // Beats: a scripted scene step (actors, a dialogue or a silent hold), shared by the battle
 // engine's map scenes (opening.inc) and the scene player (campaign/scene.c). The includer
 // provides st.open_*, W->dialog*/feet*/cover/status, cover(), actor_frame(), ui_text().
+// BEATS_PICTURE (the scene player): beats over a picture with depth (vbuf, CHAPEL_*), panned;
+// otherwise over the battle map, its camera and its cover masks.
+#ifdef BEATS_PICTURE
+#define ON_PICTURE 1
+#else
+#define ON_PICTURE 0
+#endif
 static const u8 *opening_beat(void)
 {
     return opening_story + RD16(opening_story + 2, st.open_beat);
@@ -69,7 +76,7 @@ static void opening_positions(void)
         if(!(st.open_seen&(1U<<slot))){
             W->actor_key[slot]=0xFFFF; // a scripted role never borrows a battle actor's body
             W->feet[slot].x=x;W->feet[slot].y=y;
-            if(st.open_stage==OPEN_CHAPEL&&gfx<9){W->feet[slot].x-=40;W->feet[slot].y+=20;}
+            if(ON_PICTURE&&gfx<9){W->feet[slot].x-=40;W->feet[slot].y+=20;}
             if(st.open_stage==OPEN_AFTER&&gfx==11)W->feet[slot].x-=64;
             st.open_seen|=(u16)(1U<<slot);W->cover[slot].rot=255;
         }
@@ -81,7 +88,7 @@ static void opening_positions(void)
         if(W->feet[slot].y!=y)W->feet[slot].y+=y>W->feet[slot].y?1:-1;
     }
     if(st.open_stage==OPEN_AFTER&&b[3])st.open_seen|=0x8000;
-    if(st.open_stage==OPEN_CHAPEL && !(st.tick&3)){
+    if(ON_PICTURE && !(st.tick&3)){
         if(st.open_pan<b[3])st.open_pan+=8;
         else if(st.open_pan>b[3])st.open_pan-=8;
     }
@@ -95,10 +102,14 @@ static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical)
     Cover *c=&W->cover[slot<NUNIT?slot:0];u8 depth=face>>2;
     // Cached per-byte depth sampling, the tactical cover algorithm at stride 20.
     // Six actors x 26 x 16 per-pixel tests cost ~0.9M cycles in the first version.
-    if(c->x!=x||c->y!=y||c->depth!=depth||c->rot!=(st.open_stage==OPEN_CHAPEL?42:43)){
+    if(c->x!=x||c->y!=y||c->depth!=depth||c->rot!=(ON_PICTURE?42:43)){
+#ifdef BEATS_PICTURE
         s16 bx=(x-8)>>3,shift=(x-8)&7;
-        if(st.open_stage!=OPEN_CHAPEL)cover(c->cm,x,y,depth);
-        else for(r=0;r<UNIT_SH;r++){
+#endif
+#ifndef BEATS_PICTURE
+        cover(c->cm,x,y,depth);
+#else
+        for(r=0;r<UNIT_SH;r++){
             s16 sy=y-UNIT_FOOT+r;u32 bits=0;u8 j;
             for(j=0;j<3;j++){
                 u8 bit=0;s16 sx=bx+j;
@@ -111,16 +122,17 @@ static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical)
             }
             c->cm[r]=(u16)(bits>>(8-shift));
         }
-        c->x=x;c->y=y;c->depth=depth;c->rot=st.open_stage==OPEN_CHAPEL?42:43;
+#endif
+        c->x=x;c->y=y;c->depth=depth;c->rot=ON_PICTURE?42:43;
     }
     for(r=0;r<UNIT_SH;r++){
         // The rear abduction is a staged foreground shot: the static battle
         // mesh lacks the original event's moving/hidden parts. Preserve the
         // tactical terrain shader in battle and the chapel's own cover here.
-        u16 covered=st.open_stage==OPEN_CHAPEL?c->cm[r]&RD16(g,3*UNIT_SH+r):0;
+        u16 covered=ON_PICTURE?c->cm[r]&RD16(g,3*UNIT_SH+r):0;
         l[r]=RD16(g,r)&~covered;d[r]=RD16(g,UNIT_SH+r)&~covered;m[r]=RD16(g,2*UNIT_SH+r);
     }
-    sp.w=16;sp.h=UNIT_SH;sp.light=l;sp.dark=d;sp.mask=m;draw_sprite(x-8-(st.open_stage==OPEN_CHAPEL?st.open_pan:st.camx),y-UNIT_FOOT-(st.open_stage==OPEN_CHAPEL?0:st.camy),&sp);
+    sp.w=16;sp.h=UNIT_SH;sp.light=l;sp.dark=d;sp.mask=m;draw_sprite(x-8-(ON_PICTURE?st.open_pan:st.camx),y-UNIT_FOOT-(ON_PICTURE?0:st.camy),&sp);
 }
 
 static void opening_copy_rect(s16 x,s16 y,u8 w,u8 h)

@@ -1,9 +1,10 @@
-// Native opening adapter for the common tactical engine. Immutable content is in
-// local archive banks; the chapel reuses the tactical view and Status buffers.
+// Native opening adapter for the common tactical engine: the beats played on the battle map
+// (gate, banter, aftermath) and the battle. The title and chapel before it and the chapter
+// card after it are the scene player's (campaign/scene.c, ffs0/ffs1).
 #include "data/story.h"
 typedef char OpeningDiskLayout[(sizeof(UnitDef)==24 && sizeof(Item)==23 && sizeof(Job)==14 && sizeof(Ability)==24 && sizeof(SkillSet)==18)?1:-1];
 enum { OPEN_PLAY, OPEN_TITLE, OPEN_CHAPEL, OPEN_GATE, OPEN_AFTER, OPEN_DONE, OPEN_BANTER };
-static const u8 *opening_story, *opening_chapel, *opening_title;
+static const u8 *opening_story;
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
 static void opening_stage(u8 stage);
 #include "../beats.inc"
@@ -136,7 +137,6 @@ static void opening_start(u16 n)
     memset(&st,0,sizeof st);if(!W)return;
     st.want=st.prot=st.ai_view=255;rt_seed=97;rand_seed(97);
     opening_story=rt_file("ffost",RT_NULL);
-    opening_chapel=opening_story ? opening_story+RD16(opening_story,0):RT_NULL;
     if(opening_story)opening_story+=2;
     opening_units();memcpy(st.bag,bag_init,NBAG);
     actor_reset();W->dialog_key=0xFFFF;
@@ -145,17 +145,12 @@ static void opening_start(u16 n)
     scene_rot=vbuf_rot=0xFF;
     st.rot=2;st.act=st.sel=U_RAMZA;st.cx=st.unit[0].x;st.cz=st.unit[0].z;st.mode=M_BROWSE;
     cam_target(&st.camx,&st.camy);
-    if(n==5){opening_stage(OPEN_DONE);return;} // AMS chapter-loader injection door
+    if(n==5){st.open_stage=OPEN_DONE;return;} // AMS chapter-loader injection door: over at once
     if(n==1||n==2||n==3){
         opening_battle(n==1);
         if(n==2)st.ai_all=1;
         if(n==3)opening_stage(OPEN_AFTER);
-    }else{
-        st.open_stage=OPEN_TITLE;opening_find(2);st.open_pan=48;
-        if(opening_chapel)zx0_unpack(opening_chapel,vbuf);
-        opening_title=opening_chapel+OPENING_CHAPEL_BYTES;
-
-    }
+    }else{opening_stage(OPEN_GATE);st.open_fade=9;}   // the end of the scene player's fade
 }
 
 
@@ -164,8 +159,7 @@ static void opening_stage(u8 stage)
     st.open_stage=stage;st.open_clock=0;st.open_seen=0;
     memset(W->actor_key,255,sizeof W->actor_key);
     W->dialog_key=0xFFFF;W->bg_ok=W->hold=W->frz=0;
-    if(stage==OPEN_CHAPEL){opening_find(2);st.open_pan=48;}
-    else if(stage==OPEN_GATE){opening_find(4);scene_rot=vbuf_rot=255;}
+    if(stage==OPEN_GATE){opening_find(4);scene_rot=vbuf_rot=255;}
     else if(stage==OPEN_BANTER)opening_find(5);
     else if(stage==OPEN_PLAY)opening_battle(0);
     else if(stage==OPEN_AFTER){
@@ -188,15 +182,16 @@ static void opening_advance(void)
         st.open_beat++;
         if(opening_beat()[0]==event){opening_dialog_reset();return;}
     }
-    if(st.open_stage==OPEN_CHAPEL)opening_transition(OPEN_GATE);
-    else if(st.open_stage==OPEN_GATE){opening_stage(OPEN_BANTER);}
+    if(st.open_stage==OPEN_GATE){opening_stage(OPEN_BANTER);}
     else if(st.open_stage==OPEN_BANTER)opening_transition(OPEN_PLAY);
     else opening_transition(OPEN_DONE);
 }
 
 static u8 opening_update(void)
 {
-    if(!W||!opening_story||!opening_chapel)return !input_pressed(K_ESC);
+    if(!W||!opening_story)return !input_pressed(K_ESC);
+    // A completed prologue hands over to the scene player's chapter card, never a replay.
+    if(st.open_stage==OPEN_DONE){st.open_handoff=1;return 0;}
     st.tick++;if(st.open_clock<250)st.open_clock++;
     if(!st.open_stage&&!st.open_fade)opening_transition(OPEN_AFTER);
     if(st.open_fade){
@@ -204,22 +199,10 @@ static u8 opening_update(void)
         else if(st.open_fade>=17)st.open_fade=0;
         return !input_pressed(K_ESC);
     }
-    if(st.open_stage==OPEN_TITLE){
-        // Do not consume the ENTER which launched the packed program. Finish
-        // the source-letter reveal and leave a readable hold before skipping.
-        if(st.open_clock>=150||(st.open_clock>=110&&input_pressed(K_A|K_ENTER)))opening_stage(OPEN_CHAPEL);
-        return !input_pressed(K_ESC);
-    }
-    if(st.open_stage==OPEN_DONE){
-        // A completed prologue is a handoff, never an implicit replay.
-        if(input_pressed(K_A|K_ENTER)){st.open_handoff=1;return 0;}
-        return !input_pressed(K_ESC);
-    }
-    if(st.open_stage==OPEN_CHAPEL||st.open_stage==OPEN_AFTER)opening_positions();
+    if(st.open_stage==OPEN_AFTER)opening_positions();
     if(input_pressed(K_CATALOG)){st.open_white^=1;W->dialog_key=0xFFFF;}
     if(input_pressed(K_B)){
-        if(st.open_stage==OPEN_CHAPEL)opening_transition(OPEN_GATE);
-        else if(st.open_stage==OPEN_GATE||st.open_stage==OPEN_BANTER)opening_transition(OPEN_PLAY);
+        if(st.open_stage==OPEN_GATE||st.open_stage==OPEN_BANTER)opening_transition(OPEN_PLAY);
         else if(st.open_stage==OPEN_AFTER)opening_transition(OPEN_DONE);
         return 1;
     }
@@ -247,40 +230,13 @@ static u8 opening_update(void)
 static void opening_render(void)
 {
     u8 i;
-    if(!opening_story||!opening_chapel){draw_rect(0,0,160,100,C_WHITE);ui_text(3,40,"Missing opening banks",C_BLACK,160);return;}
-    if(st.open_stage==OPEN_TITLE){
-        u8 col,y;u16 sweep=(u16)st.open_clock*2;
-        draw_rect(0,0,160,100,C_BLACK);
-        for(col=0;col<18;col++){
-            const u8 *p=opening_title+(u16)col*42;u8 l[14],d[14],m[14],white=0,mid=0,dim=0,x;
-            for(x=0;x<8;x++){
-                s16 delta=(s16)sweep-col*8-x;u8 bit=0x80>>x;
-                if(delta>=16)white|=bit;else if(delta>=8)mid|=bit;else if(delta>=0)dim|=bit;
-            }
-            for(y=0;y<14;y++){
-                u8 ink=(u8)~p[28+y];m[y]=(u8)~(ink&(white|mid|dim));
-                l[y]=(p[y]&white)|(ink&mid);d[y]=(p[14+y]&white)|(ink&dim);
-            }
-            {RtSprite sp={8,14,l,d,m};draw_sprite(8+col*8,42,&sp);}
-        }
-        return;
-    }
-    if(st.open_stage==OPEN_DONE){
-        draw_rect(0,0,160,100,C_BLACK);
-        ui_text(14,28,"Chapter 1",C_WHITE,158);
-        ui_text(14,45,"The Meager",C_WHITE,158);
-        ui_text(14,74,"ENTER: Military Academy",C_LGRAY,158);
-    }else{
+    if(!opening_story){draw_rect(0,0,160,100,C_WHITE);ui_text(3,40,"Missing opening banks",C_BLACK,160);return;}
+    if(st.open_stage==OPEN_DONE)draw_rect(0,0,160,100,C_BLACK);   // the fade's last, black frame
+    else{
         const u8 *b=opening_beat(),*a=b+4;
         ZB(21);
-        if(st.open_stage==OPEN_CHAPEL){
-            for(i=0;i<100;i++){
-                u16 at=(u16)i*CHAPEL_STRIDE+(st.open_pan>>3);
-                memcpy((u8*)rt_light+i*RT_PBYTES,vbuf+at,20);
-                memcpy((u8*)rt_dark+i*RT_PBYTES,vbuf+CHAPEL_PLANE+at,20);
-            }
-        }else{ensure_scene(st.rot);copy_view();}
-        if(st.open_stage==OPEN_CHAPEL||st.open_stage==OPEN_AFTER){
+        ensure_scene(st.rot);copy_view();
+        if(st.open_stage==OPEN_AFTER){
             for(i=0;i<b[1];i++,a+=8){
                 u8 slot=a[0]>>4;
                 opening_actor(a[0]&15,slot,W->feet[slot].x,W->feet[slot].y,a[1],RD16(a+6,0));
