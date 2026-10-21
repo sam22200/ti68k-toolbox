@@ -486,3 +486,4 @@ if __name__=='__main__':
     subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffov0.bin'],check=True)
     subprocess.run([sys.executable,HERE/'tools/common_ui.py','opening'],check=True)  # ffcu, shared with the other chapter
     subprocess.run([sys.executable,HERE/'tools/common_actors.py'],check=True)  # ffca/ffcb/ffcw, shared
+    subprocess.run([sys.executable,HERE/'tools/chapter_desc.py','opening'],check=True)  # its descriptor

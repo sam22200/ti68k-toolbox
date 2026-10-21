@@ -100,8 +100,8 @@ def main():
         f = tempfile.NamedTemporaryFile(mode='w', dir=GAME, prefix='.ring-original-', suffix='.c', delete=False)
         f.write(original); f.close(); old_source = Path(f.name); temporary.append(old_source)
         for scene, opening, scenario, banks in (
-            ('orbonne', True, 1, ['ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffcu','ffcw','ffca','ffcb']),
-            ('gariland', False, 61, ['ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffcu','ffcw','ffca','ffcb'])):
+            ('orbonne', True, 1, ['ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb']),
+            ('gariland', False, 61, ['ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcu','ffcw','ffca','ffcb'])):
             source = GAME/('opening' if opening else 'campaign')
             template = (source/'check_native.c').read_text()
             # Host-only instrumentation records the actual reach independently

@@ -36,6 +36,7 @@ def common():
     data = b''; lines = ['// Generated locally by tools/common_ui.py; never committed.']
     for n in SHARED:
         lines.append('#define UIC_%s %dUL' % (n, len(data))); data += parts[n]
+    lines += re.findall(r'#define BN_\w+ [^\n]+', header)       # the banners' layout
     (HERE / 'ui_common.h').write_text('\n'.join(lines) + '\n')
     return data, parts
 

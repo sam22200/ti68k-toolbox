@@ -22,7 +22,7 @@ def main():
     reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     base=[ROOT/'tools/bin/ti-cycles','--max',10000]
-    for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
+    for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
     cases=[('title',0,30,empty),('launch-title',0,30,launch),('title-complete',0,120,empty),('prayer',0,240,empty),('prayer-white',0,240,palette),('chapel-long',0,420,intro),('story-to-fight',0,1200,intro),('player',1,60,empty),('rotations',1,100,rotations),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,950,intro)]
     checks=[]
     for name,scenario,frames,keys in cases:
@@ -44,6 +44,6 @@ def main():
         checks.append(check);print(json.dumps(check),flush=True)
     report=dict(measurement='Actual TI binary, MC68000 datasheet cycles, grayscale/interrupt/frame-wait overhead excluded; no PC FPS inference.',checks=checks,
                 native_game_heap_bytes=8*40*192+checks[0]['native_work_bytes'],native_grayscale_heap_bytes=3840+7688,
-                native_checked_binary_bytes=(OUT/'openchk.89z').stat().st_size,archive_bytes=sum((DATA/(n+'.bin')).stat().st_size for n in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffcu','ffcw','ffca','ffcb')))
+                native_checked_binary_bytes=(OUT/'openchk.89z').stat().st_size,archive_bytes=sum((DATA/(n+'.bin')).stat().st_size for n in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb')))
     (OUT/'checked.json').write_text(json.dumps(report,indent=2)+'\n');print('Opening: %d complete PC/TI pixels + tactical-state checkpoints passed'%len(checks))
 if __name__=='__main__':main()

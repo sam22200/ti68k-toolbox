@@ -175,7 +175,8 @@ void SpriteX8_MIRROR_H_R(unsigned short height asm("%d0"), const unsigned char *
 #endif
 static void actor_reset(void);
 #endif
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
+static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
 static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
 #define UI_SHARED(s) (cgfx + UIC_##s)
 #else
@@ -540,7 +541,7 @@ void battle_units(void)
         u->brave = d->brave ? d->brave : (u8)(45 + ((30UL * rand15()) >> 15));
         u->faith = d->faith ? d->faith : (u8)(45 + ((30UL * rand15()) >> 15));
         if (!day) day = (u16)(1 + ((365UL * rand15()) >> 15));
-        for (k = 0; k < 12 && day >= zodiac_days[k]; k++) ;
+        for (k = 0; k < 12 && day >= ZODIAC_DAY(k); k++) ;
         u->zodiac = (u8)((k + 9) % 12);
         for (k = 0; k < 5; k++)
             u->raw[k] = ((u32)gen_base[d->type][k] << 14) + (((u32)rand15() * gen_var[d->type][k]) >> 1);
@@ -3412,9 +3413,14 @@ void game_init(void)
     if (!abank[0] || !abank[1]) igfx = RT_NULL;
     else abank_n0 = RD16(abank[0], 0);
 #endif
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
     cgfx = rt_file("ffcu", RT_NULL);
-    if (!cgfx) igfx = RT_NULL;
+#ifdef FFT_OPENING
+    cdesc = rt_file("ffod", RT_NULL);
+#else
+    cdesc = rt_file("ffgd", RT_NULL);
+#endif
+    if (!cgfx || !cdesc || RD16(cdesc, 0) != 0x4643 || RD16(cdesc, 1) != 0x4431) igfx = RT_NULL;
 #endif
     if (!igfx) { W = RT_NULL; return; }       // a message, ESC quits
     map_tiles = (const Tile *)(igfx + UI_TILES);

@@ -40,36 +40,78 @@ typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 j
 #define SET_N 6                                // abilities per skill set at most
 typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
+#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+// Chapter packages: the per-chapter numbers, tables and offsets come from the chapter's
+// descriptor (tools/chapter_desc.py, campaign/ENGINE.md), read at load, not from headers.
+#define FFT_CHAPTER
+#endif
+#ifdef FFT_CHAPTER
 #ifdef FFT_OPENING
 #include "opening/data/units.h"
-#include "opening/data/weapons.h"
-#include "opening/data/interface.h"
-#include "opening/data/battle.h"
 #include "opening/data/map.h"
 #else
 #include "units.h"
-#if defined(FFT_STORY_GAR) && !defined(FFT_RAW_ACTORS)
-#include "campaign/data/weapons.h"            // blades alone: ffcw
-#include "campaign/data/actors.h"             // ffga: logical frames of ffca/ffcb
-#else
-#include "weapons.h"                          // FFT_RAW_ACTORS: the earlier raw fftu/fftw control
-#endif
-#ifdef FFT_STORY_GAR
-#include "campaign/data/interface.h"
-#else
-#include "interface.h"
-#endif
-#ifdef FFT_STORY_GAR
-#include "campaign/data/battle.h"
-#else
-#include "battle.h"
-#endif
 #include "map.h"
 #endif
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
-#include "ui_common.h"                     // ffcu: the interface both chapters share (tools/common_ui.py)
+#ifdef FFT_RAW_ACTORS
+#include "weapons.h"                          // the earlier raw fftu/fftw control (Gariland)
+#else
+#include "campaign/data/weapons.h"            // blades alone: ffcw (both chapters' copies match)
+#endif
+#include "ui_common.h"                        // ffcu: the interface both chapters share
+#include "chapter.h"
+#undef ACTOR_ARMED
+#undef ACTOR_OBJECTS
+#define NUNIT 11                              // units per battle at most (both chapters: 11)
+#define BAG_MAX 5                             // bag slots at most
+#define CD(f) RD16(cdesc, CD_##f)
+#define NJOB CD(NJOB)
+#define NITEM CD(NITEM)
+#define NABIL CD(NABIL)
+#define NSET CD(NSET)
+#define SET_BASIC CD(SET_BASIC)
+#define NRSM_PRE CD(NRSM_PRE)
+#define DEFEND_JP CD(DEFEND_JP)
+#define DEFEND_RATE CD(DEFEND_RATE)
+#define NBAG CD(NBAG)
+#define ACTOR_ARMED CD(ACTOR_ARMED)
+#define ACTOR_OBJECTS CD(ACTOR_OBJECTS)
+#define jobs ((const Job *)(igfx + CD(JOBS)))
+#define items ((const Item *)(igfx + CD(ITEMS)))
+#define abilities ((const Ability *)(igfx + CD(ABILITIES)))
+#define skill_sets ((const SkillSet *)(igfx + CD(SKILL_SETS)))
+#define unit_defs ((const UnitDef *)(igfx + CD(UNIT_DEFS)))
+#define UI_PORTRAITS CD(PORTRAITS)
+#define UI_MALE CD(MALE)
+#define UI_FEMALE CD(FEMALE)
+#define UI_TILES CD(TILES)
+#define OPENING_RAW CD(UNIT_RAW)
+#define OPENING_NAMES CD(UNIT_NAMES)
+#define OPENING_WATER CD(WATER)
+#define rsm_pre ((const u8 (*)[2])(cdesc + CD(RSM_PRE)))
+#define bag_init (cdesc + CD(BAG_INIT))
+#define gen_base ((const u8 (*)[5])(cdesc + CD(GEN_BASE)))
+#define gen_var ((const u8 (*)[5])(cdesc + CD(GEN_VAR)))
+#define ZODIAC_DAY(k) RD16(cdesc + CD(ZODIAC_DAYS), k)
+#define zodiac_compat (cdesc + CD(ZODIAC_COMPAT))
+#define opening_zodiac (cdesc + CD(UNIT_ZODIAC))
+#define opening_range (cdesc + CD(WEAPON_RANGE))
+#define opening_evade (cdesc + CD(SHIELD_EVADE))
+#define opening_charge_ticks (cdesc + CD(CHARGE_TICKS))
+#else
+#include "units.h"
+#include "weapons.h"
+#include "interface.h"
+#include "battle.h"
+#include "map.h"
 #endif
 extern const Tile *map_tiles;           // read from ffti (fft.c)
+#ifndef BAG_MAX
+#define BAG_MAX NBAG
+#endif
+#ifndef ZODIAC_DAY
+#define ZODIAC_DAY(k) zodiac_days[k]
+#endif
 
 // Projection (scene pixels): a tile is a 24x12 diamond, one height unit is 6 px.
 #define HW 12                          // half tile width
@@ -224,7 +266,7 @@ typedef struct {
                                        // removed (AB_CURE)
     u16 self;                          // HP the user loses (Wish)
     u8 abil, sub, skill;               // the ability (NO_ABIL: Attack); M_ACTS's and M_SKILLS's entries
-    u8 bag[NBAG];                      // the party's items
+    u8 bag[BAG_MAX];                   // the party's items
     u8 gain, lvup, jpg;                // M_ACT: the EXP the user earned (0 none), its level up,
                                        // its JP
     u8 pick, pick_t;                   // M_PICK: the item (items[] index; 0xFF: a crystal), frame

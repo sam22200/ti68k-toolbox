@@ -29,7 +29,7 @@ def measure(binary, name):
     command = [ROOT/'tools/bin/ti-cycles', '--max', 1000, '--arg', 61,
                '--frames', 260, '--keys', OUT/'range.keys',
                '--png', OUT/(name+'.png')]
-    for bank in ('ffgv0', 'ffgv1', 'ffgv2', 'ffgv3', 'ffga', 'ffgi', 'ffcu', 'ffcw', 'ffca', 'ffcb'):
+    for bank in ('ffgv0', 'ffgv1', 'ffgv2', 'ffgv3', 'ffga', 'ffgi', 'ffgd', 'ffcu', 'ffcw', 'ffca', 'ffcb'):
         command += ['--file', DATA/(bank+'.89y')]
     log = run([*command, binary])
     (OUT/(name+'.log')).write_text(log)

@@ -4,7 +4,7 @@ TESTS := test_academy.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffac ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffcu ffcw ffca ffcb
+BANKS := ffac ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle
@@ -40,7 +40,7 @@ packed: $(TI_FILES)
 	python3 -c "from pathlib import Path; files=[Path('ffacore.89y'),Path('ffgcore.89y')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
 bundle: packed
 	@mkdir -p x
-	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost)) fftacad.89z ffacore.89y fftgar.89z ffgcore.89y $(TI_FILES)
+	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod)) fftacad.89z ffacore.89y fftgar.89z ffgcore.89y $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:
@@ -52,3 +52,6 @@ fftgar_pc: ../config.inc ../contour.h ../contour_art.inc
 	$(PY) ../tools/contour_assets.py
 
 fftintro_pc fftgar_pc fftgar_status_test fftacad_dialogue_test: | contour-assets
+
+data/ffgd.bin: ../tools/chapter_desc.py data/battle.h data/interface.h ../map.h data/actors.h
+	$(PY) ../tools/chapter_desc.py campaign
