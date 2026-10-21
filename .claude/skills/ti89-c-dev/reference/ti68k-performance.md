@@ -533,6 +533,25 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   part, the copy kept) run only with room left, and anyway after a few frames' wait (else a
   crowded scene starves it forever). It shows a frame or two later; an AI battle's frames went
   from 351k on average (590k at most) to 236k, the player's from up to 437k to 329k at most.
+- **Batch overlapping cache patches** (FFT reach follow-up, actual68000 headless,
+  2026-10-19): the rings were already retained between frames. Patching every
+  tile's rectangle repeatedly shifted overlapping viewport words. One union
+  patch plus exact membership/style reuse reduces the measured large-range
+  event frames by 8.6–9.6%, while the warm frame remains169,924 cycles. Tiny
+  ranges cost about0.18ms extra. Cache bookkeeping needs20 additional RAM bytes,
+  no asset bank. Incomplete removal must not qualify as an unchanged scene;
+  compare against clean reconstruction across slopes, rotations and interrupted
+  cancellation. See `games/fft/REACH_CACHE.md`; no new TiEmu timing is claimed.
+- **Exterior-only reach** (FFT, actual68000 headless,2026-10-19): reuse the
+  existing cursor's sloped outline with offline edge-selection masks; do not
+  fill interior tiles or internal shared edges. Identical reach in four views
+  of each map gives another16.6–19.0% entry-frame reduction on Orbonne and
+  27.9–30.7% on Gariland versus grouped filled tiles; warm-frame cost is
+  essentially unchanged. Fragmented areas have fewer interior tiles to skip.
+  The prototype adds3,408 archive bytes and no Work allocation. Append the
+  masks word-aligned to an existing bank when all eight PC file-cache slots
+  are occupied. Lower visual prominence is a review tradeoff, so keep this
+  opt-in. Counts, CPU stages and native/PC checks: `games/fft/REACH_CONTOUR.md`.
 - **Compare bytes two at a time in a 16-bit word** when they are under 128: `(w + 0x7F7F - k *
   0x0101) & 0x8080` sets bit 7 of each byte greater than k, with no carry between them;
   `(g << 1) - (g >> 7)` widens each bit into a byte mask. A depth test per byte in C cost ~600
@@ -986,3 +1005,19 @@ on both targets and a separate initial-stat check are preferable to assuming
 that a serialized struct is host-native. Production-only builds may omit the
 large research scenario initializer while retaining precise manual/AI doors;
 keep the original fixture build for regressions.
+
+
+FFT configurable reach packaging (2026-10-19, headless native verification):
+AMS's65,514-byte payload ceiling is not the only limit: TTPack1.9 rejects input
+above64,936 bytes. A seemingly small configuration feature can fit a probe yet
+fail the packed chapter with its real runtime/return wrapper. Keep existing
+immutable render tables and UI strings in an already-open archive bank when
+code space is tight; direct native pointers require no heap or file-cache slot.
+Guard the replaced definitions out of native compilation: an unused array of
+string pointers does not guarantee that its pooled literals disappear from a
+shared rodata section. Recheck PC/native pixels, animation, Status and turns.
+The FFT tail uses an aligned/versioned offset and a length check accounting for
+the six-byte AMS OTH trailer. Generated header offsets and bank data must be
+prepared before the binary prerequisite compiles, not merely before the parent
+`test` recipe runs: an order-only prerequisite on `test` alone still allowed a
+stale header/new bank pair. `games/fft/REACH_CONTOUR.md` records sizes and checks.

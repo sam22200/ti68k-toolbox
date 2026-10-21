@@ -109,3 +109,15 @@ desktop or emulator session.
 The runtime exposes CATALOG as a new `K_CATALOG` bit while retaining its legacy
 `K_APPS` alias for other games. The configuration handler consumes CATALOG first.
 No runtime key bits or scripts used by existing games are reassigned.
+
+## Chapter movement highlighting
+
+The active Orbonne and campaign Gariland builds now share the CATALOG handler
+without enabling perspective inspection or idle geometry preparation. They expose
+one checkbox: unchecked **Move: full tiles**, checked **Move: contour**. It can
+be changed while Move is visible; old highlights are restored before the new
+style is composed. Exact reach membership and costs remain unchanged. The choice
+persists through views and menu changes during that battle, then resets on a new
+battle. Held keys and closing keys are consumed. Combat, RNG and idle poses pause.
+The separate historical camera review above retains its two perspective choices.
+See [reach contour](REACH_CONTOUR.md) for storage, native checks and limitations.

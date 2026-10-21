@@ -1,5 +1,9 @@
 # Final Fantasy Tactics: Magic City Gariland (tech demo)
 
+[Shared scenery/cache experiment](scenery/README.md): one material-piece bank for
+Gariland/Orbonne, exact-source controls and native one/four-orientation benchmarks.
+Four full caches exceed the complete game's RAM budget; production remains unchanged.
+
 [Management/font prototypes](MANAGEMENT.md): three navigable Formation layouts,
 small shadow-free menu/dialogue text, fitted103-character dialogue windows, original
 equipment icons, configurable black/inverse-white dialogue themes, session-local job-change previews, a configurable4x3/5x3 small actor grid
@@ -709,3 +713,13 @@ local-disc package launched with `fftstory()`: Orbonne, the Academy bridge,
 then the existing Gariland combat. `opening/BUGFIXES.md` records delayed
 Archer actions, camera handedness and source scene-pose corrections. This
 package uses separate archived chapters rather than keeping two maps in RAM.
+
+Reach highlighting already persists in the scene cache. A follow-up skips
+visually unchanged ranges and batches overlapping background patches, reducing
+the measured large-range entry frames by 8.6–9.6% for 20 extra RAM bytes;
+warm-frame cost is unchanged. See [REACH_CACHE.md](REACH_CACHE.md).
+The [exterior contour](REACH_CONTOUR.md) is selectable in CATALOG on Orbonne
+and campaign Gariland: **Move: full tiles** (default) / **Move: contour**.
+It improves reach-entry CPU time while preserving exact movement rules.
+[Map workload profiles](MAP_COSTS.md) explain the animation cost difference and
+the corrected source tactical facing for Ramza at Orbonne.

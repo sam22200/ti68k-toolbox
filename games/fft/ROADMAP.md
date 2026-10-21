@@ -510,7 +510,7 @@ only the current menu session; campaign management is not connected yet.
 - [x] User-requested Titanium TiEmu packed launch and initial grayscale review (soft-map build).
 - [ ] Interactive keyboard/playthrough/exit review; launch the corrected presentation when requested.
 - [ ] Full original special-skill/status/Charge behavior and abduction choreography.
-- [ ] Academy scene and an integrated campaign handoff into Gariland.
+- [x] Academy bridge and an integrated campaign handoff into Gariland (see review below).
 
 Build, controls, local assets and scope: `opening/README.md`.
 Measured tradeoffs and remaining stalls: `opening/BENCHMARK.md`.
@@ -525,7 +525,12 @@ Measured tradeoffs and remaining stalls: `opening/BENCHMARK.md`.
 - [x] Reuse Gariland wood/stone artwork offline; static management roster/job actors.
 - [x] Academy bridge and Gariland continuation instead of restarting the prologue.
 - [x] PC/68000 scene/combat/continuation checks; native archive metadata is endian-safe.
+- [ ] Connect speaker portraits to opening/Academy dialogue; the management prototype
+  already shows portraits, but these scenes currently draw only the fitted name badge.
 - [ ] Remaining jobs: distinct Jump, magic targeting and periodic song/dance semantics.
+
+The user's twenty-job action requirements and their implementation boundary are
+preserved in `.claude/skills/ti-port-ps1/reference/fft-job-actions.md`.
 
 The native supervisor's heap-lifetime check is documented separately in
 `campaign/README.md`; this milestone is not a full campaign or PS1 movie port.

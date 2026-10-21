@@ -32,6 +32,24 @@ glance. Main sprites (hero, NPCs, enemies) get a **white outline** (mask dilated
 free at run time, `ti68k-c-patterns.md` § sprites), contrast against the background (a busy or
 mid-grey scenery behind a black/white character), no detail smaller than 2 pixels that matters.
 
+**Dialogue portraits:** known characters must have their speaker portrait beside the
+dialogue box, together with their name, in every dialogue implementation (prototypes,
+intro, battle scenes and campaign). Reuse the existing portrait bank; if an identified
+speaker's portrait is missing from a chapter bank, extract/adapt it rather than silently
+showing only the name. Preserve the reviewed box style, readable text and fitted margins.
+Anonymous speakers may use a name-only box. Trimming assets or using a separate renderer
+does not waive this rule.
+
+**Coordinate handedness:** keep a documented world-to-screen convention consistent with
+the original game's observed layout. Apply it across all active maps, camera orientations
+and renderers: isometric, perspective, animated turns, scripted scenes, sprite facings,
+depth/cover masks, cursor movement and targeting. Fix the shared projection/conversion,
+not individual unit positions; tactical coordinates and rules must remain coherent.
+Validate against an asymmetric source landmark and known unit positions, including
+left/right input and rotation endpoints. PC/TI checksum equality alone cannot detect a
+mirror error shared by both builds. Historical controls retaining the old convention must
+be explicitly labelled and must not supply assets or defaults to an active path.
+
 ## Workflow
 
 ```sh

@@ -26,14 +26,15 @@ make -C games/fft/campaign check bundle
 ```
 
 Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 23 variables,
-353,953 bytes at this checkpoint, including the small `fftstory` supervisor,
+364,712 bytes after configurable reach, tactical facing and archived-table updates, including the small `fftstory` supervisor,
 three packed launchers, three archived cores and the chapter banks. All data
 and packed cores have the archive attribute; do not move all of them into RAM.
 Retail art, text, binary data and captures remain generated/ignored.
 
 On the calculator, send that group and run **`fftstory()`**. ENTER/2nd advances
 dialogue; SHIFT skips the current Orbonne section; CATALOG inverts its dialogue
-window. Ordinary Gariland controls apply after the Academy. ESC cancels a chapter
+window. During battle, CATALOG selects **Move: full tiles / Move: contour**
+(default full); ENTER toggles and ESC/CATALOG closes settings. Ordinary Gariland controls apply after the Academy. ESC cancels a chapter
 without automatically starting the next. Calling `fftopen()` alone still returns
 to HOME after the prologue; use `fftstory()` for the automatic continuation.
 
@@ -67,17 +68,19 @@ Gariland, ending at Ramza's usable menu. The bounded `fftstory(99)` injection
 uses the final prologue screen, final Academy message and direct Ramza door;
 it verifies the AMS/heap/program lifetime, not a complete manual playthrough.
 Capture: `x/tiemu-check/handoff-final.gif`, final LCD `handoff-final.png`.
+That capture validates the prior 353,955-byte checkpoint; the new reach-cache
+package is headless-checked, with no new TiEmu heap-lifetime claim.
 The user's live emulator and keyboard were never touched. No original HW2 or
 physical-calculator validation is claimed for this group.
 
 Independent checks:
 
-- Opening: 10 exact PC/actual-68000 pixel/state checkpoints, CT/tile-lock and
+- Opening: 16 exact PC/actual-68000 pixel/state checkpoints, CT/tile-lock and
   interruption regressions, complete AI victory and non-repeating conclusion.
 - All 11 Orbonne actors animate; 648 walking poses match their requested bank
   frames, cold portraits take 5–12 PC updates, and four water phases are distinct.
-- Academy and Gariland: five ordinary PC/68000 replays plus the new Status
-  return replay; `x/check/checked.json` and `x/check/status.json`.
+- Academy and Gariland: ten PC/68000 replays including Status, Move settings
+  and the contour actually on screen; `x/check/checked.json` and `x/check/status.json`.
 - Academy dialogue: all words from 15 source messages survive across 17 fitted
   pages. Unnamed shouts remain body text, and speaker whitespace is trimmed.
   The final text-only bank correction also passes both native Academy replays
