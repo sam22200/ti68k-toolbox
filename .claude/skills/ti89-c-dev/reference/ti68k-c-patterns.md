@@ -223,7 +223,10 @@ GrayOff();                                       // BEFORE freeing anything it u
   **Prefer ExtGraph's own routines** (**verified** identical to the code above, HW3):
   `SpriteX8_MIRROR_H_R(h, src, bytewidth, dst)`, `SpriteX8_MIRROR_V_R`, `SpriteX8_MIRROR_HV_R`,
   `FastSprite16_MIRROR_H_R(h, src, dst)` (8/32 variants, 256-byte table, faster), and 90° rotations
-  `SpriteX8X8_ROTATE_RIGHT_R`/`_LEFT_R` (both dimensions multiples of 8). Widths must be multiples of
+  `SpriteX8X8_ROTATE_RIGHT_R`/`_LEFT_R` (both dimensions multiples of 8). **Never in place**
+  (`src == dst`): `SpriteX8_MIRROR_H_R` writes each row backwards from its end, so with
+  bytewidth 2 the right byte is overwritten before it is read (FFT's actor cache: PC/TI screens
+  differed until it mirrored from a stack copy; **verified** under `ti-cycles`). Widths must be multiples of
   8: for a narrower shape shift the mirrored rows left by `16 - w` afterwards (Sumo does). Sumo
   builds all its mirrored tiles at start-up and marks "mirror of the previous entry" with a NULL
   pointer in the sprite table. Flip **both planes and the mask**. Not worth it for asymmetric sprites (a sword in the right

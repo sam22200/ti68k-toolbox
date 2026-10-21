@@ -2638,12 +2638,18 @@ static const u8 *actor_frame(u16 logical, u8 slot)
         {   // frames are numbered across ffca then ffcb (tools/common_actors.py)
             const u8 *b = abank[0]; u16 r = id;
             if (r >= abank_n0) { b = abank[1]; r -= abank_n0; }
-            zx0_unpack(b + 2 + 2 * RD16(b, 0) + RD16(b + 2, r), (u8 *)acache[e]);
-        }
-        if (frame_key & 0x8000) {               // every 16-pixel row of the four planes
+            b += 2 + 2 * RD16(b, 0) + RD16(b + 2, r);
 #ifdef __m68k__
-            SpriteX8_MIRROR_H_R(UNIT_FB / 2, (const u8 *)acache[e], 2, (u8 *)acache[e]);
-#else
+            if (frame_key & 0x8000) {           // every 16-pixel row of the four planes; the
+                u16 tmp[UNIT_FB / 2];           // routine writes each row backwards: never in place
+                zx0_unpack(b, (u8 *)tmp);
+                SpriteX8_MIRROR_H_R(UNIT_FB / 2, (const u8 *)tmp, 2, (u8 *)acache[e]);
+            } else
+#endif
+            zx0_unpack(b, (u8 *)acache[e]);
+        }
+#ifndef __m68k__
+        if (frame_key & 0x8000) {
             static const u8 rev[16] = {0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
             u8 *p = (u8 *)acache[e], *end = p + UNIT_FB;
             for (; p < end; p += 2) {
@@ -2651,8 +2657,8 @@ static const u8 *actor_frame(u16 logical, u8 slot)
                 p[0] = (u8)(rev[c & 15] << 4 | rev[c >> 4]);
                 p[1] = (u8)(rev[a & 15] << 4 | rev[a >> 4]);
             }
-#endif
         }
+#endif
         ac_key[e] = frame_key;
         W->actor_misses++;
         ZE(20);
