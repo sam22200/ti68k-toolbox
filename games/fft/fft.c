@@ -19,13 +19,7 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 #include <alloc.h>
 #endif
 
-// LCD rows are 30 bytes: long accesses are only word-aligned on alternating rows.
-// 68000 permits this. Tell the host compiler as well, without changing TI code generation.
-#ifdef __m68k__
-typedef u32 PlaneWord;
-#else
-typedef u32 PlaneWord __attribute__((aligned(2), may_alias));
-#endif
+#include "base.inc"
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #include "contour_art.inc"
@@ -72,78 +66,10 @@ static void __attribute__((noinline)) frame_end(void)
 #define FRAME_END()
 #endif
 
-// Planes are big-endian 16-bit words (MSB = leftmost pixel): native on the TI, composed on
-// the PC. RMW16: word = word & ~k | v.
-#ifdef __m68k__
-#define RD16(p, i) (((const u16 *)(p))[i])
-#define WR16(p, i, v) (((u16 *)(p))[i] = (v))
-#define RD32(p, i) (*(const PlaneWord *)((const u8 *)(p) + 2 * (i)))
-#define WR32(p, i, v) (*(PlaneWord *)((u8 *)(p) + 2 * (i)) = (v))
-#define RMW16(p, k, v) (*(u16 *)(p) = (*(u16 *)(p) & ~(k)) | (v))
-// 16 x 16 -> 32 multiply and 32 / 16 division in one instruction (ti68k-performance.md §4,
-// verified): plain C widens shared shorts and calls __mulsi3 / __divsi3
-static inline long muls16(short a, short b)
-{ long r; asm("muls.w %2,%0" : "=d"(r) : "0"(a), "dmi"(b)); return r; }
-static inline short divs32_16(long n, short d)
-{ asm("divs.w %1,%0" : "+d"(n) : "dmi"(d)); return (short)n; }
-#else
-#define RD16(p, i) ((u16)((p)[2 * (i)] << 8 | (p)[2 * (i) + 1]))
-#define WR16(p, i, v) ((p)[2 * (i)] = (u8)((v) >> 8), (p)[2 * (i) + 1] = (u8)(v))
-#define RD32(p, i) ((u32)RD16(p, i) << 16 | RD16(p, (i) + 1))
-#define WR32(p, i, v) (WR16(p, i, (u16)((v) >> 16)), WR16(p, (i) + 1, (u16)(v)))
-#define RMW16(p, k, v) do { u16 o_ = (u16)((p)[0] << 8 | (p)[1]); o_ = (u16)((o_ & ~(k)) | (v)); \
-                            (p)[0] = (u8)(o_ >> 8); (p)[1] = (u8)o_; } while (0)
-static long muls16(short a, short b) { return (long)a * b; }
-static short divs32_16(long n, short d) { return (short)(n / d); }
-#endif
-
 #if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
 #define AB_JP(b) RD16((const u8 *)(b)+20,0)
 #else
 #define AB_JP(b) ((b)->jp)
-#endif
-
-#ifdef __m68k__
-#include "../../lib/unpack68k.h"         // zx0_asm: ~42-73 cycles per output byte
-#define zx0_unpack zx0_asm
-#else
-// ZX0 v2 (einar-saukas/ZX0), the PC's copy of lib/unpack68k.s (experiments/compress/unpack.c)
-static int zx0_bit(const u8 **s, u16 *bb)
-{
-    u16 t;
-    if (*bb == 0x8000) *bb = (u16)(*(*s)++ << 8 | 0x80);
-    t = *bb; *bb = (u16)(*bb << 1);
-    return (t & 0x8000) != 0;
-}
-static u16 zx0_gamma(const u8 **s, u16 *bb)
-{
-    u16 x = 1;
-    while (!zx0_bit(s, bb)) { x += x; if (zx0_bit(s, bb)) x++; }
-    return x;
-}
-static u8 *zx0_unpack(const u8 *s, u8 *d)
-{
-    u16 dist = 1, n, bb = 0x8000;
-    for (;;) {
-        for (n = zx0_gamma(&s, &bb); n; n--) *d++ = *s++;     // literals
-        if (!zx0_bit(&s, &bb)) {                                // repeat the last offset
-            for (n = zx0_gamma(&s, &bb); n; n--, d++) *d = d[-dist];
-            if (!zx0_bit(&s, &bb)) continue;
-        }
-        for (;;) {                                              // new offset
-            u16 lo;
-            n = 1;
-            while (!zx0_bit(&s, &bb)) { n += n; if (!zx0_bit(&s, &bb)) n++; }
-            if (n == 256) return d;
-            lo = *s++;
-            dist = (u16)((n << 7) - (lo >> 1));
-            n = 1;
-            if (!(lo & 1)) do { n += n; if (zx0_bit(&s, &bb)) n++; } while (!zx0_bit(&s, &bb));
-            for (n++; n; n--, d++) *d = d[-dist];
-            if (!zx0_bit(&s, &bb)) break;
-        }
-    }
-}
 #endif
 
 State st;
@@ -157,23 +83,10 @@ static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static const u8 *igfx;                  // portraits, names, marker and text (ffti)
 #ifdef FFT_ACTOR_BANK
-static const u8 *abank[2];              // the common actor frames (ffca, ffcb: common_actors.py)
-static u16 abank_n0;                    // frames in ffca
-// Decoded frames shared by every actor: 48 hold Gariland's AI battle at 0.06 decodes
-// a frame (1.8 with one pose per actor). Its own block: Gariland's Work + planes
-// block (57,006 bytes) cannot grow by 7 KB under AMS's ~64 KB block limit.
-#ifndef AC_N
-#define AC_N 48
-#endif
-static u16 (*acache)[UNIT_FB / 2];      // AC_N frames, then ac_key and ac_age
-static u16 *ac_key, *ac_age;            // frame key (0xFFFF: free), last frame drawn
-                                        // (in the block: -mno-bss globals cost program bytes)
-#ifdef __m68k__                         // ExtGraph (verified, ti68k-c-patterns.md: sprites)
-void SpriteX8_MIRROR_H_R(unsigned short height asm("%d0"), const unsigned char *src asm("%a0"),
-                         unsigned short bytewidth asm("%d1"), unsigned char *dest asm("%a1"))
-                         __attribute__((__regparm__(4)));
-#endif
-static void actor_reset(void);
+#define ACTOR_SLOTS (NUNIT + 2)          // units, an object, a blade
+#define ACTOR_UNITS NUNIT
+#define ACTOR_KEY(logical) RD16(ugfx, logical)   // ffoa/ffga: logical frame -> bank frame
+#include "actors.h"
 #endif
 #ifdef FFT_CHAPTER
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
@@ -219,9 +132,7 @@ typedef struct {                        // a unit's cover mask, and its covered 
 typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
 typedef struct {
 #ifdef FFT_ACTOR_BANK
-    u8 actor_budget, actor_misses, actor_next;
-    u16 actor_key[NUNIT + 2], ac_now;   // each slot's pose; frames drawn so far
-    u8 actor_ent[NUNIT + 2];            // its acache entry
+    ACTOR_FIELDS
 #endif
 #ifdef FFT_OPENING
     char dialog[6][48];
@@ -2614,70 +2525,7 @@ static u8 morph_first(void)
 
 #ifdef FFT_ACTOR_BANK
 static const u8 *unit_frame(u8 rot, u8 i);
-// A logical frame (units.h / actors.h) of the common actor bank, decoded into its
-// unit's slot of the frame cache: at most one ordinary decode a frame (actor_budget).
-static const u8 *actor_frame(u16 logical, u8 slot)
-{
-    u16 frame_key = RD16(ugfx, logical), id = frame_key & 0x7FFF, best = 0;
-    u8 e, victim = 0;
-    for (e = 0; e < AC_N && ac_key[e] != frame_key; e++) ;
-    if (e == AC_N) {
-        // Animation alone can wait a frame (its pose still cached); a new actor never
-        // borrows another's appearance. One ordinary miss per frame bounds decompression.
-        e = W->actor_ent[slot];
-        if (!W->actor_budget && W->actor_key[slot] != 0xFFFF && slot < NUNIT && ac_key[e] == W->actor_key[slot]) {
-            ac_age[e] = W->ac_now;
-            return (const u8 *)acache[e];
-        }
-        if (W->actor_budget) W->actor_budget--;
-        ZB(20);
-        // The least recently drawn entry: never one drawn this frame (48 > 13 actors).
-        for (e = 0; e < AC_N; e++) {
-            u16 unused = (u16)(W->ac_now - ac_age[e]);   // (not "idle": a TIGCC ROM call)
-            if (ac_key[e] == 0xFFFF) { victim = e; break; }
-            if (unused >= best) { best = unused; victim = e; }
-        }
-        e = victim;
-        {   // frames are numbered across ffca then ffcb (tools/common_actors.py)
-            const u8 *b = abank[0]; u16 r = id;
-            if (r >= abank_n0) { b = abank[1]; r -= abank_n0; }
-            b += 2 + 2 * RD16(b, 0) + RD16(b + 2, r);
-#ifdef __m68k__
-            if (frame_key & 0x8000) {           // every 16-pixel row of the four planes; the
-                u16 tmp[UNIT_FB / 2];           // routine writes each row backwards: never in place
-                zx0_unpack(b, (u8 *)tmp);
-                SpriteX8_MIRROR_H_R(UNIT_FB / 2, (const u8 *)tmp, 2, (u8 *)acache[e]);
-            } else
-#endif
-            zx0_unpack(b, (u8 *)acache[e]);
-        }
-#ifndef __m68k__
-        if (frame_key & 0x8000) {
-            static const u8 rev[16] = {0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
-            u8 *p = (u8 *)acache[e], *end = p + UNIT_FB;
-            for (; p < end; p += 2) {
-                u8 a = p[0], c = p[1];
-                p[0] = (u8)(rev[c & 15] << 4 | rev[c >> 4]);
-                p[1] = (u8)(rev[a & 15] << 4 | rev[a >> 4]);
-            }
-        }
-#endif
-        ac_key[e] = frame_key;
-        W->actor_misses++;
-        ZE(20);
-    }
-    ac_age[e] = W->ac_now;
-    W->actor_key[slot] = frame_key; W->actor_ent[slot] = e;
-    return (const u8 *)acache[e];
-}
-
-// Forget every slot's pose and every cached frame (a new battle or chapter scene).
-static void actor_reset(void)
-{
-    memset(W->actor_key, 255, sizeof W->actor_key);
-    memset(ac_key, 255, AC_N * 2);
-    W->actor_budget = 255; W->actor_misses = W->actor_next = 0;
-}
+#include "actors.inc"
 
 // Walking/action poses have priority; rotate the remaining decode opportunities
 // among visible actors so the frontmost unit cannot starve the other animations.
@@ -4425,35 +4273,7 @@ static const u8 tri[8] = { 0, 0x7E, 0x3E, 0x1E, 0x0E, 0x06, 0x02, 0 };
 }
 
 // Canonical AMS small glyphs; shift five byte rows while building cached UI parts.
-static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit)
-{
-    while (*s) {
-        u8 c = (u8)*s++, adv, r, shift = 24 - (x & 15);
-        const u8 *g;
-        u8 *l, *d;
-        if (c < 32 || c > 126) c = '?';
-        c -= 32; adv = UI_SHARED(ADV)[c];
-        if (x + adv > limit) break;
-        g = UI_SHARED(FONT) + (u16)c * 5;
-        l = (u8 *)rt_light + y * RT_PBYTES + ((x >> 3) & ~1);
-        d = (u8 *)rt_dark + y * RT_PBYTES + ((x >> 3) & ~1);
-        for (r = 0; r < 5; r++, l += RT_PBYTES, d += RT_PBYTES) {
-            u32 bits = (u32)*g++ << shift;
-            u16 a = (u16)(bits >> 16), b = (u16)bits;
-            if (color & 1) WR16(l, 0, RD16(l, 0) | a);
-            else WR16(l, 0, RD16(l, 0) & ~a);
-            if (color & 2) WR16(d, 0, RD16(d, 0) | a);
-            else WR16(d, 0, RD16(d, 0) & ~a);
-            if (b && x < 144) {
-                if (color & 1) WR16(l, 1, RD16(l, 1) | b);
-                else WR16(l, 1, RD16(l, 1) & ~b);
-                if (color & 2) WR16(d, 1, RD16(d, 1) | b);
-                else WR16(d, 1, RD16(d, 1) & ~b);
-            }
-        }
-        x += adv;
-    }
-}
+#include "text.inc"
 
 static u8 put_s(char *s, u8 n, const char *t) { while (*t) s[n++] = *t++; return n; }
 static u8 put_n(char *s, u8 n, u16 v)
