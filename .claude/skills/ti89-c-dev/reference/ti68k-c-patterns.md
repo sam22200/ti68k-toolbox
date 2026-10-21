@@ -102,7 +102,12 @@ void _main(void) { ... }      // entry point, NOT main()
   buf[5000];` → 10,399-byte program with the `ti-cc` flags, 785 bytes without `-mno-bss` (the BSS
   block is then allocated and zeroed at each start). `-mno-bss` stays the default (Bobble is 160
   bytes smaller with it), but **big buffers (screen buffers, generated sprites, maps) must be
-  `malloc`ed**, never declared as globals.
+  `malloc`ed**, never declared as globals. The reverse does not pay for a **hot, often-referenced
+  global**: FFT's 1,090-byte `State st` (hundreds of `st.x` accesses) made the 65,277-byte
+  opening program 67,092 bytes as the only `section(".bss")` variable (65,804 with
+  `COMPRESSED_FORMAT_BSS`); without `-mno-bss` the whole program is 66,830 bytes with
+  `COMPRESSED_FORMAT_BSS` and fails to link without it ("too far for size 2 reloc")
+  (**verified**, build sizes): each BSS reference costs a relocation.
 - `-DUSE_FLINE_ROM_CALLS` (needs `-DMIN_AMS=207`) makes each ROM call a line-1111 trap: slightly
   smaller in some programs, but here **bigger** (12,125 bytes vs 12,067) and every call pays an
   exception: not for games.

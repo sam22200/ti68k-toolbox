@@ -91,3 +91,41 @@ Independent checks:
 These are correctness checks and datasheet CPU measurements, not PC-derived
 hardware FPS. The camera handedness fix is enabled in this campaign and Orbonne;
 historical standalone research controls retain their old projection/banks.
+
+## Chapter storage
+
+Data the two chapters share is stored once in the campaign group:
+
+- **Interface, `ffcu`** (`tools/common_ui.py`, run by both chapter generators): character
+  advances, font, slope markers and banners (7,916 bytes) were byte-identical in `ffoi`
+  and `ffgi`. Both banks drop them; `fft.c` reads them through `cgfx` (`UI_SHARED`), and
+  every later `igfx` offset (tables, Orbonne's name directory) is shifted.
+  `campaign/data/interface.h` is the stripped copy of the root header.
+- **Actors, `ffca`/`ffcb`** (`tools/common_actors.py`): every distinct 208-byte actor
+  frame of both chapters (characters, armed bodies, crystals, chests) is one ZX0 stream,
+  numbered across the two variables (64,893 + 19,550 bytes, 597 frames, 71 used by both
+  chapters). A frame that mirrors another is stored once: bit 15 of a chapter's logical
+  frame entry (`opening/data/ffoa.bin`, `campaign/data/ffga.bin`) flips it after decoding
+  (ExtGraph `SpriteX8_MIRROR_H_R` on the TI). Blades alone are `ffcw` (3,024 bytes).
+  Orbonne's actors and Gariland's raw `fftu`/`fftw` (125.6 KB) become 89.7 KB.
+- **Decoded frames:** one LRU cache of 48 frames (`AC_N`, 10.2 KB, its own block) shared by
+  every actor, at most one ordinary decode a frame; each decode is charged to the frame
+  budget. Gariland's AI battle wins at frame ~9,073 (raw frames: 8,882; 32 cached frames:
+  10,445; one frame per actor: 12,615). `FFT_RAW_ACTORS` builds the raw-bank control.
+- **Scenery views** (`ffov0..3`, `ffgv0..3`) store each occlusion-mask row XORed with the
+  row above before ZX0 (`tools/extract.py:rowxor_masks`). `fft.c:unxor_masks` undoes it after
+  each decode, one long at a time: Orbonne −3,031 bytes, Gariland −2,940. A view decode
+  (load or turn) costs 78–114k more datasheet cycles (6.5–9.5 ms at 12 MHz). Colour and
+  depth planes stay plain: row XOR would save only ~1 KB / ~0.3 KB per map for the same CPU.
+- **Gariland's views drop their 16 top rows** (`SC_TOP`, empty in all four orientations;
+  `tools/campaign_assets.py` checks them): 202 scene rows, 5,120 bytes less RAM for the view
+  and scene buffers. The camera no longer climbs into that white band (it stopped once 5
+  pixels lower in the AI battle; user-validated). Orbonne's views were already cropped.
+
+RAM (TiEmu Titanium, every bank archived, `fftgar(61)` launched alone): with the crop,
+Gariland starts with 48 and with 56 cached frames; before it, 36 or more ran out of memory.
+All 16 opening and 10 campaign PC/TI checks pass; Gariland's keep the baseline's screen
+checksums and state. Eight Orbonne screens change (poses no longer lag a frame behind),
+awaiting visual review in `x/actors/opening/avant-apres-orbonne.png`. Orbonne's packed program (65,189 bytes) is still over TTPack's 64,936-byte
+input limit: the next step merges the chapters into one shared battle engine and scene player
+with chapter data files.
