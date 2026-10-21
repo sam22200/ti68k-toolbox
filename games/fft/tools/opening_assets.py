@@ -290,10 +290,27 @@ def dialogue(disc,files,chapel_tiles,cam,scene_pose):
     return beats
 
 def main():
-    ap=argparse.ArgumentParser(__doc__);ap.add_argument('disc');ap.add_argument('--reuse-scenes',action='store_true');args=ap.parse_args();OUT.mkdir(parents=True,exist_ok=True)
+    ap=argparse.ArgumentParser(__doc__);ap.add_argument('disc');ap.add_argument('--reuse-scenes',action='store_true');ap.add_argument('--facings-only',action='store_true');args=ap.parse_args();OUT.mkdir(parents=True,exist_ok=True)
     disc,files=extract.disc_files(args.disc);read=lambda s:disc.read(*files[s]);extract.SOURCE_CAMERA=True
     import oracle
     p=oracle.PSX(args.disc);p.load(str(REF/'event-05.state'))
+    if args.facings_only:
+        import re
+        header=(OUT/'battle.h').read_text()
+        offset=int(re.search(r'#define unit_defs .*?igfx \+ (\d+)UL',header)[1])
+        path=OUT/'ffoi.bin';bank=bytearray(path.read_bytes())
+        for i in range(11):
+            a=oracle.UNITS+i*448;at=offset+24*i
+            assert bank[at+8:at+10]==bytes((p.read(a+0x47),p.read(a+0x48)))
+            bank[at+10]=battle.FACE[p.read(a+0x49)&3]
+        path.write_bytes(bank)
+        metadata=OUT/'units.json'
+        if metadata.exists():
+            records=json.loads(metadata.read_text())
+            for i,record in enumerate(records):record['face']=bank[offset+24*i+10]
+            metadata.write_text(json.dumps(records,indent=2)+'\n')
+        print('Refreshed all opening tactical facings from unit records, not transient actor angles')
+        return
     # Confirm actor files against the original's resolved sheet table and packed body.
     bat=read('BATTLE.BIN');source=[];bd=battle.Disc(args.disc)
     for i in range(11):
@@ -313,8 +330,9 @@ def main():
                 assert prev+prev//den==v
                 raw[k]=prev
         name=interface.decode(bytes(p.ram[p.addr(a+0x12c):p.addr(a+0x13c)]).split(b'\xfe')[0]);name='Ramza' if i==0 else name
+        # Tactical facing is authoritative; the scene actor angle may still be turning.
         source.append(dict(gfx=GFX[i],job=r(3),type=1 if r(6)&64 else 0,level=r(0x22),brave=r(0x24),faith=r(0x26),day=r(8,2)&511,
-                           x=r(0x47),z=r(0x48),face=battle.FACE[(p.read(0x800b7308+i*0x440+0x70,2)//1024)&3],team=0 if i==0 else 1 if 5<=i<=9 else 2,
+                           x=r(0x47),z=r(0x48),face=battle.FACE[r(0x49)&3],team=0 if i==0 else 1 if 5<=i<=9 else 2,
                            eq=eq,raw=raw,name=name,ct=0,exp=r(0x21),zodiac=r(9)>>4,stats=got))
     # Data tables for the common combat model. No fixture positions leak into code.
     jobs=sorted({u['job'] for u in source});items=sorted({v for u in source for v in u['eq'] if v!=255})
@@ -469,4 +487,7 @@ def main():
     report=dict(actor_logical_frames=len(mapping),actor_unique_frames=len(records),actor_raw_with_mirrors=len(mapping)*208,actor_bank_bytes=(OUT/'ffoa.bin').stat().st_size,chapel_only_raw_frames=2*44*208,chapel_only_unique_bytes=sum(len(packed[k]) for k in set(v&32767 for v in mapping[9*44:11*44])),archive={p.name:p.stat().st_size for p in OUT.glob('*.bin')},original_units_checked=11,source_disc_sha256=__import__('hashlib').sha256(read('SCUS_942.21')).hexdigest(),dialogue_beats=len(beats),scene_pose_count=len(scene_keys),charge_ticks=list(charge),potion_hp=bd.ability(0x170)['y']*10,view_crop='Orbonne decorative towers above native scene; walkable terrain unmodified')
     (OUT/'storage.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()
+    import subprocess
+    subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffov0.bin'],check=True)

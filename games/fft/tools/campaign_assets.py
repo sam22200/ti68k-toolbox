@@ -101,4 +101,7 @@ unsigned i;for(i=0;i<5;i++){putchar(sizes[i]>>8);putchar(sizes[i]&255);fwrite(p[
         target=OUT/(name+'.bin');target.unlink(missing_ok=True);target.symlink_to(HERE/(name+'.bin'))
     print('Campaign: Academy',len(messages),'source messages,',len(data),'bytes; four mirrored Gariland views')
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()
+    import subprocess
+    subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffgv0.bin'],check=True)

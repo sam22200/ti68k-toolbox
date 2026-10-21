@@ -6,9 +6,13 @@
 #include <unistd.h>
 int main(void)
 {
+    static const u8 ramza_dir[4]={1,0,2,3};
     u8 i;u16 hp;char text[32];
     if(access("ffoa.bin",R_OK))assert(!chdir("data"));
     sw_init(1);
+    // Source tactical record faces -z. The stale scene actor angle was +x.
+    assert(st.unit[U_RAMZA].face==3);
+    for(i=0;i<4;i++)assert(unit_direction(i,U_RAMZA)==ramza_dir[i]);
     assert(skill_amount(9,9,9,0)==30); // named Potion, never 100 HP
     forecast_text(0,5,1,text);assert(!strstr(text,"-20"));
     // Charge commits a fixed tile, consumes no HP immediately and leaves its user present.

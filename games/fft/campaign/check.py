@@ -9,16 +9,19 @@ def run(args,cwd=HERE/'data'):
     return p.stdout
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
+    run([ROOT/'tools/pyenv/bin/python',HERE/'../tools/contour_assets.py','--attach',HERE/'data/ffgv0.bin'])
     empty=OUT/'none.keys';empty.write_text('0\n')
     advance=OUT/'advance.keys';advance.write_text(''.join(f'{f} ENTER\n{f+1}\n' for f in range(30,1001,15)))
     rotate=OUT/'rotate.keys';rotate.write_text('12 F5\n13\n50 F1\n51\n')
     fast=OUT/'fast.keys';fast.write_text('0 A\n')
     status=OUT/'status.keys';status.write_text('1 UP\n2\n3 UP\n4\n5 ENTER\n6\n30 B\n31\n')
+    reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
+    settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     results=[]
     for name,flags,banks,cases in (
         ('academy',[],['ffac'],[('text',0,90,empty),('complete',0,1000,advance)]),
         ('gariland',['-DCHECK_GAR'],['ffgv0','ffgv1','ffgv2','ffgv3','fftu','fftw','ffgi'],
-         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status)])):
+         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']
             if not cases:continue

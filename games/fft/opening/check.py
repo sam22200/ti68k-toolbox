@@ -9,6 +9,7 @@ def run(args,cwd=DATA):
     return p.stdout
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
+    run([ROOT/'tools/pyenv/bin/python',HERE/'../tools/contour_assets.py','--attach',HERE/'data/ffov0.bin'])
     common=[ROOT/'runtime/core/rt_core.c']
     run(['cc','-std=gnu99','-O1','-g','-o',OUT/'oracle',HERE/'check_native.c',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     run([ROOT/'tools/bin/ti-cc','-o',OUT/'openchk','-DRT_CYCLES','-DFFT_MEASURE',HERE/'check_native.c',*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
@@ -17,9 +18,12 @@ def main():
     palette=OUT/'palette.keys';palette.write_text('190 CATALOG\n191\n')
     rotations=OUT/'rotations.keys';rotations.write_text('12 F5\n13\n50 F1\n51\n')
     empty=OUT/'none.keys';empty.write_text('0\n')
+    launch=OUT/'launch.keys';launch.write_text('0 ENTER\n1\n')
+    reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
+    settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     base=[ROOT/'tools/bin/ti-cycles','--max',10000]
     for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffow','ffoi','ffost'):base+=['--file',DATA/(name+'.89y')]
-    cases=[('title',0,30,empty),('prayer',0,240,empty),('prayer-white',0,240,palette),('chapel-long',0,420,intro),('story-to-fight',0,1200,intro),('player',1,60,empty),('rotations',1,100,rotations),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,950,intro)]
+    cases=[('title',0,30,empty),('launch-title',0,30,launch),('title-complete',0,120,empty),('prayer',0,240,empty),('prayer-white',0,240,palette),('chapel-long',0,420,intro),('story-to-fight',0,1200,intro),('player',1,60,empty),('rotations',1,100,rotations),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,950,intro)]
     checks=[]
     for name,scenario,frames,keys in cases:
         pc=run([OUT/'oracle',scenario,frames,keys,OUT/(name+'-pc.png')])

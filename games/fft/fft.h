@@ -5,6 +5,11 @@
 #ifndef FFT_H
 #define FFT_H
 #include "../../runtime/core/rt.h"
+#if (defined(FFT_OPENING) || defined(FFT_STORY_GAR)) && !defined(FFT_NO_REACH_CONTOUR)
+#ifndef FFT_REACH_CONTOUR
+#define FFT_REACH_CONTOUR
+#endif
+#endif
 
 typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h, extract.py (walk 2:
                                                                     // crossed, not stopped on)
@@ -237,6 +242,12 @@ typedef struct {
     u8 open_stage, open_beat, open_clock, open_white;
     u16 open_reveal, open_offset, open_seen;
     u8 open_pan, open_fade, open_next, open_handoff;
+#endif
+#if defined(FFT_REACH_CONTOUR) && !defined(FFT_CONFIG)
+    u8 config, config_row;
+#endif
+#ifdef FFT_REACH_CONTOUR
+    u8 reach_contour;                  // full movement tiles by default; exterior edges when set
 #endif
     u8 banner, banner_t;               // BN_*: the battle's objective, its outcome; its frame
     u16 morph_mask;                    // converted units awaiting their visible transformation

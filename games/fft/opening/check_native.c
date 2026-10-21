@@ -18,6 +18,7 @@
 
 static void summary(void)
 {
+#if !defined(__m68k__) || !defined(FFT_PROFILE_ONLY)
     const Unit *u=st.unit; u16 h=0; u8 i;
 #define HASH(v) h=(u16)((h<<1)|(h>>15))^(u16)(v)
     for(i=0;i<NUNIT;i++,u++) {
@@ -39,6 +40,7 @@ static void summary(void)
     VALUE(((u32)st.moved<<24)|((u32)st.acted<<16)|((u16)st.rounds<<8)|st.act_t);
     VALUE(((u32)st.open_resolving<<24)|((u32)st.open_fade<<16)|((u16)st.open_pan<<8)|st.open_handoff);
 #undef VALUE
+#endif
 }
 
 #ifndef __m68k__

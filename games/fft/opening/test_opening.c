@@ -11,6 +11,8 @@ int main(void)
     unsigned i,frames;u8 prior;
     if(access("ffoa.bin",R_OK))assert(!chdir("data"));
     sw_init(0);assert(st.open_stage==1);
+    press(K_ENTER);assert(st.open_stage==1); // launch key cannot hide the location title
+    for(i=0;i<110;i++)assert(sw_step(0));
     press(K_ENTER);assert(st.open_stage==2);
     for(i=0;i<30;i++)assert(sw_step(0));
     assert(st.open_reveal>30);press(K_CATALOG);assert(st.open_white);
@@ -60,7 +62,7 @@ int main(void)
     for(i=0;(st.open_stage!=5||st.open_fade)&&i<1000;i++)press(K_ENTER);
     assert(st.open_stage==5&&!st.open_fade);
     assert(!sw_step(K_ENTER));assert(st.open_handoff); // no implicit prologue replay
-    sw_init(0);press(K_ENTER);press(K_B);
+    sw_init(0);for(i=0;i<110;i++)assert(sw_step(0));press(K_ENTER);press(K_B);
     for(i=0;i<20;i++)assert(sw_step(0));
     assert(st.open_stage==3);
     press(K_B);for(i=0;i<20;i++)assert(sw_step(0));assert(!st.open_stage);

@@ -15,3 +15,6 @@ fftshot.bin
 ffttex.bin
 
 fftiso.bin
+fftcont.bin
+contour.h
+contour_art.inc

@@ -69,6 +69,19 @@ FRAMES := 40
 management-review management-check management-pc management-ti: units.h interface.h fftu.bin ffti.bin $(ORACLE).state
 	$(MAKE) -C management $(patsubst management-%,%,$@)
 test: auto-battle-test
+test: rings-test
+.PHONY: rings-test rings-variant-test
+rings-test:
+	@mkdir -p x/rings
+	$(CC) $(PC_CFLAGS) -o x/rings/base test_rings.c $(RT_CORE) $(RT_SW)
+	./x/rings/base
+rings-variant-test:
+	$(PY) tools/contour_assets.py --attach opening/data/ffov0.bin campaign/data/ffgv0.bin
+	@mkdir -p x/rings
+	$(CC) $(PC_CFLAGS) -DTEST_CAMPAIGN -o x/rings/gariland test_rings.c $(RT_CORE) $(RT_SW)
+	./x/rings/gariland
+	$(CC) $(PC_CFLAGS) -DTEST_OPEN -o x/rings/opening test_rings.c $(RT_CORE) $(RT_SW)
+	./x/rings/opening
 auto-battle-test: map.h units.h weapons.h interface.h battle.h art.h
 	@mkdir -p x/auto-battle
 	$(CC) $(PC_CFLAGS) -o x/auto-battle/test test_autobattle.c $(RT_CORE) $(RT_SW)
@@ -91,6 +104,9 @@ chest-review: pc
 .PHONY: storage-audit
 storage-audit:
 	$(PY) tools/storage_audit.py
+.PHONY: contour-bench
+contour-bench:
+	$(PY) tools/bench_contour.py
 .PHONY: storage-cleanup-check
 storage-cleanup-check: pc
 	$(PY) tools/check_storage_cleanup.py

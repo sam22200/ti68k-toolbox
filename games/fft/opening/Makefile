@@ -46,3 +46,14 @@ packed: $(TI_FILES)
 bundle: packed
 	@mkdir -p x
 	$(ROOT)/tools/bin/ti-group x/fftopening.89g fftopen.89z ffocore.89y $(TI_FILES)
+
+.PHONY: contour-assets
+contour-assets:
+	$(PY) ../tools/contour_assets.py --attach data/ffov0.bin
+pc test cycles ti packed regression-check visual-check: | contour-assets
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../config.inc ../contour.h ../contour_art.inc
+
+../contour.h ../contour_art.inc: ../tools/contour_assets.py ../art.h ../fft.c ../config.inc
+	$(PY) ../tools/contour_assets.py
+
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: | contour-assets

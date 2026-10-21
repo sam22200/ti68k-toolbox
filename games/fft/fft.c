@@ -11,6 +11,10 @@
 #include "ct_recip.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef FFT_REACH_CONTOUR
+#include "contour.h"
+static const u8 *contour_gfx;            // masks appended to the existing first view bank
+#endif
 #if defined(__m68k__) && defined(FFT_CONFIG) && !defined(RT_CYCLES)
 #include <alloc.h>
 #endif
@@ -21,6 +25,10 @@
 typedef u32 PlaneWord;
 #else
 typedef u32 PlaneWord __attribute__((aligned(2), may_alias));
+#endif
+
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#include "contour_art.inc"
 #endif
 
 #ifdef RT_CYCLES                        // zones under ti-cycles: 3 view copy, 4 units, 5 cursor
@@ -49,8 +57,14 @@ static u8 frame_stall;
 #define FRAME_MODE() st.mode
 #endif
 #define FRAME_BEGIN() (frame_begin = BENCH_CYCLES, frame_stall = st.turn != 0)
-#define FRAME_END() do { BENCH_VALUE(((u32)frame_stall << 31) | ((u32)FRAME_MODE() << 24) | ((u32)st.act_t << 16) | (u16)rt_frame); \
-    BENCH_VALUE(BENCH_CYCLES - frame_begin); FRAME_SHOT(); } while (0)
+// Keep profiling below the AMS 64K variable ceiling. All render exits share
+// the marker code instead of inlining it repeatedly; production is unaffected.
+static void __attribute__((noinline)) frame_end(void)
+{
+    BENCH_VALUE(((u32)frame_stall << 31) | ((u32)FRAME_MODE() << 24) | ((u32)st.act_t << 16) | (u16)rt_frame);
+    BENCH_VALUE(BENCH_CYCLES-frame_begin);FRAME_SHOT();
+}
+#define FRAME_END() frame_end()
 #else
 #define FRAME_BEGIN()
 #define FRAME_END()
@@ -246,8 +260,8 @@ typedef struct {
     s16 ring_y0, ring_y1;               // the scene rows the reach rings are on
     s16 drop_y0, drop_y1;               // the rows still to put back (rings going)
     u8 from_who;                        // whose reach W->from holds the steps of (+ 1; 0: none)
-    u8 ring_i;                          // the next tile whose reach ring to draw (MAP_W * MAP_H:
-                                        // all drawn)
+    u8 ring_i;                          // next reach tile; MAP_W * MAP_H: all drawn
+    u8 ring_bits[(MAP_W * MAP_H + 7) / 8], ring_style; // last completed visual reach, not its costs
     u32 cur_m[24];                      // the cursor's mask, dashed where the view is in front
     u16 cur_k;                          // of it, for this tile | rot << 8 | 0x8000 (0: none)
     u32 num[3][2][7];                   // an attack's number (or Miss), the EXP and the JP its user
@@ -737,8 +751,12 @@ static void blit24(s16 x, s16 y, s16 rows, const PlaneWord *l, const PlaneWord *
 // target. Pixel (x, y) is inside when its centre is. Spans in 16-bit words.
 
 #if !defined(FFT_EXPLORATION) || defined(FFT_FIXED) || defined(FFT_ULTRA_TRANSITION)
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define lmask CONTOUR_REF_lmask
+#else
 static const u16 lmask[16] = { 0xFFFF, 0x7FFF, 0x3FFF, 0x1FFF, 0x0FFF, 0x07FF, 0x03FF, 0x01FF,
-    0x00FF, 0x007F, 0x003F, 0x001F, 0x000F, 0x0007, 0x0003, 0x0001 };   // pixels >= x & 15
+    0x00FF, 0x007F, 0x003F, 0x001F, 0x000F, 0x0007, 0x0003, 0x0001 };
+#endif   // pixels >= x & 15
 
 // rows ymin.. of the target from span_l/span_r, an 8 x 8 pattern of 16-bit rows aligned to
 // the target's pixels (the rotation frames)
@@ -818,11 +836,33 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
 // A tile's marker (a reach ring, or the cursor: cur) in view rot: the flat diamond (hi_*,
 // cur_*, 24 x 12) at its standing height, or on a sloped tile the outline of its four corners
 // at their heights (art.py slope_*), scene box left x, top y, its rows
-typedef struct { const PlaneWord *l, *d, *m; s16 x, y, rows; u8 depth; } Marker;
+typedef struct {
+    const PlaneWord *l, *d, *m; s16 x, y, rows; u8 depth;
+#ifdef FFT_REACH_CONTOUR
+    u8 edges, shape;
+#endif
+} Marker;
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define hi_l CONTOUR_REF_hi_l
+#define hi_m CONTOUR_REF_hi_m
+#define cur_l CONTOUR_REF_cur_l
+#define foe_gfx CONTOUR_REF_foe_gfx
+#define foe_ko_gfx CONTOUR_REF_foe_ko_gfx
+#define active_gfx CONTOUR_REF_active_gfx
+#define hand_gfx CONTOUR_REF_hand_gfx
+#define slope_key CONTOUR_REF_slope_key
+#define slope_top CONTOUR_REF_slope_top
+#define slope_rows CONTOUR_REF_slope_rows
+#define slope_off CONTOUR_REF_slope_off
+#define turn_pat CONTOUR_REF_turn_pat
+#endif
 static void marker(u8 rot, u8 i, u8 cur, Marker *k)
 {
     s16 u, v, lo = 255, n;
     u8 h[4], c, sk = 0;
+#ifdef FFT_REACH_CONTOUR
+    k->edges=k->shape=0;
+#endif
     view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
     k->x = scene_x(rot, u, v) - HW; k->depth = (u8)(u + v);
     for (c = 0; c < 4; c++) {
@@ -837,6 +877,9 @@ static void marker(u8 rot, u8 i, u8 cur, Marker *k)
     for (n = 0; sk && n < NSLOPE; n++)
         if (slope_key[n] == sk) {
             u8 o = slope_off[n];
+#ifdef FFT_REACH_CONTOUR
+            k->shape=(u8)(n+1);
+#endif
             k->l = (cur ? sc_l : sl_l) + o; k->d = (cur ? sc_d : sl_d) + o; k->m = (cur ? sc_m : sl_m) + o;
             k->rows = slope_rows[n]; k->y = scene_y(u, v) - (lo + 2) * HU + slope_top[n];
             return;
@@ -859,8 +902,21 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
     u16 dd = (u16)(0x7F7F - (mk->depth | mk->depth << 8));
     u16 hp = (u16)~(hide_pat[yy & 1] * 0x0101), o = (u16)(yy * SC_BYTES + 2 * w0);
     u32 inv = AIMING(st.mode) ? 0xFFFFFFFFUL : 0;   // black and white: one plane for both
+#ifdef FFT_REACH_CONTOUR
+    const u8 *edge=mk->edges ? contour_gfx+contour_off[mk->shape] : RT_NULL;
+#endif
     for (r = 0; r < mk->rows; r++, yy++, o += SC_BYTES, hp = (u16)~hp) {
         u32 m = mk->m[r], l = (mk->l[r] ^ inv) & m, a;
+#ifdef FFT_REACH_CONTOUR
+        if(mk->edges){
+            u32 selected=0;
+            if(mk->edges&1)selected|=RD32(edge,0);
+            if(mk->edges&2)selected|=RD32(edge,2);
+            if(mk->edges&4)selected|=RD32(edge,4);
+            if(mk->edges&8)selected|=RD32(edge,6);
+            m&=selected;l&=m;edge+=16;
+        }
+#endif
         u16 m3[3], l3[3];
         if ((u16)yy >= SC_H || !m) continue;
         a = m >> sh; m3[0] = (u16)(a >> 16); m3[1] = (u16)a; m3[2] = (u16)(m << (16 - sh));
@@ -1046,8 +1102,59 @@ static void scene_rows(s16 y, s16 n)
     while (k--) { *a++ = *p++; *b++ = *q++; }
 }
 
+static u8 ring_style(void)
+{
+    return RINGS(st.mode) ? (u8)(1 | (AIMING(st.mode) ? 2 : 0) | (st.over ? 4 : 0)
+#ifdef FFT_REACH_CONTOUR
+        | (!AIMING(st.mode) && st.reach_contour && contour_gfx ? 8 : 0)
+#endif
+        ) : 0;
+}
+
+// Reach costs can change without changing any displayed tile. Compare exact
+// membership bits only on invalidation, never in the ordinary frame path.
+static u8 rings_unchanged(void)
+{
+    u16 i=0;u8 j=0;
+    if(W->ring_style!=ring_style())return 0;
+    if(!W->ring_style)return 1;
+    while(i<MAP_W*MAP_H){
+        u8 bits=0,bit=1;
+        do {if(st.reach[i]!=0xFF)bits|=bit;i++;bit=(u8)(bit<<1);}
+        while(bit && i<MAP_W*MAP_H);
+        if(bits!=W->ring_bits[j++])return 0;
+    }
+    return 1;
+}
+
+#ifdef FFT_REACH_CONTOUR
+// Four-neighbour boundary, including holes and disconnected landing regions.
+// Screen edges are top-right, right-bottom, bottom-left, left-top. Rotate the
+// world neighbour bits, then reflect them with the same source-camera rule.
+static u8 reach_edges(u8 i,u8 rot)
+{
+    #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define reflected CONTOUR_REF_reflected
+#else
+static const u8 reflected[16]={0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
+#endif
+    u8 bits=0,x=W->tx[i],z=W->tz[i];
+    if(!z||st.reach[i-MAP_W]==0xFF)bits|=1;
+    if(x==MAP_W-1||st.reach[i+1]==0xFF)bits|=2;
+    if(z==MAP_H-1||st.reach[i+MAP_W]==0xFF)bits|=4;
+    if(!x||st.reach[i-1]==0xFF)bits|=8;
+    bits=(u8)(((bits<<rot)|(bits>>(4-rot)))&15);
+#ifdef FFT_SOURCE_CAMERA
+    return reflected[bits];
+#else
+    return bits;
+#endif
+}
+#endif
+
 static void ensure_scene(u8 rot)
 {
+    s16 patch_x0=SC_W,patch_x1=0;
     u8 i;
     Marker mk;
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
@@ -1057,6 +1164,9 @@ static void ensure_scene(u8 rot)
         if (W->drop_y0 < W->drop_y1) goto drop;
         if (W->ring_i >= MAP_W * MAP_H) return;
         goto rings;
+    }
+    if(scene_rot==rot && W->drop_y0>=W->drop_y1 && W->ring_i>=MAP_W*MAP_H && rings_unchanged()){
+        scene_seq=hl_seq;return;
     }
     unpack_view(rot);
     if (scene_rot != rot) {
@@ -1087,21 +1197,36 @@ drop:
     }
 rings:
     dst_scene();
-    if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; return; }
+    if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; W->ring_style=0; return; }
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
     frame_stall = 1;
 #endif
     ZB(10);
+    memset(W->ring_bits,0,sizeof W->ring_bits);
     for (; W->ring_i < MAP_W * MAP_H; W->ring_i++) {
         i = W->ring_i;
         if (st.reach[i] == 0xFF) continue;
+        W->ring_bits[i>>3]|=(u8)(1U<<(i&7));
+#ifdef FFT_REACH_CONTOUR
+        if(st.reach_contour && contour_gfx && !AIMING(st.mode)){
+            u8 edges=reach_edges(i,rot);
+            if(!edges)continue;
+            marker(rot,i,1,&mk);mk.edges=edges;
+        }else marker(rot,i,0,&mk);
+#else
         marker(rot, i, 0, &mk);
+#endif
         W->left -= RING_K * mk.rows / 12;
         ring_into_scene(&mk);
-        bg_patch(mk.x, mk.y, 24, mk.rows);
+        if(mk.x<patch_x0)patch_x0=mk.x;
+        if(mk.x+24>patch_x1)patch_x1=mk.x+24;
         if (mk.y < W->ring_y0) W->ring_y0 = mk.y < 0 ? 0 : mk.y;
         if (mk.y + mk.rows > W->ring_y1) W->ring_y1 = mk.y + mk.rows > SC_H ? SC_H : mk.y + mk.rows;
     }
+    // All rings appear together. Patch their union once, avoiding repeated
+    // screen-cache shifts where adjacent/sloped markers overlap.
+    bg_patch(patch_x0,W->ring_y0,patch_x1-patch_x0,W->ring_y1-W->ring_y0);
+    W->ring_style=ring_style();
     ZE(10);
 }
 
@@ -1536,7 +1661,11 @@ u8 act_kind(void)
 // target was KO) + the target's level - the user's, 1 to 99; at 100 EXP a level up (EXP back
 // to 0, the stats grown, HP and MP kept); and 8 + 2 x its job level + its level / 4 JP, a
 // quarter of them to each living unit of its side in the same job. A KO user earns nothing.
-static const u16 job_jp[8] = { 100, 200, 350, 550, 800, 1150, 1550, 2100 };   // job levels
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define job_jp CONTOUR_REF_job_jp
+#else
+static const u16 job_jp[8] = { 100, 200, 350, 550, 800, 1150, 1550, 2100 };
+#endif   // job levels
 
 u8 job_level(const Unit *u)
 {
@@ -2264,9 +2393,17 @@ static u8 step_frames(u8 i)
 
 // a step's frame t: how far along (64ths) and the hop (pixels, up to 8 at mid-step) of a climb,
 // the first WALK_FRAMES for a walk, the next CLIMB_FRAMES for a climb (no divide per frame)
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define walk_q CONTOUR_REF_walk_q
+#else
 static const u8 walk_q[WALK_FRAMES + CLIMB_FRAMES] = { 0, 9, 18, 27, 37, 46, 55,
     0, 6, 13, 19, 26, 32, 38, 45, 51, 58 };
+#endif
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define walk_h CONTOUR_REF_walk_h
+#else
 static const u8 walk_h[CLIMB_FRAMES] = { 0, 3, 5, 7, 8, 8, 8, 7, 5, 3 };
+#endif
 
 // FFT keeps a grounded human at the canal floor and selects the submerged SHP.
 // At depth 1 a hop above that floor uses the ordinary pose. Both endpoints of
@@ -2346,9 +2483,17 @@ static void cover(u16 *cm, s16 fx, s16 fy, u8 depth)
 
 // FFT's battle idle (TYPE1.SEQ 6 / 7: frames 11 10 9 10 11 12 13 12 for 6 8 10 8 ticks at
 // 60 Hz) and walk (8 / 9: the same frames for 2 4 6 4 ticks), in our frames (~30 per second)
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define idle_seq CONTOUR_REF_idle_seq
+#else
 static const u8 idle_seq[32] = { 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 3, 3, 3, 3 };
+#endif
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define walk_seq CONTOUR_REF_walk_seq
+#else
 static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 };
+#endif
 
 // Armed body and blade phase, 0 outside a weapon Attack. Skills and bare hands use fftu.
 static u8 armed_pose(u8 i)
@@ -2379,8 +2524,12 @@ static u8 unit_flash(u8 i)
 // View facing: 0 front, 1 back, 2 mirrored front, 3 mirrored back.
 static u8 unit_direction(u8 rot, u8 i)
 {
-    static const u8 dir[4][4] = { { 2, 1, 0, 3 }, { 0, 3, 1, 2 }, { 1, 2, 3, 0 }, { 3, 0, 2, 1 } };
-    return dir[rot][st.unit[i].face]
+    #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define facing_sprite CONTOUR_REF_facing_sprite
+#else
+static const u8 facing_sprite[4][4] = { { 2, 1, 0, 3 }, { 0, 3, 1, 2 }, { 1, 2, 3, 0 }, { 3, 0, 2, 1 } };
+#endif
+    return facing_sprite[rot][st.unit[i].face]
 #ifdef FFT_SOURCE_CAMERA
         ^2
 #endif
@@ -2437,11 +2586,15 @@ static const u8 *object_frame(u8 i)
 
 static const u8 *morph_frame(const u8 *old, const u8 *obj)
 {
-    static const u16 dissolve[5][4] = {
+    #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define dissolve CONTOUR_REF_dissolve
+#else
+static const u16 dissolve[5][4] = {
         { 0, 0, 0, 0 }, { 0xAAAA, 0, 0xAAAA, 0 },
         { 0xAAAA, 0x5555, 0xAAAA, 0x5555 },
         { 0xFFFF, 0x5555, 0xFFFF, 0x5555 }, { 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF }
     };
+#endif
     u8 r, plane, t = st.morph_t, phase = t < 8 ? 0 : t < 24 ? (u8)((t - 8) >> 2) : 4;
     u8 *out = (u8 *)W->morph_g;
     for (plane = 0; plane < 4; plane++, old += 2 * UNIT_SH, obj += 2 * UNIT_SH, out += 2 * UNIT_SH)
@@ -2500,9 +2653,13 @@ static const u8 *unit_frame(u8 rot, u8 i)
 
 // 3 x 5 digits and '/' for the panels' numbers, turned a quarter: per glyph column (left to
 // right), its 5 pixels (bit 4: the top row)
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define digits CONTOUR_REF_digits
+#else
 static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 0x17, 0x15, 0x1D },
     { 0x15, 0x15, 0x1F }, { 0x1C, 0x04, 0x1F }, { 0x1D, 0x15, 0x17 }, { 0x1F, 0x15, 0x17 },
     { 0x10, 0x10, 0x1F }, { 0x1F, 0x15, 0x1F }, { 0x1D, 0x15, 0x1F }, { 0x03, 0x04, 0x18 } };
+#endif
 
 #define DC_Y 18                         // a death counter's top above the feet
 
@@ -2731,9 +2888,13 @@ static void make_counters(void)
 #if !defined(FFT_EXPLORATION) || defined(FFT_FIXED)
 // 32 angles per turn: S = round(6 sqrt2 sin a * 256), view r is at 45 + 90 r degrees (index
 // 4 + 8 r), where the projection equals the cardinal one exactly (6 * 256)
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define sin32 CONTOUR_REF_sin32
+#else
 static const s16 sin32[32] = { 0, 424, 831, 1207, 1536, 1806, 2007, 2130, 2172, 2130, 2007,
     1806, 1536, 1207, 831, 424, 0, -424, -831, -1207, -1536, -1806, -2007, -2130, -2172, -2130,
     -2007, -1806, -1536, -1207, -831, -424 };
+#endif
 
 #if !defined(FFT_TURN_LOWPOLY_NATIVE) || defined(FFT_TURN_TEXTURE)
 static void __attribute__((noinline)) turn_expand(void)
@@ -2920,7 +3081,7 @@ static void draw_turn(void)
 #ifndef FFT_TURN_LOWPOLY_NATIVE
     turn_expand();
 #endif
-   
+
     // units on top, at their projected feet (no occlusion while turning)
     for (i = 0; i < NUNIT; i++) {
         const Unit *un = &st.unit[i];
@@ -3042,6 +3203,10 @@ release(void)
 void game_init(void)
 {
     u16 i;
+#ifdef FFT_REACH_CONTOUR
+    u16 view_size=0;
+    contour_gfx=RT_NULL;
+#endif
     rt_state = &st;
     rt_state_size = sizeof(st);
 #ifdef __m68k__
@@ -3064,8 +3229,32 @@ void game_init(void)
         char name[6] = "fftv0";                // again each run, the archive may have moved
 #endif
         name[4] = (char)('0' + i);
-        views[i] = rt_file(name, RT_NULL);
+        views[i] = rt_file(name,
+#ifdef FFT_REACH_CONTOUR
+            i==0 ? &view_size :
+#endif
+            RT_NULL);
     }
+#ifdef FFT_REACH_CONTOUR
+#ifdef FFT_CONTOUR_OFFSET
+    contour_gfx=views[0] ? views[0]+FFT_CONTOUR_OFFSET:RT_NULL; // historical isolated control
+#else
+    // ttbin2oth's OTH/dat variable includes a six-byte trailer on TI; the
+    // PC file is raw. Validate the footer and its offset before any mask read.
+#ifdef __m68k__
+    if(view_size>=6)view_size-=6;
+#endif
+    if(views[0] && !(view_size&1) && view_size>=CONTOUR_BYTES+10){
+        const u8 *f=views[0]+view_size-10;
+        if(RD32(f,0)==0x46433032UL){
+            u16 off=RD16(f,3);
+            if(!(off&1) && off+CONTOUR_BYTES==view_size-10 &&
+               RD16(f,4)==CONTOUR_BYTES)contour_gfx=views[0]+off;
+        }
+    }
+#endif
+    if(!contour_gfx){W=RT_NULL;return;}
+#endif
 #ifdef FFT_OPENING
     ugfx = rt_file("ffoa", RT_NULL);
     wgfx = rt_file("ffow", RT_NULL);
@@ -3172,6 +3361,9 @@ void game_scenario(u16 n)
 {
 #ifdef FFT_OPENING
     opening_start(n);
+#ifdef FFT_CONTOUR_DEFAULT
+    st.reach_contour=1; // isolated benchmark control, ordinary battles default to full tiles
+#endif
 #else
 #if !defined(FFT_EXPLORATION) && !defined(FFT_STORY_GAR)
     u8 i;
@@ -3182,6 +3374,9 @@ void game_scenario(u16 n)
     memset(&st, 0, sizeof st);
 #ifdef FFT_CONFIG
     st.pzoom = 1; st.psolid = 1;      // unchecked options: low-poly, wide, filled
+#endif
+#ifdef FFT_CONTOUR_DEFAULT
+    st.reach_contour=1;
 #endif
     st.want = st.prot = st.ai_view = 0xFF;
     if (!W) return;
@@ -3863,7 +4058,7 @@ static u8 update(u8 fast)
 // [2nd] / [ENTER] held through an AI turn: AI_FAST steps a frame (its glides, holds, walks and
 // blows), not while it thinks (its frames are full), nor after a step with heavy work (W->upd_k),
 // nor when the last frame had less than FAST_K left (a step costs ~6k)
-#ifdef FFT_CONFIG
+#if defined(FFT_CONFIG) || defined(FFT_REACH_CONTOUR)
 #include "config.inc"
 #endif
 
@@ -3875,7 +4070,7 @@ u8 game_update(void)
     if(W){W->actor_budget=1;W->actor_misses=W->actor_copies=0;}
     if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner)) return opening_update();
 #endif
-#ifdef FFT_CONFIG
+#if defined(FFT_CONFIG) || defined(FFT_REACH_CONTOUR)
     if (config_update()) return 1;
 #endif
 #ifdef FFT_CINEMA
@@ -4035,7 +4230,11 @@ const char *unit_name(u8 i)
 
 static void hud_labels(void)
 {
-    static const u8 tri[8] = { 0, 0x7E, 0x3E, 0x1E, 0x0E, 0x06, 0x02, 0 };
+    #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define tri CONTOUR_REF_tri
+#else
+static const u8 tri[8] = { 0, 0x7E, 0x3E, 0x1E, 0x0E, 0x06, 0x02, 0 };
+#endif
     u8 g, r, b;
     for (g = 0; g < 4; g++)
         for (r = 0; r < 8; r++) {
@@ -4190,7 +4389,11 @@ static void panel_gauge(u8 side, s16 y, u16 v, u16 max, u8 color)
     rt_light = sl; rt_dark = sd;
 }
 
-static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };   // ST_*
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define st_names CONTOUR_REF_st_names
+#else
+static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" };
+#endif   // ST_*
 
 // One compact prediction line centered above the arrow; both character names stay visible.
 // The preview uses the combat formulas directly; no separate target window is needed.
@@ -4331,8 +4534,20 @@ static u8 win_lines(u8 m)
 
 static void make_window(void)
 {
-    static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status", "Auto-battle" };
-    static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
+
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define entries CONTOUR_REF_entries
+#else
+static const char *const entries[MN_N] = { "Move", "Act", "Wait", "Status", "Auto-battle" };
+#endif
+
+
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define automatic CONTOUR_REF_automatic
+#else
+static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
+#endif
+
     u16 *l = W->win[0], *d = W->win[1];
     const Unit *u = &st.unit[W->win_k[2]];
     u8 r, i, n, k = W->win_n++, m = W->win_k[0], c = C_BLACK;
@@ -4398,7 +4613,11 @@ static void make_window(void)
 
 static void draw_hand(s16 x, s16 y)
 {
-    static const u8 sway[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
+    #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define sway CONTOUR_REF_sway
+#else
+static const u8 sway[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
+#endif
     RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
     draw_sprite(x + sway[(st.tick >> 2) & 7], y, &sp);
 }
@@ -4421,12 +4640,18 @@ static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows)
 // "Enemy" and "Guest", outlined, once: drawn above a portrait of that team
 static void make_tags(void)
 {
-    static const char *const names[2] = { "Enemy", "Guest" };
+
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define team_names CONTOUR_REF_team_names
+#else
+static const char *const team_names[2] = { "Enemy", "Guest" };
+#endif
+
     u8 t;
     memset(W->tag, 0, sizeof W->tag);
     for (t = 0; t < 2; t++) {
-        outlined_text((u8 *)W->tag[t][0], (u8 *)W->tag[t][1], (u8 *)W->tag[t][2], 1, 1, names[t], 31);
-        W->tag_w[t] = ui_width(names[t]);
+        outlined_text((u8 *)W->tag[t][0], (u8 *)W->tag[t][1], (u8 *)W->tag[t][2], 1, 1, team_names[t], 31);
+        W->tag_w[t] = ui_width(team_names[t]);
     }
     W->tag_ok = 1;
 }
@@ -4539,9 +4764,17 @@ static void draw_hud(void)
         draw_forecast();
     if (forecast && W->fc_key == forecast_key && W->pan_ok[0] && W->pan_ok[1]
         && W->pan_fk[0][0] == pk[0] && W->pan_fk[1][0] == pk[1]) {
-        static const u8 arrow[11] = { 0, 0x60, 0x30, 0x18, 0x0C, 0x06, 0x0C, 0x18, 0x30, 0x60, 0 };
-        static const u8 mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 0x81, 0x03, 0x07, 0x0F };
-        RtSprite sp = { 8, 11, arrow, arrow, mask };
+        #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define forecast_arrow CONTOUR_REF_forecast_arrow
+#else
+static const u8 forecast_arrow[11] = { 0, 0x60, 0x30, 0x18, 0x0C, 0x06, 0x0C, 0x18, 0x30, 0x60, 0 };
+#endif
+        #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define forecast_mask CONTOUR_REF_forecast_mask
+#else
+static const u8 forecast_mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 0x81, 0x03, 0x07, 0x0F };
+#endif
+        RtSprite sp = { 8, 11, forecast_arrow, forecast_arrow, forecast_mask };
         draw_sprite(76, PANEL_Y + 9, &sp);
     }
     if (!hidden && !pre && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
@@ -4571,10 +4804,18 @@ static void draw_hud(void)
 u8 hud_ready(void) { return W && W->hud_ok; }
 #endif
 
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define signs CONTOUR_REF_signs
+#else
 static const char *const signs[12] = { "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces" };
+#endif
 
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define equip_labels CONTOUR_REF_equip_labels
+#else
 static const char *const equip_labels[5] = { "Head", "Body", "Accessory", "Weapon", "Shield" };
+#endif
 
 // Details describe the equipped item or learned ability; browsing never changes the loadout.
 #ifdef FFT_OPENING
@@ -4591,7 +4832,13 @@ static void draw_status(void)
         else if(k<8){
             u8 slot=k-3;
             if(st.page)ui_text(4,40+slot*8,u->eq[slot]==255?"-":items[u->eq[slot]].name,C_BLACK,156);
-            else {static const char *const names[5]={"Level ","PA ","Speed ","Move ","Jump "};u8 v=slot==0?u->level:slot==1?u->pa:slot==2?u->sp:slot==3?u->move:u->jump;u8 n=put_s(line,0,names[slot]);n=put_n(line,n,v);line[n]=0;ui_text(4,40+slot*8,line,C_BLACK,156);}
+            else {
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define stat_labels CONTOUR_REF_stat_labels
+#else
+static const char *const stat_labels[5]={"Level ","PA ","Speed ","Move ","Jump "};
+#endif
+u8 v=slot==0?u->level:slot==1?u->pa:slot==2?u->sp:slot==3?u->move:u->jump;u8 n=put_s(line,0,stat_labels[slot]);n=put_n(line,n,v);line[n]=0;ui_text(4,40+slot*8,line,C_BLACK,156);}
         }else ui_text(4,90,"ENTER: stats/equip   SHIFT: back",C_BLACK,158);
         rt_light=l;rt_dark=d;W->status_i++;
     }
@@ -4625,7 +4872,11 @@ static void status_detail(u8 k)
         }
         else if (k == 5) { n = put_s(s, n, "JP to learn "); n = put_n(s, n, AB_JP(ab)); }
         else if (k == 6) {
-            static const char *const effects[] = { "Physical damage", "Removes status ailments", "Give HP to an ally", "Restores HP", "Revives a KO ally", "Raises evasion" };
+            #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define effects CONTOUR_REF_effects
+#else
+static const char *const effects[] = { "Physical damage", "Removes status ailments", "Give HP to an ally", "Restores HP", "Revives a KO ally", "Raises evasion" };
+#endif
             n = put_s(s, n, effects[ab->kind]);
         } else if (k == 7 && ab->flags & AF_ITEM) { n = put_s(s, n, "In stock "); n = st.unit[st.sel].team == TEAM_PLAYER ? put_n(s, n, st.bag[ab->bag]) : put_s(s, n, "Unlimited"); }
         else if (k == 8) n = put_s(s, n, ab->flags & AF_EVADE ? "Can be evaded" : "Cannot be evaded");
@@ -4697,7 +4948,11 @@ static void draw_status(void)
 
 static void draw_active(const Feet *f)
 {
-    static const u8 bob[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };   // up and down as the glove sways
+    #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define bob CONTOUR_REF_bob
+#else
+static const u8 bob[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
+#endif   // up and down as the glove sways
     RtSprite sp = { 16, ACTIVE_H, active_gfx[0], active_gfx[1], active_gfx[2] };
     draw_sprite(f->x - st.camx - 8, f->y - st.camy - UNIT_FOOT - ACTIVE_H + 1 - bob[(st.tick >> 2) & 7], &sp);
 }
@@ -4947,7 +5202,15 @@ void game_render(void)
     s16 u, v;
 #ifdef FFT_CONFIG
     pidle_interrupt();
-    if (st.config) { config_draw(); pidle_tick(PIDLE_BUDGET); FRAME_END(); return; }
+#endif
+#if defined(FFT_CONFIG) || defined(FFT_REACH_CONTOUR)
+    if (st.config) {
+        config_draw();
+#ifdef FFT_CONFIG
+        pidle_tick(PIDLE_BUDGET);
+#endif
+        FRAME_END(); return;
+    }
 #endif
     if (W &&
 #ifdef FFT_CINEMA

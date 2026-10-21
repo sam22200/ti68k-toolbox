@@ -335,7 +335,9 @@ static u8 opening_update(void)
         return !input_pressed(K_ESC);
     }
     if(st.open_stage==OPEN_TITLE){
-        if(st.open_clock>=150||input_pressed(K_A|K_ENTER))opening_stage(OPEN_CHAPEL);
+        // Do not consume the ENTER which launched the packed program. Finish
+        // the source-letter reveal and leave a readable hold before skipping.
+        if(st.open_clock>=150||(st.open_clock>=110&&input_pressed(K_A|K_ENTER)))opening_stage(OPEN_CHAPEL);
         return !input_pressed(K_ESC);
     }
     if(st.open_stage==OPEN_DONE){
