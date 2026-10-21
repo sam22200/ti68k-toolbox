@@ -4,7 +4,7 @@ TESTS := test_opening.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffcu ffcw ffca ffcb
+BANKS := ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0 ffcu ffcw ffca ffcb
 TI_FLAGS := ../../../lib/unpack68k.s
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 
@@ -60,3 +60,6 @@ $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen
 
 data/ffod.bin: ../tools/chapter_desc.py data/battle.h data/interface.h data/map.h data/units.h
 	$(PY) ../tools/chapter_desc.py opening
+
+data/ffs0.bin: ../tools/scenes.py data/ffost.bin data/story.h
+	$(PY) ../tools/scenes.py

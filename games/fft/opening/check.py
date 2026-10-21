@@ -46,4 +46,17 @@ def main():
                 native_game_heap_bytes=8*40*192+checks[0]['native_work_bytes'],native_grayscale_heap_bytes=3840+7688,
                 native_checked_binary_bytes=(OUT/'openchk.89z').stat().st_size,archive_bytes=sum((DATA/(n+'.bin')).stat().st_size for n in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb')))
     (OUT/'checked.json').write_text(json.dumps(report,indent=2)+'\n');print('Opening: %d complete PC/TI pixels + tactical-state checkpoints passed'%len(checks))
+    # The scene player (campaign/scene.c) plays the same title and chapel from ffs0: every
+    # screen must equal the opening program's at the same frame, on the PC and the 68000.
+    run(['cc','-std=gnu99','-O1','-DCHECK_SCENE','-o',OUT/'scene',HERE/'../campaign/check_native.c',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
+    run([ROOT/'tools/bin/ti-cc','-o',OUT/'scenechk','-DRT_CYCLES','-DCHECK_SCENE',HERE/'../campaign/check_native.c',*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
+    sbase=[ROOT/'tools/bin/ti-cycles','--max',10000]
+    for name in ('ffs0','ffoa','ffca','ffcb','ffcu'):sbase+=['--file',DATA/(name+'.89y')]
+    shown={c['case']:c['checksum'] for c in checks}
+    for name,scenario,frames,keys in cases[:6]:
+        pc=run([OUT/'scene',scenario,frames,keys,OUT/(name+'-scene-pc.png')])
+        ti=run([*sbase,'--arg',scenario,'--frames',frames,'--keys',keys,'--png',OUT/(name+'-scene-ti.png'),OUT/'scenechk.89z'])
+        a=re.search(r'checksum (\w+)',pc)[1];b=re.search(r'checksum\s+(\w+)',ti)[1]
+        assert a.lower()==b.lower()==shown[name].lower(),(name,'scene',a,b,shown[name])
+    print('Scene player: %d title/chapel screens equal the opening program\'s, PC and 68000'%6)
 if __name__=='__main__':main()

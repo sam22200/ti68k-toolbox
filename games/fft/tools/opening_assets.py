@@ -487,3 +487,4 @@ if __name__=='__main__':
     subprocess.run([sys.executable,HERE/'tools/common_ui.py','opening'],check=True)  # ffcu, shared with the other chapter
     subprocess.run([sys.executable,HERE/'tools/common_actors.py'],check=True)  # ffca/ffcb/ffcw, shared
     subprocess.run([sys.executable,HERE/'tools/chapter_desc.py','opening'],check=True)  # its descriptor
+    subprocess.run([sys.executable,HERE/'tools/scenes.py'],check=True)  # the scene player's sets

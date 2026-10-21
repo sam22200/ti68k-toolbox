@@ -29,8 +29,8 @@ static inline short divs32_16(long n, short d)
 #define WR32(p, i, v) (WR16(p, i, (u16)((v) >> 16)), WR16(p, (i) + 1, (u16)(v)))
 #define RMW16(p, k, v) do { u16 o_ = (u16)((p)[0] << 8 | (p)[1]); o_ = (u16)((o_ & ~(k)) | (v)); \
                             (p)[0] = (u8)(o_ >> 8); (p)[1] = (u8)o_; } while (0)
-static long muls16(short a, short b) { return (long)a * b; }
-static short divs32_16(long n, short d) { return (short)(n / d); }
+static inline long muls16(short a, short b) { return (long)a * b; }
+static inline short divs32_16(long n, short d) { return (short)(n / d); }
 #endif
 
 #ifdef __m68k__
