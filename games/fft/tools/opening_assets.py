@@ -181,7 +181,7 @@ def map_assets(disc,files,number,prefix,chapel=False):
     (OUT/'map.h').write_text('// Local disc-generated; never committed.\n#define MAP_W %d\n#define MAP_H %d\n'%(nx,nz))
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(4) as ex:
-        for rot,data in enumerate(ex.map(lambda r:extract.zx0pack.pack(extract.rowxor_masks(r)),raw)):(OUT/('ffov%d.bin'%rot)).write_bytes(data)
+        for rot,data in enumerate(ex.map(extract.pack_view,raw)):(OUT/('ffov%d.bin'%rot)).write_bytes(data)
     return tiles,(nx,nz)
 
 def source_title(disc,files):

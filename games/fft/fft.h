@@ -48,6 +48,9 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #if defined(FFT_CHAPTER) && !defined(FFT_WATER_DUMP)
 #define FFT_WATER_BANK                        // glints read from the descriptor, not computed
 #endif
+#ifdef FFT_CHAPTER
+#define FFT_VIEW_SPLIT                        // views: colours into the scene, depths in vbuf
+#endif
 #if defined(FFT_CHAPTER) && defined(__m68k__) && !defined(FFT_NO_REACH_CONTOUR)
 #define FFT_TABLES_ARCHIVED                   // constant tables read from the archive tail, not RAM
 #endif

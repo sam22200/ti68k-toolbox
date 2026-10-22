@@ -135,7 +135,11 @@ def build(chapter):
     body = bytearray(head)
     fields = {}
     values['SC_TOP'] = SC_TOP[chapter]
-    values['SC_H'] = len(unzx0((folder / (VIEW[chapter] + '.bin')).read_bytes())) // (6 * 40)
+    view = (folder / (VIEW[chapter] + '.bin')).read_bytes()
+    if view[:2] == b'V2':                      # split banks (extract.pack_view): colours first
+        values['SC_H'] = len(unzx0(view[4:4 + int.from_bytes(view[2:4], 'big')])) // (2 * 40)
+    else:
+        values['SC_H'] = len(unzx0(view)) // (6 * 40)
     for f, name in NUMBERS:
         fields[f] = values[name or f]
     for f, name in IGFX:

@@ -78,7 +78,13 @@ u8 scene_rot;
 // the four views (fftv0..3, ZX0, read in place), unpacked one at a time into vbuf: light and
 // dark planes, then twice (the frontmost pixels of each byte, then the next ones) their view
 // diagonal and their mask (SC_PLANE each)
+#ifdef FFT_VIEW_SPLIT                   // the colours live in the scene buffer only
+#define VIEW_BYTES (4UL * SC_PLANE)
+#define VDEPTH vbuf                     // depth, mask, depth, mask
+#else
+#define VDEPTH (vbuf + 2 * SC_PLANE)
 #define VIEW_BYTES (6UL * SC_PLANE)          // 52,320 (Gariland 48,480): above a 16-bit int
+#endif
 static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static const u8 *igfx;                  // portraits, names, marker and text (ffti)
@@ -107,6 +113,7 @@ static u32 slope_pc[4 * SLOPE_ROWS];    // the PC's native copy (ffti is big-end
 static const u8 *wgfx;                  // armed body poses and blades (fftw), read in place
 static u8 *vbuf, vbuf_rot;
 
+#define BK_N 128                        // FFT_VIEW_SPLIT: rows kept (a reach touches up to 126)
 // Work memory, allocated with the scene (globals and statics are stored in the program file
 // on the TI: -mno-bss, and the TI-89 refuses programs above 24 KB)
 #define TW (RT_W / 2)                   // the rotation frames: half resolution
@@ -277,6 +284,13 @@ typedef struct {
 #endif
     u16 tag[2][3][7 * RT_PBYTES / 2];   // "Enemy" / "Guest" above a portrait, made once
 #endif
+#ifdef FFT_VIEW_SPLIT
+    // The view's colours of the scene rows the reach rings were drawn on, kept before a ring
+    // changes them (the colours are no longer kept whole: VIEW_BYTES)
+    u8 bk_of[SC_H];                     // a row's slot (0xFF: the row is still the view's)
+    u8 bk_row[BK_N], bk_n, bk_over;     // each slot's row; slots used; rings past the backup
+    u8 bk[BK_N][2][SC_BYTES];
+#endif
 } Work;
 static Work *W;
 static u8 bg_usable(void);
@@ -295,6 +309,7 @@ static u8 bg_usable(void);
 #define COVER_K 16                      // its cover mask made again
 #define BG_K 25                         // the screen's copy of the scene put back
 #define VIEW_K 105                      // the view copied (the camera moved)
+#define RELOAD_K 800                    // FFT_VIEW_SPLIT: the colours decoded again (16 KB ZX0)
 #define RING_K 30                       // a new flat ring (12 rows; a sloped one by its rows): taken
                                         // from the budget, the other optional work waits
 #define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
@@ -881,9 +896,15 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
         if ((u16)yy >= SC_H || !m) continue;
         a = m >> sh; m3[0] = (u16)(a >> 16); m3[1] = (u16)a; m3[2] = (u16)(m << (16 - sh));
         a = l >> sh; l3[0] = (u16)(a >> 16); l3[1] = (u16)a; l3[2] = (u16)(l << (16 - sh));
+#ifdef FFT_VIEW_SPLIT
+        const u8 *ol = scene_l, *od = scene_d;      // past the backup: the row as it is
+        if (W->bk_of[yy] != 0xFF) { ol = W->bk[W->bk_of[yy]][0] - yy * SC_BYTES; od = W->bk[W->bk_of[yy]][1] - yy * SC_BYTES; }
+#else
+        const u8 *ol = vbuf, *od = vbuf + SC_PLANE;
+#endif
         for (k = 0; k < 3; k++) {
             u16 mw = m3[k], g1, g2, c, oo = (u16)(o + 2 * k);
-            const u8 *t = vbuf + 2 * SC_PLANE + oo;     // depths, masks: constant offsets
+            const u8 *t = VDEPTH + oo;     // depths, masks: constant offsets
             u8 *q = scene_l + oo;
             if (!mw || (u16)(w0 + k) >= SC_BYTES / 2) continue;
             if (st.over) c = 0;                         // over the scenery: no depth test
@@ -892,8 +913,8 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
                 g2 = (u16)(RD16(t + 2 * SC_PLANE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
                 c = (u16)(((g1 & RD16(t + SC_PLANE, 0)) | (g2 & RD16(t + 3 * SC_PLANE, 0))) & mw & hp);
             }
-            WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(vbuf + oo, 0) & c)));
-            WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(vbuf + SC_PLANE + oo, 0) & c)));
+            WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(ol + oo, 0) & c)));
+            WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(od + oo, 0) & c)));
         }
     }
 }
@@ -911,22 +932,57 @@ static void preview_iso_apply(u8 rot);
 #if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
 // Chapter views store each occlusion mask row XORed with the row above (extract.py
 // rowxor_masks: ~3 KB less archive per map); undone here a long at a time.
-static void unxor_masks(u8 *v)
+static void unxor_masks(u8 *v)          // v: the depth/mask planes
 {
     u8 k;
-    for (k = 3; k <= 5; k += 2) {
+    for (k = 1; k <= 3; k += 2) {
         u32 *p = (u32 *)(v + k * SC_PLANE + SC_BYTES), *e = (u32 *)(v + (k + 1) * SC_PLANE);
         do *p ^= p[-SC_BYTES / 4]; while (++p < e);
     }
 }
 #endif
 
+#ifdef FFT_VIEW_SPLIT
+static void bk_reset(void)
+{
+    memset(W->bk_of, 0xFF, sizeof W->bk_of); W->bk_n = 0; W->bk_over = 0;
+}
+
+// Keep the view's colours of scene row y before a ring changes it; 0: the backup is full of
+// rows still changed (rings drawn now or rows still to put back)
+static u8 bk_save(s16 y)
+{
+    u8 s;
+    if (W->bk_of[y] != 0xFF) return 1;
+    if (W->bk_n < BK_N) s = W->bk_n++;
+    else {                                      // a row put back since: its slot again
+        for (s = 0; s < BK_N; s++) {
+            s16 r = W->bk_row[s];
+            if ((r < W->ring_y0 || r >= W->ring_y1) && (r < W->drop_y0 || r >= W->drop_y1)) break;
+        }
+        if (s == BK_N) return 0;
+        W->bk_of[W->bk_row[s]] = 0xFF;
+    }
+    W->bk_of[y] = s; W->bk_row[s] = (u8)y;
+    memcpy(W->bk[s][0], scene_l + y * SC_BYTES, SC_BYTES);
+    memcpy(W->bk[s][1], scene_d + y * SC_BYTES, SC_BYTES);
+    return 1;
+}
+#endif
+
 static void unpack_view(u8 rot)
 {
     if (vbuf_rot == rot) return;
+#ifdef FFT_VIEW_SPLIT                           // b'V2', colour stream length (extract.pack_view)
+    zx0_unpack(views[rot] + 4, scene_l);
+    zx0_unpack(views[rot] + 4 + RD16(views[rot], 1), vbuf);
+    unxor_masks(vbuf);
+    bk_reset();
+#else
     zx0_unpack(views[rot], vbuf);
 #if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
     unxor_masks(vbuf);
+#endif
 #endif
 #ifdef FFT_TEXTURE_PREVIEW
     preview_iso_apply(rot);
@@ -938,7 +994,7 @@ static void unpack_view(u8 rot)
 #ifndef FFT_WATER_BANK
 static u8 seen(s16 x, s16 y, u8 depth)
 {
-    const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+    const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
     u16 o = (u16)(y * SC_BYTES + (x >> 3));
     u8 b = (u8)(0x80 >> (x & 7));
     return !((t1[o] > depth && m1[o] & b) || (t2[o] > depth && m2[o] & b));
@@ -954,7 +1010,7 @@ static const PlaneWord *cursor_mask(const Marker *mk, u16 c)
 {
     u16 k = (u16)(c | st.rot << 8 | 0x8000), o;   // c: the tile, | 0x1000 a reach tile's marker
     s16 r, b0 = mk->x >> 3, sh = mk->x & 7, yy = mk->y, j;
-    const u8 *t1 = vbuf + 2 * SC_PLANE;
+    const u8 *t1 = VDEPTH;
     u8 dp = mk->depth;
     if (vbuf_rot != st.rot || st.ai) return mk->m;  // (an AI turn: whole, its frames are full)
     if (W->cur_k == k) return W->cur_m;
@@ -1072,10 +1128,19 @@ static u8 bg_usable(void)
 // scene rows [y, y + n) put back from the view (u32 copies: ~0.6k a row)
 static void scene_rows(s16 y, s16 n)
 {
+#ifdef FFT_VIEW_SPLIT                           // from the backup (rows never changed are kept)
+    for (; n > 0; n--, y++) {
+        u8 s = W->bk_of[y];
+        if (s == 0xFF) continue;
+        memcpy(scene_l + y * SC_BYTES, W->bk[s][0], SC_BYTES);
+        memcpy(scene_d + y * SC_BYTES, W->bk[s][1], SC_BYTES);
+    }
+#else
     PlaneWord *a = (PlaneWord *)(scene_l + y * SC_BYTES), *b = (PlaneWord *)(scene_d + y * SC_BYTES);
     const PlaneWord *p = (const PlaneWord *)(vbuf + y * SC_BYTES), *q = (const PlaneWord *)(vbuf + SC_PLANE + y * SC_BYTES);
     u16 k = (u16)(n * (SC_BYTES / 4));
     while (k--) { *a++ = *p++; *b++ = *q++; }
+#endif
 }
 
 static u8 ring_style(void)
@@ -1147,7 +1212,9 @@ static void ensure_scene(u8 rot)
     unpack_view(rot);
     if (scene_rot != rot) {
         make_glints(rot);
+#ifndef FFT_VIEW_SPLIT                          // (split: unpack_view wrote them there)
         memcpy(scene_l, vbuf, 2 * SC_PLANE);
+#endif
         scene_ver++;
         W->drop_y0 = W->drop_y1 = 0;
     } else if (W->ring_y0 < W->ring_y1) {          // the rows the rings are on, put back below
@@ -1166,6 +1233,14 @@ drop:
         if (n > W->drop_y1 - W->drop_y0) n = W->drop_y1 - W->drop_y0;   // copy) as the budget
         if (W->left < n * ROW_K && (W->drop_wait < WAIT_MAX || !bg_usable())) { W->drop_wait++; return; }
         W->drop_wait = 0;                          // allows, then the new ones (a whole scene
+#ifdef FFT_VIEW_SPLIT
+        if (W->bk_over) {                          // rings went past the backup: the colours
+            zx0_unpack(views[scene_rot] + 4, scene_l);   // again, whole (no rings are drawn now)
+            bk_reset(); scene_ver++;
+            W->drop_y0 = W->drop_y1; W->left -= RELOAD_K;
+            goto rings;
+        }
+#endif
         scene_rows(W->drop_y0, n);                 // copy, 130k, or the rings' boxes one by one,
         bg_patch(0, W->drop_y0, SC_W, n);          // ~10k each, went over the budget)
         W->drop_y0 += n; W->left -= n * ROW_K;
@@ -1193,11 +1268,14 @@ rings:
         marker(rot, i, 0, &mk);
 #endif
         W->left -= RING_K * mk.rows / 12;
+        if (mk.y < W->ring_y0) W->ring_y0 = mk.y < 0 ? 0 : mk.y;     // (first: the backup never
+        if (mk.y + mk.rows > W->ring_y1) W->ring_y1 = mk.y + mk.rows > SC_H ? SC_H : mk.y + mk.rows;
+#ifdef FFT_VIEW_SPLIT                              // reuses a row of this ring)
+        { s16 y; for (y = W->ring_y0 > mk.y ? W->ring_y0 : mk.y; y < mk.y + mk.rows && y < SC_H; y++) if (!bk_save(y)) W->bk_over = 1; }
+#endif
         ring_into_scene(&mk);
         if(mk.x<patch_x0)patch_x0=mk.x;
         if(mk.x+24>patch_x1)patch_x1=mk.x+24;
-        if (mk.y < W->ring_y0) W->ring_y0 = mk.y < 0 ? 0 : mk.y;
-        if (mk.y + mk.rows > W->ring_y1) W->ring_y1 = mk.y + mk.rows > SC_H ? SC_H : mk.y + mk.rows;
     }
     // All rings appear together. Patch their union once, avoiding repeated
     // screen-cache shifts where adjacent/sloped markers overlap.
@@ -2439,7 +2517,7 @@ static Feet unit_feet(u8 rot, u8 i)
 // made again only when its feet, its depth or the view change: a unit standing still costs nothing.
 static void cover(u16 *cm, s16 fx, s16 fy, u8 depth)
 {
-    const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+    const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
     s16 bx = fx - 8, by = fy - UNIT_FOOT, b0 = bx >> 3, sh = 8 - (bx & 7), r, k;
     for (r = 0; r < COVER_H; r++) {
         s16 y = by + r;
@@ -2832,7 +2910,7 @@ static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
     bx = sx + weapon_x[k]; by = sy - WEAPON_FOOT;
     b0 = bx >> 3; sh = bx & 7;
     if (W->wx != bx || W->wy != by || W->wrot != st.rot || W->wdepth != depth) {
-        const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+        const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
         for (r = 0; r < WEAPON_SH; r++) {
             s16 y = by + r;
             u32 cm = 0;
@@ -3733,7 +3811,7 @@ u8 view_hides(u8 rot, u8 i)
 u8 view_hides_now(u8 i)
 {
     static const s8 col[4] = { -5, -2, 2, 5 };
-    const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
+    const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
     Feet f;
     u8 j, n = 0;
     s16 y;

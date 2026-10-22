@@ -71,7 +71,7 @@ def main():
         for i in (0,1,3,5):planes[i]=rev[planes[i]]
         assert not planes[:,:TOP].any(),('scenery above the crop',rot)
         planes=planes[:,TOP:].copy()
-        (OUT/f'ffgv{rot}.bin').write_bytes(extract.zx0pack.pack(extract.rowxor_masks(planes.tobytes())));raw.unlink()
+        (OUT/f'ffgv{rot}.bin').write_bytes(extract.pack_view(planes.tobytes()));raw.unlink()
     if not args.reuse_views:
         with ThreadPoolExecutor(4) as pool:list(pool.map(mirror_view,range(4)))
     # Move unchanged byte tables out of the 64K executable, as in Orbonne.

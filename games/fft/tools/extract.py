@@ -234,6 +234,16 @@ def rowxor_masks(raw):
     return p.tobytes()
 
 
+def pack_view(raw):
+    """A chapter view (ffov*, ffgv*): b'V2', u16 length of the colour stream, the ZX0 stream of
+    the two colour planes (fft.c decodes it straight into the scene buffer), then the ZX0
+    stream of the four depth/mask planes, mask rows XORed (rowxor_masks)."""
+    raw = rowxor_masks(raw)
+    plane = len(raw) // 6
+    colours = zx0pack.pack(raw[:2 * plane])
+    return b'V2' + len(colours).to_bytes(2, 'big') + colours + zx0pack.pack(raw[2 * plane:])
+
+
 def unrowxor_masks(raw):
     p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40).copy()
     for k in (3, 5):

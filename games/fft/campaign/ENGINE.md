@@ -72,5 +72,11 @@ constant offsets.
   starts with ~187 KB free but not with 2-5 KB less: it needs ~183 KB of a Titanium's ~188 KB.
   Already moved out of its RAM, results unchanged: water glints (4,000 bytes, now in the
   descriptor, computed by the engine itself: `campaign/water_dump.c`) and the byte-doubling
-  and tile tables (1,512 bytes, archive tail). Gariland needs several more KB of headroom
-  before the chain can run on a calculator holding anything else.
+  and tile tables (1,512 bytes, archive tail). Then the views split (`extract.pack_view`:
+  colour stream, depth stream): colours decode straight into the scene buffer, the view
+  buffer keeps the four depth planes (-16,160 bytes) and a 128-row backup keeps the colours
+  of the rows reach rings are drawn on (+10,572; a reach touched up to 126 rows; past it the
+  colours decode again, ~800k cycles once): net ~5.6 KB for Gariland, screens and states
+  unchanged, loads/turns ~90k cycles faster, a reach's first frame up to +31k. The test
+  chain (fftopen(5), fftscn(1) card and Academy, fftgar(61)) now reaches Gariland's battle
+  on TiEmu with the 48-pose cache.
