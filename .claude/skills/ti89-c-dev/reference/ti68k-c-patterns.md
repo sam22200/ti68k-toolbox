@@ -537,6 +537,13 @@ GKeyFlush();                             // don't leave the game's keypresses in
   program's own block: code copied at run time into a zone reserved in the program
   (initialised data) and called **works** after the same allocations (`overlay.c`: the zone
   at 0x3FE28 returns its value), so overlays live in the program, not in the heap.
+  **Position-independent modules** (**verified**, TiEmu Titanium, `picmod.c`/`picrun.c`,
+  built by `picmod.sh`): `tigcc -c -mpcrel` leaves only PC-relative references, already laid
+  out by the assembler, so `objcopy -O binary` gives an image that runs wherever it is
+  copied; an archived data variable holds it, the program copies it into its zone and calls
+  it with a context of pointers (data, the runtime's drawing) every frame under greys. A
+  module may call nothing else: no library, no program symbol (the script refuses
+  undefined symbols).
   No single unpatched binary works on both: a DLL game needs HW3Patch on the Titanium, or two
   builds. Exports are called by **ordinal**: never reorder the export list. For big games, split the
   **data** into separate files (§10) instead: HW3-safe and simpler.

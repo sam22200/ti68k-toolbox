@@ -22,10 +22,13 @@ TTPack's 64,936-byte input limit (Orbonne is 253 bytes over).
 
 Then every Chapter I map and scene is ripped as data. Programs, each run by `fftstory`:
 - **`fftbat`** battle engine: an unpacked core (rendering, map, units, state, input; at most
-  AMS's 65,514 bytes) plus **modules** (TIGCC DLLs, verified on the Titanium with a plain
-  loader: `experiments/dll/`) loaded only while used: AI thinking, Status/info screens,
-  results and rewards, settings. RAM = core + one module. Job abilities become data
-  (FFT's formula families) read by one interpreter, so jobs add data, not code.
+  AMS's 65,514 bytes) plus **modules** loaded only while used: AI thinking, Status/info
+  screens, results and rewards, settings. TIGCC DLLs crash on an unpatched Titanium once
+  the game has allocated its buffers (verified); modules are instead position-independent
+  images (`-mpcrel`, `experiments/dll/picmod.sh`) kept in the archive and copied into a zone
+  reserved inside the core program, called with a context of pointers (verified on TiEmu
+  under greys). RAM = core + zone. Job abilities become data (FFT's formula families) read
+  by one interpreter, so jobs add data, not code.
 - **`fftscn`** scenes (done: title, pictures with depth, beats, cards, portraits).
 - **`fftmap`** world map (to create): locations graph, travel, entering battles/scenes/menus.
 - **`fftmng`** management menus (party, equipment, jobs).
