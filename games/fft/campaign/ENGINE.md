@@ -186,7 +186,9 @@ constant offsets.
   kept. The battle does not read the party yet (the next battle will), and the job names
   now in `ffmg` can give the single Status page its names.
 - World map (`fftmap`, `campaign/worldmap.c`, 13,031 bytes): Ivalice as a simplified
-  geography (the user's choice): land light grey, sea dark grey, a black coast, from the
+  geography (the user's choice): land light grey with a sparse dark stipple, sea dark grey
+  with light waves and checkered shallows along the coast (user: "un peu de motif", 16-pixel
+  periodic motifs so that open tiles repeat), a black coast, from the
   original map texture (WORLD/WLDTEX.TM2, a VRAM upload stream; its four 8-bit pieces
   assembled, land told by its blue against its red, cleaned) drawn by ExtGraph's TileMap engine
   (255 tiles of 16x16, near-identical coast tiles merged); our markers (towns black, fields dark

@@ -17,7 +17,8 @@ Sources (layouts named after adamrt/fft_decomp, checked here on the disc and the
   and Mandalia on the original's screen).
 - WORLD/WORLD.BIN: the locations' names (0x8e1a0, FFT's text, 0xFE between them).
 Land is told from sea by the texture's blue against its red (ochre land, grey-green sea),
-filtered (median 9), opened and closed, specks below 60 pixels dropped.
+filtered (median 9), opened and closed, specks below 60 pixels dropped; drawn with 16-pixel
+periodic motifs (greys()), the rarest of the coast's tiles merged into their nearest down to 255.
 Layout, big-endian: "FWM1", u16 offsets: tiles, cells, locations, routes, story; the map's
 width and height in tiles; tiles in ExtGraph's TileMap order (16 dark / light u16 pairs);
 cells u8; locations 43 x (s16 x, y texture pixels, kind 1 town / 2 field, name offset);
@@ -91,13 +92,34 @@ def land_mask(m):
     return land
 
 
+def motif(shape, points):
+    """A 16-pixel periodic motif: aligned on the tiles, the open sea's and land's tiles repeat."""
+    p = np.zeros((16, 16), bool)
+    for x, y in points:
+        p[y % 16, x % 16] = True
+    yy, xx = np.mgrid[:shape[0], :shape[1]]
+    return p[yy % 16, xx % 16]
+
+
+WAVE = [(0, 0), (1, -1), (2, -1), (3, 0), (4, 0), (5, -1)]     # a small '~'
+
+
 def greys(land):
-    """Light-grey land, dark-grey sea, a black coast (the user's simplified geography)."""
+    """Light-grey land with a sparse dark stipple, dark-grey sea with light waves, shallows
+    checkered light along the coast (3 pixels), a black coast (the user's simplified geography,
+    then "un peu de motif")."""
     h, w = land.shape
     pad = np.zeros(((h + 15) // 16 * 16, (w + 15) // 16 * 16), bool)
     pad[:h, :w] = land
+    yy, xx = np.mgrid[:pad.shape[0], :pad.shape[1]]
     coast = pad & ~ndimage.binary_erosion(pad, border_value=1)
-    return np.where(coast, 3, np.where(pad, 1, 2))
+    near = ndimage.distance_transform_edt(~pad) <= 3
+    g = np.where(pad, 1, 2)
+    g[~pad & motif(pad.shape, [(2 + x, 3 + y) for x, y in WAVE] + [(10 + x, 11 + y) for x, y in WAVE])] = 1
+    g[~pad & near & ((xx + yy) % 2 == 0)] = 1
+    g[pad & motif(pad.shape, [(5, 6), (13, 14), (1, 12), (9, 2)])] = 2
+    g[coast] = 3
+    return g
 
 
 def tiles_of(g):
