@@ -46,8 +46,44 @@ def main():
             if case=='won':                    # the campaign save (save.h): the same bytes, Gariland's flag, its party
                 saved=save_dump.payload(sav);assert saved==save_dump.payload(OUT/'ffsave.89y'),(name,case,'save')
                 party=save_dump.decode(saved);assert party['flags']==[1] and party['party'],party
-                row['save']=hashlib.sha1(saved).hexdigest()[:12];sav.unlink()
+                row['save']=hashlib.sha1(saved).hexdigest()[:12]
+                sav.rename(OUT/'ffsave_won.sav');(OUT/'ffsave.89y').rename(OUT/'ffsave_won.89y')   # the menus' party
             results.append(row);print(json.dumps(row),flush=True)
+    if '--status-only' not in sys.argv and '--academy-only' not in sys.argv:
+        results+=manage(OUT/'ffsave_won.sav',OUT/'ffsave_won.89y')
     (OUT/('status.json' if '--status-only' in sys.argv else 'academy.json' if '--academy-only' in sys.argv else 'checked.json')).write_text(json.dumps(results,indent=2)+'\n')
     print('Campaign: %d actual-68000 pixels/state replays passed'%len(results))
+def keys(path,events):
+    path.write_text(''.join(f'{f} {k}\n{f+1}\n' for f,k in events));return path
+
+def manage(pc_save,ti_save):
+    """The management menus (manage.c) on the party Gariland's victory saved: each screen, then a
+    tour that changes a job and leaves (its save written); PC and 68000 alike."""
+    common=[HERE/'check_manage.c',ROOT/'runtime/core/rt_core.c']
+    run(['cc','-std=gnu99','-O1','-o',OUT/'manage',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
+    run([ROOT/'tools/bin/ti-cc','-o',OUT/'managec','-DRT_CYCLES',*common,ROOT/'tools/extgraph/lib/tilemap.a'])
+    empty=OUT/'none.keys'
+    tour=keys(OUT/'tour.keys',[(2,'C'),(4,'DOWN'),(6,'DOWN'),(8,'DOWN'),(10,'ENTER'),(12,'DOWN'),(14,'DOWN'),(16,'ENTER'),
+        (18,'ENTER'),(20,'B'),(22,'UP'),(24,'UP'),(26,'UP'),(28,'ENTER'),(30,'ENTER'),(32,'B'),(34,'B'),(36,'DOWN'),(38,'DOWN'),
+        (40,'ENTER'),(42,'ENTER'),(44,'ENTER'),(46,'B'),(48,'B'),(50,'ESC')])
+    sav=HERE/'data/ffsave.sav';out=[]
+    for case,door,frames,script in (('formation',0,4,empty),('status',1,4,empty),('equip',2,4,empty),('abilities',3,4,empty),
+                                    ('learn',4,4,empty),('jobs',5,4,empty),('menu',6,4,empty),('tour',0,80,tour)):
+        sav.write_bytes(pc_save.read_bytes());(OUT/'ffsave.89y').unlink(missing_ok=True)
+        pc=run([OUT/'manage',door,frames,script,OUT/('manage-'+case+'-pc.png')])
+        command=[ROOT/'tools/bin/ti-cycles','--max',2000,'--arg',door,'--frames',frames,'--keys',script,'--png',OUT/('manage-'+case+'-ti.png'),
+                 '--file',HERE/'data/ffmg.89y','--file',ti_save,'--save-dir',OUT,OUT/'managec.89z']
+        ti=run(command)
+        executed=int(re.search(r'executed (\d+)',pc)[1]);checksum=re.search(r'checksum (\w+)',pc)[1];state=int(re.search(r'state (\w+)',pc)[1],16)
+        assert checksum.lower()==re.search(r'checksum\s+(\w+)',ti)[1].lower(),('manage',case,'pixels')
+        values=[int(v,16) for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',ti)]
+        assert values[-2:]==[0x4d4e4701,state],('manage',case,'state',values,pc)
+        row=dict(chapter='manage',case=case,executed_frames=executed,checksum=checksum,state_hash=state)
+        if case=='tour':                       # the edited party: the same save written by both
+            saved=save_dump.payload(sav);assert saved==save_dump.payload(OUT/'ffsave.89y'),('manage','save')
+            assert save_dump.decode(saved)['party'][0]['job']==0x4C,'Ramza a Knight'
+            row['save']=hashlib.sha1(saved).hexdigest()[:12]
+        sav.unlink(missing_ok=True);out.append(row);print(json.dumps(row),flush=True)
+    return out
+
 if __name__=='__main__':main()

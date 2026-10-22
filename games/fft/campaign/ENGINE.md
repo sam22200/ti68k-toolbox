@@ -31,7 +31,7 @@ Then every Chapter I map and scene is ripped as data. Programs, each run by `fft
   by one interpreter, so jobs add data, not code.
 - **`fftscn`** scenes (done: title, pictures with depth, beats, cards, portraits).
 - **`fftmap`** world map (to create): locations graph, travel, entering battles/scenes/menus.
-- **`fftmng`** management menus (party, equipment, jobs).
+- **`fftmng`** management menus (party, equipment, jobs): done, below.
 - **A campaign save** shared by every program: party, items, story flags (done, below);
   the location comes with the world map.
 - **Per map / chapter, data only**: views, descriptor, units, beat script.
@@ -165,7 +165,26 @@ constant offsets.
   (a chest picked, the save's inventory and draws); Orbonne's handoff sets its flag only, and
   the two merge. TiEmu Titanium: `fftbat(105)` returns 1 and leaves `ffsave` (OTH), then
   `fftstory()` opens on the chapter card; `fftstory(1)` starts at the chapel and the save is
-  gone.
+  gone. TiEmu also passed a whole Gariland victory (`fftbat(216)`, the save written on the
+  calculator, management menus below).
+- Management menus (`fftmng`, `campaign/manage.c`, 18,203 bytes, not packed): the first
+  program to read the party. The prototype's classic grid with still sprites (user's choice),
+  Status, Equip, Abilities, Learn, Change Job, by FFT's rules on the save's records: an item
+  fits its slot and the job's equipment types and moves to or from the inventory; an ability
+  costs its job's JP; a job needs the job levels of its row (SCUS 0x800660c4, decoded:
+  Knight and Archer need Squire 2 .. Mime Squire and Chemist 8 and more), Bard men, Dancer
+  women; a job change takes off what the new job cannot equip; the statistics are derived as
+  the battle's unit_stats. Ramza keeps his own sprite in every job, as in FFT. The bank `ffmg`
+  (47.8 KB archived, `tools/management_data.py`): 20 generic jobs and Ramza's Squire, 256 items
+  with 253 icons, the names of jobs, items, abilities and skill sets (BATTLE.BIN's lists),
+  generic names, one still sprite and portrait per job and sex. Checks: `manage-test` (levels,
+  unlocks, statistics, job change, equipment, learning, slots, the save written), campaign
+  `check.py` (7 screens and a tour on the party Gariland's victory saved: PC and 68000
+  screens, states and the written save identical). TiEmu Titanium: `fftbat(216)` (the AI
+  plays Gariland to its victory) returns 1 and leaves `ffsave`; `fftmng()` shows the three
+  survivors; Ramza made a Knight, ESC, then `fftstory()` opens the menus with the Knight
+  kept. The battle does not read the party yet (the next battle will), and the job names
+  now in `ffmg` can give the single Status page its names.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

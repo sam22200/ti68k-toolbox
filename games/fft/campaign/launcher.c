@@ -27,17 +27,19 @@ void _main(void)
     // The scene player (fftscn) shows what lies between battles: Orbonne's title and chapel
     // (ffs0), the chapter card and the Academy (ffs1).
     // The battle program (fftbat) plays every chapter: 100 + an Orbonne door, 200 + Gariland's.
-    static const char *const steps[]={"fftscn(0)","fftbat(100)","fftscn(1)","fftbat(200)"};
+    // The management menus (fftmng) edit the party after a victory.
+    static const char *const steps[]={"fftscn(0)","fftbat(100)","fftscn(1)","fftbat(200)","fftmng()"};
     ESI args;short arg=0,k=0;
     InitArgPtr(args);if(GetArgType(args)==POSINT_TAG)arg=GetIntArg(args);
     if(arg==99){if(chapter("fftbat(105)")&&chapter("fftscn(1)"))chapter("fftbat(261)");}
     else{
         // fftstory(1): a new game, the save deleted; else the story resumes after the last
-        // victory saved (Orbonne's: the card), from the start once every chapter is won
+        // victory saved (Orbonne's: the card; Gariland's: the management menus)
         if(arg==1){SYM_ENTRY *e=SymFindPtr(SYMSTR(SAVE_NAME),0);
             if(e){if(e->flags.bits.archived)EM_moveSymFromExtMem(SYMSTR(SAVE_NAME),HS_NULL);SymDel(SYMSTR(SAVE_NAME));}}
-        else if(won(0)&&!won(1))k=2;
-        while(k<4&&chapter(steps[k]))k++;
+        else if(won(1))k=4;
+        else if(won(0))k=2;
+        while(k<5&&chapter(steps[k]))k++;
     }
     push_shortint(0);
 }
