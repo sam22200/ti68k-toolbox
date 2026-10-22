@@ -10,6 +10,7 @@ TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 check: pc test $(TI_FILES)
 	$(PY) check.py
 test: status-test
+test: save-test
 test: dialogue-test
 test: scene-test
 .PHONY: scene-test
@@ -20,6 +21,10 @@ scene-test: data/ffs1.bin
 dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
 	./fftscn_dialogue_test
+.PHONY: save-test
+save-test:
+	$(CC) $(PC_CFLAGS) -o fftgar_save_test test_save.c $(RT_CORE) $(RT_SW)
+	./fftgar_save_test
 .PHONY: status-test
 status-test:
 	$(CC) $(PC_CFLAGS) -o fftgar_status_test test_status.c $(RT_CORE) $(RT_SW)

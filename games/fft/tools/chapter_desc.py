@@ -38,7 +38,7 @@ TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE
           ('ZODIAC_COMPAT', 'zodiac_compat', 'B'), ('UNIT_ZODIAC', 'opening_zodiac', 'B'),
           ('WEAPON_RANGE', 'opening_range', 'B'), ('SHIELD_EVADE', 'opening_evade', 'B'),
           ('CHARGE_TICKS', 'opening_charge_ticks', 'B'), ('JOB_ID', 'job_ids', 'B'),
-          ('SET_POS', 'set_pos', 'B'), ('BAG_ITEM', 'bag_items', 'B')]
+          ('SET_POS', 'set_pos', 'B'), ('BAG_ITEM', 'bag_items', 'B'), ('RSM_POS', 'rsm_pos', 'B')]
 # WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
 # Gariland's computed by the engine itself (campaign/water_dump.c).
 # MAP_SCRIPT: the beats played on the battle map (fft.c mapbeats.inc): u16 count, then per
@@ -58,10 +58,11 @@ START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc)
 # The campaign save (campaign/save.h): PARTY 1, the player's units are the campaign's party
 # (written at the victory; Orbonne's are not: the flashback starts a new party); WON, the story
 # flag + 1 its victory sets (0 none). JOB_ID, SET_POS, BAG_ITEM, DEFEND_ID, EQUIP_CHANGE_ID: FFT's
-# ids of the chapter's jobs, skill set entries (their learned bit), bag slots and supports.
+# ids of the chapter's jobs, skill set entries (their learned bit), bag slots and supports;
+# RSM_POS, EQUIP_CHANGE_POS: the learned bits of the reactions and supports a unit draws.
 PARTY = {'opening': 0, 'campaign': 1}
 WON = {'opening': 1, 'campaign': 2}
-SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID')
+SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
     ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS', 'START',
      'PARTY', 'WON'] + list(SAVE_IDS)

@@ -543,18 +543,26 @@ void battle_units(void)
     for (i = 0; i < NUNIT; i++) {                  // the support ability (not a new game's Ramza):
         Unit *u = &st.unit[i];                     // Defend bought with the Squire job's JP after
         u16 jp = u->jp;                            // the reactions and supports listed before it,
-        u->defend = 0;                             // then one of the two it knows
+        u->defend = 0;                             // then one of the two it knows (what was learned
+        u->sq_jp = u->sq_tjp = 0;                  // kept for the campaign save)
+        u->sq_learned = u->rsm = 0;
         if (unit_defs[i].type == 2) continue;
         if (jobs[u->job].row) {                    // another job: the Squire's JP and abilities
             const u8 *a = skill_sets[SET_BASIC].abil;
-            jp = (u16)(100 + ((100UL * rand15()) >> 15));
+            jp = u->sq_tjp = (u16)(100 + ((100UL * rand15()) >> 15));
             for (k = 0; k < SET_N && a[k] != 0xFF; k++)
-                if (((100UL * rand15()) >> 15) < abilities[a[k]].rate && jp >= AB_JP(&abilities[a[k]]))
-                    jp -= AB_JP(&abilities[a[k]]);
+                if (((100UL * rand15()) >> 15) < abilities[a[k]].rate && jp >= AB_JP(&abilities[a[k]])) {
+                    jp -= AB_JP(&abilities[a[k]]); u->sq_learned |= (u8)(1 << k);
+                }
         }
         for (k = 0; k < NRSM_PRE; k++)
-            if (((100UL * rand15()) >> 15) < rsm_pre[k][1] && jp >= rsm_pre[k][0]) jp -= rsm_pre[k][0];
-        if (((100UL * rand15()) >> 15) < DEFEND_RATE && jp >= DEFEND_JP) u->defend = !(rand15() >> 14);
+            if (((100UL * rand15()) >> 15) < rsm_pre[k][1] && jp >= rsm_pre[k][0]) {
+                jp -= rsm_pre[k][0]; u->rsm |= (u8)(1 << k);
+            }
+        if (((100UL * rand15()) >> 15) < DEFEND_RATE && jp >= DEFEND_JP) {
+            u->rsm |= 0x80; u->defend = !(rand15() >> 14);
+        }
+        if (jobs[u->job].row) u->sq_jp = jp;
     }
     {
         u16 seed = (u16)(rt_seed ^ 0x5A17);
@@ -1824,6 +1832,9 @@ void pick_up(u8 who, u8 obj)
         u8 k, n = 0, eq[EQ_N];
         for (k = 0; k < EQ_N; k++) if (o->eq[k] != 0xFF) eq[n++] = o->eq[k];
         st.pick = eq[(u32)rand15() * n >> 15];
+#ifdef FFT_CHAPTER
+        if (st.nfound < NUNIT) st.found[st.nfound++] = st.pick;   // the party's (save.inc)
+#endif
     }
     o->dc = DC_GONE; o->x = 0xFF;
     st.mode = M_PICK; st.pick_t = 0;
@@ -4418,6 +4429,7 @@ u8 game_update(void)
     if (battle_update()) return 1;
 #ifdef FFT_CHAPTER
     if (W && (st.end == END_VICTORY || st.open_handoff)) {
+        st.open_handoff = 1;                    // the campaign goes on (fftbat returns it)
         save_campaign();
 #ifdef __m68k__
         release(); W = RT_NULL;

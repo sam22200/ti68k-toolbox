@@ -144,25 +144,28 @@ constant offsets.
   larger scene (~2.4 KB more RAM); an AI thinking step +4 % on average (sizes read at run
   time); frame averages +0.5-1 %, peaks within +3 %. Both Status pages remain (style by
   data) until Chapter I's job names are ripped; then one page.
-- Campaign save (`campaign/save.h`, `ffsave`): one 3,046-byte variable every program shares,
-  bytes only (u16 big-endian), FFT's own ids so any chapter reads it: 256 story flags, the
-  inventory per FFT item id, up to 16 units (FFT job id, sprite, generation table, name,
-  level, EXP, Brave, Faith, zodiac, raw stats, equipment, support, per generic job its JP and
-  FFT's learned bits). The descriptor says what a victory writes (`WON`: its flag; `PARTY`:
-  its player's units are the campaign's party, Gariland's new one, not Orbonne's flashback)
-  and maps the chapter's tables to FFT's ids (`JOB_ID`, `SET_POS`, `BAG_ITEM`, `DEFEND_ID`,
-  `EQUIP_CHANGE_ID`, from `tools/battle.py`). `fftbat` writes it as it leaves after a victory,
-  from a fifth module (`MOD_SAVE`, save.inc, its buffer in the module's own image: no RAM
-  of the core), then frees its buffers for AMS to write the archived variable (core +268
-  bytes: 63,131). A battle unit keeps only its own job's JP and abilities and the support it
-  fights with: so does the save; units turned to crystals or chests leave the party.
-  `fftstory()` resumes after the last victory saved, `fftstory(1)` deletes it (a new game).
-  Checks: campaign `won` (the AI plays Gariland to the end, ENTER leaves): PC and TI saves
-  byte-identical, Gariland's flag and party; Orbonne's handoff sets its flag only, and the
-  two merge. TiEmu Titanium: `fftbat(105)` returns 1 and leaves `ffsave` (OTH), then
+- Campaign save (`campaign/save.h`, `ffsave`, format FSV2): one 3,110-byte variable every
+  program shares, bytes only (u16 big-endian), FFT's own ids so any chapter reads it: 256
+  story flags, the inventory per FFT item id, up to 16 units (FFT job id, sprite, generation
+  table, name, level, EXP, Brave, Faith, zodiac, raw stats, equipment, secondary skill set,
+  reaction, support, movement, per generic job its JP and FFT's learned bits). The descriptor
+  says what a victory writes (`WON`: its flag; `PARTY`: its player's units are the campaign's
+  party, Gariland's new one, not Orbonne's flashback) and maps the chapter's tables to FFT's ids
+  (`JOB_ID`, `SET_POS`, `BAG_ITEM`, `RSM_POS`, `DEFEND_ID`, `EQUIP_CHANGE_ID`,
+  `EQUIP_CHANGE_POS`, from `tools/battle.py`). `fftbat` writes it as it leaves after a victory
+  (and then returns 1: the campaign goes on), from a fifth module (`MOD_SAVE`, save.inc, its
+  buffer in the module's own image: no RAM of the core), then frees its buffers for AMS to
+  write the archived variable. A unit keeps what it was drawn with (battle_units records it
+  without another draw): its job's JP and abilities, a generic unit's Squire JP and abilities
+  when it is another job, the reactions and supports it learned (Equip Change: always), the
+  support it fights with; units turned to crystals or chests leave the party; the items picked
+  from chests join the inventory. `fftstory()` resumes after the last victory saved,
+  `fftstory(1)` deletes it (a new game). Checks: campaign `won` (the AI plays Gariland to the
+  end, ENTER leaves): PC and TI saves byte-identical, Gariland's flag and party; `save-test`
+  (a chest picked, the save's inventory and draws); Orbonne's handoff sets its flag only, and
+  the two merge. TiEmu Titanium: `fftbat(105)` returns 1 and leaves `ffsave` (OTH), then
   `fftstory()` opens on the chapter card; `fftstory(1)` starts at the chapel and the save is
-  gone. Not on TiEmu: a Gariland victory (same write path, ~9,000 frames of play).
-  No program reads the party yet: the management menus and the next battle will.
+  gone.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

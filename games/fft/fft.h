@@ -279,6 +279,10 @@ typedef struct {
     u16 jp, tjp;                       // its job's JP: left, earned in all (the job level)
     u16 gexp, gjp;                     // EXP and JP earned in this battle (the results)
     u32 raw[5];                        // FFT's raw stats (24 bits): HP MP SP PA MA
+    u16 sq_jp, sq_tjp;                 // drawn with them, kept for the campaign save: another job's
+    u8 sq_learned, rsm;                // Squire JP (left, in all) and abilities (bit k: SET_BASIC's
+                                       // k-th); the reactions and supports learned (bit k: rsm_pre's
+                                       // k-th, 0x80 Defend)
 } Unit;
 
 typedef struct {
@@ -356,6 +360,7 @@ typedef struct {
     u8 open_stage, open_beat, open_clock, open_white;
     u16 open_reveal, open_offset, open_seen;
     u8 open_pan, open_fade, open_next, open_handoff;
+    u8 found[NUNIT], nfound;           // the chests' items picked up (items[] index): the campaign's
 #endif
 #if defined(FFT_REACH_CONTOUR) && !defined(FFT_CONFIG)
     u8 config, config_row;

@@ -533,6 +533,13 @@ def rsm(d, k):
     return [(a,) + struct.unpack('<HB', d.at(ABILITY + 8 * a, 3)) for a in ids if a]
 
 
+def rsm_raw(d, k):
+    """Skill set k's six reaction, support and movement entries, empty ones included (0)."""
+    b = d.at(SKILLSETS + 25 * k, 25)
+    hi = b[0] << 16 | b[1] << 8 | b[2]
+    return [(b[19 + i] | (0x100 if hi & 0x80 >> i else 0),) for i in range(6)]
+
+
 def write_support(d, f, sets):
     """The support ability (main_unit_calculate_rsm): one of those the unit learned with its jobs'
     JP, drawn. With at most JP_MAX JP per job only Equip Change (Chemist, 0 JP, always learned),
@@ -629,6 +636,15 @@ def write(d, path):
     f.write('static const u8 bag_items[NBAG] __attribute__((unused)) = { %s };\n' % ', '.join(
         '0x%02X' % (a - ITEM_FIRST + 0xF0) for a in bag))
     f.write('#define DEFEND_ID 0x%03X\n#define EQUIP_CHANGE_ID 0x%03X\n' % (DEFEND, EQUIP_CHANGE))
+    # the reactions and supports a unit draws (write_support): their learned bits, FFT's RSM entry
+    # i of a job's list being its 16 + i-th; rsm_pre's in the Squire's list then Defend's, Equip
+    # Change's in the Chemist's
+    raw = lambda k: [a for a, *_ in rsm_raw(d, k)]
+    sq, ch = raw(0x05), raw(0x06)
+    pre = [a for a in sq[:sq.index(DEFEND)] if a]
+    f.write('static const u8 rsm_pos[NRSM_PRE + 1] __attribute__((unused)) = { %s };\n' % ', '.join(
+        str(16 + sq.index(a)) for a in pre + [DEFEND]))
+    f.write('#define EQUIP_CHANGE_POS %d\n' % (16 + ch.index(EQUIP_CHANGE)))
     f.close()
 
 
