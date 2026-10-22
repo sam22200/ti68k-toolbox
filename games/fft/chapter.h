@@ -50,6 +50,7 @@
 #define CD_START 49
 #define CD_PARTY 50
 #define CD_WON 51
-#define CD_DEFEND_ID 52
-#define CD_EQUIP_CHANGE_ID 53
-#define CD_EQUIP_CHANGE_POS 54
+#define CD_LOCATION 52
+#define CD_DEFEND_ID 53
+#define CD_EQUIP_CHANGE_ID 54
+#define CD_EQUIP_CHANGE_POS 55

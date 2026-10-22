@@ -61,11 +61,12 @@ START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc)
 # ids of the chapter's jobs, skill set entries (their learned bit), bag slots and supports;
 # RSM_POS, EQUIP_CHANGE_POS: the learned bits of the reactions and supports a unit draws.
 PARTY = {'opening': 0, 'campaign': 1}
+LOCATION = {'opening': 19, 'campaign': 7}       # its world map location: FFT id + 1 (Orbonne, Gariland)
 WON = {'opening': 1, 'campaign': 2}
 SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
     ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS', 'START',
-     'PARTY', 'WON'] + list(SAVE_IDS)
+     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS)
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -195,7 +196,7 @@ def build(chapter):
             body += struct.pack('>4B2h', *seq)
     fields['RAMZA'], fields['UNIT_K'], fields['STATUS'] = RAMZA[chapter], UNIT_K[chapter], STATUS[chapter]
     fields['START'] = START[chapter]
-    fields['PARTY'], fields['WON'] = PARTY[chapter], WON[chapter]
+    fields['PARTY'], fields['WON'], fields['LOCATION'] = PARTY[chapter], WON[chapter], LOCATION[chapter]
     for f in SAVE_IDS:
         fields[f] = values.get(f, 0)
     gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())

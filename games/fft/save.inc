@@ -61,6 +61,7 @@ static void save_campaign(void)
         memcpy(save.magic, SAVE_MAGIC, 4);
     }
     if (w--) save.flags[w >> 3] |= (u8)(1 << (w & 7));
+    if (CD(LOCATION)) save.loc = (u8)CD(LOCATION);      // the battle's place on the world map
     if (CD(PARTY)) save_party();
     rt_save(SAVE_NAME, &save, sizeof save);
 }

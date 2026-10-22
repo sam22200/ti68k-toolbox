@@ -25,7 +25,7 @@ def payload(path):
 def decode(b):
     assert len(b) == HEAD + PARTY_MAX * UNIT and b[:4] == b'FSV2', 'not a campaign save'
     flags = [k for k in range(FLAG_N) if b[4 + (k >> 3)] >> (k & 7) & 1]
-    n = b[4 + FLAG_N // 8]
+    n, loc = b[4 + FLAG_N // 8], b[5 + FLAG_N // 8]
     inv = {i: c for i, c in enumerate(b[4 + FLAG_N // 8 + 2:HEAD]) if c}
     units = []
     for k in range(n):
@@ -42,12 +42,12 @@ def decode(b):
                           eq=list(u[25:30]), reaction=struct.unpack_from('>H', u, 30)[0],
                           support=struct.unpack_from('>H', u, 32)[0], movement=struct.unpack_from('>H', u, 34)[0],
                           careers=careers))
-    return dict(flags=flags, inventory=inv, party=units)
+    return dict(flags=flags, location=loc - 1 if loc else None, inventory=inv, party=units)
 
 
 def main():
     s = decode(payload(sys.argv[1]))
-    print('story flags', s['flags'])
+    print('story flags', s['flags'], 'location', s['location'])
     print('inventory', ' '.join('%02X:%d' % kv for kv in s['inventory'].items()))
     for u in s['party']:
         print('job %02X type %d gfx %d name %d Lv %d EXP %d Br %d Fa %d zodiac %d eq %s secondary %02X '

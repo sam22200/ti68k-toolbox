@@ -1,6 +1,6 @@
 // The campaign save (campaign/ENGINE.md, core milestone): one variable every program of the
-// campaign shares (fftbat writes it after a victory, fftmng edits the party, fftstory reads
-// where to resume). Bytes only, u16 big-endian: the same file on the PC and the TI. Every id is
+// campaign shares (fftbat writes it after a victory, fftmng edits the party, fftmap moves on
+// the world map, fftstory reads where to resume). Bytes only, u16 big-endian: the same file on the PC and the TI. Every id is
 // FFT's own (jobs, items, abilities, skill sets), never a chapter's table index, so any chapter
 // reads it.
 #define SAVE_NAME "ffsave"
@@ -27,7 +27,7 @@ typedef struct {
 typedef struct {
     u8 magic[4];
     u8 flags[FLAG_N / 8];               // story progress: a chapter's flag set by its victory
-    u8 n, pad;                          // units in the party
+    u8 n, loc;                          // units in the party; the map location (FFT id + 1, 0 none)
     u8 inv[256];                        // items owned (bag and spare equipment), per FFT item id
     SaveUnit unit[PARTY_MAX];
 } Save;
