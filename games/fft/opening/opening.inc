@@ -4,10 +4,28 @@
 #include "data/story.h"
 typedef char OpeningDiskLayout[(sizeof(UnitDef)==24 && sizeof(Item)==23 && sizeof(Job)==14 && sizeof(Ability)==24 && sizeof(SkillSet)==18)?1:-1];
 enum { OPEN_PLAY, OPEN_TITLE, OPEN_CHAPEL, OPEN_GATE, OPEN_AFTER, OPEN_DONE, OPEN_BANTER };
+#if MOD_CORE
 static const u8 *opening_story, *pgfx;   // pgfx: the speakers' portraits (ffcp)
+static void opening_battle(u8 direct);
+static void opening_after(void);
+#endif
+#if MOD_PART(MOD_BEATS)                   // with modules: the beats module (fft.h)
+#if !MOD_CORE && defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define walk_seq CONTOUR_REF_walk_seq
+#endif
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
-static void opening_stage(u8 stage);
 #include "../beats.inc"
+#include "../mapbeats.inc"
+#if !MOD_CORE
+u16 mod_entry(u8 op, u8 a)
+{
+    if (op == 0) return map_update();
+    if (op == 1) map_render(); else map_start(a);
+    return 0;
+}
+#endif
+#endif
+#if MOD_CORE
 
 enum { DEFER_NONE, DEFER_CHARGING, DEFER_AIRBORNE, DEFER_PERFORMING };
 static u8 opening_pending(void)
@@ -150,120 +168,14 @@ static void opening_start(u16 n)
     if(n==1||n==2||n==3){
         opening_battle(n==1);
         if(n==2)st.ai_all=1;
-        if(n==3)opening_stage(OPEN_AFTER);
-    }else{opening_stage(OPEN_GATE);st.open_fade=9;}   // the end of the scene player's fade
+        if(n==3)map_start(1);
+    }else map_start(0);                              // in the scene player's fade
 }
 
 
-static void opening_stage(u8 stage)
+// after the battle, the chapter's own state (the charges waiting) put back
+static void opening_after(void)
 {
-    st.open_stage=stage;st.open_clock=0;st.open_seen=0;
-    memset(W->actor_key,255,sizeof W->actor_key);
-    W->dialog_key=0xFFFF;W->bg_ok=W->hold=W->frz=0;
-    if(stage==OPEN_GATE){opening_find(4);scene_rot=vbuf_rot=255;}
-    else if(stage==OPEN_BANTER)opening_find(5);
-    else if(stage==OPEN_PLAY)opening_battle(0);
-    else if(stage==OPEN_AFTER){
-        opening_find(6);st.mode=M_BROWSE;st.banner=st.end=0;st.rot=0;
-        st.camx=108;st.camy=68;scene_rot=vbuf_rot=255;
-        st.morph_mask=0;memset(st.pending,0,sizeof st.pending);
-    }
+    memset(st.pending,0,sizeof st.pending);
 }
-
-static void opening_transition(u8 stage)
-{
-    st.open_next=stage;st.open_fade=1;
-}
-
-
-static void opening_advance(void)
-{
-    u8 event=opening_beat()[0];
-    if(st.open_beat+1<OPENING_BEATS){
-        st.open_beat++;
-        if(opening_beat()[0]==event){opening_dialog_reset();return;}
-    }
-    if(st.open_stage==OPEN_GATE){opening_stage(OPEN_BANTER);}
-    else if(st.open_stage==OPEN_BANTER)opening_transition(OPEN_PLAY);
-    else opening_transition(OPEN_DONE);
-}
-
-static u8 opening_update(void)
-{
-    if(!W||!opening_story)return !input_pressed(K_ESC);
-    // A completed prologue hands over to the scene player's chapter card, never a replay.
-    if(st.open_stage==OPEN_DONE){st.open_handoff=1;return 0;}
-    st.tick++;if(st.open_clock<250)st.open_clock++;
-    if(!st.open_stage&&!st.open_fade)opening_transition(OPEN_AFTER);
-    if(st.open_fade){
-        if(++st.open_fade==9){opening_stage(st.open_next);st.open_fade=9;}
-        else if(st.open_fade>=17)st.open_fade=0;
-        return !input_pressed(K_ESC);
-    }
-    if(st.open_stage==OPEN_AFTER)opening_positions();
-    if(input_pressed(K_CATALOG)){st.open_white^=1;W->dialog_key=0xFFFF;}
-    if(input_pressed(K_B)){
-        if(st.open_stage==OPEN_GATE||st.open_stage==OPEN_BANTER)opening_transition(OPEN_PLAY);
-        else if(st.open_stage==OPEN_AFTER)opening_transition(OPEN_DONE);
-        return 1;
-    }
-    if(opening_beat()[2]){
-        if(st.open_clock>=opening_beat()[2])opening_advance();
-        return !input_pressed(K_ESC);
-    }
-    if(W->dialog_key!=st.open_beat)opening_layout();
-    if(st.open_reveal<W->dialog_total){
-        st.open_reveal+=3;
-        if(st.open_reveal>W->dialog_total)st.open_reveal=W->dialog_total;
-        if(input_pressed(K_A|K_ENTER))st.open_reveal=W->dialog_total;
-    }else if(input_pressed(K_A|K_ENTER)){
-        const char *s=opening_text();
-        if(W->dialog_drawn!=0xFFFF && W->dialog_drawn<W->dialog_total)return 1;
-        if(s[W->dialog_next]){st.open_offset+=W->dialog_next;st.open_reveal=0;W->dialog_key=0xFFFF;return 1;}
-        opening_advance();
-    }
-    return !input_pressed(K_ESC);
-}
-
-
-
-
-static void opening_render(void)
-{
-    u8 i;
-    if(!opening_story){draw_rect(0,0,160,100,C_WHITE);ui_text(3,40,"Missing data or memory",C_BLACK,160);return;}
-    if(st.open_stage==OPEN_DONE)draw_rect(0,0,160,100,C_BLACK);   // the fade's last, black frame
-    else{
-        const u8 *b=opening_beat(),*a=b+4;
-        ZB(21);
-        ensure_scene(st.rot);copy_view();
-        if(st.open_stage==OPEN_AFTER){
-            for(i=0;i<b[1];i++,a+=8){
-                u8 slot=a[0]>>4;
-                opening_actor(a[0]&15,slot,W->feet[slot].x,W->feet[slot].y,a[1],RD16(a+6,0));
-            }
-        }else{
-            // Outside dialogue: actors are static, without battle timers/markers.
-            for(i=0;i<NUNIT;i++)if(st.unit[i].hp){
-                Feet f=unit_feet(st.rot,i);u8 dir=unit_direction(st.rot,i);
-                W->feet_k[i]=0;
-                opening_actor(st.unit[i].gfx,i,f.x,f.y,(f.depth<<2)|dir,
-                    (u16)(st.unit[i].gfx*44+(dir&1?5:0)+(dir&2?22:0)));
-            }
-        }
-        ZE(21);
-        if(!b[2]){
-            if(W->dialog_key!=st.open_beat)opening_layout();
-            ZB(22);opening_dialog_draw();ZE(22);
-        }
-    }
-    if(st.open_fade){
-        u8 level=st.open_fade<9?st.open_fade:17-st.open_fade;
-        u8 phase=(level+1)>>1,r;u16 pat=phase>=4?0xFFFF:phase==3?0xEEEE:phase==2?0xAAAA:0x8888;
-        for(r=0;r<100;r++){
-            u8 *l=(u8*)rt_light+(u16)r*RT_PBYTES,*d=(u8*)rt_dark+(u16)r*RT_PBYTES;u8 w;
-            u16 bits=r&1?(u16)((pat<<1)|(pat>>15)):pat;
-            for(w=0;w<10;w++){RMW16(l+2*w,bits,bits);RMW16(d+2*w,bits,bits);}
-        }
-    }
-}
+#endif

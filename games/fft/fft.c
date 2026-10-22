@@ -89,9 +89,11 @@ u8 scene_rot;
 #define VDEPTH (vbuf + 2 * SC_PLANE)
 #define VIEW_BYTES (6UL * SC_PLANE)          // 52,320 (Gariland 48,480): above a 16-bit int
 #endif
+#if MOD_CORE
 static const u8 *views[4];
 static const u8 *ugfx;                  // the units' frames (fftu, units.h), read in place
 static const u8 *igfx;                  // portraits, names, marker and text (ffti)
+#endif
 #ifdef FFT_ACTOR_BANK
 #define ACTOR_SLOTS (NUNIT + 2)          // units, an object, a blade
 #define ACTOR_UNITS NUNIT
@@ -103,8 +105,8 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
 const Job *jobs; const Item *items; const Ability *abilities;   // its tables in igfx
 const SkillSet *skill_sets; const UnitDef *unit_defs;
-#endif
 static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
+#endif
 #define UI_SHARED(s) (cgfx + UIC_##s)
 #else
 #define UI_SHARED(s) (igfx + UI_##s)
@@ -118,8 +120,10 @@ static const PlaneWord *sl_l, *sl_m, *sc_l, *sc_m;   // markers' planes (art.py)
 #ifndef __m68k__
 static u32 slope_pc[4 * SLOPE_ROWS];    // the PC's native copy (ffti is big-endian)
 #endif
+#if MOD_CORE
 static const u8 *wgfx;                  // armed body poses and blades (fftw), read in place
 static u8 *vbuf, vbuf_rot;
+#endif
 
 #define BK_N 128                        // FFT_VIEW_SPLIT: rows kept (a reach touches up to 126)
 // Work memory, allocated with the scene (globals and statics are stored in the program file
@@ -475,8 +479,8 @@ void unit_stats(Unit *u)
 #ifdef FFT_OPENING
 static void opening_units(void);
 static void opening_start(u16 n);
-static u8 opening_update(void);
-static void opening_render(void);
+static u8 map_update(void);
+static void map_render(void);
 static u8 opening_attack_range(u8 a, u8 o, u8 c);
 static void opening_damage(void);
 static u8 opening_hit(u8 a,u8 t);
@@ -2467,13 +2471,30 @@ u8 ai_frozen(void) { return W->frz; }
 // The modules' bank (tools/module.py): "FMB1", a u16 offset per module, each "FMD1", its entry,
 // size and context offsets (u16), its image. One module at a time in the zone, copied when
 // another is called; the zone is in the program (module.h)
-#define MOD_ZONE 7688
+#ifdef FFT_OPENING                      // the largest image of the bank (tools/module.py)
+#define MOD_ZONE 7748
+#else
+#define MOD_ZONE 7604
+#endif
 static u16 mod_zone[MOD_ZONE / 2];
 static const u8 *mod_bank;
 static u8 mod_id;                       // the module in the zone + 1 (0: none)
 long __attribute__((__stkparm__)) __divsi3(long a, long b);
 long __attribute__((__stkparm__)) __mulsi3(long a, long b);
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c);
+static void cover(u16 *cm, s16 fx, s16 fy, u8 depth);
+#ifdef FFT_ACTOR_BANK
+static const u8 *actor_frame(u16 logical, u8 slot);
+#endif
+static void ensure_scene(u8 rot);
+static void copy_view(void);
+static Feet unit_feet(u8 rot, u8 i);
+static u8 unit_direction(u8 rot, u8 i);
+#ifdef FFT_OPENING
+static const u8 *opening_story, *pgfx;
+static void opening_battle(u8 direct);
+static void opening_after(void);
+#endif
 static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit);
 static u8 put_s(char *s, u8 n, const char *t);
 static u8 put_n(char *s, u8 n, u16 v);
@@ -2506,6 +2527,19 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->draw_text = draw_text; c->job_level = job_level;
 #ifndef FFT_OPENING
         c->status_ability = status_ability; c->status_ability_count = status_ability_count;
+#endif
+#ifdef FFT_OPENING
+        c->opening_story = &opening_story; c->pgfx = &pgfx; c->opening_battle = opening_battle;
+        c->opening_after = opening_after;
+#endif
+#ifdef FFT_ACTOR_BANK
+        c->actor_frame = actor_frame;
+#endif
+        c->cover = cover; c->ensure_scene = ensure_scene; c->copy_view = copy_view;
+        c->unit_feet = unit_feet; c->unit_direction = unit_direction; c->draw_sprite = draw_sprite;
+        c->rt_keys = &rt_keys; c->rt_prev = &rt_prev; c->scene_rot = &scene_rot; c->vbuf_rot = &vbuf_rot;
+        c->cgfx = cgfx;
+#ifndef FFT_OPENING
         c->gauge = gauge;
 #endif
 #ifdef FFT_OPENING
@@ -2534,6 +2568,11 @@ static u8 ai_think(void) { return (u8)mod_call(MOD_AI, 0, 0); }
 static void draw_turn(void) { mod_call(MOD_TURN, 0, 0); }
 static void draw_end(void) { mod_call(MOD_SCREENS, 0, 0); }
 static void draw_status(void) { mod_call(MOD_SCREENS, 1, 0); }
+#ifdef FFT_OPENING
+static u8 map_update(void) { return (u8)mod_call(MOD_BEATS, 0, 0); }
+static void map_render(void) { mod_call(MOD_BEATS, 1, 0); }
+static void map_start(u8 after) { mod_call(MOD_BEATS, 2, after); }
+#endif
 u8 ai_facing(u8 a) { return (u8)mod_call(MOD_AI, 1, a); }
 #endif
 
@@ -4310,7 +4349,7 @@ u8 game_update(void)
     if(W){W->actor_budget=ACTOR_BUDGET;W->actor_misses=0;W->ac_now++;}
 #endif
 #ifdef FFT_OPENING
-    if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner)) return opening_update();
+    if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner)) return map_update();
 #endif
 #if defined(FFT_CONFIG) || defined(FFT_REACH_CONTOUR)
     if (config_update()) return 1;
@@ -5468,7 +5507,7 @@ void game_render(void)
     if (st.perspective) { perspective_render(); FRAME_END(); return; }
 #endif
 #ifdef FFT_OPENING
-    if (st.open_stage || st.open_fade) { opening_render(); FRAME_END(); return; }
+    if (st.open_stage || st.open_fade) { map_render(); FRAME_END(); return; }
 #endif
     if (st.mode == M_END && !st.banner && !st.morph_mask) { draw_end(); FRAME_END(); return; }
     if (st.mode == M_STATUS) { draw_status(); FRAME_END(); return; }
@@ -5623,4 +5662,7 @@ void game_render(void)
 #ifdef FFT_OPENING
 #include "opening/opening.inc"
 #endif
+#endif
+#if !MOD_CORE && MOD_PART(MOD_BEATS) && defined(FFT_OPENING)
+#include "opening/opening.inc"                  // its beats only (MOD_PART there)
 #endif

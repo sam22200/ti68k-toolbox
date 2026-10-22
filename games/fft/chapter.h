@@ -36,3 +36,4 @@
 #define CD_SHIELD_EVADE 35
 #define CD_CHARGE_TICKS 36
 #define CD_WATER 37
+#define CD_MAP_SCRIPT 38

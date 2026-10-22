@@ -63,7 +63,12 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_AI 0                              // the AI: thinking a step a frame, facing at Wait
 #define MOD_TURN 1                            // the rotation animation
 #define MOD_SCREENS 2                         // the results and Status screens
-#define MOD_COUNT 3
+#define MOD_BEATS 3                           // the beats on the battle map (mapbeats.inc)
+#ifdef FFT_OPENING
+#define MOD_COUNT 4
+#else
+#define MOD_COUNT 3                           // (no map script yet)
+#endif
 #ifdef FFT_MODULE
 #define MOD_CORE 0
 #define MOD_PART(k) (FFT_MODULE == (k) + 1)

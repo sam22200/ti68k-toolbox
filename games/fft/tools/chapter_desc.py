@@ -40,7 +40,14 @@ TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE
           ('CHARGE_TICKS', 'opening_charge_ticks', 'B')]
 # WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
 # Gariland's computed by the engine itself (campaign/water_dump.c).
-FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + ['WATER']
+# MAP_SCRIPT: the beats played on the battle map (fft.c mapbeats.inc): u16 count, then per
+# sequence its stage (st.open_stage), the beats' event, MS_* flags (1 after the victory,
+# 2 fades in, 4 actors placed by the beats, 8 camera set), rot, s16 camx, camy
+MS_AFTER, MS_FADE, MS_PLACED, MS_CAMERA = 1, 2, 4, 8
+SCRIPT = {'opening': [(3, 4, MS_FADE, 0, 0, 0),                     # the gate, from the scene
+                      (6, 5, 0, 0, 0, 0),                           # player's fade; the banter
+                      (4, 6, MS_AFTER | MS_FADE | MS_PLACED | MS_CAMERA, 0, 108, 68)]}   # aftermath
+FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + ['WATER', 'MAP_SCRIPT']
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -160,6 +167,14 @@ def build(chapter):
         fields['WATER'] = len(body); body += water
     else:
         fields['WATER'] = 0
+    fields['MAP_SCRIPT'] = 0
+    if chapter in SCRIPT:
+        if len(body) & 1:
+            body.append(0)
+        fields['MAP_SCRIPT'] = len(body)
+        body += struct.pack('>H', len(SCRIPT[chapter]))
+        for seq in SCRIPT[chapter]:
+            body += struct.pack('>4B2h', *seq)
     struct.pack_into('>%dH' % len(FIELDS), body, 4, *(fields[f] for f in FIELDS))
     (folder / (NAMES[chapter] + '.bin')).write_bytes(bytes(body))
     print(NAMES[chapter], len(body), 'bytes')

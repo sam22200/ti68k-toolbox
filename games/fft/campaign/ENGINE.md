@@ -88,24 +88,29 @@ constant offsets.
   Every dialogue shows a known speaker's portrait, framed beside the box (validated):
   `ffcp` (tools/common_portraits.py, 2,198 bytes: Ramza, Delita, Agrias, Gafgarion, Ovelia,
   Simon, and the scripts' other names for them); generic speakers keep the name box.
-  Orbonne's program is 64,931 bytes for TTPack's 64,936: the next steps must shrink it. Next: the map beats as a generic
-  script in the engine. Status stays per chapter for now: unifying on Orbonne's text-only
+  The beats on the battle map are a generic script (`mapbeats.inc`): the chapter descriptor's
+  MAP_SCRIPT lists sequences of the beats bank (stage, event, flags: after the victory, fades
+  in, actors placed by the beats, camera) and the player walks them before the battle and
+  after a victory; Orbonne's gate, banter and aftermath are its three sequences (screens and
+  states unchanged in every replay). Gariland can get its own by data once it enables it. Status stays per chapter for now: unifying on Orbonne's text-only
   page would save 2.2 KB but lose what the management menus will need.
 - Modules (core milestone): the battle engine's chapter builds on the TI (`FFT_MODULES`) keep
-  three parts out of the core, in an archived bank per chapter (`ffgm`, `ffom`, built by
+  three parts out of the core (Orbonne four: its map beats), in an archived bank per chapter (`ffgm`, `ffom`, built by
   `tools/module.py` from the chapter's own source with `FFT_MODULE = k + 1`), Gariland /
   Orbonne image bytes: the AI (7,556 / 7,688), the rotation animation (3,458 / 3,476), the
-  results and Status screens (4,002 / 1,570). `fft.c` marks them `MOD_PART(k)`, the rest
+  results and Status screens (4,050 / 1,630), Orbonne's map beats (4,794). `fft.c` marks them `MOD_PART(k)`, the rest
   `MOD_CORE`; `module.h` lists the context a module reaches the core through. One module at
-  a time sits in a zone inside the program (`MOD_ZONE`: the largest image, 7,688 bytes; the
+  a time sits in a zone inside the program (`MOD_ZONE`: the bank's largest image, 7,604 /
+  7,748 bytes, the context included; the
   load refuses a bank that does not fit or was built with other types), copied when another
-  is called. Programs: Gariland 57,493 bytes (was 62,797), Orbonne 61,801 (was 64,931 for
+  is called. Programs: Gariland 57,573 bytes (was 62,797), Orbonne 58,039 (was 64,931 for
   TTPack's 64,936). PC builds have no modules, so the PC/TI replays check the modules
   (campaign 11 with Status and the results, opening 12 with its Status page + 6, unchanged).
   Cost (ti-cycles): an AI thinking step +8 % on average (+3 % at its peak: the core's state
   through a pointer), a rotation frame +3 %; frame peaks unchanged; entering Status or the
-  results copies that module once. TiEmu Titanium, packed programs: the AI plays and the
-  view turns from the modules. Next candidates: Orbonne's map beats, the settings screen.
+  results copies that module once; Orbonne's story frames +1 % (dialogue drawing through the
+  context). TiEmu Titanium, packed programs: the AI plays and the
+  view turns from the modules. Next candidate: the settings screen.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

@@ -111,17 +111,17 @@ static void opening_positions(void)
             W->actor_key[slot]=0xFFFF; // a scripted role never borrows a battle actor's body
             W->feet[slot].x=x;W->feet[slot].y=y;
             if(ON_PICTURE&&gfx<9){W->feet[slot].x-=40;W->feet[slot].y+=20;}
-            if(st.open_stage==OPEN_AFTER&&gfx==11)W->feet[slot].x-=64;
+            if(!ON_PICTURE&&gfx==11)W->feet[slot].x-=64;
             st.open_seen|=(u16)(1U<<slot);W->cover[slot].rot=255;
         }
-        if(st.open_stage==OPEN_AFTER && b[3] && !(st.open_seen&0x8000) && (gfx==1||gfx==9)){
+        if(!ON_PICTURE && b[3] && !(st.open_seen&0x8000) && (gfx==1||gfx==9)){
             W->feet[slot].x=x-64;W->feet[slot].y=y;
         }
         W->feet_k[slot]=W->feet[slot].x!=x||W->feet[slot].y!=y;
         if(W->feet[slot].x!=x)W->feet[slot].x+=x>W->feet[slot].x?1:-1;
         if(W->feet[slot].y!=y)W->feet[slot].y+=y>W->feet[slot].y?1:-1;
     }
-    if(st.open_stage==OPEN_AFTER&&b[3])st.open_seen|=0x8000;
+    if(!ON_PICTURE&&b[3])st.open_seen|=0x8000;
     if(ON_PICTURE && !(st.tick&3)){
         if(st.open_pan<b[3])st.open_pan+=8;
         else if(st.open_pan>b[3])st.open_pan-=8;
@@ -131,7 +131,7 @@ static void opening_positions(void)
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical)
 {
     u8 pose=W->feet_k[slot]?walk_seq[st.tick&15]:0;
-    const u8 *g=actor_frame(W->feet_k[slot]&&gfx<11&&!(st.open_stage==OPEN_AFTER&&opening_beat()[3])?(u16)(gfx*44+(face&1?5:0)+pose+(face&2?22:0)):logical,slot);
+    const u8 *g=actor_frame(W->feet_k[slot]&&gfx<11&&!(!ON_PICTURE&&opening_beat()[3])?(u16)(gfx*44+(face&1?5:0)+pose+(face&2?22:0)):logical,slot);
     RtSprite sp;u16 l[UNIT_SH],d[UNIT_SH],m[UNIT_SH];u8 r;
     Cover *c=&W->cover[slot<NUNIT?slot:0];u8 depth=face>>2;
     // Cached per-byte depth sampling, the tactical cover algorithm at stride 20.

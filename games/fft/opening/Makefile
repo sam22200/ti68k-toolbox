@@ -18,7 +18,7 @@ data/%.89y: data/%.bin
 	python3 -c "from pathlib import Path; p=Path('$@'); b=bytearray(p.read_bytes()); b[0x49]=3; p.write_bytes(b)"
 ti cycles: $(TI_FILES)
 data/ffom.bin: ../tools/module.py opening.c opening.inc ../fft.c ../fft.h ../module.h $(wildcard ../*.inc)
-	$(PY) ../tools/module.py $@ opening.c 3
+	$(PY) ../tools/module.py $@ opening.c 4
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../fft.c ../fft.h opening.inc $(wildcard data/*.h)
 check: test pc cycles
 	$(PY) check.py

@@ -48,6 +48,23 @@ typedef struct {
     void (*gauge)(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
 #endif
 #ifdef FFT_OPENING
+    const u8 **opening_story, **pgfx;
+    void (*opening_battle)(u8 direct);
+    void (*opening_after)(void);
+#endif
+#ifdef FFT_ACTOR_BANK
+    const u8 *(*actor_frame)(u16 logical, u8 slot);
+#endif
+    void (*cover)(u16 *cm, s16 fx, s16 fy, u8 depth);
+    void (*ensure_scene)(u8 rot);
+    void (*copy_view)(void);
+    Feet (*unit_feet)(u8 rot, u8 i);
+    u8 (*unit_direction)(u8 rot, u8 i);
+    void (*draw_sprite)(s16 x, s16 y, const RtSprite *s);
+    u32 *rt_keys, *rt_prev;
+    u8 *scene_rot, *vbuf_rot;
+    const u8 *cgfx;
+#ifdef FFT_OPENING
     u8 (*opening_attack_range)(u8 a, u8 o, u8 c);
 #endif
     long __attribute__((__stkparm__)) (*divsi3)(long a, long b);   // GCC's helpers: stack
@@ -96,6 +113,22 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define job_level M.job_level
 #define status_ability M.status_ability
 #define status_ability_count M.status_ability_count
+#define opening_story (*M.opening_story)
+#define pgfx (*M.pgfx)
+#define opening_battle M.opening_battle
+#define opening_after M.opening_after
+#define actor_frame M.actor_frame
+#define cover(cm, fx, fy, depth) M.cover(cm, fx, fy, depth)   // (W->cover: a field too)
+#define ensure_scene M.ensure_scene
+#define copy_view M.copy_view
+#define unit_feet M.unit_feet
+#define unit_direction M.unit_direction
+#define draw_sprite M.draw_sprite
+#define rt_keys (*M.rt_keys)
+#define rt_prev (*M.rt_prev)
+#define scene_rot (*M.scene_rot)
+#define vbuf_rot (*M.vbuf_rot)
+#define cgfx (M.cgfx)
 long __attribute__((__stkparm__)) __divsi3(long a, long b) { return M.divsi3(a, b); }
 long __attribute__((__stkparm__)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
 #endif
