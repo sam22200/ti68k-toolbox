@@ -18,12 +18,13 @@ def main():
     palette=OUT/'palette.keys';palette.write_text('190 CATALOG\n191\n')
     rotations=OUT/'rotations.keys';rotations.write_text('12 F5\n13\n50 F1\n51\n')
     empty=OUT/'none.keys';empty.write_text('0\n')
+    status=OUT/'status.keys';status.write_text('30 UP\n31\n40 UP\n41\n50 ENTER\n51\n')
     launch=OUT/'launch.keys';launch.write_text('0 ENTER\n1\n')
     reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     base=[ROOT/'tools/bin/ti-cycles','--max',10000]
     for name in ('ffom','ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcp','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
-    cases=[('gate',0,60,empty),('story-to-fight',0,700,intro),('player',1,60,empty),('rotations',1,100,rotations),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,400,intro)]
+    cases=[('gate',0,60,empty),('story-to-fight',0,700,intro),('player',1,60,empty),('rotations',1,100,rotations),('status',1,90,status),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,400,intro)]
     checks=[]
     for name,scenario,frames,keys in cases:
         pc=run([OUT/'oracle',scenario,frames,keys,OUT/(name+'-pc.png')])

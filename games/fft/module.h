@@ -29,6 +29,24 @@ typedef struct {
     s16 (*scene_x)(u8 rot, s16 u, s16 v);
     s16 (*scene_y)(s16 u, s16 v);
     void (*draw_unit_covered)(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c);
+    u8 **scene_l;
+    const Item *items;
+    void (*ui_text)(s16 x, s16 y, const char *s, u8 color, s16 limit);
+    u8 (*put_s)(char *s, u8 n, const char *t);
+    u8 (*put_n)(char *s, u8 n, u16 v);
+    const char *(*unit_name)(u8 i);
+    void (*text_into)(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color);
+    void (*portrait)(u8 gfx, s16 x, s16 y);
+    void (*draw_hand)(s16 x, s16 y);
+    void (*copy_box)(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows);
+    void (*draw_rect)(s16 x, s16 y, s16 w, s16 h, u8 color);
+    void (*draw_text)(s16 x, s16 y, const char *s, u8 font, u8 color);
+    u8 (*job_level)(const Unit *u);
+#ifndef FFT_OPENING
+    u8 (*status_ability)(void);
+    u8 (*status_ability_count)(void);
+    void (*gauge)(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
+#endif
 #ifdef FFT_OPENING
     u8 (*opening_attack_range)(u8 a, u8 o, u8 c);
 #endif
@@ -62,6 +80,22 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define scene_x M.scene_x
 #define scene_y M.scene_y
 #define draw_unit_covered M.draw_unit_covered
+#define scene_l (*M.scene_l)
+#define items (M.items)
+#define ui_text M.ui_text
+#define put_s M.put_s
+#define put_n M.put_n
+#define unit_name M.unit_name
+#define text_into M.text_into
+#define portrait M.portrait
+#define gauge M.gauge
+#define draw_hand M.draw_hand
+#define copy_box M.copy_box
+#define draw_rect M.draw_rect
+#define draw_text M.draw_text
+#define job_level M.job_level
+#define status_ability M.status_ability
+#define status_ability_count M.status_ability_count
 long __attribute__((__stkparm__)) __divsi3(long a, long b) { return M.divsi3(a, b); }
 long __attribute__((__stkparm__)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
 #endif

@@ -92,18 +92,20 @@ constant offsets.
   script in the engine. Status stays per chapter for now: unifying on Orbonne's text-only
   page would save 2.2 KB but lose what the management menus will need.
 - Modules (core milestone): the battle engine's chapter builds on the TI (`FFT_MODULES`) keep
-  two parts out of the core, in an archived bank per chapter (`ffgm`, `ffom`, built by
-  `tools/module.py` from the chapter's own source with `FFT_MODULE = k + 1`): the AI (7,492 /
-  7,632 bytes) and the rotation animation (3,390 / 3,414). `fft.c` marks them `MOD_PART(k)`,
-  the rest `MOD_CORE`; `module.h` lists the context a module reaches the core through. One
-  module at a time sits in a 7,632-byte zone inside the program, copied when another is
-  called. Programs: Gariland ~61.0 KB (was 62.8), Orbonne ~63.0 KB (was 64.9, TTPack's limit
-  64.9). PC builds have no modules, so the PC/TI replays check the modules (campaign 11,
-  opening 11 + 6, unchanged). Cost (ti-cycles): an AI thinking step +8 % on average (+3 % at
-  its peak: the core's state through a pointer), a rotation frame +3 %; frame peaks unchanged.
-  TiEmu Titanium, packed programs: the AI plays and the view turns from the modules. A
-  module only pays once the modules beyond the largest outgrow the zone and the loader
-  (~1.1 KB): next candidates are the results, Status and Orbonne's map beats.
+  three parts out of the core, in an archived bank per chapter (`ffgm`, `ffom`, built by
+  `tools/module.py` from the chapter's own source with `FFT_MODULE = k + 1`), Gariland /
+  Orbonne image bytes: the AI (7,556 / 7,688), the rotation animation (3,458 / 3,476), the
+  results and Status screens (4,002 / 1,570). `fft.c` marks them `MOD_PART(k)`, the rest
+  `MOD_CORE`; `module.h` lists the context a module reaches the core through. One module at
+  a time sits in a zone inside the program (`MOD_ZONE`: the largest image, 7,688 bytes; the
+  load refuses a bank that does not fit or was built with other types), copied when another
+  is called. Programs: Gariland 57,493 bytes (was 62,797), Orbonne 61,801 (was 64,931 for
+  TTPack's 64,936). PC builds have no modules, so the PC/TI replays check the modules
+  (campaign 11 with Status and the results, opening 12 with its Status page + 6, unchanged).
+  Cost (ti-cycles): an AI thinking step +8 % on average (+3 % at its peak: the core's state
+  through a pointer), a rotation frame +3 %; frame peaks unchanged; entering Status or the
+  results copies that module once. TiEmu Titanium, packed programs: the AI plays and the
+  view turns from the modules. Next candidates: Orbonne's map beats, the settings screen.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

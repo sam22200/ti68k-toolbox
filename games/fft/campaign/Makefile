@@ -62,7 +62,7 @@ data/ffgd.bin: ../tools/chapter_desc.py data/battle.h data/interface.h ../map.h 
 	$(PY) ../tools/chapter_desc.py campaign
 
 data/ffgm.bin: ../tools/module.py gariland.c ../fft.c ../fft.h ../module.h $(wildcard ../*.inc)
-	$(PY) ../tools/module.py $@ gariland.c 2
+	$(PY) ../tools/module.py $@ gariland.c 3
 
 data/ffs1.bin: ../tools/scenes.py data/ffac.bin data/academy.h
 	$(PY) ../tools/scenes.py

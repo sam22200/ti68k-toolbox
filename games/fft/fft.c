@@ -2467,13 +2467,25 @@ u8 ai_frozen(void) { return W->frz; }
 // The modules' bank (tools/module.py): "FMB1", a u16 offset per module, each "FMD1", its entry,
 // size and context offsets (u16), its image. One module at a time in the zone, copied when
 // another is called; the zone is in the program (module.h)
-#define MOD_ZONE 7632
+#define MOD_ZONE 7688
 static u16 mod_zone[MOD_ZONE / 2];
 static const u8 *mod_bank;
 static u8 mod_id;                       // the module in the zone + 1 (0: none)
 long __attribute__((__stkparm__)) __divsi3(long a, long b);
 long __attribute__((__stkparm__)) __mulsi3(long a, long b);
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c);
+static void ui_text(s16 x, s16 y, const char *s, u8 color, s16 limit);
+static u8 put_s(char *s, u8 n, const char *t);
+static u8 put_n(char *s, u8 n, u16 v);
+static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color);
+static void portrait(u8 gfx, s16 x, s16 y);
+static void draw_hand(s16 x, s16 y);
+static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows);
+#ifndef FFT_OPENING
+static u8 status_ability(void);
+static u8 status_ability_count(void);
+static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
+#endif
 
 static u16 mod_call(u8 id, u8 op, u8 a)
 {
@@ -2488,6 +2500,14 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->skill_hit = skill_hit; c->skill_amount = skill_amount; c->tile_at = tile_at;
         c->D = &D; c->rt_light = &rt_light; c->rt_dark = &rt_dark; c->view_of = view_of;
         c->scene_x = scene_x; c->scene_y = scene_y; c->draw_unit_covered = draw_unit_covered;
+        c->scene_l = &scene_l; c->items = items; c->ui_text = ui_text; c->put_s = put_s; c->put_n = put_n;
+        c->unit_name = unit_name; c->text_into = text_into; c->portrait = portrait;
+        c->draw_hand = draw_hand; c->copy_box = copy_box; c->draw_rect = draw_rect;
+        c->draw_text = draw_text; c->job_level = job_level;
+#ifndef FFT_OPENING
+        c->status_ability = status_ability; c->status_ability_count = status_ability_count;
+        c->gauge = gauge;
+#endif
 #ifdef FFT_OPENING
         c->opening_attack_range = opening_attack_range;
 #endif
@@ -2512,6 +2532,8 @@ static u8 mod_ready(void)
 
 static u8 ai_think(void) { return (u8)mod_call(MOD_AI, 0, 0); }
 static void draw_turn(void) { mod_call(MOD_TURN, 0, 0); }
+static void draw_end(void) { mod_call(MOD_SCREENS, 0, 0); }
+static void draw_status(void) { mod_call(MOD_SCREENS, 1, 0); }
 u8 ai_facing(u8 a) { return (u8)mod_call(MOD_AI, 1, a); }
 #endif
 
@@ -4996,6 +5018,8 @@ static const u8 forecast_mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 
 u8 hud_ready(void) { return W && W->hud_ok; }
 #endif
 
+#endif
+#if MOD_CORE || MOD_PART(MOD_SCREENS)
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define help_lines CONTOUR_REF_help_lines
 #else
@@ -5015,6 +5039,11 @@ static const char *const signs[12] = { "Aries", "Taurus", "Gemini", "Cancer", "L
 static const char *const equip_labels[5] = { "Head", "Body", "Accessory", "Weapon", "Shield" };
 #endif
 
+#endif
+#if MOD_PART(MOD_SCREENS)                  // with modules: the screens module (module.h)
+#if !MOD_CORE && defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define st_names CONTOUR_REF_st_names
+#endif
 // Details describe the equipped item or learned ability; browsing never changes the loadout.
 #ifdef FFT_OPENING
 static void draw_status(void)
@@ -5143,6 +5172,8 @@ static void draw_status(void)
 }
 
 #endif
+#endif
+#if MOD_CORE
 
 static void draw_active(const Feet *f)
 {
@@ -5344,6 +5375,8 @@ static void bn_draw(void)
     }
 }
 
+#endif
+#if MOD_PART(MOD_SCREENS)
 // the results (M_END): the outcome, then each of the player's units with its level (before >
 // after), the EXP and JP it earned, and the keys; drawn into the scene buffer one line a frame
 // (AMS text), copied to the screen
@@ -5390,6 +5423,11 @@ static void draw_end(void)
     }
     memcpy(rt_light, l, RT_PSIZE); memcpy(rt_dark, d, RT_PSIZE);
 }
+#if !MOD_CORE
+u16 mod_entry(u8 op, u8 a) { (void)a; if (op) draw_status(); else draw_end(); return 0; }
+#endif
+#endif
+#if MOD_CORE
 
 void game_render(void)
 {
