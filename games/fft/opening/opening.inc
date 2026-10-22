@@ -4,7 +4,7 @@
 #include "data/story.h"
 typedef char OpeningDiskLayout[(sizeof(UnitDef)==24 && sizeof(Item)==23 && sizeof(Job)==14 && sizeof(Ability)==24 && sizeof(SkillSet)==18)?1:-1];
 enum { OPEN_PLAY, OPEN_TITLE, OPEN_CHAPEL, OPEN_GATE, OPEN_AFTER, OPEN_DONE, OPEN_BANTER };
-static const u8 *opening_story;
+static const u8 *opening_story, *pgfx;   // pgfx: the speakers' portraits (ffcp)
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
 static void opening_stage(u8 stage);
 #include "../beats.inc"
@@ -137,6 +137,7 @@ static void opening_start(u16 n)
     memset(&st,0,sizeof st);if(!W)return;
     st.want=st.prot=st.ai_view=255;rt_seed=97;rand_seed(97);
     opening_story=rt_file("ffost",RT_NULL);
+    pgfx=rt_file("ffcp",RT_NULL);                    // (none: name-only boxes)
     if(opening_story)opening_story+=2;
     opening_units();memcpy(st.bag,bag_init,NBAG);
     actor_reset();W->dialog_key=0xFFFF;
@@ -230,7 +231,7 @@ static u8 opening_update(void)
 static void opening_render(void)
 {
     u8 i;
-    if(!opening_story){draw_rect(0,0,160,100,C_WHITE);ui_text(3,40,"Missing opening banks",C_BLACK,160);return;}
+    if(!opening_story){draw_rect(0,0,160,100,C_WHITE);ui_text(3,40,"Missing data or memory",C_BLACK,160);return;}
     if(st.open_stage==OPEN_DONE)draw_rect(0,0,160,100,C_BLACK);   // the fade's last, black frame
     else{
         const u8 *b=opening_beat(),*a=b+4;

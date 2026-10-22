@@ -3,7 +3,7 @@ SRC := scene.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcu ffcw ffca ffcb
+BANKS := ffs1 ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle

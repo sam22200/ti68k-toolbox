@@ -44,7 +44,7 @@ typedef struct {
     char dialog[6][48];
     u8 dialog_n, dialog_w, dialog_h, dialog_next;
     u16 dialog_total, dialog_key, dialog_drawn;
-    u8 dialog_white, dialog_part;
+    u8 dialog_white, dialog_part, dialog_face;
     Cover cover[NUNIT];
     Feet feet[NUNIT];
     u16 feet_k[NUNIT];
@@ -52,7 +52,7 @@ typedef struct {
 } Work;
 static Work *W;
 static u8 *vbuf;                        // the picture: colour, colour, depth/mask x 2
-static const u8 *set, *amap, *cgfx;
+static const u8 *set, *amap, *cgfx, *pgfx;   // pgfx: the speakers' portraits (ffcp)
 static const u8 *opening_story, *opening_title;
 #define PIC_STRIDE_MAX 40                // a picture is 320 pixels wide at most
 static u16 pic_stride, pic_plane;
@@ -122,6 +122,7 @@ void game_init(void)
 {
     W = RT_NULL; vbuf = RT_NULL; acache = RT_NULL;   // statics survive between runs
     cgfx = rt_file("ffcu", RT_NULL);
+    pgfx = rt_file("ffcp", RT_NULL);              // (none: name-only boxes)
     abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
     if (abank[0]) abank_n0 = RD16(abank[0], 0);
     W = malloc(sizeof(Work));

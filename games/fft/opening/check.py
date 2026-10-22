@@ -22,7 +22,7 @@ def main():
     reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     base=[ROOT/'tools/bin/ti-cycles','--max',10000]
-    for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
+    for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcp','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
     cases=[('gate',0,60,empty),('story-to-fight',0,700,intro),('player',1,60,empty),('rotations',1,100,rotations),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,400,intro)]
     checks=[]
     for name,scenario,frames,keys in cases:
@@ -44,15 +44,15 @@ def main():
         checks.append(check);print(json.dumps(check),flush=True)
     report=dict(measurement='Actual TI binary, MC68000 datasheet cycles, grayscale/interrupt/frame-wait overhead excluded; no PC FPS inference.',checks=checks,
                 native_game_heap_bytes=8*40*192+checks[0]['native_work_bytes'],native_grayscale_heap_bytes=3840+7688,
-                native_checked_binary_bytes=(OUT/'openchk.89z').stat().st_size,archive_bytes=sum((DATA/(n+'.bin')).stat().st_size for n in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcu','ffcw','ffca','ffcb')))
+                native_checked_binary_bytes=(OUT/'openchk.89z').stat().st_size,archive_bytes=sum((DATA/(n+'.bin')).stat().st_size for n in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcp','ffcu','ffcw','ffca','ffcb')))
     (OUT/'checked.json').write_text(json.dumps(report,indent=2)+'\n');print('Opening: %d complete PC/TI pixels + tactical-state checkpoints passed'%len(checks))
     # The scene player (campaign/scene.c) plays the title and chapel from ffs0. These screens
     # are the ones the opening program showed before they moved (same frames and keys).
     run(['cc','-std=gnu99','-O1','-DCHECK_SCENE','-o',OUT/'scene',HERE/'../campaign/check_native.c',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     run([ROOT/'tools/bin/ti-cc','-o',OUT/'scenechk','-DRT_CYCLES','-DCHECK_SCENE',HERE/'../campaign/check_native.c',*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     sbase=[ROOT/'tools/bin/ti-cycles','--max',10000]
-    for name in ('ffs0','ffoa','ffca','ffcb','ffcu'):sbase+=['--file',DATA/(name+'.89y')]
-    shown={'title':'AFE4','launch-title':'AFE4','title-complete':'B16A','prayer':'3AA3','prayer-white':'38F6','chapel-long':'C903'}
+    for name in ('ffs0','ffoa','ffca','ffcb','ffcu','ffcp'):sbase+=['--file',DATA/(name+'.89y')]
+    shown={'title':'AFE4','launch-title':'AFE4','title-complete':'B16A','prayer':'C1F3','prayer-white':'AE24','chapel-long':'D296'}   # with speaker portraits (validated)
     for name,scenario,frames,keys in (('title',0,30,empty),('launch-title',0,30,launch),('title-complete',0,120,empty),('prayer',0,240,empty),('prayer-white',0,240,palette),('chapel-long',0,420,intro)):
         pc=run([OUT/'scene',scenario,frames,keys,OUT/(name+'-scene-pc.png')])
         ti=run([*sbase,'--arg',scenario,'--frames',frames,'--keys',keys,'--png',OUT/(name+'-scene-ti.png'),OUT/'scenechk.89z'])

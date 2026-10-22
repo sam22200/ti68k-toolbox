@@ -103,7 +103,7 @@ def main():
     table('ct_recip','u16',[int(body[1])],[int(n) for n in re.findall(r'\d+',body[2])])
     body=re.search(r'weapon_x\[(\d+)\] = \{(.*?)\};',(HERE/'weapons.h').read_text(),re.S)
     table('weapon_x','s8',[int(body[1])],[int(n) for n in re.findall(r'-?\d+',body[2])])
-    for name,width in [('st_names',8),('signs',12),('equip_labels',12),('effects',32),('entries',16),('automatic',16),('team_names',8),('stat_labels',8),('chapter_ui',24)]:
+    for name,width in [('st_names',8),('signs',12),('equip_labels',12),('effects',32),('entries',16),('automatic',16),('team_names',8),('stat_labels',8),('help_lines',34),('chapter_ui',24)]:
         pattern=r'static const char \*const '+name+r'\[[^]]*\]\s*=\s*\{(.*?)\};'
         body=re.search(pattern,source,re.S)[1] if name!='chapter_ui' else re.search(r'static const char chapter_ui\[4\]\[24\]=\{(.*?)\};',(HERE/'config.inc').read_text(),re.S)[1]
         words=re.findall(r'"([^"]*)"',body);at=len(bank)

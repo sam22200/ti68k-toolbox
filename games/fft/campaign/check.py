@@ -19,8 +19,8 @@ def main():
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     results=[]
     for name,flags,banks,cases in (
-        ('scene',['-DCHECK_SCENE'],['ffs1','ffcu','ffca','ffcb'],[('card',1,30,empty),('academy',1,120,advance),('academy-complete',1,1000,advance)]),
-        ('gariland',['-DCHECK_GAR'],['ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcu','ffcw','ffca','ffcb'],
+        ('scene',['-DCHECK_SCENE'],['ffs1','ffcp','ffcu','ffca','ffcb'],[('card',1,30,empty),('academy',1,120,advance),('academy-complete',1,1000,advance)]),
+        ('gariland',['-DCHECK_GAR'],['ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb'],
          [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']

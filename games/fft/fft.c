@@ -145,7 +145,7 @@ typedef struct {
     char dialog[6][48];
     u8 dialog_n, dialog_w, dialog_h, dialog_next;
     u16 dialog_total, dialog_key, dialog_drawn;
-    u8 dialog_white, dialog_part;
+    u8 dialog_white, dialog_part, dialog_face;
 #endif
     Cover cover[NUNIT];                 // per unit, for its feet, its depth and the view
     u32 wcover[WEAPON_SH];              // the blade's cover, kept while its anchor stands
@@ -4903,6 +4903,12 @@ u8 hud_ready(void) { return W && W->hud_ok; }
 #endif
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define help_lines CONTOUR_REF_help_lines
+#else
+static const char *const help_lines[2] = { "ENTER: stats/equip   SHIFT: back", "[ENTER] again   [ESC] quit" };
+#endif
+
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define signs CONTOUR_REF_signs
 #else
 static const char *const signs[12] = { "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -4937,7 +4943,7 @@ static void draw_status(void)
 static const char *const stat_labels[5]={"Level ","PA ","Speed ","Move ","Jump "};
 #endif
 u8 v=slot==0?u->level:slot==1?u->pa:slot==2?u->sp:slot==3?u->move:u->jump;u8 n=put_s(line,0,stat_labels[slot]);n=put_n(line,n,v);line[n]=0;ui_text(4,40+slot*8,line,C_BLACK,156);}
-        }else ui_text(4,90,"ENTER: stats/equip   SHIFT: back",C_BLACK,158);
+        }else ui_text(4,90,help_lines[0],C_BLACK,158);
         rt_light=l;rt_dark=d;W->status_i++;
     }
     copy_box(W->status[0],W->status[1],0,0,10,100);
@@ -5286,7 +5292,7 @@ static void draw_end(void)
             text_into((u16 *)l, (u16 *)d, 52, 78, s, C_BLACK);
             n = put_s(s, 0, "Loot left "); n = put_n(s, n, left); s[n] = 0;
             text_into((u16 *)l, (u16 *)d, 92, 78, s, C_BLACK);
-        } else text_into((u16 *)l, (u16 *)d, 8, 90, "[ENTER] again   [ESC] quit", C_BLACK);
+        } else text_into((u16 *)l, (u16 *)d, 8, 90, help_lines[1], C_BLACK);
     }
     memcpy(rt_light, l, RT_PSIZE); memcpy(rt_dark, d, RT_PSIZE);
 }
@@ -5320,7 +5326,7 @@ void game_render(void)
     }
     if (!W || !ugfx || !wgfx || !igfx || !views[0] || !views[1] || !views[2] || !views[3]) {
         draw_rect(0, 0, RT_W, RT_H, C_WHITE);
-        draw_text(4, 40, W ? "missing fftu/w/i/fftv0-3" : "not enough memory", F_SMALL, C_BLACK);
+        draw_text(4, 40, "Missing data or memory", F_SMALL, C_BLACK);   // (banks, or the heap)
         FRAME_END(); return;
     }
 #ifdef FFT_EXPLORATION

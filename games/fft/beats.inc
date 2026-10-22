@@ -41,18 +41,52 @@ static u8 opening_find(u8 event)
     return 0;
 }
 
+// A known speaker's portrait (ffcp, tools/common_portraits.py: names, then 32x29 portraits),
+// at the bottom left of the dialogue; pgfx is the includer's (RT_NULL: none). 0xFF: none.
+#define DLG_FACE_W 20                   // its outlined art is 19 pixels wide; 22 with frame and gap
+static u8 opening_face(const char *name)
+{
+    const u8 *p;u8 n;
+    if(!pgfx||!*name)return 0xFF;
+    for(p=pgfx+7,n=pgfx[6];n;n--){
+        const char *a=(const char *)p+1,*b=name;
+        while(*a&&*a==*b)a++,b++;
+        if(!*a&&!*b)return p[0];
+        p++;while(*p++);               // the next entry: its portrait, its name
+    }
+    return 0xFF;
+}
+static void opening_face_draw(u8 face,s16 x)   // x: its frame's left, beside the box
+{
+    const u8 *q=pgfx+RD16(pgfx,2)+(u16)face*348;
+    {
+#ifdef __m68k__
+        RtSprite sp={32,29,q,q+116,q+232};
+#else
+        u32 rows[3][29];u8 k,r;
+        RtSprite sp={32,29,rows[0],rows[1],rows[2]};
+        for(k=0;k<3;k++)for(r=0;r<29;r++)rows[k][r]=RD32(q+k*116,r*2);
+#endif
+        draw_rect(x,RT_H-31,DLG_FACE_W+1,31,st.open_white?C_BLACK:C_WHITE);   // the box's frame
+        draw_rect(x+1,RT_H-30,DLG_FACE_W-1,30,st.open_white?C_WHITE:C_BLACK);
+        draw_sprite(x,RT_H-29,&sp);
+    }
+}
+
 // Fit words with the actual canonical glyph advances; six lines maximum, with
 // a continuation page instead of truncation. The box has no spare bottom rows.
 static void opening_layout(void)
 {
     ZB(23);
-    const char *s=opening_text();u16 at=0;u8 row=0,maxw=0;
+    const char *s=opening_text();u16 at=0;u8 row=0,maxw=0,limit;
+    W->dialog_face=opening_face(opening_speaker());
+    limit=W->dialog_face==0xFF?146:146-DLG_FACE_W-2;
     memset(W->dialog,0,sizeof W->dialog);W->dialog_total=0;W->dialog_drawn=0xFFFF;W->dialog_part=0;
     while(s[at] && row<6){
         u16 start=at,last=at;u8 width=0,col=0,lastcol=0,lastwidth=0;
         while(s[at] && col<47){
             u8 ch=(u8)s[at],adv=UI_SHARED(ADV)[ch>=32&&ch<=126?ch-32:'?'-32];
-            if(width+adv>146)break;
+            if(width+adv>limit)break;
             if(ch==' '){last=at;lastcol=col;lastwidth=width;}
             width+=adv;at++;col++;
         }
@@ -152,7 +186,9 @@ static void opening_copy_rect(s16 x,s16 y,u8 w,u8 h)
 static void opening_dialog_draw(void)
 {
     u8 row,col;u16 n=0;u8 w=W->dialog_w,h=W->dialog_h;
-    s16 x=(RT_W-w)>>1,y=RT_H-h;const char *name=opening_speaker();s16 nw=8;
+    // with a portrait, the frame and the box are centred together
+    s16 x=W->dialog_face==0xFF?(RT_W-w)>>1:DLG_FACE_W+2+((RT_W-DLG_FACE_W-2-w)>>1),y=RT_H-h;
+    const char *name=opening_speaker();s16 nw=8;
     void *saved_l=rt_light,*saved_d=rt_dark;
     u8 cold=W->dialog_drawn==0xFFFF;
     u16 visible=st.open_reveal,from=cold?0:W->dialog_drawn;
@@ -199,5 +235,6 @@ static void opening_dialog_draw(void)
     // Only the fitted window rectangle is copied, not a second whole screen.
     opening_copy_rect(x,y,w,h);
     if(*name)opening_copy_rect(x,y-11,(u8)nw,11);
+    if(W->dialog_face!=0xFF)opening_face_draw(W->dialog_face,x-DLG_FACE_W-2);
     if(st.open_reveal>=W->dialog_total && (st.tick&16))draw_rect(x+w-5,96,3,2,st.open_white?C_BLACK:C_WHITE);
 }

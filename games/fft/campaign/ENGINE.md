@@ -60,8 +60,11 @@ constant offsets.
   The chain: fftscn(0), fftopen, fftscn(1), fftgar (test door 99: fftopen(5), fftscn(1),
   fftgar(61)). The Academy is a scene of `ffs1` (its picture with the eight actors drawn in,
   15 beats; 4,142 bytes with the card instead of the Academy program and bank, ~13.6 KB);
-  its dialogue now has the shared style (gradient, six lines, continuation blink: before/
-  after `x/academy-avant-apres.png`, awaiting validation). Next: the map beats as a generic
+  its dialogue now has the shared style (gradient, six lines, continuation blink; validated).
+  Every dialogue shows a known speaker's portrait, framed beside the box (validated):
+  `ffcp` (tools/common_portraits.py, 2,198 bytes: Ramza, Delita, Agrias, Gafgarion, Ovelia,
+  Simon, and the scripts' other names for them); generic speakers keep the name box.
+  Orbonne's program is 64,931 bytes for TTPack's 64,936: the next steps must shrink it. Next: the map beats as a generic
   script in the engine. Status stays per chapter for now: unifying on Orbonne's text-only
   page would save 2.2 KB but lose what the management menus will need.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.

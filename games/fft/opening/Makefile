@@ -4,7 +4,7 @@ TESTS := test_opening.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0 ffcu ffcw ffca ffcb
+BANKS := ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0 ffcp ffcu ffcw ffca ffcb
 TI_FLAGS := ../../../lib/unpack68k.s
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 
