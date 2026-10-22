@@ -98,6 +98,13 @@ void _main(void) { ... }      // entry point, NOT main()
      buffers.
   4. More than 64 KB of **code**: DLLs (§4, model-dependent) or split into several programs
      chained through a data file. Last resort; flash apps (.89k) need a signature.
+- **Programs run from a launcher keep their archived copies** (**verified** in TiEmu, Titanium,
+  `HeapAvail` read by a probe run after each one): AMS runs an archived ASM program from a RAM
+  copy, and when a launcher starts it with `NG_execute`, that copy is freed only when the
+  launcher's own top-level command ends. A 12 KB archived scene player left 11.2 KB taken for the
+  next chapter; unarchived, 0.2 KB (but its size stays in RAM). A chain of programs therefore
+  costs the sum of their files: keep each one a small `-pack` stub (~1.1 KB). Keys queued with
+  `OSenqueue(…, kbd_queue())` before returning are not run by HOME (no top-level chaining).
 - **`-mno-bss` stores uninitialised globals in the file** (**verified**): `unsigned short
   buf[5000];` → 10,399-byte program with the `ti-cc` flags, 785 bytes without `-mno-bss` (the BSS
   block is then allocated and zeroed at each start). `-mno-bss` stays the default (Bobble is 160

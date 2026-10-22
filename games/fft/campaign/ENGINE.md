@@ -61,3 +61,12 @@ constant offsets.
   fftscn(1), fftacad(14), fftgar(61)). Next: the Academy as a scene set, then the map
   beats as a generic script in the engine.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
+- RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
+  the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:
+  each archived program the launcher ran stays copied in RAM until the launcher ends (the
+  scene player was 12 KB: now a 1.1 KB `-pack` stub), and Gariland nested under the launcher
+  starts with ~187 KB free but not with 2-5 KB less: it needs ~183 KB of a Titanium's ~188 KB.
+  Already moved out of its RAM, results unchanged: water glints (4,000 bytes, now in the
+  descriptor, computed by the engine itself: `campaign/water_dump.c`) and the byte-doubling
+  and tile tables (1,512 bytes, archive tail). Gariland needs several more KB of headroom
+  before the chain can run on a calculator holding anything else.
