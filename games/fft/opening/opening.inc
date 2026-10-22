@@ -1,7 +1,7 @@
 // Native opening adapter for the common tactical engine: the beats played on the battle map
 // (gate, banter, aftermath) and the battle. The title and chapel before it and the chapter
 // card after it are the scene player's (campaign/scene.c, ffs0/ffs1).
-#include "data/story.h"
+#define OPENING_BEATS RD16(opening_story, 0)   // the beats bank's count
 typedef char OpeningDiskLayout[(sizeof(UnitDef)==24 && sizeof(Item)==23 && sizeof(Job)==14 && sizeof(Ability)==24 && sizeof(SkillSet)==18)?1:-1];
 enum { OPEN_PLAY, OPEN_TITLE, OPEN_CHAPEL, OPEN_GATE, OPEN_AFTER, OPEN_DONE, OPEN_BANTER };
 #if MOD_CORE
@@ -49,7 +49,7 @@ static void opening_start(u16 n)
 #endif
     memset(&st,0,sizeof st);if(!W)return;
     st.want=st.prot=st.ai_view=255;rt_seed=97;rand_seed(97);
-    opening_story=rt_file("ffost",RT_NULL);
+    {char name[6]="ff?st";name[2]=chapter_letter[chapter_now-1];opening_story=rt_file(name,RT_NULL);}
     pgfx=rt_file("ffcp",RT_NULL);                    // (none: name-only boxes)
     if(opening_story)opening_story+=2;
     fixed_units();memcpy(st.bag,bag_init,NBAG);

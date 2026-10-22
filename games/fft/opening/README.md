@@ -24,7 +24,7 @@ export PATH="$PWD/tools/bin:$PATH"
 make -C games/fft/opening reference   # once: original cold boot + AI observation
 make -C games/fft/opening assets      # offline conversion; ZX0 can take a few minutes
 make -C games/fft/opening check       # PC tests + actual 68000 framebuffer/state checks
-make -C games/fft/opening bundle      # packed native program + one TI transfer group
+make -C games/fft/campaign bundle     # the battle program (every chapter) + one TI transfer group
 make -C games/fft/opening review      # PC framebuffer GIFs, not a TI speed demonstration
 cd games/fft/opening/data
 ../fftopen_pc
@@ -36,10 +36,9 @@ or victory forcing is used. Its states, dialogue trace and screenshots are in
 `../x/opening/reference/`. Without `--story` it stops at Ramza's first turn and
 uses no RAM writes.
 
-`x/fftopening.89g` contains the complete ten-variable TI transfer set.
-Alternatively send `fftopen.89z`, `ffocore.89y`, and these **eight archived** data variables:
-`ffov0..3`, `ffoa`, `ffow`, `ffoi`, `ffost`. Run `fftopen()`.
-`make packed` avoids the original TI-89 AMS 2.xx 24,576-byte executable-entry
+Orbonne is a chapter of the campaign's battle program (`../campaign/ENGINE.md` M4): send
+`../campaign/x/fftcampaign.89g` and run `fftbat(100)` (or `fftstory()` for the whole chain).
+The packed launcher avoids the original TI-89 AMS 2.xx 24,576-byte executable-entry
 limit with GCC4TI's packed launcher. The plain `make ti` executable is intended
 for the Titanium; `make cycles` is the non-I/O profiling binary.
 The packed launcher and all eight archived banks now cold-launch in Titanium

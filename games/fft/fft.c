@@ -68,7 +68,7 @@ static void __attribute__((noinline)) frame_end(void)
 #define FRAME_END()
 #endif
 
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
 #define AB_JP(b) RD16((const u8 *)(b)+20,0)
 #else
 #define AB_JP(b) ((b)->jp)
@@ -213,7 +213,7 @@ typedef struct {
     u8 tag_w[2], tag_ok;                // the tags' widths, made
     u8 hud_ok;                          // every panel and menu due this frame drawn (tests)
     u8 arrow[4][2][8];
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
     // Status/dialogue storage aliases the idle tactical portrait cache below.
 #elif defined(FFT_COMPACT_UI)
     u16 status[2][800];                 // fixed inspection FWork only; no full-screen Status
@@ -287,7 +287,7 @@ typedef struct {
     u16 (*pan)[2][3][PANEL_ROWS * RT_PBYTES / 2];
     u16 (*tag)[3][7 * RT_PBYTES / 2];
 #else
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
     union {
         u16 status[2][RT_H * RT_PBYTES / 2];
         u16 pan[2][2][3][PANEL_ROWS * RT_PBYTES / 2];
@@ -485,7 +485,7 @@ static void weapon_effect(void);
 static u8 pending_next(void);
 static void charge_resolve(void);
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
 static void opening_start(u16 n);
 static u8 map_update(void);
 static void map_render(void);
@@ -952,7 +952,7 @@ static u8 hl_seq;                       // bumped when the highlights may have c
 #ifdef FFT_TEXTURE_PREVIEW
 static void preview_iso_apply(u8 rot);
 #endif
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
 // Chapter views store each occlusion mask row XORed with the row above (extract.py
 // rowxor_masks: ~3 KB less archive per map); undone here a long at a time.
 static void unxor_masks(u8 *v)          // v: the depth/mask planes
@@ -1003,7 +1003,7 @@ static void unpack_view(u8 rot)
     bk_reset();
 #else
     zx0_unpack(views[rot], vbuf);
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_CHAPTER
     unxor_masks(vbuf);
 #endif
 #endif
@@ -2482,11 +2482,7 @@ u8 ai_frozen(void) { return W->frz; }
 // The modules' bank (tools/module.py): "FMB1", a u16 offset per module, each "FMD1", its entry,
 // size and context offsets (u16), its image. One module at a time in the zone, copied when
 // another is called; the zone is in the program (module.h)
-#ifdef FFT_OPENING                      // MOD_ZONE: the bank's largest image
-#include "opening/data/modules.h"
-#else
-#include "campaign/data/modules.h"
-#endif
+#include "campaign/data/modules.h"      // MOD_ZONE: the bank's largest image (ffbm)
 static u16 mod_zone[MOD_ZONE / 2];
 static const u8 *mod_bank;
 static u8 mod_id;                       // the module in the zone + 1 (0: none)
@@ -2501,7 +2497,7 @@ static void ensure_scene(u8 rot);
 static void copy_view(void);
 static Feet unit_feet(u8 rot, u8 i);
 static u8 unit_direction(u8 rot, u8 i);
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
 static const u8 *opening_story, *pgfx;
 static void opening_battle(u8 direct);
 static void opening_after(void);
@@ -2536,7 +2532,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->draw_hand = draw_hand; c->copy_box = copy_box; c->draw_rect = draw_rect;
         c->draw_text = draw_text; c->job_level = job_level;
         c->status_ability = status_ability; c->status_ability_count = status_ability_count;
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
         c->opening_story = &opening_story; c->pgfx = &pgfx; c->opening_battle = opening_battle;
         c->opening_after = opening_after;
 #endif
@@ -2572,7 +2568,7 @@ static u8 ai_think(void) { return (u8)mod_call(MOD_AI, 0, 0); }
 static void draw_turn(void) { mod_call(MOD_TURN, 0, 0); }
 static void draw_end(void) { mod_call(MOD_SCREENS, 0, 0); }
 static void draw_status(void) { mod_call(MOD_SCREENS, 1, 0); }
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
 static u8 map_update(void) { return (u8)mod_call(MOD_BEATS, 0, 0); }
 static void map_render(void) { mod_call(MOD_BEATS, 1, 0); }
 static void map_start(u8 after) { mod_call(MOD_BEATS, 2, after); }
@@ -3424,6 +3420,132 @@ release(void)
     scene_l = scene_d = RT_NULL;
 }
 
+#ifdef FFT_CHAPTER
+// The battle program's chapters (FFT_BATTLE, campaign/ENGINE.md M4): each one's banks are "ff",
+// its letter, then v0..v3 (views), a (actor frame keys), i (interface), d (descriptor); every
+// chapter shares ffcw, ffca, ffcb, ffcu and the modules (ffbm)
+static const char chapter_letter[] = "og";      // Orbonne, Gariland
+static u8 chapter_now;                          // the chapter loaded + 1 (0: none)
+static u8 story_after;                          // its script plays beats after the victory
+
+void game_init(void)
+{
+    rt_state = &st;
+    rt_state_size = sizeof(st);
+    chapter_now = 0; W = RT_NULL; igfx = RT_NULL;
+#ifdef __m68k__
+    sbuf = vbuf = RT_NULL; acache = RT_NULL;   // statics survive between runs
+#endif
+    wgfx = rt_file("ffcw", RT_NULL);
+    abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
+    cgfx = rt_file("ffcu", RT_NULL);
+#ifdef FFT_MODULES
+    mod_bank = rt_file("ffbm", RT_NULL);
+    if (!mod_ready()) return;                  // a message, ESC quits
+#endif
+    if (!wgfx || !abank[0] || !abank[1] || !cgfx) return;
+    abank_n0 = RD16(abank[0], 0);
+    if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB; the
+        vbuf = malloc(4UL * SC_BYTES * SC_HMAX);   // largest chapter's (VIEW_BYTES)
+        sbuf = vbuf ? malloc(2UL * SC_BYTES * SC_HMAX + sizeof(Work)) : RT_NULL;
+        acache = sbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
+        if (!acache && sbuf) { free(sbuf); sbuf = RT_NULL; }
+        if (!sbuf) {                           // not enough memory: a message, ESC quits
+            if (vbuf) free(vbuf);
+            vbuf = RT_NULL;
+            return;
+        }
+        ac_key = (u16 *)acache[AC_N]; ac_age = ac_key + AC_N;
+#ifdef __m68k__
+        atexit(release);
+#else
+        (void)release;
+#endif
+    }
+}
+
+// chapter c's banks, sizes and tables (1: ready); its work memory starts afresh
+static u8 chapter_load(u8 c)
+{
+    char name[6] = "ff?v0";
+    u16 i, view_size = 0;
+    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; contour_gfx = RT_NULL;
+    if (!sbuf || !cgfx || c >= sizeof chapter_letter - 1) return 0;
+    name[2] = chapter_letter[c];
+    for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
+        name[4] = (char)('0' + i);             // again each load, the archive may have moved
+        views[i] = rt_file(name, i == 0 ? &view_size : RT_NULL);
+    }
+    // ttbin2oth's OTH/dat variable includes a six-byte trailer on TI; the
+    // PC file is raw. Validate the footer and its offset before any mask read.
+#ifdef __m68k__
+    if(view_size>=6)view_size-=6;
+#endif
+    if(views[0] && !(view_size&1) && view_size>=CONTOUR_BYTES+10){
+        const u8 *f=views[0]+view_size-10;
+        if(RD32(f,0)==0x46433032UL){
+            u16 off=RD16(f,3);
+            if(!(off&1) && off+CONTOUR_BYTES==view_size-10 &&
+               RD16(f,4)==CONTOUR_BYTES)contour_gfx=views[0]+off;
+        }
+    }
+    name[4] = 0;
+    name[3] = 'a'; ugfx = rt_file(name, RT_NULL);
+    name[3] = 'd'; cdesc = rt_file(name, RT_NULL);
+    name[3] = 'i'; igfx = rt_file(name, RT_NULL);
+    if (!contour_gfx || !ugfx || !igfx || !cdesc || RD16(cdesc, 0) != 0x4643 || RD16(cdesc, 1) != 0x4431) {
+        igfx = RT_NULL; return 0;
+    }
+    map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u8)(map_w * map_h); sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
+    jobs = (const Job *)(igfx + CD(JOBS)); items = (const Item *)(igfx + CD(ITEMS));
+    abilities = (const Ability *)(igfx + CD(ABILITIES));
+    skill_sets = (const SkillSet *)(igfx + CD(SKILL_SETS));
+    unit_defs = (const UnitDef *)(igfx + CD(UNIT_DEFS));
+    story_after = 0;
+    if (CD(MAP_SCRIPT))
+        for (i = 0; i < cdesc[CD(MAP_SCRIPT) + 1]; i++) story_after |= cdesc[CD(MAP_SCRIPT) + 4 + 8 * i] & 1;
+    map_tiles = (const Tile *)(igfx + UI_TILES);
+#ifdef __m68k__
+    sl_l = (const PlaneWord *)UI_SHARED(SLOPES);
+#else
+    for (i = 0; i < 4 * SLOPE_ROWS; i++) slope_pc[i] = RD32(UI_SHARED(SLOPES), 2 * i);
+    sl_l = slope_pc;
+#endif
+    sl_m = sl_l + SLOPE_ROWS; sc_l = sl_m + SLOPE_ROWS; sc_m = sc_l + SLOPE_ROWS;
+    W = (Work *)(sbuf + 2UL * SC_BYTES * SC_HMAX);
+    memset(W, 0, sizeof(Work));
+    for (i = 0; i < MAP_N; i++) {
+#ifndef FFT_TABLES_ARCHIVED
+        TILE_X[i] = (u8)(i % MAP_W); TILE_Z[i] = (u8)(i / MAP_W);
+#endif
+        W->hs[i] = map_tiles[i].stand; W->hl[i] = lower((u8)i);
+        W->hw[i] = (u8)((map_tiles[i].walk != 0) | map_tiles[i].water << 1);
+        W->top[i] = (u16)(tile_h(&map_tiles[i]) * 12);
+    }
+#ifndef FFT_TABLES_ARCHIVED
+    for (i = 0; i < MAP_W * 28; i++) TILE_COL[i] = (u8)(i / 28);
+    for (i = 0; i < MAP_H * 28; i++) TILE_ROW[i] = (u8)(i / 28 * MAP_W);
+    for (i = 0; i < 256; i++) {
+        u16 d = 0;
+        u8 b;
+        for (b = 0; b < 8; b++) if (i & (0x80 >> b)) d |= 0xC000 >> (2 * b);
+        dbl[i] = d;
+    }
+#endif
+    edges(3);                                  // Gariland's units all have Jump 3
+    for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
+    W->wrot = 0xFF;
+    hud_labels();
+    make_counters();
+    scene_l = sbuf; scene_d = sbuf + SC_PLANE;
+    scene_rot = vbuf_rot = 0xFF;
+#ifdef FFT_MODULES
+    mod_id = 0;                                // the modules' context: this chapter's
+#endif
+    chapter_now = (u8)(c + 1);
+    return 1;
+}
+#else
 void game_init(void)
 {
     u16 i;
@@ -3435,9 +3557,6 @@ void game_init(void)
     rt_state_size = sizeof(st);
 #ifdef __m68k__
     sbuf = vbuf = RT_NULL;
-#ifdef FFT_ACTOR_BANK
-    acache = RT_NULL;                          // statics survive between runs
-#endif
 #ifdef FFT_CONFIG
     pidle=RT_NULL;
 #endif
@@ -3448,13 +3567,7 @@ void game_init(void)
     HeapCompress();
 #endif
     for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
-#ifdef FFT_OPENING
-        char name[6] = "ffov0";
-#elif defined(FFT_STORY_GAR)
-        char name[6] = "ffgv0";
-#else
         char name[6] = "fftv0";                // again each run, the archive may have moved
-#endif
         name[4] = (char)('0' + i);
         views[i] = rt_file(name,
 #ifdef FFT_REACH_CONTOUR
@@ -3482,51 +3595,9 @@ void game_init(void)
 #endif
     if(!contour_gfx){W=RT_NULL;return;}
 #endif
-#ifdef FFT_OPENING
-    ugfx = rt_file("ffoa", RT_NULL);
-    igfx = rt_file("ffoi", RT_NULL);
-#elif defined(FFT_STORY_GAR) && !defined(FFT_RAW_ACTORS)
-    ugfx = rt_file("ffga", RT_NULL);
-    igfx = rt_file("ffgi", RT_NULL);
-#elif defined(FFT_STORY_GAR)                    // control: the raw banks read in place
-    ugfx = rt_file("fftu", RT_NULL);
-    wgfx = rt_file("fftw", RT_NULL);
-    igfx = rt_file("ffgi", RT_NULL);
-#else
     ugfx = rt_file("fftu", RT_NULL);
     wgfx = rt_file("fftw", RT_NULL);
     igfx = rt_file("ffti", RT_NULL);
-#endif
-#ifdef FFT_ACTOR_BANK
-    wgfx = rt_file("ffcw", RT_NULL);           // the blades both chapters share
-    abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
-    if (!abank[0] || !abank[1]) igfx = RT_NULL;
-    else abank_n0 = RD16(abank[0], 0);
-#endif
-#ifdef FFT_CHAPTER
-    cgfx = rt_file("ffcu", RT_NULL);
-#ifdef FFT_OPENING
-    cdesc = rt_file("ffod", RT_NULL);
-#else
-    cdesc = rt_file("ffgd", RT_NULL);
-#endif
-#ifdef FFT_MODULES
-#ifdef FFT_OPENING
-    mod_bank = rt_file("ffom", RT_NULL);
-#else
-    mod_bank = rt_file("ffgm", RT_NULL);
-#endif
-    if (!mod_ready()) igfx = RT_NULL;
-#endif
-    if (!cgfx || !cdesc || RD16(cdesc, 0) != 0x4643 || RD16(cdesc, 1) != 0x4431) igfx = RT_NULL;
-    else {
-        map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u8)(map_w * map_h); sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
-        jobs = (const Job *)(igfx + CD(JOBS)); items = (const Item *)(igfx + CD(ITEMS));
-        abilities = (const Ability *)(igfx + CD(ABILITIES));
-        skill_sets = (const SkillSet *)(igfx + CD(SKILL_SETS));
-        unit_defs = (const UnitDef *)(igfx + CD(UNIT_DEFS));
-    }
-#endif
     if (!igfx) { W = RT_NULL; return; }       // a message, ESC quits
     map_tiles = (const Tile *)(igfx + UI_TILES);
 #ifdef __m68k__
@@ -3539,11 +3610,6 @@ void game_init(void)
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB
         vbuf = malloc(VIEW_BYTES);
         sbuf = vbuf ? malloc(2 * SC_PLANE + sizeof(Work)) : RT_NULL;
-#ifdef FFT_ACTOR_BANK
-        acache = sbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
-        if (!acache && sbuf) { free(sbuf); sbuf = RT_NULL; }
-        ac_key = (u16 *)acache[AC_N]; ac_age = ac_key + AC_N;
-#endif
         if (!sbuf) {                           // not enough memory: a message, ESC quits
             if (vbuf) free(vbuf);
             vbuf = RT_NULL; W = RT_NULL;
@@ -3610,6 +3676,8 @@ void game_init(void)
 #endif
 }
 
+#endif
+
 // a target for the weapon or the ability: a living unit (Phoenix Down: a KO one; unit_at never
 // gives a crystal or a chest)
 static u8 aim_ok(u8 t)
@@ -3629,13 +3697,19 @@ static void aim(u8 ab)
 
 void game_scenario(u16 n)
 {
-#ifdef FFT_OPENING
-    opening_start(n);
+#ifdef FFT_CHAPTER
+    u8 c = (u8)(n < 100 ? FFT_DEFAULT_CHAPTER : n / 100 - 1);   // the chapter, then its door
+    n %= 100;
+    if (chapter_now != c + 1 && !chapter_load(c)) return;
+    if (CD(START)) {                            // a story start: beats before the battle
+        opening_start(n);
 #ifdef FFT_CONTOUR_DEFAULT
-    st.reach_contour=1; // isolated benchmark control, ordinary battles default to full tiles
+        st.reach_contour=1; // isolated benchmark control, ordinary battles default to full tiles
 #endif
-#else
-#if !defined(FFT_EXPLORATION) && !defined(FFT_STORY_GAR)
+        return;
+    }
+#endif
+#if !defined(FFT_EXPLORATION) && !defined(FFT_CHAPTER)
     u8 i;
 #endif
 #ifdef FFT_EXPLORATION
@@ -3663,7 +3737,7 @@ void game_scenario(u16 n)
     st.ai_all = n == 16;                          // the AI plays both sides to the end
     turn_start();
     while (n && n != 16 && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn
-#if !defined(FFT_EXPLORATION) && !defined(FFT_STORY_GAR)
+#if !defined(FFT_EXPLORATION) && !defined(FFT_CHAPTER)
     if (n >= 1 && n <= 4) {                       // an enemy behind a building, each view
         st.unit[U_HIDE].x = 1; st.unit[U_HIDE].z = 11;    // (fft_test --find)
         st.rot = (u8)(n - 1);
@@ -3793,7 +3867,7 @@ void game_scenario(u16 n)
 #endif
 #endif
     }
-#ifndef FFT_STORY_GAR
+#ifndef FFT_CHAPTER
     if (n >= 69 && n <= 72) {                 // loot presentation: crystal, chest, queue, covered
         st.ai = AI_OFF; st.mode = M_MENU; st.act = st.sel = U_RAMZA;
         st.want = st.prot = 0xFF; st.turn = st.banner = 0;
@@ -3811,7 +3885,6 @@ void game_scenario(u16 n)
     if (!n) bn_start(BN_START);                  // a battle: its objective first
     cam_target(&st.camx, &st.camy);
     hl_seq++;
-#endif
 }
 
 static void move_cursor(s16 du, s16 dv)
@@ -4345,8 +4418,8 @@ u8 game_update(void)
 #endif
     if(W){W->actor_budget=ACTOR_BUDGET;W->actor_misses=0;W->ac_now++;}
 #endif
-#ifdef FFT_OPENING
-    if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner)) return map_update();
+#ifdef FFT_CHAPTER
+    if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner && story_after)) return map_update();
 #endif
 #if defined(FFT_CONFIG) || defined(FFT_REACH_CONTOUR)
     if (config_update()) return 1;
@@ -5502,7 +5575,7 @@ void game_render(void)
 #endif
     if (st.perspective) { perspective_render(); FRAME_END(); return; }
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     if (st.open_stage || st.open_fade) { map_render(); FRAME_END(); return; }
 #endif
     if (st.mode == M_END && !st.banner && !st.morph_mask) { draw_end(); FRAME_END(); return; }
@@ -5658,10 +5731,10 @@ void game_render(void)
 #ifdef FFT_CHAPTER
 #include "rules.inc"
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
 #include "opening/opening.inc"
 #endif
 #endif
-#if !MOD_CORE && MOD_PART(MOD_BEATS) && defined(FFT_OPENING)
+#if !MOD_CORE && MOD_PART(MOD_BEATS) && defined(FFT_CHAPTER)
 #include "opening/opening.inc"                  // its beats only (MOD_PART there)
 #endif

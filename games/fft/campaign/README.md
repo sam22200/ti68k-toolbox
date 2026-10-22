@@ -25,9 +25,10 @@ make -C games/fft/campaign assets
 make -C games/fft/campaign check bundle
 ```
 
-Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 23 variables,
-364,712 bytes after configurable reach, tactical facing and archived-table updates, including the small `fftstory` supervisor,
-three packed launchers, three archived cores and the chapter banks. All data
+Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 28 variables, 291,136 bytes:
+the small `fftstory` supervisor, two packed launchers (`fftbat`, the battle program of every
+chapter, and `fftscn`, the scene player), their archived cores (`ffbcore`, `ffscore`), the
+battle modules (`ffbm`) and the chapter banks. All data
 and packed cores have the archive attribute; do not move all of them into RAM.
 Retail art, text, binary data and captures remain generated/ignored.
 
@@ -35,8 +36,9 @@ On the calculator, send that group and run **`fftstory()`**. ENTER/2nd advances
 dialogue; SHIFT skips the current Orbonne section; CATALOG inverts its dialogue
 window. During battle, CATALOG selects **Move: full tiles / Move: contour**
 (default full); ENTER toggles and ESC/CATALOG closes settings. Ordinary Gariland controls apply after the Academy. ESC cancels a chapter
-without automatically starting the next. Calling `fftopen()` alone still returns
-to HOME after the prologue; use `fftstory()` for the automatic continuation.
+without automatically starting the next. `fftbat(n)` alone plays one chapter (100 + an
+Orbonne door: `fftbat(100)` its gate; 200 + a Gariland door: `fftbat(200)` its battle) and
+returns to HOME; use `fftstory()` for the automatic continuation.
 
 On the PC:
 

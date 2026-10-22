@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#define FFT_OPENING
+#define FFT_BATTLE
 #include "../fft.h"
 #include "../../../runtime/platform-sw/rt_sw.h"
 static void press(u32 k){assert(sw_step(k));assert(sw_step(0));}

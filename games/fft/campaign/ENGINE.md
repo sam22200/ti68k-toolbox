@@ -81,8 +81,8 @@ constant offsets.
   aftermath: its packed core is 45,215 bytes and now passes TTPack. The aftermath is
   identical frame by frame; from the gate, only frame-counter phases differ (the dialogue's
   continuation blink, banner sweep, idle poses), the counter restarting with the program.
-  The chain: fftscn(0), fftopen, fftscn(1), fftgar (test door 99: fftopen(5), fftscn(1),
-  fftgar(61)). The Academy is a scene of `ffs1` (its picture with the eight actors drawn in,
+  The chain (then; now fftbat, M4 below): fftscn(0), fftopen, fftscn(1), fftgar (test door
+  99: fftopen(5), fftscn(1), fftgar(61)). The Academy is a scene of `ffs1` (its picture with the eight actors drawn in,
   15 beats; 4,142 bytes with the card instead of the Academy program and bank, ~13.6 KB);
   its dialogue now has the shared style (gradient, six lines, continuation blink; validated).
   Every dialogue shows a known speaker's portrait, framed beside the box (validated):
@@ -95,7 +95,7 @@ constant offsets.
   states unchanged in every replay). Gariland can get its own by data once it enables it. Status stays per chapter for now: unifying on Orbonne's text-only
   page would save 2.2 KB but lose what the management menus will need.
 - Modules (core milestone): the battle engine's chapter builds on the TI (`FFT_MODULES`) keep
-  three parts out of the core (Orbonne four: its map beats), in an archived bank per chapter (`ffgm`, `ffom`, built by
+  three parts out of the core (Orbonne four: its map beats), in an archived bank (`ffbm` since M4, built by
   `tools/module.py` from the chapter's own source with `FFT_MODULE = k + 1`), Gariland /
   Orbonne image bytes: the AI (7,556 / 7,688), the rotation animation (3,458 / 3,476), the
   results and Status screens (4,050 / 1,630), Orbonne's map beats (4,794). `fft.c` marks them `MOD_PART(k)`, the rest
@@ -126,6 +126,23 @@ constant offsets.
   peak 284k cycles (was 268k: a unit's weapon reach checked per candidate), average +1 %.
   Left for M4: unit names and portraits, the Status page, water and towers per map, map
   sizes; then one battle program.
+- M4 (one battle program): `fftbat` (campaign/battle.c, 62,765 bytes, under TTPack's 64,936)
+  plays every chapter: `fftbat(100 + door)` Orbonne, `fftbat(200 + door)` Gariland (below 100:
+  the door of the build's FFT_DEFAULT_CHAPTER, for the tests). `FFT_OPENING` and
+  `FFT_STORY_GAR` are gone: the engine reads every chapter difference from its descriptor
+  (Ramza's unit, a unit's frame cost, sprite portraits and Chemist bodies, the Status style,
+  the start: a story start with map beats or the battle at once, the map script) and its
+  sizes (map, scene: buffers for the largest, chapters.h). `game_init` loads what every
+  chapter shares (blades, actor banks, interface, the modules `ffbm`, one bank from
+  battle.c) and allocates; `chapter_load` takes a chapter's banks ("ff" + o/g + v0..v3, a,
+  i, d, st) on its first scenario. Both chapters' replays are identical to M3's (Gariland 11,
+  Orbonne 12 + 6), each check binary plays the other chapter identically too, and on TiEmu
+  Titanium the test chain fftstory(99) (fftbat(105), the card and the Academy, fftbat(261))
+  reaches Gariland's battle and fftbat(100) plays Orbonne's gate. The launcher chains
+  fftscn(0), fftbat(100), fftscn(1), fftbat(200). Costs: Orbonne's buffers take Gariland's
+  larger scene (~2.4 KB more RAM); an AI thinking step +4 % on average (sizes read at run
+  time); frame averages +0.5-1 %, peaks within +3 %. Both Status pages remain (style by
+  data) until Chapter I's job names are ripped; then one page.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

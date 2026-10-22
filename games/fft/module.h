@@ -47,7 +47,7 @@ typedef struct {
     u8 (*status_ability)(void);
     u8 (*status_ability_count)(void);
     void (*gauge)(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     const u8 **opening_story, **pgfx;
     void (*opening_battle)(u8 direct);
     void (*opening_after)(void);

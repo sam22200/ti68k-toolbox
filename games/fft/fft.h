@@ -5,12 +5,18 @@
 #ifndef FFT_H
 #define FFT_H
 #include "../../runtime/core/rt.h"
-#if (defined(FFT_OPENING) || defined(FFT_STORY_GAR)) && !defined(FFT_NO_REACH_CONTOUR)
+// FFT_BATTLE: the campaign's battle program, every chapter (campaign/ENGINE.md M4): the chapter
+// comes with the scenario number: 100 + door Orbonne, 200 + door Gariland (below 100: the
+// door of FFT_DEFAULT_CHAPTER)
+#if defined(FFT_BATTLE) && !defined(FFT_DEFAULT_CHAPTER)
+#define FFT_DEFAULT_CHAPTER 0
+#endif
+#if defined(FFT_BATTLE) && !defined(FFT_NO_REACH_CONTOUR)
 #ifndef FFT_REACH_CONTOUR
 #define FFT_REACH_CONTOUR
 #endif
 #endif
-#if defined(FFT_OPENING) || (defined(FFT_STORY_GAR) && !defined(FFT_RAW_ACTORS))
+#ifdef FFT_BATTLE
 #define FFT_ACTOR_BANK                // chapter packages: actor frames from the common ffca/ffcb
 #endif
 
@@ -40,7 +46,7 @@ typedef struct { char name[13]; u8 kind, y, range, vert, flags, bag, rate; u16 j
 #define SET_N 6                                // abilities per skill set at most
 typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] indices, 0xFF none
 #include "art.h"
-#if defined(FFT_OPENING) || defined(FFT_STORY_GAR)
+#ifdef FFT_BATTLE
 // Chapter packages: the per-chapter numbers, tables and offsets come from the chapter's
 // descriptor (tools/chapter_desc.py, campaign/ENGINE.md), read at load, not from headers.
 #define FFT_CHAPTER
@@ -64,11 +70,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_TURN 1                            // the rotation animation
 #define MOD_SCREENS 2                         // the results and Status screens
 #define MOD_BEATS 3                           // the beats on the battle map (mapbeats.inc)
-#ifdef FFT_OPENING
 #define MOD_COUNT 4
-#else
-#define MOD_COUNT 3                           // (no map script yet)
-#endif
 #ifdef FFT_MODULE
 #define MOD_CORE 0
 #define MOD_PART(k) (FFT_MODULE == (k) + 1)
@@ -80,11 +82,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_PART(k) 1
 #endif
 #ifdef FFT_CHAPTER
-#ifdef FFT_OPENING
-#include "opening/data/units.h"
-#else
-#include "units.h"
-#endif
+#include "units.h"                            // (the sprites' numbers: the chapters' data)
 // The map's and its views' sizes are the chapter's (descriptor MAP_W, MAP_H, SC_H, SC_TOP), read
 // at load; buffers take the largest of every chapter (chapters.h, tools/chapter_desc.py)
 #include "chapters.h"
@@ -93,11 +91,7 @@ extern s16 sc_h, sc_top;
 #define MAP_W map_w
 #define MAP_H map_h
 #define MAP_N map_n                           // its tiles (u8 loops: at most 255)
-#ifdef FFT_RAW_ACTORS
-#include "weapons.h"                          // the earlier raw fftu/fftw control (Gariland)
-#else
 #include "campaign/data/weapons.h"            // blades alone: ffcw (both chapters' copies match)
-#endif
 #include "ui_common.h"                        // ffcu: the interface both chapters share
 #include "chapter.h"
 #undef ACTOR_ARMED
@@ -184,6 +178,7 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define MAP_N (MAP_W * MAP_H)
 #define MAP_NMAX (MAP_W * MAP_H)
 #define SC_HMAX SC_H
+#define GFX_CHEMIST(g) ((g) >= UG_CHEMIST_M)   // the demo's sprites (units.h)
 #endif
 #define SC_OY (HU * MAXH + 4 - SC_TOP) // scene y of the top vertex of view tile (0, 0) at h 0
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane

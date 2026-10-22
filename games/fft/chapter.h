@@ -43,3 +43,4 @@
 #define CD_GFX_PORTRAIT 42
 #define CD_GFX_CHEMIST 43
 #define CD_STATUS 44
+#define CD_START 45

@@ -53,8 +53,9 @@ SCRIPT = {'opening': [(3, 4, MS_FADE, 0, 0, 0),                     # the gate, 
 RAMZA = {'opening': 0, 'campaign': 6}
 UNIT_K = {'opening': 16, 'campaign': 20}
 STATUS = {'opening': 0, 'campaign': 1}          # Status: 0 the text-only page, 1 the full one
+START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc), 0: the battle at once
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
-    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS']
+    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS', 'START']
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -183,6 +184,7 @@ def build(chapter):
         for seq in SCRIPT[chapter]:
             body += struct.pack('>4B2h', *seq)
     fields['RAMZA'], fields['UNIT_K'], fields['STATUS'] = RAMZA[chapter], UNIT_K[chapter], STATUS[chapter]
+    fields['START'] = START[chapter]
     gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
     portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
     for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):

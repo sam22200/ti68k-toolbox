@@ -17,7 +17,8 @@ void _main(void)
     InitArgPtr(args);if(GetArgType(args)==POSINT_TAG)test=GetIntArg(args)==99;
     // The scene player (fftscn) shows what lies between battles: Orbonne's title and chapel
     // (ffs0), the chapter card and the Academy (ffs1).
-    if(test){if(chapter("fftopen(5)")&&chapter("fftscn(1)"))chapter("fftgar(61)");}
-    else if(chapter("fftscn(0)")&&chapter("fftopen()")&&chapter("fftscn(1)"))chapter("fftgar()");
+    // The battle program (fftbat) plays every chapter: 100 + an Orbonne door, 200 + Gariland's.
+    if(test){if(chapter("fftbat(105)")&&chapter("fftscn(1)"))chapter("fftbat(261)");}
+    else if(chapter("fftscn(0)")&&chapter("fftbat(100)")&&chapter("fftscn(1)"))chapter("fftbat(200)");
     push_shortint(0);
 }

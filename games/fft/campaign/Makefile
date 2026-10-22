@@ -3,7 +3,7 @@ SRC := scene.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffgm ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS := ffs1 ffbm ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle
@@ -37,15 +37,16 @@ fftintro_pc: ../opening/opening.c ../fft.c ../fft.h ../opening/opening.inc pc_en
 fftgar_pc: gariland.c ../fft.c ../fft.h
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ gariland.c $(RT_CORE) $(RT_SW) $(RT)platform-sdl/rt_sdl.c $(SDL_LIBS)
 # Chapter programs are archived too: in RAM, a waiting one would take the running one's room.
+OPENING_BANKS := $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0))
 packed: $(TI_FILES)
-	$(MAKE) -C ../opening packed
-	$(ROOT)/tools/bin/ti-cc -o fftgar -pack ffgcore gariland.c $(RT_CORE) $(RT)platform-ti68k/rt_ti.c $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
+	$(MAKE) -C ../opening banks
+	$(ROOT)/tools/bin/ti-cc -o fftbat -pack ffbcore native_battle.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftscn -pack ffscore native_scene.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftstory launcher.c
-	python3 -c "from pathlib import Path; files=[Path('ffgcore.89y'),Path('ffscore.89y'),Path('fftscn.89z'),Path('fftgar.89z')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
+	python3 -c "from pathlib import Path; files=[Path('ffbcore.89y'),Path('ffscore.89y'),Path('fftscn.89z'),Path('fftbat.89z')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
 bundle: packed
 	@mkdir -p x
-	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0)) fftscn.89z ffscore.89y fftgar.89z ffgcore.89y $(TI_FILES)
+	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z fftbat.89z ffbcore.89y fftscn.89z ffscore.89y $(OPENING_BANKS) $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:
@@ -61,8 +62,8 @@ fftintro_pc fftgar_pc fftgar_status_test: | contour-assets
 data/ffgd.bin: ../tools/chapter_desc.py data/battle.h data/interface.h ../map.h data/actors.h
 	$(PY) ../tools/chapter_desc.py campaign
 
-data/ffgm.bin: ../tools/module.py gariland.c ../fft.c ../fft.h ../module.h $(wildcard ../*.inc)
-	$(PY) ../tools/module.py $@ gariland.c 3
+data/ffbm.bin: ../tools/module.py battle.c ../fft.c ../fft.h ../module.h $(wildcard ../*.inc) ../opening/opening.inc
+	$(PY) ../tools/module.py $@ battle.c 4
 
 data/ffs1.bin: ../tools/scenes.py data/ffac.bin data/academy.h
 	$(PY) ../tools/scenes.py
