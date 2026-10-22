@@ -481,7 +481,7 @@ static uint32_t load_89z(const char *path)
 
 int main(int argc, char **argv)
 {
-    const char *prog = NULL, *files[16];
+    const char *prog = NULL, *files[NVAR];
     int i, nfiles = 0;
     uint32_t entry, sp;
     for (i = 1; i < argc; i++) {
@@ -489,7 +489,10 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--png") && i + 1 < argc) png_pattern = argv[++i];
         else if (!strcmp(argv[i], "--max") && i + 1 < argc) max_cycles = atoll(argv[++i]) * 1000000LL;
         else if (!strcmp(argv[i], "--trace-rom")) trace_rom = 1;
-        else if (!strcmp(argv[i], "--file") && i + 1 < argc) files[nfiles++ & 15] = argv[++i];
+        else if (!strcmp(argv[i], "--file") && i + 1 < argc) {
+            if (nfiles >= NVAR) { fprintf(stderr, "more than %d --file\n", NVAR); return 2; }
+            files[nfiles++] = argv[++i];
+        }
         else if (!strcmp(argv[i], "--save-dir") && i + 1 < argc) save_dir = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) bench_frames = atol(argv[++i]);
         else if (!strcmp(argv[i], "--keys") && i + 1 < argc) { if (load_script(argv[++i])) { perror(argv[i]); return 2; } }
@@ -511,7 +514,7 @@ int main(int argc, char **argv)
     wr32(ROMTAB + 4 * 0x45d, ZERO_WORD);                                 /* EV_runningApp = 0 */
     for (i = 0; i < (int)sizeof ams_f4x6; i++) wr8(FONT_ADDR + i, ams_f4x6[i]);
     for (i = 0; i < (int)sizeof ams_f6x8; i++) wr8(FONT_ADDR + sizeof ams_f4x6 + i, ams_f6x8[i]);
-    for (i = 0; i < nfiles && i < 16; i++) load_var(files[i]);
+    for (i = 0; i < nfiles; i++) load_var(files[i]);
     wr16(SENTINEL, 0x4E71);
     wr16(EXC_ADDR, 0x4E71);
     for (i = 2; i < 64; i++) if (4 * i != 0xC8) wr32(4 * i, EXC_ADDR);   /* 0xC8: the ROM table */
