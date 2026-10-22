@@ -142,8 +142,7 @@ constant offsets.
   reaches Gariland's battle and fftbat(100) plays Orbonne's gate. The launcher chains
   fftscn(0), fftbat(100), fftscn(1), fftbat(200). Costs: Orbonne's buffers take Gariland's
   larger scene (~2.4 KB more RAM); an AI thinking step +4 % on average (sizes read at run
-  time); frame averages +0.5-1 %, peaks within +3 %. Both Status pages remain (style by
-  data) until Chapter I's job names are ripped; then one page.
+  time); frame averages +0.5-1 %, peaks within +3 %. One Status page since: below.
 - Campaign save (`campaign/save.h`, `ffsave`, format FSV2): one 3,110-byte variable every
   program shares, bytes only (u16 big-endian), FFT's own ids so any chapter reads it: 256
   story flags, the inventory per FFT item id, up to 16 units (FFT job id, sprite, generation
@@ -211,6 +210,12 @@ constant offsets.
   Mandalia, ALPHA opens the menus and ESC returns to the map, ESC quits, `fftstory()` reopens
   the map at Mandalia. The original was driven headless to its map after Gariland
   (`sources/fft_ps1/world/world.state`, local) for the texture and the screen check.
+- One Status page: every chapter shows the full page (portrait, gauges, stats, equipment and
+  abilities); its job name is the descriptor's (`JOB_NAME`, 14 bytes a job, from BATTLE.BIN's
+  names by `tools/battle.py` and `tools/opening_assets.py`, which also emit FFT's `job_ids`).
+  Orbonne's text-only page and the descriptor's `STATUS` field are gone (the screens module
+  4,648 -> 4,094 bytes). Gariland's Status replays are identical; Orbonne's status case now
+  shows the full page (Ramza: Squire; Gafgarion: Dark Knight; Agrias: Holy Knight).
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

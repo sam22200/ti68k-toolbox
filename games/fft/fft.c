@@ -4215,13 +4215,6 @@ static u8 status_ability(void)
 
 static void status_keys(void)
 {
-#ifdef FFT_CHAPTER
-    if (!CD(STATUS)) {                          // the text-only page (descriptor STATUS 0)
-    if(input_pressed(K_B|K_ESC)){st.mode=st.back;W->pan_ok[0]=W->pan_ok[1]=0;W->pan_k[0][0]=W->pan_k[1][0]=0;}
-    if(input_pressed(K_LEFT|K_RIGHT|K_A|K_ENTER)){st.page^=1;W->status_i=0;}
-    return;
-    }
-#endif
     if (st.status_info) {
         if (input_pressed(K_A | K_ENTER | K_ESC | K_B)) st.status_info = 0;
     } else if (!st.page) {
@@ -5182,33 +5175,6 @@ static const char *const equip_labels[5] = { "Head", "Body", "Accessory", "Weapo
 #define st_names CONTOUR_REF_st_names
 #endif
 // Details describe the equipped item or learned ability; browsing never changes the loadout.
-#ifdef FFT_CHAPTER
-static void status_text(void)                   // the text-only page (descriptor STATUS 0)
-{
-    const Unit *u=&st.unit[st.sel];
-    u8 k=W->status_i;char line[40];
-    if(k<9){
-        void *l=rt_light,*d=rt_dark;
-        rt_light=W->status[0];rt_dark=W->status[1];
-        if(!k){draw_rect(0,0,160,100,C_WHITE);ui_text(4,4,unit_name(st.sel),C_BLACK,156);}
-        else if(k==1){u8 n=put_s(line,0,"HP ");n=put_n(line,n,u->hp);line[n++]='/';n=put_n(line,n,u->max_hp);line[n]=0;ui_text(4,18,line,C_BLACK,156);}
-        else if(k==2){u8 n=put_s(line,0,"MP ");n=put_n(line,n,u->mp);line[n]=0;ui_text(4,28,line,C_BLACK,156);}
-        else if(k<8){
-            u8 slot=k-3;
-            if(st.page)ui_text(4,40+slot*8,u->eq[slot]==255?"-":items[u->eq[slot]].name,C_BLACK,156);
-            else {
-#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
-#define stat_labels CONTOUR_REF_stat_labels
-#else
-static const char *const stat_labels[5]={"Level ","PA ","Speed ","Move ","Jump "};
-#endif
-u8 v=slot==0?u->level:slot==1?u->pa:slot==2?u->sp:slot==3?u->move:u->jump;u8 n=put_s(line,0,stat_labels[slot]);n=put_n(line,n,v);line[n]=0;ui_text(4,40+slot*8,line,C_BLACK,156);}
-        }else ui_text(4,90,help_lines[0],C_BLACK,158);
-        rt_light=l;rt_dark=d;W->status_i++;
-    }
-    copy_box(W->status[0],W->status[1],0,0,10,100);
-}
-#endif
 static void status_detail(u8 k)
 {
     char s[64];
@@ -5252,9 +5218,6 @@ static const char *const effects[] = { "Physical damage", "Removes status ailmen
 // Building a line per frame keeps even entry and paging within the ordinary frame budget.
 static void draw_status(void)
 {
-#ifdef FFT_CHAPTER
-    if (!CD(STATUS)) { status_text(); return; }
-#endif
     void *sl = rt_light, *sd = rt_dark;
     const Unit *u = &st.unit[st.sel];
     u8 k, n = 0, i;
@@ -5273,7 +5236,11 @@ static void draw_status(void)
             draw_rect(0, 0, RT_W, 32, C_LGRAY); draw_rect(0, 32, RT_W, 1, C_DGRAY);
             portrait(u->gfx, 2, 1);
             ui_text(24, 2, unit_name(st.sel), C_BLACK, 92);
+#ifdef FFT_CHAPTER
+            ui_text(24, 9, (const char *)cdesc + CD(JOB_NAME) + 14 * u->job, C_BLACK, 92);   // the descriptor's
+#else
             ui_text(24, 9, GFX_CHEMIST(u->gfx) ? "Chemist" : "Squire", C_BLACK, 92);
+#endif
             n = put_s(s, 0, "Lv "); n = put_n(s, n, u->level); n = put_s(s, n, " Exp "); n = put_n(s, n, u->exp); s[n] = 0;
             ui_text(24, 17, s, C_BLACK, 92);
             ui_text(24, 25, st.page ? "EQUIP / SKILLS" : "STATUS", C_DGRAY, 92);

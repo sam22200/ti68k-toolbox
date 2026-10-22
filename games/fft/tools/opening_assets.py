@@ -365,6 +365,11 @@ def main():
     f+=['};','static const u32 opening_raw[NUNIT][5]={'+','.join('{'+','.join(str(v)+'UL' for v in u['raw'])+'}' for u in source)+'};','static const char *const opening_names[NUNIT]={'+','.join(json.dumps(u['name']) for u in source)+'};','static const u8 opening_zodiac[NUNIT]={'+','.join(str(u['zodiac']) for u in source)+'};','static const u8 opening_range[NITEM]={'+','.join(map(str,rng))+'};','static const u8 opening_evade[NITEM]={'+','.join(map(str,ev))+'};']
     charge=bd.at(0x80061044,16)[::2]
     f+=['static const u8 opening_charge_ticks[8]={'+','.join(map(str,charge))+'};']
+    # FFT's ids and names of the jobs (the campaign save, the Status page: chapter_desc.py)
+    import management_data
+    jn=management_data.names(bat,management_data.JOB_NAMES,0xA0)
+    f+=['static const u8 job_ids[NJOB] __attribute__((unused)) = { %s };'%', '.join('0x%02X'%j for j in jobs),
+        'static const char job_names[] __attribute__((unused)) = "%s";'%''.join(jn[j]+'\\0' for j in jobs)]
     (OUT/'battle.h').write_text('\n'.join(f)+'\n');(OUT/'units.json').write_text(json.dumps(source,indent=2)+'\n')
     if not args.reuse_scenes:map_assets(disc,files,56,'battle')
     chapel,cam=map_assets(disc,files,62,'chapel',True)

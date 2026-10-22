@@ -46,11 +46,11 @@
 #define CD_UNIT_K 45
 #define CD_GFX_PORTRAIT 46
 #define CD_GFX_CHEMIST 47
-#define CD_STATUS 48
-#define CD_START 49
-#define CD_PARTY 50
-#define CD_WON 51
-#define CD_LOCATION 52
+#define CD_START 48
+#define CD_PARTY 49
+#define CD_WON 50
+#define CD_LOCATION 51
+#define CD_JOB_NAME 52
 #define CD_DEFEND_ID 53
 #define CD_EQUIP_CHANGE_ID 54
 #define CD_EQUIP_CHANGE_POS 55

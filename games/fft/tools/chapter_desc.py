@@ -53,7 +53,6 @@ SCRIPT = {'opening': [(3, 4, MS_FADE, 0, 0, 0),                     # the gate, 
 # index) and whether it is a Chemist's body (armed frames, Status)
 RAMZA = {'opening': 0, 'campaign': 6}
 UNIT_K = {'opening': 16, 'campaign': 20}
-STATUS = {'opening': 0, 'campaign': 1}          # Status: 0 the text-only page, 1 the full one
 START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc), 0: the battle at once
 # The campaign save (campaign/save.h): PARTY 1, the player's units are the campaign's party
 # (written at the victory; Orbonne's are not: the flashback starts a new party); WON, the story
@@ -65,8 +64,8 @@ LOCATION = {'opening': 19, 'campaign': 7}       # its world map location: FFT id
 WON = {'opening': 1, 'campaign': 2}
 SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
-    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS', 'START',
-     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS)
+    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'START',
+     'PARTY', 'WON', 'LOCATION', 'JOB_NAME'] + list(SAVE_IDS)
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -194,11 +193,20 @@ def build(chapter):
         body += struct.pack('>H', len(SCRIPT[chapter]))
         for seq in SCRIPT[chapter]:
             body += struct.pack('>4B2h', *seq)
-    fields['RAMZA'], fields['UNIT_K'], fields['STATUS'] = RAMZA[chapter], UNIT_K[chapter], STATUS[chapter]
+    fields['RAMZA'], fields['UNIT_K'] = RAMZA[chapter], UNIT_K[chapter]
     fields['START'] = START[chapter]
     fields['PARTY'], fields['WON'], fields['LOCATION'] = PARTY[chapter], WON[chapter], LOCATION[chapter]
     for f in SAVE_IDS:
         fields[f] = values.get(f, 0)
+    names = re.search(r'job_names\[\][^=]*= "(.*)";', text)    # JOB_NAME: 14 bytes a job (Status)
+    fields['JOB_NAME'] = 0
+    if names:
+        jobs = names[1].split('\\0')[:-1]
+        assert len(jobs) == values['NJOB'] and max(map(len, jobs)) <= 13, jobs
+        if len(body) & 1:
+            body.append(0)
+        fields['JOB_NAME'] = len(body)
+        body += b''.join(j.encode('ascii').ljust(14, b'\0') for j in jobs)
     gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
     portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
     for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):
