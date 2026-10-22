@@ -42,7 +42,7 @@ int main(void)
     // rebuild those panels rather than displaying its old text over the map.
     sw_init(1);st.menu=MN_STATUS;press(K_ENTER);assert(st.mode==M_STATUS);
     for(i=0;i<20;i++)assert(sw_step(0));
-    press(K_ENTER);assert(st.page==1);
+    press(K_RIGHT);assert(st.page==1);   // the full page: arrows turn it
     for(i=0;i<20;i++)assert(sw_step(0));
     press(K_B);assert(st.mode==M_MENU);
     for(i=0;i<40;i++)assert(sw_step(0));
