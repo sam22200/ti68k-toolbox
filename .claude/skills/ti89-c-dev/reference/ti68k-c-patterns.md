@@ -528,6 +528,15 @@ GKeyFlush();                             // don't leave the game's keypresses in
   | `#define EXECUTE_IN_GHOST_SPACE` | **works** | refused at start ("HW3Patch required") |
   | exe-packed (`-pack name`) | **works** | `LoadDLL` = 0, then the first DLL call **freezes** the calculator |
 
+  **A DLL loaded after big allocations crashes when called on an unpatched Titanium**
+  (**verified**, TiEmu, AMS 3.10, `experiments/dll/`): the GCC4TI example loaded first sits at
+  0x3F828 and its call works; after three 50,000-byte `malloc`s it lands at 0x1AE0A and the
+  first call crashes (RAM execution is only allowed where AMS placed programs). A runtime
+  game always allocates its planes first, so every module call crashed, whatever the
+  calling convention or link options. Modules need HW3Patch, or code kept inside the
+  program's own block: code copied at run time into a zone reserved in the program
+  (initialised data) and called **works** after the same allocations (`overlay.c`: the zone
+  at 0x3FE28 returns its value), so overlays live in the program, not in the heap.
   No single unpatched binary works on both: a DLL game needs HW3Patch on the Titanium, or two
   builds. Exports are called by **ordinal**: never reorder the export list. For big games, split the
   **data** into separate files (§10) instead: HW3-safe and simpler.

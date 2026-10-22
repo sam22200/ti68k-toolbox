@@ -18,6 +18,27 @@ TTPack's 64,936-byte input limit (Orbonne is 253 bytes over).
   directory of offsets instead of generated `.h` files, the scene/beat script.
 - **`fftstory`** walks the chapter list and chains the two programs.
 
+## Core milestone (user, 2026-10-21): Titanium only, engine + modules
+
+Then every Chapter I map and scene is ripped as data. Programs, each run by `fftstory`:
+- **`fftbat`** battle engine: an unpacked core (rendering, map, units, state, input; at most
+  AMS's 65,514 bytes) plus **modules** (TIGCC DLLs, verified on the Titanium with a plain
+  loader: `experiments/dll/`) loaded only while used: AI thinking, Status/info screens,
+  results and rewards, settings. RAM = core + one module. Job abilities become data
+  (FFT's formula families) read by one interpreter, so jobs add data, not code.
+- **`fftscn`** scenes (done: title, pictures with depth, beats, cards, portraits).
+- **`fftmap`** world map (to create): locations graph, travel, entering battles/scenes/menus.
+- **`fftmng`** management menus (party, equipment, jobs).
+- **A campaign save** shared by every program: party, items, story flags, location.
+- **Per map / chapter, data only**: views, descriptor, units, beat script.
+
+Scaling limits measured, and their answers:
+- map RAM: Gariland's buffers ~59 KB; Chapter I's largest maps (240 rows) ~+9 KB: run-time
+  map width/height (only the map's size reserved) and the modules (core code ~63 KB in RAM
+  today, a smaller core plus one module).
+- units: 11 at most today; a larger run-time maximum.
+- the TI-89 HW2 is not a target (DLLs need HW3Patch there).
+
 ## Size
 
 Measured unpacked: Gariland 62,797 bytes, Orbonne 65,189. Orbonne's own scenario code
