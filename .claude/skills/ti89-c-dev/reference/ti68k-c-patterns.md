@@ -543,7 +543,16 @@ GKeyFlush();                             // don't leave the game's keypresses in
   copied; an archived data variable holds it, the program copies it into its zone and calls
   it with a context of pointers (data, the runtime's drawing) every frame under greys. A
   module may call nothing else: no library, no program symbol (the script refuses
-  undefined symbols).
+  undefined symbols). **Verified in a game** (FFT, `games/fft/module.h`, `tools/module.py`,
+  TiEmu Titanium, `-pack` program): the zone inside an exe-packed program runs too. With
+  `-mpcrel`, GCC4TI still puts constants (`.rodata.*`) and uninitialised statics (`.lcomm`)
+  in other sections, joined only by relocations: rewrite the `-S` output so that every
+  section directive becomes `.text` (and `.lcomm x,n` a label plus `.skip n`), then the
+  assembler resolves everything alone; drop tigcclib.h's `__ref_all_*` marks. GCC's
+  `__divsi3`/`__mulsi3` take stack arguments: define them in the module as `__stkparm__`
+  wrappers calling the core's through the context. AMS ROM calls (`memset`, ...) need
+  nothing: they read the ROM table at a fixed address. Measured: reaching the core's state
+  through a context pointer cost the FFT AI ~8 % cycles.
   No single unpatched binary works on both: a DLL game needs HW3Patch on the Titanium, or two
   builds. Exports are called by **ordinal**: never reorder the export list. For big games, split the
   **data** into separate files (§10) instead: HW3-safe and simpler.
