@@ -631,9 +631,6 @@ def write(d, path):
     f.write('// the campaign save\'s ids (campaign/save.h): each job\'s FFT id, each skill set entry\'s place in\n'
             '// FFT\'s list (its learned bit), each bag slot\'s item; the supports a unit can have\n')
     f.write('static const u8 job_ids[NJOB] __attribute__((unused)) = { %s };\n' % ', '.join('0x%02X' % j for j in jobs))
-    import management_data
-    jn = management_data.names(d.bat, management_data.JOB_NAMES, 0xA0)
-    f.write('static const char job_names[] __attribute__((unused)) = "%s";\n' % ''.join(jn[j] + '\\0' for j in jobs))
     f.write('static const u8 set_pos[NSET][SET_N] __attribute__((unused)) = { %s };\n' % ', '.join(
         '{ %s }' % ', '.join(str(d.skillset(k).index(a)) for a in lists[k]) for k in sets))
     f.write('static const u8 bag_items[NBAG] __attribute__((unused)) = { %s };\n' % ', '.join(

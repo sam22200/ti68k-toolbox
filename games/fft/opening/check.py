@@ -24,7 +24,7 @@ def main():
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     base=[ROOT/'tools/bin/ti-cycles','--max',10000]
     base+=['--file',HERE.parent/'campaign/data/ffbm.89y']   # the battle program's modules
-    for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcp','ffcu','ffcw','ffca','ffcb'):base+=['--file',DATA/(name+'.89y')]
+    for name in ('ffov0','ffov1','ffov2','ffov3','ffoa','ffoi','ffost','ffod','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'):base+=['--file',DATA/(name+'.89y')]
     cases=[('gate',0,60,empty),('story-to-fight',0,700,intro),('player',1,60,empty),('rotations',1,100,rotations),('status',1,90,status),('reach',1,260,reach),('reach-settings',1,200,settings),('reach-contour',1,70,settings),('reach-menu',1,44,settings),('fight-first',2,1200,fast),('fight-complete',2,9500,fast),('ending',3,400,intro)]
     checks=[]
     for name,scenario,frames,keys in cases:

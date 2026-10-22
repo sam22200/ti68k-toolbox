@@ -107,7 +107,10 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 #ifdef FFT_CHAPTER
 #if MOD_CORE
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
-const Job *jobs; const Item *items; const Ability *abilities;   // its tables in igfx
+const Job *jobs; const Item *items; const Ability *abilities;   // its tables in igfx (jobs, items:
+#ifdef FFT_CHAPTER
+const char *job_names;                                           // ffcj, every chapter's)
+#endif
 const SkillSet *skill_sets; const UnitDef *unit_defs;
 static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
 #endif
@@ -2556,7 +2559,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->rt_keys = &rt_keys; c->rt_prev = &rt_prev; c->scene_rot = &scene_rot; c->vbuf_rot = &vbuf_rot;
         c->cgfx = cgfx;
         c->gauge = gauge;
-        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save;
+        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->job_names = job_names;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
         mod_id = id + 1;
     }
@@ -3454,6 +3457,14 @@ void game_init(void)
     cgfx = rt_file("ffcu", RT_NULL);
 #ifdef FFT_MODULES
     mod_bank = rt_file("ffbm", RT_NULL);
+#endif
+    {                                          // the jobs and items every chapter shares
+        const u8 *cj = rt_file("ffcj", RT_NULL);
+        if (!cj || RD16(cj, 0) != 0x4643 || RD16(cj, 1) != 0x4A31) return;
+        jobs = (const Job *)(cj + RD16(cj, 2)); job_names = (const char *)cj + RD16(cj, 3);
+        items = (const Item *)(cj + RD16(cj, 4));
+    }
+#ifdef FFT_MODULES
     if (!mod_ready()) return;                  // a message, ESC quits
 #endif
     if (!wgfx || !abank[0] || !abank[1] || !cgfx) return;
@@ -3510,7 +3521,6 @@ static u8 chapter_load(u8 c)
         igfx = RT_NULL; return 0;
     }
     map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u8)(map_w * map_h); sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
-    jobs = (const Job *)(igfx + CD(JOBS)); items = (const Item *)(igfx + CD(ITEMS));
     abilities = (const Ability *)(igfx + CD(ABILITIES));
     skill_sets = (const SkillSet *)(igfx + CD(SKILL_SETS));
     unit_defs = (const UnitDef *)(igfx + CD(UNIT_DEFS));
@@ -5237,7 +5247,7 @@ static void draw_status(void)
             portrait(u->gfx, 2, 1);
             ui_text(24, 2, unit_name(st.sel), C_BLACK, 92);
 #ifdef FFT_CHAPTER
-            ui_text(24, 9, (const char *)cdesc + CD(JOB_NAME) + 14 * u->job, C_BLACK, 92);   // the descriptor's
+            ui_text(24, 9, JOB_NAME(u->job), C_BLACK, 92);
 #else
             ui_text(24, 9, GFX_CHEMIST(u->gfx) ? "Chemist" : "Squire", C_BLACK, 92);
 #endif

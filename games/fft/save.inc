@@ -1,7 +1,8 @@
 // The campaign save (campaign/save.h) written after a victory: the chapter's story flag
 // (descriptor WON), and when its player's units are the campaign's party (PARTY), those still
-// with it (not a crystal or a chest), the bag and the chests' items. FFT's ids throughout
-// (JOB_ID, SET_POS, BAG_ITEM, RSM_POS, the supports'): the save is every chapter's. A unit keeps
+// with it (not a crystal or a chest), the bag and the chests' items. FFT's ids throughout (a
+// unit's job and equipment already are; SET_POS, BAG_ITEM, RSM_POS, the supports'): the save is
+// every chapter's. A unit keeps
 // what it was drawn with (battle_units): its job's JP and abilities, a generic one's Squire JP
 // and abilities when it is another job, the reactions and supports it learned (Equip Change:
 // always), the support it fights with.
@@ -23,7 +24,7 @@ static void save_party(void)
         u8 c;
         if (u->team != TEAM_PLAYER || DC_OBJ(u->dc) || save.n == PARTY_MAX) continue;
         s = &save.unit[save.n++];
-        s->job = cdesc[CD(JOB_ID) + u->job];
+        s->job = u->job;
         c = (u8)(s->job - 0x4A);           // its career row (another job: the Squire's)
         if (c >= CAREER_N) c = 0;
         s->gfx = u->gfx; s->type = (u8)(i == U_RAMZA ? 2 : u->female); s->name = u->name;
@@ -32,7 +33,7 @@ static void save_party(void)
         for (k = 0; k < 5; k++) {
             s->raw[k][0] = (u8)(u->raw[k] >> 16); s->raw[k][1] = (u8)(u->raw[k] >> 8); s->raw[k][2] = (u8)u->raw[k];
         }
-        for (k = 0; k < EQ_N; k++) s->eq[k] = u->eq[k] == 0xFF ? 0 : items[u->eq[k]].id;
+        for (k = 0; k < EQ_N; k++) s->eq[k] = u->eq[k] == 0xFF ? 0 : u->eq[k];
         be16(s->jp[c], u->jp); be16(s->tjp[c], u->tjp);
         for (k = 0; k < SET_N; k++) if (u->learned & (1 << k)) learn(s->learned[c], pos[u->set * SET_N + k]);
         if (i == U_RAMZA) continue;

@@ -18,7 +18,7 @@ import tempfile
 
 HERE = Path(__file__).resolve().parents[1]
 # Numbers: header #define name (None: computed here)
-NUMBERS = [('NJOB', 'NJOB'), ('NITEM', 'NITEM'), ('NABIL', 'NABIL'), ('NSET', 'NSET'),
+NUMBERS = [('NABIL', 'NABIL'), ('NSET', 'NSET'),
            ('SET_BASIC', 'SET_BASIC'), ('NRSM_PRE', 'NRSM_PRE'), ('DEFEND_JP', 'DEFEND_JP'),
            ('DEFEND_RATE', 'DEFEND_RATE'), ('NBAG', 'NBAG'), ('MAP_H', 'MAP_H'), ('MAP_W', 'MAP_W'),
            ('ACTOR_ARMED', 'ACTOR_ARMED'), ('ACTOR_OBJECTS', 'ACTOR_OBJECTS'),
@@ -28,7 +28,7 @@ NUMBERS = [('NJOB', 'NJOB'), ('NITEM', 'NITEM'), ('NABIL', 'NABIL'), ('NSET', 'N
 SC_TOP = {'opening': 0, 'campaign': 16}
 VIEW = {'opening': 'ffov1', 'campaign': 'ffgv1'}
 # Offsets into the chapter's interface bank (igfx): header names
-IGFX = [('JOBS', 'jobs'), ('ITEMS', 'items'), ('ABILITIES', 'abilities'), ('SKILL_SETS', 'skill_sets'),
+IGFX = [('ABILITIES', 'abilities'), ('SKILL_SETS', 'skill_sets'),
         ('UNIT_DEFS', 'unit_defs'), ('PORTRAITS', 'UI_PORTRAITS'), ('MALE', 'UI_MALE'),
         ('FEMALE', 'UI_FEMALE'), ('TILES', 'UI_TILES'), ('UNIT_RAW', 'OPENING_RAW'),
         ('UNIT_NAMES', 'OPENING_NAMES')]
@@ -36,8 +36,7 @@ IGFX = [('JOBS', 'jobs'), ('ITEMS', 'items'), ('ABILITIES', 'abilities'), ('SKIL
 TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE', 'gen_base', 'B'),
           ('GEN_VAR', 'gen_var', 'B'), ('ZODIAC_DAYS', 'zodiac_days', 'H'),
           ('ZODIAC_COMPAT', 'zodiac_compat', 'B'), ('UNIT_ZODIAC', 'opening_zodiac', 'B'),
-          ('WEAPON_RANGE', 'opening_range', 'B'), ('SHIELD_EVADE', 'opening_evade', 'B'),
-          ('CHARGE_TICKS', 'opening_charge_ticks', 'B'), ('JOB_ID', 'job_ids', 'B'),
+          ('CHARGE_TICKS', 'opening_charge_ticks', 'B'),
           ('SET_POS', 'set_pos', 'B'), ('BAG_ITEM', 'bag_items', 'B'), ('RSM_POS', 'rsm_pos', 'B')]
 # WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
 # Gariland's computed by the engine itself (campaign/water_dump.c).
@@ -56,8 +55,9 @@ UNIT_K = {'opening': 16, 'campaign': 20}
 START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc), 0: the battle at once
 # The campaign save (campaign/save.h): PARTY 1, the player's units are the campaign's party
 # (written at the victory; Orbonne's are not: the flashback starts a new party); WON, the story
-# flag + 1 its victory sets (0 none). JOB_ID, SET_POS, BAG_ITEM, DEFEND_ID, EQUIP_CHANGE_ID: FFT's
-# ids of the chapter's jobs, skill set entries (their learned bit), bag slots and supports;
+# flag + 1 its victory sets (0 none). SET_POS, BAG_ITEM, DEFEND_ID, EQUIP_CHANGE_ID: FFT's ids of
+# the chapter's skill set entries (their learned bit), bag slots and supports (a unit's job and
+# equipment are FFT ids, the shared tables ffcj);
 # RSM_POS, EQUIP_CHANGE_POS: the learned bits of the reactions and supports a unit draws.
 PARTY = {'opening': 0, 'campaign': 1}
 LOCATION = {'opening': 19, 'campaign': 7}       # its world map location: FFT id + 1 (Orbonne, Gariland)
@@ -65,7 +65,7 @@ WON = {'opening': 1, 'campaign': 2}
 SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
     ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'START',
-     'PARTY', 'WON', 'LOCATION', 'JOB_NAME'] + list(SAVE_IDS)
+     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS)
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -198,15 +198,6 @@ def build(chapter):
     fields['PARTY'], fields['WON'], fields['LOCATION'] = PARTY[chapter], WON[chapter], LOCATION[chapter]
     for f in SAVE_IDS:
         fields[f] = values.get(f, 0)
-    names = re.search(r'job_names\[\][^=]*= "(.*)";', text)    # JOB_NAME: 14 bytes a job (Status)
-    fields['JOB_NAME'] = 0
-    if names:
-        jobs = names[1].split('\\0')[:-1]
-        assert len(jobs) == values['NJOB'] and max(map(len, jobs)) <= 13, jobs
-        if len(body) & 1:
-            body.append(0)
-        fields['JOB_NAME'] = len(body)
-        body += b''.join(j.encode('ascii').ljust(14, b'\0') for j in jobs)
     gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
     portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
     for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):

@@ -216,6 +216,16 @@ constant offsets.
   Orbonne's text-only page and the descriptor's `STATUS` field are gone (the screens module
   4,648 -> 4,094 bytes). Gariland's Status replays are identical; Orbonne's status case now
   shows the full page (Ramza: Squire; Gafgarion: Dark Knight; Agrias: Holy Knight).
+- Shared jobs and items (step 1 of the party from the save): the tables `jobs`, `items` and the
+  job names are every chapter's, indexed by FFT's ids, in the archived bank `ffcj` (11 KB,
+  `tools/common_tables.py`: 160 jobs, 256 items with their weapon reach and shield evade); a
+  unit's job and equipment are FFT ids (campaign_assets.py / opening_assets.py convert the unit
+  records). The descriptor loses JOBS, ITEMS, NJOB, NITEM, JOB_ID, JOB_NAME, WEAPON_RANGE and
+  SHIELD_EVADE (the reach and evade rules read the items). Orbonne's 12 + 6 replays and
+  Gariland's screens and frames are identical (its state hash changes: it hashes the units'
+  equipment, now ids). Orbonne's hand-named shields take the disc's names (Mythril Shield,
+  Gold Shield). Next: a battle that takes the player's units from the save, then the
+  abilities as shared data.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

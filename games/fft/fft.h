@@ -25,7 +25,8 @@ typedef struct { u8 c[4]; u8 look[5]; u8 walk, stand, water; } Tile;   // map.h,
 // battle.h (tools/battle.py): FFT's numbers for the Gariland battle
 typedef struct { u8 growth[5], mult[5], move, jump, cev, row; } Job;   // raw stats HP MP SP PA MA; row:
                                                                     // its JP's career slot
-typedef struct { u8 id, hp, mp, pa, ma, sp, move, jump, wp, knife; char name[13]; } Item;
+typedef struct { u8 id, hp, mp, pa, ma, sp, move, jump, wp, knife; char name[13]; u8 reach, sev, pad; } Item;
+// (reach: the weapon's range, sev: a shield's evade: the chapters' shared table, ffcj)
 typedef struct {
     u8 gfx, job, type, level, brave, faith;   // type: the generation table (male, female, Ramza)
     u16 day;                                   // birthday 1..365; 0, and Brave / Faith 0: drawn
@@ -100,8 +101,6 @@ extern s16 sc_h, sc_top;
 #define NUNIT 11                              // units per battle at most (both chapters: 11)
 #define BAG_MAX 5                             // bag slots at most
 #define CD(f) RD16(cdesc, CD_##f)
-#define NJOB CD(NJOB)
-#define NITEM CD(NITEM)
 #define NABIL CD(NABIL)
 #define NSET CD(NSET)
 #define SET_BASIC CD(SET_BASIC)
@@ -111,8 +110,10 @@ extern s16 sc_h, sc_top;
 #define NBAG CD(NBAG)
 #define ACTOR_ARMED CD(ACTOR_ARMED)
 #define ACTOR_OBJECTS CD(ACTOR_OBJECTS)
-extern const Job *jobs;                       // in the chapter's igfx, set at load: one global
-extern const Item *items;                     // pointer, as small as the former constant offsets
+extern const Job *jobs;                       // every chapter's, by FFT job id (ffcj)
+extern const Item *items;                     // every chapter's, by FFT item id (ffcj)
+extern const char *job_names;                 // 14 bytes a job (ffcj)
+#define JOB_NAME(j) (job_names + 14 * (j))
 extern const Ability *abilities;
 extern const SkillSet *skill_sets;
 extern const UnitDef *unit_defs;
@@ -132,8 +133,8 @@ extern const UnitDef *unit_defs;
 // The chapter's rules (campaign/ENGINE.md M3), in effect when its descriptor has the table:
 // fixed signs, a weapon's reach (bows: more than 1), a shield's evade, Charge's clock ticks
 #define unit_zodiac (cdesc + CD(UNIT_ZODIAC))
-#define WEAPON_REACH(u) (CD(WEAPON_RANGE) && (u)->eq[EQ_WEAPON] != 255 ? (cdesc + CD(WEAPON_RANGE))[(u)->eq[EQ_WEAPON]] : 1)
-#define SHIELD_EV(u) (CD(SHIELD_EVADE) && (u)->eq[EQ_SHIELD] != 255 ? (cdesc + CD(SHIELD_EVADE))[(u)->eq[EQ_SHIELD]] : 0)
+#define WEAPON_REACH(u) ((u)->eq[EQ_WEAPON] != 255 ? items[(u)->eq[EQ_WEAPON]].reach : 1)
+#define SHIELD_EV(u) ((u)->eq[EQ_SHIELD] != 255 ? items[(u)->eq[EQ_SHIELD]].sev : 0)
 #define charge_ticks (cdesc + CD(CHARGE_TICKS))
 // a sprite's portrait in the chapter's table, whether it is a Chemist's body
 #define GFX_PORTRAIT(g) (CD(GFX_PORTRAIT) ? (cdesc + CD(GFX_PORTRAIT))[g] : (g))

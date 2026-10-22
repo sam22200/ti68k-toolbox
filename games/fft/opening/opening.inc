@@ -2,7 +2,7 @@
 // (gate, banter, aftermath) and the battle. The title and chapel before it and the chapter
 // card after it are the scene player's (campaign/scene.c, ffs0/ffs1).
 #define OPENING_BEATS RD16(opening_story, 0)   // the beats bank's count
-typedef char OpeningDiskLayout[(sizeof(UnitDef)==24 && sizeof(Item)==23 && sizeof(Job)==14 && sizeof(Ability)==24 && sizeof(SkillSet)==18)?1:-1];
+typedef char OpeningDiskLayout[(sizeof(UnitDef)==24 && sizeof(Item)==26 && sizeof(Job)==14 && sizeof(Ability)==24 && sizeof(SkillSet)==18)?1:-1];
 enum { OPEN_PLAY, OPEN_TITLE, OPEN_CHAPEL, OPEN_GATE, OPEN_AFTER, OPEN_DONE, OPEN_BANTER };
 #if MOD_CORE
 static const u8 *opening_story, *pgfx;   // pgfx: the speakers' portraits (ffcp)

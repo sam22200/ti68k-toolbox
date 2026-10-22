@@ -22,7 +22,7 @@ def main():
     results=[]
     for name,flags,banks,cases in (
         ('scene',['-DCHECK_SCENE'],['ffs1','ffcp','ffcu','ffca','ffcb'],[('card',1,30,empty),('academy',1,120,advance),('academy-complete',1,1000,advance)]),
-        ('gariland',['-DCHECK_GAR'],['ffbm','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb'],
+        ('gariland',['-DCHECK_GAR'],['ffbm','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
          [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']

@@ -346,15 +346,12 @@ def main():
     f=['// Generated from local original data; never committed.','#define NJOB %d\n#define NITEM %d\n#define NUNIT 11'%(len(jobs),len(items)),'static const Job jobs[NJOB] = {']
     for j in jobs:
         q=bd.job(j);f.append('{ {%s}, {%s}, %d,%d,%d,%d },'%(','.join(map(str,q['growth'])),','.join(map(str,q['mult'])),q['move'],q['jump'],q['cev'],j-0x4a if j>=0x4a else 0))
-    f+=['};','static const Item items[NITEM] = {'];ev=[];rng=[]
+    f+=['};','static const Item items[NITEM] = {']
     # Item names are original labels, IDs/values are read from the disc.
     names={2:'Mythril Knife',20:'Long Sword',21:'Iron Sword',22:'Mythril Sword',83:'Long Bow',128:'Escutcheon',129:'Buckler',132:'Bronze Shield',133:'Round Shield',145:'Leather Helmet',146:'Bronze Helmet',148:'Iron Helmet',149:'Barbut',150:'Mythril Helm',157:'Leather Hat',158:'Feather Hat',159:'Red Hood',173:'Leather Armor',174:'Linen Cuirass',175:'Bronze Armor',177:'Chain Mail',178:'Mythril Armor',186:'Clothes',187:'Leather Outfit',189:'Leather Vest',208:'Battle Boots',215:'Power Wrist'}
     for item in items:
         q=bd.item(item);wp=read('SCUS_942.21')[battle.WEAPONS-battle.EXE+8*item+4] if q['flags']&128 else 0
         f.append('{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,"%s"},'%(item,q['hp'],q['mp'],q['pa'],q['ma'],q['sp'],q['move'],q['jump'],wp,2 if q['type']==12 else int(q['type']==1),names.get(item,'Item %02X'%item)[:12]))
-        rng.append(5 if q['type']==12 else 1)
-        # Shield table entries are two physical/magical evade bytes.
-        base=0x80063eb8;ev.append(bd.at(base+2*(item-128),1)[0] if 128<=item<144 else 0)
     f+=['};','#define NABIL %d\nstatic const Ability abilities[NABIL] = {'%len(abil)]
     for name,kind,y,r,v,fl,bag in abil:f.append('{"%s",%s,%s,%d,%d,%s,%d,100,0,1},'%(name,kind,y,r,v,fl,bag))
     f+=['};','#define NSET %d\nstatic const SkillSet skill_sets[NSET] = {'%len(sets)]
@@ -362,14 +359,9 @@ def main():
     f+=['};','#define SET_BASIC 6\n#define NRSM_PRE 1\n#define DEFEND_JP 50\n#define DEFEND_RATE 0\n#define NBAG 2','static const u8 rsm_pre[1][2]={{0,0}};','static const u8 bag_init[2]={5,1};','static const u8 gen_base[3][5]={{0}}, gen_var[3][5]={{0}};','static const u16 zodiac_days[12]={%s};'%','.join(map(str,struct.unpack('<12H',bd.at(battle.ZODIAC,24)))),'static const u8 zodiac_compat[12]={%s};'%','.join(map(str,bd.bat[battle.ZCOMPAT-battle.BAT:battle.ZCOMPAT-battle.BAT+12])),'static const UnitDef unit_defs[NUNIT] = {']
     for i,u in enumerate(source):
         f.append('{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,{%s},%d,%d},'%(u['gfx'],jobs.index(u['job']),u['type'],u['level'],u['brave'],u['faith'],u['day'],u['x'],u['z'],u['face'],u['team'],','.join('{%d,255}'%(items.index(v) if v in items else 255) for v in u['eq']),unitsets[i],learned[i]))
-    f+=['};','static const u32 opening_raw[NUNIT][5]={'+','.join('{'+','.join(str(v)+'UL' for v in u['raw'])+'}' for u in source)+'};','static const char *const opening_names[NUNIT]={'+','.join(json.dumps(u['name']) for u in source)+'};','static const u8 opening_zodiac[NUNIT]={'+','.join(str(u['zodiac']) for u in source)+'};','static const u8 opening_range[NITEM]={'+','.join(map(str,rng))+'};','static const u8 opening_evade[NITEM]={'+','.join(map(str,ev))+'};']
+    f+=['};','static const u32 opening_raw[NUNIT][5]={'+','.join('{'+','.join(str(v)+'UL' for v in u['raw'])+'}' for u in source)+'};','static const char *const opening_names[NUNIT]={'+','.join(json.dumps(u['name']) for u in source)+'};','static const u8 opening_zodiac[NUNIT]={'+','.join(str(u['zodiac']) for u in source)+'};']
     charge=bd.at(0x80061044,16)[::2]
     f+=['static const u8 opening_charge_ticks[8]={'+','.join(map(str,charge))+'};']
-    # FFT's ids and names of the jobs (the campaign save, the Status page: chapter_desc.py)
-    import management_data
-    jn=management_data.names(bat,management_data.JOB_NAMES,0xA0)
-    f+=['static const u8 job_ids[NJOB] __attribute__((unused)) = { %s };'%', '.join('0x%02X'%j for j in jobs),
-        'static const char job_names[] __attribute__((unused)) = "%s";'%''.join(jn[j]+'\\0' for j in jobs)]
     (OUT/'battle.h').write_text('\n'.join(f)+'\n');(OUT/'units.json').write_text(json.dumps(source,indent=2)+'\n')
     if not args.reuse_scenes:map_assets(disc,files,56,'battle')
     chapel,cam=map_assets(disc,files,62,'chapel',True)
@@ -445,17 +437,10 @@ def main():
     # Read immutable byte-only combat tables directly from archive. UnitDef's
     # sole 16-bit field (birthday) is unused here and serialized as zero.
     tables={}
-    tables['jobs']=bytes(v for j in jobs for v in (*bd.job(j)['growth'],*bd.job(j)['mult'],bd.job(j)['move'],bd.job(j)['jump'],bd.job(j)['cev'],j-0x4a if j>=0x4a else 0))
-    itdata=bytearray()
-    for item in items:
-        q=bd.item(item);wp=bd.at(battle.WEAPONS+8*item+4,1)[0] if q['flags']&128 else 0
-        itdata+=bytes((item,q['hp'],q['mp'],q['pa'],q['ma'],q['sp'],q['move'],q['jump'],wp,2 if q['type']==12 else int(q['type']==1)))
-        itdata+=names.get(item,'Item %02X'%item)[:12].encode('ascii').ljust(13,b'\0')
-    tables['items']=bytes(itdata)
     ud=bytearray()
     for i,u in enumerate(source):
-        ud+=bytes((u['gfx'],jobs.index(u['job']),u['type'],u['level'],u['brave'],u['faith'],0,0,u['x'],u['z'],u['face'],u['team']))
-        ud+=bytes(v for eq in u['eq'] for v in (items.index(eq) if eq in items else 255,255))
+        ud+=bytes((u['gfx'],u['job'],u['type'],u['level'],u['brave'],u['faith'],0,0,u['x'],u['z'],u['face'],u['team']))
+        ud+=bytes(v for eq in u['eq'] for v in (eq,255))   # FFT's ids (ffcj: tools/common_tables.py)
         ud+=bytes((unitsets[i],learned[i]))
     assert len(ud)==11*24
     tables['unit_defs']=bytes(ud)
@@ -465,7 +450,7 @@ def main():
     tables['abilities']=b''.join(struct.pack('>13s7BHBx',name.encode('ascii'),value(kind),value(y),r,v,value(flags),bag,100,0,1) for name,kind,y,r,v,flags,bag in abil)
     tables['skill_sets']=b''.join(name.encode('ascii').ljust(12,b'\0')+bytes(ids+[255]*(6-len(ids))) for name,ids in sets)
     bank=bytearray((OUT/'ffoi.bin').read_bytes());hdr=(OUT/'battle.h').read_text()
-    for name,typ in (('jobs','Job'),('items','Item'),('unit_defs','UnitDef'),('abilities','Ability'),('skill_sets','SkillSet')):
+    for name,typ in (('unit_defs','UnitDef'),('abilities','Ability'),('skill_sets','SkillSet')):
         if len(bank)&1:bank.append(0)
         replacement='#define %s ((const %s *)(igfx + %dUL))'%(name,typ,len(bank))
         hdr,n=re.subn(r'static const '+typ+r' '+name+r'\[[^]]+\] = \{.*?\n\};',replacement,hdr,flags=re.S);assert n==1,name

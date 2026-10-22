@@ -3,7 +3,7 @@ SRC := scene.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffbm ffmg ffwm ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS := ffs1 ffbm ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle
@@ -86,6 +86,9 @@ data/ffbm.bin: ../tools/module.py battle.c ../fft.c ../fft.h ../module.h $(wildc
 
 data/ffmg.bin: ../tools/management_data.py ../tools/battle.py ../tools/units.py ../tools/interface.py
 	$(PY) ../tools/management_data.py "$(DISC)" $@
+
+data/ffcj.bin ../opening/data/ffcj.bin &: ../tools/common_tables.py ../tools/battle.py
+	$(PY) ../tools/common_tables.py "$(DISC)"
 
 data/ffwm.bin: ../tools/world_assets.py ../tools/management_data.py
 	$(PY) ../tools/world_assets.py "$(DISC)" $@

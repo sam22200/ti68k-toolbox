@@ -80,7 +80,7 @@ def main():
     exporter.write_text('''#include <stdio.h>
 #include <stddef.h>
 #include "../../fft.h"
-_Static_assert(sizeof(Job)==14 && sizeof(Item)==23 && sizeof(UnitDef)==24,"disk layout");
+_Static_assert(sizeof(Job)==14 && sizeof(Item)==26 && sizeof(UnitDef)==24,"disk layout");
 _Static_assert(offsetof(UnitDef,day)==6,"birthday offset");
 int main(void){
 const void *p[5]={jobs,items,unit_defs,abilities,skill_sets};unsigned sizes[5]={sizeof jobs,sizeof items,sizeof unit_defs,sizeof abilities,sizeof skill_sets};
@@ -89,10 +89,17 @@ unsigned i;for(i=0;i<5;i++){putchar(sizes[i]>>8);putchar(sizes[i]&255);fwrite(p[
     subprocess.run(['cc','-std=gnu11','-o',work/'tables',exporter],check=True)
     tables=subprocess.check_output([work/'tables']);offset=0
     data=bytearray((HERE/'ffti.bin').read_bytes());header=(HERE/'battle.h').read_text()
+    # A unit's job and equipment are FFT's ids (the shared tables ffcj, tools/common_tables.py)
+    job_ids=[int(v,16) for v in re.search(r'job_ids\[NJOB\][^=]*= \{([^}]*)\}',header)[1].split(',')]
+    item_ids=[int(v,16) for v in re.findall(r'^    \{ (0x[0-9A-F]{2}), ',re.search(r'static const Item items\[NITEM\] = \{.*?\n\};',header,re.S)[0],re.M)]
     for name,typ in (('jobs','Job'),('items','Item'),('unit_defs','UnitDef'),('abilities','Ability'),('skill_sets','SkillSet')):
         count=struct.unpack_from('>H',tables,offset)[0];offset+=2;block=bytearray(tables[offset:offset+count]);offset+=count
+        if name in ('jobs','items'):continue
         if name=='unit_defs':
-            for at in range(0,count,24):block[at+6:at+8]=struct.pack('>H',struct.unpack_from('<H',block,at+6)[0])
+            for at in range(0,count,24):
+                block[at+6:at+8]=struct.pack('>H',struct.unpack_from('<H',block,at+6)[0])
+                block[at+1]=job_ids[block[at+1]]
+                for k in range(12,22):block[at+k]=255 if block[at+k]==255 else item_ids[block[at+k]]
         if name=='abilities':
             for at in range(0,count,24):block[at+20:at+22]=struct.pack('>H',struct.unpack_from('<H',block,at+20)[0])
         if len(data)&1:data.append(0)
