@@ -37,16 +37,17 @@ fftintro_pc: ../opening/opening.c ../fft.c ../fft.h ../opening/opening.inc pc_en
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ ../opening/opening.c $(RT_CORE) $(RT_SW) pc_entry.c $(SDL_LIBS)
 fftgar_pc: gariland.c ../fft.c ../fft.h
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ gariland.c $(RT_CORE) $(RT_SW) $(RT)platform-sdl/rt_sdl.c $(SDL_LIBS)
+# Chapter programs are archived too: in RAM, a waiting one would take the running one's room.
 packed: $(TI_FILES)
 	$(MAKE) -C ../opening packed
 	$(ROOT)/tools/bin/ti-cc -o fftacad -pack ffacore native_academy.c $(RT_CORE) $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftgar -pack ffgcore gariland.c $(RT_CORE) $(RT)platform-ti68k/rt_ti.c $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
-	$(ROOT)/tools/bin/ti-cc -o fftscn native_scene.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
+	$(ROOT)/tools/bin/ti-cc -o fftscn -pack ffscore native_scene.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftstory launcher.c
-	python3 -c "from pathlib import Path; files=[Path('ffacore.89y'),Path('ffgcore.89y')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
+	python3 -c "from pathlib import Path; files=[Path('ffacore.89y'),Path('ffgcore.89y'),Path('ffscore.89y'),Path('fftscn.89z'),Path('fftacad.89z'),Path('fftgar.89z')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
 bundle: packed
 	@mkdir -p x
-	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0)) fftscn.89z fftacad.89z ffacore.89y fftgar.89z ffgcore.89y $(TI_FILES)
+	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z ../opening/fftopen.89z ../opening/ffocore.89y $(addprefix ../opening/data/,$(addsuffix .89y,ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0)) fftscn.89z ffscore.89y fftacad.89z ffacore.89y fftgar.89z ffgcore.89y $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:

@@ -157,9 +157,11 @@ typedef struct {
 #endif
     u8 from[MAP_W * MAP_H];
     u8 half[2][TW / 8 * TH];
+#ifndef FFT_TABLES_ARCHIVED
     u16 dbl[256];                       // byte -> its bits doubled
+#endif
     u8 order[MAP_W * MAP_H], count[256];
-#ifdef FFT_OPENING
+#ifdef FFT_WATER_BANK
     const u8 *puddle[4];                // archived even-x/2,y pairs; no decoded glint arrays
 #else
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
@@ -219,7 +221,10 @@ typedef struct {
     u8 sq[4][MAP_W * MAP_H], sq_n[4];
     u8 sp_d, sp_i, sp_limit, sp_out, sp_left, *sp_dist, *sp_from;
     const u8 *sp_need;
-    u8 blk[MAP_W * MAP_H], tx[MAP_W * MAP_H], tz[MAP_W * MAP_H];
+    u8 blk[MAP_W * MAP_H];
+#ifndef FFT_TABLES_ARCHIVED
+    u8 tx[MAP_W * MAP_H], tz[MAP_W * MAP_H];
+#endif
     u8 hs[MAP_W * MAP_H], hl[MAP_W * MAP_H], hw[MAP_W * MAP_H];
     u8 eg[MAP_W * MAP_H][16], en[MAP_W * MAP_H], ej, ej_pad;
 #ifdef FFT_OPENING
@@ -227,7 +232,9 @@ typedef struct {
 #else
     u8 top[MAP_W * MAP_H];              // a tile's column for a projectile (FFT: its height x 12);
 #endif
+#ifndef FFT_TABLES_ARCHIVED
     u8 col[MAP_W * 28], row[MAP_H * 28];    // world x, z -> the tile's column, z * MAP_W
+#endif
     // the AI (fft.c § the AI): per tile the sets (1: can stop there, 2: to act from), the danger,
     // the steps from the focus, what stepping there gives; the tiles to act from
     // in map order and safest first; the ranking; the usable abilities, the unit's thinking step
@@ -309,7 +316,19 @@ static u8 bg_usable(void);
 #define span_r (W->span_r)
 #define bfs_from (W->from)
 #define half (W->half)
+#ifdef FFT_TABLES_ARCHIVED                 // in the archive tail (tools/contour_assets.py)
+#define dbl CONTOUR_REF_dbl
+#define TILE_X CONTOUR_REF_tile_x
+#define TILE_Z CONTOUR_REF_tile_z
+#define TILE_COL CONTOUR_REF_tile_col
+#define TILE_ROW CONTOUR_REF_tile_row
+#else
 #define dbl (W->dbl)
+#define TILE_X (W->tx)
+#define TILE_Z (W->tz)
+#define TILE_COL (W->col)
+#define TILE_ROW (W->row)
+#endif
 #define order (W->order)
 #define key (W->key)
 #define gx (W->gx)
@@ -916,7 +935,7 @@ static void unpack_view(u8 rot)
 }
 
 // is scene pixel (x, y) in front of everything nearer than view diagonal depth (not covered)?
-#ifndef FFT_OPENING
+#ifndef FFT_WATER_BANK
 static u8 seen(s16 x, s16 y, u8 depth)
 {
     const u8 *t1 = vbuf + 2 * SC_PLANE, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
@@ -967,8 +986,8 @@ static const PlaneWord *cursor_mask(const Marker *mk, u16 c)
 static void make_glints(u8 rot)
 {
     u8 i;
-#ifdef FFT_OPENING
-    const u8 *p=igfx+OPENING_WATER;
+#ifdef FFT_WATER_BANK                   // the chapter's descriptor (tools/chapter_desc.py)
+    const u8 *p=cdesc+CD(WATER);
     p+=RD16(p,rot);
     for(i=0;i<4;i++) {
         u8 n=(u8)RD16(p,0);p+=2;W->glints[i]=n;
@@ -1001,11 +1020,11 @@ static void make_glints(u8 rot)
 static void draw_glints(void)
 {
     u8 ph = (u8)((st.tick >> 3) & 3), n = W->glints[ph], i;
-#ifdef FFT_OPENING
+#ifdef FFT_WATER_BANK
     const u8 *p=W->puddle[ph];
 #endif
     for (i = 0; i < n; i++) {
-#ifdef FFT_OPENING
+#ifdef FFT_WATER_BANK
         s16 x=(s16)(*p++<<1)-st.camx,y=(s16)*p++-st.camy,k;
 #else
         s16 x = W->glint[ph][i].x - st.camx, y = W->glint[ph][i].y - st.camy, k;
@@ -1095,7 +1114,7 @@ static u8 reach_edges(u8 i,u8 rot)
 #else
 static const u8 reflected[16]={0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
 #endif
-    u8 bits=0,x=W->tx[i],z=W->tz[i];
+    u8 bits=0,x=TILE_X[i],z=TILE_Z[i];
     if(!z||st.reach[i-MAP_W]==0xFF)bits|=1;
     if(x==MAP_W-1||st.reach[i+1]==0xFF)bits|=2;
     if(z==MAP_H-1||st.reach[i+MAP_W]==0xFF)bits|=4;
@@ -1220,7 +1239,7 @@ static void edges(u8 jump)
     u8 t, k, j;
     W->ej = jump;
     for (t = 0; t < MAP_W * MAP_H; t++) {
-        u8 x = W->tx[t], z = W->tz[t], h = W->hl[t], n = 0, *e = W->eg[t];
+        u8 x = TILE_X[t], z = TILE_Z[t], h = W->hl[t], n = 0, *e = W->eg[t];
         for (k = 0; k < 4; k++) {
             u8 room = k == 0 ? MAP_W - 1 - x : k == 1 ? x : k == 2 ? MAP_H - 1 - z : z, nc = t;
             for (j = 0; j <= (jump >= 2) && j < room; j++) {
@@ -1821,7 +1840,7 @@ static u8 ai_range(u8 a, u8 ab)
 static u8 ai_reaches(u8 a, u8 ab, u8 o, u8 c)
 {
     const Tile *s = &map_tiles[o], *t = &map_tiles[c];
-    s16 dx = (s16)W->tx[c] - W->tx[o], dz = (s16)W->tz[c] - W->tz[o], h = (s16)t->stand - s->stand;
+    s16 dx = (s16)TILE_X[c] - TILE_X[o], dz = (s16)TILE_Z[c] - TILE_Z[o], h = (s16)t->stand - s->stand;
     u8 d = (u8)((dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz));
     if (!t->walk) return 0;
 #ifdef FFT_OPENING
@@ -1976,7 +1995,7 @@ static u8 ai_clear(u8 a, u8 t)
         x += dx; y += dy; z += dz;
         px = (s16)(x >> 16); pz = (s16)(z >> 16); py = (s16)(y >> 16);
         if (py <= 0 || (u16)px >= MAP_W * 28 || (u16)pz >= MAP_H * 28) continue;
-        c = (u8)(W->col[px] + W->row[pz]);                  // the tile under the point
+        c = (u8)(TILE_COL[px] + TILE_ROW[pz]);                  // the tile under the point
 #ifdef FFT_OPENING
         if ((u16)py <= W->top[c]) return 0; // py > 0 above; tower blockers require a word
 #else
@@ -2079,7 +2098,7 @@ static void ai_ability(u8 a, u8 ab, u8 self)
     if (ab != NO_ABIL && abilities[ab].flags & AF_SELF && W->ai_use & (1 << a)) {
         if (ai_try(a, ab, W->ai_c1, me, a, best)) best->t = me;  // from its tile, then to the tile
         best->f = best->pri != AI_BAD;                           // it would move to (the same:
-        ua->x = W->tx[W->ai_c1]; ua->z = W->tz[W->ai_c1];        // first wins)
+        ua->x = TILE_X[W->ai_c1]; ua->z = TILE_Z[W->ai_c1];        // first wins)
         if (ai_try(a, ab, W->ai_c1, W->ai_c1, a, best)) best->f = best->t == me;
         ua->x = x0; ua->z = z0;
         if (best->pri != AI_BAD) ai_insert(best);
@@ -2102,7 +2121,7 @@ static u8 ai_ability_go(u8 a, s16 *work)
     for (; W->ab_k < W->ai_no && *work > 0; W->ab_k++) {
         u8 j, self = (u8)(W->ai_use >> a & 1);      // on itself: its tile is the origin
         o = ab == NO_ABIL ? W->ai_grid[W->ab_k] : W->ai_ord[W->ab_k];
-        ua->x = W->tx[o]; ua->z = W->tz[o];
+        ua->x = TILE_X[o]; ua->z = TILE_Z[o];
         *work -= 1;
         for (j = 0; j <= n; j++) {
             if (self && (j == n || o < W->ai_tt[j])) {
@@ -2166,7 +2185,7 @@ static void ai_setup(u8 a, u8 acted)
         u8 p = 0;
         if (W->ai_m[c])
             for (i = 0; i < ne; i++) {
-                s16 dx = (s16)ex[i] - W->tx[c], dz = (s16)ez[i] - W->tz[c], dd;
+                s16 dx = (s16)ex[i] - TILE_X[c], dz = (s16)ez[i] - TILE_Z[c], dd;
                 dd = (dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz);
                 if (dd < 10) p += (u8)(10 - dd);
             }
@@ -3303,13 +3322,17 @@ void game_init(void)
         W = (Work *)(sbuf + 2 * SC_PLANE);
         memset(W, 0, sizeof(Work));
         for (i = 0; i < MAP_W * MAP_H; i++) {
-            W->tx[i] = (u8)(i % MAP_W); W->tz[i] = (u8)(i / MAP_W);
+#ifndef FFT_TABLES_ARCHIVED
+            TILE_X[i] = (u8)(i % MAP_W); TILE_Z[i] = (u8)(i / MAP_W);
+#endif
             W->hs[i] = map_tiles[i].stand; W->hl[i] = lower((u8)i);
             W->hw[i] = (u8)((map_tiles[i].walk != 0) | map_tiles[i].water << 1);
             W->top[i] = (u16)(tile_h(&map_tiles[i]) * 12);
         }
-        for (i = 0; i < MAP_W * 28; i++) W->col[i] = (u8)(i / 28);
-        for (i = 0; i < MAP_H * 28; i++) W->row[i] = (u8)(i / 28 * MAP_W);
+#ifndef FFT_TABLES_ARCHIVED
+        for (i = 0; i < MAP_W * 28; i++) TILE_COL[i] = (u8)(i / 28);
+        for (i = 0; i < MAP_H * 28; i++) TILE_ROW[i] = (u8)(i / 28 * MAP_W);
+#endif
         edges(3);                              // Gariland's units all have Jump 3
         for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
         W->wrot = 0xFF;
@@ -3347,12 +3370,14 @@ void game_init(void)
     memset(W->blade_k, 0, sizeof W->blade_k); // rt_file may reload the bank on the PC
 #endif
     scene_rot = vbuf_rot = 0xFF;
+#ifndef FFT_TABLES_ARCHIVED
     for (i = 0; i < 256; i++) {
         u16 d = 0;
         u8 b;
         for (b = 0; b < 8; b++) if (i & (0x80 >> b)) d |= 0xC000 >> (2 * b);
         dbl[i] = d;
     }
+#endif
 }
 
 // a target for the weapon or the ability: a living unit (Phoenix Down: a KO one; unit_at never

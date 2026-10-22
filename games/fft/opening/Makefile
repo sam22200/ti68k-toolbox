@@ -40,7 +40,7 @@ review: pc
 .PHONY: packed
 packed: $(TI_FILES)
 	$(ROOT)/tools/bin/ti-cc -o fftopen -pack ffocore $(CFLAGS_GAME) $(TI_FLAGS) ../campaign/native_opening.c $(RT_CORE) $(ROOT)/tools/extgraph/lib/tilemap.a
-	python3 -c "from pathlib import Path; files=[Path('ffocore.89y')]+[Path(p) for p in '$(TI_FILES)'.split()]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
+	python3 -c "from pathlib import Path; files=[Path('ffocore.89y'),Path('fftopen.89z')]+[Path(p) for p in '$(TI_FILES)'.split()]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
 
 .PHONY: bundle
 bundle: packed

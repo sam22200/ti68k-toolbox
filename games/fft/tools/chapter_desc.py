@@ -31,14 +31,16 @@ VIEW = {'opening': 'ffov1', 'campaign': 'ffgv1'}
 IGFX = [('JOBS', 'jobs'), ('ITEMS', 'items'), ('ABILITIES', 'abilities'), ('SKILL_SETS', 'skill_sets'),
         ('UNIT_DEFS', 'unit_defs'), ('PORTRAITS', 'UI_PORTRAITS'), ('MALE', 'UI_MALE'),
         ('FEMALE', 'UI_FEMALE'), ('TILES', 'UI_TILES'), ('UNIT_RAW', 'OPENING_RAW'),
-        ('UNIT_NAMES', 'OPENING_NAMES'), ('WATER', 'OPENING_WATER')]
+        ('UNIT_NAMES', 'OPENING_NAMES')]
 # Small tables stored in the descriptor: field, header array, element type
 TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE', 'gen_base', 'B'),
           ('GEN_VAR', 'gen_var', 'B'), ('ZODIAC_DAYS', 'zodiac_days', 'H'),
           ('ZODIAC_COMPAT', 'zodiac_compat', 'B'), ('UNIT_ZODIAC', 'opening_zodiac', 'B'),
           ('WEAPON_RANGE', 'opening_range', 'B'), ('SHIELD_EVADE', 'opening_evade', 'B'),
           ('CHARGE_TICKS', 'opening_charge_ticks', 'B')]
-FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES]
+# WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
+# Gariland's computed by the engine itself (campaign/water_dump.c).
+FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + ['WATER']
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -147,9 +149,40 @@ def build(chapter):
             body.append(0)
         fields[f] = len(body)
         body += struct.pack('>%d%s' % (len(rows), typ), *rows)
+    water = water_block(chapter, folder, offsets)
+    if water:
+        if len(body) & 1:
+            body.append(0)
+        fields['WATER'] = len(body); body += water
+    else:
+        fields['WATER'] = 0
     struct.pack_into('>%dH' % len(FIELDS), body, 4, *(fields[f] for f in FIELDS))
     (folder / (NAMES[chapter] + '.bin')).write_bytes(bytes(body))
     print(NAMES[chapter], len(body), 'bytes')
+
+
+def water_block(chapter, folder, offsets):
+    if chapter == 'opening':
+        bank = (folder / 'ffoi.bin').read_bytes(); at = offsets['OPENING_WATER']
+        end = 8
+        for rot in range(4):
+            p = struct.unpack_from('>H', bank, at + 2 * rot)[0]
+            for _ in range(4):
+                p += 2 + 2 * struct.unpack_from('>H', bank, at + p)[0]
+            end = max(end, p)
+        return bank[at:at + end]
+    path = folder / 'water.bin'
+    return path.read_bytes() if path.exists() else b''
+
+
+def dump_water():
+    """Gariland's glints, computed by the engine with the descriptor just written."""
+    exe = HERE / 'campaign/x/water_dump'
+    exe.parent.mkdir(exist_ok=True)
+    root = HERE.parents[1]
+    subprocess.run(['cc', '-std=gnu99', '-O1', '-w', '-o', exe, HERE / 'campaign/water_dump.c',
+                    root / 'runtime/core/rt_core.c', root / 'runtime/platform-sw/rt_sw.c'], check=True)
+    subprocess.run([exe], cwd=HERE / 'campaign/data', check=True)
 
 
 def header():
@@ -166,3 +199,5 @@ if __name__ == '__main__':
     header()
     for chapter in sys.argv[1:]:
         build(chapter)
+        if chapter == 'campaign':
+            dump_water(); build(chapter)

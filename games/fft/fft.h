@@ -45,6 +45,12 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // descriptor (tools/chapter_desc.py, campaign/ENGINE.md), read at load, not from headers.
 #define FFT_CHAPTER
 #endif
+#if defined(FFT_CHAPTER) && !defined(FFT_WATER_DUMP)
+#define FFT_WATER_BANK                        // glints read from the descriptor, not computed
+#endif
+#if defined(FFT_CHAPTER) && defined(__m68k__) && !defined(FFT_NO_REACH_CONTOUR)
+#define FFT_TABLES_ARCHIVED                   // constant tables read from the archive tail, not RAM
+#endif
 #ifdef FFT_CHAPTER
 #ifdef FFT_OPENING
 #include "opening/data/units.h"

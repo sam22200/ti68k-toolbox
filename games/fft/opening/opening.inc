@@ -53,7 +53,7 @@ static u8 opening_attack_range(u8 a,u8 o,u8 c)
 {
     const Unit *u=&st.unit[a];
     u8 range=u->eq[EQ_WEAPON]==255 ? 1:opening_range[u->eq[EQ_WEAPON]];
-    s16 dx=(s16)W->tx[c]-W->tx[o],dz=(s16)W->tz[c]-W->tz[o],h=(s16)map_tiles[c].stand-map_tiles[o].stand;
+    s16 dx=(s16)TILE_X[c]-TILE_X[o],dz=(s16)TILE_Z[c]-TILE_Z[o],h=(s16)map_tiles[c].stand-map_tiles[o].stand;
     u8 d=(u8)((dx<0?-dx:dx)+(dz<0?-dz:dz));
     if(!map_tiles[c].walk)return 0;
     if(range==1)return d==1 && h>=-6 && h<=5;
