@@ -268,6 +268,7 @@ typedef struct {
     AiAct ai_rank[8];
     u8 ai_n, ai_list[1 + SET_N], ai_nab, ai_k, ai_a, ai_self, ai_focus, ai_c0, ai_c1, ai_retreat;
     u8 ai_er, ai_ar, ai_ranged;         // its shortest reach on an enemy, an ally; a ranged ability
+    u8 ai_weapon;                       // its weapon's reach (WEAPON_REACH: 1, a bow farther)
     u16 ai_use;                         // the units the ability is worth using on (bits)
     s16 ai_base;                        // the fallback tile's score: to beat
     u8 frz, frz_n, hold;                // a unit thinking: the picture stands still (no longer
@@ -476,24 +477,26 @@ void unit_stats(Unit *u)
     u->hp = u->max_hp; u->mp = u->max_mp;
 }
 
+#ifdef FFT_CHAPTER                      // rules.inc
+static void fixed_units(void);
+static u8 ranged_reach(u8 a, u8 o, u8 c);
+static void skill_extra(void);
+static void weapon_effect(void);
+static u8 pending_next(void);
+static void charge_resolve(void);
+#endif
 #ifdef FFT_OPENING
-static void opening_units(void);
 static void opening_start(u16 n);
 static u8 map_update(void);
 static void map_render(void);
-static u8 opening_attack_range(u8 a, u8 o, u8 c);
-static void opening_damage(void);
-static u8 opening_hit(u8 a,u8 t);
-static void opening_effect(void);
-static u8 opening_pending(void);
-static void opening_resolve(void);
 #endif
 
 void battle_units(void)
 {
-#ifdef FFT_OPENING
-    opening_units();
-#else
+#ifdef FFT_CHAPTER
+    if (CD(UNIT_RAW)) { fixed_units(); return; }
+#endif
+#ifndef FFT_OPENING
     u8 i, k;
     for (i = 0; i < NUNIT; i++) {
         const UnitDef *d = &unit_defs[i];
@@ -584,18 +587,18 @@ u8 ct_next(void)
     for (;;) {
         u8 i, best = 0xFF, max = 99;
         Unit *u;
-#ifdef FFT_OPENING
-        if (st.open_ct_phase && opening_pending() != 255) return 254;
+#ifdef FFT_CHAPTER
+        if (st.open_ct_phase && pending_next() != 255) return 254;
 #endif
         for (i = 0, u = st.unit; i < NUNIT; i++, u++)
             if (!DC_OBJ(u->dc) && u->ct > max) { max = u->ct; best = i; }
         if (best == 0xFF) {                        // a tick
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
             if (!st.open_ct_phase) {
                 for (i = 0; i < NUNIT; i++)
                     if (st.pending[i].state && st.pending[i].ticks) st.pending[i].ticks--;
                 st.open_ct_phase = 1;
-                if (opening_pending() != 255) return 254;
+                if (pending_next() != 255) return 254;
             }
             st.open_ct_phase = 0;
 #endif
@@ -667,8 +670,8 @@ static void turn_start(void)
     u8 me;
     if (W) W->upd_k += TURN_K;
     st.act = ct_next();
-#ifdef FFT_OPENING
-    if (st.act == 254) { opening_resolve(); return; }
+#ifdef FFT_CHAPTER
+    if (st.act == 254) { charge_resolve(); return; }
 #endif
     if (st.act == U_RAMZA) st.rounds++;
     st.pick_t = 0;
@@ -1466,10 +1469,10 @@ void attack_range(u8 who)
     u8 d;
     hl_seq++;
     memset(st.reach, 0xFF, sizeof st.reach);
-#ifdef FFT_OPENING
-    if (u->eq[EQ_WEAPON] != 255 && opening_range[u->eq[EQ_WEAPON]] > 1) {
+#ifdef FFT_CHAPTER
+    if (WEAPON_REACH(u) > 1) {
         u8 c, o = (u8)(u->z * MAP_W + u->x);
-        for (c = 0; c < MAP_W * MAP_H; c++) if (opening_attack_range(who, o, c)) st.reach[c] = 1;
+        for (c = 0; c < MAP_W * MAP_H; c++) if (ranged_reach(who, o, c)) st.reach[c] = 1;
         return;
     }
 #endif
@@ -1492,17 +1495,23 @@ u8 attack_side(u8 a, u8 t)
     return c > 0 ? SIDE_FRONT : c < 0 ? SIDE_BACK : SIDE_SIDE;
 }
 
-// from the front the target evades with its class evade; Defending halves the base hit (100):
-// the chance (base - evade) * 100 / base
+// from the front the target evades with its class evade, from the front or a side with its
+// shield's (SHIELD_EV); Defending halves the base hit (100): the chance (base - evade) * 100
+// / base, times (base - shield) / base
 u8 hit_chance(u8 a, u8 t)
 {
-#ifdef FFT_OPENING
-    return opening_hit(a,t);
-#else
     const Unit *ut = &st.unit[t];
-    u8 base = ut->status & ST_DEFEND ? 50 : 100, ev = attack_side(a, t) == SIDE_FRONT ? jobs[ut->job].cev : 0;
-    return (u8)((base - ev) * 100 / base);
+    u8 side = attack_side(a, t), base = ut->status & ST_DEFEND ? 50 : 100, ev = side == SIDE_FRONT ? jobs[ut->job].cev : 0;
+    u16 hit;
+    if (ev > base) ev = base;
+    hit = (u16)((base - ev) * 100 / base);
+#ifdef FFT_CHAPTER
+    if (side != SIDE_BACK && (ev = SHIELD_EV(ut)) != 0) {
+        if (ev > base) ev = base;
+        hit = (u16)(hit * (base - ev) / base);
+    }
 #endif
+    return (u8)hit;
 }
 
 // XA = x changed by the signs' compatibility (at least 1)
@@ -1524,7 +1533,7 @@ u16 attack_damage(u8 a, u8 t, u8 crit, u16 r)
     const Item *w = ua->eq[EQ_WEAPON] != 0xFF ? &items[ua->eq[EQ_WEAPON]] : RT_NULL;
     s16 xa = zodiac_xa(ua, ut, w && w->knife ? (ua->pa + ua->sp) >> 1 : ua->pa), ya;
     u16 d;
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     if (st.pending[t].state == 1) xa += xa >> 1; // source XA * 3 / 2 while Charging
 #endif
     if (crit) xa += (s16)(((u32)r * (u16)xa) >> 15);
@@ -1534,16 +1543,18 @@ u16 attack_damage(u8 a, u8 t, u8 crit, u16 r)
     return d > 999 ? 999 : d;
 }
 
-// the evades rolled: a miss when rand() * base / 32768 < the evade (base 100, 50 Defending)
+// the evades rolled, each source in turn (RE_NOTES.md § Attack): a miss when rand() * base /
+// 32768 < the evade (base 100, 50 Defending); the class evade from the front, then a
+// shield's from the front or a side (none: no roll)
 static u8 roll_hit(u8 a, u8 t)
 {
-#ifdef FFT_OPENING
-    return (u16)(((u32)rand15()*100)>>15)<opening_hit(a,t);
-#else
     const Unit *ut = &st.unit[t];
-    u8 base = ut->status & ST_DEFEND ? 50 : 100, ev = attack_side(a, t) == SIDE_FRONT ? jobs[ut->job].cev : 0;
-    return (u8)(((u32)rand15() * base >> 15) >= ev);
+    u8 side = attack_side(a, t), base = ut->status & ST_DEFEND ? 50 : 100, ev = side == SIDE_FRONT ? jobs[ut->job].cev : 0;
+    if (((u32)rand15() * base >> 15) < ev) return 0;
+#ifdef FFT_CHAPTER
+    if (side != SIDE_BACK && (ev = SHIELD_EV(ut)) != 0) return (u8)(((u32)rand15() * base >> 15) >= ev);
 #endif
+    return 1;
 }
 
 // the act starts: the user turns to its target (M_ACT)
@@ -1581,7 +1592,7 @@ static void knockback(u8 a, u8 t)
 // the hit rolled, then the critical (4 %: XA + 0..XA - 1 and a knockback) and the damage
 void attack(u8 a, u8 t)
 {
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     st.pending[a].state = 0;
 #endif
     act_start(a, t);
@@ -1648,7 +1659,7 @@ u16 skill_amount(u8 a, u8 t, u8 ab, u16 r)
     const Ability *b = &abilities[ab];
     const Unit *ua = &st.unit[a];
     u16 k = (u16)(((u32)r * b->y >> 15) + 1);
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     if (b->kind == AB_RAISE || b->kind == AB_BREAK) return b->y;
     if (b->flags & AF_WEAPON) {
         const Item *w = ua->eq[EQ_WEAPON] == 255 ? RT_NULL : &items[ua->eq[EQ_WEAPON]];
@@ -1679,12 +1690,12 @@ u16 skill_amount(u8 a, u8 t, u8 ab, u16 r)
 void skill(u8 a, u8 t, u8 ab)
 {
     const Ability *b = &abilities[ab];
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     if (!st.open_resolving) {
         st.pending[a].state = 0;
         if (b->flags & AF_CHARGE) {
             st.pending[a].state = 1;
-            st.pending[a].ticks = opening_charge_ticks[b->y - 1];
+            st.pending[a].ticks = charge_ticks[b->y - 1];
             st.pending[a].ability = ab;
             st.pending[a].tile = st.unit[t].z * MAP_W + st.unit[t].x;
             st.pending[a].origin = st.unit[a].z * MAP_W + st.unit[a].x;
@@ -1710,7 +1721,7 @@ void skill(u8 a, u8 t, u8 ab)
     if (b->kind == AB_CURE) st.dmg = st.unit[t].status & b->y;   // the statuses removed (shown)
     if (b->kind == AB_WISH) st.self = st.unit[a].max_hp / 5;
     if (b->kind == AB_DAMAGE
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
         && !(b->flags & AF_WEAPON)
 #endif
     ) {
@@ -1829,7 +1840,7 @@ static void attack_step(void)
     Unit *ut = &st.unit[st.tgt], *ua = &st.unit[st.atk];
     if (st.act_t == ACT_HIT && st.hit) {
         u8 kind = act_kind(), ko = !ut->hp;
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
         if (kind == AB_RAISE) { if (ua->pa < 99) ua->pa++; rewards(st.atk,st.tgt,0); goto shown; }
         if (kind == AB_BREAK) {
             u8 *v = abilities[st.abil].y == 2 ? &ut->sp : &ut->ma;
@@ -1850,8 +1861,8 @@ static void attack_step(void)
             ut->hp = st.dmg >= ut->max_hp - ut->hp ? ut->max_hp : ut->hp + st.dmg;
             if (ko) ut->dc = 3;
         }
-#ifdef FFT_OPENING
-        opening_damage();
+#ifdef FFT_CHAPTER
+        skill_extra();
 #endif
         rewards(st.atk, st.tgt, kind == AB_DAMAGE && !ut->hp);
         if (st.self) ua->hp = st.self >= ua->hp ? 0 : ua->hp - st.self;
@@ -1860,7 +1871,7 @@ static void attack_step(void)
 shown:
     if (++st.act_t >= (st.gain ? ACT_GAIN_END : ACT_END)) {
         if (outcome()) { end_battle(outcome()); return; }
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
         if (st.open_resolving) { st.open_resolving = 0; turn_start(); return; }
 #endif
         if (!st.unit[st.act].hp) { turn_end(st.moved, 1); return; }
@@ -1930,8 +1941,8 @@ static u8 ai_usable(u8 a, u8 ab)
 // its range for the AI (an item: at most the unit's Move, as FFT's AI takes it)
 static u8 ai_range(u8 a, u8 ab)
 {
-#ifdef FFT_OPENING
-    if (ab == NO_ABIL) return st.unit[a].eq[EQ_WEAPON] == 255 ? 1 : opening_range[st.unit[a].eq[EQ_WEAPON]];
+#ifdef FFT_CHAPTER
+    if (ab == NO_ABIL) return W->ai_weapon;
 #endif
     if (ab == NO_ABIL) return 1;
     if (abilities[ab].flags & AF_ITEM && st.unit[a].move < abilities[ab].range) return st.unit[a].move;
@@ -1945,8 +1956,8 @@ static u8 ai_reaches(u8 a, u8 ab, u8 o, u8 c)
     s16 dx = (s16)TILE_X[c] - TILE_X[o], dz = (s16)TILE_Z[c] - TILE_Z[o], h = (s16)t->stand - s->stand;
     u8 d = (u8)((dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz));
     if (!t->walk) return 0;
-#ifdef FFT_OPENING
-    if (ab == NO_ABIL) return opening_attack_range(a, o, c);
+#ifdef FFT_CHAPTER
+    if (ab == NO_ABIL && W->ai_weapon > 1) return ranged_reach(a, o, c);   // a bow
 #endif
     if (ab == NO_ABIL) return d == 1 && h >= -6 && h <= 5;
     if (d > ai_range(a, ab) || (!d && !(abilities[ab].flags & AF_SELF))) return 0;
@@ -2098,11 +2109,7 @@ static u8 ai_clear(u8 a, u8 t)
         px = (s16)(x >> 16); pz = (s16)(z >> 16); py = (s16)(y >> 16);
         if (py <= 0 || (u16)px >= MAP_W * 28 || (u16)pz >= MAP_H * 28) continue;
         c = (u8)(TILE_COL[px] + TILE_ROW[pz]);                  // the tile under the point
-#ifdef FFT_OPENING
-        if ((u16)py <= W->top[c]) return 0; // py > 0 above; tower blockers require a word
-#else
-        if (py <= W->top[c]) return 0;
-#endif
+        if ((u16)py <= W->top[c]) return 0; // py > 0 above (Orbonne's towers: a word)
         for (k = 0; k < m; k++)
             if (py > oy[k] && py < oy[k] + 36 && px > ox[k] - 8 && px < ox[k] + 8 && pz > oz[k] - 8 && pz < oz[k] + 8)
                 return 0;
@@ -2133,11 +2140,11 @@ static s16 ai_score(u8 a, u8 ab, u8 t, u8 o, u8 *hit)
     }
     d = worth(ut, hp, status) - worth(ut, ut->hp, ut->status);
     if (blue(ut) != blue(ua)) d = -d;
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     if (kind == AB_RAISE) return 0; // no unlimited self-buffing in guest AI
     if (kind == AB_BREAK) return AI_BAD; // conservative guest/enemy action policy
     if(ab!=NO_ABIL&&(abilities[ab].flags&AF_CHARGE)
-        && ut->ct+(u16)ut->sp*opening_charge_ticks[abilities[ab].y-1]>=100) d >>= 1;
+        && ut->ct+(u16)ut->sp*charge_ticks[abilities[ab].y-1]>=100) d >>= 1;
 #endif
     if (kind == AB_WISH) {
         m = ua->max_hp / 5;
@@ -2254,6 +2261,9 @@ static void ai_setup(u8 a, u8 acted)
     u8 ex[NUNIT], ez[NUNIT], ne = 0;
     u16 lim = ai_ticks(u);
     W->ai_n = 0;
+#ifdef FFT_CHAPTER
+    W->ai_weapon = WEAPON_REACH(u);
+#endif
     if (!acted) W->ai_list[n++] = NO_ABIL;
     for (k = 0; !acted && (ab = known(a, k)) != 0xFF; k++)
         if (ai_usable(a, ab)) W->ai_list[n++] = ab;
@@ -2471,10 +2481,10 @@ u8 ai_frozen(void) { return W->frz; }
 // The modules' bank (tools/module.py): "FMB1", a u16 offset per module, each "FMD1", its entry,
 // size and context offsets (u16), its image. One module at a time in the zone, copied when
 // another is called; the zone is in the program (module.h)
-#ifdef FFT_OPENING                      // the largest image of the bank (tools/module.py)
-#define MOD_ZONE 7748
+#ifdef FFT_OPENING                      // MOD_ZONE: the bank's largest image
+#include "opening/data/modules.h"
 #else
-#define MOD_ZONE 7604
+#include "campaign/data/modules.h"
 #endif
 static u16 mod_zone[MOD_ZONE / 2];
 static const u8 *mod_bank;
@@ -2542,9 +2552,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
 #ifndef FFT_OPENING
         c->gauge = gauge;
 #endif
-#ifdef FFT_OPENING
-        c->opening_attack_range = opening_attack_range;
-#endif
+        c->ranged_reach = ranged_reach;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
         mod_id = id + 1;
     }
@@ -3041,8 +3049,8 @@ static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
     RtSprite sp;
     s16 bx, by, b0, sh;
     if (phase < 2) return;
-#ifdef FFT_OPENING
-    if (st.unit[i].eq[EQ_WEAPON] != 255 && opening_range[st.unit[i].eq[EQ_WEAPON]] > 1) return;
+#ifdef FFT_CHAPTER
+    if (WEAPON_REACH(&st.unit[i]) > 1) return;      // a bow: no blade
 #endif
     rows = unit_in_water(i) ? WEAPON_FOOT - HU : WEAPON_SH;
     k = weapon_pose(i, phase);
@@ -5266,7 +5274,7 @@ static void draw_number(void)
             if (st.lvup) n = put_s(s, 0, "LvUp");
             else { n = put_s(s, 0, "EXP+"); n = put_n(s, n, st.gain); }
         } else if (!st.hit) n = put_s(s, 0, "Miss");
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
         else if (kind == AB_RAISE) n=put_s(s,0,"PA+1");
         else if (kind == AB_BREAK) n=put_s(s,0,abilities[st.abil].y==2?"SP-2":"MA-3");
 #endif
@@ -5600,8 +5608,8 @@ void game_render(void)
     W->left-=(s16)W->actor_misses*32;
 #endif
     ZE(4); ZB(5);
-#ifdef FFT_OPENING
-    opening_effect();
+#ifdef FFT_CHAPTER
+    weapon_effect();
 #endif
     // the cursor, above everything (blinking), dashed behind the scenery
     dst_screen(st.camx, st.camy);
@@ -5659,6 +5667,9 @@ void game_render(void)
 #endif
 }
 
+#ifdef FFT_CHAPTER
+#include "rules.inc"
+#endif
 #ifdef FFT_OPENING
 #include "opening/opening.inc"
 #endif

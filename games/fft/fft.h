@@ -128,10 +128,12 @@ extern const UnitDef *unit_defs;
 #define gen_var ((const u8 (*)[5])(cdesc + CD(GEN_VAR)))
 #define ZODIAC_DAY(k) RD16(cdesc + CD(ZODIAC_DAYS), k)
 #define zodiac_compat (cdesc + CD(ZODIAC_COMPAT))
-#define opening_zodiac (cdesc + CD(UNIT_ZODIAC))
-#define opening_range (cdesc + CD(WEAPON_RANGE))
-#define opening_evade (cdesc + CD(SHIELD_EVADE))
-#define opening_charge_ticks (cdesc + CD(CHARGE_TICKS))
+// The chapter's rules (campaign/ENGINE.md M3), in effect when its descriptor has the table:
+// fixed signs, a weapon's reach (bows: more than 1), a shield's evade, Charge's clock ticks
+#define unit_zodiac (cdesc + CD(UNIT_ZODIAC))
+#define WEAPON_REACH(u) (CD(WEAPON_RANGE) && (u)->eq[EQ_WEAPON] != 255 ? (cdesc + CD(WEAPON_RANGE))[(u)->eq[EQ_WEAPON]] : 1)
+#define SHIELD_EV(u) (CD(SHIELD_EVADE) && (u)->eq[EQ_SHIELD] != 255 ? (cdesc + CD(SHIELD_EVADE))[(u)->eq[EQ_SHIELD]] : 0)
+#define charge_ticks (cdesc + CD(CHARGE_TICKS))
 #else
 #include "units.h"
 #include "weapons.h"
@@ -334,11 +336,13 @@ typedef struct {
 #endif
 #endif
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     // Deferred actions are separate from the active unit's turn. Only Archer
     // Charge is currently exposed; Jump and performances need their own rules.
     struct { u8 state, ticks, ability, tile, origin, weapon; } pending[NUNIT];
     u8 open_resolving, open_ct_phase;
+#endif
+#ifdef FFT_OPENING
     u8 open_stage, open_beat, open_clock, open_white;
     u16 open_reveal, open_offset, open_seen;
     u8 open_pan, open_fade, open_next, open_handoff;

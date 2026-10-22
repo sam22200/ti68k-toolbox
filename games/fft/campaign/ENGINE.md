@@ -111,6 +111,21 @@ constant offsets.
   results copies that module once; Orbonne's story frames +1 % (dialogue drawing through the
   context). TiEmu Titanium, packed programs: the AI plays and the
   view turns from the modules. Next candidate: the settings screen.
+- M3 (rules): Orbonne's rule variants are general mechanics of every chapter build
+  (`rules.inc`, `FFT_CHAPTER`), each switched on by the chapter's data: a weapon's reach and
+  its projectile (descriptor WEAPON_RANGE: bows), a shield's evade (SHIELD_EVADE), Charge on
+  the CT clock (AF_CHARGE, CHARGE_TICKS), weapon skills, Raise/Break, drain and the cross
+  splash (ability kinds and flags), fixed unit records (UNIT_RAW). Evasion follows the
+  decompiled rule for both (RE_NOTES.md § Attack): each source rolled in turn, the class
+  evade from the front, then the shield's from the front or a side. Gariland has none of
+  these tables or flags: its 11 replays are identical (screens, states, frames). Orbonne's
+  former single roll on the product of its evades became the per-source rolls: its battles
+  play differently (fight-first and fight-complete have new references; the complete
+  battle still ends in the aftermath; its 10 other replays unchanged). Programs: Gariland
+  60,467 bytes (+2.9 KB: Orbonne's rules), Orbonne 58,279. An AI thinking step: Gariland's
+  peak 284k cycles (was 268k: a unit's weapon reach checked per candidate), average +1 %.
+  Left for M4: unit names and portraits, the Status page, water and towers per map, map
+  sizes; then one battle program.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

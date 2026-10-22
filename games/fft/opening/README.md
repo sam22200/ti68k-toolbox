@@ -134,7 +134,8 @@ original first battle. Only Ramza is controlled manually; the other allies are
 AI guests. Original scene dialogue order and chapel actor positions come from
 the unmodified event flow. Actors interpolate between observed dialogue poses.
 
-The native opening adds bow reach, directional shield evasion, Accumulate,
+The native opening adds bow reach, directional shield evasion (each evade rolled in turn,
+as the decompiled rule; these rules are now the engine's for every chapter: `../rules.inc`), Accumulate,
 stat breaks, Stasis Sword's cross-shaped damage and Night Sword's HP drain.
 It shows the shared movement/blow/hit/KO/reward animations and compact projectile
 and sword effects. Guest/enemy AI deliberately favors attacks and damage/healing

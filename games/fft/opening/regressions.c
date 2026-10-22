@@ -30,9 +30,9 @@ int main(void)
     hp=st.unit[0].hp;st.hit=1;st.act_t=ACT_HIT;attack_step();assert(st.unit[0].hp<hp);
     // Interrupted by death or displacement, without gaining an extra action.
     sw_init(1);st.ai=0;st.act=6;skill(6,0,7);st.unit[6].hp=0;
-    assert(opening_pending()==255&&!st.pending[6].state);
+    assert(pending_next()==255&&!st.pending[6].state);
     sw_init(1);st.ai=0;st.act=6;skill(6,0,7);st.unit[6].x++;
-    assert(opening_pending()==255&&!st.pending[6].state);
+    assert(pending_next()==255&&!st.pending[6].state);
     // A different unit can take its ordinary turn while the archer is still charging.
     sw_init(1);st.ai=0;st.act=6;skill(6,0,7);
     for(i=0;i<NUNIT;i++){st.unit[i].ct=0;st.unit[i].sp=1;}

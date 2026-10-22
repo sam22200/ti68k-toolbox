@@ -64,8 +64,8 @@ typedef struct {
     u32 *rt_keys, *rt_prev;
     u8 *scene_rot, *vbuf_rot;
     const u8 *cgfx;
-#ifdef FFT_OPENING
-    u8 (*opening_attack_range)(u8 a, u8 o, u8 c);
+#ifdef FFT_CHAPTER
+    u8 (*ranged_reach)(u8 a, u8 o, u8 c);
 #endif
     long __attribute__((__stkparm__)) (*divsi3)(long a, long b);   // GCC's helpers: stack
     long __attribute__((__stkparm__)) (*mulsi3)(long a, long b);   // arguments
@@ -89,7 +89,7 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define skill_hit M.skill_hit
 #define skill_amount M.skill_amount
 #define tile_at M.tile_at
-#define opening_attack_range M.opening_attack_range
+#define ranged_reach M.ranged_reach
 #define D (*M.D)
 #define rt_light (*M.rt_light)
 #define rt_dark (*M.rt_dark)
