@@ -134,6 +134,9 @@ extern const UnitDef *unit_defs;
 #define WEAPON_REACH(u) (CD(WEAPON_RANGE) && (u)->eq[EQ_WEAPON] != 255 ? (cdesc + CD(WEAPON_RANGE))[(u)->eq[EQ_WEAPON]] : 1)
 #define SHIELD_EV(u) (CD(SHIELD_EVADE) && (u)->eq[EQ_SHIELD] != 255 ? (cdesc + CD(SHIELD_EVADE))[(u)->eq[EQ_SHIELD]] : 0)
 #define charge_ticks (cdesc + CD(CHARGE_TICKS))
+// a sprite's portrait in the chapter's table, whether it is a Chemist's body
+#define GFX_PORTRAIT(g) (CD(GFX_PORTRAIT) ? (cdesc + CD(GFX_PORTRAIT))[g] : (g))
+#define GFX_CHEMIST(g) ((cdesc + CD(GFX_CHEMIST))[g])
 #else
 #include "units.h"
 #include "weapons.h"
@@ -245,8 +248,8 @@ typedef struct { s16 pri; u8 hit, ab, o, t, f; } AiAct;   // a ranked action: FF
 enum { SIDE_FRONT, SIDE_SIDE, SIDE_BACK };   // where an attack comes from, for the target
 enum { MN_MOVE, MN_ACT, MN_WAIT, MN_STATUS, MN_AUTO, MN_N };   // the turn menu's entries
 enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on its own (AI)
-#ifdef FFT_OPENING
-#define U_RAMZA 0
+#ifdef FFT_CHAPTER
+#define U_RAMZA CD(RAMZA)              // the chapter's (descriptor)
 #else
 #define U_RAMZA 6                      // in battle.h's order: Delita, five enemies, Ramza, recruits
 #endif
@@ -342,7 +345,7 @@ typedef struct {
     struct { u8 state, ticks, ability, tile, origin, weapon; } pending[NUNIT];
     u8 open_resolving, open_ct_phase;
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     u8 open_stage, open_beat, open_clock, open_white;
     u16 open_reveal, open_offset, open_seen;
     u8 open_pan, open_fade, open_next, open_handoff;

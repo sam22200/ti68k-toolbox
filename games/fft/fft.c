@@ -49,7 +49,7 @@ static u8 frame_stall;
 #else
 #define FRAME_SHOT()
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
 #define FRAME_MODE() (st.open_stage ? st.open_stage + 32 : st.mode)
 #else
 #define FRAME_MODE() st.mode
@@ -131,11 +131,7 @@ static u8 *vbuf, vbuf_rot;
 #define TW (RT_W / 2)                   // the rotation frames: half resolution
 #define TH (RT_H / 2)
 #define COVER_H UNIT_SH                // the shadow lies inside the sprite's box
-#ifdef FFT_OPENING
-#define GLINTS 64                      // palette-animated water, no traversable canal immersion
-#else
-#define GLINTS 250                      // glints per phase at most
-#endif
+#define GLINTS 250                      // glints per phase at most (chapters: FFT_WATER_BANK)
 #define HUD_ROWS 14                     // scratch rows for outlined action numbers (8-13)
 #define PANEL_ROWS 29                   // portrait sets the height; level overlays its lower corner
 #define PANEL_Y (RT_H - PANEL_ROWS)
@@ -154,7 +150,7 @@ typedef struct {
 #ifdef FFT_ACTOR_BANK
     ACTOR_FIELDS
 #endif
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER                      // the beats on the map (mapbeats.inc)
     char dialog[6][48];
     u8 dialog_n, dialog_w, dialog_h, dialog_next;
     u16 dialog_total, dialog_key, dialog_drawn;
@@ -247,7 +243,7 @@ typedef struct {
 #endif
     u8 hs[MAP_W * MAP_H], hl[MAP_W * MAP_H], hw[MAP_W * MAP_H];
     u8 eg[MAP_W * MAP_H][16], en[MAP_W * MAP_H], ej, ej_pad;
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     u16 top[MAP_W * MAP_H];             // map-56 towers exceed 255 source height units
 #else
     u8 top[MAP_W * MAP_H];              // a tile's column for a projectile (FFT: its height x 12);
@@ -320,8 +316,8 @@ static u8 bg_usable(void);
 // a frame with room for it: it shows a frame or two later, the frame stays within the budget
 #define FRAME_K 332
 #define BASE_K 65                       // glints, HUD copies, cursor, the units' sort
-#ifdef FFT_OPENING
-#define UNIT_K 16                       // dry-body shader; pose decoding charged separately
+#ifdef FFT_CHAPTER
+#define UNIT_K CD(UNIT_K)               // the chapter's (Orbonne's dry shader 16, Gariland 20)
 #else
 #define UNIT_K 20                       // a unit on screen, including its water check / surface edge
 #endif
@@ -496,13 +492,12 @@ void battle_units(void)
 #ifdef FFT_CHAPTER
     if (CD(UNIT_RAW)) { fixed_units(); return; }
 #endif
-#ifndef FFT_OPENING
     u8 i, k;
     for (i = 0; i < NUNIT; i++) {
         const UnitDef *d = &unit_defs[i];
         Unit *u = &st.unit[i];
         u16 day = d->day;
-#ifdef FFT_STORY_GAR
+#ifdef FFT_CHAPTER                     // the descriptor's big-endian records
         day=RD16((const u8*)d+6,0);
 #endif
         u->x = d->x; u->z = d->z; u->gfx = d->gfx; u->team = d->team; u->face = d->face;
@@ -572,7 +567,6 @@ void battle_units(void)
         }
     }
 
-#endif
 }
 
 // ---------------------------------------------------------------- turn order
@@ -2512,11 +2506,9 @@ static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color);
 static void portrait(u8 gfx, s16 x, s16 y);
 static void draw_hand(s16 x, s16 y);
 static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows);
-#ifndef FFT_OPENING
 static u8 status_ability(void);
 static u8 status_ability_count(void);
 static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
-#endif
 
 static u16 mod_call(u8 id, u8 op, u8 a)
 {
@@ -2535,9 +2527,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->unit_name = unit_name; c->text_into = text_into; c->portrait = portrait;
         c->draw_hand = draw_hand; c->copy_box = copy_box; c->draw_rect = draw_rect;
         c->draw_text = draw_text; c->job_level = job_level;
-#ifndef FFT_OPENING
         c->status_ability = status_ability; c->status_ability_count = status_ability_count;
-#endif
 #ifdef FFT_OPENING
         c->opening_story = &opening_story; c->pgfx = &pgfx; c->opening_battle = opening_battle;
         c->opening_after = opening_after;
@@ -2549,9 +2539,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->unit_feet = unit_feet; c->unit_direction = unit_direction; c->draw_sprite = draw_sprite;
         c->rt_keys = &rt_keys; c->rt_prev = &rt_prev; c->scene_rot = &scene_rot; c->vbuf_rot = &vbuf_rot;
         c->cgfx = cgfx;
-#ifndef FFT_OPENING
         c->gauge = gauge;
-#endif
         c->ranged_reach = ranged_reach;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
         mod_id = id + 1;
@@ -2615,9 +2603,6 @@ __attribute__((noinline))                       // GCC4TI register allocation wo
 #endif
 u8 unit_in_water(u8 i)
 {
-#ifdef FFT_OPENING
-    (void)i;return 0; // Source water is depth four and blocked for the human party.
-#else
     const Unit *u = &st.unit[i];
     if (DC_OBJ(u->dc) || u->x >= MAP_W || u->z >= MAP_H) return 0;
     if (st.mode == M_WALK && st.sel == i && st.path_i + 1 < st.path_n) {
@@ -2628,7 +2613,6 @@ u8 unit_in_water(u8 i)
         return map_tiles[a[1] * MAP_W + a[0]].water;
     }
     return map_tiles[u->z * MAP_W + u->x].water;
-#endif
 }
 
 // a unit's feet: scene position of its tile centre at its standing height, interpolated
@@ -2752,7 +2736,7 @@ static u8 unit_pose(u8 i)
             && act_kind() == AB_DAMAGE) return P_HIT;
     }
     if (!un->hp) return P_KO;
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
     if (st.pending[i].state == 1) return P_WIND;
 #endif
     return (u16)(un->hp * 5) <= un->max_hp ? P_KNEEL : 0;
@@ -2895,7 +2879,6 @@ static const u8 digits[11][3] = { { 0x1F, 0x11, 0x1F }, { 0x09, 0x1F, 0x01 }, { 
 // the others copied first.
 // Depth-1 shader: a short, constant-height pass. The ordinary dry shader
 // stays unchanged; standing units reuse their cached terrain classification.
-#ifndef FFT_OPENING
 static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
     RtSprite s;
@@ -2931,15 +2914,12 @@ static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
         draw_sprite(sx - 3, sy - DC_Y, &s);
     }
 }
-#endif
 
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
-#ifndef FFT_OPENING
     if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
         draw_unit_water(sx, sy, rot, i, c); return;
     }
-#endif
     RtSprite s;
     u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
     u8 r, h0 = UNIT_SH, h1 = 0, flash = unit_flash(i);
@@ -3016,8 +2996,8 @@ static u8 weapon_pose(u8 i, u8 phase)
 {
     u8 dir = unit_direction(st.rot, i);
     return (u8)((
-#ifdef FFT_OPENING
-        st.unit[i].gfx == UG_CHEMIST_M
+#ifdef FFT_CHAPTER
+        GFX_CHEMIST(st.unit[i].gfx)
 #else
         st.unit[i].gfx >= UG_CHEMIST_M
 #endif
@@ -4124,7 +4104,6 @@ static u8 twin(u8 c, u8 aim)
     return 0;
 }
 
-#ifndef FFT_OPENING
 static u8 status_ability_count(void)
 {
     u8 n = 0;
@@ -4139,13 +4118,15 @@ static u8 status_ability(void)
     return ab == NO_ABIL && st.unit[st.sel].defend ? ABIL_DEFEND : ab;
 }
 
-#endif
 static void status_keys(void)
 {
-#ifdef FFT_OPENING
+#ifdef FFT_CHAPTER
+    if (!CD(STATUS)) {                          // the text-only page (descriptor STATUS 0)
     if(input_pressed(K_B|K_ESC)){st.mode=st.back;W->pan_ok[0]=W->pan_ok[1]=0;W->pan_k[0][0]=W->pan_k[1][0]=0;}
     if(input_pressed(K_LEFT|K_RIGHT|K_A|K_ENTER)){st.page^=1;W->status_i=0;}
-#else
+    return;
+    }
+#endif
     if (st.status_info) {
         if (input_pressed(K_A | K_ENTER | K_ESC | K_B)) st.status_info = 0;
     } else if (!st.page) {
@@ -4168,8 +4149,7 @@ static void status_keys(void)
         if (input_pressed(K_A | K_ENTER)) st.status_info = 1;
         if (input_pressed(K_ESC | K_B)) st.mode = st.back;
     }
-#endif
-#ifdef FFT_STORY_GAR
+#ifdef FFT_CHAPTER
     if(st.mode!=M_STATUS){W->pan_ok[0]=W->pan_ok[1]=0;W->pan_k[0][0]=W->pan_k[1][0]=0;}
 #endif
 }
@@ -4249,7 +4229,7 @@ static u8 update(u8 fast)
     } else if (st.mode == M_PICK) {                // the message, then the menu (no undo)
         if (++st.pick_t >= PICK_FRAMES) { st.mode = M_MENU; if (st.ai) ai_next(); }
     } else if (st.mode == M_END) {                 // the results: the battle again, or quit
-#ifdef FFT_STORY_GAR
+#ifdef FFT_CHAPTER                                 // (a chapter: back to the campaign)
         if(input_pressed(K_A|K_ENTER|K_ESC))return 0;
 #else
         if (input_pressed(K_A | K_ENTER)) game_scenario(0);
@@ -4504,9 +4484,9 @@ static void screen_scene(void)
 
 const char *unit_name(u8 i)
 {
-#ifdef FFT_OPENING
-    return (const char *)(igfx+RD16(igfx+OPENING_NAMES,i));
-#else
+#ifdef FFT_CHAPTER
+    if (CD(UNIT_NAMES)) return (const char *)(igfx+RD16(igfx+OPENING_NAMES,i));
+#endif
     const Unit *u = &st.unit[i];
     if (u->gfx == UG_RAMZA) return "Ramza";
     if (u->gfx == UG_DELITA) return "Delita";
@@ -4514,7 +4494,6 @@ const char *unit_name(u8 i)
         const u8 *names = igfx + (u->female ? UI_FEMALE : UI_MALE);
         return (const char *)names + RD16(names, u->name);
     }
-#endif
 }
 
 static void hud_labels(void)
@@ -4564,8 +4543,8 @@ static void text_into(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color)
 // Original portrait with palette-zero transparency and an offline white silhouette outline.
 static void portrait(u8 gfx, s16 x, s16 y)
 {
-#ifdef FFT_OPENING
-    if(gfx>1)gfx--;
+#ifdef FFT_CHAPTER
+    gfx = GFX_PORTRAIT(gfx);
 #endif
     const u8 *p = igfx + UI_PORTRAITS + (u16)gfx * 348;
 #ifdef __m68k__
@@ -4578,7 +4557,6 @@ static void portrait(u8 gfx, s16 x, s16 y)
     draw_sprite(x, y, &sp);
 }
 
-#ifndef FFT_OPENING
 static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width)
 {
     u8 n = max ? (u8)((width * v + max - 1) / max) : 0;
@@ -4588,7 +4566,6 @@ static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width)
 }
 
 // Outlined small text built into the transparent panel, never redrawn glyph by glyph on screen.
-#endif
 static void outlined_text(u8 *l, u8 *d, u8 *mask, s16 x, s16 y, const char *s, s16 limit)
 {
     void *sl = rt_light, *sd = rt_dark;
@@ -4715,8 +4692,8 @@ static void make_panel(u8 side, u8 i)
     if (!k) {
         memset(PAN_MAKE(side), 0, sizeof PAN_MAKE(side));
         u8 gfx=u->gfx;
-#ifdef FFT_OPENING
-        if(gfx>1)gfx--; // The trimmed portrait table has no Delita entry.
+#ifdef FFT_CHAPTER
+        gfx = GFX_PORTRAIT(gfx);
 #endif
         const u8 *p = igfx + UI_PORTRAITS + (u16)gfx * 348 + 232;
         u8 r;
@@ -5092,8 +5069,8 @@ static const char *const equip_labels[5] = { "Head", "Body", "Accessory", "Weapo
 #define st_names CONTOUR_REF_st_names
 #endif
 // Details describe the equipped item or learned ability; browsing never changes the loadout.
-#ifdef FFT_OPENING
-static void draw_status(void)
+#ifdef FFT_CHAPTER
+static void status_text(void)                   // the text-only page (descriptor STATUS 0)
 {
     const Unit *u=&st.unit[st.sel];
     u8 k=W->status_i;char line[40];
@@ -5118,7 +5095,7 @@ u8 v=slot==0?u->level:slot==1?u->pa:slot==2?u->sp:slot==3?u->move:u->jump;u8 n=p
     }
     copy_box(W->status[0],W->status[1],0,0,10,100);
 }
-#else
+#endif
 static void status_detail(u8 k)
 {
     char s[64];
@@ -5162,6 +5139,9 @@ static const char *const effects[] = { "Physical damage", "Removes status ailmen
 // Building a line per frame keeps even entry and paging within the ordinary frame budget.
 static void draw_status(void)
 {
+#ifdef FFT_CHAPTER
+    if (!CD(STATUS)) { status_text(); return; }
+#endif
     void *sl = rt_light, *sd = rt_dark;
     const Unit *u = &st.unit[st.sel];
     u8 k, n = 0, i;
@@ -5180,7 +5160,7 @@ static void draw_status(void)
             draw_rect(0, 0, RT_W, 32, C_LGRAY); draw_rect(0, 32, RT_W, 1, C_DGRAY);
             portrait(u->gfx, 2, 1);
             ui_text(24, 2, unit_name(st.sel), C_BLACK, 92);
-            ui_text(24, 9, u->gfx >= UG_CHEMIST_M ? "Chemist" : "Squire", C_BLACK, 92);
+            ui_text(24, 9, GFX_CHEMIST(u->gfx) ? "Chemist" : "Squire", C_BLACK, 92);
             n = put_s(s, 0, "Lv "); n = put_n(s, n, u->level); n = put_s(s, n, " Exp "); n = put_n(s, n, u->exp); s[n] = 0;
             ui_text(24, 17, s, C_BLACK, 92);
             ui_text(24, 25, st.page ? "EQUIP / SKILLS" : "STATUS", C_DGRAY, 92);
@@ -5218,7 +5198,6 @@ static void draw_status(void)
         draw_hand(st.status_col ? 81 : 1, 41 + 8 * st.status_row);
 }
 
-#endif
 #endif
 #if MOD_CORE
 

@@ -37,3 +37,8 @@
 #define CD_CHARGE_TICKS 36
 #define CD_WATER 37
 #define CD_MAP_SCRIPT 38
+#define CD_RAMZA 39
+#define CD_UNIT_K 40
+#define CD_GFX_PORTRAIT 41
+#define CD_GFX_CHEMIST 42
+#define CD_STATUS 43

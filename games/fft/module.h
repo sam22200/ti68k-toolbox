@@ -42,11 +42,9 @@ typedef struct {
     void (*draw_rect)(s16 x, s16 y, s16 w, s16 h, u8 color);
     void (*draw_text)(s16 x, s16 y, const char *s, u8 font, u8 color);
     u8 (*job_level)(const Unit *u);
-#ifndef FFT_OPENING
     u8 (*status_ability)(void);
     u8 (*status_ability_count)(void);
     void (*gauge)(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
-#endif
 #ifdef FFT_OPENING
     const u8 **opening_story, **pgfx;
     void (*opening_battle)(u8 direct);

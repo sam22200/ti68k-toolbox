@@ -47,7 +47,14 @@ MS_AFTER, MS_FADE, MS_PLACED, MS_CAMERA = 1, 2, 4, 8
 SCRIPT = {'opening': [(3, 4, MS_FADE, 0, 0, 0),                     # the gate, from the scene
                       (6, 5, 0, 0, 0, 0),                           # player's fade; the banter
                       (4, 6, MS_AFTER | MS_FADE | MS_PLACED | MS_CAMERA, 0, 108, 68)]}   # aftermath
-FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + ['WATER', 'MAP_SCRIPT']
+# Per chapter (campaign/ENGINE.md M4): Ramza's unit, a unit's frame cost (k cycles: Orbonne's
+# dry shader, Gariland's water check); per sprite (units.h UG_*) its portrait (0: the same
+# index) and whether it is a Chemist's body (armed frames, Status)
+RAMZA = {'opening': 0, 'campaign': 6}
+UNIT_K = {'opening': 16, 'campaign': 20}
+STATUS = {'opening': 0, 'campaign': 1}          # Status: 0 the text-only page, 1 the full one
+FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
+    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS']
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -175,9 +182,25 @@ def build(chapter):
         body += struct.pack('>H', len(SCRIPT[chapter]))
         for seq in SCRIPT[chapter]:
             body += struct.pack('>4B2h', *seq)
+    fields['RAMZA'], fields['UNIT_K'], fields['STATUS'] = RAMZA[chapter], UNIT_K[chapter], STATUS[chapter]
+    gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
+    portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
+    for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):
+        fields[f] = 0
+        if rows:                               # (opening: its portrait table has no Delita)
+            if len(body) & 1:
+                body.append(0)
+            fields[f] = len(body); body += bytes(rows)
     struct.pack_into('>%dH' % len(FIELDS), body, 4, *(fields[f] for f in FIELDS))
     (folder / (NAMES[chapter] + '.bin')).write_bytes(bytes(body))
     print(NAMES[chapter], len(body), 'bytes')
+
+
+def sprites(text):
+    """units.h's UG_* names in order (UNIT_GFX_N ends them)."""
+    m = re.search(r'enum\s*\{\s*(UG_RAMZA[^}]*)\}', text)
+    names = [n.strip() for n in m[1].split(',')]
+    return [n for n in names[:names.index('UNIT_GFX_N')]]
 
 
 def water_block(chapter, folder, offsets):
