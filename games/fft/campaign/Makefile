@@ -3,7 +3,7 @@ SRC := scene.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffbm ffmg ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS := ffs1 ffbm ffmg ffwm ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle
@@ -12,6 +12,7 @@ check: pc test $(TI_FILES)
 test: status-test
 test: save-test
 test: manage-test
+test: map-test
 test: dialogue-test
 test: scene-test
 .PHONY: scene-test
@@ -22,6 +23,10 @@ scene-test: data/ffs1.bin
 dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
 	./fftscn_dialogue_test
+.PHONY: map-test
+map-test: data/ffwm.bin data/ffmg.bin
+	$(CC) $(PC_CFLAGS) -o fftmap_test test_worldmap.c $(RT_CORE) $(RT_SW)
+	./fftmap_test
 .PHONY: manage-test
 manage-test: data/ffmg.bin
 	$(CC) $(PC_CFLAGS) -o fftmng_test test_manage.c $(RT_CORE) $(RT_SW)
@@ -54,12 +59,13 @@ packed: $(TI_FILES)
 	$(MAKE) -C ../opening banks
 	$(ROOT)/tools/bin/ti-cc -o fftbat -pack ffbcore native_battle.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftscn -pack ffscore native_scene.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
+	$(ROOT)/tools/bin/ti-cc -o fftmap native_worldmap.c $(RT_CORE) $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftmng native_manage.c $(RT_CORE) $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftstory launcher.c
-	python3 -c "from pathlib import Path; files=[Path('ffbcore.89y'),Path('ffscore.89y'),Path('fftscn.89z'),Path('fftbat.89z'),Path('fftmng.89z')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
+	python3 -c "from pathlib import Path; files=[Path('ffbcore.89y'),Path('ffscore.89y'),Path('fftscn.89z'),Path('fftbat.89z'),Path('fftmng.89z'),Path('fftmap.89z')]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
 bundle: packed
 	@mkdir -p x
-	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z fftmng.89z fftbat.89z ffbcore.89y fftscn.89z ffscore.89y $(OPENING_BANKS) $(TI_FILES)
+	$(ROOT)/tools/bin/ti-group x/fftcampaign.89g fftstory.89z fftmap.89z fftmng.89z fftbat.89z ffbcore.89y fftscn.89z ffscore.89y $(OPENING_BANKS) $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:
@@ -80,6 +86,9 @@ data/ffbm.bin: ../tools/module.py battle.c ../fft.c ../fft.h ../module.h $(wildc
 
 data/ffmg.bin: ../tools/management_data.py ../tools/battle.py ../tools/units.py ../tools/interface.py
 	$(PY) ../tools/management_data.py "$(DISC)" $@
+
+data/ffwm.bin: ../tools/world_assets.py ../tools/management_data.py
+	$(PY) ../tools/world_assets.py "$(DISC)" $@
 
 data/ffs1.bin: ../tools/scenes.py data/ffac.bin data/academy.h
 	$(PY) ../tools/scenes.py

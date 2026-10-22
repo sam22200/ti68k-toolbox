@@ -25,10 +25,11 @@ make -C games/fft/campaign assets
 make -C games/fft/campaign check bundle
 ```
 
-Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 30 variables, 363,696 bytes:
+Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 32 variables, 396,433 bytes:
 the small `fftstory` supervisor, two packed launchers (`fftbat`, the battle program of every
 chapter, and `fftscn`, the scene player), their archived cores (`ffbcore`, `ffscore`), the
-management menus (`fftmng`, 18,203 bytes, and their bank `ffmg`), the battle modules (`ffbm`)
+management menus (`fftmng`, 18,203 bytes, and their bank `ffmg`), the world map (`fftmap`,
+13,031 bytes, and its bank `ffwm`), the battle modules (`ffbm`)
 and the chapter banks. All data
 and packed cores have the archive attribute; do not move all of them into RAM.
 Retail art, text, binary data and captures remain generated/ignored.
@@ -45,11 +46,17 @@ returns to HOME; use `fftstory()` for the automatic continuation.
 leaves after a victory: the chapter's story flag, and after Gariland the new party (the
 units still with it, FFT's job/item/ability ids, their jobs' JP and learned abilities, their
 ability slots), the bag and the chests' items. `fftstory()` resumes after the last victory
-saved (after Orbonne: the chapter card; after Gariland: the management menus); `fftstory(1)`
+saved (after Orbonne: the chapter card; after Gariland: the world map); `fftstory(1)`
 deletes the save and starts a new game. `python3 games/fft/tools/save_dump.py ffsave.sav`
 decodes one.
 
-**Management menus** (`fftmng()`, `manage.c`, after Gariland in the chain): the party in the
+**World map** (`fftmap()`, `worldmap.c`, after Gariland in the chain): Ivalice simplified (land,
+sea, coast), the locations the story shows and their routes. Arrows choose a location, ENTER
+walks Ramza there or enters the one he stands on (its battle while it is not won), ALPHA or
+DIAMOND opens the management menus (then the map again), ESC quits; the save keeps where he
+is. Its bank `ffwm` (`tools/world_assets.py`): the map's tiles, locations, routes, names.
+
+**Management menus** (`fftmng()`, `manage.c`, opened from the world map): the party in the
 prototype's classic grid (`../MANAGEMENT.md`, still sprites). ENTER: Status; ALPHA or
 DIAMOND: the unit's menu, Equip (from the inventory, within the job's equipment types),
 Abilities (secondary skill set, reaction, support, movement among those learned), Learn (the

@@ -30,7 +30,7 @@ Then every Chapter I map and scene is ripped as data. Programs, each run by `fft
   under greys). RAM = core + zone. Job abilities become data (FFT's formula families) read
   by one interpreter, so jobs add data, not code.
 - **`fftscn`** scenes (done: title, pictures with depth, beats, cards, portraits).
-- **`fftmap`** world map (to create): locations graph, travel, entering battles/scenes/menus.
+- **`fftmap`** world map: locations graph, travel, entering battles/scenes/menus (done, below).
 - **`fftmng`** management menus (party, equipment, jobs): done, below.
 - **A campaign save** shared by every program: party, items, story flags (done, below);
   the location comes with the world map.
@@ -185,6 +185,30 @@ constant offsets.
   survivors; Ramza made a Knight, ESC, then `fftstory()` opens the menus with the Knight
   kept. The battle does not read the party yet (the next battle will), and the job names
   now in `ffmg` can give the single Status page its names.
+- World map (`fftmap`, `campaign/worldmap.c`, 13,031 bytes): Ivalice as a simplified
+  geography (the user's choice): land light grey, sea dark grey, a black coast, from the
+  original map texture (WORLD/WLDTEX.TM2, a VRAM upload stream; its four 8-bit pieces
+  assembled, land told by its blue against its red, cleaned) drawn by ExtGraph's TileMap engine
+  (255 tiles of 16x16, near-identical coast tiles merged); our markers (towns black, fields dark
+  grey, a white ring), the shown routes as black lines, Ramza's still sprite, the hand on the
+  chosen location and its name. FFT's own data, read from WLDCORE.BIN (tables located with
+  adamrt/fft_decomp's names, checked on the original's screen: a map position + (263, 186) is
+  its texture pixel): the 43 locations' positions and kinds, the 48 routes (ends, cost, points);
+  the names from WORLD.BIN. Arrows choose a shown location (the nearest in that direction),
+  ENTER travels there along the cheapest chain of shown routes (Dijkstra on FFT's costs, two
+  pixels a frame, the camera following) or enters the location Ramza stands on: its battle
+  (fftbat's door) until that battle is won, else "Not ripped yet"; ALPHA / DIAMOND the menus,
+  ESC quits; the save keeps the location (`loc`, also written by a battle's victory: descriptor
+  `LOCATION`). What shows comes from the bank's story list: after Gariland, Gariland and
+  Mandalia Plains with their route, as on the original's map then. `fftstory` loops on the map
+  after Gariland: 0 quits, 1 opens fftmng, a door runs fftbat, then the map again. Bank `ffwm`
+  (`tools/world_assets.py`, 19.6 KB). Checks: `map-test` (shown locations, the route, the walk to
+  Mandalia, its notice, the save, the menus' and a battle's codes), campaign `check.py` (five
+  map cases: PC and 68000 screens, states and the written save identical). TiEmu Titanium, with
+  the save a Gariland victory wrote: `fftstory()` opens the map at Gariland, Ramza walks to
+  Mandalia, ALPHA opens the menus and ESC returns to the map, ESC quits, `fftstory()` reopens
+  the map at Mandalia. The original was driven headless to its map after Gariland
+  (`sources/fft_ps1/world/world.state`, local) for the texture and the screen check.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:
