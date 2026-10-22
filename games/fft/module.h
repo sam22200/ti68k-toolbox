@@ -1,0 +1,67 @@
+// Battle-engine modules (campaign/ENGINE.md, core milestone): parts of fft.c compiled apart as
+// position-independent images (tools/module.py), kept in the archive and copied into a zone
+// of the core program when used (the only RAM an unpatched Titanium runs code from:
+// ti68k-c-patterns.md § interrupts). A module reaches the core only through this context,
+// written into the module's copy (its symbol M) after each load.
+// Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
+// (a module's own build: the core's names become the context's).
+#define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work)))   // both sides built alike
+typedef struct {
+    u16 sig;                            // MOD_SIG, from the module's own build
+    State *st;
+    Work *w;
+    const Ability *abilities;
+    const Tile *map_tiles;
+    const u8 *contour_gfx, *cdesc;
+    u16 (*rand15)(void);
+    u8 (*known)(u8 who, u8 k);
+    void (*spread_start)(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, const u8 *need, u8 left);
+    u8 (*spread_go)(u16 n);
+    void (*bfs)(u8 who, u8 *from);
+    u8 (*hit_chance)(u8 a, u8 t);
+    u16 (*attack_damage)(u8 a, u8 t, u8 crit, u16 r);
+    u8 (*skill_hit)(u8 a, u8 t, u8 ab);
+    u16 (*skill_amount)(u8 a, u8 t, u8 ab, u16 r);
+    const Tile *(*tile_at)(s16 x, s16 z);
+    Dst *D;
+    void **rt_light, **rt_dark;
+    void (*view_of)(u8 rot, s16 x, s16 z, s16 *u, s16 *v);
+    s16 (*scene_x)(u8 rot, s16 u, s16 v);
+    s16 (*scene_y)(s16 u, s16 v);
+    void (*draw_unit_covered)(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c);
+#ifdef FFT_OPENING
+    u8 (*opening_attack_range)(u8 a, u8 o, u8 c);
+#endif
+    long __attribute__((__stkparm__)) (*divsi3)(long a, long b);   // GCC's helpers: stack
+    long __attribute__((__stkparm__)) (*mulsi3)(long a, long b);   // arguments
+} ModCtx;
+
+#ifdef FFT_MODULE
+ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one section)
+#define st (*M.st)
+#define W (M.w)
+#define abilities (M.abilities)
+#define map_tiles (M.map_tiles)
+#define contour_gfx (M.contour_gfx)
+#define cdesc (M.cdesc)
+#define rand15 M.rand15
+#define known M.known
+#define spread_start M.spread_start
+#define spread_go M.spread_go
+#define bfs M.bfs
+#define hit_chance M.hit_chance
+#define attack_damage M.attack_damage
+#define skill_hit M.skill_hit
+#define skill_amount M.skill_amount
+#define tile_at M.tile_at
+#define opening_attack_range M.opening_attack_range
+#define D (*M.D)
+#define rt_light (*M.rt_light)
+#define rt_dark (*M.rt_dark)
+#define view_of M.view_of
+#define scene_x M.scene_x
+#define scene_y M.scene_y
+#define draw_unit_covered M.draw_unit_covered
+long __attribute__((__stkparm__)) __divsi3(long a, long b) { return M.divsi3(a, b); }
+long __attribute__((__stkparm__)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
+#endif

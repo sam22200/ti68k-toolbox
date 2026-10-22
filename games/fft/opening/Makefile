@@ -4,7 +4,7 @@ TESTS := test_opening.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0 ffcp ffcu ffcw ffca ffcb
+BANKS := ffom ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffs0 ffcp ffcu ffcw ffca ffcb
 TI_FLAGS := ../../../lib/unpack68k.s
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 
@@ -17,6 +17,8 @@ data/%.89y: data/%.bin
 	cd data && ../../../../tools/gcc4ti-bin/bin/ttbin2oth -89 dat $*.bin $*
 	python3 -c "from pathlib import Path; p=Path('$@'); b=bytearray(p.read_bytes()); b[0x49]=3; p.write_bytes(b)"
 ti cycles: $(TI_FILES)
+data/ffom.bin: ../tools/module.py opening.c opening.inc ../fft.c ../fft.h ../module.h $(wildcard ../*.inc)
+	$(PY) ../tools/module.py $@ opening.c 2
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../fft.c ../fft.h opening.inc $(wildcard data/*.h)
 check: test pc cycles
 	$(PY) check.py

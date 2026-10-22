@@ -54,6 +54,25 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #if defined(FFT_CHAPTER) && defined(__m68k__) && !defined(FFT_NO_REACH_CONTOUR)
 #define FFT_TABLES_ARCHIVED                   // constant tables read from the archive tail, not RAM
 #endif
+#if defined(FFT_CHAPTER) && defined(__m68k__) && !defined(FFT_MODULE)
+#define FFT_MODULES                           // parts of the engine in modules (module.h)
+#endif
+// The parts of the engine kept in modules (module.h): MOD_PART(k) is module k's code (in the
+// core when there are no modules; alone in that module's build, FFT_MODULE = k + 1), MOD_CORE
+// the rest
+#define MOD_AI 0                              // the AI: thinking a step a frame, facing at Wait
+#define MOD_TURN 1                            // the rotation animation
+#define MOD_COUNT 2
+#ifdef FFT_MODULE
+#define MOD_CORE 0
+#define MOD_PART(k) (FFT_MODULE == (k) + 1)
+#elif defined(FFT_MODULES)
+#define MOD_CORE 1
+#define MOD_PART(k) 0
+#else
+#define MOD_CORE 1
+#define MOD_PART(k) 1
+#endif
 #ifdef FFT_CHAPTER
 #ifdef FFT_OPENING
 #include "opening/data/units.h"

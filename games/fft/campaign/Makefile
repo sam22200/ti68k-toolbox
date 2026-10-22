@@ -3,7 +3,7 @@ SRC := scene.c
 include ../../../runtime/rt.mk
 PY := ../../../tools/pyenv/bin/python
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS := ffs1 ffgm ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: assets bundle
@@ -60,6 +60,9 @@ fftintro_pc fftgar_pc fftgar_status_test: | contour-assets
 
 data/ffgd.bin: ../tools/chapter_desc.py data/battle.h data/interface.h ../map.h data/actors.h
 	$(PY) ../tools/chapter_desc.py campaign
+
+data/ffgm.bin: ../tools/module.py gariland.c ../fft.c ../fft.h ../module.h $(wildcard ../*.inc)
+	$(PY) ../tools/module.py $@ gariland.c 2
 
 data/ffs1.bin: ../tools/scenes.py data/ffac.bin data/academy.h
 	$(PY) ../tools/scenes.py

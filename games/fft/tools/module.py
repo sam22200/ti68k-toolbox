@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""The battle engine's modules bank (module.h, campaign/ENGINE.md): a chapter's source built
+with FFT_MODULE as a position-independent image.
+
+usage: module.py OUT.bin SOURCE.c COUNT
+Module k is SOURCE built with FFT_MODULE = k + 1 (fft.h MOD_PART). GCC4TI's -mpcrel makes every reference PC-relative, but puts constants and uninitialised
+statics in sections of their own; the assembly is rewritten so that everything lands in one
+.text section, which the assembler resolves alone: the image runs wherever it is copied. A
+module may reach nothing outside (no relocation, no undefined symbol: refused here); the
+core's names come through its context M. Layout, big-endian: "FMB1", a u16 offset per
+module; each module "FMD1", u16 entry, image size and M's offsets, then the image.
+"""
+from pathlib import Path
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[3]
+T = ROOT / 'tools'
+ENV = {'TIGCC': str(T / 'gcc4ti-bin'), 'PATH': '%s:/usr/bin:/bin' % (T / 'gcc4ti-bin/bin')}
+CFLAGS = ['-Os', '-Wall', '-W', '-mpcrel', '-mregparm=5', '-fomit-frame-pointer',
+          '-I%s' % (T / 'extgraph/lib')]
+
+
+def run(*args, cwd=None):
+    p = subprocess.run([str(a) for a in args], env=ENV, cwd=cwd, text=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if p.returncode:
+        sys.exit(p.stdout)
+    return p.stdout
+
+
+def one_section(asm):
+    out = []
+    for line in asm.splitlines():
+        s = line.strip()
+        if re.search(r'__ref_all_|_tigcc_native', s):    # tigcclib.h's program-format marks
+            continue
+        m = re.match(r'\.(l?comm)\s+([\w.]+),\s*(\d+)', s)
+        if m:
+            if m[1] == 'comm':
+                out.append('\t.globl %s' % m[2])
+            out += ['\t.text', '\t.even', '%s:' % m[2], '\t.skip %s' % m[3]]
+        elif s.startswith('.section') or s in ('.data', '.bss'):
+            out.append('\t.text')
+        else:
+            out.append(line)
+    return '\n'.join(out) + '\n'
+
+
+def module(source, k, d):
+    src = Path(source).resolve()
+    asm, obj, img = d / 'm.s', d / 'm.o', d / 'm.img'
+    run('tigcc', '-S', *CFLAGS, '-DFFT_MODULE=%d' % (k + 1), '-o', asm, src, cwd=src.parent)
+    asm.write_text(one_section(asm.read_text()))
+    run('tigcc', '-c', '-o', obj, asm)
+    heads = run('m68k-coff-tigcc-objdump', '-h', '-r', obj)
+    sizes = {n: int(v, 16) for n, v in re.findall(r'^\s*\d+\s+(\S+)\s+([0-9a-f]+)', heads, re.M)}
+    if any(v for n, v in sizes.items() if n != '.text') or 'RELOCATION RECORDS' in heads:
+        sys.exit('%s: more than one section or relocations\n%s' % (source, heads))
+    syms = run('m68k-coff-tigcc-objdump', '-t', obj)
+    undefined = re.findall(r'\(sec\s+0\).* (\S+)$', syms, re.M)
+    if undefined:
+        sys.exit('%s: undefined symbols %s' % (source, ' '.join(undefined)))
+    addr = {n: int(v, 16) for v, n in re.findall(r'\(sec\s+1\).* 0x([0-9a-f]+) (\S+)$', syms, re.M)}
+    run('m68k-coff-tigcc-objcopy', '-O', 'binary', obj, img)
+    image = img.read_bytes()
+    if len(image) & 1:
+        image += b'\0'
+    return b'FMD1' + struct.pack('>3H', addr['mod_entry'], len(image), addr['M']) + image
+
+
+def main():
+    out, source, count = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+    with tempfile.TemporaryDirectory() as d:
+        mods = [module(source, k, Path(d)) for k in range(count)]
+    bank = bytearray(b'FMB1') + bytes(2 * len(mods))
+    for i, m in enumerate(mods):
+        struct.pack_into('>H', bank, 4 + 2 * i, len(bank))
+        bank += m
+    out.write_bytes(bytes(bank))
+    print('%s: %s bytes (images %s)' % (out.name, len(bank), ', '.join(str(len(m) - 10) for m in mods)))
+
+
+if __name__ == '__main__':
+    main()

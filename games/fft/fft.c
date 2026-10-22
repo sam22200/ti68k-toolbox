@@ -13,7 +13,9 @@
 #include <string.h>
 #ifdef FFT_REACH_CONTOUR
 #include "contour.h"
+#if MOD_CORE
 static const u8 *contour_gfx;            // masks appended to the existing first view bank
+#endif
 #endif
 #if defined(__m68k__) && defined(FFT_CONFIG) && !defined(RT_CYCLES)
 #include <alloc.h>
@@ -72,9 +74,11 @@ static void __attribute__((noinline)) frame_end(void)
 #define AB_JP(b) ((b)->jp)
 #endif
 
+#if MOD_CORE                            // a module reaches them through its context (module.h)
 State st;
 u8 *scene_l, *scene_d;
 u8 scene_rot;
+#endif
 // the four views (fftv0..3, ZX0, read in place), unpacked one at a time into vbuf: light and
 // dark planes, then twice (the frontmost pixels of each byte, then the next ones) their view
 // diagonal and their mask (SC_PLANE each)
@@ -95,16 +99,20 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 #include "actors.h"
 #endif
 #ifdef FFT_CHAPTER
+#if MOD_CORE
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
 const Job *jobs; const Item *items; const Ability *abilities;   // its tables in igfx
 const SkillSet *skill_sets; const UnitDef *unit_defs;
+#endif
 static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
 #define UI_SHARED(s) (cgfx + UIC_##s)
 #else
 #define UI_SHARED(s) (igfx + UI_##s)
 #endif
+#if MOD_CORE
 const Tile *map_tiles;                  // in ffti too: the map's tiles (extract.py) and the sloped
 static const PlaneWord *sl_l, *sl_m, *sc_l, *sc_m;   // markers' planes (art.py), out of the program
+#endif
 #define sl_d sl_l                       // black and white: one plane for both
 #define sc_d sc_l
 #ifndef __m68k__
@@ -137,6 +145,7 @@ typedef struct {                        // a unit's cover mask, and its covered 
     u16 cm[COVER_H];
 } Cover;
 typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
+typedef struct { u8 *l, *d; s16 stride, ox, oy, x0, x1, y0, y1; } Dst;   // a drawing target
 typedef struct {
 #ifdef FFT_ACTOR_BANK
     ACTOR_FIELDS
@@ -292,7 +301,12 @@ typedef struct {
     u8 bk[BK_N][2][SC_BYTES];
 #endif
 } Work;
+#if MOD_CORE
 static Work *W;
+#endif
+#if defined(FFT_MODULES) || defined(FFT_MODULE)
+#include "module.h"
+#endif
 static u8 bg_usable(void);
 
 // A frame's budget, in thousands of cycles (ti-cycles): what a frame costs without its optional
@@ -351,6 +365,7 @@ static u8 bg_usable(void);
 #define HUD_L ((u8 *)W->hud[0])
 #define HUD_D ((u8 *)W->hud[1])
 
+#if MOD_CORE                            // a module's build (module.h): only its own part
 // ---------------------------------------------------------------- the map in four orientations
 u8 view_w(u8 rot) { return rot & 1 ? MAP_H : MAP_W; }
 u8 view_h(u8 rot) { return rot & 1 ? MAP_W : MAP_H; }
@@ -673,8 +688,7 @@ void turn_end(u8 moved, u8 acted)
 
 // ---------------------------------------------------------------- drawing targets
 // Every drawing call takes scene coordinates; the target maps them to its own pixels (origin
-// ox, oy) and clips to pixels [x0, x1) and rows [y0, y1).
-typedef struct { u8 *l, *d; s16 stride, ox, oy, x0, x1, y0, y1; } Dst;
+// ox, oy) and clips to pixels [x0, x1) and rows [y0, y1) (Dst: with the work memory's types).
 static Dst D;
 
 static void dst_scene(void)
@@ -725,6 +739,8 @@ static void blit24(s16 x, s16 y, s16 rows, const PlaneWord *l, const PlaneWord *
 // Convex polygon (n <= 4 points, target coordinates) filled with an 8x8 pattern aligned to the
 // target. Pixel (x, y) is inside when its centre is. Spans in 16-bit words.
 
+#endif
+#if MOD_PART(MOD_TURN)
 #if !defined(FFT_EXPLORATION) || defined(FFT_FIXED) || defined(FFT_ULTRA_TRANSITION)
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define lmask CONTOUR_REF_lmask
@@ -799,6 +815,8 @@ static void fill_poly(const s16 *px, const s16 *py, u8 n, const u16 *pl, const u
     fill_spans(ymin, rows, pl, pd);
 }
 #endif
+#endif
+#if MOD_CORE
 
 #define DENY_FRAMES 16                  // the cursor's blinks when [2nd] cannot pick its tile
 #define AI_FAST 3                       // AI turn steps a frame while [2nd] is held
@@ -1848,6 +1866,7 @@ shown:
     }
 }
 
+#endif
 // ---------------------------------------------------------------- the AI
 // FFT's AI for the enemies and the guest (RE_NOTES.md § Enemy AI: read in the decompilation,
 // checked on the original's turns). FFT plays each candidate in its battle engine, random rolls
@@ -1876,6 +1895,7 @@ static u8 tile_h(const Tile *t)         // FFT's tile height: its lowest corner
     return h;
 }
 
+#if MOD_PART(MOD_AI)                    // with modules: the AI module (module.h)
 // a unit's worth with hp HP and those statuses (Poison -26, Darkness -64: FFT's weights)
 static s16 worth(const Unit *u, u16 hp, u8 status)
 {
@@ -2393,6 +2413,7 @@ static u8 ai_think(void)
     return 0;
 }
 
+#if MOD_CORE                            // tests' hooks (no modules)
 void ai_plan(u8 a, u8 acted)
 {
     u8 act = st.act, ac = st.acted;
@@ -2404,7 +2425,7 @@ void ai_plan(u8 a, u8 acted)
 const AiAct *ai_ranked(u8 *n) { *n = W->ai_n; return W->ai_rank; }
 
 u8 ai_fallback(void) { return W->ai_c0; }
-u8 ai_frozen(void) { return W->frz; }
+#endif
 
 // FFT's facing at Wait: towards the nearest enemy that acts before its next turn (else the
 // nearest enemy) by quadrant, unless the tile that way is off the map, blocked or 3 higher; else
@@ -2435,6 +2456,64 @@ u8 ai_facing(u8 a)
         return ok[ours[u->face]] ? u->face : ours[last];
     }
 }
+#endif
+
+#if !MOD_CORE && MOD_PART(MOD_AI)
+u16 mod_entry(u8 op, u8 a) { return op ? ai_facing(a) : ai_think(); }
+#endif
+#if MOD_CORE
+u8 ai_frozen(void) { return W->frz; }
+#ifdef FFT_MODULES
+// The modules' bank (tools/module.py): "FMB1", a u16 offset per module, each "FMD1", its entry,
+// size and context offsets (u16), its image. One module at a time in the zone, copied when
+// another is called; the zone is in the program (module.h)
+#define MOD_ZONE 7632
+static u16 mod_zone[MOD_ZONE / 2];
+static const u8 *mod_bank;
+static u8 mod_id;                       // the module in the zone + 1 (0: none)
+long __attribute__((__stkparm__)) __divsi3(long a, long b);
+long __attribute__((__stkparm__)) __mulsi3(long a, long b);
+static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c);
+
+static u16 mod_call(u8 id, u8 op, u8 a)
+{
+    const u8 *m = mod_bank + RD16(mod_bank, 2 + id);
+    if (mod_id != id + 1) {
+        ModCtx *c = (ModCtx *)((u8 *)mod_zone + RD16(m, 4));
+        memcpy(mod_zone, m + 10, RD16(m, 3));
+        c->st = &st; c->w = W; c->abilities = abilities; c->map_tiles = map_tiles;
+        c->contour_gfx = contour_gfx; c->cdesc = cdesc;
+        c->rand15 = rand15; c->known = known; c->spread_start = spread_start; c->spread_go = spread_go;
+        c->bfs = bfs; c->hit_chance = hit_chance; c->attack_damage = attack_damage;
+        c->skill_hit = skill_hit; c->skill_amount = skill_amount; c->tile_at = tile_at;
+        c->D = &D; c->rt_light = &rt_light; c->rt_dark = &rt_dark; c->view_of = view_of;
+        c->scene_x = scene_x; c->scene_y = scene_y; c->draw_unit_covered = draw_unit_covered;
+#ifdef FFT_OPENING
+        c->opening_attack_range = opening_attack_range;
+#endif
+        c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
+        mod_id = id + 1;
+    }
+    return ((u16 (*)(u8, u8))((u8 *)mod_zone + RD16(m, 2)))(op, a);
+}
+
+// the bank found, each module of this build and within the zone
+static u8 mod_ready(void)
+{
+    u8 id;
+    mod_id = 0;
+    if (!mod_bank || RD16(mod_bank, 0) != 0x464D || RD16(mod_bank, 1) != 0x4231) return 0;
+    for (id = 0; id < MOD_COUNT; id++) {
+        const u8 *m = mod_bank + RD16(mod_bank, 2 + id);
+        if (RD16(m, 3) > MOD_ZONE || RD16(m + 10 + RD16(m, 4), 0) != MOD_SIG) return 0;
+    }
+    return 1;
+}
+
+static u8 ai_think(void) { return (u8)mod_call(MOD_AI, 0, 0); }
+static void draw_turn(void) { mod_call(MOD_TURN, 0, 0); }
+u8 ai_facing(u8 a) { return (u8)mod_call(MOD_AI, 1, a); }
+#endif
 
 // ---------------------------------------------------------------- units on screen
 // frames of walking step i (to path[i + 1]): FFT's climbs, drops and jumps over a tile are slower
@@ -2961,6 +3040,8 @@ static void make_counters(void)
 #include "perspective.inc"
 #endif
 
+#endif
+#if MOD_PART(MOD_TURN)
 // ---------------------------------------------------------------- the rotation animation
 #if !defined(FFT_EXPLORATION) || defined(FFT_FIXED)
 // 32 angles per turn: S = round(6 sqrt2 sin a * 256), view r is at 45 + 90 r degrees (index
@@ -3182,6 +3263,11 @@ static void render_turn(void)
 }
 #endif
 #endif
+#if !MOD_CORE
+u16 mod_entry(u8 op, u8 a) { (void)op; (void)a; draw_turn(); return 0; }
+#endif
+#endif
+#if MOD_CORE
 
 // ---------------------------------------------------------------- camera
 #define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
@@ -3366,6 +3452,14 @@ void game_init(void)
     cdesc = rt_file("ffod", RT_NULL);
 #else
     cdesc = rt_file("ffgd", RT_NULL);
+#endif
+#ifdef FFT_MODULES
+#ifdef FFT_OPENING
+    mod_bank = rt_file("ffom", RT_NULL);
+#else
+    mod_bank = rt_file("ffgm", RT_NULL);
+#endif
+    if (!mod_ready()) igfx = RT_NULL;
 #endif
     if (!cgfx || !cdesc || RD16(cdesc, 0) != 0x4643 || RD16(cdesc, 1) != 0x4431) igfx = RT_NULL;
     else {
@@ -5490,4 +5584,5 @@ void game_render(void)
 
 #ifdef FFT_OPENING
 #include "opening/opening.inc"
+#endif
 #endif
