@@ -63,7 +63,7 @@ data/ffgd.bin: ../tools/chapter_desc.py data/battle.h data/interface.h ../map.h 
 	$(PY) ../tools/chapter_desc.py campaign
 
 data/ffbm.bin: ../tools/module.py battle.c ../fft.c ../fft.h ../module.h $(wildcard ../*.inc) ../opening/opening.inc
-	$(PY) ../tools/module.py $@ battle.c 4
+	$(PY) ../tools/module.py $@ battle.c 5
 
 data/ffs1.bin: ../tools/scenes.py data/ffac.bin data/academy.h
 	$(PY) ../tools/scenes.py

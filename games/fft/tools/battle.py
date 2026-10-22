@@ -620,6 +620,15 @@ def write(d, path):
                                                                 for k in range(2)) for s in eq),
             sets.index(u['set']), learned))
     f.write('};\n')
+    # FFT's own ids, for the campaign save (campaign/save.h): unused by the battle itself
+    f.write('// the campaign save\'s ids (campaign/save.h): each job\'s FFT id, each skill set entry\'s place in\n'
+            '// FFT\'s list (its learned bit), each bag slot\'s item; the supports a unit can have\n')
+    f.write('static const u8 job_ids[NJOB] __attribute__((unused)) = { %s };\n' % ', '.join('0x%02X' % j for j in jobs))
+    f.write('static const u8 set_pos[NSET][SET_N] __attribute__((unused)) = { %s };\n' % ', '.join(
+        '{ %s }' % ', '.join(str(d.skillset(k).index(a)) for a in lists[k]) for k in sets))
+    f.write('static const u8 bag_items[NBAG] __attribute__((unused)) = { %s };\n' % ', '.join(
+        '0x%02X' % (a - ITEM_FIRST + 0xF0) for a in bag))
+    f.write('#define DEFEND_ID 0x%03X\n#define EQUIP_CHANGE_ID 0x%03X\n' % (DEFEND, EQUIP_CHANGE))
     f.close()
 
 

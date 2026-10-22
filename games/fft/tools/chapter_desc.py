@@ -37,7 +37,8 @@ TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE
           ('GEN_VAR', 'gen_var', 'B'), ('ZODIAC_DAYS', 'zodiac_days', 'H'),
           ('ZODIAC_COMPAT', 'zodiac_compat', 'B'), ('UNIT_ZODIAC', 'opening_zodiac', 'B'),
           ('WEAPON_RANGE', 'opening_range', 'B'), ('SHIELD_EVADE', 'opening_evade', 'B'),
-          ('CHARGE_TICKS', 'opening_charge_ticks', 'B')]
+          ('CHARGE_TICKS', 'opening_charge_ticks', 'B'), ('JOB_ID', 'job_ids', 'B'),
+          ('SET_POS', 'set_pos', 'B'), ('BAG_ITEM', 'bag_items', 'B')]
 # WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
 # Gariland's computed by the engine itself (campaign/water_dump.c).
 # MAP_SCRIPT: the beats played on the battle map (fft.c mapbeats.inc): u16 count, then per
@@ -54,8 +55,16 @@ RAMZA = {'opening': 0, 'campaign': 6}
 UNIT_K = {'opening': 16, 'campaign': 20}
 STATUS = {'opening': 0, 'campaign': 1}          # Status: 0 the text-only page, 1 the full one
 START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc), 0: the battle at once
+# The campaign save (campaign/save.h): PARTY 1, the player's units are the campaign's party
+# (written at the victory; Orbonne's are not: the flashback starts a new party); WON, the story
+# flag + 1 its victory sets (0 none). JOB_ID, SET_POS, BAG_ITEM, DEFEND_ID, EQUIP_CHANGE_ID: FFT's
+# ids of the chapter's jobs, skill set entries (their learned bit), bag slots and supports.
+PARTY = {'opening': 0, 'campaign': 1}
+WON = {'opening': 1, 'campaign': 2}
+SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
-    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS', 'START']
+    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'STATUS', 'START',
+     'PARTY', 'WON'] + list(SAVE_IDS)
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -78,7 +87,7 @@ def numbers(text, values):
 
 
 def table(text, name, values):
-    m = re.search(r'\b' + name + r'((?:\[[^]]*\])+)\s*=\s*\{', text)
+    m = re.search(r'\b' + name + r'((?:\[[^]]*\])+)(?:\s*__attribute__\(\(unused\)\))?\s*=\s*\{', text)
     if not m:
         return None
     depth, at = 0, m.end() - 1                 # the balanced initializer (several per line)
@@ -139,7 +148,7 @@ def build(chapter):
     texts.append((maps if maps.exists() else HERE / 'map.h').read_text())
     actors = folder / ('units.h' if chapter == 'opening' else 'actors.h')
     texts.append(actors.read_text())
-    values = {}
+    values = {'SET_N': int(re.search(r'#define SET_N (\d+)', (HERE / 'fft.h').read_text())[1])}
     for t in texts:
         numbers(t, values)
     offsets = {}
@@ -185,6 +194,9 @@ def build(chapter):
             body += struct.pack('>4B2h', *seq)
     fields['RAMZA'], fields['UNIT_K'], fields['STATUS'] = RAMZA[chapter], UNIT_K[chapter], STATUS[chapter]
     fields['START'] = START[chapter]
+    fields['PARTY'], fields['WON'] = PARTY[chapter], WON[chapter]
+    for f in SAVE_IDS:
+        fields[f] = values.get(f, 0)
     gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
     portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
     for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):

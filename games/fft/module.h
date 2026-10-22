@@ -66,6 +66,8 @@ typedef struct {
     const u8 *cgfx;
 #ifdef FFT_CHAPTER
     u8 (*ranged_reach)(u8 a, u8 o, u8 c);
+    u8 (*rt_load)(const char *name, void *data, u16 size);
+    u8 (*rt_save)(const char *name, const void *data, u16 size);
 #endif
     long __attribute__((__stkparm__)) (*divsi3)(long a, long b);   // GCC's helpers: stack
     long __attribute__((__stkparm__)) (*mulsi3)(long a, long b);   // arguments
@@ -134,6 +136,8 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define scene_rot (*M.scene_rot)
 #define vbuf_rot (*M.vbuf_rot)
 #define cgfx (M.cgfx)
+#define rt_load M.rt_load
+#define rt_save M.rt_save
 long __attribute__((__stkparm__)) __divsi3(long a, long b) { return M.divsi3(a, b); }
 long __attribute__((__stkparm__)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
 #endif

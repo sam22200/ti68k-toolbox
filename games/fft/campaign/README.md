@@ -25,7 +25,7 @@ make -C games/fft/campaign assets
 make -C games/fft/campaign check bundle
 ```
 
-Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 28 variables, 291,136 bytes:
+Serialize GCC4TI builds. The bundle is `x/fftcampaign.89g`: 28 variables, 295,707 bytes:
 the small `fftstory` supervisor, two packed launchers (`fftbat`, the battle program of every
 chapter, and `fftscn`, the scene player), their archived cores (`ffbcore`, `ffscore`), the
 battle modules (`ffbm`) and the chapter banks. All data
@@ -39,6 +39,13 @@ window. During battle, CATALOG selects **Move: full tiles / Move: contour**
 without automatically starting the next. `fftbat(n)` alone plays one chapter (100 + an
 Orbonne door: `fftbat(100)` its gate; 200 + a Gariland door: `fftbat(200)` its battle) and
 returns to HOME; use `fftstory()` for the automatic continuation.
+
+**Campaign save** (`save.h`, the variable `ffsave`, archived): `fftbat` writes it when it
+leaves after a victory: the chapter's story flag, and after Gariland the new party (the
+units still with it, FFT's job/item/ability ids, each one's job JP and learned abilities,
+its support) and the bag. `fftstory()` resumes after the last victory saved (after Orbonne:
+the chapter card), or from the start once every chapter is won; `fftstory(1)` deletes the save
+and starts a new game. `python3 games/fft/tools/save_dump.py ffsave.sav` decodes one.
 
 On the PC:
 

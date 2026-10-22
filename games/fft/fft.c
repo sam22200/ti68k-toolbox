@@ -489,6 +489,7 @@ static void charge_resolve(void);
 static void opening_start(u16 n);
 static u8 map_update(void);
 static void map_render(void);
+static void save_campaign(void);
 #endif
 
 void battle_units(void)
@@ -2544,7 +2545,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->rt_keys = &rt_keys; c->rt_prev = &rt_prev; c->scene_rot = &scene_rot; c->vbuf_rot = &vbuf_rot;
         c->cgfx = cgfx;
         c->gauge = gauge;
-        c->ranged_reach = ranged_reach;
+        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
         mod_id = id + 1;
     }
@@ -2572,6 +2573,7 @@ static void draw_status(void) { mod_call(MOD_SCREENS, 1, 0); }
 static u8 map_update(void) { return (u8)mod_call(MOD_BEATS, 0, 0); }
 static void map_render(void) { mod_call(MOD_BEATS, 1, 0); }
 static void map_start(u8 after) { mod_call(MOD_BEATS, 2, after); }
+static void save_campaign(void) { mod_call(MOD_SAVE, 0, 0); }
 #endif
 u8 ai_facing(u8 a) { return (u8)mod_call(MOD_AI, 1, a); }
 #endif
@@ -4408,7 +4410,24 @@ static u8 update(u8 fast)
 #include "config.inc"
 #endif
 
+static u8 battle_update(void);
+// leaving after a victory: the campaign save written (save.inc), then on the TI the buffers
+// freed, for AMS to write it as the program exits (rt_save)
 u8 game_update(void)
+{
+    if (battle_update()) return 1;
+#ifdef FFT_CHAPTER
+    if (W && (st.end == END_VICTORY || st.open_handoff)) {
+        save_campaign();
+#ifdef __m68k__
+        release(); W = RT_NULL;
+#endif
+    }
+#endif
+    return 0;
+}
+
+static u8 battle_update(void)
 {
     u8 r, k = st.ai == AI_THINK ? AI_FAST : 1;   // (thinking this frame: its last step too)
     FRAME_BEGIN();
@@ -5737,4 +5756,7 @@ void game_render(void)
 #endif
 #if !MOD_CORE && MOD_PART(MOD_BEATS) && defined(FFT_CHAPTER)
 #include "opening/opening.inc"                  // its beats only (MOD_PART there)
+#endif
+#if MOD_PART(MOD_SAVE) && defined(FFT_CHAPTER)
+#include "save.inc"
 #endif

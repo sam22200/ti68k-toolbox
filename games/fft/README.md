@@ -713,6 +713,8 @@ local-disc package launched with `fftstory()`: Orbonne, the Academy bridge,
 then the existing Gariland combat. `opening/BUGFIXES.md` records delayed
 Archer actions, camera handedness and source scene-pose corrections. This
 package uses separate archived chapters rather than keeping two maps in RAM.
+A victory writes the campaign save (`ffsave`: story flags, Gariland's party and bag, FFT's
+ids), from which `fftstory()` resumes; `fftstory(1)` starts a new game.
 
 Reach highlighting already persists in the scene cache. A follow-up skips
 visually unchanged ranges and batches overlapping background patches, reducing

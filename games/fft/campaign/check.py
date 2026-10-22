@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Actual 68000 Academy/Gariland pixels and portable state; no emulator timings."""
 from pathlib import Path
-import subprocess,re,json,sys
+import subprocess,re,json,sys,hashlib
 HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2];OUT=HERE/'x/check'
+sys.path.insert(0,str(HERE.parent/'tools'));import save_dump
 def run(args,cwd=HERE/'data'):
     p=subprocess.run(list(map(str,args)),cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
     if p.returncode:print(p.stdout);p.check_returncode()
@@ -16,12 +17,13 @@ def main():
     fast=OUT/'fast.keys';fast.write_text('0 A\n')
     status=OUT/'status.keys';status.write_text('1 UP\n2\n3 UP\n4\n5 ENTER\n6\n30 B\n31\n')
     reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
+    won=OUT/'won.keys';won.write_text('0 A\n'+''.join(f'{f} A ENTER\n{f+1} A\n' for f in range(9000,20001,40)))
     settings=OUT/'settings.keys';settings.write_text('20 ENTER\n21\n40 CATALOG\n41\n43 ENTER\n44\n46 ESC\n47\n80 F5\n81\n115 CATALOG\n116\n118 ENTER\n119\n122 CATALOG\n123\n145 APPS\n146\n155 APPS\n156\n180 B\n181\n')
     results=[]
     for name,flags,banks,cases in (
         ('scene',['-DCHECK_SCENE'],['ffs1','ffcp','ffcu','ffca','ffcb'],[('card',1,30,empty),('academy',1,120,advance),('academy-complete',1,1000,advance)]),
         ('gariland',['-DCHECK_GAR'],['ffbm','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb'],
-         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings)])):
+         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']
             if not cases:continue
@@ -30,15 +32,21 @@ def main():
         run(['cc','-std=gnu99','-O1',*flags,'-o',OUT/name,*common,ROOT/'runtime/platform-sw/rt_sw.c'])
         run([ROOT/'tools/bin/ti-cc','-o',OUT/(name+'c'),'-DRT_CYCLES',*flags,*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
         for case,scenario,frames,keys in cases:
+            sav=HERE/'data/ffsave.sav';sav.unlink(missing_ok=True);(OUT/'ffsave.89y').unlink(missing_ok=True)
             pc=run([OUT/name,scenario,frames,keys,OUT/(name+'-'+case+'-pc.png')])
             command=[ROOT/'tools/bin/ti-cycles','--max',10000,'--arg',scenario,'--frames',frames,'--keys',keys,'--png',OUT/(name+'-'+case+'-ti.png')]
             for bank in banks:command+=['--file',HERE/'data'/(bank+'.89y')]
+            if case=='won':command+=['--save-dir',OUT]
             ti=run([*command,OUT/(name+'c.89z')]);(OUT/(name+'-'+case+'.log')).write_text(ti)
             executed=int(re.search(r'executed (\d+)',pc)[1]);checksum=re.search(r'checksum (\w+)',pc)[1];state=int(re.search(r'state (\w+)',pc)[1],16)
             assert checksum.lower()==re.search(r'checksum\s+(\w+)',ti)[1].lower(),(name,case,'pixels')
             values=[int(v,16) for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',ti)]
             assert values[-3:]==[executed,0xacad0001,state],(name,case,'state',values,pc)
             row=dict(chapter=name,case=case,executed_frames=executed,checksum=checksum,state_hash=state)
+            if case=='won':                    # the campaign save (save.h): the same bytes, Gariland's flag, its party
+                saved=save_dump.payload(sav);assert saved==save_dump.payload(OUT/'ffsave.89y'),(name,case,'save')
+                party=save_dump.decode(saved);assert party['flags']==[1] and party['party'],party
+                row['save']=hashlib.sha1(saved).hexdigest()[:12];sav.unlink()
             results.append(row);print(json.dumps(row),flush=True)
     (OUT/('status.json' if '--status-only' in sys.argv else 'academy.json' if '--academy-only' in sys.argv else 'checked.json')).write_text(json.dumps(results,indent=2)+'\n')
     print('Campaign: %d actual-68000 pixels/state replays passed'%len(results))
