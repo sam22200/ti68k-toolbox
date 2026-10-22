@@ -57,9 +57,13 @@ constant offsets.
   aftermath: its packed core is 45,215 bytes and now passes TTPack. The aftermath is
   identical frame by frame; from the gate, only frame-counter phases differ (the dialogue's
   continuation blink, banner sweep, idle poses), the counter restarting with the program.
-  The chain: fftscn(0), fftopen, fftscn(1), fftacad, fftgar (test door 99: fftopen(5),
-  fftscn(1), fftacad(14), fftgar(61)). Next: the Academy as a scene set, then the map
-  beats as a generic script in the engine.
+  The chain: fftscn(0), fftopen, fftscn(1), fftgar (test door 99: fftopen(5), fftscn(1),
+  fftgar(61)). The Academy is a scene of `ffs1` (its picture with the eight actors drawn in,
+  15 beats; 4,142 bytes with the card instead of the Academy program and bank, ~13.6 KB);
+  its dialogue now has the shared style (gradient, six lines, continuation blink: before/
+  after `x/academy-avant-apres.png`, awaiting validation). Next: the map beats as a generic
+  script in the engine. Status stays per chapter for now: unifying on Orbonne's text-only
+  page would save 2.2 KB but lose what the management menus will need.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

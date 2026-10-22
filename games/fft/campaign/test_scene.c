@@ -24,11 +24,14 @@ int main(void)
     for(i=0;i<20&&sw_step(0);i++){}
     assert(chapter_completed());   // SHIFT skips the chapel
     sw_init(0);assert(!sw_step(K_ESC)&&!chapter_completed());
-    // ffs1, the chapter card (campaign/data): it fades in, ENTER goes on
+    // ffs1, the chapter card (campaign/data): it fades in, ENTER goes on to the Academy,
+    // whose every message leads to the end
     assert(!chdir("../../campaign/data"));
     sw_init(1);assert(st.open_stage==OPEN_DONE&&st.open_fade==9);
     for(i=0;i<10;i++)assert(sw_step(0));
-    assert(!st.open_fade&&!sw_step(K_ENTER)&&chapter_completed());
-    printf("Scene player: title, chapel beats, palette, skip, card and cancellation passed\n");
+    assert(!st.open_fade);press(K_ENTER);assert(st.open_stage==OPEN_CHAPEL&&st.step==1);
+    for(i=0;i<2000&&sw_step(i%2?0:K_ENTER);i++){}
+    assert(i<2000&&chapter_completed());
+    printf("Scene player: title, chapel beats, palette, skip, card, Academy and cancellation passed\n");
     return 0;
 }

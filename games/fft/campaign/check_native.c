@@ -11,10 +11,8 @@
 #endif
 #ifdef CHECK_GAR
 #include "gariland.c"
-#elif defined(CHECK_SCENE)
+#else                                   // CHECK_SCENE: the scene player
 #include "scene.c"
-#else
-#include "academy.c"
 #endif
 #ifndef __m68k__
 #include <stdio.h>
@@ -34,12 +32,9 @@ static u32 state_hash(void)
         for(k=0;k<5;k++){HASH(u->eq[k]);HASH(u->raw[k]);}
     }
     HASH(st.act);HASH(st.mode);HASH(st.ai);HASH(st.abil);HASH(st.end);HASH(st.rot);HASH(rng32);
-#elif defined(CHECK_SCENE)
+#else
     HASH(st.step);HASH(st.open_stage);HASH(st.open_beat);HASH(st.open_reveal);HASH(st.open_offset);
     HASH(st.open_pan);HASH(st.open_white);HASH(st.done);
-#else
-    HASH(academy.message);HASH(academy.offset);HASH(academy.reveal);
-    HASH(academy.tick);HASH(academy.white);HASH(academy.done);
 #endif
 #undef HASH
     return h;

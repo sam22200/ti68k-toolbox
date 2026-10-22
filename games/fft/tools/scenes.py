@@ -97,11 +97,51 @@ def opening():
     print('ffost', len(rest) + 2, 'bytes,', count, 'map beats')
 
 
+def academy():
+    """The Academy bridge (campaign_assets.py: ffac): its fixed picture with the eight
+    actors drawn in (they never move), then its messages as beats."""
+    data = HERE / 'campaign/data'
+    bank = (data / 'ffac.bin').read_bytes()
+    h = dict(re.findall(r'#define (AC_\w+) (\d+)', (data / 'academy.h').read_text()))
+    h = {k: int(v) for k, v in h.items()}
+    be = lambda a: struct.unpack_from('>H', bank, a)[0]
+    planes = [bytearray(bank[h['AC_BG']:h['AC_BG'] + 2000]), bytearray(bank[h['AC_BG'] + 2000:h['AC_BG'] + 4000])]
+    for i in range(h['AC_NACTORS']):      # academy.c: draw_sprite, pixel = data | (mask & old)
+        a = h['AC_ACTORS'] + 160 * i
+        x, y = struct.unpack_from('>hh', bank, a)
+        light, dark, mask = ([be(a + 4 + 52 * k + 2 * r) for r in range(26)] for k in range(3))
+        for plane, bits in ((planes[0], light), (planes[1], dark)):
+            for r in range(26):
+                for c in range(16):
+                    px, py, bit = x + c, y + r, 0x8000 >> c
+                    if not (0 <= px < 160 and 0 <= py < 100):
+                        continue
+                    at, b = py * 20 + px // 8, 0x80 >> (px & 7)
+                    on = bool(bits[r] & bit) or (bool(mask[r] & bit) and bool(plane[at] & b))
+                    plane[at] = plane[at] | b if on else plane[at] & ~b
+    picture = extract_pack(bytes(planes[0]) + bytes(planes[1]) + bytes(4 * 2000))
+    beats = []
+    for i in range(h['AC_NMESSAGES']):
+        a = be(h['AC_MESSAGES'] + 2 * i)
+        name = bank[a:bank.index(b'\0', a)]
+        body = bank[a + len(name) + 1:bank.index(b'\0', a + len(name) + 1)]
+        beats.append(bytes((7, 0, 0, 0)) + name + b'\0' + body + b'\0')
+    return picture, beat_block(beats)
+
+
+def extract_pack(raw):
+    import sys
+    sys.path.insert(0, str(HERE / 'tools'))
+    import extract
+    return extract.zx0pack.pack(raw)
+
+
 def card():
-    """ffs1: the end card of Orbonne's chapter, before the Academy."""
+    """ffs1: the end card of Orbonne's chapter, then the Academy bridge."""
     lines = [(14, 28, 0, 'Chapter 1'), (14, 45, 0, 'The Meager'), (14, 74, 1, 'ENTER: Military Academy')]   # C_WHITE, C_LGRAY
     blob = bytes([len(lines)]) + b''.join(bytes((x, y, c)) + s.encode('ascii') + b'\0' for x, y, c, s in lines)
-    out = scene_set('', [(CARD, 1, [blob])])
+    picture, beats = academy()
+    out = scene_set('', [(CARD, 1, [blob]), (STORY, 0, [picture, 20, beats])])
     (HERE / 'campaign/data/ffs1.bin').write_bytes(out)
     print('ffs1', len(out), 'bytes')
 

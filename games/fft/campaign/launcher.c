@@ -16,8 +16,8 @@ void _main(void)
     ESI args;short test=0;
     InitArgPtr(args);if(GetArgType(args)==POSINT_TAG)test=GetIntArg(args)==99;
     // The scene player (fftscn) shows what lies between battles: Orbonne's title and chapel
-    // (ffs0), the chapter card (ffs1).
-    if(test){if(chapter("fftopen(5)")&&chapter("fftscn(1)")&&chapter("fftacad(14)"))chapter("fftgar(61)");}
-    else if(chapter("fftscn(0)")&&chapter("fftopen()")&&chapter("fftscn(1)")&&chapter("fftacad()"))chapter("fftgar()");
+    // (ffs0), the chapter card and the Academy (ffs1).
+    if(test){if(chapter("fftopen(5)")&&chapter("fftscn(1)"))chapter("fftgar(61)");}
+    else if(chapter("fftscn(0)")&&chapter("fftopen()")&&chapter("fftscn(1)"))chapter("fftgar()");
     push_shortint(0);
 }

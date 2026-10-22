@@ -174,9 +174,11 @@ static void opening_dialog_draw(void)
                 RMW16(l+2*word,mask,st.open_white?mask:0);
             }
         }
-        draw_rect(x,y-11,nw,11,st.open_white?C_BLACK:C_WHITE);
-        draw_rect(x+1,y-10,nw-2,10,st.open_white?C_WHITE:C_BLACK);
-        ui_text(x+4,y-8,name,st.open_white?C_BLACK:C_WHITE,156);
+        if(*name){                      // (an anonymous line: no name box)
+            draw_rect(x,y-11,nw,11,st.open_white?C_BLACK:C_WHITE);
+            draw_rect(x+1,y-10,nw-2,10,st.open_white?C_WHITE:C_BLACK);
+            ui_text(x+4,y-8,name,st.open_white?C_BLACK:C_WHITE,156);
+        }
     }
     if(cold||W->dialog_drawn!=st.open_reveal||W->dialog_part<W->dialog_n){
         for(row=0;row<W->dialog_n;row++){
@@ -196,6 +198,6 @@ static void opening_dialog_draw(void)
     rt_light=saved_l;rt_dark=saved_d;
     // Only the fitted window rectangle is copied, not a second whole screen.
     opening_copy_rect(x,y,w,h);
-    opening_copy_rect(x,y-11,(u8)nw,11);
+    if(*name)opening_copy_rect(x,y-11,(u8)nw,11);
     if(st.open_reveal>=W->dialog_total && (st.tick&16))draw_rect(x+w-5,96,3,2,st.open_white?C_BLACK:C_WHITE);
 }
