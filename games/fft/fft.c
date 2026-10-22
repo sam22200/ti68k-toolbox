@@ -75,6 +75,10 @@ static void __attribute__((noinline)) frame_end(void)
 #endif
 
 #if MOD_CORE                            // a module reaches them through its context (module.h)
+#ifdef FFT_CHAPTER
+u8 map_w, map_h, map_n;                 // the chapter's (fft.h)
+s16 sc_h, sc_top;
+#endif
 State st;
 u8 *scene_l, *scene_d;
 u8 scene_rot;
@@ -171,19 +175,19 @@ typedef struct {
 #else
     s16 span_l[TH + 8], span_r[TH + 8];
 #endif
-    u8 from[MAP_W * MAP_H];
+    u8 from[MAP_NMAX];
     u8 half[2][TW / 8 * TH];
 #ifndef FFT_TABLES_ARCHIVED
     u16 dbl[256];                       // byte -> its bits doubled
 #endif
-    u8 order[MAP_W * MAP_H], count[256];
+    u8 order[MAP_NMAX], count[256];
 #ifdef FFT_WATER_BANK
     const u8 *puddle[4];                // archived even-x/2,y pairs; no decoded glint arrays
 #else
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
 #endif
     u8 glints[4];
-    s16 key[MAP_W * MAP_H], gx[MAP_W + 1][MAP_H + 1], gy[MAP_W + 1][MAP_H + 1];
+    s16 key[MAP_NMAX], gx[MAP_WMAX + 1][MAP_HMAX + 1], gy[MAP_WMAX + 1][MAP_HMAX + 1];
 #ifdef FFT_COMPACT_UI
     // No backing tactical panels in the bounded camera renderer. Its full-UI render
     // entry point is excluded below; legacy panel helpers are never called.
@@ -221,8 +225,8 @@ typedef struct {
     s16 ring_y0, ring_y1;               // the scene rows the reach rings are on
     s16 drop_y0, drop_y1;               // the rows still to put back (rings going)
     u8 from_who;                        // whose reach W->from holds the steps of (+ 1; 0: none)
-    u8 ring_i;                          // next reach tile; MAP_W * MAP_H: all drawn
-    u8 ring_bits[(MAP_W * MAP_H + 7) / 8], ring_style; // last completed visual reach, not its costs
+    u8 ring_i;                          // next reach tile; MAP_N: all drawn
+    u8 ring_bits[(MAP_NMAX + 7) / 8], ring_style; // last completed visual reach, not its costs
     u32 cur_m[24];                      // the cursor's mask, dashed where the view is in front
     u16 cur_k;                          // of it, for this tile | rot << 8 | 0x8000 (0: none)
     u32 num[3][2][7];                   // an attack's number (or Miss), the EXP and the JP its user
@@ -234,33 +238,33 @@ typedef struct {
     // the movement spread (spread_start, spread_go): its tiles to go on from by cost & 3, where it
     // stands; the mover's enemies' tiles; each tile's x, z, standing height, height out of it
     // (water: its surface), 1 walkable | 2 water; the moves out of each tile (edges()), for Jump ej
-    u8 sq[4][MAP_W * MAP_H], sq_n[4];
+    u8 sq[4][MAP_NMAX], sq_n[4];
     u8 sp_d, sp_i, sp_limit, sp_out, sp_left, *sp_dist, *sp_from;
     const u8 *sp_need;
-    u8 blk[MAP_W * MAP_H];
+    u8 blk[MAP_NMAX];
 #ifndef FFT_TABLES_ARCHIVED
-    u8 tx[MAP_W * MAP_H], tz[MAP_W * MAP_H];
+    u8 tx[MAP_NMAX], tz[MAP_NMAX];
 #endif
-    u8 hs[MAP_W * MAP_H], hl[MAP_W * MAP_H], hw[MAP_W * MAP_H];
-    u8 eg[MAP_W * MAP_H][16], en[MAP_W * MAP_H], ej, ej_pad;
+    u8 hs[MAP_NMAX], hl[MAP_NMAX], hw[MAP_NMAX];
+    u8 eg[MAP_NMAX][16], en[MAP_NMAX], ej, ej_pad;
 #ifdef FFT_CHAPTER
-    u16 top[MAP_W * MAP_H];             // map-56 towers exceed 255 source height units
+    u16 top[MAP_NMAX];             // map-56 towers exceed 255 source height units
 #else
-    u8 top[MAP_W * MAP_H];              // a tile's column for a projectile (FFT: its height x 12);
+    u8 top[MAP_N];              // a tile's column for a projectile (FFT: its height x 12);
 #endif
 #ifndef FFT_TABLES_ARCHIVED
-    u8 col[MAP_W * 28], row[MAP_H * 28];    // world x, z -> the tile's column, z * MAP_W
+    u8 col[MAP_WMAX * 28], row[MAP_HMAX * 28];    // world x, z -> the tile's column, z * MAP_W
 #endif
     // the AI (fft.c § the AI): per tile the sets (1: can stop there, 2: to act from), the danger,
     // the steps from the focus, what stepping there gives; the tiles to act from
     // in map order and safest first; the ranking; the usable abilities, the unit's thinking step
-    u8 ai_m[MAP_W * MAP_H], ai_prox[MAP_W * MAP_H], ai_dist[MAP_W * MAP_H];
+    u8 ai_m[MAP_NMAX], ai_prox[MAP_NMAX], ai_dist[MAP_NMAX];
     u8 ai_tt[NUNIT], ai_tu[NUNIT];      // an ability's targets (but the actor): their tiles, units
     u8 ab, ab_k, ab_n, ab_all, ai_traj; // the ability being tried: its next origin, its targets,
     u16 ab_done;                        // no target used up, a trajectory just checked; the
     AiAct ab_best;                      // targets used up, its best so far
-    s16 ai_gain[MAP_W * MAP_H], ai_key[MAP_W * MAP_H];   // what stepping there gives, its key
-    u8 ai_grid[MAP_W * MAP_H], ai_ord[MAP_W * MAP_H], ai_no;
+    s16 ai_gain[MAP_NMAX], ai_key[MAP_NMAX];   // what stepping there gives, its key
+    u8 ai_grid[MAP_NMAX], ai_ord[MAP_NMAX], ai_no;
     AiAct ai_rank[8];
     u8 ai_n, ai_list[1 + SET_N], ai_nab, ai_k, ai_a, ai_self, ai_focus, ai_c0, ai_c1, ai_retreat;
     u8 ai_er, ai_ar, ai_ranged;         // its shortest reach on an enemy, an ally; a ranged ability
@@ -297,7 +301,7 @@ typedef struct {
 #ifdef FFT_VIEW_SPLIT
     // The view's colours of the scene rows the reach rings were drawn on, kept before a ring
     // changes them (the colours are no longer kept whole: VIEW_BYTES)
-    u8 bk_of[SC_H];                     // a row's slot (0xFF: the row is still the view's)
+    u8 bk_of[SC_HMAX];                     // a row's slot (0xFF: the row is still the view's)
     u8 bk_row[BK_N], bk_n, bk_over;     // each slot's row; slots used; rings past the backup
     u8 bk[BK_N][2][SC_BYTES];
 #endif
@@ -1070,7 +1074,7 @@ static void make_glints(u8 rot)
     }
 #else
     memset(W->glints, 0, sizeof W->glints);
-    for (i = 0; i < MAP_W * MAP_H; i++) {
+    for (i = 0; i < MAP_N; i++) {
         s16 u, v, x, y, r, px;
         if (!map_tiles[i].water) continue;
         view_of(rot, i % MAP_W, i / MAP_W, &u, &v);
@@ -1222,7 +1226,7 @@ static void ensure_scene(u8 rot)
 #endif
     if (scene_rot == rot && scene_seq == hl_seq) {
         if (W->drop_y0 < W->drop_y1) goto drop;
-        if (W->ring_i >= MAP_W * MAP_H) return;
+        if (W->ring_i >= MAP_N) return;
         goto rings;
     }
     if(scene_rot==rot && W->drop_y0>=W->drop_y1 && W->ring_i>=MAP_W*MAP_H && rings_unchanged()){
@@ -1267,13 +1271,13 @@ drop:
     }
 rings:
     dst_scene();
-    if (!RINGS(st.mode)) { W->ring_i = MAP_W * MAP_H; W->ring_style=0; return; }
+    if (!RINGS(st.mode)) { W->ring_i = MAP_N; W->ring_style=0; return; }
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
     frame_stall = 1;
 #endif
     ZB(10);
     memset(W->ring_bits,0,sizeof W->ring_bits);
-    for (; W->ring_i < MAP_W * MAP_H; W->ring_i++) {
+    for (; W->ring_i < MAP_N; W->ring_i++) {
         i = W->ring_i;
         if (st.reach[i] == 0xFF) continue;
         W->ring_bits[i>>3]|=(u8)(1U<<(i&7));
@@ -1332,10 +1336,14 @@ static u8 lower(u8 c)                    // a tile's height a unit leaves it fro
 // jump, 2 into water)
 static void edges(u8 jump)
 {
+#ifdef FFT_CHAPTER
+    const s8 step[4] = { 1, -1, (s8)MAP_W, (s8)-MAP_W };   // (the chapter's width)
+#else
     static const s8 step[4] = { 1, -1, MAP_W, -MAP_W };
+#endif
     u8 t, k, j;
     W->ej = jump;
-    for (t = 0; t < MAP_W * MAP_H; t++) {
+    for (t = 0; t < MAP_N; t++) {
         u8 x = TILE_X[t], z = TILE_Z[t], h = W->hl[t], n = 0, *e = W->eg[t];
         for (k = 0; k < 4; k++) {
             u8 room = k == 0 ? MAP_W - 1 - x : k == 1 ? x : k == 2 ? MAP_H - 1 - z : z, nc = t;
@@ -1360,12 +1368,12 @@ static void spread_start(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, con
     const Unit *un = &st.unit[who];
     u8 *blk = W->blk, i, foe = un->team == TEAM_ENEMY;
     if (W->ej != un->jump) edges(un->jump);
-    memset(blk, 0, MAP_W * MAP_H);
+    memset(blk, 0, MAP_N);
     for (i = 0; i < NUNIT; i++) {
         const Unit *u = &st.unit[i];
         if (!DC_OBJ(u->dc) && (u->team == TEAM_ENEMY) != foe) blk[u->z * MAP_W + u->x] = 1;
     }
-    memset(dist, 0xFF, MAP_W * MAP_H);
+    memset(dist, 0xFF, MAP_N);
     W->sq_n[0] = W->sq_n[1] = W->sq_n[2] = W->sq_n[3] = 0;
     dist[c] = 0;
     W->sq[0][W->sq_n[0]++] = c;
@@ -1423,7 +1431,7 @@ void compute_reach(u8 who)
         if (i != who && st.unit[i].x < MAP_W && st.unit[i].z < MAP_H
             && unit_at(st.unit[i].x, st.unit[i].z))       // can, it is picked up)
             st.reach[st.unit[i].z * MAP_W + st.unit[i].x] = 0xFF;
-    for (i = 0; i < MAP_W * MAP_H; i++)            // nor on a tree (crossed only)
+    for (i = 0; i < MAP_N; i++)            // nor on a tree (crossed only)
         if (map_tiles[i].walk == 2) st.reach[i] = 0xFF;
 }
 
@@ -1466,7 +1474,7 @@ void attack_range(u8 who)
 #ifdef FFT_CHAPTER
     if (WEAPON_REACH(u) > 1) {
         u8 c, o = (u8)(u->z * MAP_W + u->x);
-        for (c = 0; c < MAP_W * MAP_H; c++) if (ranged_reach(who, o, c)) st.reach[c] = 1;
+        for (c = 0; c < MAP_N; c++) if (ranged_reach(who, o, c)) st.reach[c] = 1;
         return;
     }
 #endif
@@ -1888,7 +1896,6 @@ shown:
 // standing on the fallback tile, the best eight drawn in order on their hit chance (none: to the
 // fallback tile, Defend if it has it); acting from its own tile, it acts first, then moves to
 // the safest tile. The setup, then an ability per frame.
-#define MAP_N (MAP_W * MAP_H)
 #define AI_UNREACHED 125                // FFT's steps to a tile its spread does not reach
 #define AI_BAD (-0x7FFF)
 enum { NT_ENEMY, NT_HEALER, NT_IMMINENT, NT_ANY_ENEMY };
@@ -2516,6 +2523,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
     if (mod_id != id + 1) {
         ModCtx *c = (ModCtx *)((u8 *)mod_zone + RD16(m, 4));
         memcpy(mod_zone, m + 10, RD16(m, 3));
+        c->map_w = map_w; c->map_h = map_h; c->map_n = map_n; c->sc_h = sc_h; c->sc_top = sc_top;
         c->st = &st; c->w = W; c->abilities = abilities; c->map_tiles = map_tiles;
         c->contour_gfx = contour_gfx; c->cdesc = cdesc;
         c->rand15 = rand15; c->known = known; c->spread_start = spread_start; c->spread_go = spread_go;
@@ -3222,8 +3230,8 @@ static void draw_turn(void)
                 cnt[k]++;
             }
         for (i = 0, j = 0; i < 256; i++) { u8 c = cnt[i]; cnt[i] = (u8)j; j += c; }
-        for (i = 0; i < MAP_W * MAP_H; i++) order[cnt[key[i]]++] = (u8)i;
-        n = MAP_W * MAP_H;
+        for (i = 0; i < MAP_N; i++) order[cnt[key[i]]++] = (u8)i;
+        n = MAP_N;
     }
     for (i = 0; i < n; i++) {
         u8 o = order[i], f;
@@ -3512,6 +3520,7 @@ void game_init(void)
 #endif
     if (!cgfx || !cdesc || RD16(cdesc, 0) != 0x4643 || RD16(cdesc, 1) != 0x4431) igfx = RT_NULL;
     else {
+        map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u8)(map_w * map_h); sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
         jobs = (const Job *)(igfx + CD(JOBS)); items = (const Item *)(igfx + CD(ITEMS));
         abilities = (const Ability *)(igfx + CD(ABILITIES));
         skill_sets = (const SkillSet *)(igfx + CD(SKILL_SETS));
@@ -3542,7 +3551,7 @@ void game_init(void)
         }
         W = (Work *)(sbuf + 2 * SC_PLANE);
         memset(W, 0, sizeof(Work));
-        for (i = 0; i < MAP_W * MAP_H; i++) {
+        for (i = 0; i < MAP_N; i++) {
 #ifndef FFT_TABLES_ARCHIVED
             TILE_X[i] = (u8)(i % MAP_W); TILE_Z[i] = (u8)(i / MAP_W);
 #endif
@@ -4095,7 +4104,7 @@ static u8 twin(u8 c, u8 aim)
     u8 i;
     view_of(st.rot, c % MAP_W, c / MAP_W, &u, &v);
     x = scene_x(st.rot, u, v); y = scene_y(u, v) - map_tiles[c].stand * (HU / 2);
-    for (i = 0; i < MAP_W * MAP_H; i++) {
+    for (i = 0; i < MAP_N; i++) {
         if (i == c) continue;
         view_of(st.rot, i % MAP_W, i / MAP_W, &u, &v);
         if (scene_x(st.rot, u, v) == x && scene_y(u, v) - map_tiles[i].stand * (HU / 2) == y && pickable(i, aim))

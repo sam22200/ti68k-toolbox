@@ -8,6 +8,8 @@
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work)))   // both sides built alike
 typedef struct {
     u16 sig;                            // MOD_SIG, from the module's own build
+    u8 map_w, map_h, map_n;             // the chapter's sizes, as they are at load (fft.h)
+    s16 sc_h, sc_top;
     State *st;
     Work *w;
     const Ability *abilities;
@@ -71,6 +73,11 @@ typedef struct {
 
 #ifdef FFT_MODULE
 ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one section)
+#define map_w (M.map_w)
+#define map_h (M.map_h)
+#define map_n (M.map_n)
+#define sc_h (M.sc_h)
+#define sc_top (M.sc_top)
 #define st (*M.st)
 #define W (M.w)
 #define abilities (M.abilities)

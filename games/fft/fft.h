@@ -82,11 +82,17 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #ifdef FFT_CHAPTER
 #ifdef FFT_OPENING
 #include "opening/data/units.h"
-#include "opening/data/map.h"
 #else
 #include "units.h"
-#include "map.h"
 #endif
+// The map's and its views' sizes are the chapter's (descriptor MAP_W, MAP_H, SC_H, SC_TOP), read
+// at load; buffers take the largest of every chapter (chapters.h, tools/chapter_desc.py)
+#include "chapters.h"
+extern u8 map_w, map_h, map_n;
+extern s16 sc_h, sc_top;
+#define MAP_W map_w
+#define MAP_H map_h
+#define MAP_N map_n                           // its tiles (u8 loops: at most 255)
 #ifdef FFT_RAW_ACTORS
 #include "weapons.h"                          // the earlier raw fftu/fftw control (Gariland)
 #else
@@ -161,18 +167,23 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define SC_BYTES 40                    // 320 px
 #define SC_W (SC_BYTES * 8)
 // Per map: its views' rows (SC_H) once the rows above every view's scenery (SC_TOP) are cut.
-#ifdef FFT_OPENING
-#define SC_H 192                       // exact mesh bottom 190; no cropped walkable terrain
-#elif defined(FFT_STORY_GAR)
-#ifndef SC_TOP
-#define SC_TOP 16                      // Gariland: tools/campaign_assets.py crops and checks them
-#endif
-#define SC_H (HH * (MAP_W + MAP_H) + HU * MAXH + 8 - SC_TOP)
+#ifdef FFT_CHAPTER
+#define SC_H sc_h                      // (Orbonne 192, its mesh bottom 190; Gariland cropped)
+#define SC_TOP sc_top
 #else
 #define SC_H (HH * (MAP_W + MAP_H) + HU * MAXH + 8)
 #endif
 #ifndef SC_TOP
 #define SC_TOP 0
+#endif
+#ifdef FFT_CHAPTER
+#define MAP_NMAX (MAP_WMAX * MAP_HMAX)  // the largest map's tiles (buffers)
+#else
+#define MAP_WMAX MAP_W
+#define MAP_HMAX MAP_H
+#define MAP_N (MAP_W * MAP_H)
+#define MAP_NMAX (MAP_W * MAP_H)
+#define SC_HMAX SC_H
 #endif
 #define SC_OY (HU * MAXH + 4 - SC_TOP) // scene y of the top vertex of view tile (0, 0) at h 0
 #define SC_PLANE (SC_BYTES * SC_H)     // one plane
@@ -290,7 +301,7 @@ typedef struct {
     u8 path[PATH_MAX][2];
     Unit unit[NUNIT];
     s16 camx, camy;                    // camera, scene pixels of the current orientation
-    u8 reach[MAP_W * MAP_H];           // M_TARGET: steps to each tile, 0xFF unreachable
+    u8 reach[MAP_NMAX];           // M_TARGET: steps to each tile, 0xFF unreachable
     u8 act;                            // the unit whose turn it is
     u8 turns[ORDER_N];                 // the next turns (FFT's AT list), turns[0] = act
     u8 page;                            // Status: stats (0), equipment / abilities (1)
