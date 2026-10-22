@@ -113,6 +113,7 @@ extern s16 sc_h, sc_top;
 extern const Job *jobs;                       // every chapter's, by FFT job id (ffcj)
 extern const Item *items;                     // every chapter's, by FFT item id (ffcj)
 extern const char *job_names;                 // 14 bytes a job (ffcj)
+extern const u8 *job_sets;                    // a job's skill set, FFT id (ffcj)
 #define JOB_NAME(j) (job_names + 14 * (j))
 extern const Ability *abilities;
 extern const SkillSet *skill_sets;
@@ -284,6 +285,8 @@ typedef struct {
     u8 sq_learned, rsm;                // Squire JP (left, in all) and abilities (bit k: SET_BASIC's
                                        // k-th); the reactions and supports learned (bit k: rsm_pre's
                                        // k-th, 0x80 Defend)
+    u8 slot;                           // its record in the campaign save, when the battle took the
+                                       // party from it (st.party_in; 0xFF: none)
 } Unit;
 
 typedef struct {
@@ -362,6 +365,7 @@ typedef struct {
     u16 open_reveal, open_offset, open_seen;
     u8 open_pan, open_fade, open_next, open_handoff;
     u8 found[NUNIT], nfound;           // the chests' items picked up (items[] index): the campaign's
+    u8 party_in;                       // the player's units came from the campaign save (save.inc)
 #endif
 #if defined(FFT_REACH_CONTOUR) && !defined(FFT_CONFIG)
     u8 config, config_row;

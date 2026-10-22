@@ -69,6 +69,9 @@ typedef struct {
     u8 (*rt_load)(const char *name, void *data, u16 size);
     u8 (*rt_save)(const char *name, const void *data, u16 size);
     const char *job_names;
+    const u8 *job_sets;
+    const SkillSet *skill_sets;
+    void (*unit_stats)(Unit *u);
 #endif
     long __attribute__((__stkparm__)) (*divsi3)(long a, long b);   // GCC's helpers: stack
     long __attribute__((__stkparm__)) (*mulsi3)(long a, long b);   // arguments
@@ -140,6 +143,9 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define rt_load M.rt_load
 #define rt_save M.rt_save
 #define job_names (M.job_names)
+#define job_sets (M.job_sets)
+#define skill_sets (M.skill_sets)
+#define unit_stats M.unit_stats
 long __attribute__((__stkparm__)) __divsi3(long a, long b) { return M.divsi3(a, b); }
 long __attribute__((__stkparm__)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
 #endif

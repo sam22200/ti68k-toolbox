@@ -226,6 +226,21 @@ constant offsets.
   equipment, now ids). Orbonne's hand-named shields take the disc's names (Mythril Shield,
   Gold Shield). Next: a battle that takes the player's units from the save, then the
   abilities as shared data.
+- Party from the save (step 2): the descriptor's PARTY is two bits, 1 the victory writes the
+  party (Gariland creates it), 2 the battle reads it (the battles after Gariland); the test door
+  70 reads it in any chapter. `party_load` (save.inc, in the save module: no code in the core)
+  fills the chapter's player units, the deployment slots: Ramza's with the save's Ramza, the
+  others in the roster's order; slots past the party leave the battle. A unit takes its FFT
+  job, sprite (Squire's when its job has none), level, EXP, Brave, Faith, sign, raw stats and
+  equipment (its statistics derived as the battle derives them), its job's JP and, when the
+  chapter has its job's skill set (`SET_ID`, `job_sets` in ffcj), the abilities it learned
+  there and its Defend; the bag from the inventory. A victory then updates the records it took
+  (level, EXP, the job's JP) and drops the units lost: the other jobs' JP and abilities stay.
+  Checks: `save-test` rebuilds Gariland's units from what it saved and finds them identical
+  (job, sprite, level, stats, equipment, JP, abilities), then a victory keeps the other jobs;
+  campaign `party` (door 270 with the save a Gariland victory wrote: Ramza and the two
+  survivors) PC and 68000 alike. fftbat is 64,161 bytes (TTPack's limit 64,936): the abilities'
+  interpreter (step 3) goes in a module.
 - Known limit: the white dialogue palette (CATALOG) does not carry over between programs.
 - RAM (TiEmu, Titanium): the test chain runs the opening door, the scene player's card and
   the Academy, then Gariland stops on "not enough memory". Measured with a HeapAvail probe:

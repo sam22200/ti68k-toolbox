@@ -23,7 +23,7 @@ def main():
     for name,flags,banks,cases in (
         ('scene',['-DCHECK_SCENE'],['ffs1','ffcp','ffcu','ffca','ffcb'],[('card',1,30,empty),('academy',1,120,advance),('academy-complete',1,1000,advance)]),
         ('gariland',['-DCHECK_GAR'],['ffbm','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
-         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won)])):
+         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won),('party',70,90,empty)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']
             if not cases:continue
@@ -33,10 +33,12 @@ def main():
         run([ROOT/'tools/bin/ti-cc','-o',OUT/(name+'c'),'-DRT_CYCLES',*flags,*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
         for case,scenario,frames,keys in cases:
             sav=HERE/'data/ffsave.sav';sav.unlink(missing_ok=True);(OUT/'ffsave.89y').unlink(missing_ok=True)
+            if case=='party':sav.write_bytes((OUT/'ffsave_won.sav').read_bytes())   # the party Gariland's victory saved
             pc=run([OUT/name,scenario,frames,keys,OUT/(name+'-'+case+'-pc.png')])
             command=[ROOT/'tools/bin/ti-cycles','--max',10000,'--arg',scenario,'--frames',frames,'--keys',keys,'--png',OUT/(name+'-'+case+'-ti.png')]
             for bank in banks:command+=['--file',HERE/'data'/(bank+'.89y')]
             if case=='won':command+=['--save-dir',OUT]
+            if case=='party':command+=['--file',OUT/'ffsave_won.89y']
             ti=run([*command,OUT/(name+'c.89z')]);(OUT/(name+'-'+case+'.log')).write_text(ti)
             executed=int(re.search(r'executed (\d+)',pc)[1]);checksum=re.search(r'checksum (\w+)',pc)[1];state=int(re.search(r'state (\w+)',pc)[1],16)
             assert checksum.lower()==re.search(r'checksum\s+(\w+)',ti)[1].lower(),(name,case,'pixels')
@@ -48,6 +50,7 @@ def main():
                 party=save_dump.decode(saved);assert party['flags']==[1] and party['party'],party
                 row['save']=hashlib.sha1(saved).hexdigest()[:12]
                 sav.rename(OUT/'ffsave_won.sav');(OUT/'ffsave.89y').rename(OUT/'ffsave_won.89y')   # the menus' party
+            if case=='party':sav.unlink(missing_ok=True)
             results.append(row);print(json.dumps(row),flush=True)
     if '--status-only' not in sys.argv and '--academy-only' not in sys.argv:
         results+=manage(OUT/'ffsave_won.sav',OUT/'ffsave_won.89y')

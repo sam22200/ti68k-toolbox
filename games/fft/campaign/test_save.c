@@ -22,7 +22,31 @@ int main(void)
         assert(s.unit[i].learned[1][2]&(0x80>>(CD(EQUIP_CHANGE_POS)&7)));
         assert(s.unit[i].support[0]==1);
     }
+    // the party from the save: Gariland's units rebuilt from what it saved are its own
     remove("ffsave.sav");
-    puts("Gariland: the campaign save keeps a chest's item, the party's draws and its flag");
+    sw_init(61);assert(sw_step(0));
+    {
+        Unit before[NUNIT];
+        memcpy(before,st.unit,sizeof before);
+        save_campaign();
+        for(i=0;i<NUNIT;i++)if(st.unit[i].team==TEAM_PLAYER){Unit *u=&st.unit[i];
+            u->job=u->level=u->brave=u->set=u->learned=u->defend=0;memset(u->raw,0,sizeof u->raw);memset(u->eq,0,sizeof u->eq);}
+        party_load();assert(st.party_in);
+        for(i=0;i<NUNIT;i++){
+            const Unit *a=&before[i],*b=&st.unit[i];
+            if(a->team!=TEAM_PLAYER)continue;
+            assert(a->job==b->job&&a->gfx==b->gfx&&a->level==b->level&&a->exp==b->exp&&a->brave==b->brave&&a->faith==b->faith);
+            assert(a->zodiac==b->zodiac&&a->name==b->name&&a->female==b->female&&!memcmp(a->raw,b->raw,sizeof a->raw));
+            assert(!memcmp(a->eq,b->eq,sizeof a->eq)&&a->max_hp==b->max_hp&&a->max_mp==b->max_mp&&a->pa==b->pa&&a->ma==b->ma);
+            assert(a->sp==b->sp&&a->move==b->move&&a->jump==b->jump&&a->jp==b->jp&&a->tjp==b->tjp);
+            assert(a->set==b->set&&a->learned==b->learned&&a->defend==b->defend);
+        }
+        // a victory with that party updates its records only: the other jobs' JP stay
+        {Save s1,s2;assert(rt_load(SAVE_NAME,&s1,sizeof s1));
+         st.unit[U_RAMZA].level++;save_campaign();assert(rt_load(SAVE_NAME,&s2,sizeof s2));
+         assert(s2.n==s1.n&&s2.unit[0].level==s1.unit[0].level+1&&!memcmp(s2.unit[1].jp,s1.unit[1].jp,sizeof s1.unit[1].jp));}
+    }
+    remove("ffsave.sav");
+    puts("Gariland: the campaign save keeps a chest's item, the party's draws and its flag; the party loads back as it was");
     return 0;
 }

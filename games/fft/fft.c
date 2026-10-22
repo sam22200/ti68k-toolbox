@@ -109,7 +109,7 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
 const Job *jobs; const Item *items; const Ability *abilities;   // its tables in igfx (jobs, items:
 #ifdef FFT_CHAPTER
-const char *job_names;                                           // ffcj, every chapter's)
+const char *job_names; const u8 *job_sets;                       // ffcj, every chapter's)
 #endif
 const SkillSet *skill_sets; const UnitDef *unit_defs;
 static const u8 *cgfx;                  // the interface both chapters share (ffcu, ui_common.h)
@@ -493,6 +493,7 @@ static void opening_start(u16 n);
 static u8 map_update(void);
 static void map_render(void);
 static void save_campaign(void);
+static void party_load(void);
 #endif
 
 void battle_units(void)
@@ -2560,6 +2561,7 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->cgfx = cgfx;
         c->gauge = gauge;
         c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->job_names = job_names;
+        c->job_sets = job_sets; c->skill_sets = skill_sets; c->unit_stats = unit_stats;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
         mod_id = id + 1;
     }
@@ -2588,6 +2590,7 @@ static u8 map_update(void) { return (u8)mod_call(MOD_BEATS, 0, 0); }
 static void map_render(void) { mod_call(MOD_BEATS, 1, 0); }
 static void map_start(u8 after) { mod_call(MOD_BEATS, 2, after); }
 static void save_campaign(void) { mod_call(MOD_SAVE, 0, 0); }
+static void party_load(void) { mod_call(MOD_SAVE, 1, 0); }
 #endif
 u8 ai_facing(u8 a) { return (u8)mod_call(MOD_AI, 1, a); }
 #endif
@@ -3462,7 +3465,7 @@ void game_init(void)
         const u8 *cj = rt_file("ffcj", RT_NULL);
         if (!cj || RD16(cj, 0) != 0x4643 || RD16(cj, 1) != 0x4A31) return;
         jobs = (const Job *)(cj + RD16(cj, 2)); job_names = (const char *)cj + RD16(cj, 3);
-        items = (const Item *)(cj + RD16(cj, 4));
+        job_sets = cj + RD16(cj, 4); items = (const Item *)(cj + RD16(cj, 5));
     }
 #ifdef FFT_MODULES
     if (!mod_ready()) return;                  // a message, ESC quits
@@ -3757,6 +3760,9 @@ void game_scenario(u16 n)
     rand_seed(rt_seed);
     battle_units();                               // Gariland's eleven units at their start tiles
     memcpy(st.bag, bag_init, NBAG);
+#ifdef FFT_CHAPTER
+    if (CD(PARTY) & 2 || n == 70) party_load();   // the campaign's party (save.inc; test door 70)
+#endif
     st.ai_all = n == 16;                          // the AI plays both sides to the end
     turn_start();
     while (n && n != 16 && st.act != U_RAMZA) turn_end(0, 0);   // tests: Ramza's first turn

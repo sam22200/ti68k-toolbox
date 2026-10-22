@@ -37,7 +37,7 @@ TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE
           ('GEN_VAR', 'gen_var', 'B'), ('ZODIAC_DAYS', 'zodiac_days', 'H'),
           ('ZODIAC_COMPAT', 'zodiac_compat', 'B'), ('UNIT_ZODIAC', 'opening_zodiac', 'B'),
           ('CHARGE_TICKS', 'opening_charge_ticks', 'B'),
-          ('SET_POS', 'set_pos', 'B'), ('BAG_ITEM', 'bag_items', 'B'), ('RSM_POS', 'rsm_pos', 'B')]
+          ('SET_POS', 'set_pos', 'B'), ('SET_ID', 'set_ids', 'B'), ('BAG_ITEM', 'bag_items', 'B'), ('RSM_POS', 'rsm_pos', 'B')]
 # WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
 # Gariland's computed by the engine itself (campaign/water_dump.c).
 # MAP_SCRIPT: the beats played on the battle map (fft.c mapbeats.inc): u16 count, then per
@@ -53,10 +53,11 @@ SCRIPT = {'opening': [(3, 4, MS_FADE, 0, 0, 0),                     # the gate, 
 RAMZA = {'opening': 0, 'campaign': 6}
 UNIT_K = {'opening': 16, 'campaign': 20}
 START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc), 0: the battle at once
-# The campaign save (campaign/save.h): PARTY 1, the player's units are the campaign's party
-# (written at the victory; Orbonne's are not: the flashback starts a new party); WON, the story
+# The campaign save (campaign/save.h): PARTY bit 1, the player's units are the campaign's party
+# (written at the victory; Orbonne's are not: the flashback starts a new party), bit 2 they come
+# from the save (the battles after Gariland, which creates it); WON, the story
 # flag + 1 its victory sets (0 none). SET_POS, BAG_ITEM, DEFEND_ID, EQUIP_CHANGE_ID: FFT's ids of
-# the chapter's skill set entries (their learned bit), bag slots and supports (a unit's job and
+# the chapter's skill sets (SET_ID) and their entries (their learned bit), bag slots and supports (a unit's job and
 # equipment are FFT ids, the shared tables ffcj);
 # RSM_POS, EQUIP_CHANGE_POS: the learned bits of the reactions and supports a unit draws.
 PARTY = {'opening': 0, 'campaign': 1}
