@@ -1,9 +1,980 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-Session of 2026-10-21/22, branch `feat/fft-shared-engine`, last commit `dba2fbc`. Read first:
+**Current addition — Spin Fist, 2026-10-31:** [CORE_PUNCH_ART.md](CORE_PUNCH_ART.md).
+Punch Art's area strike: formula 0x31 on radius 1 around the user (excluded),
+Attack's physical evasion per victim, a 4% critical without knockback (the
+source knocks back only single targets). It rides the owned area pipeline,
+the damage reusing `punch_strike`. `core-punch-strikes-check` 6524 assertions.
+Closure partial (stopped at the user's request to save budget): 16 of 38
+suites green plus area-impact rerun green; the remaining family suites last
+passed with Death Sentence (36/36) and should be rerun before the next family.
+Production: 117 normalized records, 84 casts, 114/201 generic entries (87
+remaining entries are not 87 effects). Resident headroom about 153.
+
+**Historical Talk Skill family — 2026-10-31:** [CORE_TALK_SKILL.md](CORE_TALK_SKILL.md).
+Persuade, Praise, Threaten, Preach, Solution, Death Sentence, Insult and Mimic
+Daravon are enabled as immediate owned area casts: hit (zodiac(MA) + zodiac(X))%, no
+Magic AttackUP or Faith, a sleeping target misses without a draw. Brave/Faith
+records carry a signed loss (Foxbird shares the commit), new AB_FAITH clamps
+0..100, Persuade writes CT 0 through AB_QUICK; Death Sentence counts the
+unit's turns in the end-of-turn upkeep (FORMULA15) and kills non-Undead units
+at 0. 344 original profiles and 12 upkeep traces; `core-talk-skill-check` 4616
+assertions. Production: 116 normalized records, 83 casts, 113/201 generic
+entries (88 remaining entries are not 88 effects). Invitation and Negotiate
+stay gated. Three stale checks
+(knockback, targets, batch) were repaired first. Resident headroom about 227,
+zone 8182. Full core remains incomplete. Preserve live TiEmu, standard
+playtest, saves and old proof bytes AND dates.
+
+**Historical Punch Art family — 2026-10-30:** [CORE_PUNCH_ART.md](CORE_PUNCH_ART.md).
+Stigma Magic, Chakra, Revive, Wave Fist and Repeating Fist are enabled.
+Support (formulas 0x33/0x34/0x35): immediate owned area casts from PA with
+Attack UP x4/3 and Martial Arts x3/2, no Faith (99 original profiles,
+`core-punch-art-check` 1256 assertions). Strikes (0x31/0x32): single-target
+physical skills with Attack's evasion, a 4% critical with knockback and
+Repeating Fist's 1..9 hits, behind the exported `charge_query` (276 original
+profiles, `core-punch-strikes-check` 4412 assertions). Resident room first:
+chapter grid tables moved into PARTY op 10, and `FFT_PRODUCTION_CORE` drops
+twelve test-only exported entries from fftbat. Production: 108 normalized
+records, 75 casts, 105/201 generic entries (96 remaining entries are not 96
+effects). Spin Fist, Earth Slash and Secret Fist stay gated. Resident headroom
+about 323, zone 8170. Full core remains incomplete. Preserve live TiEmu,
+standard playtest, saves and old proof bytes AND dates.
+
+**Historical protection family — 2026-10-30:** [CORE_PROTECT.md](CORE_PROTECT.md).
+Reraise and Golem are enabled together. Reraise (status set 33) survives KO;
+at a KO unit's turn it revives with max HP/10 (one upkeep draw; 0 HP spends it
+and keeps the counter). Golem (formula 0x14) fills its side's pool with the
+caster's max HP; a primary Attack/Charge on that side is absorbed whole and
+drains the pool (source BLOCKED_BY_GOLEM, ability 0's range data). State gains
+`golem[2]` (4 bytes): MOD_SIG changes, older banks are rejected. 28 original
+formula/finalizer profiles and six Reraise upkeep traces; `core-protect-check`
+460 PC/sanitizer/68000 assertions. Production: 103 normalized records, 72
+casts, 100/201 generic entries (101 remaining entries are not 101 effects).
+End-of-turn upkeep moves into FORMULA15; resident headroom about 443. Float
+waits for L1 movement with Jump. Full core remains incomplete. Preserve live
+TiEmu, standard playtest, saves and old proof bytes AND dates.
+
+**Historical control family — 2026-10-30:** [CORE_CONTROL_STATUS.md](CORE_CONTROL_STATUS.md).
+Frog, Blind Rage (Berserk), Confusion Song and Foxbird (Brave -30, Chicken
+below 10) are enabled together. Shared handlers: a cached STATUS_NO_CONTROL bit
+hands Berserk/Confusion/Chicken units to the AI (Chicken flees, Berserk Attacks
+its nearest enemy, Confusion draws ability and target of any team); source
+physical XA order (Berserk x3/2, Frog XA 1, target Chicken/Frog x3/2);
+Confusion halves base hit and is cleared by HP damage; a Frog fights
+bare-handed (reach 1) and may only Attack or cast Frog, Frog toggles; Brave
+clamps 0..100 and gains +1 per turn below 10. 56 original formula/finalizer
+profiles; `core-control-status-check` 1509 PC/sanitizer/68000 assertions.
+Production: 101 normalized records, 70 casts, 98/201 generic entries (103
+remaining entries are not 103 effects). Resident room was recovered first:
+`opening_after` compiles into BEATS, Wait arrows into ORDER, `ai_choose` into
+AI_SETUP5, `ai_clear` uses MULS. Resident input about 64451 (headroom about
+485, from 7); zone 8116 (AI). ABI 45 rejects older banks. Stale sleep,
+incapacity and area-impact checks were repaired (area-impact's native binary
+fits again). No frog/chicken sprite. Next grouped family: Reraise and Golem
+(Float belongs with deferred L1 movement). Full core remains incomplete.
+Preserve live TiEmu, standard playtest, saves and old proof bytes AND dates.
+
+**Historical decisive family — 2026-10-30:** [CORE_TERMINAL.md](CORE_TERMINAL.md).
+Death, Quick, Zombie and Petrify are enabled together as one shared target/
+status/clock family. 56 original formula/finalizer profiles and 12 upkeep
+traces pin Death (Dead plus nominal max-HP damage, Undead healing), Quick
+(CT255 handed to the Quick-priority scheduler), Petrify (statue keeps HP/CT/
+tile, leaves ordinary elimination, curable) and Zombie (Undead bit; KO-expiry
+revival draw). 1702 family assertions (1292/5DEE6FD1 rules, 410/C4AE09F8
+edges) agree on PC, sanitizers and 68000. KO-counter and end-turn CT-credit
+policies move unchanged from resident code to FORMULA14/15; the Wait arrows
+use a 16-byte Jacobian table (-34 bytes). Production: 97 normalized records,
+66 casts, 94/201 generic action entries (107 remaining entries are not 107
+effects). ABI 44/signature 1438, 17 images split 8+9, static zone 8228 (not
+heap). Private group 539377 bytes (+1571); resident input 64929, headroom 7:
+the next resident growth needs a relocation first. Unit/State/Work/FSV3 and
+five core allocations fixed; 27 other data banks identical. Both native pilot
+save/results flows, old frames and 18694 preserved paths pass. Next grouped
+family: Reraise/Frog/Float/Berserk/Confusion and Brave/Faith control. Full core
+remains incomplete; Jump remains deferred. Preserve live TiEmu, standard
+playtest, saves and old proof bytes AND dates.
+
+**Historical resource-restoration family — 2026-10-30:**
+[CORE_RESTORATION.md](CORE_RESTORATION.md). Hi-Potion, X-Potion, Ether, Hi-Ether
+and Elixir are enabled together; Potion/Phoenix Down use the same seven-producer
+scalar pipeline. All 14 ordinary Item records are enabled. Frozen paired HP/MP
+quantities reuse existing packet bytes; action-start forecast invalidation and
+no-effect item rewards are fixed. Original evidence: 80 formula/finalizer
+profiles and 38 actual HP/MP store traces. Undead Elixir damages HP and still
+restores MP. The 2481 family assertions agree on PC, sanitizers and 68000;
+relocated menu/view controls retain State/Work and the 1.5-second AI pause.
+Production: 93 normalized records, 62 casts, 90/201 generic action entries.
+The 111 remaining entries include upgrades/categories, not 111 distinct effects.
+ABI 43/376/signature 1181, 17 images split 8+9, static resident zone 8172
+(+966, not heap). Private group 537806 bytes (+5982); resident input 64829,
+headroom 107. Unit/State/Work/FSV3 and five core allocations stay fixed;
+27 other data banks stay identical. Scoped callers, 20 layouts, 12 old frames
+and both native pilot save/results flows pass. Full core remains incomplete:
+remaining control/barrier/job families, R/S/M, special actors, campaign/objectives,
+formats/tools and worst-case RAM/stack/frame gates. Jump remains deferred.
+Preserve live TiEmu, standard playtest, saves and old proof bytes AND dates.
+
+**Historical cleansing family — 2026-10-29:** [CORE_CLEANSE.md](CORE_CLEANSE.md).
+Esuna, Dispel Magic, Maiden's Kiss, Soft, Holy Water and Remedy ship together.
+A frozen ordinal subset spans all five status bytes inside the existing effect
+quantity: no new Unit/State/Work/save field or heap block. Innate protection,
+source cancellation eligibility, timers, statues, one item debit, CT/MP,
+Reflect and actual AI have 1711 PC/sanitizer/68000 assertions and 78 original
+profiles. Production has 88 executable records, 62 casts (47 spells/15 summons)
+and 85/201 generic action entries. The 116 unavailable entries include upgrades
+and categories, not 116 distinct effects. ABI 42/ModCtx 376/signature 924,
+17 images, split 9+8, static resident zone 7206 (+86, not a heap allocation).
+Cold forecast formatting/cache and unchanged Wait arrows move to NUMBERS;
+32 arrow cases and six new cache boxes retain exact pixels. Private group:
+531824 bytes (+4415), resident input 64885/headroom 51; 27 other banks unchanged.
+Full core/content gates remain open: HP/MP item restoration, remaining status/control/barrier and
+job families, R/S/M, special actors, campaign/objectives, formats/tools and full
+frame/stack/residency budgets. Keep families grouped and Jump deferred. Preserve
+live TiEmu, standard playtest, saves and old proof bytes AND modification dates.
+
+**Historical percentage/resource-transfer batch — 2026-10-29:**
+[CORE_PERCENT.md](CORE_PERCENT.md). Demi, Demi 2, Lich, Spell Absorb and Life
+Drain ship together: 60 casts, 82 normalized records and 79/201 generic action
+entries. The 122 remaining entries include upgrades/categories, not 122 effects.
+2396 PC/sanitizer/68000 assertions cover 57 original paired-result profiles,
+production records, CT/MP, Reflect, Undead, AI, capped/empty pools and bootstrap.
+Caster returns reuse the existing packet; MP effects remain separate from HP.
+ABI 41/ModCtx 376/signature 667, 17 images, zone 7120. The unchanged catalogue
+validator moves to SAVE5 before Work allocation. The image zone is static
+resident storage, not a heap allocation; Unit/State/Work/FSV3 and the five heap
+allocations stay fixed. See the linked note and private verification report for
+sizes and scoped closure. Private group: 527409 bytes (+1392); resident packed
+input: 64845, with 91 bytes of headroom. Full core/content gates remain open:
+remaining status/control/barrier and job families, R/S/M, campaign/objectives,
+formats/tools
+and full frame/stack/residency budgets. Keep effects grouped and Jump deferred.
+Preserve live TiEmu, standard playtest, saves and old proof bytes AND dates.
+
+**Historical compatible buff/status batch —2026-10-29:** [CORE_BUFFS.md](CORE_BUFFS.md).
+22 retail producers ship together:55 casts,77 normalized actions and 74/201
+career action-table entries (127 unavailable entries, not 127 effects).
+5682 PC/sanitizer/native checks cover the batch, including 13 distinct actors;
+67 original formula profiles/10 Protect cases and 4843 bitmap-kernel checks pass.
+Skipping empty status bytes reduces 13-victim impact 441270→296906 backend cycles.
+ABI 40/376/sig 410,17 images/zone 7020; shared menu composition moves unchanged to
+RESULTS. Private 526017 (+2753), resident 64915/headroom 21.
+Full core/content gates remain open. Next compatible family: five
+percentage/resource-transfer entries. Keep Jump deferred and preserve live
+TiEmu, standard playtest, user saves and old gallery/group bytes AND dates.
+
+**Historical healing family —2026-10-29:** [CORE_HEALING.md](CORE_HEALING.md).
+Cure1–4/Raise1–2/Moogle/Fairy are enabled together:33 executable casts,
+55 normalized actions and52/201 generic entries (149 unavailable entries,
+not149 effects). Source formula0c/0d, Undead, ceil resurrection, source RNG,
+Reflect, shared area/AI and once-only MP/impact use one common pipeline.
+2110 PC/sanitizer/native assertions11072857 plus75 original formula/finalizer
+profiles pass; original25 retain2736/77DAC288. Unchanged banners move to NUMBERS,
+with32 exact plane comparisons; old12 screens/20 layouts/native pilot saves
+pass. ABI39/376/sig153,17 images/zone6650; private523264(+2925), resident64927/
+headroom9.27 other data banks/assets unchanged. Next compatible buffs/status
+batch must include required resident relocation, not a separate empty milestone.
+Broader core/RSM/campaign/formats/tools/full budgets remain open; Jump deferred.
+Preserve live TiEmu/standard group/saves/gallery bytes AND dates.
+
+**Previous Reflect batch —2026-10-29:** [CORE_REFLECT.md](CORE_REFLECT.md).
+All25 ordinary offensive casts are executable (15 spells/10 summons), including
+11 newly enabled reflectable spells. Generic actions44/201,157 entries remain;
+entries are not distinct effects. Shared source Reflect uses one MP payment,
+original caster stats/origin, one endpoint/no recursive bounce and the existing
+response queue, with no extra state/heap.2736 PC/sanitizer/native assertions
+77DAC288,22 bounded original endpoint/guard cases, affected callers/loader,
+20 layouts/12 old screens and native pilot saves pass. ABI38/372/sig65428,
+17 images/zone6398; private520339(+1512), resident64887/headroom49. Reflect/Carbunkle
+producers, remaining magic/status/RSM/campaign/formats/tools/full budgets remain
+open; core is incomplete. Next healing/resurrection batch8; Jump deferred.
+Preserve live TiEmu/standard group/saves and gallery bytes AND dates.
+
+**Previous family-batch checkpoint —2026-10-29:** [CORE_OFFENSIVE_MAGIC.md](CORE_OFFENSIVE_MAGIC.md).
+Retail casts are now enabled: Fire4/Bolt4/Ice4, Meteor and ten offensive summons,
+through one source-field classifier and the existing approved area pipeline.
+1290 PC/sanitizer/68000 checks08E75784 exercise all14 production records, real
+learned lists, unit/panel orders, CT/payment, Silence, HalfMP, team/self filters,
+once-only impacts and actual AI inclusion. Generic careers:33/201 action-table
+entries enabled,168 remain (entries include upgrades/categories, not distinct
+mechanics). All normalized records:36 enabled, including14 casts. Eleven
+reflectable formula08 actions remain one gated batch. Other magic/status/heal/
+special families remain incomplete; full core is not done. Invocations use
+approved generic impacts, not original summon cinematics. Private group518827,
+zero growth: only ffcj changes; all runtime code, ABI37/372/sig65171, RAM and
+27 other non-code banks are unchanged. Follow the grouped backlog in the linked
+note; do not return to a milestone per named ability. Preserve live TiEmu,
+standard playtest, user saves and old gallery bytes AND dates. Jump deferred.
+
+**Previous incapacity checkpoint —2026-10-29:** [CORE_INCAPACITY.md](CORE_INCAPACITY.md).
+Ordinary elimination now respects source KO membership and native presence;
+statues keep HP/tile occupancy but do not sustain a camp. Petrify forecasts,
+ordinary impact/splash immunity, queued reactions and actual AI targeting pass
+193 PC/sanitizer/68000 checks55D44C55 against30 original outcomes/4 finalizers.
+Node255/count256 and terminal injection doors are checked; clipped map contexts
+are restored before playable setup. ORDER1 owns the pure outcome query, ORDER0
+keeps AT. ABI37/372/sig65171,17 images/split8+9/zone6316(+52), same core layouts/
+FSV3/five allocations. Private518827(+245), raw banks40664/39940, resident64765/
+headroom171;28 data banks stable. TURN/BEATS/RESULTS/AREA_AI compiler drift has
+isolated declaration controls. Scoped actions/reactions/scheduler/tempo/magic/
+area CT/bindings/layouts/12 old frames/pilot saves pass. Outcome cold/warm15922/
+5172 and wake318536 are backend-only; full frame/stack/residency stays open.
+Petrify infliction/cure/presentation/persistence and general source importance/
+original-team objective metadata remain gated, as do broader core/content gates.
+Jump deferred. Standard playtest/live TiEmu/saves/gallery bytes AND dates stay
+unchanged. Evidence: x/core-incapacity/verification.json.
+
+**Historical Haste/Slow checkpoint —2026-10-28:** [CORE_HASTE_SLOW.md](CORE_HASTE_SLOW.md).
+Public tempo states, real CT gain and finite/innate AT segments pass748 PC/
+sanitizer/68000 checks30A798F0 (45 original gains,4 charge phases,33 AT lists).
+Slow wins; real Slow1 can gain0 while AT retains source minimum1. Expiry,
+Stop/Sleep waits, cures/immunity/cancel, KO/revive and unscaled Charge work.
+ORDER0 replaces FORMULA6: ABI36/372/sig64914,17 images/split8+9/zone6264; directory
++4, same core layouts/FSV3/five allocations. No new reciprocal data. Private
+518582(+650), raw banks40644/39636, resident64803/headroom133;28 data banks
+unchanged. Cold/warm AT39086/29724, CT phase max8778 and wake266028 are backend
+costs, not full-frame/stack/residency certificates. Scoped scheduler/deferred/
+public status58/area CT/bindings/12 old frames/layouts/pilot saves pass.
+RESULTS/AREA_AI compiler drift is reproduced with unused-declaration controls.
+Retail spells and full-core/content gates remain closed; Jump deferred. Next
+other status/incapacitation/response/AI, campaign, formats/tools and budgets.
+Preserve standard playtest/live TiEmu/saves/gallery bytes AND dates. Evidence:
+x/core-haste-slow/verification.json.
+
+**Historical scheduler checkpoint —2026-10-28:** [CORE_SCHEDULER.md](CORE_SCHEDULER.md).
+Quick255 now consumes0 CT and can interrupt a settled charge wave before the
+next due root. Permanent-freeze/Speed0/KO-guest clocks yield safely; mutable
+Stop/Sleep resume without duplicate turns or credits. Ordinary entry remains
+synchronous, idle searches use8 ticks and waking updates at most16. Shared Quit
+and rotation remain usable.263 PC/sanitizer/68000 checks3056BFD2 and two nonempty
+browse-identical HUD hashes pass; wake quantum max256892 cycles is not a full
+frame/stack certificate. ABI35/ModCtx372/sig64657,16 images/split8+8/zone6264;
+State/Work/Unit/FSV3/five allocations unchanged. FORMULA+14, AI_SETUP-6 and
+same-size TURN changes are isolated with compiler controls. Raw banks41080/38606,
+private517932(+195), resident64681/headroom255;28 data banks unchanged. Deferred,
+controls, owned area CT/restarts, AI pause, bindings/rejection,12 old frame hashes,
+layouts and both pilot save flows pass. Next broader status/reaction/targeting
+and AI families, campaign contracts, formats/tools and worst-case budgets.
+Retail Quick/casts remain gated; full core/content production remains incomplete.
+Jump deferred. Standard playtest/live TiEmu/user saves and old gallery bytes/dates
+are preserved. Evidence: x/core-scheduler/verification.json.
+
+**Historical approved area-impact integration —2026-10-28:**
+[CORE_AREA_IMPACT.md](CORE_AREA_IMPACT.md). Shared per-victim quantities/Miss,
+absorbed healing, hit poses/flash, covered centre pulse and Oil feedback now
+reuse existing sprites/font. No fake caster result on an empty footprint;
+secondary reactions suppress root effects and retain EXP/JP/terminal draining.
+416 candidate captures match the accepted review. Native full-render1012 checks
+12D9C238/64 individual screens agree;13-victim/two-floor/node255/signed/centre
+bounds pass154 checksC56EC8B9. Cache412 aliases idle ai_gain512; State/Work/Unit/
+FSV3/five core allocations unchanged. ABI34/ModCtx372/sig64400,16 images/split8+8,
+zone6264; NUMBERS2416 also owns unchanged scalar number drawing. Raw shards
+41072/38606, private517737(+2173), resident64473/headroom463. Package/affected regression evidence is
+in x/core-area-impact/verification.json. No new bitmap bank or retail unlock.
+Cold view decompression/full-frame/stack/residency gates stay open;13-number
+backend timing is not a full13-actor frame certificate. Next shared scheduler/
+status edges (Quick/clock liveness), broader families/AI/campaign/formats/tools.
+Full core remains incomplete; mass content production is gated. Jump deferred. Standard playtest,
+old review/gallery bytes and dates, user saves and live TiEmu remain untouched.
+
+**Historical approved area-UI integration —2026-10-28:** [CORE_AREA_UI.md](CORE_AREA_UI.md).
+The accepted panel/target-list/Unit-or-Panel flow now runs in the shared PC/68000
+engine.499 PC/sanitizer/native checks67EED097, eight HUD hashes and four actual
+full-screen/state replay checkpoints agree. The list only inspects victims;
+Unit/Panel selects centre binding. AreaUi228 aliases idle256-byte AI scratch;
+State2192/Work45576/Unit112/FSV3/five allocations stay fixed. ABI33/ModCtx372/
+sig64143,15 images/zone6264, shards41066/36084. Private515564(+6146), resident64719/
+headroom217;28 non-code banks unchanged. AI camera moved unchanged to AI_SETUP
+(1321 native-equal checks); old actions, forecast/CT/magic/AI/pause and pilot saves
+pass. First13-unit whole-map HUD peaks375252 cycles: interactive full-frame/
+stack/residency gates remain open. Next reviewed per-victim/empty-centre impact
+presentation, then remaining families/campaign/formats/tools. Retail casts and
+full core/content gates stay closed; Jump deferred. Approved review PNG/GIF and
+standard playtest/live TiEmu/gallery bytes/dates remain intact.
+
+**Historical AI-pause checkpoint —2026-10-28:** [CORE_AI_PACING.md](CORE_AI_PACING.md).
+User accepts roughly one-second thinking inside the requested frozen AI pause.
+The1.5-second elapsed-clock minimum now includes planning instead of adding48
+frames afterwards; slow plans add no second full pause.171 PC/sanitizer/native
+checks58CBDE4E pass. All14 images/ABI32/State/Work/FSV3/five allocations unchanged;
+resident timestamp adds2 static bytes. Private509418(-24), resident64467/headroom469.
+The prior general setup peak remains measured, but is not a30fps blocker while
+frozen. Next reviewed area targeting/per-target/empty presentation. Worst total
+plan latency, other core and production gates remain open; Jump deferred.
+
+**Historical cached area-AI checkpoint —2026-10-28:** [CORE_AREA_AI.md](CORE_AREA_AI.md).
+The actual AI now chooses ordinary hostile formula08 area centres, including
+empty panels, with cached current effects, friendly-fire and absorption scoring.
+676 PC/sanitizer/native checksD04607FA;12 bounded original HP/accounting profiles,
+five rank comparisons and three empty-panel visits. This is the immediate-HP
+subset, not a complete original future-CT/status/Reflect/MP-utility chooser.
+ABI32/ModCtx364/signature63878,14 images/zone6218; State/Work/FSV3/five allocations
+unchanged, idle scratch reused. Private509442(+4838), input64447/headroom489,
+28 non-code banks unchanged. New area quanta max319968 cycles; general setup
+stage0 reaches12059828, so C07/L4 performance explicitly remains open. Next bound
+general AI setup/reach, then reviewed targeting/per-target/empty presentation.
+Retail casts/full production gates stay closed; Jump deferred. Standard playtest,
+live TiEmu and existing gallery bytes/dates are preserved.
+
+**Historical owned-area checkpoint —2026-10-27:** [CORE_AREA_CT.md](CORE_AREA_CT.md).
+Supported formula08 areas now use command/CT/automatic impact and existing response/
+reward drain, with one60-byte Work packet.353 PC/sanitizer/native checks11D6FCB4,
+5 Orbonne retry checks00000230;13 equal-tick roots, explicit unit/tile centres and
+pure late rejection. Retail area producers/AI/forecast/presentation remain gated.
+ABI29/ModCtx364/signature63107/largest6204; Work45576(+60), State2192/Unit112/packet22/
+FSV3 stable; same5 allocations, scene+Work and totals+60. Private504139(+533), shards
+33782/31632, input64927/headroom9;28 non-code banks unchanged. Next area forecast/AI
+and reviewed per-target/empty presentation, with a resident budget first. Broader
+families and C07/L4 frame/residency remain open. Jump deferred; standard group/
+live TiEmu/gallery bytes and dates untouched.
+
+**Historical archive-bank checkpoint —2026-10-27:** [CORE_BANKS.md](CORE_BANKS.md).
+FMB3 splits the same13 images into33772/31234 archived bytes; one6204-byte execution
+zone remains. All image code is unchanged except ABI28 signature62790/ModCtx364.
+Startup validates both ranges/export token before execution; six bad/missing/mixed
+pair cases reject.130 PC/sanitizer/native parser checks and112 native full-context
+checks pass; fixed callbacks share a const template, dynamic fields still refresh.
+Native directory52 replaces6 bytes; State2192/Unit112/Work45516/packet22/FSV3 and five
+allocations unchanged. Private503606(-27), input64845/headroom91;28 non-code banks
+unchanged. Next durable area-batch ownership/CT/command/AI/impact routing and reviewed
+presentation. Resident growth and C07/L4 frame/residency still need budgets; Jump
+stays deferred. Standard group/live TiEmu/gallery bytes and dates untouched.
+
+**Historical compound-cast checkpoint —2026-10-27:** [CORE_BATCH.md](CORE_BATCH.md).
+Formula08 batches prepare all outcomes before HP, pay once, commit once and reuse
+stable response/reward drain.13 original compound groups/1202 PC/sanitizer/68000
+checks94558E80; private13-slot carrier, no retail area command/AI/presentation.
+Caller packet60 bytes; no State/Work/Unit/FSV3 growth or new batch heap allocation.
+ABI27/thirteen images/ModCtx364/largest6204; private503633 (+3027), resident input64783/
+headroom153, raw bank64984.28 non-code banks unchanged; future growth needs a bank
+budget. Next durable batch ownership, area CT/command/AI/impact routing and reviewed
+presentation; remaining families and C07/L4 full-frame/residency gates stay open.
+Jump deferred; live TiEmu, standard group and gallery bytes/dates untouched.
+
+**Historical radial-target checkpoint —2026-10-27:** [CORE_TARGETS.md](CORE_TARGETS.md).
+Read-only ordinary formula08 target sets pass79 original footprints/42 column
+boundaries and1193 PC/sanitizer/68000 checksFC02B091. Nearest-layer/ties, whole-map,
+follow coordinates, presence and panel-level team filtering are source-checked.
+One-floor maps skip upper reads; no damage/MP/RNG/State changes or live area producer.
+ABI26/thirteen images/ModCtx364/largest6172; State2192/Unit112/Work45516/packet22/FSV3
+unchanged. Private500606 (+1564), input64749/headroom187;28 non-code banks unchanged.
+Next batch preparation/commit in source order, one payment, per-target responses/
+rewards/presentation before retail activation. C07/L4 cold-HUD/frame/residency and
+broader core/content gates remain open. Jump deferred; playtest group/live TiEmu/
+existing gallery bytes and dates untouched.
+
+**Historical formula08 environment checkpoint —2026-10-27:** [CORE_WEATHER.md](CORE_WEATHER.md).
+Weather/Float and prepared protected Oil removal now share prediction/AI/
+execution.254 original profiles and6493 PC/sanitizer/68000 checks pass. Preserve
+PS1 Oil's no-double-damage bug and signed per-step weather narrowing. Retail
+spells/climate/status producers remain gated; weather/Float movement are separate.
+ABI25/ModCtx364/largest6172; State2192 (+2), Unit112/Work45516/packet22/FSV3 stable.
+Private499042 (+279), input64735/headroom201; all28 non-code banks unchanged.
+FORMULA11 owns unchanged forecast-cache drawing; full cold forecast costs up to
+92032 in the fixture, so full-frame/cold-HUD/residency gates stay open. Next area
+target sets and per-target effects/reactions/rewards/presentation. Standard group,
+live TiEmu and existing image bytes/dates remain untouched.
+
+**Historical affinity-data checkpoint —2026-10-27:** [CORE_AFFINITY.md](CORE_AFFINITY.md).
+Source job/equipment affinities now rebuild a65-byte derived battle cache;
+Unit stays112 bytes, State grows66 including alignment, FSV3/Work stay unchanged.
+178 original aggregation profiles and1881 PC/sanitizer/68000 checks pass. FCJ9
+stores416 references to32 shared masks in582 bytes, rejects FCJ8/bad references
+and preserves all existing ability semantics. This is data/cache preparation:
+elemental damage, absorption/healing, nullification and retail spells stay gated.
+Native stats now execute locally in PARTY/ACTION/RESPONSE; no stat callback
+can evict an executing image. ABI22/ModCtx348/largest6060; five allocation requests.
+Private495758 (+2709), input64859/headroom77;27 non-code banks unchanged.
+Next: typed elemental outcomes through prediction/AI/impact/responses, with
+source rounding/capping, then magic evasion/areas/presentation. Full core and
+residency gates remain open. Standard group/live TiEmu untouched; Jump deferred.
+
+**Historical magical-scalar checkpoint —2026-10-27:** [CORE_MAGIC.md](CORE_MAGIC.md).
+Formula08 now shares source-checked MA/support/Shell/zodiac/Faith arithmetic
+between prediction, execution and actual AI. A private normalized Holy record
+exercises vulnerable casting, one payment, one impact and Auto-Potion settlement;
+production Holy/Fire and all AF_CAST producers remain disabled.104 original-MIPS
+profiles and1352 PC/sanitizer/68000 assertions pass. No element affinities,
+magic-evasion spells, monster zodiac or new status/trait producers are enabled.
+ABI21/ModCtx348/largest5882; battle/save layouts and five allocations unchanged.
+Private493049 (+503), input64919/headroom17;28 non-code banks unchanged.
+Pure math remains resident; cold banner/cache setup uses PARTY7/8. Next:
+element/target eligibility and magic evasion, then areas and reviewed casting
+presentation. L2/L3/L4 and residency gates remain open; Jump stays deferred.
+Standard playtest group and live TiEmu remain untouched.
+
+**Historical incantation checkpoint —2026-10-27:** [CORE_INCANTATION.md](CORE_INCANTATION.md).
+Single-centre casts now retain a fixed tile or stable unit slot through actual
+CT, interruption, one MP payment and root/reaction settlement. Exact-cost paid
+effects also fix the preceding preview-affordability recheck. Private carriers
+exercise the backend; no retail Holy/Fire formula or binding UI is enabled.
+ABI20/twelve images/ModCtx344/largest5862; State/Unit/Work/FSV3 unchanged.
+Private492546 (+1481), input64859/headroom77;28 non-code banks unchanged.
+COMMAND3/4 own validation/arming/due preparation, with arguments outside State.
+Next magical formulas/traits, area target sets and presentation. Broader core/
+residency gates stay open; standard group/live TiEmu untouched. Jump deferred.
+
+**Historical casting-resource checkpoint —2026-10-27:** [CORE_CASTING.md](CORE_CASTING.md).
+Player/forecast/AI share effective MP eligibility; COMMAND pays once at effect
+start, after arming returns. Half MP and preparation timing have original-MIPS
+fixtures. This enables no new Holy/Fire effect or caster producer. ABI19/twelve
+images, ModCtx336/largest5860; Unit/State/Work/FSV3/five allocations unchanged.
+Private491065 (+686), input64743/headroom193;28 non-code banks unchanged.
+Cold range construction moves unchanged to COMMAND2; pure cost callback cannot
+evict its caller. Spell targeting/formulas/AoE and broader scheduler gates remain
+open. Standard group/live TiEmu untouched; earlier checkpoints are history.
+
+**Historical deferred-dispatch checkpoint —2026-10-26:** [CORE_DEFERRED.md](CORE_DEFERRED.md).
+Due Charges drain iteratively, in source slot order, before expiry/next CT.
+Busy roots preserve the packet; later invalidated casters are rechecked. No new
+State/Work/save fields, queue or ABI: ABI18/twelve images unchanged. Private490379
+(+8), input64857/headroom79. Source unit-versus-tile coordinates are observed;
+magic/MP/AoE, Quick255 priority and all-permanent-freeze liveness remain open.
+Jump stays deferred; standard group/live TiEmu untouched. Earlier notes are history.
+
+**Historical dual-Charge checkpoint —2026-10-26:** [CORE_CHARGE_HANDS.md](CORE_CHARGE_HANDS.md).
+All eight Archer Charge powers now resolve per hand with source criticals,
+shared potential forecast/AI and delayed validation of both weapons.586 targeted
+PC/sanitizer/68000 checks; eight original initializations and sixty scalar cases.
+Pending's spare byte holds the off weapon: State2124/Unit112/Work45516/FSV3 and
+five allocations unchanged. ABI18/twelve images, ModCtx332, largest5814.
+Private490371 (+1570), packed input64845/headroom91;28 non-code banks unchanged.
+Pure math stays resident; cold pickup moves to PARTY6. Broader targeting,
+weapon procs/elements, action/status families and combined residency remain
+open. Jump stays deferred; standard group/live TiEmu untouched. Earlier dated
+checkpoints below are historical; see CORE_ROADMAP.md for current priorities.
+
+**Historical hands checkpoint —2026-10-26:** [CORE_HANDS.md](CORE_HANDS.md).
+Ordinary supported Two Swords and dual Counter now use independent hands;
+forecast/AI share potential damage and Sleep wake. Management returns an illegal
+left weapon to stock.196+16 targeted PC/sanitizer/native checks; FSV3 unchanged.
+FCJ8 adds20 innate bytes/reuses Item.pad; ABI17/twelve images split COMMAND and
+RESPONSE from impact. Native State2124 (+30), Unit112/Work45516 unchanged.
+Private488801 (+5387), input64821/headroom115, zone5750. Further resident growth
+still needs a module budget. Broader weapon/skill/element/proc and original AI
+families remain open; full L2/L3/content/residency gates stay open. Jump deferred.
+Standard group/live TiEmu untouched. Earlier checkpoint numbers are historical.
+
+**Current consecutive-strike checkpoint —2026-10-26:** [CORE_STRIKES.md](CORE_STRIKES.md).
+The bounded ordinary-Attack engine entry resolves two primary impacts before
+one response drain and best-EXP/one-JP settlement;250 PC/sanitizer/native checks.
+Normal commands still request one: independent hands, preview/AI and the actual
+Two Swords producer remain open. ABI16/ten images, CoreAction34/State2094 (+2),
+Unit112/Work45516/FSV3 unchanged. Private483414 (+836), input64923/headroom13,
+zone5830; data/pictures unchanged. Relocate further resident growth first.
+Next: hand-specific policies and more reaction families; full L2/L3/content and
+residency gates remain open. Jump deferred; standard group/live TiEmu untouched.
+Earlier checkpoint numbers below are historical.
+
+**Current reaction checkpoint —2026-10-26:** [CORE_REACTIONS.md](CORE_REACTIONS.md).
+Counter/Auto-Potion now queue, revalidate, execute and restore the primary packet.
+Equipped party IDs load from FSV3. Shared stock, secondary suppression, deferred
+root rewards and terminal ordering are covered by267 PC/sanitizer/native checks.
+ABI15/ten images, State2092 (+46), Unit112/Work45516/FSV3 and allocation count
+unchanged. Private482578 (+4008), input64605/headroom331, zone5742; data unchanged.
+Next: source strike sequencing and more reaction families; general L2/L3/content
+and timing/residency gates remain open. Jump deferred; live TiEmu untouched.
+Earlier checkpoint numbers below are historical.
+
+**Current action-context checkpoint —2026-10-26:** [CORE_CONTEXT.md](CORE_CONTEXT.md).
+Live roots protect costs/impact/settlement; a hit or miss commits once, and a new
+command cannot reset an active action.357 PC/sanitizer/68000 checks cover source
+reaction guards and bounded per-actor response primitives. Reaction effects,
+packet restoration, producers and multistrike remain next; full L2 stays open.
+ABI14/nine images, State2046 (+32), unchanged Unit112/Work45516/FSV3 and allocation
+count. Private478570 (+434), input64727/headroom209, zone5742. FCJ7/data unchanged.
+Jump deferred; standard group/live TiEmu untouched. Older notes are historical.
+
+**Current Sleep checkpoint —2026-10-26:** [CORE_SLEEP.md](CORE_SLEEP.md).
+Sleep now shares source60-tick CT freeze, Charge cancellation, physical XA
+vulnerability before zodiac and protected wake at successful HP-damage impact.
+1070 PC/sanitizer/68000 assertions pass. No new producer/art or allocation;
+Unit112/State2014/Work45516/FSV3 unchanged. ABI13/nine images, private478136
+(+112), input64837/headroom99, zone5742. FCJ7/data banks unchanged.
+Next: explicit action/reaction contexts; broader effects, timing/residency and
+content-production gates remain open. Jump deferred. Earlier notes are history.
+
+**Current control checkpoint —2026-10-26:** [CORE_CONTROL.md](CORE_CONTROL.md).
+Stop pauses CT/Charge; Don't Move/Don't Act share player/preview/AI restrictions,
+source CT credit and due-time Charge validation.594 targeted PC/sanitizer/native
+checks pass. Cached flags reuse existing fields; ABI12/nine images, unchanged
+Unit/State/Work/FSV3. Cold AT/glyph setup moved to existing images, with a safe
+scene-to-battle return boundary. Private478024 (+1340), input64847/headroom89;
+FCJ7/data banks unchanged. Next: Sleep damage/wake and action/reaction contexts.
+Full L2/content gates remain open; Jump deferred. Older notes are historical.
+
+**Current Poison/Regen lifetime checkpoint —2026-10-26:** [CORE_STATUS_LIFETIME.md](CORE_STATUS_LIFETIME.md).
+Source counters, application/renewal/removal, clock expiry and end-turn HP upkeep
+now pass4140 PC/sanitizer/native assertions with13 actors. KO cancels mutable
+timed/command effects; menus pause CT. FCJ7 remains unchanged; ABI11/nine images,
+Unit112/State2014 (+210 RAM bytes), unchanged Work/FSV3 and allocation count.
+Private group476684 (+1168), packed input64789/headroom147. Next: incapacitation,
+cast interruption and action/reaction contexts. Full L2/content gates stay open;
+Jump deferred. Earlier checkpoints below are historical.
+
+**Current status-state checkpoint —2026-10-26:** [CORE_STATUS_STATE.md](CORE_STATUS_STATE.md).
+Canonical forty-bit storage/filtering, immunity and innate-protected cures now
+share source policy; Charge/Defend command state is consistent. Gameplay effects
+remain a restricted subset; expiry/upkeep and reaction contexts are next.
+FCJ7/ABI10, Unit96/State1804 (+218 RAM bytes), Work45516/FSV3 unchanged.
+Private group475516 (+1877), packed input64673/headroom263.4842 targeted
+PC/sanitizer/native checks pass. Earlier checkpoints below are historical;
+Jump stays deferred. Standard bundle and live TiEmu are unchanged.
+
+**Darkness/Silence checkpoint —2026-10-26:** [CORE_STATUS_RULES.md](CORE_STATUS_RULES.md).
+Physical preview and commit now apply attacker Darkness and target Defend through
+one rule. Player/preview/AI share the source Silence flag/menu restriction.
+FCJ6 adds224 archived menu bytes and strict length/version rejection; no new
+battle/save fields or heap allocation.433 native status checks plus existing
+primary actions/Charge pass. Private group473639 (+1174), ABI9/nine images,
+packed input64575/headroom361. Full status policy, poison upkeep and reaction
+contexts remain open; Jump deferred. Standard bundle/live TiEmu stay unchanged.
+
+**Shared primary actions checkpoint —2026-10-25:** [CORE_ACTIONS.md](CORE_ACTIONS.md).
+Impact commit is separated from animation; combat, AI and healing forecasts share
+pure HP/status transitions. Existing primary effects and six action pictures
+remain identical before/after on PC/68000. ABI8/nine images; no State/Work/Save or
+heap growth. Private group472465 bytes (+464); resident packed input64177,
+headroom759. Impact relocation costs extra CPU (scoped peak33480 cycles).
+Next: source-backed status policy/action contexts. Full L2/L1 and production
+gates remain open; Jump refinements deferred; standard group/live TiEmu untouched.
+
+**Common compact topology closed —2026-10-25:** [CORE_COMPACT.md](CORE_COMPACT.md).
+ABI7/nine images use36-byte lower-only or68-byte two-floor row storage, with
+four cached neighbors per node. Native Gariland heap requests fall1798 bytes;
+Orbonne1678. Actual ordinary search CPU is preserved; wider searches are about
+1.6% cheaper in the scoped two-map comparison. Generic/Work search now represents
+cost6 and32-link rows; live gameplay still emits one-gap links. Work45516 (+2),
+State1586 and FSV3 unchanged. Private group472001 bytes (+119),28 identical data
+banks, accepted Status/range views preserved; packed input64825/headroom111.
+**User priority: Jump is minor. Finish this common-storage verification, then
+advance L2 actions/statuses; defer Jump refinements.** Full L1 and production
+readiness remain open; standard group/live TiEmu are unchanged.
+
+**Current consolidated roadmap:** [CORE_ROADMAP.md](CORE_ROADMAP.md). L1 is
+advanced but incomplete; L2/L3 still require major rules work, and L4 production
+gates remain open. Dated checkpoint notes below retain their historical scope.
+
+**Resident capacity / actor-column checkpoint —2026-10-25:** [CORE_RESIDENT.md](CORE_RESIDENT.md).
+SAVE is split from encounter/party initialization (new PARTY image); unchanged
+Status keys now run in SCREENS. ABI6/nine FMB2 images reduce the reserved zone
+6074→5734. Wider-cost search is now linked by default, with unchanged Work/State/
+Save layouts and fast ordinary movement. Private group471882 bytes (+1438),28
+unchanged data hashes. Packed input64831 bytes leaves105 below TTPack's limit;
+new build reports expose this separately from compressed size. Targeted flow,
+save, Status, search and accepted-view checks pass.88 original actor-column
+queries also feed a99-check PC/sanitized/68000 prototype. Runtime still has
+one-gap links: bounded longer links, actor-record production and wet costs
+remain next. Standard group and live TiEmu are unchanged.
+
+**Wider-cost search prerequisite —2026-10-25:** [CORE_SPAN_SEARCH.md](CORE_SPAN_SEARCH.md).
+An optional eight-bucket linked frontier supports abstract costs1..5 while
+reusing the existing queue storage.27592 focused PC/sanitized/68000 checks pass;
+actual Work/caller tests pass1219 Gariland and1065 Orbonne checks, including
+cost/predecessor equality, representation restarts and an abstract cost5 path.
+Fresh native Search1054/Work45514/State1586/Save3138 sizes are unchanged.
+`FFT_NAV_SPANS` is TEST-ONLY in the bound battle build: making it resident exceeds
+TTPack's64936-byte input ceiling. The ordinary package builds at470444 bytes
+(+37), with28 unchanged non-code variable hashes and accepted views unchanged.
+Before enabling longer jumps, solve resident code headroom, bounded links and
+all-intermediate actor bodies together. Shipping still has one-gap jumps.
+The standard group/live TiEmu are untouched; no exhaustive audit rerun.
+
+**Accepted movement/cache milestone —2026-10-25:** [CORE_STEPS.md](CORE_STEPS.md).
+Forward source edges, asymmetric slope/headroom gates and ordinary water exits
+replace stand-height approximations. User accepted Gariland's changed rings;
+Orbonne remains unchanged.112 original endpoint fixtures feed451 kernel checks;
+80 battle checks and cached-versus-reference graph/search checks (628/588) pass
+PC/sanitizers/68000. Scratch reuse cuts cold graph CPU by30.77%/28.18% over
+Jump1..4 with no extra allocation or fields. Private group470407 bytes (+178),
+42 variables; ABI5/FMB2/FSV3 unchanged. All28 non-code hashes match the previous
+group. Standard bundle and live TiEmu remain untouched; no exhaustive rerun.
+
+**Next long-span gate:** [CORE_LONG_JUMPS.md](CORE_LONG_JUMPS.md).22 original full
+spread trials feed278 geometry checks on PC/sanitizers/68000. Ordinary Jump is
+capped at7 (static config evidence), allowing up to3 intervening cells. This is
+a test-only prototype: shipping still supports one gap. Before activation,
+extend bounded link storage, queue cost support and all-intermediate actor
+checks together. Actor/special movement, raster, action/status pipeline, peak
+combined residency and production formats/editors remain open.
+
+**Previous recoil/test-scope checkpoint —2026-10-25:** [CORE_KNOCKBACK.md](CORE_KNOCKBACK.md).
+Source-bound recoil selects the highest eligible floor by facing edges and
+headroom, with no fallback after chosen-floor occupancy/targetability rejection.
+The cached single-floor fast path remains.68 focused original queries feed172
+PC/sanitized/68000 geometry checks;82 actual battle hit/placement/cache checks
+pass. Private `x/core-knockback/fftcampaign.89g`:470229 bytes (+395),42 variables;
+ABI5/eight modules and storage fields remain unchanged. All28 non-code variable
+hashes match the prior group. No full scene/decoder/profile sweep was rerun;
+[CORE_TESTING.md](CORE_TESTING.md) is the default impact policy, with2574 focused
+profile checks and an explicit `--deep` exhaustive certificate. Endpoint/long-
+jump/actor/raster/action contexts remain open; standard group/live TiEmu unchanged.
+
+**Previous per-map layer checkpoint —2026-10-25:** [CORE_MAP_PROFILE.md](CORE_MAP_PROFILE.md).
+User accepted CORE_JUMPS; its Decision marker is cleared. The new census covers
+109 event/random-referenced maps and214 terrain variants:77 lack upper stop
+cells,66 can omit upper movement queries,64 can omit positive-height upper ray
+queries. Cached independent flags skip those paths without removing lower-floor
+height/slope rules.3,234,825 PC/sanitized/68000 equivalence checks pass;169
+accepted images remain identical. ABI5/eight FMB2 images reduce the resident
+module zone7406→6074; Work45514 and the five battle heap requests are unchanged.
+Private `x/core-single-floor/fftcampaign.89g`:469834 bytes (+734, including the
+accepted jump rule). Full upper traversal/raster cover, action/status mechanics,
+combined residency and production formats remain open. Standard group/live
+TiEmu are unchanged; production stays closed.
+
+**Previous source-surface checkpoint —2026-10-25:** [CORE_SURFACES.md](CORE_SURFACES.md).
+Both chapter descriptors now contain validated source solid spans. Straight-ray
+AI collision keeps upper solids even without a walkable node; ordinary movement
+filters endpoint headroom.9294 original-MIPS queries feed9462 portable/native
+checks;55 battle integration checks and1846 boundary checks pass. Existing
+movement/replays pass and169 images remain identical. A data-derived classifier
+removes Gariland's extra cold ceiling cost with an identical graph. Private
+`x/core-terrain/fftcampaign.89g`:469100 bytes (+3033); native Work45514 (+4),
+five Gariland blocks116094, maximum nodes/current scene121182. ABI4/FMB2,
+FSV3 unchanged. Full source upper paths, raster bridge masks, special movement,
+ballistic/player targeting, action/status pipeline and combined residency remain
+open. The production gate is closed; standard bundle/live TiEmu are unchanged.
+
+**Previous256-node tactical checkpoint —2026-10-24:** [CORE_FULL_GRID.md](CORE_FULL_GRID.md).
+The battle now supports13 actors/256 compact nodes with16-bit counts/endpoints,
+valid node255, complete AI origin/selection iteration, range completion and
+rotation sorting.3181 PC/sanitized/68000 checks pass, including two floors and
+allocation-failure rollback;37 campaign and24 opening/scene/control replays pass
+and169 reference images remain identical. AI origin merge sorting preserves the
+frozen tie order and makes the pathological setup zone about9.25× faster.
+Topology is a fifth heap block; Gariland requests116090 bytes (+4770), maximum
+nodes with the current scene121178, excluding full residency/stack. Largest block
+61670; Unit remains80 bytes. Private `x/core-256/fftcampaign.89g`:466067 bytes
+(+501). Source upper-floor traversal/LoS/cover, full-scene extrema, maximum
+combined residency and formats/editors remain open; the production gate stays
+closed. Standard groups and user-owned live TiEmu are unchanged.
+
+
+**Previous battle-cell milestone —2026-10-24:** [CORE_CELL_STATE.md](CORE_CELL_STATE.md).
+Canonical cells now drive units/cursor, compact paths, movement undo, Charge,
+knockback, AI placement and feet-cache keys.128 actual battle checks plus68
+FMB2 module-bank checks pass on PC/sanitizers/68000; the256-node kernel still
+passes13887 checks and91186 old movement comparisons agree.37 campaign and24
+opening/scene/control replays pass;169 images remain identical. Unit remains80
+bytes, State1480, Work48046; four battle blocks request111320 bytes (+3598),
+not combined residency/stack. Seven overlays reduce the largest image to7404.
+Private `x/core-floors/fftcampaign.89g`:465566 bytes (+746 versus geometry).
+Full256-node battle counts/arrays, source upper-floor traversal/LoS/cover and
+matching archived topology remain open; the production gate is closed. Standard
+groups and the user-owned live TiEmu are untouched.
+
+
+**Previous geometry/search checkpoint —2026-10-24:** [CORE_GEOMETRY.md](CORE_GEOMETRY.md).
+Shared compact identity and graph search support256 IDs across two floors;
+13887 PC/sanitized/native checks pass, including upper node255 and all256 pending
+targets. Active battles use this search and bounded path extraction.91186 checks
+preserve old distances/predecessors;1837 boundary checks,37 campaign and24 opening/
+scene/control replays pass. The four13-actor pictures are unchanged. Actual unit/
+cursor/target/cover adapters remain150-slot/lower-floor and are next, not complete.
+Work44434, State+deferred-save allocation4632; four requested heap blocks107722
+bytes, excluding combined residency/stack. Save bytes remain FSV3/3138 and survive
+Work release; modules/signature must match. Native cancel/rotation/Charge/flow
+checks pass. Private group `x/core-grid/fftcampaign.89g` is464820 bytes (-2605
+versus the preceding capacity candidate). Artifacts are under `x/core-grid/`; standard groups and the
+user-owned live TiEmu remain untouched.
+
+**Previous actor-capacity checkpoint —2026-10-24:** [CORE_CAPACITY.md](CORE_CAPACITY.md).
+Descriptor-driven1..13 battle actors, capacity-sized caches/AI/masks/rewards,
+FCD3 per-actor results and matching module ABI are implemented. Existing maps
+retain11 actors.1813 PC/68000 boundary checks, four13-actor renderer cases,
+37 campaign and24 opening/scene/control replays pass; nine fixed11 control
+pictures are identical. The private candidate is467425 bytes (+1380), at
+`x/core-capacity/fftcampaign.89g`. Battle heap requests total102936 bytes across
+four blocks, including the new1494-byte State allocation; combined residency,
+stack and fragmentation remain unmeasured. Compact256-node/two-floor gameplay
+is next and remains unimplemented. Live TiEmu and standard bundles are untouched.
+
+**Accepted reduced envelope —2026-10-24:** read
+[PORT_LIMITS.md](PORT_LIMITS.md) and `../core_limits.h` first for workstream4.
+User selects13 actors (eleven-Monk random encounter excluded),256 compact8-bit
+tile IDs across both floors,16-bit count/endpoints and separate missing-node
+validity. Keep source coordinates/elevation/IDs separate. Raw21-slot/512-cell
+research below is not the target. All retained retail geometry candidates fit
+225 nodes after test-map exclusions; source maximum stoppable upper-bearing
+map is MAP029155+4=159, maximum upper is MAP05318. Community MAP120 is labelled
+fake and counts differ from US flags.16 validator tests pass; the current core
+supports13 actors but still has one tactical layer. See the current milestone
+above for packaging and native evidence.
+
+**Active workstream4 —2026-10-24:** the user accepted all latest UI reviews
+("bien pour tout"); their Decision markers are cleared. Begin core production
+work from [CORE_AUDIT.md](CORE_AUDIT.md), not an assumed16-unit hard limit.
+The read-only retail census finds21 simulation slots (16 ENTD+5 deployed),
+16 Formation+4 guest records, two256-cell terrain layers, observed18-cell axes,
+and40 status policies. Concurrent active maximum and deployment event445 remain
+explicit research questions.15 census/fixture validator tests and1070 current
+eleven-unit PC/68000 boundary checks passed at that audit checkpoint; the13-actor
+implementation above supersedes this baseline.16/21-unit gameplay is out of scope.
+Size/native decoder benchmarks and the20-case fixture plan are linked there.
+The466045-byte playtest group and the user's live TiEmu remain unchanged.
+
+**Required interaction rules:** read [GAME_DESIGN.md](../GAME_DESIGN.md) before
+UI/render work. The2026-10-24 hardware QA adds deployment latency/input/legality,
+immediate range cancellation,1px-only edges, map texture/magnet/save slots and
+management animation/shared confirmations/white unavailable jobs/visible JP.
+The shared glyph-font review is accepted. The live TiEmu remains user-owned.
+
+**Latest implementation —2026-10-24:**
+[QA_FOLLOWUP_2026-10-24.md](QA_FOLLOWUP_2026-10-24.md) records deployment cache/
+legality/ALPHA/white-cell/blink fixes, first-frame range cleanup,1px-only banks,
+corrected multi-rectangle world texture, stronger magnet/shared Data files,
+management diamond/common confirmations/white jobs/visible JP and the
+source-observed light-column job effect. Shared font is integrated. New group
+is466045 bytes; native checks pass. Live TiEmu is untouched. Five GIFs and
+three PNG reviews in `x/qa-followup/review/` are pinned Decision; visual review
+and hardware playthrough are pending. Notes below are chronological history.
+
+**Shared font / B01 —2026-10-24:** [QA_STATUS.md](QA_STATUS.md) is authoritative;
+the historical batches below are not an all-fixed claim. The472686-byte group
+is running in the user's Titanium TiEmu; do not send keys or restart it.
+[SHARED_FONT.md](SHARED_FONT.md) records the implemented portable glyph-font
+candidate,6556-byte shared bank and4014-byte combined flow/title-B data saving
+(not a measured total-package saving). Six actual-C before/after GIFs plus a
+sheet under `x/shared-font/` are pinned Decision, superseding `x/white-titles/`.
+PC sanitizers and37 PC/68000 screens pass; visual approval must precede native
+consumer packaging/optimisation. Title A/B remains separate. B01 retains the
+full-resolution renderer the user says looked good: both chapters' real F1/F5
+paths now pass144 checks,80 framebuffer hashes and81840 independent geometric
+corner checks. No new LCD timing claim. Both1px/2px scenery widths remain
+available for the user's gameplay verdict; B06/B07 remain unreproduced/open.
+
+**Perspective retired / selectable scenery —2026-10-23:** the user keeps
+perspective in [experiments](../../../experiments/fft-perspective/README.md),
+outside the campaign. [EDGE_WIDTH.md](EDGE_WIDTH.md) records the temporary
+Gariland1px/2px choice through MODE, current tests and the472686-byte group.
+Both widths remain for the user's actual test; no final width verdict.
+SVG remains an offline old-banner generator, not a runtime perspective library.
+
+**UI size study —2026-10-23:** [dynamic lettering, optional1/2px edges and
+close/wide perspective](UI_SIZE_STUDY.md) records the latest measured costs.
+The old SVG font converter is now shared at `lib/svgfont.py`; old banner output
+is byte-identical. No new font renderer, edge setting or perspective campaign
+integration is claimed.
+
+**Title A/B and QA follow-up —2026-10-23:** [QA_TITLE_FOLLOWUP.md](QA_TITLE_FOLLOWUP.md) records the normal-start memory failure reproduced on private Titanium and the corrected packed path reaching Agrias, plus native Continue/Data2. Academy pan clamping, shortcut99 joining the full Gariland/map route, and the first-frame premature-victory fix are implemented. Serif title/result reveals and1px/2px scenery are marked review candidates. A/B remain isolated; campaign perspective is explicitly still absent and B06/B07 remain open.29 campaign +18 opening/chapel native replays,18 current/A and29 B title cases and split native flow checks pass.
+
+**Package memory check —2026-10-23:** [PACKAGE_CHECK.md](PACKAGE_CHECK.md) records an isolated Titanium run. Plain archived map/management retained36550bytes under the supervisor; packed stubs reduce that pair to2020bytes. Deployment → battle → map/management twice → battle passes, with repeated returns stable at186980bytes free and the second battle visibly playable. The pre-title candidate group is452879bytes. Title-enabled full packaging/presentation and B06/B07 remain open; no live session or real save was changed.
+
+**Title/three-save candidate —2026-10-23:** see [TITLE.md](TITLE.md). Source PS1 title art, New Game/Continue, shared animated hand and three isolated slots are implemented. Legacy saves are preserved/imported explicitly; overwrite defaults to Return.18 title PC/68000 cases and the88-assertion battle flow on slot2 pass.29 campaign +18 opening/scene replays retain all139 reference PNGs. Requested work order is2(package),1(QA/title),4(core mechanisms). Review images are under `x/qa/title/review-1`; final title packaging/presentation awaits the visual verdict.
+
+**User approval —2026-10-23:** deployment review-11 is accepted, including A's2px arrow with horizontal lower edge. The decision marker is cleared. This closes that visual review; full native campaign packaging/heap/presentation checks and B06/B07 ghost reports remain open.
+
+**Arrow A selected:** the doubled2px contour is now active, with both lower vertices at y87 to make its bottom edge horizontal. Tip/placement/menu remain unchanged. Review-11 supersedes review-10's A/B decision marker. Deployment unit and15 PC/68000 replay checks pass; see CHOICE_MENU.md.
+
+**Arrow A/B pending:** `review_deploy_arrow.py` generates isolated current/A/B builds: A doubles the contour, B reduces height12->10px. Active deployment stays unchanged. Six PC/68000 cases pass; changes stay within the arrow region. Marked `x/qa/flow/review-10/deployment-arrow-ab.png` supersedes review-9; see CHOICE_MENU.md.
+
+**Placement triangle shape:** review-9 increases the arrow height8->12px, preserving its accepted tip position and making the hollow triangle clearer. Vertices(56,75),(61,86),(84,87). Only its silhouette changes. Review-9 supersedes review-8's decision marker; see CHOICE_MENU.md.
+
+**Placement arrow height:** raised11px from review-7, leaving the tip about2px below the grid; left offset and shape retained. Footer separator is continuous again. Review-8 supersedes review-7's decision marker. See CHOICE_MENU.md.
+
+**Placement arrow offset:** moved30px left following the annotated screenshot, keeping shape/height and hand/menu unchanged. Footer gap/help follow the arrow. Review-7 supersedes review-6's decision markers; see CHOICE_MENU.md.
+
+**Source-photo deployment refinement:** the straight-down indicator was rejected. A long inclined ground-plane wedge now sits below the grid, as in the user photo. The shared animated hand is closer to text; confirmation height33->27px. Existing geometry/stats/placement are unchanged. See [CHOICE_MENU.md](CHOICE_MENU.md). Review-6 PNG and actual-frame GIF supersede review-5; other decisions remain pending. Scoped unit/native checks are recorded there.
+
+**Latest direction/menu follow-up:** [CHOICE_MENU.md](CHOICE_MENU.md). The orientation indicator now points south, centered below the grid. Start Battle / Return uses the shared tabbed menu and white hand. Layout, frame/rows, selector and wrapping navigation are shared with battle, management and world map; owners retain validation and caches. Review-5 supersedes review-4; other pending visual decisions remain. Campaign/root/opening unit suites pass, including648 walking poses.29 campaign +18 opening/scene +8 deployment PC/68000 replays pass, with all139 preserved reference PNGs byte-identical. Gariland/Orbonne flow retains74+14 assertions and matching saved bytes/payout guards. PC entries build; no live emulator or shipping bundle changes.
+
+Session of 2026-10-21/22, branch `feat/fft-shared-engine`, code checkpoint `dba2fbc`
+(handover commit `6100fb4`). Read first:
 `CLAUDE.md` (technical rules), `docs/working-rules.md` (collaboration rules), this file, then
 `ENGINE.md` (the one-engine design and its milestones), `README.md` (build and checks) and
 `../MANAGEMENT.md`.
+
+**Latest shared-panel/placement follow-up:** [UNIT_CARD.md](UNIT_CARD.md).
+`unit_card.h/.inc` + `portrait32.inc` share presentation data, portraits,
+formatting, alignment and bars across Formation/deployment, management headers,
+battle HUD and Status. Five layouts; callers retain caches and incremental parts.
+Status uses a new core callback; `MOD_SIG` now includes `sizeof(ModCtx)`. Keep
+matching new `ffbm` and core together.29 campaign +18 opening/scene native replays
+pass with every preserved reference PNG byte-identical.88 flow assertions/save
+checks and five deployment replays pass; Status/cache and deployment pass ASan/
+UBSan with legacy shift/leak exclusions. Flow native checkers are split by chapter
+to fit the variable limit without dropping checks. Placement adds the depth0
+grid, bottom-left orientation arrow and complete white rims/dark outer keylines.
+The marked review-4 sheet supersedes review-3; other decisions stay pending.
+No shipping bundle, heap/FPS claim, live emulator changes or handwritten asm.
+
+**Latest placement-only revision:** omit all light-gray nondeployable cells and
+increase legal slab side depth2→4px. No rule/save changes. Deployment unit tests
+and five PC/68000 input/pixel/state/save replays pass. New marked comparison:
+`x/qa/flow/review-3/new/deployment-slabs-review.png`; previous placement sheet/GIF
+markers cleared. Other pending decisions retained. No bundle or TiEmu changes.
+
+**Latest user refinements:** Gariland's location title is on black (`ffs2`35B).
+Deployment and Formation call one shared detail renderer, so their stats layout
+is identical. Deployment has raised white-rimmed slabs and depth-sorted actors;
+the former loop could erase actors' feet. F1/F5 is verified in both directions,
+including wrap, with an actual-input GIF. Trophy icon/name rows are centred.
+Updated88 battle checks (Gariland `8B4BB22B`) and10 UI/save replays agree PC/68000.
+Replacement comparisons/GIF are marked decisions in `x/qa/flow/review-2/new`;
+old flow markers are cleared. `review_white_edges.py` proposes white on gray
+faces, black on white, in four isolated Gariland views; active scenery remains
+unchanged. Await the new verdict before packaging/benchmarking presentation.
+`tools/deployment_research.py` confirms85 source scenario records with two squads,
+including event39/MAP034 capacity2+2; Gariland remains count1/ID256. Source Start
+advances squads, Cross returns, L1/R1 changes units. The pyramids/arrows are also
+cursor/orientation graphics. Later native maps still need real multi-area data,
+per-group capacities/upper-level bits and safe save/runtime capacity; no fake
+second Gariland grid was introduced. See FLOW.md and RE_NOTES.md. No TiEmu changes.
+
+**Latest flow candidates —2026-10-23:** [FLOW.md](FLOW.md) documents V01/S01/S02
+and user-reactivated V02. New actual result pages use live source rewards/icons;
+Orbonne has no results. Dark Academy narration/chapter/location, Gariland title,
+pre/post dialogue and playable5-from7 deployment are wired into both supervisors.
+FSV3 adds funds/phase/deployment, migrates FSV2, and preserves reserves/ordinaryKO.
+The seven-member initial party is a fixed observed source roster, not a native
+random generator.74 Gariland +14 Orbonne PC/68000 checks and10 menu replays pass;
+campaign unit tests and PC entry builds pass. The four real-renderer flow sheets
+are marked gallery decisions and verified first in the served listing. Await
+their verdict before integrating/benchmarking presentation further. No new full
+bundle, live emulator changes or hardware/FPS/combined-heap claim. Older statements
+below that deployment is absent or V02 deferred describe earlier checkpoints.
+
+Follow-up validation:29 campaign +12 opening battle +6 original title/chapel
+replays pass after the shared state/save changes; existing title references were
+not refreshed. ASan/UBSan passes the production result-confirmation fixtures
+(legacy shifts/leak accounting excluded). Five active PC entries execute
+headless and all resume checkpoints pass. The isolated native supervisor builds.
+Opening regression captures now preserve unchanged image timestamps too.
+
+**Latest integration —2026-10-23, user selected67%:** `world_assets.py` now
+defaults to2/3 for the source texture, all43 locations/48 routes and existing
+Ramza idle poses. The18,066-byte FWM3 bank is byte-identical to the approved
+review-4/67 bank; the Gariland picture matches its preview exactly. Map cache/
+sprite heap is11,532bytes (previously16,652). No runtime resizing or new sprite
+rip. Progression still only shows implemented story locations; the Igros review
+fixture was not installed.696 PC/68000 pixel/cache/pose/decor checks and7 map
+replays pass; the trip's save still matches. Roads/markers are now painted once
+into decoded strips: all7 replay pictures and256 cold/warm reference comparisons
+are pixel-identical. Full-frame idle rendering drops from470,237 mean cycles to
+190,977 including entry, warmed max177,586; cold entry render is1,808,576 cycles.
+Free-pan cache misses can still exceed the30fps frame target (render peak415,666
+plus update); do not claim a universal frame budget. These are MC68000 CPU
+measurements, not LCD FPS. Map67% decision markers are cleared; other pending
+reviews remain. The native map program/archive are rebuilt separately; the
+complete oldFCJ4 group and user's live TiEmu are untouched. No bundle/push.
+
+**Previous user verdict —2026-10-23, map zoom review:** keep **source texture /
+stronger road contour**; the contrastA/B alternatives are rejected. Change Job
+also loses the gray bars under every actor, in addition to its removed diamond.
+`make manage-test` passes. `tools/world_zoom_review.py` creates isolated75% and
+67% banks from the existing FWM3 texture and five decoded idle poses, with no new
+sprite rip or runtime resizing. Both use the actual world-map C renderer and
+the same Gariland location/camera center. The north-context row deliberately
+shows the Mandalia-Igros route, without unlocking Igros in the active campaign.
+Igros's center sits at screenY1/13/17 for100%/75%/67%; the latter two fit its
+marker and route.75% is recommended; user selection remains pending. Candidate
+banks are21,622/18,066bytes, not shipping package or performance results.
+Comparisons and reduced-idle GIF: `x/qa/review-4/new`. Active `data/ffwm.bin`,
+save and live TiEmu are unchanged. Do not integrate/benchmark the zoom until the
+visual verdict. Review-3 map contrast/roads and carousel markers are superseded.
+
+**Previous follow-up —2026-10-23:** Change Job clarification is resolved: no
+carousel diamond; Formation retains a double-thickness floor diamond and loses
+its gray floor lines. The map has stronger road clearance, a battle-style menu
+and a glove outside its text. New contrastA/B pictures under `x/qa/review-3/new`
+await user selection; source texture is still active. FWM3 is33,218bytes versus
+51,416, with eight-row ZX0 strips and a16,652-byte cache/sprite allocation.
+`world-storage-check` checks248 PC/68000 source-pixel/cache/pose cases; actual
+cursor update/glide testing passes1088 checks across32 Move/Attack/Throw Stone/
+Charge/player/AI/view cases (hash81047F76). The mandatory mask fix is immediate
+in the framebuffer; persistent ghosts and actual new LCD presentation remain
+open. Old review images are preserved; new publishing skips identical bytes
+and247 existing images retained exact timestamps on a repeated generation.
+The running gallery now displays full file modification dates; its listing
+version refreshes old browser pages. Current gallery PID is recorded locally
+in `/tmp/fft-gallery-pid`, log `/tmp/ti-view-decisions.log`.
+See QA.md's third batch for compression controls, tests and remaining gates.
+No bundle/relaunch/push. The user's live TiEmu remains the oldFCJ4 group.
+
+**Latest QA continuation (2026-10-22):** read [QA.md](QA.md) first. Every report in
+root `fft_bugs/` is tracked there. Current candidates fix full item names (FCJ5,
+39,610bytes, Item30), first-frame cursor masking including AI, Wait arrow handedness,
+top camera padding and the Gariland scenery-style packaging regression. Campaign
+turns now use native160x100 geometry; the wrapper selects the existing fixed-address
+copy presenter.15,902 PC/68000 checks and40 turn pictures pass; the actual new LCD
+presentation order/duration remains unverified. Shared unit tests and45 campaign/
+opening/scene native replays pass, including27 rerun with restored Gariland edges.
+ASan/UBSan passes the extended QA reproducers. No golden files were refreshed.
+
+Visual candidates are in `x/qa`: battle/scenery comparisons, rotation GIF, three
+world-map options, neutral five-column Formation/compact Status/carousel and three
+victory layouts. Management/world-map/victory sketches do not implement their
+behaviors. Source cinematic ordering and deployment remain work; after-victory
+enemy cleanup/ally staging is explicitly deferred. Persistent ghost silhouettes
+are still unresolved: the tested knockback caches are fresh. The latest request
+for a rotating job carousel supersedes the earlier static-management choice.
+
+Do not rebuild the shipping group or launch into the user's TiEmu before review.
+It still runs the requested FCJ4 group; no keys/restart were sent. The new banks
+must never be mixed individually into that session. Recheck TTPack/heap/costs
+after review; earlier size/timing claims below are historical. No public push.
+
+**Previous working-tree review:** [CHARGE.md](CHARGE.md). All eight Archer Charges
+have 48 original preview/initial-CT fixtures, each replayed twice. The actual
+PC/68000 evaluator and scheduler checks pass; bare-hand power and the order of
+Charging/zodiac rounding are corrected. Long action lists scroll safely in the
+existing buffers. **Five-row scrolling is approved**; its requested continuation
+indicators await review at `x/charge/scroll-indicators-review.png`. Do not ship
+or build further presentation on those indicators until approved. The
+working bank is FCJ4 (rejects the old power-as-CT-index engine); descriptors and
+management stay FCD2/FMG2. At the user's request, `x/fftcampaign.89g` was rebuilt
+for manual TiEmu review: 33 variables, 430,593 bytes, matching FCJ4 programs/banks
+and archive flags verified. This is not visual approval; the FCJ3 measurements
+below remain the previous validated checkpoint. All 45 prior replays keep
+their frame counts/screens/states/saves. Mandalia's source scenario/ENTD and its
+remaining action/unit-count constraints are recorded in CHARGE.md.
+
+**User review follow-up:** five-row scrolling is approved; the user requested
+above/below indicators. The cached triangles are prepared at
+`x/charge/scroll-indicators-review.png` and await approval. The user subsequently
+requested removing the white backing and keeping the bottom arrow inside the
+frame: backings are removed and the bottom arrow is raised one pixel. Updated
+first/middle/last cache pixels match PC/68000, hash `276A2090`; the updated
+comparison remains pinned as **Décision** in ti-view. All 45 existing native
+replays and the 48 Charge fixtures pass. Do not replace the user's live TiEmu
+session: it is theirs after the requested FCJ4 campaign launch. The package has
+not been rebuilt with indicators. [CORE_STATUS.md](CORE_STATUS.md) is the current
+completion checklist. `tools/mandalia_preflight.py` reads the original deployment
+table and disc: four player slots + eight ENTD records = twelve declared maximum;
+full Mandalia conditional deployment remains to observe before changing NUNIT.
+
+**2026-10-22 continuation (working-tree changes):** read [ABILITIES.md](ABILITIES.md).
+Core step 3 now has its shared catalogue, source-ID battle migration and modular
+evaluator for the existing encounters. `ffcj` is FCJ3 (512 source entries, 224
+packed sets and normalized execution records); descriptors are FCD2; `ffmg` is
+FMG2 (32-byte job records, names/lists/costs from the catalogue). Battle IDs and
+learned action bits are 16-bit. Unimplemented actions stay unavailable and their
+learned bits survive. This does not implement all FFT formula families.
+
+27 campaign + 18 opening/scene PC/68000 replays pass, including the new Phoenix
+Down ID/bit-position save replay. A separate 29,391-frame audit preserves every
+pixel and logical state after canonicalizing only the changed ID representation.
+No regression reference was refreshed. The native group has 33 variables,
+430,437 bytes. The uncompressed battle is 63,427 bytes (1,509 bytes of TTPack
+margin). Six modules: AI, TURN, SCREENS, BEATS, SAVE, FORMULA. Generation runs
+with SAVE; stats stay resident; AI evaluates locally without evicting its image.
+The matched 9,500-frame profile adds about 0.2% mean cycles; old budget overruns
+remain (details and raw local evidence in ABILITIES.md / x/id-migration).
+
+User remarks have regressions: 20 generic careers, not 160; KO counters 3..0
+survive both save paths and return with full HP/MP; only crystal/chest/gone units
+leave. Ramza's 51 versus the original capture's 52 comes from different raw HP
+(0x07C272 versus 0x07E86D); both round-trip and display correctly. No +1 was added.
+
+The user's "continue" was taken as authorization to finish the core migration.
+Do not re-ask the old scope question. Next: source-check the additional formula
+families needed by Chapter I and extract Mandalia as data. Previous visual
+approval remains pending at `x/core-review/pending-review.png`; this migration
+preserves those pixels. An isolated Titanium AMS 3.10 run of the archived group reaches playable
+Gariland through `fftstory(99)`; see `x/id-migration/tiemu/handoff-ready.png`.
+The first launch command was missed during transfer; retry after confirmed HOME
+readiness passed. The user's live emulator was untouched. No public push.
 
 ## Where we want to go
 
@@ -15,7 +986,7 @@ done, the next step is to **rip every Chapter I map and scene** as data.
 The battle engine will grow a lot (many FFT jobs and abilities missing), so program size and
 RAM are permanent constraints, not one-off problems (see "Limits").
 
-## Results of this session (all committed and pushed)
+## Initial session results (committed and pushed before this continuation)
 
 | Commit | What |
 |---|---|
@@ -51,15 +1022,12 @@ TiEmu (Titanium) was checked once at the end:
 1. **Visual validation pending.** The user has not yet approved the screens of `fftmng`, of
    `fftmap` (with motifs) or of the unified Status page. Show before/after images and get an
    OK before building more on them.
-2. **Step 3 of the core: abilities as shared data, plus an FFT formula interpreter.**
-   - 512 abilities, 16-entry skill sets.
-   - Wider indices and learned bits (today `SET_N` entries per set, `u8 learned`).
-   - The interpreter must live in a **module** (`ffbm`): `fftbat` has no room left.
-   - A question to the user is still unanswered:
-     - (a) start with the formula families Chapter I needs; or
-     - (b) first rip the next battle (Mandalia Plains, door 200 on the map, `STORY` in
-       `world_assets.py`) to work from concrete needs.
-   - Wait for the answer, or ask again in one short question.
+2. **Step 3 baseline done: source IDs, sixteen action bits and modular evaluation.**
+   - All 512 catalogue entries and 224 skill sets are available as data.
+   - Existing encounters use source IDs; sixteen action bits survive saves.
+   - Formula evaluation lives in FORMULA and locally in AI, never overlaid during
+     an executing AI call. Enabling more actions still requires source checks.
+   - Keep the real native size and frame measurements in ABILITIES.md current.
 3. After the core: rip Chapter I's maps and scenes. `world_assets.py STORY` lists which
    location shows after which story flag, and the battle door it enters.
 
@@ -69,7 +1037,7 @@ TiEmu (Titanium) was checked once at the end:
 - `FFT_CHAPTER` builds read a descriptor `cdesc`/`CD(field)` (`tools/chapter_desc.py`
   generates `chapter.h`).
 - PIC modules live in the bank `ffbm` (`tools/module.py`): MOD_AI 0, TURN 1, SCREENS 2,
-  BEATS 3, SAVE 4.
+  BEATS 3, SAVE 4, FORMULA 5.
   - Their context is `ModCtx` in `module.h`. A new core function a module needs goes there.
   - Parts are marked `MOD_PART(k)` / `MOD_CORE`.
 
@@ -90,7 +1058,9 @@ TiEmu (Titanium) was checked once at the end:
 - `PARTY`: bit 1 writes the party at the victory, bit 2 reads it at the start; test door 70
   reads it too.
 - `WON` (flag + 1), `LOCATION` (id + 1).
-- `SET_POS`, `SET_ID`, `BAG_ITEM`, `RSM_POS`: the chapter's indices to FFT's ids.
+- `BAG_ITEM`, `RSM_POS`: remaining chapter mappings. `SET_POS` / `SET_ID` are legacy
+  extraction fields; the active battle reads source sets directly. FCD2 adds
+  descriptor-local 28-byte unit definitions and RNG draw masks (`DRAW_BASIC`).
 - `DEFEND_ID`, `EQUIP_CHANGE_ID`, `EQUIP_CHANGE_POS`.
 
 **Descriptor fields removed**
@@ -100,9 +1070,9 @@ TiEmu (Titanium) was checked once at the end:
 
 | Bank | Built by | Contents |
 |---|---|---|
-| `ffcj` | `common_tables.py` | "FCJ1": Job[160] (14 bytes), job names, job skill sets, Item[256] (26 bytes; `reach`, `sev`, `pad` after the name). Written to both `opening/data` and `campaign/data`. |
-| `ffmg` | `management_data.py` | "FMG1", ~47.8 KB: 21 job records (careers 0..19, Ramza at 20), items, ability/set names, icons, 41 sprites, 41 portraits, font, generic names. |
-| `ffwm` | `world_assets.py` | "FWM1", ~19.6 KB: 255 TileMap tiles, a 31×24 grid, 43 locations, 48 routes, the story list. |
+| `ffcj` | `common_tables.py` | "FCJ5", 39,610 bytes: Job[160] internal records (20 generic careers), job names/skill sets, Item[256], all ability metadata and packed skill sets. Written to both `opening/data` and `campaign/data`; see ABILITIES.md. |
+| `ffmg` | `management_data.py` | "FMG2", 41,231 bytes: 21 job records of 32 bytes (careers 0..19, Ramza at 20), items, icons, 41 sprites, 41 portraits, font, generic names. Ability/set names, lists and costs come from ffcj. |
+| `ffwm` | `world_assets.py` | "FWM3", 33,218 bytes: compressed 8-row source-texture strips, five reused idle poses, 43 locations, 48 routes and the story list; 16,652 decoded bytes. |
 
 ## Discoveries (verified, save the time)
 
@@ -135,7 +1105,7 @@ TiEmu (Titanium) was checked once at the end:
 
 ## Limits (lasting)
 
-- **TTPack input limit: 64,936 bytes. `fftbat` is 64,161 bytes: 775 bytes left.**
+- **TTPack input limit: 64,936 bytes. `fftbat` is 63,427 bytes: 1,509 bytes left.**
   - Every new feature goes into a module (`ffbm`) or into data, not into the core.
   - Measure the size after every change.
 - RAM: the Titanium has ~188 KB free, and Gariland already needs ~183 KB. Prefer archived data
@@ -149,7 +1119,7 @@ TiEmu (Titanium) was checked once at the end:
 export PATH=$PWD/tools/bin:$PATH
 make -C games/fft/opening assets check      # 12 + 6 replays
 make -C games/fft/campaign assets           # needs the local disc
-make -C games/fft/campaign check bundle     # 26 cases incl. won, party, manage, worldmap
+make -C games/fft/campaign check bundle     # 27 cases incl. won, party, wide, manage, worldmap
 make -C games/fft/campaign save-test manage-test map-test
 ```
 
@@ -162,7 +1132,7 @@ make -C games/fft/campaign save-test manage-test map-test
 
 ## Do not
 
-- Do not grow `fftbat`'s core: 775 bytes left.
+- Keep new mechanics modular: only 1,509 bytes of TTPack margin remain.
 - Do not commit anything derived from the disc (`*.bin` banks, sprites, texts).
 - Do not build on an unvalidated visual change. Show side-by-side images first. Identical output
   needs no validation.

@@ -1,5 +1,10 @@
 # Camera configuration
 
+**Active campaign2026-10-24:** user selected1px scenery only. MODE/CATALOG now
+offers Move full-tiles/contour and Tiles covered/over-scenery; no width toggle.
+Old1px/2px and perspective sections below are historical. Perspective stays
+in experiments. See [current QA](campaign/QA_FOLLOWUP_2026-10-24.md).
+
 `make camera-config` builds the full PC game and an interactive native TI camera
 review with the same configuration code. The feature uses `FFT_CONFIG`; historical
 research/control builds keep their original defaults and checksums.
@@ -111,6 +116,15 @@ The runtime exposes CATALOG as a new `K_CATALOG` bit while retaining its legacy
 No runtime key bits or scripts used by existing games are reassigned.
 
 ## Chapter movement highlighting
+
+**2026-10-23 update:** the chapter settings are now accessible through MODE
+or CATALOG. Gariland temporarily exposes both1px/2px scenery widths for the
+user's in-game comparison; Move style and highlight cover remain separate
+rows. Orbonne has no2px candidate. See
+[selectable scenery widths](campaign/EDGE_WIDTH.md) for current controls,
+native checks and costs. The perspective configuration above is now an
+[experiment](../../experiments/fft-perspective/README.md), outside the campaign.
+The following paragraph describes the previous single-option chapter UI.
 
 The active Orbonne and campaign Gariland builds now share the CATALOG handler
 without enabling perspective inspection or idle geometry preparation. They expose

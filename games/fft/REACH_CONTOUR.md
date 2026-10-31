@@ -1,6 +1,11 @@
 # Exterior-only movement reach: native comparison
 
-2026-10-19. Orbonne and campaign Gariland now expose the contour in CATALOG:
+2026-10-23: MODE/CATALOG now opens a three-row chapter settings menu. Move style
+retains its behavior; scenery width and highlight cover are separate choices.
+See [EDGE_WIDTH.md](campaign/EDGE_WIDTH.md) for the current controls and native
+checks. The following notes retain the original contour measurements.
+
+2026-10-19. Orbonne and campaign Gariland expose the contour in CATALOG:
 unchecked **Move: full tiles** (default), checked **Move: contour**. ENTER/2nd or
 left/right toggles it; CATALOG, ESC or SHIFT closes settings. The battle, CT,
 RNG and actor animation pause while the menu is open. APPS retains the turn list.
