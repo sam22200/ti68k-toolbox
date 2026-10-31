@@ -1,7 +1,7 @@
 // The management menus (fftmng, campaign/ENGINE.md core milestone): the campaign's party from
 // its save (save.h), edited the way FFT does and written back when the menus close. The layout
 // is the management prototype's classic grid (../MANAGEMENT.md, chosen by the user), still
-// sprites. Everything shown or ruled on comes from the archived bank ffmg
+// sprites. Everything shown or ruled on comes from the archived banks ffmg/ffcj
 // (tools/management_data.py): FFT's 20 generic jobs and Ramza's own Squire, items, names,
 // icons, sprites, portraits, font.
 // Screens: the formation (ENTER: a unit's Status; ALPHA / DIAMOND: its menu), then Equip,
@@ -15,6 +15,7 @@
 #include "../art.h"
 #include "../units.h"
 #include "save.h"
+#include "../common.h"
 #include <stdlib.h>
 #include <string.h>
 #ifdef RT_CYCLES
@@ -22,18 +23,23 @@
 #endif
 
 enum { S_FORM, S_MENU, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_PICK, S_NONE };
-enum { CAREERS = 20, RAMZA_JOB = 20, JOB_SIZE = 120, ITEM_SIZE = 14, SLOTS = 5, ROWS = 6 };
+enum { CAREERS = 20, RAMZA_JOB = 20, JOB_SIZE = 32, ITEM_SIZE = 14, SLOTS = 5, ROWS = 6 };
 enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD };   // the save's order
+enum { JOB_CHANGE_FRAMES=96 }; // source-observed light column, adapted to30Hz/four greys
 typedef struct {
     u8 screen, back, unit, row, top, slot, confirm, note;   // note: a message (NOTE_*)
     u8 pick_n;                          // S_PICK: entries (pick[]: an item id or an ability)
     u16 pick[64];
     u8 changed;                         // the party edited (written at the end)
+    u8 jobs[CAREERS], angle[CAREERS], job_n, job_pos;
+    s8 spin;
+    u8 slide,job_anim,old_picture;
+    s16 floor_from_x,floor_from_y;
 } Mg;
 enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED };
 Mg mg;
 Save save;
-static const u8 *bank;
+static const u8 *bank, *common;
 static u8 *cache;
 static u8 dirty;
 
@@ -42,8 +48,8 @@ static const u8 *section(u8 k) { return bank + b16(bank + 4 + 2 * k); }
 static const char *str(u16 at) { return at ? (const char *)bank + at : ""; }
 static const u8 *job_rec(u8 k) { return section(0) + (u16)k * JOB_SIZE; }
 static const u8 *item_rec(u8 id) { return section(1) + (u16)id * ITEM_SIZE; }
-static const char *ability_name(u16 a) { return str(b16(section(2) + 2 * (a & 511))); }
-static const char *set_name(u8 s) { return str(b16(section(3) + 2 * (s & 63))); }
+static const char *ability_name(u16 a) { return cj_ability_name(common, a); }
+static const char *set_name(u8 s) { return cj_set_name(common, s); }
 // job record fields
 #define J_ID 2
 #define J_SET 3
@@ -54,14 +60,19 @@ static const char *set_name(u8 s) { return str(b16(section(3) + 2 * (s & 63))); 
 #define J_CATS 16
 #define J_REQ 20
 #define J_ONLY 30
-#define J_ABIL 32
-#define J_COST 76
 // item record fields
 #define I_FLAGS 2
 #define I_TYPE 3
 #define I_HP 5
 #define I_ICON 12
 static const u8 slot_flag[SLOTS] = { 0x20, 0x10, 0x08, 0x80, 0x40 };
+
+static u16 job_ability(const u8 *j, u8 k) { return cj_set_ability(common, j[J_SET], k); }
+static u16 ability_cost(u16 id)
+{
+    const u8 *p = cj_primary(common, id);
+    return p ? cj_word(p) : 0;
+}
 
 // ---------------------------------------------------------------- the party's rules
 static SaveUnit *unit(u8 i) { return &save.unit[i]; }
@@ -95,10 +106,39 @@ u8 unlocked(const SaveUnit *u, u8 c, u8 *what)
     return 1;
 }
 
+// Source world_job_build_unit_list(mode2): reveal jobs unlocked by any party
+// member, tint those unavailable to this unit, hide undiscovered jobs entirely.
+static u8 job_visible(const SaveUnit *u, u8 c)
+{
+    u8 i,only=job_rec(c)[J_ONLY];
+    if(only && only!=(u->type==1?2:1))return 0;
+    if(c==career(u)||unlocked(u,c,RT_NULL))return 1;
+    for(i=0;i<save.n;i++)if(unlocked(unit(i),c,RT_NULL))return 1;
+    return 0;
+}
+
+static void open_jobs(void)
+{
+    u8 c;
+    mg.screen=S_JOBS;mg.top=0;mg.row=career(unit(mg.unit));
+    mg.job_n=mg.job_pos=0;mg.spin=0;
+    for(c=0;c<CAREERS;c++)if(job_visible(unit(mg.unit),c)) {
+        if(c==mg.row)mg.job_pos=mg.job_n;
+        mg.jobs[mg.job_n++]=c;
+    }
+    for(c=0;c<mg.job_n;c++)mg.angle[c]=(u8)((u16)c*32/mg.job_n);
+}
+
 u8 can_equip(const SaveUnit *u, u8 slot, u8 id)
 {
     const u8 *it = item_rec(id), *j = job_rec(record(u, career(u)));
     u8 t = it[I_TYPE];
+    if(slot==EQ_SHIELD&&(it[I_FLAGS]&0x80)){
+        const u8 *battle=cj_section(common,CJ_ITEMS);
+        if(!cj_two_swords(common,u->job,b16(u->support))||!(battle[(u16)id*30+29]&HAND_DUAL))return 0;
+        if(u->eq[EQ_WEAPON]&&!(battle[(u16)u->eq[EQ_WEAPON]*30+29]&HAND_DUAL))return 0;
+        return (j[J_CATS+(t>>3)]&(0x80>>(t&7)))!=0;
+    }
     return (it[I_FLAGS] & slot_flag[slot]) && (j[J_CATS + (t >> 3)] & (0x80 >> (t & 7)));
 }
 
@@ -138,6 +178,7 @@ void equip(SaveUnit *u, u8 slot, u8 id)    // id 0: taken off; the inventory kee
     if (u->eq[slot] && save.inv[u->eq[slot]] < 99) save.inv[u->eq[slot]]++;
     if (id) save.inv[id]--;
     u->eq[slot] = id;
+    if(slot==EQ_WEAPON&&u->eq[EQ_SHIELD]&&!can_equip(u,EQ_SHIELD,u->eq[EQ_SHIELD]))equip(u,EQ_SHIELD,0);
     mg.changed = 1;
 }
 
@@ -146,8 +187,8 @@ u8 learn(SaveUnit *u, u8 k)
 {
     u8 c = career(u);
     const u8 *j = job_rec(record(u, c));
-    u16 cost = b16(j + J_COST + 2 * k);
-    if (!b16(j + J_ABIL + 2 * k) || learned(u, c, k) || jp(u, c) < cost) return 0;
+    u16 id = job_ability(j, k), cost = ability_cost(id);
+    if (!id || learned(u, c, k) || jp(u, c) < cost) return 0;
     set16(u->jp[c], (u16)(jp(u, c) - cost));
     u->learned[c][k >> 3] |= (u8)(0x80 >> (k & 7));
     mg.changed = 1;
@@ -179,12 +220,12 @@ static void choices(SaveUnit *u, u8 which)
         const u8 *j = job_rec(record(u, c));
         if (!which) {
             if (c == own) continue;
-            for (k = 0; k < 16; k++) if (learned(u, c, k) && b16(j + J_ABIL + 2 * k)) break;
+            for (k = 0; k < 16; k++) if (learned(u, c, k) && job_ability(j, k)) break;
             if (k < 16) mg.pick[n++] = j[J_SET];
             continue;
         }
         for (k = 16; k < 22; k++) {
-            u16 a = b16(j + J_ABIL + 2 * k);
+            u16 a = job_ability(j, k);
             if (a && learned(u, c, k) && kind(a) == which && n < 64) mg.pick[n++] = a;
         }
     }
@@ -206,12 +247,19 @@ static const u8 *menu_font(void) { return section(7); }
 
 #include "mgtext.inc"
 
-static void heading(const char *s) { draw_rect(0, 0, 160, 13, C_BLACK); text(5, 4, s, C_WHITE, 153); }
+static u8 card_width(const char *s)
+{
+    const u8 *advance=menu_font()+103;u8 width=0;
+    while(*s)width+=advance[(u8)*s++-32];
+    return width;
+}
+#define CHOICE_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define CHOICE_WIDTH(s) card_width(s)
+#include "../choice_menu.inc"
+
+static void heading(const char *s) { draw_rect(0, 0, 160, 7, C_BLACK); text(5, 1, s, C_WHITE, 153); }
 static void foot(const char *s) { draw_rect(0, 93, 160, 1, C_BLACK); black(2, 95, s); }
 
-#ifndef __m68k__
-static u32 b32(const u8 *p) { return (u32)b16(p) << 16 | b16(p + 2); }
-#endif
 // still pictures of the bank: per career and sex (2 c + 1 for a woman), Ramza's at 40 (FFT draws
 // him alike in every job)
 static u8 picture(const SaveUnit *u, u8 c) { return u->type == 2 ? 40 : (u8)(2 * c + (u->type == 1)); }
@@ -227,18 +275,19 @@ static void actor(s16 x, s16 y, u8 k)
 #endif
     draw_sprite(x, y, &sp);
 }
-static void portrait(s16 x, s16 y, u8 k)
+static void actor_white(s16 x,s16 y,u8 k)
 {
-    const u8 *p = section(6) + (u16)k * 348;
-#ifdef __m68k__
-    RtSprite sp = { 32, 29, p, p + 116, p + 232 };
-#else
-    u32 r[3][29]; u8 i, j;
-    RtSprite sp = { 32, 29, r[0], r[1], r[2] };
-    for (i = 0; i < 3; i++) for (j = 0; j < 29; j++) r[i][j] = b32(p + i * 116 + 4 * j);
-#endif
-    draw_sprite(x, y, &sp);
+    const u8 *p=section(5)+(u16)k*156+104;
+    u16 rows[2][26];u8 r;RtSprite sp={16,26,rows[0],rows[0],rows[1]};
+    for(r=0;r<26;r++) {
+        u16 ink=(u16)~b16(p+2*r),above=r?(u16)~b16(p+2*r-2):0;
+        u16 below=r<25?(u16)~b16(p+2*r+2):0;
+        rows[0][r]=(u16)(ink&~((ink<<1)&(ink>>1)&above&below));
+        rows[1][r]=(u16)~ink;
+    }
+    draw_sprite(x,y,&sp);
 }
+#include "../portrait32.inc"
 static void icon(s16 x, s16 y, u8 id)
 {
     const u8 *p = section(4) + (u16)item_rec(id)[I_ICON] * 24;
@@ -247,8 +296,7 @@ static void icon(s16 x, s16 y, u8 id)
 }
 static void hand(s16 x, s16 y)
 {
-    RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
-    draw_sprite(x, y, &sp);
+    choice_hand_at(x,y);
 }
 
 static const char *unit_name(const SaveUnit *u)
@@ -258,18 +306,46 @@ static const char *unit_name(const SaveUnit *u)
 }
 static const char *job_name(const SaveUnit *u, u8 c) { return str(b16(job_rec(record(u, c)))); }
 
+static void floor_diamond(s16 x,s16 y)
+{
+    s16 r;
+    for(r=-5;r<=5;r++) {
+        s16 a=15-3*(r<0?-r:r),inner=a-6;
+        draw_rect(x-a-1,y+r,2*a+3,1,C_WHITE);
+        if(inner>0) {
+            draw_rect(x-a,y+r,a-inner,1,C_BLACK);
+            draw_rect(x+inner+1,y+r,a-inner,1,C_BLACK);
+        } else draw_rect(x-a,y+r,2*a+1,1,C_BLACK);
+    }
+}
+
+#include "../unit_card.h"
+#define CARD_TEXT(x,y,s,c,l,context) text(x,y,s,c,l)
+#define CARD_WIDTH(s) card_width(s)
+#define CARD_MANAGEMENT_LAYOUTS
+#include "../unit_card.inc"
+static void management_card(UnitCard *d,const SaveUnit *u,const Stats *s)
+{
+    d->portrait=section(6)+(u16)picture(u,career(u))*348;
+    d->name=unit_name(u);d->job=job_name(u,career(u));
+    d->hp=d->max_hp=s->hp;d->mp=d->max_mp=s->mp;
+    d->level=u->level;d->exp=u->exp;d->brave=u->brave;d->faith=u->faith;
+}
+
+// Formation and deployment use the same portrait/stat layout and full HP/MP bars.
+static void formation_details(const SaveUnit *u,const Stats *s,s16 y)
+{
+    UnitCard d;u8 part;management_card(&d,u,s);
+    for(part=0;part<UC_PARTS;part++)unit_card_draw(&d,UC_FORMATION,y,part,0,0);
+}
+
 static void unit_header(void)
 {
     const SaveUnit *u = unit(mg.unit);
     Stats s = stats(u);
-    u8 c = career(u);
-    portrait(5, 15, picture(u, c));
-    black(40, 16, unit_name(u)); black(40, 25, job_name(u, c));
-    black(92, 25, "Lv"); right(110, 25, u->level);
-    black(40, 36, "HP"); right(70, 36, s.hp);
-    black(78, 36, "MP"); right(106, 36, s.mp);
-    black(112, 36, "JP"); right(138, 36, jp(u, c));
-    actor(140, 15, picture(u, c));
+    UnitCard d;u8 part;management_card(&d,u,&s);
+    for(part=0;part<=UC_JOB;part++)unit_card_draw(&d,UC_MANAGEMENT,0,part,0,0);
+    actor(140,15,picture(u,career(u)));
     draw_rect(2, 46, 156, 1, C_LGRAY);
 }
 
@@ -280,20 +356,73 @@ static const u8 slot_order[SLOTS] = { EQ_WEAPON, EQ_SHIELD, EQ_HEAD, EQ_BODY, EQ
 
 static void formation(void)
 {
-    u8 i, first = (u8)(mg.top * 4);
+    u8 i, first = (u8)(mg.top * 5);
     const SaveUnit *u = unit(mg.unit);
-    for (i = 0; i < 8 && first + i < save.n; i++) {
-        s16 x = 3 + (i & 3) * 39, y = 16 + (i >> 2) * 32;
+    Stats s=stats(u);
+    for (i = 0; i < 10 && first + i < save.n; i++) {
+        s16 x = 8 + (i % 5) * 32, y = 7 + (i / 5) * 27;
         const SaveUnit *v = unit((u8)(first + i));
-        if (first + i == mg.unit) { draw_rect(x, y, 37, 31, C_LGRAY); draw_rect(x, y + 30, 37, 1, C_BLACK); }
-        else draw_rect(x + 4, y + 30, 29, 1, C_LGRAY);
-        black(x + 1, y + 1, "Lv"); number(x + 10, y + 1, v->level);
-        actor(x + 14, y + 3, picture(v, career(v)));
+        actor(x,y,picture(v,career(v)));
     }
-    draw_rect(0, 81, 160, 1, C_BLACK);
-    black(4, 84, unit_name(u)); black(84, 84, job_name(u, career(u)));
-    if (save.n > 8) { black(150, 16, mg.top ? "^" : " "); black(150, 72, (u8)(mg.top * 4 + 8) < save.n ? "v" : " "); }
-    if (mg.screen == S_FORM) { hand(1 + (mg.unit & 3) * 39, 32 + ((mg.unit >> 2) - mg.top) * 32); foot("ENTER:status ALPHA:menu ESC:save"); }
+    draw_rect(0,62,160,1,C_BLACK);formation_details(u,&s,65);
+    if(save.n>10){black(154,8,mg.top?"^":"");black(154,54,first+10<save.n?"v":"");}
+    if(mg.screen==S_FORM)black(37,95,"ENTER:status ALPHA:menu");
+}
+
+static void formation_cursor(void)
+{
+    u8 i,first=(u8)(mg.top*5);s16 x=16+(mg.unit%5)*32,y=29+(mg.unit/5-mg.top)*27;
+    if(mg.slide) {
+        x+=((mg.floor_from_x-x)*mg.slide)>>2;y+=((mg.floor_from_y-y)*mg.slide)>>2;
+    }
+    floor_diamond(x,y);
+    // The diamond goes underneath feet; reusing the cheap actor sprites avoids
+    // rebuilding stats/text/the entire cached page on each interpolation step.
+    for(i=0;i<10&&first+i<save.n;i++) {
+        const SaveUnit *v=unit((u8)(first+i));
+        actor(8+(i%5)*32,7+(i/5)*27,picture(v,career(v)));
+    }
+}
+
+static void jobs_page(void)
+{
+    static const s16 sine[32]={0,50,98,142,181,213,237,251,256,251,237,213,181,142,98,50,
+        0,-50,-98,-142,-181,-213,-237,-251,-256,-251,-237,-213,-181,-142,-98,-50};
+    s16 x[CAREERS],y[CAREERS];u8 ord[CAREERS],i,j;
+    const SaveUnit *u=unit(mg.unit);
+    black(3,10,unit_name(u));
+    for(i=0;i<mg.job_n;i++) {
+        u8 a=(u8)((8+mg.angle[i]-mg.angle[mg.job_pos]+mg.spin)&31);
+        x[i]=80+(sine[(a+8)&31]*62>>8);y[i]=49+(sine[a]*15>>8);
+        for(j=i;j&&y[ord[j-1]]>y[i];j--)ord[j]=ord[j-1];
+        ord[j]=i;
+    }
+    for(j=0;j<mg.job_n;j++) {
+        u8 c,available;
+        i=ord[j];c=mg.jobs[i];available=unlocked(u,c,RT_NULL);
+        if(available)actor(x[i]-8,y[i]-22,(u8)(2*c+(u->type==1)));
+        else actor_white(x[i]-8,y[i]-22,(u8)(2*c+(u->type==1)));
+    }
+    if(mg.job_anim) {
+        u8 age=JOB_CHANGE_FRAMES-mg.job_anim,frame=age<JOB_CHANGE_FRAMES/2?mg.old_picture:picture(u,career(u));
+        s16 top=8,bottom=43;
+        if(age<8)bottom=8+(((s16)age+1)*35>>3);
+        if(age>=JOB_CHANGE_FRAMES-8)top+=((s16)(age-(JOB_CHANGE_FRAMES-8))*35)>>3;
+        // Source effect is a vertical translucent column, not an actor jump.
+        // Bounded strips avoid an effect sprite bank or per-pixel blending.
+        draw_rect(70,top,21,bottom-top,C_LGRAY);
+        draw_rect(70,top,1,bottom-top,C_DGRAY);draw_rect(90,top,1,bottom-top,C_DGRAY);
+        draw_rect(74+(age&3),top,1,bottom-top,C_WHITE);
+        draw_rect(82+((age+2)&3),top,2,bottom-top,C_WHITE);
+        draw_rect(78,top,3,bottom-top,C_WHITE);
+        if(age>=44&&age<52)actor_white(72,16,frame);else actor(72,16,frame);
+        if(age>=8&&age<JOB_CHANGE_FRAMES-8)draw_rect(72,42,17,1,C_DGRAY);
+    }else actor(72,16,picture(u,career(u)));
+    draw_rect(0,72,160,1,C_BLACK);black(65,76,job_name(u,mg.row));
+    black(15,85,"Move");number(36,85,job_rec(mg.row)[J_MOVE]);
+    black(52,85,"Jump");number(73,85,job_rec(mg.row)[J_JUMP]);
+    black(110,85,"JP");number(125,85,jp(u,mg.row));
+    black(15,94,unlocked(u,mg.row,RT_NULL)?"< > jobs ENTER:change":"Known by another unit");
 }
 
 static void status_page(void)
@@ -350,7 +479,7 @@ static u8 learn_entry(const SaveUnit *u, u8 row)   // the row-th entry of the li
 {
     const u8 *j = job_rec(record(u, career(u)));
     u8 k;
-    for (k = 0; k < 22; k++) if (b16(j + J_ABIL + 2 * k) && !row--) return k;
+    for (k = 0; k < 22; k++) if (job_ability(j, k) && !row--) return k;
     return 22;
 }
 static u8 learn_count(const SaveUnit *u) { u8 n = 0; while (learn_entry(u, n) < 22) n++; return n; }
@@ -368,18 +497,9 @@ static void learn_row(u8 i, s16 y)
     const SaveUnit *u = unit(mg.unit);
     const u8 *j = job_rec(record(u, career(u)));
     u8 k = learn_entry(u, i);
-    black(31, y, ability_name(b16(j + J_ABIL + 2 * k)));
+    black(31, y, ability_name(job_ability(j, k)));
     if (learned(u, career(u), k)) black(118, y, "Learned");
-    else right(146, y, b16(j + J_COST + 2 * k));
-}
-
-static void job_row(u8 c, s16 y)
-{
-    const SaveUnit *u = unit(mg.unit);
-    black(31, y, job_name(u, c));
-    if (c == career(u)) black(90, y, "Now");
-    else if (unlocked(u, c, RT_NULL)) { black(90, y, "Lv"); number(100, y, job_level(u, c)); }
-    else black(90, y, "Locked");
+    else right(146, y, ability_cost(job_ability(j, k)));
 }
 
 static void pick_row(u8 i, s16 y)
@@ -413,16 +533,29 @@ static void note_panel(void)
 static void confirm_panel(void)
 {
     const SaveUnit *u = unit(mg.unit);
+    static const ChoiceLayout menu={65,53,94,27,3,CHOICE_TAB,3,1,0,6,10,8,157,-15,7};
     if (!mg.confirm) return;
-    panel(5, 60, 150, 24);
-    if (mg.screen == S_JOBS) { s16 x = black(12, 64, "Change to"); black(x + 4, 64, job_name(u, (u8)(mg.top + mg.row))); }
-    else {
-        const u8 *j = job_rec(record(u, career(u)));
-        u8 k = learn_entry(u, (u8)(mg.top + mg.row));
-        s16 x = black(12, 64, "Learn"); x = black(x + 4, 64, ability_name(b16(j + J_ABIL + 2 * k)));
-        black(x + 4, 64, "?");
-    }
-    black(12, 74, "ENTER:yes SHIFT:no");
+    choice_frame(&menu,mg.screen==S_JOBS?job_name(u,mg.row):"Learn ability?");
+    choice_row(&menu,0,mg.screen==S_JOBS?"Change Job":"Learn",C_BLACK);
+    choice_row(&menu,1,"Return",C_BLACK);
+    choice_cursor_animated(&menu,mg.confirm-1,rt_frame);
+}
+
+static void command_menu(void)
+{
+    static const ChoiceLayout menu={56,15,101,50,0,CHOICE_PANEL,9,4,0,25,14,8,159,1,10};
+    u8 i;choice_frame(&menu,"Menu");
+    for(i=0;i<4;i++)choice_row(&menu,i,menu_rows[i],C_BLACK);
+    choice_cursor_animated(&menu,mg.row,rt_frame);
+}
+
+static void list_cursor(void)
+{
+    ChoiceLayout cursor={0,0,160,100,0,CHOICE_BARE,0,0,0,0,0,7,159,5,39};
+    if(mg.note||mg.confirm)return;
+    if(mg.screen==S_EQUIP||mg.screen==S_SET)cursor.pitch=8;
+    else if(mg.screen!=S_LEARN&&mg.screen!=S_PICK)return;
+    choice_cursor_animated(&cursor,mg.row,rt_frame);
 }
 
 static void page(void)
@@ -435,32 +568,32 @@ static void page(void)
     if (mg.screen == S_FORM || mg.screen == S_MENU) {
         formation();
         if (mg.screen == S_MENU) {
-            panel(56, 15, 101, 18 + 4 * 8); black(65, 19, "Menu");
-            { u8 i; for (i = 0; i < 4; i++) black(81, 29 + i * 8, menu_rows[i]); }
-            hand(57, 25 + mg.row * 8);
+            formation_cursor();
             foot("ENTER:open SHIFT:back");
         }
         note_panel();
         return;
     }
+    if(mg.screen==S_JOBS){jobs_page();note_panel();return;}
     unit_header();
+    if(mg.screen==S_LEARN){black(91,25,"JP");right(127,25,jp(unit(mg.unit),career(unit(mg.unit))));}
     switch (mg.screen) {
     case S_STATUS: status_page(); break;
-    case S_EQUIP: equip_page(); hand(5, 45 + mg.row * 8); break;
-    case S_SET: set_page(); hand(5, 45 + mg.row * 8); break;
+    case S_EQUIP: equip_page(); break;
+    case S_SET: set_page(); break;
     case S_LEARN:
         list_rows(learn_count(unit(mg.unit)), learn_row);
-        hand(5, 45 + mg.row * 7); foot("ENTER:learn SHIFT:back F1/F5:unit"); break;
-    case S_JOBS:
-        list_rows(CAREERS, job_row);
-        if (!mg.confirm && !mg.note) actor(122, 56, picture(unit(mg.unit), (u8)(mg.top + mg.row)));
-        hand(5, 45 + mg.row * 7); foot("ENTER:change SHIFT:back F1/F5:unit"); break;
+        foot("ENTER:learn SHIFT:back F1/F5:unit"); break;
     case S_PICK:
         list_rows(mg.pick_n, pick_row);
-        hand(5, 45 + mg.row * 7); foot("ENTER:choose SHIFT:back"); break;
+        foot("ENTER:choose SHIFT:back"); break;
     }
-    confirm_panel();
     note_panel();
+    // Recover six rows beneath the compact title; all body/overlay coordinates
+    // above remain shared with the existing equipment and ability list layout.
+    memmove((u8 *)rt_light+7*RT_PBYTES,(u8 *)rt_light+13*RT_PBYTES,87*RT_PBYTES);
+    memmove((u8 *)rt_dark+7*RT_PBYTES,(u8 *)rt_dark+13*RT_PBYTES,87*RT_PBYTES);
+    draw_rect(0,94,160,6,C_WHITE);
 }
 
 // ---------------------------------------------------------------- the frame loop
@@ -471,14 +604,25 @@ static void open_list(u8 screen, u8 at)          // a scrolling list, its entry 
     mg.row = (u8)(at - mg.top);
 }
 
+static void roster_position(u8 screen)
+{
+    u8 row=mg.unit/5;
+    mg.screen=screen;mg.top=row?row-1:0;
+}
+
 void game_init(void)
 {
     u16 size;
+#ifndef __m68k__
+    if(cache)free(cache);
+#endif
     bank = RT_NULL; cache = RT_NULL;     // (statics survive between runs)
     memset(&mg, 0, sizeof mg);
     bank = rt_file("ffmg", &size);
-    if (bank && memcmp(bank, "FMG1", 4)) bank = RT_NULL;
-    if (!rt_load(SAVE_NAME, &save, sizeof save) || memcmp(save.magic, SAVE_MAGIC, 4)) memset(&save, 0, sizeof save);
+    if (bank && memcmp(bank, "FMG2", 4)) bank = RT_NULL;
+    common = rt_file("ffcj", &size);
+    if (!cj_valid(common, size)) bank = RT_NULL;
+    save_load(&save);
     if (save.n > PARTY_MAX) save.n = 0;
     cache = (u8 *)malloc(2 * RT_PSIZE);
     dirty = 1;
@@ -490,7 +634,7 @@ void game_scenario(u16 n)                // test doors: a screen of the first un
     static const u8 doors[] = { S_FORM, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_MENU };
     mg.screen = n < sizeof doors ? doors[n] : S_FORM;
     mg.unit = mg.row = mg.top = 0;
-    if (mg.screen == S_JOBS) open_list(S_JOBS, career(unit(0)));
+    if (mg.screen == S_JOBS) open_jobs();
     dirty = 1;
 }
 
@@ -517,6 +661,13 @@ u8 game_update(void)
     u32 key = rt_keys & ~rt_prev;
     SaveUnit *u;
     u8 at;
+    if(mg.slide)mg.slide--;
+    if(mg.job_anim) {
+        mg.job_anim--;dirty=1;
+        if(key&(K_B|K_ESC))mg.job_anim=0;
+        else {if(key&(K_ENTER|K_A))mg.job_anim=0;return 1;}
+    }
+    if(mg.spin){mg.spin+=mg.spin>0?-1:1;dirty=1;return 1;}
     if (!key) return 1;
     dirty = 1;
     if (!bank || !save.n) { if (key & K_ESC) { leave(); return 0; } return 1; }
@@ -525,15 +676,18 @@ u8 game_update(void)
     if (mg.confirm) {
         if (key & (K_B | K_ESC)) mg.confirm = 0;
         else if (key & (K_ENTER | K_A)) {
+            u8 accept=mg.confirm==1;
             mg.confirm = 0;
-            if (mg.screen == S_JOBS) change_job(u, (u8)(mg.top + mg.row));
-            else if (!learn(u, learn_entry(u, (u8)(mg.top + mg.row)))) mg.note = NOTE_JP;
-        }
+            if(accept) {
+                if (mg.screen == S_JOBS) {mg.old_picture=picture(u,career(u));change_job(u,mg.row);mg.job_anim=JOB_CHANGE_FRAMES;}
+                else if (!learn(u, learn_entry(u, (u8)(mg.top + mg.row)))) mg.note = NOTE_JP;
+            }
+        }else mg.confirm=choice_move(mg.confirm-1,2,key)+1;
         return 1;
     }
     if ((key & (K_F1 | K_F5)) && mg.screen != S_FORM && mg.screen != S_MENU && mg.screen != S_PICK) {
         mg.unit = (u8)((mg.unit + (key & K_F1 ? save.n - 1 : 1)) % save.n);
-        if (mg.screen == S_JOBS) open_list(S_JOBS, career(unit(mg.unit)));
+        if (mg.screen == S_JOBS) open_jobs();
         else if (mg.screen == S_LEARN) mg.row = mg.top = 0;
         return 1;
     }
@@ -543,33 +697,36 @@ u8 game_update(void)
         at = mg.unit;
         if (key & K_LEFT) at = at ? (u8)(at - 1) : (u8)(save.n - 1);
         if (key & K_RIGHT) at = (u8)(at + 1 == save.n ? 0 : at + 1);
-        if (key & K_UP) at = at >= 4 ? (u8)(at - 4) : at;
-        if (key & K_DOWN) at = at + 4 < save.n ? (u8)(at + 4) : at;
+        if (key & K_UP) at = at >= 5 ? (u8)(at - 5) : at;
+        if (key & K_DOWN) at = at + 5 < save.n ? (u8)(at + 5) : at;
+        if(at!=mg.unit) {
+            s16 x=16+(mg.unit%5)*32,y=29+(mg.unit/5-mg.top)*27;
+            if(mg.slide){x+=((mg.floor_from_x-x)*mg.slide)>>2;y+=((mg.floor_from_y-y)*mg.slide)>>2;}
+            mg.floor_from_x=x;mg.floor_from_y=y;mg.slide=4;
+        }
         mg.unit = at;
-        if ((at >> 2) < mg.top) mg.top = (u8)(at >> 2);
-        if ((at >> 2) > mg.top + 1) mg.top = (u8)((at >> 2) - 1);
+        if (at / 5 < mg.top) mg.top = at / 5;
+        if (at / 5 > mg.top + 1) mg.top = at / 5 - 1;
         if (key & (K_ENTER | K_A)) mg.screen = S_STATUS;
-        if (key & (K_C | K_D)) { mg.screen = S_MENU; mg.row = 0; }
+        if (key & (K_C | K_D)) { mg.screen = S_MENU; mg.row = 0;mg.slide=0; }
         return 1;
     case S_MENU:
-        if (key & (K_B | K_ESC)) { mg.screen = S_FORM; return 1; }
-        if (key & K_UP) mg.row = (u8)((mg.row + 3) & 3);
-        if (key & K_DOWN) mg.row = (u8)((mg.row + 1) & 3);
+        if (key & (K_B | K_ESC)) { roster_position(S_FORM); return 1; }
+        mg.row=choice_move(mg.row,4,key);
         if (key & (K_ENTER | K_A)) {
             static const u8 dest[] = { S_EQUIP, S_SET, S_LEARN, S_JOBS };
             mg.screen = dest[mg.row]; mg.row = mg.top = 0;
-            if (mg.screen == S_JOBS) open_list(S_JOBS, career(u));
+            if (mg.screen == S_JOBS) open_jobs();
         }
         return 1;
     case S_STATUS:
-        if (key & (K_B | K_ESC | K_ENTER | K_A)) mg.screen = S_FORM;
+        if (key & (K_B | K_ESC | K_ENTER | K_A)) roster_position(S_FORM);
         return 1;
     case S_EQUIP: case S_SET:
-        if (key & (K_B | K_ESC)) { mg.row = mg.screen == S_EQUIP ? 0 : 1; mg.screen = S_MENU; return 1; }
+        if (key & (K_B | K_ESC)) { mg.row = mg.screen == S_EQUIP ? 0 : 1; roster_position(S_MENU); return 1; }
         {
             u8 n = mg.screen == S_EQUIP ? SLOTS : 4;
-            if (key & K_UP) mg.row = mg.row ? (u8)(mg.row - 1) : (u8)(n - 1);
-            if (key & K_DOWN) mg.row = (u8)(mg.row + 1 == n ? 0 : mg.row + 1);
+            mg.row=choice_move(mg.row,n,key);
         }
         if (key & (K_ENTER | K_A)) {
             mg.back = mg.screen;
@@ -590,24 +747,36 @@ u8 game_update(void)
             u16 v = mg.pick[at];
             if (mg.back == S_EQUIP) equip(u, mg.slot, (u8)v);
             else if (!mg.slot) { u->secondary = (u8)v; mg.changed = 1; }
-            else { set16(slot_of(u, mg.slot), v); mg.changed = 1; }
+            else { set16(slot_of(u, mg.slot), v); mg.changed = 1;
+                if(u->eq[EQ_SHIELD]&&!can_equip(u,EQ_SHIELD,u->eq[EQ_SHIELD]))equip(u,EQ_SHIELD,0);
+            }
             mg.screen = mg.back; mg.top = 0;
             if (mg.back == S_EQUIP) { for (at = 0; slot_order[at] != mg.slot; at++) ; mg.row = at; }
             else mg.row = mg.slot;
         }
         return 1;
     case S_LEARN:
-        if (key & (K_B | K_ESC)) { mg.screen = S_MENU; mg.row = 2; return 1; }
+        if (key & (K_B | K_ESC)) { roster_position(S_MENU); mg.row = 2; return 1; }
         at = list_move(key, learn_count(u));
         if ((key & (K_ENTER | K_A)) && !learned(u, career(u), learn_entry(u, at))) {
             const u8 *j = job_rec(record(u, career(u)));
-            if (jp(u, career(u)) < b16(j + J_COST + 2 * learn_entry(u, at))) mg.note = NOTE_JP;
+            if (jp(u, career(u)) < ability_cost(job_ability(j, learn_entry(u, at)))) mg.note = NOTE_JP;
             else mg.confirm = 1;
         }
         return 1;
     case S_JOBS:
-        if (key & (K_B | K_ESC)) { mg.screen = S_MENU; mg.row = 3; mg.top = 0; return 1; }
-        at = list_move(key, CAREERS);
+        if (key & (K_B | K_ESC)) { roster_position(S_MENU); mg.row = 3; return 1; }
+        if(key&(K_LEFT|K_UP|K_RIGHT|K_DOWN)) {
+            u8 old=mg.job_pos;
+            s16 delta;
+            if(key&(K_LEFT|K_UP))mg.job_pos=mg.job_pos?mg.job_pos-1:mg.job_n-1;
+            else mg.job_pos=mg.job_pos+1<mg.job_n?mg.job_pos+1:0;
+            delta=mg.angle[mg.job_pos]-mg.angle[old];
+            if(delta>16)delta-=32;
+            if(delta<-16)delta+=32;
+            mg.spin=(s8)delta;mg.row=mg.jobs[mg.job_pos];
+        }
+        at=mg.row;
         if ((key & (K_ENTER | K_A)) && at != career(u)) {
             if (unlocked(u, at, RT_NULL)) mg.confirm = 1; else mg.note = NOTE_LOCKED;
         }
@@ -627,5 +796,10 @@ void game_render(void)
         dirty = 0;
     }
     memcpy(rt_light, cache, RT_PSIZE); memcpy(rt_dark, cache + RT_PSIZE, RT_PSIZE);
+    if(!bank||!save.n)return;
+    if(mg.screen==S_FORM)formation_cursor();
+    if(mg.screen==S_MENU)command_menu();
+    list_cursor();
+    confirm_panel();
 }
 

@@ -47,8 +47,15 @@ int main(int argc,char**argv)
     sw_init((u16)atoi(argv[1]));
     for(f=0;f<limit;f++)if(!sw_step(sw_script_keys(&script,rt_frame)))break;
     printf("executed %u checksum %04X state %08lX\n",rt_frame,sw_checksum(),(unsigned long)state_hash());
+#ifdef CHECK_GAR
+    printf("identity %08lX\n", (unsigned long)((u32)st.abil << 16 | st.unit[U_RAMZA].learned));
+#endif
     return sw_write_png(argv[4],1);
 }
 #else
-void _main(void){chapter_runtime_main();BENCH_VALUE(0xACAD0001UL);BENCH_VALUE(state_hash());}
+void _main(void){chapter_runtime_main();BENCH_VALUE(0xACAD0001UL);BENCH_VALUE(state_hash());
+#ifdef CHECK_GAR
+    BENCH_VALUE((u32)st.abil << 16 | st.unit[U_RAMZA].learned);
+#endif
+}
 #endif

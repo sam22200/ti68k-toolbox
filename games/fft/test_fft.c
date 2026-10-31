@@ -726,7 +726,7 @@ static void test_skills(void)
         sw_init(0);
         ra = &st.unit[U_RAMZA]; t = &st.unit[10];
         ra->zodiac = 9; t->zodiac = 3; ra->female = t->female = 0;
-        t->hp = oracle_skills[i].hp; t->status = oracle_skills[i].status;
+        t->hp = oracle_skills[i].hp; unit_status_seed(t,oracle_skills[i].status);
         if (ab == 0xFF) {                                 // Attack on a Defending target
             CHECKV(hit_chance(U_RAMZA, 10), oracle_skills[i].hit);
             continue;
@@ -836,7 +836,7 @@ static void test_skills(void)
     CHECK(st.unit[1].hp >= 1 && st.unit[1].hp <= 20 && st.bag[abilities[phoenix].bag] == 1);
     // Wish when it leaves Ramza at 0 HP: the turn ends; a Defending unit stops at its turn
     sw_init(10);
-    st.unit[U_RAMZA].hp = 5; st.unit[1].status = ST_DEFEND;
+    st.unit[U_RAMZA].hp = 5; unit_status_seed(&st.unit[1],ST_DEFEND);
     skill(U_RAMZA, 10, wish);
     while (st.act == U_RAMZA) sw_step(0);
     CHECKV(st.unit[U_RAMZA].hp, 0);
@@ -987,7 +987,7 @@ static void ai_load(u16 r)
         unit_stats(u);
         u->brave = oracle_bz[i][0]; u->faith = oracle_bz[i][1]; u->zodiac = oracle_bz[i][2]; u->female = oracle_bz[i][3];
         u->x = v[0]; u->z = v[1]; u->face = v[2]; u->hp = v[3]; u->ct = v[4]; u->dc = v[5];
-        u->status = v[6]; u->learned = v[7]; u->defend = v[8];
+        unit_status_seed(u,v[6]); u->learned = v[7]; u->defend = v[8];
     }
     st.act = oracle_ai[r].unit; st.moved = st.acted = 0; st.ai_nosup = 0;
 }

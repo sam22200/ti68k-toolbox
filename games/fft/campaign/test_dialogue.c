@@ -11,7 +11,7 @@ static void check_set(u16 set_number)
     u8 i;
     sw_init(set_number);
     for (st.step = 0; st.step < RD16(set, 5); st.step++) {
-        if (step_at(st.step)[0] != STEP_STORY) continue;
+        if (step_at(st.step)[0] != STEP_STORY && step_at(st.step)[0] != STEP_NARRATE) continue;
         step_start();
         for (i = 0; i < OPENING_BEATS; i++) {
             st.open_beat = i; st.open_offset = 0;

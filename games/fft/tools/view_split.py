@@ -28,7 +28,7 @@ for chapter in sys.argv[1:]:
     for rot in range(4):
         path = HERE / chapter / 'data' / ('%s%d.bin' % (PREFIX[chapter], rot))
         data = path.read_bytes()
-        if data[:2] == b'V2':
+        if data[:2] in (b'V2',b'V3'):
             print(path.name, 'already split'); continue
         tail = b''
         if len(data) >= 10 and data[-10:-6] in (b'FC01', b'FC02'):

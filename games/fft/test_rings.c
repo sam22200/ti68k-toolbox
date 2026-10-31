@@ -1,5 +1,5 @@
 // Compare the cached scene with a clean composition, including invalidations
-// while the old reach is still being removed, using the existing asset banks.
+// with mandatory first-render cancellation, using the existing asset banks.
 #ifdef TEST_OPEN
 #include "opening/opening.c"
 #elif defined(TEST_CAMPAIGN)
@@ -39,7 +39,26 @@ static void verify(void)
     u8 *saved_l=scene_l,*saved_d=scene_d;u16 i;
     W->left=30000;ensure_scene(st.rot);
     assert(W->ring_i==MAP_W*MAP_H && W->drop_y0>=W->drop_y1);
+#ifdef FFT_VIEW_SPLIT
+    // Split views keep depth in vbuf. Reconstruct pristine colours from the
+    // archive instead of accidentally treating those depth bytes as pixels.
+    {
+        const u8 *p=views[st.rot];u8 head=p[1]=='3'?6:4;
+        zx0_unpack(p+head,reference);
+        if(head==6&&(st.scenery&1)) {
+            u8 *mask=malloc(SC_PLANE);u16 j;
+            assert(mask);zx0_unpack(p+head+RD16(p,1),mask);
+            for(j=0;j<SC_PLANE;j++) {
+                u8 dark=reference[SC_PLANE+j],m=mask[j];
+                reference[j]=(reference[j]&~m)|(~dark&m);
+                reference[SC_PLANE+j]=dark^m;
+            }
+            free(mask);
+        }
+    }
+#else
     memcpy(reference,vbuf,2*SC_PLANE);
+#endif
     scene_l=reference;scene_d=reference+SC_PLANE;
     if(RINGS(st.mode))for(i=0;i<MAP_W*MAP_H;i++)if(st.reach[i]!=0xFF){
         Marker mk;
@@ -69,6 +88,9 @@ int main(void)
     u8 rot,i;u16 c,version;
 #ifdef FFT_REACH_CONTOUR
     u8 style;
+#endif
+#ifdef FFT_VIEW_SPLIT
+    u8 width;
 #endif
 #ifdef TEST_OPEN
 #ifdef TEST_CONTOUR_DATA
@@ -113,6 +135,10 @@ int main(void)
     }
 #endif
     reference=malloc(2*SC_PLANE);assert(reference);
+#ifdef FFT_VIEW_SPLIT
+    for(width=0;width<(views[0][1]=='3'?2:1);width++) {
+        st.scenery=width;scene_rot=vbuf_rot=255;
+#endif
 #ifdef FFT_REACH_CONTOUR
     assert(contour_gfx);
     for(style=0;style<2;style++){
@@ -134,9 +160,10 @@ int main(void)
         st.over=1;hl_seq++;verify();
         st.mode=M_AIM;hl_seq++;verify();
         st.over=0;hl_seq++;verify();
-        // Cancel a range, then open another before row restoration finishes.
+        // Cancel even with optional work exhausted. The next render must
+        // contain no old range; reopening another must start from clean pixels.
         st.mode=M_MENU;hl_seq++;W->left=-1;ensure_scene(rot);
-        assert(W->drop_y0<W->drop_y1);
+        assert(W->drop_y0>=W->drop_y1);verify();
         st.mode=M_AIM;memset(st.reach,0xFF,sizeof st.reach);
         st.reach[rot+MAP_W]=1;hl_seq++;verify();
         st.mode=M_MENU;hl_seq++;verify();
@@ -145,6 +172,9 @@ int main(void)
 #ifdef FFT_REACH_CONTOUR
     }
 #endif
-    printf("Reach cache: %u clean scene comparisons, four views, styles, costs and interrupted removal passed\n",comparisons);
+#ifdef FFT_VIEW_SPLIT
+    }
+#endif
+    printf("Reach cache: %u clean scene comparisons, four views, styles, costs and immediate removal passed\n",comparisons);
     free(reference);return 0;
 }

@@ -1,29 +1,22 @@
 #!/usr/bin/env python3
-"""The world map's bank (fftmap, campaign/worldmap.c) from the local FFT disc -> ffwm.bin (never
-committed). The user chose a simplified geography: Ivalice's land and sea from the original map,
-without the parchment's lines and lettering, our own markers, roads and labels.
+"""Reviewed 67% source world texture, locations/routes and reduced Ramza idle poses.
 
 usage: world_assets.py DISC.cue OUT.bin [preview.png]
-Sources (layouts named after adamrt/fft_decomp, checked here on the disc and the original run):
-- WORLD/WLDTEX.TM2: the map texture, a stream of 2048-byte sectors loaded into VRAM, each a
-  12-byte header (type: 1/2 the last sector of a rectangle, x, y, words left in the row) then
-  1010 words; each rectangle starts with its 256-colour palette. Its four 8-bit pieces make the
-  map: 240 + 256 columns, 241 + 132 rows; each piece's first 8 columns are not map (filled from
-  the next column here).
-- WORLD/WLDCORE.BIN (loaded at 0x80067000): the 43 locations' map positions and dot kinds
-  (s_world_map_dot_source_data, 0x2ddfc: s16 x and kind bytes, then y), the 48 routes
-  (g_world_map_route_table at 0x2e008: count, start, end, cost, then count points of 12 bytes,
-  x and y packed in the first word). A map position + (263, 186) is its texture pixel (Gariland
-  and Mandalia on the original's screen).
-- WORLD/WORLD.BIN: the locations' names (0x8e1a0, FFT's text, 0xFE between them).
-Land is told from sea by the texture's blue against its red (ochre land, grey-green sea),
-filtered (median 9), opened and closed, specks below 60 pixels dropped; drawn with 16-pixel
-periodic motifs (greys()), the rarest of the coast's tiles merged into their nearest down to 255.
-Layout, big-endian: "FWM1", u16 offsets: tiles, cells, locations, routes, story; the map's
-width and height in tiles; tiles in ExtGraph's TileMap order (16 dark / light u16 pairs);
-cells u8; locations 43 x (s16 x, y texture pixels, kind 1 town / 2 field, name offset);
-routes 48 x (start, end, cost, points, offset of its points: s16 x, y); story: u8 count, then
-6 bytes each (location, story flag + 1 that shows it, u16 battle door, flag + 1 it sets, 0). Strings NUL-terminated ASCII after them.
+FWM3: magic; five big-endian u16 offsets (compressed strips, compressed idle
+poses, locations, routes, story); width/height in16px cells. Section0 has u16
+row stride/count, then a u16 offset per independent8-row ZX0 stream. Each raw
+strip is light rows followed by dark rows. Sixteen cached strips cover any
+100-row viewport; the complete map is never allocated. Section1 has eight pose
+indices then ZX0 for five unique16x26 sprites. Locations/routes/story keep the
+FWM1 metadata layouts. Default scale is2/3 (the approved67% candidate), prepared
+offline from the existing full-size four-grey artwork and idle poses. Source
+contrast is retained. --scale 100 and --scale 75 are historical review controls.
+
+Source texture: WORLD/WLDTEX.TM2's four CLUT rectangles. Source position and
+route tables: WORLD/WLDCORE.BIN,0x2ddfc/0x2e008; texture origin(263,186).
+Names: WORLD/WORLD.BIN,0x8e1a0. Ramza: TYPE1.SHP11,10,9,10,11,12,13,12.
+The older greys()/tiles_of() helpers below are historical controls only;
+they no longer provide active map artwork or defaults.
 """
 from pathlib import Path
 import struct
@@ -35,6 +28,9 @@ from scipy import ndimage
 
 import extract
 import management_data
+import interface
+import units
+import zx0pack
 
 WLDCORE = 0x80067000
 DOTS, ROUTES, NAMES = 0x2ddfc, 0x2e008, 0x8e1a0
@@ -45,6 +41,8 @@ TILES_MAX = 255
 # that shows it, the battle program's door it enters (fftbat; 0 none: not ripped yet) and the
 # flag + 1 that battle's victory sets (then the location is a town or a field again).
 STORY = [(6, 2, 200, 2), (24, 2, 0, 0)]
+SCALES = {'100': (1, 1), '75': (3, 4), '67': (2, 3)}
+MAP_SCALE = SCALES['67']
 
 
 def s16(v):
@@ -53,31 +51,38 @@ def s16(v):
 
 def texture(disc, files):
     b = disc.read(*files['WORLD/WLDTEX.TM2'])
-    P = 1010
-    secs = [(struct.unpack_from('<I4H', b, o), np.frombuffer(b[o + 12:o + 12 + 2 * P], '<u2'))
-            for o in range(0, len(b), 2048)]
-    groups, cur = [], []
-    for s in secs:
-        cur.append(s)
-        if s[0][0] in (1, 2):
-            groups.append(cur); cur = []
+    # Each sector starts with a RECTANGLE COUNT, followed by that many
+    # (x,y,w,h,pixels) uploads. There are three internal8-byte headers in an
+    # ordinary sector, not one header plus1010 contiguous pixel words. Treating
+    # those headers as pixels produced repeated vertical corruption at seams.
+    groups,cur=[],[]
+    for sector in range(0,len(b),2048):
+        count=struct.unpack_from('<I',b,sector)[0];assert 1<=count<=3
+        at=sector+4
+        for _ in range(count):
+            x,y,w,h=struct.unpack_from('<4H',b,at);at+=8
+            end=at+2*w*h;assert end<=sector+2048
+            cur.append((x,y,w,h,b[at:end]));at=end
+        if count<3:groups.append(cur);cur=[]
+    assert not cur and len(groups)>=4
     pieces = []
     for g in groups[:4]:
-        (_, _, _, cw, _), d0 = g[0]
-        clut = d0[:cw].astype(int)
-        (_, x1, y1, w1, _), _ = g[1]
-        (_, x2, y2, _, _), _ = g[2]
-        W = (P - (x2 - x1)) // (y2 - y1)
-        words = np.concatenate([d0[cw:]] + [d for _, d in g[1:]])
-        H = len(words) // W
-        idx = words[:H * W].reshape(H, W).view(np.uint8).reshape(H, W * 2)
+        assert g[0][:4]==(0,480,256,1)
+        clut=np.frombuffer(g[0][4],'<u2').astype(int)
+        x0=min(r[0] for r in g[1:]);y0=min(r[1] for r in g[1:])
+        width=max(x+w for x,y,w,h,p in g[1:])-x0
+        height=max(y+h for x,y,w,h,p in g[1:])-y0
+        idx=np.zeros((height,width*2),np.uint8);covered=np.zeros_like(idx,bool)
+        for x,y,w,h,pixels in g[1:]:
+            target=np.s_[y-y0:y-y0+h,2*(x-x0):2*(x-x0+w)]
+            assert not covered[target].any()
+            idx[target]=np.frombuffer(pixels,np.uint8).reshape(h,w*2);covered[target]=True
+        assert covered.all(),('source image holes',x0,y0,width,height)
         rgb = np.stack([(clut & 31) << 3, (clut >> 5 & 31) << 3, (clut >> 10 & 31) << 3], 1)
         pieces.append(rgb[idx].astype(float))
     top = np.concatenate([pieces[0][:241], pieces[1][:241]], 1)
     bottom = np.concatenate([pieces[2][:132], pieces[3][:132]], 1)
     m = np.concatenate([top, bottom], 0)
-    for x0 in (0, 240):
-        m[:, x0:x0 + 8] = m[:, x0 + 8:x0 + 9]
     return m
 
 
@@ -154,15 +159,76 @@ def tile_bytes(t):
     return bytes(out)
 
 
+def shades(m, contrast='source'):
+    lum = m @ np.array([.299, .587, .114])
+    levels = {'source': [20,50,80], 'strong': [35,50,65], 'light': [12,38,62]}
+    q = np.percentile(lum, levels[contrast])
+    g = (3-np.digitize(lum,q)).astype(np.uint8)
+    tw,th=(g.shape[1]+15)//16,(g.shape[0]+15)//16
+    return np.pad(g,((0,th*16-g.shape[0]),(0,tw*16-g.shape[1])),mode='edge')
+
+
+def scale_coord(v, n=MAP_SCALE[0], d=MAP_SCALE[1]):
+    return (v*n+d//2)//d
+
+
+def scaled_texture(g, n=MAP_SCALE[0], d=MAP_SCALE[1]):
+    if n==d:return g.copy()
+    h,w=g.shape
+    g=np.asarray(Image.fromarray(g).resize((scale_coord(w,n,d),scale_coord(h,n,d)),Image.Resampling.NEAREST))
+    return np.pad(g,((0,(-g.shape[0])%16),(0,(-g.shape[1])%16)),mode='edge')
+
+
+def scaled_sprite(frame, n=MAP_SCALE[0], d=MAP_SCALE[1]):
+    if n==d:return frame.copy()
+    # Same approved preview: reduce an existing pose around its feet anchor(8,22),
+    # then restore a one-pixel white rim. No scaling or new sprite rip at runtime.
+    w,h=scale_coord(16,n,d),scale_coord(26,n,d)
+    small=np.asarray(Image.fromarray((frame+1).astype(np.uint8)).resize((w,h),Image.Resampling.NEAREST)).astype(np.int8)-1
+    out=np.full((26,16),-1,np.int8)
+    x,y=8-scale_coord(8,n,d),22-scale_coord(22,n,d)
+    out[y:y+h,x:x+w]=small
+    mask=out>=0;p=np.pad(mask,1)
+    ring=(p[:-2,1:-1]|p[2:,1:-1]|p[1:-1,:-2]|p[1:-1,2:])&~mask
+    out[ring]=0
+    assert (out[0]<0).all() and (out[:,0]<0).all() and (out[:,-1]<0).all()
+    return out
+
+
+def texture_block(g):
+    # Eight-row independent streams, sixteen cached strips cover any100-row view.
+    # A stream contains light rows then dark rows; no whole-map decoded buffer.
+    streams=[]
+    for y in range(0,g.shape[0],8):
+        raw=b''.join(np.packbits((g[y:y+8]&bit)!=0,axis=1).tobytes() for bit in (1,2))
+        streams.append(zx0pack.pack(raw))
+    body=bytearray(struct.pack('>HH',g.shape[1]//8,len(streams))+bytes(2*len(streams)))
+    for i,stream in enumerate(streams):
+        struct.pack_into('>H',body,4+2*i,len(body));body+=stream
+    return bytes(body)
+
+
 def main():
-    cue, out = sys.argv[1], Path(sys.argv[2])
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('cue');parser.add_argument('out',type=Path)
+    parser.add_argument('preview',nargs='?',type=Path)
+    parser.add_argument('--contrast',choices=('source','strong','light'),default='source')
+    parser.add_argument('--scale',choices=tuple(SCALES),default='67')
+    args=parser.parse_args();cue,out=args.cue,args.out
+    n,d=SCALES[args.scale]
     disc, files = extract.disc_files(cue)
     core = disc.read(*files['WORLD/WLDCORE.BIN'])
     world = disc.read(*files['WORLD/WORLD.BIN'])
     m = texture(disc, files)
-    land = land_mask(m)
-    g = greys(land)
-    tiles, cells, tw, th = tiles_of(g)
+    # Reviewed source texture, including its original relief and lettering.
+    # Keep the exact two planes: merging to 255 tiles would damage unique lettering.
+    g=scaled_texture(shades(m,args.contrast),n,d);th,tw=g.shape[0]//16,g.shape[1]//16
+    packed_texture=texture_block(g)
+    shp = units.shp_frames(disc.read(*files['BATTLE/TYPE1.SHP']))
+    spr = disc.read(*files['BATTLE/RAMUZA.SPR'])
+    animation=b''.join(interface.planes(scaled_sprite(units.sprite(spr,shp[k]),n,d),16) for k in (9,10,11,12,13))
+    packed_animation=bytes((2,1,0,1,2,3,4,3))+zx0pack.pack(animation)
     names = management_data.names(world, NAMES, 43)
     assert (names[6], names[24]) == ('Magic City Gariland', 'Mandalia Plains'), names[:8]
     locs = []
@@ -172,15 +238,15 @@ def main():
     routes = []
     for r in range(48):
         p = struct.unpack_from('<I', core, ROUTES + 4 * r)[0] - WLDCORE
-        n, s, e, cost = core[p:p + 4]
+        count, s, e, cost = core[p:p + 4]
         pts = []
-        for k in range(n):
+        for k in range(count):
             v = struct.unpack_from('<I', core, p + 4 + 12 * k)[0]
             pts.append((s16(v & 0xFFFF) + ORIGIN[0], s16(v >> 16) + ORIGIN[1]))
         near = lambda a, b: abs(a[0] - b[0]) <= 3 and abs(a[1] - b[1]) <= 3   # (Bariaus Hill's: 2 off)
         assert near(pts[0], locs[s]) and near(pts[-1], locs[e]), ('route ends', r)
         routes.append((s, e, cost, pts))
-    body = bytearray(b'FWM1' + bytes(10) + struct.pack('>BB', tw, th))
+    body = bytearray(b'FWM3' + bytes(10) + struct.pack('>BB', tw, th))
     offs = []
 
     def section():
@@ -188,24 +254,27 @@ def main():
         offs.append(len(body))
 
     section()
-    for t in tiles: body += tile_bytes(t)
-    section(); body += cells
+    body += packed_texture
+    section(); body += packed_animation
     section(); loc_at = len(body); body += bytes(8 * 43)
     section(); route_at = len(body); body += bytes(6 * 48)
     section(); body += bytes([len(STORY)]) + b''.join(struct.pack('>BBHBx', *e) for e in STORY)
     for r, (s, e, cost, pts) in enumerate(routes):
         if len(body) & 1: body.append(0)
         struct.pack_into('>4BH', body, route_at + 6 * r, s, e, cost, len(pts), len(body))
-        for x, y in pts: body += struct.pack('>hh', x, y)
+        for x, y in pts: body += struct.pack('>hh', scale_coord(x,n,d), scale_coord(y,n,d))
     for i, (x, y, kind) in enumerate(locs):
-        struct.pack_into('>hhBBH', body, loc_at + 8 * i, x, y, kind, 0, len(body))
+        struct.pack_into('>hhBBH', body, loc_at + 8 * i, scale_coord(x,n,d), scale_coord(y,n,d), kind, 0, len(body))
         body += names[i].encode('ascii') + b'\0'
     struct.pack_into('>5H', body, 4, *offs)
     assert len(body) < 65000
     out.write_bytes(bytes(body))
-    if len(sys.argv) > 3:
-        Image.fromarray(np.array([255, 170, 85, 0], np.uint8)[g]).save(sys.argv[3])
-    print('%s: %d bytes (%d tiles, %dx%d cells, 43 locations, 48 routes)' % (out.name, len(body), len(tiles), tw, th))
+    if args.preview:
+        Image.fromarray(np.array([255,170,85,0],np.uint8)[g]).save(args.preview)
+    print('%s: %d bytes (%d lossless texture bytes, %d compressed idle bytes, %s contrast)' %
+          (out.name,len(body),len(packed_texture),len(packed_animation),args.contrast))
+    print('Offline scale %s; %dx%d texture, all43 locations/48 routes and eight idle steps retained' %
+          (args.scale,g.shape[1],g.shape[0]))
 
 
 if __name__ == '__main__':

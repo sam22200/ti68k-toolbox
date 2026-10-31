@@ -20,7 +20,7 @@ import re
 import struct
 
 HERE = Path(__file__).resolve().parents[1]
-TITLE, STORY, CARD = 1, 2, 3
+TITLE, STORY, CARD, NARRATE, OVERLAY = 1, 2, 3, 4, 5
 
 
 def beats(story):
@@ -56,15 +56,18 @@ def scene_set(mapping, steps):
     table = len(head)
     head += bytes(8 * len(steps))
     body = bytearray(head)
+    shared={}
     for i, (kind, arg, fields) in enumerate(steps):
         values = []
         for f in fields:
             if isinstance(f, int):
                 values.append(f)
             else:
+                if f in shared:
+                    values.append(shared[f]);continue
                 if len(body) & 1:
                     body.append(0)
-                values.append(len(body)); body += f
+                values.append(len(body));shared[f]=len(body);body += f
         values += [0] * (3 - len(values))
         struct.pack_into('>BB3H', body, table + 8 * i, kind, arg, *values)
     return bytes(body)
@@ -137,13 +140,21 @@ def extract_pack(raw):
 
 
 def card():
-    """ffs1: the end card of Orbonne's chapter, then the Academy bridge."""
-    lines = [(14, 28, 0, 'Chapter 1'), (14, 45, 0, 'The Meager'), (14, 74, 1, 'ENTER: Military Academy')]   # C_WHITE, C_LGRAY
-    blob = bytes([len(lines)]) + b''.join(bytes((x, y, c)) + s.encode('ascii') + b'\0' for x, y, c, s in lines)
-    picture, beats = academy()
-    out = scene_set('', [(CARD, 1, [blob]), (STORY, 0, [picture, 20, beats])])
+    """Source order: dark narration, chapter/location titles, normal Academy dialogue."""
+    picture, raw = academy();rows=beats(raw)
+    narration=beat_block([rows[0][1]])
+    dialogue=beat_block([row for _,row in rows[1:]])
+    chapter=bytes((2,5,29,6,49));location=bytes((2,7,36,8,53))
+    out = scene_set('', [(NARRATE,1,[picture,20,narration]),
+                         (OVERLAY,0,[picture,20,chapter]),
+                         (OVERLAY,0,[picture,20,location]),
+                         (STORY,0,[picture,20,dialogue])])
     (HERE / 'campaign/data/ffs1.bin').write_bytes(out)
     print('ffs1', len(out), 'bytes')
+    # User-requested black title background; no world-map texture on this card.
+    planes=bytes([255])*4000+bytes(8000)
+    out=scene_set('',[(OVERLAY,0,[extract_pack(planes),20,bytes((1,9,42))])])
+    (HERE/'campaign/data/ffs2.bin').write_bytes(out);print('ffs2',len(out),'bytes')
 
 
 if __name__ == '__main__':

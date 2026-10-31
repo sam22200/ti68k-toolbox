@@ -26,7 +26,7 @@ static void summary(void)
         HASH(u->status); HASH(u->dc); HASH(u->exp); HASH(u->jp); HASH(u->gexp); HASH(u->gjp);
         HASH(st.pending[i].state);HASH(st.pending[i].ticks);HASH(st.pending[i].tile);HASH(st.pending[i].ability);
     }
-    for(i=0;i<NBAG;i++) { HASH(st.bag[i]); }
+    for(i=0;i<NBAG;i++) { HASH(st.bag[BAG_SLOT(i)]); }
 #undef HASH
 #ifdef __m68k__
 #define VALUE(v) BENCH_VALUE(v)

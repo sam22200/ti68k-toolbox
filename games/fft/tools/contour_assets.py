@@ -87,7 +87,7 @@ def main():
         dims=[int(n) if n.isdigit() else sizes[n] for n in re.findall(r'\[([^]]+)\]',dim)]
         values=[int(n.rstrip('UL'),0) for n in re.findall(r'0x[0-9A-F]+(?:UL)?|\b[0-9]+\b',body)]
         table(name,typ,dims,values)
-    source=(HERE/'fft.c').read_text()
+    source=(HERE/'fft.c').read_text()+'\n'+(HERE/'setup_glyphs.inc').read_text()+'\n'+(HERE/'window_label.inc').read_text()
     for name,typ in [('lmask','u16'),('sin32','s16'),('idle_seq','u8'),('walk_seq','u8'),('digits','u8'),('job_jp','u16'),('walk_q','u8'),('walk_h','u8'),('dissolve','u16'),('tri','u8'),('sway','u8'),('bob','u8'),('reflected','u8'),('facing_sprite','u8'),('forecast_arrow','u8'),('forecast_mask','u8')]:
         dim,body=re.search(r'static const '+typ+' '+name+r'((?:\[[^]]+\])+?)\s*=\s*\{(.*?)\};',source,re.S).groups()
         table(name,typ,[sum(int(t.strip()) if t.strip().isdigit() else {'WALK_FRAMES':7,'CLIMB_FRAMES':10}[t.strip()] for t in n.split('+')) for n in re.findall(r'\[([^]]+)\]',dim)],[int(n,0) for n in re.findall(r'-?0x[0-9A-F]+|-?\b[0-9]+\b',body)])
@@ -105,7 +105,7 @@ def main():
     table('weapon_x','s8',[int(body[1])],[int(n) for n in re.findall(r'-?\d+',body[2])])
     for name,width in [('st_names',8),('signs',12),('equip_labels',12),('effects',32),('entries',16),('automatic',16),('team_names',8),('help_lines',34),('chapter_ui',24)]:
         pattern=r'static const char \*const '+name+r'\[[^]]*\]\s*=\s*\{(.*?)\};'
-        body=re.search(pattern,source,re.S)[1] if name!='chapter_ui' else re.search(r'static const char chapter_ui\[4\]\[24\]=\{(.*?)\};',(HERE/'config.inc').read_text(),re.S)[1]
+        body=re.search(pattern,source,re.S)[1] if name!='chapter_ui' else re.search(r'static const char chapter_ui\[\d+\]\[24\]=\{(.*?)\};',(HERE/'config.inc').read_text(),re.S)[1]
         words=re.findall(r'"([^"]*)"',body);at=len(bank)
         for word in words:
             raw=word.encode('ascii');assert len(raw)<width

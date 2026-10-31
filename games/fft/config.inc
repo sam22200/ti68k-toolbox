@@ -10,26 +10,52 @@ enum {
 #ifdef FFT_REACH_CONTOUR
     CONFIG_MOVE,
 #endif
+#ifdef FFT_CHAPTER
+#ifdef FFT_EDGE_WIDTH_REVIEW
+    CONFIG_EDGE,
+#endif
+    CONFIG_OVER,
+#endif
 #ifdef FFT_CONFIG
     CONFIG_ZOOM, CONFIG_MESH,
 #endif
     CONFIG_ROWS
 };
 
+#ifdef FFT_MODULES
+// Avoid loading a module on ordinary game frames; the chapter core is near64K.
+static u8 config_update(void)
+{
+    return st.config || input_pressed(K_MODE|K_CATALOG) ? (u8)mod_call(MOD_SCREENS,2,0) : 0;
+}
+static void config_draw(void){mod_call(MOD_SCREENS,3,0);}
+#else
 static u8 config_update(void)
 {
     if (!W) return 0;
     if (st.config) {
-        if (input_pressed(K_CATALOG | K_ESC | K_B)) {
+        if (input_pressed(K_CATALOG | K_ESC | K_B
+#ifdef FFT_CHAPTER
+                          | K_MODE
+#endif
+                         )) {
             st.config = 0; W->hold = W->frz = 0;
             return 1;                       // consume close, including CATALOG's legacy APPS
         }
-#ifdef FFT_CONFIG
+#if defined(FFT_CONFIG) || defined(FFT_CHAPTER)
         if (input_pressed(K_DOWN)) {
             if(++st.config_row==CONFIG_ROWS)st.config_row=0;
         }else if(input_pressed(K_UP))st.config_row=st.config_row ? st.config_row-1 : CONFIG_ROWS-1;
 #endif
         if (input_pressed(K_A | K_ENTER | K_LEFT | K_RIGHT)) {
+#ifdef FFT_CHAPTER
+#ifdef FFT_EDGE_WIDTH_REVIEW
+            if(st.config_row==CONFIG_EDGE && (st.scenery&2)) {
+                st.scenery^=1;scene_rot=vbuf_rot=255;W->bg_ok=0;hl_seq++;
+            }else
+#endif
+            if(st.config_row==CONFIG_OVER){st.over^=1;hl_seq++;}
+#endif
 #ifdef FFT_REACH_CONTOUR
             if(st.config_row==CONFIG_MOVE){
                 if(contour_gfx){st.reach_contour^=1;hl_seq++;}
@@ -47,7 +73,11 @@ static u8 config_update(void)
         }
         return 1;
     }
-    if (input_pressed(K_CATALOG)) {
+    if (input_pressed(K_CATALOG
+#ifdef FFT_CHAPTER
+                      | K_MODE
+#endif
+                     )) {
         if (!st.ai && !st.banner && !st.morph_mask && !st.turn && st.want == 0xFF
 #ifdef FFT_CONFIG
             && !st.ptrans
@@ -57,6 +87,9 @@ static u8 config_update(void)
 #endif
             && st.mode != M_ACT && st.mode != M_WALK && st.mode != M_END) {
             st.config = 1; st.config_row = 0;
+#if defined(FFT_CHAPTER) && defined(FFT_EDGE_WIDTH_REVIEW)
+            st.scenery=(st.scenery&1)|(views[0]&&views[0][1]=='3' ? 2 : 0);
+#endif
             return 1;
         }
         rt_keys &= ~K_APPS;                 // a blocked CATALOG must not open the turn list
@@ -67,17 +100,27 @@ static u8 config_update(void)
 static void config_draw(void)
 {
 #ifndef FFT_CONFIG
-    // The chapter only has one setting. Keep its menu small enough for the
-    // original 64K variable ceiling, including the native profiling build.
+    // Compact chapter settings; strings live in the existing shared archive tail.
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define chapter_ui CONTOUR_REF_chapter_ui
 #else
-    static const char chapter_ui[4][24]={"SETTINGS","Move: full tiles","Move: contour","ENTER:toggle  ESC:back"};
+    static const char chapter_ui[9][24]={"SETTINGS","Move: full tiles","Move: contour","ENTER:toggle  ESC:back",
+        "Edges: 1px","Edges: 2px","Edges: unavailable","Tiles: covered","Tiles: over scenery"};
 #endif
-    draw_clear();
+    draw_rect(0,0,RT_W,RT_H,C_WHITE);
     draw_text(4,1,chapter_ui[0],F_MEDIUM,C_BLACK);
-    draw_text(5,30,st.reach_contour ? "[x]" : "[ ]",F_SMALL,C_BLACK);
-    draw_text(21,30,chapter_ui[st.reach_contour ? 2 : 1],F_SMALL,C_BLACK);
+    {
+        u8 row;
+        for(row=0;row<CONFIG_ROWS;row++) {
+            u8 label=st.reach_contour ? 2 : 1,y=28+18*row;
+#ifdef FFT_EDGE_WIDTH_REVIEW
+            if(row==CONFIG_EDGE)label=(st.scenery&2) ? 4+(st.scenery&1) : 6;
+#endif
+            if(row==CONFIG_OVER)label=7+st.over;
+            if(row==st.config_row){draw_rect(3,y-3,154,12,C_BLACK);draw_rect(4,y-2,152,10,C_LGRAY);}
+            draw_text(8,y,chapter_ui[label],F_SMALL,C_BLACK);
+        }
+    }
 #else
     const char *labels[CONFIG_ROWS]; u8 values[CONFIG_ROWS],i,y=38;
 #ifdef FFT_REACH_CONTOUR
@@ -121,3 +164,4 @@ static void config_draw(void)
     draw_text(4,93,"ENTER:toggle  ESC:back",F_SMALL,C_BLACK);
 #endif
 }
+#endif

@@ -5,7 +5,7 @@ take from generated headers, as one small archived variable read at load.
 usage: chapter_desc.py opening|campaign ...
 Reads <chapter>/data/{battle,interface,map}.h and the actor offsets (opening/data/units.h,
 campaign/data/actors.h); writes <chapter>/data/<ffod|ffgd>.bin and the shared layout
-chapter.h (CD_* word indices, identical for every chapter). Layout: "FCD1", then u16
+chapter.h (CD_* word indices, identical for every chapter). Layout: "FCD3", then u16
 fields (FIELDS), then the small tables (u8 rows; zodiac_days u16), each at a field's
 byte offset from the start of the descriptor (0: the chapter has none).
 """
@@ -66,7 +66,7 @@ WON = {'opening': 1, 'campaign': 2}
 SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
     ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'START',
-     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS)
+     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS) + ['DRAW_BASIC', 'UNIT_COUNT', 'UNIT_REWARDS']
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -150,20 +150,26 @@ def build(chapter):
     texts.append((maps if maps.exists() else HERE / 'map.h').read_text())
     actors = folder / ('units.h' if chapter == 'opening' else 'actors.h')
     texts.append(actors.read_text())
-    values = {'SET_N': int(re.search(r'#define SET_N (\d+)', (HERE / 'fft.h').read_text())[1])}
+    values = {'SET_N': 6}                    # legacy extractor records; converted below
     for t in texts:
         numbers(t, values)
     offsets = {}
     for t in texts:
         offsets.update({k: int(v) for k, v in re.findall(r'#define (\w+) \(\(const \w+ \*\)\(igfx \+ (\d+)UL\)\)', t)})
         offsets.update({k: int(v) for k, v in re.findall(r'#define ((?:UI|OPENING)_\w+) (\d+)UL', t)})
-    head = b'FCD1' + bytes(2 * len(FIELDS))
+    unit_count=values['NUNIT']
+    limit=int(re.search(r'^#define FFT_CORE_UNIT_MAX (\d+)',(HERE/'core_limits.h').read_text(),re.M)[1])
+    if not 1<=unit_count<=limit:
+        raise ValueError(f'{chapter}: {unit_count} actors exceed the accepted1..{limit} envelope')
+    head = b'FCD3' + bytes(2 * len(FIELDS))
     body = bytearray(head)
     fields = {}
+    fields['UNIT_COUNT']=unit_count
     values['SC_TOP'] = SC_TOP[chapter]
     view = (folder / (VIEW[chapter] + '.bin')).read_bytes()
-    if view[:2] == b'V2':                      # split banks (extract.pack_view): colours first
-        values['SC_H'] = len(unzx0(view[4:4 + int.from_bytes(view[2:4], 'big')])) // (2 * 40)
+    if view[:2] in (b'V2',b'V3'):             # split banks; V3 also carries a width mask
+        head=6 if view[:2]==b'V3' else 4
+        values['SC_H'] = len(unzx0(view[head:head + int.from_bytes(view[2:4], 'big')])) // (2 * 40)
     else:
         values['SC_H'] = len(unzx0(view)) // (6 * 40)
     for f, name in NUMBERS:
@@ -199,6 +205,20 @@ def build(chapter):
     fields['PARTY'], fields['WON'], fields['LOCATION'] = PARTY[chapter], WON[chapter], LOCATION[chapter]
     for f in SAVE_IDS:
         fields[f] = values.get(f, 0)
+    convert_units(chapter, folder, offsets, values, fields, body)
+    # Per-actor result data belongs to the encounter, not the two-chapter flow
+    # table. This also prevents a13-actor encounter from reading11-row rewards.
+    if len(body)&1:body.append(0)
+    fields['UNIT_REWARDS']=len(body)
+    rewards=bytearray(2*unit_count)
+    if chapter=='campaign':
+        import battle
+        source=battle.Disc(str(HERE.parents[1]/'roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'))
+        if len(battle.UNITS)!=unit_count:raise ValueError('Encounter/reward definitions disagree')
+        for i,definition in enumerate(battle.UNITS):
+            if isinstance(definition[0],int):
+                record=source.entd(*definition);rewards[2*i:2*i+2]=record[0x1E:0x20]
+    body.extend(rewards)
     gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
     portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
     for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):
@@ -208,8 +228,80 @@ def build(chapter):
                 body.append(0)
             fields[f] = len(body); body += bytes(rows)
     struct.pack_into('>%dH' % len(FIELDS), body, 4, *(fields[f] for f in FIELDS))
+    import surface_data
+    disc,files=surface_data.extract.disc_files(str(HERE.parents[1]/'roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'))
+    raw,geometry,_=surface_data.terrain(disc,files,56 if chapter=='opening'else 22)
+    body=surface_data.attach_descriptor(body,surface_data.encode(raw,geometry['width'],geometry['height']))
     (folder / (NAMES[chapter] + '.bin')).write_bytes(bytes(body))
     print(NAMES[chapter], len(body), 'bytes')
+
+
+def convert_units(chapter, folder, offsets, values, fields, body):
+    """Initial encounter data, converted once offline to source IDs/action positions.
+
+    Original extraction controls retain their six-entry records. Their production
+    descriptor contains only native 28-byte UnitDefs, with no runtime remapping.
+    Draw masks preserve the exact former generation RNG calls independently of
+    which formula families the common interpreter later gains.
+    """
+    bank = (folder / ('ffoi.bin' if chapter == 'opening' else 'ffgi.bin')).read_bytes()
+    common = (HERE / 'campaign/data/ffcj.bin').read_bytes()
+    assert common[:4] == b'FCJA', 'rebuild ffcj before the chapter descriptors'
+    sections = struct.unpack_from('>14H', common, 4)
+    names = {}
+    for a in range(512):
+        at = struct.unpack_from('>H', common, sections[10] + 2 * a)[0]
+        if at:
+            name = common[at:common.index(0, at)].decode('ascii')[:12]
+            names.setdefault(name.replace(' ', ''), []).append(a)
+    old_ids = []
+    for a in range(values['NABIL']):
+        at = offsets['abilities'] + 24 * a
+        name = bank[at:at + 13].split(b'\0')[0].decode('ascii')
+        old_ids.append(names[name.replace(' ', '')])
+
+    # Older fixed encounters did not need a bag-ID map. Give every production
+    # descriptor one: the shared runtime indexes Potion..Phoenix Down uniformly.
+    bag = [None] * values['NBAG']
+    for a in range(values['NABIL']):
+        at = offsets['abilities'] + 24 * a
+        if bank[at + 17] & 4:
+            ids = [i for i in old_ids[a] if 0x170 <= i < 0x17E]
+            assert len(ids) == 1, (a, ids)
+            bag[bank[at + 18]] = ids[0] - 0x170 + 0xF0
+    assert None not in bag
+    if fields['BAG_ITEM']:
+        assert list(body[fields['BAG_ITEM']:fields['BAG_ITEM'] + len(bag)]) == bag
+    else:
+        fields['BAG_ITEM'] = len(body); body.extend(bag)
+
+    def actions(set_id):
+        at = sections[8] + 25 * set_id
+        p = common[at:at + 25]
+        return [p[3 + k] | (0x100 if p[k >> 3] & (0x80 >> (k & 7)) else 0) for k in range(16)]
+
+    def positions(old_set, source_set):
+        at = offsets['skill_sets'] + old_set * 18 + 12
+        source = actions(source_set)
+        out = []
+        for a in bank[at:at + 6]:
+            if a == 255: continue
+            matches = [k for k, ability in enumerate(source) if ability in old_ids[a]]
+            assert len(matches) == 1, (old_set, source_set, old_ids[a], matches)
+            out.append(matches[0])
+        return out
+
+    fields['DRAW_BASIC'] = sum(1 << p for p in positions(values['SET_BASIC'], 5))
+    if len(body) & 1: body.append(0)
+    fields['UNIT_DEFS'] = len(body)            # now an offset in the descriptor, not igfx
+    for i in range(values['NUNIT']):
+        at = offsets['unit_defs'] + 24 * i
+        rec = bank[at:at + 24]
+        set_id = common[sections[2] + rec[1]]
+        pos = positions(rec[22], set_id)
+        mask = sum(1 << p for p in pos)
+        learned = 0xFFFF if rec[23] == 255 else sum(1 << p for k, p in enumerate(pos) if rec[23] & (1 << k))
+        body.extend(rec[:22] + bytes([set_id, 0]) + struct.pack('>2H', learned, mask))
 
 
 def sprites(text):
@@ -245,7 +337,8 @@ def dump_water():
 
 def header():
     lines = ['// Generated by tools/chapter_desc.py: a chapter descriptor\'s layout (campaign/ENGINE.md).',
-             '#define CD_MAGIC 0x46434431UL   // "FCD1"']
+             '#define CD_MAGIC 0x46434433UL   // "FCD3"',
+             '#define CD_HEADER_BYTES %dU' % (4+2*len(FIELDS))]
     lines += ['#define CD_%s %d' % (f, 2 + i) for i, f in enumerate(FIELDS)]   # u16 word index
     path = HERE / 'chapter.h'
     text = '\n'.join(lines) + '\n'

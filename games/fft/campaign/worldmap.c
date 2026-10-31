@@ -1,13 +1,13 @@
-// The world map (fftmap, campaign/ENGINE.md core milestone): Ivalice as a simplified geography
-// (the user's choice: the original map's land and sea, our markers and roads), the locations the
+// The world map (fftmap, campaign/ENGINE.md core milestone): the reviewed source texture
+// and original lettering, with native markers and roads, the locations the
 // story has shown, Ramza travelling FFT's routes between them. fftmap() returns what the
 // campaign does next (fftstory runs it, then the map again): 0 quit, 1 the management menus,
 // 100+ a battle program's door (fftbat). The bank ffwm (tools/world_assets.py) holds the map's
-// tiles (ExtGraph's TileMap engine draws them), the 43 locations, the 48 routes and the story
+// compressed colour planes cached in eight-row strips, the43 locations,48 routes and story
 // list (a location shown by a story flag, entered as its battle until that battle is won);
-// ffmg gives the font and Ramza's still sprite; the campaign save (save.h) the flags and
+// ffmg gives the font; ffwm also holds Ramza's eight idle_sprites poses. The save gives the flags and
 // the location, written back when the map closes.
-// Keys: arrows choose a shown location, ENTER travels there (along the shortest chain of
+// Keys: arrows move a free cursor, with nearby locations snapped on release. ENTER travels
 // shown routes: FFT's costs) or enters the one Ramza stands on, ALPHA / DIAMOND the menus, ESC
 // quits.
 #include "../../../runtime/core/rt.h"
@@ -15,13 +15,16 @@
 #include "save.h"
 #include <stdlib.h>
 #include <string.h>
+#include "../base.inc"
 
-enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER };
+enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED };
 typedef struct {
     u8 at, sel;                          // Ramza's location, the chosen one
     u8 moving, leg, legs, step;          // travelling: leg of path[], its point
     u8 path[16];                         // route ids, bit 7: run end to start
     s16 x, y;                            // Ramza on the map (texture pixels)
+    s16 handx, handy;                    // free hand hotspot; never commits a journey
+    u8 menu, row;
     u8 note, changed, tick;
     u16 result;                          // what fftmap returns
 } Wm;
@@ -29,10 +32,21 @@ Wm wm;
 Save save;
 static const u8 *bank, *mgb;
 static RtTilemap map;
-void rt_clamp_cam(const RtTilemap *m, s16 *cx, s16 *cy);   // (rt_core.c: draw_tilemap's camera)
-#ifndef __m68k__
-static u16 *tiles_host;                  // the PC's host-order copy of the tiles
+static u8 *wmcache,*idle_sprites;
+static u8 strip_tag[16];
+static u16 stride,strip_bytes;
+static u8 strip_decor,decor_ready,decor_at,visible[LOC_N];
+
+#ifdef __m68k__
+static void __attribute__((__stkparm__)) release_map(void)
+#else
+static void release_map(void)
 #endif
+{
+    if(wmcache)free(wmcache);
+    wmcache=idle_sprites=RT_NULL;
+}
+void rt_clamp_cam(const RtTilemap *m, s16 *cx, s16 *cy);   // (rt_core.c: draw_tilemap's camera)
 
 static u16 b16(const u8 *p) { return (u16)((u16)p[0] << 8 | p[1]); }
 static s16 s16v(const u8 *p) { return (s16)b16(p); }
@@ -45,6 +59,16 @@ static const u8 *route(u8 r) { return part(3) + 6 * r; }
 static const u8 *menu_font(void) { return mgb + b16(mgb + 4 + 2 * 7); }
 #define MGTEXT_TEXT_ONLY
 #include "mgtext.inc"
+
+static u8 map_menu_width(const char *s)
+{
+    const u8 *advance=menu_font()+103;u8 width=0;
+    while(*s)width+=advance[(u8)*s++-32];
+    return width;
+}
+#define CHOICE_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define CHOICE_WIDTH(s) map_menu_width(s)
+#include "../choice_menu.inc"
 
 static u8 flag(u8 k) { return (u8)(save.flags[k >> 3] >> (k & 7) & 1); }
 // the story list's entry of location i (RT_NULL: none): location, flag + 1 that shows it,
@@ -120,19 +144,16 @@ static void travel_step(void)            // a pixel a frame along the route's po
     if (++wm.leg == wm.legs) arrive();
 }
 
-// the shown location nearest in the direction pressed (dx, dy: -1, 0, 1)
-static u8 nearest(s16 dx, s16 dy)
+// A bounded magnetic radius, measured in texture pixels. No destination on hover alone.
+static u8 magnet(void)
 {
-    u8 i, best = wm.sel;
-    u32 bd = 0xFFFFFFFFUL;
+    u8 i, best = 255;
+    u16 bd = 401;
     for (i = 0; i < LOC_N; i++) {
-        s16 ex = (s16)(loc_x(i) - loc_x(wm.sel)), ey = (s16)(loc_y(i) - loc_y(wm.sel));
-        s16 along = (s16)(ex * dx + ey * dy), across = (s16)(dx ? ey : ex);
-        u32 d;
-        if (i == wm.sel || !shown(i) || along <= 0) continue;
-        if (across < 0) across = (s16)-across;
-        if (across > 2 * along) continue;                    // within a broad cone
-        d = (u32)((s32)along * along) + 4UL * (u32)((s32)across * across);
+        s16 ex = (s16)(loc_x(i) - wm.handx), ey = (s16)(loc_y(i) - wm.handy);
+        u16 d;
+        if (!shown(i) || ex < -20 || ex > 20 || ey < -20 || ey > 20) continue;
+        d = (u16)(ex * ex + ey * ey);
         if (d < bd) { bd = d; best = i; }
     }
     return best;
@@ -141,26 +162,28 @@ static u8 nearest(s16 dx, s16 dy)
 void game_init(void)
 {
     u16 size;
+#ifndef __m68k__
+    release_map();
+#endif
+    wmcache=idle_sprites=RT_NULL;
     bank = mgb = RT_NULL;                    // (statics survive between runs)
+    strip_decor=decor_ready=0;
     memset(&wm, 0, sizeof wm);
     bank = rt_file("ffwm", &size);
-    if (bank && memcmp(bank, "FWM1", 4)) bank = RT_NULL;
+    if (bank && memcmp(bank, "FWM3", 4)) bank = RT_NULL;
     mgb = rt_file("ffmg", &size);
-    if (mgb && memcmp(mgb, "FMG1", 4)) mgb = RT_NULL;
-    if (!rt_load(SAVE_NAME, &save, sizeof save) || memcmp(save.magic, SAVE_MAGIC, 4)) memset(&save, 0, sizeof save);
+    if (mgb && memcmp(mgb, "FMG2", 4)) mgb = RT_NULL;
+    save_load(&save);
     if (bank) {
-        u16 n = (u16)((part(1) - part(0)) / 2);
-        map.map = part(1); map.w = bank[14]; map.h = bank[15];
-        map.ntiles = (u16)(n / 32);
+        map.w = bank[14]; map.h = bank[15];
+        stride=b16(part(0));strip_bytes=stride<<4;
+        wmcache=malloc((u16)(strip_bytes<<4)+5*156);
+        if(!wmcache){bank=RT_NULL;return;}
+        idle_sprites=wmcache+(strip_bytes<<4);
+        zx0_unpack(part(1)+8,idle_sprites);
+        memset(strip_tag,255,sizeof strip_tag);
 #ifdef __m68k__
-        map.tiles = (const u16 *)part(0);
-#else
-        {
-            u16 k;
-            tiles_host = (u16 *)malloc(2UL * n);
-            for (k = 0; k < n; k++) tiles_host[k] = b16(part(0) + 2 * k);
-            map.tiles = tiles_host;
-        }
+        atexit(release_map);
 #endif
     }
     rt_state = &wm; rt_state_size = sizeof wm;
@@ -170,14 +193,17 @@ void game_scenario(u16 n)                 // the save's location (n: test doors,
 {
     (void)n;
     wm.at = save.loc ? (u8)(save.loc - 1) : 6;        // a save before any: Gariland
-    wm.sel = wm.at; wm.moving = 0; wm.note = 0; wm.result = 0;
+    wm.sel = wm.at; wm.moving = 0; wm.note = n==1?NOTE_SAVED:0; wm.result = 0;
     if (bank) { wm.x = loc_x(wm.at); wm.y = loc_y(wm.at); }
+    wm.handx=wm.x;wm.handy=wm.y;wm.menu=wm.row=0;
+    decor_ready=0;
 }
 
 static u8 leave(u16 result)
 {
     wm.result = result;
     if (wm.changed) rt_save(SAVE_NAME, &save, sizeof save);
+    release_map();
     return 0;
 }
 
@@ -186,15 +212,40 @@ u8 game_update(void)
     u32 key = rt_keys & ~rt_prev;
     wm.tick++;
     if (!bank || !mgb) return !(key & K_ESC);
-    if (wm.moving) { travel_step(); travel_step(); return 1; }     // two pixels a frame
+    if (wm.moving) { travel_step(); if(wm.moving)travel_step(); return 1; }
     if (wm.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) wm.note = 0; return 1; }
-    if (key & K_ESC) return leave(0);
-    if (key & (K_C | K_D)) return leave(1);
-    if (key & K_LEFT) wm.sel = nearest(-1, 0);
-    if (key & K_RIGHT) wm.sel = nearest(1, 0);
-    if (key & K_UP) wm.sel = nearest(0, -1);
-    if (key & K_DOWN) wm.sel = nearest(0, 1);
+    if (key & K_ESC) {if(wm.menu){wm.menu=0;return 1;}return leave(0);}
+    if (key & (K_C | K_D)) { wm.menu^=1;wm.row=0;return 1; }
+    if (wm.menu) {
+        if (key & K_B) { wm.menu=0;return 1; }
+        wm.row=choice_move(wm.row,6,key);
+        if (key & (K_ENTER|K_A)) {
+            if (wm.row==1) return leave(1);
+            if (!wm.row) wm.menu=0;
+            else if (wm.row==4) return leave(2); // same ffttitle(3) file module, after pending save flush
+            else wm.note=NOTE_UNAVAILABLE;
+        }
+        return 1;
+    }
+    if (rt_keys & (K_LEFT|K_RIGHT|K_UP|K_DOWN)) {
+        if (rt_keys & K_LEFT) wm.handx-=2;
+        if (rt_keys & K_RIGHT) wm.handx+=2;
+        if (rt_keys & K_UP) wm.handy-=2;
+        if (rt_keys & K_DOWN) wm.handy+=2;
+        if(wm.handx<0)wm.handx=0;
+        if(wm.handy<0)wm.handy=0;
+        if(wm.handx>map.w*16-1)wm.handx=map.w*16-1;
+        if(wm.handy>map.h*16-1)wm.handy=map.h*16-1;
+        wm.sel=magnet();
+    } else if (rt_prev & (K_LEFT|K_RIGHT|K_UP|K_DOWN)) {
+        wm.sel=magnet();
+        if(wm.sel!=255){wm.handx=loc_x(wm.sel);wm.handy=loc_y(wm.sel);}
+    }
     if (key & (K_ENTER | K_A)) {
+        if (wm.sel==255) {
+            wm.handx=wm.x;wm.handy=wm.y;wm.sel=wm.at;
+            return 1; // recenter only: a second explicit press is needed to enter
+        }
         if (wm.sel != wm.at) {
             if (find_path(wm.sel)) { wm.moving = 1; wm.leg = wm.step = 0; }
             else wm.note = NOTE_NOROAD;
@@ -209,6 +260,8 @@ u8 game_update(void)
 }
 
 // ---------------------------------------------------------------- drawing
+#ifdef WM_REFERENCE
+// Original immediate-mode road/marker renderer retained only as a pixel oracle.
 static void pset(s16 x, s16 y, u8 c)
 {
     u8 *l, *d, m;
@@ -219,13 +272,16 @@ static void pset(s16 x, s16 y, u8 c)
     if (c & 2) *d |= m; else *d &= (u8)~m;
 }
 
-static void line(s16 x0, s16 y0, s16 x1, s16 y1)    // a black road, Bresenham
+static void line(s16 x0, s16 y0, s16 x1, s16 y1,u8 outline) // road centre / white contour
 {
     s16 dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = y1 > y0 ? y0 - y1 : y1 - y0;
     s16 sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, e = dx + dy;
     for (;;) {
         s16 e2;
-        pset(x0, y0, C_BLACK);
+        pset(x0,y0,outline?C_WHITE:C_BLACK);
+        if(outline) {
+            draw_rect(x0-2,y0-2,5,5,C_WHITE);
+        }
         if (x0 == x1 && y0 == y1) return;
         e2 = (s16)(2 * e);
         if (e2 >= dy) { e += dy; x0 += sx; }
@@ -233,16 +289,91 @@ static void line(s16 x0, s16 y0, s16 x1, s16 y1)    // a black road, Bresenham
     }
 }
 
-static void marker(s16 x, s16 y, u8 town)     // white ring; a town black, a field dark grey
+static void marker(s16 x, s16 y, u8 town)     // circular white ring with a dark centre
 {
-    draw_rect(x - 3, y - 3, 7, 7, C_WHITE);
-    draw_rect(x - 2, y - 2, 5, 5, town ? C_BLACK : C_DGRAY);
-    if (!town) draw_rect(x - 1, y - 1, 3, 3, C_BLACK);
+    static const u8 widths[9]={3,7,7,9,9,9,7,7,3};
+    u8 r;
+    for(r=0;r<9;r++)draw_rect(x-(widths[r]>>1),y+r-4,widths[r],1,C_WHITE);
+    for(r=0;r<9;r++) {
+        pset(x-(widths[r]>>1),y+r-4,C_BLACK);pset(x+(widths[r]>>1),y+r-4,C_BLACK);
+    }
+    draw_rect(x-1,y-4,3,1,C_BLACK);draw_rect(x-1,y+4,3,1,C_BLACK);
+    for(r=0;r<5;r++)draw_rect(x-(r==0||r==4?0:1),y+r-2,r==0||r==4?1:3,1,town?C_BLACK:C_DGRAY);
+}
+#endif
+
+// Paint static roads/markers once into each decoded eight-row strip. They use
+// the existing cache allocation, so ordinary scrolling only copies the planes.
+static void strip_span(u8 *dst,s16 y,s16 x0,s16 x1,u8 color)
+{
+    u8 first,last,mask,*l,*d;
+    if((u16)y>=8||x1<0||x0>=(s16)(stride<<3))return;
+    if(x0<0)x0=0;
+    if(x1>=(s16)(stride<<3))x1=(s16)((stride<<3)-1);
+    first=(u8)((u16)x0>>3);last=(u8)((u16)x1>>3);
+    mask=(u8)(255U>>((u16)x0&7));
+    l=dst+(u16)y*stride+first;d=l+(stride<<3);
+    for(;;l++,d++,first++) {
+        u8 m=first==last?(u8)(mask&(255U<<(7-((u16)x1&7)))):mask;
+        if(color&1)*l|=m;else *l&=(u8)~m;
+        if(color&2)*d|=m;else *d&=(u8)~m;
+        if(first==last)return;
+        mask=255;
+    }
 }
 
-static void ramza(s16 x, s16 y)              // ffmg's still sprite 40, feet on the marker
+static void strip_line(u8 *dst,s16 top,s16 x0,s16 y0,s16 x1,s16 y1,u8 outline)
 {
-    const u8 *p = mgb + b16(mgb + 4 + 2 * 5) + 40 * 156;
+    s16 dx,dy,sx,sy,e;
+    if((y0<top-2&&y1<top-2)||(y0>top+9&&y1>top+9))return;
+    dx=x1>x0?x1-x0:x0-x1;dy=y1>y0?y0-y1:y1-y0;
+    sx=x0<x1?1:-1;sy=y0<y1?1:-1;e=dx+dy;
+    for(;;) {
+        s16 e2;
+        if(outline) {
+            s16 row=y0-top-2,end=row+4;
+            for(;row<=end;row++)strip_span(dst,row,x0-2,x0+2,C_WHITE);
+        } else strip_span(dst,y0-top,x0,x0,C_BLACK);
+        if(x0==x1&&y0==y1)return;
+        e2=(s16)(2*e);
+        if(e2>=dy){e+=dy;x0+=sx;}
+        if(e2<=dx){e+=dx;y0+=sy;}
+    }
+}
+
+static void decorate_strip(u8 *dst,u16 top)
+{
+    static const u8 widths[9]={3,7,7,9,9,9,7,7,3};
+    u8 pass,r,k,i;
+    for(pass=0;pass<2;pass++)for(r=0;r<ROUTE_N;r++) {
+        const u8 *rt=route(r),*p=bank+b16(rt+4);
+        if(!visible[rt[0]]||!visible[rt[1]])continue;
+        for(k=0;k+1<rt[3];k++,p+=4)
+            strip_line(dst,(s16)top,s16v(p),s16v(p+2),s16v(p+4),s16v(p+6),!pass);
+    }
+    for(i=0;i<LOC_N;i++)if(visible[i]) {
+        s16 x=loc_x(i),y=(s16)(loc_y(i)-top);
+        if(y<-4||y>11)continue;
+        for(r=0;r<9;r++)strip_span(dst,y+r-4,x-(widths[r]>>1),x+(widths[r]>>1),C_WHITE);
+        for(r=0;r<9;r++) {
+            s16 a=(s16)(widths[r]>>1);
+            strip_span(dst,y+r-4,x-a,x-a,C_BLACK);strip_span(dst,y+r-4,x+a,x+a,C_BLACK);
+        }
+        strip_span(dst,y-4,x-1,x+1,C_BLACK);strip_span(dst,y+4,x-1,x+1,C_BLACK);
+        for(r=0;r<5;r++) {
+            s16 a=r==0||r==4?0:1;
+            strip_span(dst,y+r-2,x-a,x+a,loc(i)[4]==1?C_BLACK:C_DGRAY);
+        }
+    }
+}
+
+static void ramza(s16 x, s16 y)              // eight source idle_sprites poses, feet on the marker
+{
+    static const u8 ends[8]={3,7,12,16,19,23,28,32};
+    u8 phase=0,t=wm.tick&31;
+    const u8 *p;
+    while(phase<7&&t>=ends[phase])phase++;
+    p=idle_sprites+(u16)part(1)[phase]*156;
 #ifdef __m68k__
     RtSprite sp = { 16, 26, p, p + 52, p + 104 };
 #else
@@ -253,30 +384,92 @@ static void ramza(s16 x, s16 y)              // ffmg's still sprite 40, feet on 
     draw_sprite(x - 8, y - 22, &sp);
 }
 
+static void map_background(s16 cx,s16 cy,u8 decor)
+{
+    // Story flags stay fixed until this module returns. Arrival may change the
+    // visible set; keep the strips when the already-shown destination adds none.
+    if(decor&&(!decor_ready||decor_at!=wm.at)) {
+        u8 i,changed=(u8)!decor_ready;
+        for(i=0;i<LOC_N;i++) {
+            u8 v=shown(i);
+            if(v!=visible[i])changed=1;
+            visible[i]=v;
+        }
+        decor_at=wm.at;decor_ready=1;
+        if(changed)memset(strip_tag,255,sizeof strip_tag);
+    }
+    if(strip_decor!=decor){memset(strip_tag,255,sizeof strip_tag);strip_decor=decor;}
+    // Only the visible compressed strips are decoded; a slot survives pixel scrolling.
+    {
+        u16 y=0;
+        u8 sh=(u8)(cx&15),rs=(u8)(16-sh);
+        while(y<100) {
+            u16 row=(u16)(cy+y),block=row>>3;
+            u8 slot=block&15,n=(u8)(8-(row&7)),r;
+            const u8 *sl,*sd;
+            u8 *dl=(u8 *)rt_light+y*RT_PBYTES,*dd=(u8 *)rt_dark+y*RT_PBYTES;
+            if(strip_tag[slot]!=block) {
+                zx0_unpack(part(0)+b16(part(0)+4+2*block),wmcache+(u16)slot*strip_bytes);
+                if(decor)decorate_strip(wmcache+(u16)slot*strip_bytes,block<<3);
+                strip_tag[slot]=(u8)block;
+            }
+            if(y+n>100)n=(u8)(100-y);
+            sl=wmcache+(u16)slot*strip_bytes+(row&7)*stride+((cx>>4)<<1);
+            sd=sl+(stride<<3);
+            // Same word-aligned copy/shift as battle copy_view; avoid4000
+            // individually shifted byte writes on every ordinary scrolling frame.
+            for(r=0;r<n;r++,sl+=stride,sd+=stride,dl+=RT_PBYTES,dd+=RT_PBYTES) {
+#ifdef __m68k__
+                const u16 *a=(const u16 *)sl,*b=(const u16 *)sd;
+                PlaneWord *p=(PlaneWord *)dl,*q=(PlaneWord *)dd;
+                if(!sh) {
+                    const PlaneWord *c=(const PlaneWord *)a,*e=(const PlaneWord *)b;
+                    p[0]=c[0];p[1]=c[1];p[2]=c[2];p[3]=c[3];p[4]=c[4];
+                    q[0]=e[0];q[1]=e[1];q[2]=e[2];q[3]=e[3];q[4]=e[4];
+                } else {
+#define WM_COPY(k) p[k]=*(const PlaneWord *)(a+2*k)<<sh|a[2*k+2]>>rs; \
+                   q[k]=*(const PlaneWord *)(b+2*k)<<sh|b[2*k+2]>>rs
+                    WM_COPY(0);WM_COPY(1);WM_COPY(2);WM_COPY(3);WM_COPY(4);
+#undef WM_COPY
+                }
+#else
+                u8 k;
+                for(k=0;k<10;k+=2) {
+                    WR32(dl,k,sh?RD32(sl,k)<<sh|RD16(sl,k+2)>>rs:RD32(sl,k));
+                    WR32(dd,k,sh?RD32(sd,k)<<sh|RD16(sd,k+2)>>rs:RD32(sd,k));
+                }
+#endif
+            }
+            y+=n;
+        }
+    }
+}
+
 void game_render(void)
 {
     s16 cx, cy;
-    u8 i, r, k;
+    u8 i;
     if (!bank || !mgb) { draw_clear(); draw_text(4, 40, "Missing ffwm / ffmg", 0, C_BLACK); return; }
-    cx = (s16)(wm.x - 80); cy = (s16)(wm.y - 50);
+    cx = (s16)((wm.moving?wm.x:wm.handx) - 80); cy = (s16)((wm.moving?wm.y:wm.handy) - 50);
     rt_clamp_cam(&map, &cx, &cy);
-    draw_tilemap(&map, cx, cy);
-    for (r = 0; r < ROUTE_N; r++) {                   // the shown routes
-        const u8 *rt = route(r), *p = bank + b16(rt + 4);
-        if (!shown(rt[0]) || !shown(rt[1])) continue;
-        for (k = 0; k + 1 < rt[3]; k++, p += 4)
-            line((s16)(s16v(p) - cx), (s16)(s16v(p + 2) - cy), (s16)(s16v(p + 4) - cx), (s16)(s16v(p + 6) - cy));
-    }
-    for (i = 0; i < LOC_N; i++) if (shown(i)) marker((s16)(loc_x(i) - cx), (s16)(loc_y(i) - cy), loc(i)[4] == 1);
+    map_background(cx,cy,1);
     ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
-    if (!wm.moving) {
+    if (!wm.moving && !wm.menu) {
+        s16 hx=wm.sel==255?wm.handx:loc_x(wm.sel),hy=wm.sel==255?wm.handy:loc_y(wm.sel);
         RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
-        draw_sprite((s16)(loc_x(wm.sel) - cx - 26), (s16)(loc_y(wm.sel) - cy - 7), &sp);
+        draw_sprite((s16)(hx - cx - 26), (s16)(hy - cy - 7), &sp);
     }
     draw_rect(0, 91, 160, 9, C_WHITE); draw_rect(0, 90, 160, 1, C_BLACK);
-    black(3, 93, loc_name(wm.sel));
+    black(3, 93, wm.sel==255?"Move cursor":loc_name(wm.sel));
+    if(wm.menu) {
+        static const char *const rows[]={"Move","Formation","Brave Story","Tutorial","Data","Option"};
+        static const ChoiceLayout menu={88,43,72,57,3,CHOICE_TAB_PLAIN,3,1,25,6,10,7,158,-20,7};
+        choice_frame(&menu,"Menu");
+        for(i=0;i<6;i++)choice_row(&menu,i,rows[i],i==2||i==3||i==5?C_DGRAY:C_BLACK);
+        choice_cursor_animated(&menu,wm.row,rt_frame);
+    }
     if (wm.note) {
-        static const char *const notes[] = { "", "No road there yet", "Not ripped yet" };
+        static const char *const notes[] = { "", "No road there yet", "Not ripped yet", "Not available yet", "Campaign saved" };
         panel(20, 36, 120, 22);
         black(26, 40, notes[wm.note]);
         black(26, 48, "ENTER or SHIFT");

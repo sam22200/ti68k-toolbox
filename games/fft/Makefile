@@ -22,7 +22,7 @@ $(VIEWS:=.bin) tiles.bin: map.h
 fftu.bin: units.h
 fftw.bin: weapons.h
 ffti.bin: interface.h
-interface.h: tools/interface.py tools/units.py tools/art.py tools/banner.py map.h
+interface.h: tools/interface.py tools/units.py tools/art.py tools/banner.py ../../lib/svgfont.py map.h
 	$(PY) tools/interface.py $(DISC)
 ti cycles: $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
 TI_FILES := $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
@@ -61,6 +61,13 @@ $(AI): $(ORACLE).state
 oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 $(NAME)_test: oracle.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: stats.inc unit_setup.inc formula.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: action_effect.h action_resolve.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: status_rules.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: status_policy.h status_unit.h status_policy.inc status_lifetime.h status_control.h status_runtime.inc turn_order.inc setup_glyphs.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftcam_pc fftcam.89z fftcamc.89z: core_limits.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftcam_pc fftcam.89z fftcamc.89z: tactical_grid.h tactical_search.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftcam_pc fftcam.89z fftcamc.89z: unit_card.h unit_card.inc portrait32.inc choice_menu.h choice_menu.inc
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h weapons.h interface.h battle.h art.h fft.h ct_recip.h $(VIEWS:=.bin) fftu.bin fftw.bin ffti.bin
 XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60
 FRAMES := 40
@@ -367,5 +374,7 @@ camera-prefetch-filter-check:
 	cd x/config/data && ../test-config-filter
 
 .PHONY: iso-silhouette-check
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: action_context.h action_start.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: reaction_policy.h reaction_runtime.inc action_module.inc rewards.inc
 iso-silhouette-check:
 	$(PY) tools/iso_silhouette_review.py

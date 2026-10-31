@@ -33,7 +33,7 @@ int main(void)
     press(K_ENTER);assert(st.mode==M_TARGET&&st.sel==0);
     {u8 x=st.unit[0].x,z=st.unit[0].z,c;
         for(c=0;c<MAP_W*MAP_H;c++)if(st.reach[c]!=255&&st.reach[c]&& !unit_at(c%MAP_W,c/MAP_W))break;
-        assert(c<MAP_W*MAP_H);st.cx=c%MAP_W;st.cz=c/MAP_W;press(K_ENTER);
+        assert(c<MAP_W*MAP_H);cursor_place((u8)c);press(K_ENTER);
         assert(st.mode==M_WALK);for(i=0;i<400&&st.mode==M_WALK;i++)assert(sw_step(0));
         assert(st.mode==M_MENU&&(st.unit[0].x!=x||st.unit[0].z!=z));
         press(K_B);assert(st.unit[0].x==x&&st.unit[0].z==z); // ordinary Move undo
@@ -49,7 +49,7 @@ int main(void)
     assert(hud_ready());
     // Original learned techniques: Stasis is an area, Night Sword restores HP.
     sw_init(1);st.unit[2].hp=50;
-    {u8 a=known(2,0);u16 hp=st.unit[2].hp;skill(2,5,a);assert(st.hit&&st.dmg>0);
+    {AbId a=known(2,0);u16 hp=st.unit[2].hp;skill(2,5,a);assert(st.hit&&st.dmg>0);
         for(i=0;i<80&&st.mode==M_ACT;i++)assert(sw_step(0));
         assert(st.unit[2].hp>hp);
     }

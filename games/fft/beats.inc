@@ -123,11 +123,13 @@ static void opening_positions(void)
     }
     if(!ON_PICTURE&&b[3])st.open_seen|=0x8000;
     if(ON_PICTURE && !(st.tick&3)){
-        if(st.open_pan<b[3])st.open_pan+=8;
-        else if(st.open_pan>b[3])st.open_pan-=8;
+        // A partial final step must land on the target, not oscillate around it.
+        if(st.open_pan<b[3])st.open_pan=b[3]-st.open_pan>8?st.open_pan+8:b[3];
+        else if(st.open_pan>b[3])st.open_pan=st.open_pan-b[3]>8?st.open_pan-8:b[3];
     }
 }
 
+static u8 opening_tactical_cover;
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical)
 {
     u8 pose=W->feet_k[slot]?walk_seq[st.tick&15]:0;
@@ -163,7 +165,7 @@ static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical)
         // The rear abduction is a staged foreground shot: the static battle
         // mesh lacks the original event's moving/hidden parts. Preserve the
         // tactical terrain shader in battle and the chapel's own cover here.
-        u16 covered=ON_PICTURE?c->cm[r]&RD16(g,3*UNIT_SH+r):0;
+        u16 covered=ON_PICTURE||opening_tactical_cover?c->cm[r]&RD16(g,3*UNIT_SH+r):0;
         l[r]=RD16(g,r)&~covered;d[r]=RD16(g,UNIT_SH+r)&~covered;m[r]=RD16(g,2*UNIT_SH+r);
     }
     sp.w=16;sp.h=UNIT_SH;sp.light=l;sp.dark=d;sp.mask=m;draw_sprite(x-8-(ON_PICTURE?st.open_pan:st.camx),y-UNIT_FOOT-(ON_PICTURE?0:st.camy),&sp);

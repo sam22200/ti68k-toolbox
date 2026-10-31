@@ -4,11 +4,15 @@
 // and returns 1 once it is over (0: ESC). The beats, dialogue, text and actor bank are the
 // battle engine's own code (../beats.inc, ../text.inc, ../actors.inc).
 #include "../../../runtime/core/rt.h"
+#include "../core_limits.h"
 #include "../units.h"
 #include "../ui_common.h"
 #include <stdlib.h>
 #include <string.h>
 #include "../base.inc"
+#include "save.h"
+#include "flow.h"
+#include "flow_draw.inc"
 
 #ifdef RT_CYCLES
 #include "../../../tools/m68kbench/bench.h"
@@ -19,9 +23,9 @@
 #define ZE(n)
 #endif
 
-enum { STEP_TITLE = 1, STEP_STORY, STEP_CARD };
+enum { STEP_TITLE = 1, STEP_STORY, STEP_CARD, STEP_NARRATE, STEP_OVERLAY };
 enum { OPEN_PLAY, OPEN_TITLE, OPEN_CHAPEL, OPEN_GATE, OPEN_AFTER, OPEN_DONE, OPEN_BANTER };
-#define NUNIT 11                        // scripted actor slots (beats: slot << 4 | gfx)
+#define NUNIT FFT_CORE_UNIT_MAX         // scripted role capacity; beats carry their own counts
 #define COVER_H UNIT_SH
 typedef struct { s16 x, y; u8 depth, rot, r0, r1, wet; u16 cm[COVER_H]; } Cover;
 typedef struct { s16 x, y; u8 depth; } Feet;
@@ -54,6 +58,9 @@ static Work *W;
 static u8 *vbuf;                        // the picture: colour, colour, depth/mask x 2
 static const u8 *set, *amap, *cgfx, *pgfx;   // pgfx: the speakers' portraits (ffcp)
 static const u8 *opening_story, *opening_title;
+static const u8 *scene_flow;
+static Save scene_save;
+static u8 scene_set_id;
 #define PIC_STRIDE_MAX 40                // a picture is 320 pixels wide at most
 static u16 pic_stride, pic_plane;
 #define CHAPEL_STRIDE pic_stride
@@ -69,25 +76,36 @@ static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
 #include "../beats.inc"
 
 static const u8 *step_at(u8 i) { return set + 12 + 8 * i; }
+static void scene_progress(void)
+{
+    if(scene_flow&&(scene_set_id==1||scene_set_id==2)&&save_load(&scene_save)) {
+        u8 phase=scene_set_id==1?1:3;
+        if(phase==3&&(scene_save.flow<2||!scene_save.deploy_n||qword(scene_save.deploy_battle)!=200))return;
+        if(scene_save.flow<phase)scene_save.flow=phase;
+        rt_save(SAVE_NAME,&scene_save,sizeof scene_save);
+    }
+}
 
 // A step begins (the battle engine's opening_stage for the chapel).
 static void step_start(void)
 {
     const u8 *s;
     for (;;) {
-        if (st.step >= RD16(set, 5)) { st.done = 1; return; }
+        if (st.step >= RD16(set, 5)) { st.done = 1;scene_progress();return; }
         s = step_at(st.step);
         st.open_clock = 0; st.open_seen = 0;
         memset(W->actor_key, 255, sizeof W->actor_key);
         W->dialog_key = 0xFFFF;
         if (s[0] == STEP_TITLE) { st.open_stage = OPEN_TITLE; opening_title = set + RD16(s, 1); return; }
-        if (s[0] == STEP_STORY) {
+        if (s[0] == STEP_STORY||s[0]==STEP_NARRATE||s[0]==STEP_OVERLAY) {
             opening_story = set + RD16(s, 3);
             pic_stride = RD16(s, 2); pic_plane = (u16)(pic_stride * 100);
             zx0_unpack(set + RD16(s, 1), vbuf);
             st.open_stage = OPEN_CHAPEL;
-            opening_find(opening_story[RD16(opening_story, 1)]);   // its first beat's event
-            st.open_pan = s[1];
+            if(s[0]!=STEP_OVERLAY)opening_find(opening_story[RD16(opening_story, 1)]);
+            else st.open_stage=OPEN_DONE;
+            // NARRATE bit0 means fade-in, not a one-pixel camera offset.
+            st.open_pan = s[0]==STEP_STORY?s[1]:0;
             return;
         }
         if (s[0] == STEP_CARD) { st.open_stage = OPEN_DONE; return; }
@@ -105,7 +123,7 @@ static void advance(void)
         st.open_beat++;
         if (opening_beat()[0] == event) { opening_dialog_reset(); return; }
     }
-    transition();
+    if(step_at(st.step)[0]==STEP_NARRATE)next_step();else transition();
 }
 
 u8 chapter_completed(void) { return st.done == 1; }
@@ -122,6 +140,7 @@ void game_init(void)
 {
     W = RT_NULL; vbuf = RT_NULL; acache = RT_NULL;   // statics survive between runs
     cgfx = rt_file("ffcu", RT_NULL);
+    scene_flow=rt_file("ffflow",RT_NULL);if(!qvalid(scene_flow))scene_flow=RT_NULL;
     pgfx = rt_file("ffcp", RT_NULL);              // (none: name-only boxes)
     abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
     if (abank[0]) abank_n0 = RD16(abank[0], 0);
@@ -139,6 +158,7 @@ void game_scenario(u16 n)
 {
     char name[6] = "ffs0";
     memset(&st, 0, sizeof st);
+    scene_set_id=(u8)n;
     name[3] = (char)('0' + n);
     set = rt_file(name, RT_NULL);
     if (!W || !set || !cgfx || !abank[0] || !abank[1] || RD16(set, 0) != 0x4653) { set = RT_NULL; return; }
@@ -150,12 +170,15 @@ void game_scenario(u16 n)
     memset(W, 0, sizeof *W);
     actor_reset(); W->dialog_key = 0xFFFF;
     step_start();
-    if (!st.done && step_at(st.step)[0] == STEP_CARD && step_at(st.step)[1] & 1)
+    if (!st.done && (step_at(st.step)[0] == STEP_CARD||step_at(st.step)[0]==STEP_NARRATE) && step_at(st.step)[1] & 1)
         st.open_fade = 9;               // the previous program faded out: this card fades in
 }
 
 u8 game_update(void)
 {
+    if(st.done) {
+        return 0;
+    }
     if (!set) return !input_pressed(K_ESC);
     W->actor_budget = 1; W->actor_misses = 0; W->ac_now++;
     st.tick++; if (st.open_clock < 250) st.open_clock++;
@@ -171,7 +194,10 @@ u8 game_update(void)
         return !input_pressed(K_ESC);
     }
     if (st.open_stage == OPEN_DONE) {
-        if (input_pressed(K_A | K_ENTER)) { next_step(); return !st.done; }
+        if ((step_at(st.step)[0]==STEP_OVERLAY&&st.open_clock>=150)||
+            (input_pressed(K_A | K_ENTER)&&(step_at(st.step)[0]!=STEP_OVERLAY||st.open_clock>=30))) {
+            next_step();return 1;
+        }
         return !input_pressed(K_ESC);
     }
     opening_positions();
@@ -197,6 +223,10 @@ u8 game_update(void)
 
 static void draw_title(void)
 {
+#ifdef FFT_SHARED_SERIF
+    draw_rect(0,0,160,100,C_BLACK);
+    if(scene_flow)qtitle_reveal(scene_flow,12,42,(u16)st.open_clock*2);
+#else
     u8 col, y; u16 sweep = (u16)st.open_clock * 2;
     draw_rect(0, 0, 160, 100, C_BLACK);
     for (col = 0; col < 18; col++) {
@@ -211,6 +241,7 @@ static void draw_title(void)
         }
         { RtSprite sp = { 8, 14, l, d, m }; draw_sprite(8 + col * 8, 42, &sp); }
     }
+#endif
 }
 
 static void draw_card(void)
@@ -224,27 +255,59 @@ static void draw_card(void)
     }
 }
 
+static void draw_picture(void)
+{
+    u8 i;
+    for(i=0;i<100;i++) {
+        u16 at=(u16)i*pic_stride+(st.open_pan>>3);
+        memcpy((u8 *)rt_light+(u16)i*RT_PBYTES,vbuf+at,20);
+        memcpy((u8 *)rt_dark+(u16)i*RT_PBYTES,vbuf+pic_plane+at,20);
+    }
+}
+static void draw_narration(void)
+{
+    u8 row;u16 reveal=st.open_reveal;
+    if(W->dialog_key!=st.open_beat)opening_layout();
+    for(row=0;row<W->dialog_n;row++) {
+        char line[48];u8 n=(u8)strlen(W->dialog[row]),k;u16 width=0;
+        for(k=0;k<n;k++)width+=UI_SHARED(ADV)[(u8)W->dialog[row][k]-32];
+        if(n>reveal)n=(u8)reveal;
+        memcpy(line,W->dialog[row],n);line[n]=0;reveal-=n;
+        ui_text((160-width)/2,(100-W->dialog_n*7)/2+row*7,line,C_WHITE,158);
+    }
+}
+
 void game_render(void)
 {
     u8 i;
     if (!set) { draw_rect(0, 0, 160, 100, C_WHITE); ui_text(3, 40, "Missing scene set", C_BLACK, 160); return; }
     if (st.done) return;
     if (st.open_stage == OPEN_TITLE) draw_title();
+    else if (st.open_stage == OPEN_DONE&&step_at(st.step)[0]==STEP_OVERLAY) {
+        const u8 *p=set+RD16(step_at(st.step),3);u8 n=*p++;
+        draw_picture();qshade();
+        if(!scene_flow)ui_text(3,40,"Missing flow data",C_WHITE,158);
+        else {
+            u8 line=0;
+            while(n--){
+                s16 sweep=(s16)st.open_clock*3-line*48;
+                qtitle_reveal(scene_flow,p[0],p[1],sweep>0?(u16)sweep:0);
+                p+=2;line++;
+            }
+        }
+    }
     else if (st.open_stage == OPEN_DONE) draw_card();
     else {
         const u8 *b = opening_beat(), *a = b + 4;
         ZB(21);
-        for (i = 0; i < 100; i++) {
-            u16 at = (u16)i * CHAPEL_STRIDE + (st.open_pan >> 3);
-            memcpy((u8 *)rt_light + i * RT_PBYTES, vbuf + at, 20);
-            memcpy((u8 *)rt_dark + i * RT_PBYTES, vbuf + CHAPEL_PLANE + at, 20);
-        }
+        draw_picture();
         for (i = 0; i < b[1]; i++, a += 8) {
             u8 slot = a[0] >> 4;
             opening_actor(a[0] & 15, slot, W->feet[slot].x, W->feet[slot].y, a[1], RD16(a + 6, 0));
         }
         ZE(21);
-        if (!b[2]) {
+        if(step_at(st.step)[0]==STEP_NARRATE){qshade();draw_narration();}
+        else if (!b[2]) {
             if (W->dialog_key != st.open_beat) opening_layout();
             ZB(22); opening_dialog_draw(); ZE(22);
         }

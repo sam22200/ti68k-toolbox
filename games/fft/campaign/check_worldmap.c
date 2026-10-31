@@ -23,6 +23,10 @@ static u32 state_hash(void)
     const u8 *p = (const u8 *)&save;
     for (i = 0; i < sizeof save; i++) h = (h << 1 | h >> 31) ^ p[i];
     h = (h << 1 | h >> 31) ^ ((u32)wm.at << 16 | (u16)wm.sel << 8 | (u8)wm.result);
+    h=(h<<1|h>>31)^(u16)wm.x;h=(h<<1|h>>31)^(u16)wm.y;
+    h=(h<<1|h>>31)^(u16)wm.handx;h=(h<<1|h>>31)^(u16)wm.handy;
+    h=(h<<1|h>>31)^wm.moving;h=(h<<1|h>>31)^wm.leg;h=(h<<1|h>>31)^wm.step;
+    h=(h<<1|h>>31)^wm.menu;h=(h<<1|h>>31)^wm.row;h=(h<<1|h>>31)^wm.note;
     return h;
 }
 #ifndef __m68k__

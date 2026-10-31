@@ -7,13 +7,18 @@
 // The includer provides opening_battle (the battle starting) and opening_after (the
 // chapter's own state put back after it).
 enum { MS_AFTER = 1, MS_FADE = 2, MS_PLACED = 4, MS_CAMERA = 8 };
-#define MAP_SCRIPT (cdesc + CD(MAP_SCRIPT))
+static const u8 *map_script_data(void)
+{
+    return flow_bank&&CD(LOCATION)==7?qpart(flow_bank,Q_SCRIPT):cdesc+CD(MAP_SCRIPT);
+}
+#define MAP_SCRIPT map_script_data()
+#define HAS_MAP_SCRIPT (CD(MAP_SCRIPT)||(flow_bank&&CD(LOCATION)==7))
 
 static const u8 *map_seq(u8 stage)              // the sequence shown as stage (RT_NULL: none)
 {
     const u8 *s = MAP_SCRIPT + 2;
     u8 n = MAP_SCRIPT[1];
-    if (!CD(MAP_SCRIPT)) return RT_NULL;
+    if (!HAS_MAP_SCRIPT) return RT_NULL;
     for (; n; n--, s += 8) if (s[0] == stage) return s;
     return RT_NULL;
 }
@@ -22,7 +27,7 @@ static const u8 *map_first(u8 after)            // the first sequence before / a
 {
     const u8 *s = MAP_SCRIPT + 2;
     u8 n = MAP_SCRIPT[1];
-    if (!CD(MAP_SCRIPT)) return RT_NULL;
+    if (!HAS_MAP_SCRIPT) return RT_NULL;
     for (; n; n--, s += 8) if ((s[2] & MS_AFTER) == after) return s;
     return RT_NULL;
 }
@@ -33,10 +38,11 @@ static void map_stage(u8 stage)
     st.open_stage = stage; st.open_clock = 0; st.open_seen = 0;
     memset(W->actor_key, 255, sizeof W->actor_key);
     W->dialog_key = 0xFFFF; W->bg_ok = W->hold = W->frz = 0;
-    if (!s) { if (stage == OPEN_PLAY) opening_battle(0); return; }
+    if (!s) { if (stage == OPEN_PLAY) st.open_stage=OPEN_BEGIN; return; }
     opening_find(s[1]);
-    if (s[2] & MS_AFTER) { st.mode = M_BROWSE; st.banner = st.end = 0; st.morph_mask = 0; opening_after(); }
+    if (s[2] & MS_AFTER) { st.mode = M_BROWSE; st.banner = st.end = 0; st.morph_mask = 0; }
     if (s[2] & MS_CAMERA) { st.rot = s[3]; st.camx = (s16)RD16(s, 2); st.camy = (s16)RD16(s, 3); scene_rot = vbuf_rot = 255; }
+    if(s[2]&MS_AFTER)opening_after();
 }
 
 static void map_transition(u8 stage)            // faded out, then in on that stage
@@ -58,7 +64,7 @@ static void map_begin(void)                     // the first sequence (the progr
     if (s[2] & MS_FADE) st.open_fade = 9;
 }
 
-static void map_start(u8 after)                 // the first sequence before the battle, or after
+static void map_start_step(u8 after)                 // the first sequence before the battle, or after
 {                                               // it (test doors)
     if (after) map_stage(map_first(MS_AFTER)[0]); else map_begin();
 }
@@ -82,12 +88,19 @@ static void map_advance(void)
     else map_skip();
 }
 
-static u8 map_update(void)
+static u8 map_step(void)
 {
     const u8 *s;
+    if(st.open_stage==OPEN_BEGIN)return 1; // resident resumes after this image returns
     if (!W || !opening_story) return !input_pressed(K_ESC);
     // A completed script hands over to the next program (the scene player's chapter card).
-    if (st.open_stage == OPEN_DONE) { st.open_handoff = 1; return 0; }
+    if (st.open_stage == OPEN_DONE) {
+        if(flow_bank&&CD(LOCATION)==7&&st.reward_ready) {
+            st.open_stage=st.open_fade=0;st.story_done=1;st.mode=M_END;st.end=END_VICTORY;
+            st.reward_page=st.open_clock=0;W->bg_ok=0;return 1;
+        }
+        st.open_handoff = 1; return 0;
+    }
     st.tick++; if (st.open_clock < 250) st.open_clock++;
     if (!st.open_stage && !st.open_fade) {      // the victory: what follows it, else the end
         s = map_first(MS_AFTER);
@@ -131,7 +144,31 @@ static void map_render(void)
         ZB(21);
         ensure_scene(st.rot); copy_view();
         s = map_seq(st.open_stage);
-        if (s && s[2] & MS_PLACED) {
+        if(flow_bank&&s&&(s[2]&MS_AFTER)) {
+            u16 represented=0,hidden_roles=0;u8 j;
+            if(s[2]&MS_PLACED)for(j=0;j<b[1];j++) {
+                const u8 *role=b+4+8*j;u8 k,dead=0;
+                for(k=0;k<NUNIT;k++)if(st.unit[k].team!=TEAM_ENEMY&&st.unit[k].gfx==(role[0]&15)) {
+                    if(!st.unit[k].hp)dead=1;
+                    else if(!(represented&(1U<<k))){represented|=(u16)(1U<<k);break;}
+                }
+                if(k==NUNIT&&dead)hidden_roles|=(u16)(1U<<(role[0]>>4));
+            }
+            // Keep unrepresented allies at their actual ending tiles, including
+            // KO poses. Scripted living roles retain the existing choreography.
+            for(i=0;i<NUNIT;i++)if(!(st.scene_hide&(1U<<i))&&!(represented&(1U<<i))&&st.unit[i].x<MAP_W) {
+                Feet f=unit_feet(st.rot,i);u8 dir=unit_direction(st.rot,i);u16 old=W->feet_k[i];
+                W->feet_k[i]=0;opening_tactical_cover=1;
+                opening_actor(st.unit[i].gfx,i,f.x,f.y,(f.depth<<2)|dir,
+                    (u16)(st.unit[i].gfx*44+(st.unit[i].hp?2:P_KO)+(st.unit[i].hp?(dir&1?5:0):(dir&1))+(dir&2?22:0)));
+                opening_tactical_cover=0;W->feet_k[i]=old;
+            }
+            if(s[2]&MS_PLACED)for(i=0;i<b[1];i++,a+=8)if(!(hidden_roles&(1U<<(a[0]>>4)))) {
+                u8 slot=a[0]>>4;
+                opening_actor(a[0]&15,slot,W->feet[slot].x,W->feet[slot].y,a[1],RD16(a+6,0));
+            }
+        }
+        else if (s && s[2] & MS_PLACED) {
             for (i = 0; i < b[1]; i++, a += 8) {
                 u8 slot = a[0] >> 4;
                 opening_actor(a[0] & 15, slot, W->feet[slot].x, W->feet[slot].y, a[1], RD16(a + 6, 0));

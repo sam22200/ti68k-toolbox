@@ -4,17 +4,85 @@
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
+
+// A KO is temporary until the countdown becomes a crystal/chest. Exercise both the
+// first party creation and subsequent victories, including an undeployed roster member.
+static void check_ko_party(void)
+{
+    static const u8 death[] = { 3, 2, 1, 0, DC_CRYSTAL, DC_CHEST, DC_GONE };
+    u8 k, i, recruit = 0;
+    for (k = 0; k < sizeof death; k++) {
+        Save first, back;
+        Unit before;
+        u8 slot = 0, lost = DC_OBJ(death[k]);
+        remove("ffsave.sav");
+        sw_init(61);
+        for (i = 0; i < NUNIT; i++) if (st.unit[i].team == TEAM_PLAYER && i != U_RAMZA) { recruit = i; break; }
+        assert(i < NUNIT);
+        before = st.unit[recruit];
+        for (i = 0; i < recruit; i++) if (st.unit[i].team == TEAM_PLAYER) slot++;
+        st.unit[recruit].hp = 0; st.unit[recruit].dc = death[k];
+        save_campaign(); assert(rt_load(SAVE_NAME, &back, sizeof back));
+        assert(back.n == 5 - lost);
+        if (!lost) {
+            for (i = 0; i < 5; i++)
+                assert(((u32)back.unit[slot].raw[i][0] << 16 | (u16)back.unit[slot].raw[i][1] << 8 |
+                        back.unit[slot].raw[i][2]) == before.raw[i]);
+            party_load();
+            assert(st.unit[recruit].hp == before.max_hp && st.unit[recruit].mp == before.max_mp);
+            assert(st.unit[recruit].dc == 3 && !st.unit[recruit].status);
+        }
+
+        // A loaded party uses slot identities; compaction must retain the other units
+        // and the member who was not deployed, with all their learned abilities/JP.
+        remove("ffsave.sav");
+        sw_init(61); save_campaign(); assert(rt_load(SAVE_NAME, &first, sizeof first));
+        first.unit[first.n] = first.unit[first.n - 1]; first.unit[first.n++].name = 254;
+        assert(rt_save(SAVE_NAME, &first, sizeof first));
+        party_load();
+        slot = st.unit[recruit].slot;
+        st.unit[recruit].hp = 0; st.unit[recruit].dc = death[k];
+        save_campaign(); assert(rt_load(SAVE_NAME, &back, sizeof back));
+        assert(back.n == first.n - lost);
+        for (i = 0; i < back.n; i++)
+            assert(!memcmp(&back.unit[i], &first.unit[i + (lost && i >= slot)], sizeof back.unit[i]));
+        if (!lost) {
+            party_load();
+            assert(st.unit[recruit].hp == before.max_hp && st.unit[recruit].dc == 3);
+        }
+    }
+}
+
+static void check_hp_roundtrip(void)
+{
+    u8 original;
+    for (original = 0; original < 2; original++) {
+        Unit *r;
+        u16 hp = original ? 52 : 51;
+        remove("ffsave.sav");
+        sw_init(16); r = &st.unit[U_RAMZA];
+        assert(r->raw[0] == 508530UL && r->max_hp == 51); // the native victory fixture's seed
+        if (original) r->raw[0] = 0x07E86DUL;            // original Gariland oracle.h, same equipment
+        unit_stats(r); assert(r->max_hp == hp);
+        save_campaign();
+        memset(r->raw, 0, sizeof r->raw); r->max_hp = r->hp = 0;
+        party_load(); assert(r->max_hp == hp && r->hp == hp);
+    }
+}
+
 int main(void)
 {
     u8 i,before,id;Save s;
     if(access("ffgi.bin",R_OK))assert(!chdir("data"));
+    check_ko_party();
+    check_hp_roundtrip();
     remove("ffsave.sav");
     sw_init(61);assert(sw_step(0));
     st.unit[1].hp=0;st.unit[1].dc=DC_CHEST;
     pick_up(U_RAMZA,1);id=items[st.pick].id;assert(st.nfound==1);
     st.mode=M_BROWSE;
     save_campaign();assert(rt_load(SAVE_NAME,&s,sizeof s)&&!memcmp(s.magic,SAVE_MAGIC,4));
-    before=0;for(i=0;i<NBAG;i++)if(cdesc[CD(BAG_ITEM)+i]==id)before=st.bag[i];
+    before=0;for(i=0;i<NBAG;i++)if(cdesc[CD(BAG_ITEM)+i]==id)before=st.bag[BAG_SLOT(i)];
     assert(s.inv[id]==before+1);
     assert(s.flags[0]==2&&s.n==5);              // Gariland's flag; Ramza and four recruits
     assert(s.unit[0].job==0x01&&s.unit[0].type==2);
@@ -47,6 +115,6 @@ int main(void)
          assert(s2.n==s1.n&&s2.unit[0].level==s1.unit[0].level+1&&!memcmp(s2.unit[1].jp,s1.unit[1].jp,sizeof s1.unit[1].jp));}
     }
     remove("ffsave.sav");
-    puts("Gariland: the campaign save keeps a chest's item, the party's draws and its flag; the party loads back as it was");
+    puts("Gariland: KO counters 3..0 survive both save paths; crystals/chests/gone leave; undeployed records and stats survive");
     return 0;
 }
