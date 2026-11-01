@@ -1,13 +1,37 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-**Current addition — Spin Fist, 2026-10-31:** [CORE_PUNCH_ART.md](CORE_PUNCH_ART.md).
+**Current addition — module rebalance, 2026-11-01:** Guts had pushed the
+FORMULA image to 8392 bytes; the module zone equals the largest image and is
+part of every core program (the real production headroom was negative; the
+83 bytes noted for Guts were measured against a stale `data/modules.h`).
+Turn-end status runtime (ops 4/5/14/15: tick, upkeep, dead turn) moves from
+FORMULA to ORDER, which the turn order loads next anyway (one image load less
+per turn); the objective/result banners move from NUMBERS (3/4) to ORDER (6/7),
+never drawn with damage numbers. `hand_weapon` and `restore_ability` are
+shared through ModCtx instead of copied per image (ABI 46), and
+`magic_formula`/`magic_status_formula` are 13-byte bitmaps (all 256 ids checked
+equal). Images: FORMULA 7016, NUMBERS 7290, ORDER 5130, AI 8094 (now the
+zone), ACTION 7940. Zone 8392 -> 8094; resident headroom 235 (scratch raw build
+64701). All 37 family suites green with unchanged hashes (`closure.py`);
+talk-skill and area-impact fit again. Behaviour unchanged.
+
+**Historical Guts addition — 2026-10-31:** [CORE_GUTS.md](CORE_GUTS.md).
+Ramza's Yell (Speed +1), Cheer Up (Brave +5) and Scream (Brave +10, PA/MA/Speed
++1) are immediate owned area casts that always hit, without a draw; a KO,
+Petrified or Wall target is a cancelled miss. New AB_SPEED (cap 50); Scream
+also raises PA/MA (cap 99). 117 original profiles; `core-guts-check` 1546
+assertions. Production: 120 normalized records, 87 casts; Guts is not among the
+201 generic entries (114/201). Resident headroom then negative, restored by the module rebalance. Full core remains
+incomplete; Jump deferred. Preserve live TiEmu, standard playtest, saves and
+old proof bytes AND dates.
+
+**Historical Spin Fist addition — 2026-10-31:** [CORE_PUNCH_ART.md](CORE_PUNCH_ART.md).
 Punch Art's area strike: formula 0x31 on radius 1 around the user (excluded),
 Attack's physical evasion per victim, a 4% critical without knockback (the
 source knocks back only single targets). It rides the owned area pipeline,
 the damage reusing `punch_strike`. `core-punch-strikes-check` 6524 assertions.
-Closure partial (stopped at the user's request to save budget): 16 of 38
-suites green plus area-impact rerun green; the remaining family suites last
-passed with Death Sentence (36/36) and should be rerun before the next family.
+All 37 family suites green; `actions` changes (E0988BD3) only through the
+Spin Fist entry (FCF28AB1 without it).
 Production: 117 normalized records, 84 casts, 114/201 generic entries (87
 remaining entries are not 87 effects). Resident headroom about 153.
 

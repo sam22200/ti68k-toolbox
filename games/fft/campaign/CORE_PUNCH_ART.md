@@ -101,6 +101,7 @@ Wave/Repeating Fist left its gate list).
 - `core-punch-strikes-check` now replays 0x31 for Spin Fist too (its source
   status-proc draw included) and casts it: forecast mask without the user,
   hits, criticals without knockback, misses: 6524 assertions, BC005771.
+- Closure: all 37 family suites green (x/core-punch-strikes/spin-closure.txt).
 
 ## Resident relocation
 
@@ -119,7 +120,6 @@ Wave/Repeating Fist left its gate list).
 
 ## Not done
 
-Punch Art animations; Spin Fist (an area of physical hits: per-victim
-physical evasion in the area batch), Earth Slash's line and Secret Fist's
+Punch Art animations; Earth Slash's line and Secret Fist's
 Death Sentence countdown. The full core is not complete; Jump
 stays deferred.

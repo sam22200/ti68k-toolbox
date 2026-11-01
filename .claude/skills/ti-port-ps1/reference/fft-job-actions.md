@@ -8,13 +8,17 @@ with this requested model in `games/fft/RE_NOTES.md`.
 
 ## Delivery rule and current coverage (2026-10-30)
 
+CORE_GUTS.md adds Ramza's Yell, Cheer Up and Scream (always hit, Speed/Brave/
+PA/MA gains): 120 normalized records, 87 casts; generic entries stay 114/201.
+CORE_PUNCH_ART.md's Spin Fist (area physical hits, no knockback) came before it.
+
 CORE_TALK_SKILL.md adds Persuade, Praise, Threaten, Preach, Solution, Insult
 and Mimic Daravon: 115 normalized records, 82 casts, 112/201 generic entries.
 Invitation, Death Sentence and Negotiate stay gated.
 
 CORE_PUNCH_ART.md adds the Monk's Stigma Magic, Chakra, Revive, Wave Fist and
 Repeating Fist: 108 normalized records, 75 casts, 105/201 generic entries.
-Spin Fist (area physical hits), Earth Slash (line) and Secret Fist stay gated. CORE_PROTECT.md before it
+Earth Slash (line) and Secret Fist stay gated (Spin Fist followed). CORE_PROTECT.md before it
 adds Reraise and Golem (103 records, 72 casts, 100/201).
 
 CORE_CONTROL_STATUS.md adds Frog, Blind Rage, Confusion Song and Foxbird

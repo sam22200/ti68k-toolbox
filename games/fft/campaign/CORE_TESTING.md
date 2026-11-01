@@ -1,11 +1,34 @@
 # Validation by affected dependency
 
-Current Spin Fist closure (partial): `core-punch-strikes-check` 6524
-(BC005771); 16 of 38 suites rerun green (punch-art 1255/AFA2F059 after its
-gate list, targets, batch, knockback, area-ui/forecast, headroom, protect,
-control-status, status-lifetime, sleep, terminal, scheduler) and area-impact
-rerun green after `cast_area_supported` dropped a redundant 0x31 kind test
-(68000 binary back under the limit). Rerun the rest before the next family.
+Run closures with `closure.py` (`make` per suite is unchanged): the
+core-*-check suites run in parallel (`-j 12`, 20 cores here: about 6.5 min for
+all 37 instead of tens of minutes), each under strace; a suite whose recorded
+inputs (every workspace file opened or looked up, absent paths included) are
+byte-identical to its last green run is skipped (`x/closure-cache/`, private).
+A shared-core change still reruns every suite (each binary changes); a check,
+oracle or doc change reruns only its own suites. `--first a,b` schedules suites
+first, `--fail-fast` stops at the first red, `--force` ignores the cache (after
+a toolchain change). banks/headroom run LeakSanitizer, which cannot run under
+ptrace: they rerun untraced and are never cached. `ti-cc` now takes a lock
+(tigcc writes .s/.o next to shared sources such as runtime/core/rt_core.o).
+Validated: the first parallel run gave the serial run's hashes for all 37. `--all` adds the 26
+older core-*-check suites (63 in all, about 2.5 min more); casting, incantation
+(Death gated in the test since CORE_TERMINAL), elements, magic (Holy AI rank)
+and jump (Jump deferred) were already red before 2026-11-01, identical with or
+without Guts: stale expectations to repair, not regressions.
+
+Current Guts + module rebalance closure (2026-11-01): `core-guts-check`
+1546 (F8F2AD6B); all 37 suites green through `closure.py`, every hash equal to
+the Spin Fist closure except `actions` (42026132: the three Guts entries only,
+E0988BD3 without them). banks/headroom updated for ModCtx ABI 46 (384 bytes,
+two shared helpers); their hashes are unchanged.
+
+Historical Spin Fist closure: `core-punch-strikes-check` 6524 (BC005771);
+all 37 family suites green (x/core-punch-strikes/spin-closure.txt), hashes
+equal to the Talk closure except punch-art (AFA2F059, its gate list) and
+`actions` (E0988BD3: the Spin Fist catalogue entry only; FCF28AB1 without it).
+area-impact is green after `cast_area_supported` dropped a redundant 0x31
+kind test (68000 binary back under the limit).
 
 Historical Talk Skill closure: CORE_TALK_SKILL.md / `core-talk-skill-check`
 3916 assertions (707B1244), PC = sanitizers = 68000, against 301 original
