@@ -14,8 +14,13 @@ static void emit(u16 origin,u8 target,u8 kind,u8 old,u8 now,u8 jump)
     const u8 *floor=W->surface+((u16)(W->grid_row[z]+x)<<3)+4*node_layer((u8)origin);
     const u8 *middle=W->surface+((u16)(W->grid_row[z+dz]+x+dx)<<3);
     u8 height=(u8)(surface_edge(floor,shift[k])+((floor[1]>>5)<<1));
-    if(!(kind&1)){fprintf(stderr,"non-jump difference\n");exit(2);}
-    printf("%u %u %u %u %u %u %u ",jump,origin,target,old,now,shift[k],height);
+    if(!(kind&1)){printf("walk %u %u %u %u %u\n",jump,origin,target,old,now);return;}   // surface walk/ceiling edges: core-surface
+    // Landing minus exit height (the source's battle_move_propagate_destination test).
+    {s16 dh=(s16)(u8)(W->nav.queue[k^1][target]+(W->blk[target]&14))-(s16)W->nav.queue[k][origin];
+     // Steep panels: battle_move_init_source_panel / battle_move_propagate_destination (return 3).
+     u8 steep=((W->blk[origin]&1)&&W->nav.queue[k][origin]>=W->nav.queue[k^1][origin])||
+              ((W->blk[target]&1)&&W->nav.queue[k][target]>W->nav.queue[k^1][target]);
+     printf("%u %u %u %u %u %u %u %d %u ",jump,origin,target,old,now,shift[k],height,dh,steep);}
     for(i=0;i<8;i++)printf("%02x",middle[i]);putchar('\n');
 }
 int main(int argc,char **argv)

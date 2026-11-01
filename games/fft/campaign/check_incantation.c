@@ -183,7 +183,13 @@ static void node255(void)
     // Reset the engine while the borrowed fixture is still alive.
     prepared();free(f);
 }
+// The 68000 binary leaves casting_trials out (program size; core-casting runs them natively):
+// a PC build with the same define must print exactly what the 68000 part prints.
+#ifdef INCANTATION_NATIVE_SPLIT
+static void incantation_trials(void){paid_success();bindings();interruption();clock_and_support();wave();response_order();node255();}
+#else
 static void incantation_trials(void){casting_trials();paid_success();bindings();interruption();clock_and_support();wave();response_order();node255();}
+#endif
 #ifndef __m68k__
 int main(void){sw_init(61);incantation_trials();printf("incantation %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else

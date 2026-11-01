@@ -53,7 +53,7 @@ static void eligibility(void)
         CHECK(skill_hit(id,id,0x93)>0,1);
     }
     prepared();a=&st.unit[U_RAMZA];a->mp=999;
-    CHECK(can_use(U_RAMZA,0x1e),0);CHECK(abilities[0x1e].kind,255); // Death family remains gated.
+    CHECK(can_use(U_RAMZA,38),0);CHECK(abilities[38].kind,255); // Float (deferred movement) remains gated; Death since CORE_TERMINAL.
     CHECK(skill_cost(U_RAMZA,0x170),0);CHECK(skill_cost(U_RAMZA,0x196),0);
     a->set=8;CHECK(skill_cost(U_RAMZA,0x93),0);a->set=0xe0;CHECK(skill_cost(U_RAMZA,0x93),0);
     a->set=SET_BASIC;a->job=SOURCE_JOB_MIME;a->mp=0;

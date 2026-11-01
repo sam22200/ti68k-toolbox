@@ -63,7 +63,8 @@ static void response_packet(void)
     CHECK(st.effect_kind,AB_HEAL);CHECK(st.action.pending,0);
     // Transport fixture only: healing does not naturally offer Auto-Potion.
     CHECK(core_action_queue(&st.action,10,REACTION_POTION,NUNIT),CTX_OK);end_anim();
-    CHECK(st.primary.running,1);CHECK(st.primary.effect_kind,AB_HEAL);CHECK(st.effect_kind,AB_DAMAGE);
+    // The Potion is prepared at launch (restore_prepare, CORE_RESTORATION): already a heal.
+    CHECK(st.primary.running,1);CHECK(st.primary.effect_kind,AB_HEAL);CHECK(st.effect_kind,AB_HEAL);
     impact();end_anim();CHECK(st.effect_kind,AB_HEAL);CHECK(act_kind(),AB_HEAL);
     CHECK(st.unit[U_RAMZA].mp,0);
 }

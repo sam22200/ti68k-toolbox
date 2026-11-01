@@ -75,7 +75,10 @@ static void ai_formula(void)
         steps=0;while(!ai_think()&&++steps<1024){}CHECK(steps<1024,1);found=0;
         for(k=0;k<W->ai_n;k++)if(W->ai_rank[k].ab==0xf){found=1;rank[level]=W->ai_rank[k].pri;}
         CHECK(found,1);CHECK(st.unit[U_RAMZA].mp,56);CHECK(st.unit[10].hp,999);
-        CHECK(rng32==after,1);
+        // Only the source ranking draw: one rand() per ranked action until one passes its hit
+        // chance (ai_choose); the evaluation itself draws nothing.
+        after=rng32;rng32=seed;for(k=0;k<W->ai_n&&rand15()%100>=W->ai_rank[k].hit;k++){}
+        CHECK(rng32==after,1);rng32=after;
     }
     CHECK(rank[1]>rank[0],1);
 }
