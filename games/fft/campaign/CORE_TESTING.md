@@ -26,7 +26,16 @@ source's landing rule (battle_move_propagate_destination 8/9) and steep-panel
 rule (init_source_panel / propagate_destination 3), and counts walk-edge
 differences separately (core-step/surface): 536 and 544 changed jump edges agree.
 
-Current equipment breaks closure (2026-11-01): `closure.py --all`, 66 suites
+Current equipment steals closure (2026-11-01): `closure.py --all`, 68 suites
+green; `core-steal-equip-check` 4478 (F66BB1DC) joins the standard list. Every
+hash equals the Magic Break closure except `actions` (69BA66A5: five records).
+`make save-test` (outside the closure) checks a stolen item reaching the inventory.
+
+Magic Break closure (2026-11-01): `closure.py --all`, 67 suites green;
+`core-mp-break-check` 790 (C7D8B92A) joins the standard list. Every hash equals
+the equipment breaks closure except `actions` (2B7773A6: Magic Break's record).
+
+Equipment breaks closure (2026-11-01): `closure.py --all`, 66 suites
 green; `core-equip-breaks-check` 3255 (0AF4C46E) joins the standard list. Every
 hash equals the stat breaks closure except `actions` (2ECB73A6: the four new
 records). The opening package's generated `ffcj.89y` must be rebuilt with the

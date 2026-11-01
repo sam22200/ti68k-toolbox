@@ -212,7 +212,8 @@ The enabled set covers the existing encounters: Accumulate, Dash, Throw Stone,
 Heal, Wish, Potion, Antidote, Eye Drop, Echo Grass, Phoenix Down, Stasis Sword,
 Night Sword, Speed Break, Magic Break and Charge +1/+2. `formula.inc` dispatches
 through source formula IDs. The previous Orbonne weapon/stat-break adaptations
-are preserved; this checkpoint does not claim new original-game fidelity for them.
+are preserved; this checkpoint does not claim new original-game fidelity for them
+(the stat breaks and Magic Break later moved to source rules: CORE_BREAKS.md, CORE_MP_BREAK.md).
 Other execution records have `kind=255` and are rejected before use.
 
 Source locations come from local `sources/fft_decomp/target/main.yaml`,

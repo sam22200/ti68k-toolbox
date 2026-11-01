@@ -1,6 +1,24 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-**Current addition — equipment breaks, 2026-11-01:** [CORE_EQUIP_BREAKS.md](CORE_EQUIP_BREAKS.md).
+**Current addition — equipment steals, 2026-11-01:** [CORE_STEAL_EQUIP.md](CORE_STEAL_EQUIP.md).
+Steal Helmet/Armor/Shield/Weapon/Accessory (formula 0x26): the breaks' slot plus
+the accessory (nothing to steal: a forced failure), range 1, physical evasion,
+Steal Exp's (Speed' + zodiac(X))%, Maintenance resists. The item and its
+bonuses leave the target; a player's thief adds it to the campaign inventory
+(99 owned: price / 4 gil). 320 original profiles; `core-steal-equip-check`
+4478 assertions, F66BB1DC. Production: 132 records, 87 casts, 126/201 generic
+entries. `charge_query`'s formula mask saves ~110 resident bytes: headroom 313,
+zone 8148 (NUMBERS). All 68 suites green; only `actions` changes (69BA66A5).
+
+**Historical Magic Break addition — 2026-11-01:** [CORE_MP_BREAK.md](CORE_MP_BREAK.md).
+Magic Break (formula 0x2c) leaves its Orbonne adaptation: weapon reach,
+physical evasion, the stat breaks' (PA' + zodiac(Y))%, then ceil(max MP x 50 /
+100) MP lost, MP clamped at 0; the Knight's set is complete. 74 original
+profiles; `core-mp-break-check` 790 assertions, C7D8B92A. Production
+unchanged at 127 records, 87 casts, 121/201 generic entries. Headroom 251,
+zone 8108. All 67 suites green; only `actions` changes (2B7773A6).
+
+**Historical equipment breaks addition — 2026-11-01:** [CORE_EQUIP_BREAKS.md](CORE_EQUIP_BREAKS.md).
 Head, Armor, Shield and Weapon Break (formula 0x25): the slot by ability id
 (the weapon of the higher required level), weapon reach, physical evasion,
 (PA' + zodiac(WP + Y))%, Maintenance resists; an empty slot becomes the

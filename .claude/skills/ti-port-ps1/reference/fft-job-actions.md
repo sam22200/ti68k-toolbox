@@ -8,6 +8,12 @@ with this requested model in `games/fft/RE_NOTES.md`.
 
 ## Delivery rule and current coverage (2026-10-30)
 
+CORE_STEAL_EQUIP.md adds the Thief's five equipment steals (formula 0x26; 132 records,
+126/201 generic entries): the item reaches the campaign inventory.
+
+CORE_MP_BREAK.md moves Magic Break (formula 0x2c) to source rules: the stat breaks' hit,
+ceil(max MP x 50 / 100) MP lost; the Knight's set is complete (127 records, 121/201).
+
 CORE_EQUIP_BREAKS.md adds Head/Armor/Shield/Weapon Break (formula 0x25; 127 records,
 121/201 generic entries): the Knight's set is complete but Magic Break's adaptation.
 
