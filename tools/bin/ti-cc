@@ -14,4 +14,6 @@ EG="$T/extgraph/lib"
 OPT="-ffunction-sections -fdata-sections -fomit-frame-pointer -mregparm=5 -mno-bss -DCOMPRESSED_FORMAT_RELOCS
      --optimize-code --cut-ranges --reorder-sections --remove-unused --merge-constants"
 [ -n "$TI_CC_PLAIN" ] && OPT=
-exec tigcc -Os -Wall -W $OPT -I"$EG" "$@" "$EG/extgraph.a"
+# tigcc writes its .s/.o next to each source (runtime/core/rt_core.o, lib/unpack68k.o):
+# concurrent builds would overwrite each other's intermediates, so builds take turns.
+exec flock "${TMPDIR:-/tmp}/ti-cc-$(id -u).lock" tigcc -Os -Wall -W $OPT -I"$EG" "$@" "$EG/extgraph.a"
