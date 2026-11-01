@@ -8,6 +8,9 @@ with this requested model in `games/fft/RE_NOTES.md`.
 
 ## Delivery rule and current coverage (2026-10-30)
 
+CORE_EQUIP_BREAKS.md adds Head/Armor/Shield/Weapon Break (formula 0x25; 127 records,
+121/201 generic entries): the Knight's set is complete but Magic Break's adaptation.
+
 CORE_BREAKS.md adds the Knight's Speed/Power/Mind Break (formula 0x2b, source rules;
 123 records, 117/201 generic entries); Magic Break keeps its Orbonne adaptation.
 

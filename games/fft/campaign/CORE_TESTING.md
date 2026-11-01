@@ -26,7 +26,14 @@ source's landing rule (battle_move_propagate_destination 8/9) and steep-panel
 rule (init_source_panel / propagate_destination 3), and counts walk-edge
 differences separately (core-step/surface): 536 and 544 changed jump edges agree.
 
-Current stat breaks + chapter-loading closure (2026-11-01): `closure.py --all`,
+Current equipment breaks closure (2026-11-01): `closure.py --all`, 66 suites
+green; `core-equip-breaks-check` 3255 (0AF4C46E) joins the standard list. Every
+hash equals the stat breaks closure except `actions` (2ECB73A6: the four new
+records). The opening package's generated `ffcj.89y` must be rebuilt with the
+catalogue (`make -C ../opening data/ffcj.89y`): `cell` loads it and the
+validator now requires the item levels.
+
+Historical stat breaks + chapter-loading closure (2026-11-01): `closure.py --all`,
 65 suites green in 471 s; `core-breaks-check` 2016 (AE26B19D) joins the standard
 list. Every hash equals the Steal Exp closure except `actions` (F091239D: the
 two new break records and Speed Break's source record). banks/headroom/cell

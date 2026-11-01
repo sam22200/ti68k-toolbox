@@ -1,6 +1,19 @@
 # Core roadmap: current state and content-production gate
 
-**Current addition — stat breaks, 2026-11-01:** [CORE_BREAKS.md](CORE_BREAKS.md).
+**Current addition — equipment breaks, 2026-11-01:** [CORE_EQUIP_BREAKS.md](CORE_EQUIP_BREAKS.md).
+Head, Armor, Shield and Weapon Break (formula 0x25): the slot by ability id
+(the weapon of the higher required level), weapon reach, physical evasion,
+(PA' + zodiac(WP + Y))%, Maintenance resists; an empty slot becomes the
+ordinary Attack. The item and its bonuses are lost (a lost weapon ends its
+Charge). 228 original profiles; `core-equip-breaks-check` 3255 assertions,
+0AF4C46E. Production: 127 records, 87 casts, 121/201 generic entries. Room:
+the resident sends formulas 0x25..0x2b to FORMULA, so the AI/ACTION evaluator
+copies drop the breaks, Steal Exp and ACTION's hit evaluation (ACTION 8162 ->
+7314); `skill_range` moves from COMMAND to TARGETS. Zone 8108 (AI), headroom
+255. FCJ carries the items' required levels. All 66 suites green; only
+`actions` changes (2ECB73A6).
+
+**Historical stat breaks addition — 2026-11-01:** [CORE_BREAKS.md](CORE_BREAKS.md).
 Speed, Power and Mind Break (formula 0x2b): weapon reach, physical evasion,
 then (PA' + zodiac(Y))%; the stat (by ability id) loses X, at least 1. Speed
 Break leaves its Orbonne adaptation; Magic Break (0x2c) keeps its own. Martial
