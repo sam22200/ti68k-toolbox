@@ -26,7 +26,7 @@ static u8 magic_hit(u8 a,u8 t,AbId ab,u8 execute)
     if(magic_reflects(t,ab))return 0;
     if(abilities[ab].formula==0x2a&&(core_status_current(&u->statuses,4)&0x10))return 0;   // Talk: a sleeper never listens, no draw
     if(abilities[ab].formula==0x31)return execute?roll_hit(a,t):hit_chance(a,t);       // Spin Fist: Attack's physical evasion
-    if(abilities[ab].formula==12)return execute?1:100;
+    if(abilities[ab].formula==12||guts_formula(abilities[ab].formula))return execute?1:100;   // Guts always hits
     if(!(abilities[ab].flags&AF_EVADE)||(abilities[ab].formula==14&&(core_status_current(&u->statuses,0)&16)))return magic_accuracy(a,t,ab,execute?1:100,execute);
     for(k=0;k<3;k++){
         id=u->eq[k==0?EQ_ACC:k==1?EQ_WEAPON:EQ_SHIELD];tag=id==255?0:items[id].pad;

@@ -90,7 +90,7 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
     // Quick; Golem (a marker, its pool is the target's max HP at commit); Foxbird's Brave loss
     if(!query&&(b->formula==18||b->formula==20||b->formula==97))return b->formula==18?255:b->formula==20?1:b->y;
     // Talk: Persuade's CT 0 (high byte keeps it non-zero); Brave/Faith carry a signed loss.
-    if(!query&&b->formula==0x2a&&b->kind!=AB_STATUS)return b->kind==AB_QUICK?0x100:(u16)(s16)(s8)b->y;
+    if(!query&&speech_formula(b->formula)&&b->kind!=AB_STATUS)return b->kind==AB_QUICK?0x100:(u16)(s16)(s8)b->y;
     if(!query&&b->formula==14)return restore_cap(st.unit[t].max_hp);
     if(!query&&(magic_status_formula(b->formula)||b->kind==AB_CLEANSE))return magic_status_value(t,ab);
     ua=&st.unit[a];ut=&st.unit[t];

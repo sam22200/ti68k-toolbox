@@ -20,6 +20,7 @@ GOLEM=(65,)
 PUNCH=(105,106,107)
 STRIKES=(101,102)
 SPIN=(100,)
+GUTS=(150,151,153)
 TALK=(117,118,119,120,121,122,124,125)
 HEALING=(1,2,3,4,5,6,60,72)
 BUFFS=(8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71)
@@ -37,7 +38,7 @@ def catalogue_report():
         n=norm(a)
         if n[0]!=255 and(n[10]in range(8,17)or n[10]==18):assert n[4]&128,(a,n)
     actual=tuple(a for a in range(512)if norm(a)[4]&128)
-    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN)),actual
+    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS)),actual
     # Reject unsupported behavior as a family; adding an id must not bypass it.
     base=raw(SPELLS[0])
     for offset,bit in ((3,32),(4,2),(4,4),(4,8),(5,16),(5,4),(6,32),(9,1),(11,1)):

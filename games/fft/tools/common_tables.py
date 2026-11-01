@@ -163,6 +163,14 @@ def talk_record(d,a,r):
     return kind,y,r[0],2*r[2],128|32|1
 
 
+def guts_record(r):
+    """Guts 0x39 Yell (Speed), 0x3a Cheer Up (Brave), 0x3b Scream (Brave X, PA/MA/Speed Y):
+    immediate casts that always hit. Y is a signed loss like Praise; Scream's stat Y is in element."""
+    if r[8]not in(0x39,0x3a,0x3b)or r[1]or r[4]!=0x10 or r[5]!=0x10 or r[6]or r[7]or r[11]or r[3]&~2:return None
+    if r[8]==0x3b:return 18,(256-r[9])&255,r[0],255,128|32|1,r[10]
+    return (21 if r[8]==0x39 else 18),(256-r[10])&255,r[0],255,128|32|1,0
+
+
 def percent_magic_record(r):
     """Retail percent HP and single-panel HP/MP drains, with separate caster packets."""
     if r[8]not in(9,15,16)or r[9]==0 or r[11]or r[3]&~9 or r[4]&~0xe1 or r[5]&~0xe2 or r[6]&~0x42:return None
@@ -208,6 +216,8 @@ def battle_records(d):
         strike = strike_record(art) if art else None
         speech = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x74<=a<=0x7d else None
         talk = talk_record(d,a,speech) if speech else None
+        # Guts (0x96..0x99) is read beyond the magic interval too.
+        guts = guts_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x96<=a<=0x99 else None
         if a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
@@ -257,6 +267,8 @@ def battle_records(d):
             kind,y,rng,vert,flags=punch;formula=art[8]
         elif strike:
             kind,y,rng,vert,flags=strike;formula=art[8]
+        elif guts:
+            kind,y,rng,vert,flags,element=guts;formula=d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif talk:
             kind,y,rng,vert,flags=talk;formula=speech[8]
         elif percent:

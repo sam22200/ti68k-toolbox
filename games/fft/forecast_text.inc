@@ -13,7 +13,7 @@ u8 forecast_text(u8 a, u8 t, AbId ab, char *s)
     u8 kind=b&&(magic_formula(b->formula)||restore_ability(ab))?skill_kind(a,t,ab):b?b->kind:AB_DAMAGE;
     if(kind==AB_NULL||(b&&restore_ability(ab)&&!hit)||(b&&magic_formula(b->formula)&&!magic_applicable(t,ab)))n=put_s(s,n,"Miss");
     else if(kind==AB_QUICK||kind==AB_GOLEM)n=put_s(s,n,kind==AB_GOLEM?"Golem":abilities[ab].formula==0x2a?"CT 0":"Quick");
-    else if(kind==AB_BRAVE||kind==AB_FAITH){s8 v=(s8)abilities[ab].y;n=put_s(s,n,kind==AB_BRAVE?"Br":"Fa");s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));}
+    else if(kind==AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 v=(s8)abilities[ab].y;n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));}
     else if(kind==AB_STATUS||kind==AB_CLEANSE)n=put_s(s,n,hit?"Status":"Miss");
     else if(kind==AB_MP_DAMAGE){n=put_s(s,n,"-");n=put_n(s,n,skill_amount(a,t,ab,0));n=put_s(s,n,"MP");}
     else if(kind==AB_MP_HEAL){

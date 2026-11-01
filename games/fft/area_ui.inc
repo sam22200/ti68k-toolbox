@@ -21,7 +21,7 @@ static void area_line(u8 t,char *s)
     u8 n=0,kind=v->effect&EFFECT_KIND_MASK,harm=effect_damage(kind);u16 amount=v->amount;
     if(!v->hit||kind==AB_NULL)n=put_s(s,n,"Miss");
     else if(kind==AB_QUICK||kind==AB_GOLEM)n=put_s(s,n,kind==AB_GOLEM?"Golem":amount>>8?"CT 0":"Quick");
-    else if(kind==AB_BRAVE||kind==AB_FAITH){s8 v=(s8)amount;n=put_s(s,n,kind==AB_BRAVE?"Br":"Fa");s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));}
+    else if(kind==AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 v=(s8)amount;n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));}
     else if(kind==AB_STATUS||kind==AB_CLEANSE)n=put_s(s,n,"Status");
     else if(kind==AB_MP_DAMAGE||kind==AB_MP_HEAL){s[n++]=kind==AB_MP_DAMAGE?'-':'+';n=put_n(s,n,amount);n=put_s(s,n,"MP");}
     else{

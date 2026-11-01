@@ -48,7 +48,7 @@ static void number_single(void)
         else if (kind == AB_HP_MP_HEAL) n=put_s(s,0,"+HP/MP");
         else if (kind == AB_HP_DAMAGE_MP_HEAL) n=put_s(s,0,"-HP+MP");
         else if (kind == AB_MP_DAMAGE||kind==AB_MP_HEAL){s[n++]=kind==AB_MP_HEAL?'+':'-';n=put_n(s,n,st.dmg);n=put_s(s,n,"MP");}
-        else if (kind == AB_BRAVE||kind==AB_FAITH){s8 v=(s8)st.dmg;s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));n=put_s(s,n,kind==AB_BRAVE?"Br":"Fa");}
+        else if (kind == AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 v=(s8)st.dmg;s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");}
 #endif
         else if (kind == AB_DEFEND) n = put_s(s, 0, st_names[0]);
         else if (kind == AB_CURE) {                // the first status removed
@@ -88,7 +88,7 @@ static u8 area_number_prepare(void)
         else if(kind==AB_STATUS)n=put_s(s,0,status_label(v->amount));
         else if(kind==AB_CLEANSE)n=put_s(s,0,"Cured");
         else if(kind==AB_MP_DAMAGE||kind==AB_MP_HEAL){s[n++]=kind==AB_MP_HEAL?'+':'-';n=put_n(s,n,v->amount);n=put_s(s,n,"MP");}
-        else if(kind==AB_BRAVE||kind==AB_FAITH){s8 w=(s8)v->amount;s[n++]=w<0?'+':'-';n=put_n(s,n,(u16)(w<0?-w:w));n=put_s(s,n,kind==AB_BRAVE?"Br":"Fa");}
+        else if(kind==AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 w=(s8)v->amount;s[n++]=w<0?'+':'-';n=put_n(s,n,(u16)(w<0?-w:w));n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");}
         else{
             amount=v->amount;heal=kind==AB_HEAL;
             if((s16)amount<0){heal=!heal;amount=(u16)(0U-amount);}

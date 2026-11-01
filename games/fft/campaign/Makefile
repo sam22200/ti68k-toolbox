@@ -558,3 +558,8 @@ core-headroom-check: $(TI_FILES) $(OPENING_BANKS)
 
 core-area-ct-check: $(TI_FILES) $(OPENING_BANKS)
 	$(PY) check_area_ct.py
+.PHONY: core-guts-check
+x/core-guts/oracle/source.h: ../tools/guts_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/guts_oracle.py
+core-guts-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-guts/oracle/source.h
+	$(PY) check_guts.py
