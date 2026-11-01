@@ -1,5 +1,8 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+**Next agent: start with "Adding an action family" below** (recipe, measuring tools, pitfalls),
+then the current addition; the remaining families are listed there.
+
 **Current addition — equipment steals, 2026-11-01:** [CORE_STEAL_EQUIP.md](CORE_STEAL_EQUIP.md).
 Steal Helmet/Armor/Shield/Weapon/Accessory (formula 0x26): the breaks' slot plus
 the accessory (nothing to steal: a forced failure), range 1, physical evasion,
@@ -1059,6 +1062,57 @@ preserves those pixels. An isolated Titanium AMS 3.10 run of the archived group 
 Gariland through `fftstory(99)`; see `x/id-migration/tiemu/handoff-ready.png`.
 The first launch command was missed during transfer; retry after confirmed HOME
 readiness passed. The user's live emulator was untouched. No public push.
+
+## Adding an action family (recipe, 2026-11-01)
+
+Remaining disabled generic entries (75/201, `coverage.json` of the last check, grouped by
+formula): Gil Taking (0x27), Steal Heart (0x29), Earth Slash (0x31), Secret Fist (0x50),
+Float (0x0b), Invitation/Negotiate (0x2a), Draw Out (0x20..0x23, 10), Songs/Dances
+(0x1c/0x1d, 14), Geomancy (0x24, 12), and the special dispatch: Throw (12), Jump (12,
+deferred by the user), Arithmeticks (8). Recent examples to copy: CORE_STEAL_EQUIP.md,
+CORE_MP_BREAK.md, CORE_EQUIP_BREAKS.md.
+
+1. **Source rules**: read the formula and its helpers in `sources/fft_decomp/src/battle/`
+   (a clone of github.com/adamrt/fft_decomp; `target/battle.yaml` lists the formulas by
+   address). Dump the records: `surface_data.battle.Disc(...).at(ABILITY_RANGE+14*id,14)`.
+2. **Record**: a `*_record(r)` in `tools/common_tables.py` that accepts only the exact bytes
+   seen, a branch in `battle_records` keeping the source formula id; a new kind in `fft.h`'s
+   AB_ enum if no existing one fits. Rebuild `campaign/data/ffcj.89y` **and**
+   `make -C ../opening data/ffcj.89y` (`cell` loads the opening's copy).
+3. **Engine**: COMMAND (`command.inc`: rolls, `st.hit`/`st.dmg`), the evaluator (`formula.inc`:
+   forecast hit/amount; `formula_call` in `fft.c` routes 0x25..0x2c to FORMULA), ACTION's
+   commit (`action_resolve.inc`), numbers (`numbers.inc`) and forecast (`forecast_text.inc`).
+   New physical percents usually reuse `charge_query` -> `punch_strike` (its formula mask).
+   The scalar AI rejects new kinds in `ai_score` unless the family is scored.
+4. **Oracle**: `tools/<family>_oracle.py`, copied from the nearest one (`steal_equip_oracle.py`):
+   runs the original formula + finalizer under unicorn on profiles, writes
+   `campaign/x/core-<family>/oracle/source.h` (gitignored, rebuilt by make).
+5. **Native test**: `campaign/check_<family>.c` (profiles vs the oracle, a production action,
+   forecast, reach, Silence/Frog gates, AI policy) and `check_<family>.py` (copy
+   `check_steal_equip.py`). The label passed to `trial()` must equal the one the C prints.
+   Makefile target `core-<family>-check`; add the suite name to `SUITES` in `closure.py`.
+6. **Room**: `tools/headroom.sh` (after rebuilding the banks) prints the TTPack input, the
+   headroom and the zone; `tools/resident_sizes.sh before.txt` / `after.txt` and a diff show
+   which resident functions grew. `module.py`'s output line lists the 17 image sizes
+   (order: AI TURN SCREENS BEATS SAVE FORMULA AI_SETUP RESULTS PARTY ACTION COMMAND RESPONSE
+   TARGETS AREA_AI AREA_UI NUMBERS ORDER); the zone is the largest.
+7. **Verify**: `make core-<family>-check` (PC = sanitizers = 68000), then
+   `python closure.py --all -j 12` (68 suites, ~8 min): only `actions` should change.
+8. **Docs**: `CORE_<FAMILY>.md` (source behavior, implementation, room, not modelled,
+   evidence), the "Current addition" block of README/ENGINE/HANDOVER/CORE_ROADMAP/CORE_AUDIT
+   (the previous one becomes "Historical"), `CORE_TESTING.md`,
+   `.claude/skills/ti-port-ps1/reference/fft-job-actions.md`.
+
+Pitfalls met:
+- Module images have no `memcpy` (no array initialisers in module code) and no 32-bit
+  division (`__udivsi3`): keep module arithmetic 16-bit when the range allows.
+- Keep about 250 bytes of production headroom: some 68000 test binaries (area-impact) are
+  larger than production and overflow first.
+- A module cannot call another one; code needed by two images is compiled into both, or
+  stays resident, or the result travels through `ModCtx`/`st`.
+- tigcc cuts `-o` at the first dot of the whole path (a `tmp.XXXX` directory sends the
+  binary to `/tmp/tmp.89z`).
+- `ti-cycles` does not emulate AMS `strcmp`: compare strings by hand in 68000 tests.
 
 ## Where we want to go
 
