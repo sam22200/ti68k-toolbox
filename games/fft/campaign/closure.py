@@ -23,7 +23,7 @@ CACHE=HERE/'x/closure-cache'
 SUITES=('guts punch-strikes punch-art talk-skill area-impact area-ui area-forecast targets batch knockback '
         'headroom protect control-status status-lifetime sleep terminal scheduler actions ai-pause reactions '
         'banks area-ai restoration cleanse control incapacity area-ct buffs charge-hands hands healing '
-        'offensive-magic percent reflect status-state strikes surface steal-exp breaks equip-breaks').split()
+        'offensive-magic percent reflect status-state strikes surface steal-exp breaks equip-breaks mp-break steal-equip').split()
 # Older family suites outside the usual closure: run with --all after a core-wide change.
 # All 63 suites are green since 2026-11-01 (five stale expectations repaired, CORE_TESTING.md).
 EXTRA=('affinity boundaries capacity-render casting cell compact context deferred elements full-grid grid '

@@ -121,6 +121,15 @@ bag:
         u8 *n = &save.inv[items[st.found[k]].id];
         if (*n < 99) ++*n;
     }
+    for (k = 0; k < st.nstolen; k++) {      // steals: at 99 owned (worn included), price / 4 gil
+        u8 item = items[st.stolen[k]].id, j, e; u16 count = save.inv[item];
+        for (j = 0; j < save.n; j++) for (e = 0; e < EQ_N; e++) if (save.unit[j].eq[e] == item) count++;
+        if (count < 99) save.inv[item]++;
+        else if (flow_bank) {
+            u32 m = qlong(save.money) + (qword(qpart(flow_bank, Q_PRICES) + 2 * item) >> 2);
+            qput(save.money, m > 99999999UL ? 99999999UL : m);
+        }
+    }
 }
 
 static void save_campaign(void)

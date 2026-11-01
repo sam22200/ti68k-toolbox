@@ -24,16 +24,16 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
         (!magic_status_formula(b->formula)||magic_heal(a,t,ab,0))?magic_hit(a,t,ab,0):0;
 #endif
 #if !defined(FFT_MODULE) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_NUMBERS)   // forecasts only
-    if (b->formula == 0x25) {           // equipment: nothing to break, the Attack's; Maintenance: 0
-        u16 c, h = hit_chance(a, t);
-        if (equip_break_slot(ut, ab) == 255) return (u8)h;
+    if ((u8)(b->formula - 0x25) <= 1) { // equipment: nothing to break, the Attack's (nothing to
+        u16 c, h = hit_chance(a, t);     // steal: 0); Maintenance: 0
+        if (equip_break_slot(ut, ab) == 255) return b->formula == 0x25 ? (u8)h : 0;
         if (st.support[t] == SUPPORT_MAINTENANCE) return 0;
         c = equip_break_percent(a, t, ab);
         return (u8)(c >= 100 ? h : h * c / 100);
     }
 #endif
 #if !defined(FFT_MODULE) || !MOD_PART(MOD_AI)    // the AI rejects them first (ai_score)
-    if (b->formula == 0x28 || b->formula == 0x2b) {   // Steal Exp, stat breaks: evasion x the percent;
+    if (b->formula == 0x28 || (u8)(b->formula - 0x2b) <= 1) {   // Steal Exp, breaks: evasion x the percent;
         u16 c = charge_query(a, t, ab, 0, 0), h = hit_chance(a, t);   // nothing left to steal: no hit
         return b->formula == 0x28 && !skill_amount(a, t, ab, 0) ? 0 : (u8)(c >= 100 ? h : h * c / 100);
     }
@@ -73,8 +73,10 @@ u16 skill_amount(u8 a, u8 t, AbId ab, u16 r)
         k = ua->sp + b->y; if (k > 100) k = 100;
         return k < st.unit[t].exp ? k : st.unit[t].exp;
     }
+    if (b->formula == 0x2C)             // Magic Break: ceil(max MP x Y / 100); 999 x 50 fits a u16
+        return (u16)((u16)(st.unit[t].max_mp * b->element + 99) / 100);
 #endif
-    if (b->formula == 0x36 || b->formula == 0x2B || b->formula == 0x2C) return b->y;
+    if (b->formula == 0x36 || b->formula == 0x2B) return b->y;
     if (b->formula == 0x2D || b->formula == 0x30 || (b->formula == 1 && b->flags & AF_CHARGE)) {
         u8 weapon=hand_weapon(ua,0);
         const Item *w = weapon == 255 ? RT_NULL : &items[weapon];

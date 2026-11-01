@@ -90,8 +90,15 @@ static u8 action_commit(void)
     if (kind == AB_STEAL_EXP) { steal_exp(st.atk,ut,(u8)st.dmg); action_rewards(0); return 0; }
     // Equipment breaks: the item and its bonuses lost; 1: the order again (a Speed bonus).
     if (kind == AB_EQUIP_BREAK) { equip_loss(); action_rewards(0); return 1; }
+    if (kind == AB_STEAL_EQUIP) {   // the player's thief keeps it (save.inc); then as a break
+        u8 s = (u8)st.dmg;
+        if (s < EQ_N && ut->eq[s] != 255 && st.unit[st.atk].team == TEAM_PLAYER && st.nstolen < NUNIT)
+            st.stolen[st.nstolen++] = ut->eq[s];
+        equip_loss(); action_rewards(0); return 1;
+    }
     if (kind == AB_BREAK) {
-        // Source stat by ability id (0x2b); Magic Break's Orbonne adaptation lowers MA.
+        // Source stat by ability id (0x2b); Magic Break (0x2c): the MP lost, at least 0.
+        if (st.abil == 0x8e) { ut->mp = ut->mp > st.dmg ? ut->mp - st.dmg : 0; action_rewards(0); return 0; }
         u8 *v = st.abil == 0x90 ? &ut->pa : st.abil == 0x8f ? &ut->sp : &ut->ma;
         *v = *v > abilities[st.abil].y ? *v - abilities[st.abil].y : 1;
         action_rewards(0); return 0;

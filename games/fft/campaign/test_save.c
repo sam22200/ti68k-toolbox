@@ -80,8 +80,10 @@ int main(void)
     sw_init(61);assert(sw_step(0));
     st.unit[1].hp=0;st.unit[1].dc=DC_CHEST;
     pick_up(U_RAMZA,1);id=items[st.pick].id;assert(st.nfound==1);
+    st.stolen[st.nstolen++]=0xD1;               // a stolen accessory (CORE_STEAL_EQUIP): the inventory
     st.mode=M_BROWSE;
     save_campaign();assert(rt_load(SAVE_NAME,&s,sizeof s)&&!memcmp(s.magic,SAVE_MAGIC,4));
+    assert(s.inv[items[0xD1].id]==(id==items[0xD1].id?2:1));
     before=0;for(i=0;i<NBAG;i++)if(cdesc[CD(BAG_ITEM)+i]==id)before=st.bag[BAG_SLOT(i)];
     assert(s.inv[id]==before+1);
     assert(s.flags[0]==2&&s.n==5);              // Gariland's flag; Ramza and four recruits

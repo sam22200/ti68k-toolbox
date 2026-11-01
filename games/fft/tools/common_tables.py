@@ -177,10 +177,19 @@ def steal_exp_record(r):
     return 22,r[10],r[0],2*r[2],2
 
 
+def steal_equip_record(r):
+    """Equipment steals 0x26 (Steal Helmet/Armor/Shield/Weapon/Accessory): the slot as the breaks'
+    (plus the accessory; nothing to steal fails), physical evasion, then (SP'+X)% as Steal Exp,
+    Maintenance resists; the item goes to the player's inventory (CORE_STEAL_EQUIP)."""
+    if r[8]!=0x26 or r[1] or r[2]>1 or r[3]!=9 or r[4]&~0x51 or r[5] or r[6]!=0x12 or r[7] or r[10] or r[11]:return None
+    return 24,0,r[0],2*r[2],2
+
+
 def break_record(r):
     """Stat breaks 0x2b (Speed/Power/Mind Break): weapon range, physical evasion, then (PA'+Y)%;
-    the stat (by ability id) loses X, at least 1. X is the record's Y, the source Y its element."""
-    if r[8]!=0x2b or r[0]or r[1]or r[2]or r[3]!=0x20 or r[4]!=0x10 or r[5]or r[6]!=0x12 or r[7]or r[11]:return None
+    the stat (by ability id) loses X, at least 1. X is the record's Y, the source Y its element.
+    Magic Break 0x2c: the same hit, then MP loses ceil(max MP x Y / 100) (CORE_MP_BREAK)."""
+    if r[8]not in(0x2b,0x2c)or r[0]or r[1]or r[2]or r[3]!=0x20 or r[4]!=0x10 or r[5]or r[6]!=0x12 or r[7]or r[11]:return None
     return 7,r[9],0,255,2
 
 
@@ -201,7 +210,7 @@ def percent_magic_record(r):
 def battle_records(d):
     """Shared native execution records. Unverified families remain explicitly disabled.
 
-    Existing Orbonne adaptations (weapon skills, stat breaks) remain deliberate;
+    Existing Orbonne adaptations (weapon skills) remain deliberate;
     their actual formula ids are retained for the module's dispatch.
     """
     # kind, Y, range, vertical, flags (fft.h); byte 10 is FFT's formula id.
@@ -209,7 +218,6 @@ def battle_records(d):
         0x92: (6, 1, 0, 0, 1), 0x93: (0, 4, 1, 2, 0), 0x94: (0, 2, 4, 255, 2),
         0x98: (2, 0, 1, 6, 0), 0x9B: (0, 2, 2, 255, 8 | 32),
         0xA5: (0, 0, 3, 255, 8 | 16),
-        0x8E: (7, 3, 1, 6, 2),
     }
     symbols = dict(AB_DAMAGE=0, AB_CURE=1, AB_WISH=2, AB_HEAL=3, AB_REVIVE=4,
                    ST_DEFEND=1, ST_POISON=2, ST_DARK=4, ST_SILENCE=8,
@@ -239,7 +247,8 @@ def battle_records(d):
         # Guts (0x96..0x99) is read beyond the magic interval too.
         guts = guts_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x96<=a<=0x99 else None
         steal = steal_exp_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if a==0x73 else None
-        stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8f<=a<=0x91 else None
+        stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8e<=a<=0x91 else None
+        gear_steal = steal_equip_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x6e<=a<=0x72 else None
         gear_break = equip_break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8a<=a<=0x8d else None
         if a in adapted:
             kind, y, rng, vert, flags = adapted[a]
@@ -293,7 +302,9 @@ def battle_records(d):
         elif gear_break:
             kind,y,rng,vert,flags=gear_break;formula=0x25;element=y   # Y, the hit percent's addend
         elif stat_break:
-            kind,y,rng,vert,flags=stat_break;formula=0x2b;element=d.at(battle.ABILITY_RANGE + 14*a, 14)[10]   # Y
+            kind,y,rng,vert,flags=stat_break;formula,element=d.at(battle.ABILITY_RANGE + 14*a, 14)[8:11:2]   # Y
+        elif gear_steal:
+            kind,y,rng,vert,flags=gear_steal;formula,element=0x26,d.at(battle.ABILITY_RANGE + 14*a, 14)[9]   # X
         elif steal:
             kind,y,rng,vert,flags=steal;formula=0x28;element=d.at(battle.ABILITY_RANGE + 14*a, 14)[9]   # X
         elif guts:

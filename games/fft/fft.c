@@ -2138,7 +2138,7 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
     // zodiac(X) (X in the record's element byte), the Repeating Fist sum with a multiplier of 1.
     // Stat breaks 0x2b (CORE_BREAKS): PA and Y (element byte) the same way. Both apply Martial
     // Arts bare-handed only.
-    if(b->formula==0x28)xa=ua->sp;
+    if(b->formula==0x28||b->formula==0x26)xa=ua->sp;
     // Equipment breaks 0x25: Y + the attacker's WP, which the caller passes as r (X = 0: a
     // multiplier of 1 below; Steal Exp and stat breaks pass 0).
     if(b->formula<0x31)ya=b->element+r;
@@ -2157,8 +2157,8 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
 }
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
 {
-    u8 f=abilities[ab].formula;
-    if((u8)(f-0x31)<=1||f==0x28||f==0x2b||f==0x25)return punch_strike(a,t,ab,roll);
+    u8 f=(u8)(abilities[ab].formula-0x25);  // 0x25/26 equipment, 0x28 Steal Exp, 0x2b/2c breaks, 0x31/32
+    if(f<=13&&(0x30CBU>>f)&1)return punch_strike(a,t,ab,roll);
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }
@@ -2921,7 +2921,7 @@ static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
 #endif
 #ifdef FFT_CHAPTER
     // Conservative guest/enemy action policy, before any evaluation (no copy in the AI image).
-    if (kind == AB_BREAK||kind==AB_STEAL_EXP||kind==AB_EQUIP_BREAK) return AI_BAD;
+    if (kind == AB_BREAK||kind==AB_STEAL_EXP||kind==AB_EQUIP_BREAK||kind==AB_STEAL_EQUIP) return AI_BAD;
 #endif
     *hit = ab == NO_ABIL ? hit_chance(a, t) : skill_hit(a, t, ab);
     if (!*hit) return AI_BAD;
@@ -3513,12 +3513,12 @@ void battle_units(void) { mod_call(MOD_PARTY, 2, 0); }
 static void fixed_units(void) { mod_call(MOD_PARTY, 4, 0); }
 // Keep a resident AI overlay resident: it already contains the identical evaluator.
 // Otherwise load the much smaller formula image. No hot AI/formula copy ping-pong.
-// Formulas 0x25..0x2b (breaks, steals, Talk) always use FORMULA: the AI/ACTION copies leave the
+// Formulas 0x25..0x2c (breaks, steals, Talk) always use FORMULA: the AI/ACTION copies leave the
 // breaks and Steal Exp out (the AI rejects them first; ACTION never evaluates them).
 static u16 __attribute__((noinline)) formula_call(u8 op)
 {
     u16 ab=st.formula.ability;u8 id=mod_id;
-    if(ab<512&&(u8)(abilities[ab].formula-0x25)<=6)id=0;
+    if(ab<512&&(u8)(abilities[ab].formula-0x25)<=7)id=0;
     if(id==MOD_ACTION+1&&op)op+=8;          // ACTION's copy: the amount only
     else if(id==MOD_AI+1)op+=2;
     else id=MOD_FORMULA+1;
@@ -4724,7 +4724,7 @@ static void aim(AbId ab)
 #ifdef FFT_CHAPTER
     if(ab<512&&cast_area_supported(&abilities[ab],cj_range(common,ab))&&!st.ai)st.mode=M_CAST_RANGE;
 #endif
-    if (ab == NO_ABIL || abilities[ab].formula == 0x2b || abilities[ab].formula == 0x25)
+    if (ab == NO_ABIL || (u8)(abilities[ab].formula - 0x2b) <= 1 || abilities[ab].formula == 0x25)
         attack_range(st.act);                                                     // breaks: weapon range
     else skill_range(st.act, ab);
     if (W) W->win_k[0] = 0;                        // the preview: for this ability

@@ -68,7 +68,7 @@ typedef struct {
 // tiles at most `range` steps away (any path), within `vert` half units of the user's height
 // (0xFF: any); AF_SELF: the user's own tile too, AF_EVADE: evaded as an attack, AF_ITEM: from
 // the bag (slot `bag`; the enemies' items do not run out, those of their level `lv` or less).
-enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND, AB_RAISE, AB_BREAK, AB_NULL, AB_REFLECT, AB_STATUS, AB_MP_DAMAGE, AB_MP_HEAL, AB_CLEANSE, AB_HP_MP_HEAL, AB_HP_DAMAGE_MP_HEAL, AB_DEATH, AB_QUICK, AB_BRAVE, AB_GOLEM, AB_FAITH, AB_SPEED, AB_STEAL_EXP, AB_EQUIP_BREAK }; // outcome-only markers
+enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND, AB_RAISE, AB_BREAK, AB_NULL, AB_REFLECT, AB_STATUS, AB_MP_DAMAGE, AB_MP_HEAL, AB_CLEANSE, AB_HP_MP_HEAL, AB_HP_DAMAGE_MP_HEAL, AB_DEATH, AB_QUICK, AB_BRAVE, AB_GOLEM, AB_FAITH, AB_SPEED, AB_STEAL_EXP, AB_EQUIP_BREAK, AB_STEAL_EQUIP }; // outcome-only markers
 enum { AF_SELF = 1, AF_EVADE = 2, AF_ITEM = 4, AF_WEAPON = 8, AF_DRAIN = 16, AF_AREA = 32, AF_CHARGE = 64, AF_CAST=128 };
 #define FORMULA_FORECAST 0x8000U        // Charge query: both hands, potential successful hits
 enum { ST_DEFEND = 1, ST_POISON = 2, ST_DARK = 4, ST_SILENCE = 8 };   // Dead: 0 HP
@@ -494,7 +494,8 @@ typedef struct {
     u8 open_stage, open_beat, open_clock, open_white;
     u16 open_reveal, open_offset, open_seen;
     u8 open_pan, open_fade, open_next, open_handoff;
-    u8 found[UNIT_CAPACITY], nfound;   // the chests' items picked up (items[] index): the campaign's
+    u8 found[UNIT_CAPACITY], nfound;
+    u8 stolen[UNIT_CAPACITY], nstolen; // equipment the player's units stole (items[] index, save.inc)   // the chests' items picked up (items[] index): the campaign's
     u8 party_in;                       // the player's units came from the campaign save (save.inc)
     u8 reward_ready,reward_page,reward_n,reward_scroll,story_done;
     u8 reward_items[UNIT_CAPACITY];

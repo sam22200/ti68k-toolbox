@@ -26,13 +26,15 @@ static u8 command_effect(u8 a,u8 t,AbId ab)
 #ifdef FFT_CHAPTER
     if(restore_ability(ab)){restore_prepare(t,ab);return 0;}
     if(b->kind==AB_CLEANSE)st.effect_kind=AB_CLEANSE;
-    if(b->formula==0x28||b->formula==0x2b||b->formula==0x25){
+    if(b->formula==0x26&&equip_break_slot(&st.unit[t],ab)==255){st.hit=0;return 0;}   // nothing to steal: forced failure
+    if(b->formula==0x28||(u8)(b->formula-0x2b)<=1||(u8)(b->formula-0x25)<=1){
         // Steal Exp, breaks: physical evasion, then the percent roll (none at 100), then the effect.
         u16 c;st.hit=roll_hit(a,t);if(!st.hit)return 0;
-        c=b->formula==0x25?equip_break_percent(a,t,ab):charge_query(a,t,ab,0,0);
+        c=b->formula<=0x26?equip_break_percent(a,t,ab):charge_query(a,t,ab,0,0);
         if(c<100&&(u16)((u32)rand15()*100>>15)>=c){st.hit=0;return 0;}
         if(b->formula==0x2b){st.dmg=b->y;return 0;}            // a break: the stat loss (commit)
-        if(b->formula==0x25){st.hit=st.support[t]!=SUPPORT_MAINTENANCE;st.dmg=equip_break_slot(&st.unit[t],ab);return 0;}
+        if(b->formula==0x2c){st.dmg=skill_amount(a,t,ab,0);return 0;}   // Magic Break: the MP lost
+        if(b->formula<=0x26){st.hit=st.support[t]!=SUPPORT_MAINTENANCE;st.dmg=equip_break_slot(&st.unit[t],ab);return 0;}
         st.dmg=skill_amount(a,t,ab,0);st.hit=st.dmg!=0;return 0;
     }
     if((u8)(b->formula-0x31)<=1){

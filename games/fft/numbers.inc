@@ -42,14 +42,14 @@ static void number_single(void)
 #ifdef FFT_CHAPTER
         else if (kind == AB_RAISE) n=put_s(s,0,"PA+1");
         else if (kind == AB_STEAL_EXP) { n=put_s(s,0,"EXP-"); n=put_n(s,n,st.dmg); }
-        else if (kind == AB_EQUIP_BREAK) n=put_s(s,0,"Break");
+        else if (kind == AB_EQUIP_BREAK||kind==AB_STEAL_EQUIP) n=put_s(s,0,kind==AB_EQUIP_BREAK?"Break":"Steal");
         else if (kind == AB_BREAK){n=put_s(s,0,st.abil==0x90?"PA-":st.abil==0x8f?"SP-":"MA-");n=put_n(s,n,abilities[st.abil].y);}
         else if (kind == AB_QUICK||kind==AB_GOLEM) n=put_s(s,0,kind==AB_GOLEM?"Golem":st.dmg>>8?"CT 0":"Quick");
         else if (kind == AB_STATUS) n=put_s(s,0,status_label(st.dmg));
         else if (kind == AB_CLEANSE) n=put_s(s,0,"Cured");
         else if (kind == AB_HP_MP_HEAL) n=put_s(s,0,"+HP/MP");
         else if (kind == AB_HP_DAMAGE_MP_HEAL) n=put_s(s,0,"-HP+MP");
-        else if (kind == AB_MP_DAMAGE||kind==AB_MP_HEAL){s[n++]=kind==AB_MP_HEAL?'+':'-';n=put_n(s,n,st.dmg);n=put_s(s,n,"MP");}
+        else if (kind == AB_MP_DAMAGE||kind==AB_MP_HEAL||(kind==AB_BREAK&&st.abil==0x8e)){s[n++]=kind==AB_MP_HEAL?'+':'-';n=put_n(s,n,st.dmg);n=put_s(s,n,"MP");}
         else if (kind == AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 v=(s8)st.dmg;s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");}
 #endif
         else if (kind == AB_DEFEND) n = put_s(s, 0, st_names[0]);

@@ -573,6 +573,16 @@ x/core-breaks/oracle/source.h: ../tools/break_oracle.py ../tools/status_state_or
 	$(PY) ../tools/break_oracle.py
 core-breaks-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-breaks/oracle/source.h
 	$(PY) check_breaks.py
+.PHONY: core-steal-equip-check
+x/core-steal-equip/oracle/source.h: ../tools/steal_equip_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/steal_equip_oracle.py
+core-steal-equip-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-steal-equip/oracle/source.h
+	$(PY) check_steal_equip.py
+.PHONY: core-mp-break-check
+x/core-mp-break/oracle/source.h: ../tools/mp_break_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/mp_break_oracle.py
+core-mp-break-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-mp-break/oracle/source.h
+	$(PY) check_mp_break.py
 .PHONY: core-steal-exp-check
 x/core-steal-exp/oracle/source.h: ../tools/steal_exp_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/steal_exp_oracle.py
