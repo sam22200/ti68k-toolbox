@@ -1,6 +1,17 @@
 # Opening -> Academy -> Gariland
 
-**Current addition — module rebalance, 2026-11-01:** Guts had pushed the
+**Current addition — Steal Exp, 2026-11-01:** [CORE_STEAL_EXP.md](CORE_STEAL_EXP.md).
+The Thief's Steal Exp: physical evasion, then (Speed' + zodiac(X))%; it steals
+min(Speed + Y, 100, target EXP), the thief levelling up at once before the
+ordinary reward. 100 original profiles; `core-steal-exp-check` 1038 assertions.
+Production: 121 normalized records, 87 casts, 115/201 generic entries. 62 of 64
+suites green (hashes unchanged except `actions`, B1F19D7E, from the new entry
+only); talk-skill and area-impact check binaries exceed the 68000 limit again:
+production headroom 17, a further relocation comes before the next family. The
+five stale older suites (casting, incantation, elements, magic, jump) were
+repaired first (CORE_TESTING.md).
+
+**Historical module rebalance — 2026-11-01:** Guts had pushed the
 FORMULA image to 8392 bytes; the module zone equals the largest image and is
 part of every core program (the real production headroom was negative; the
 83 bytes noted for Guts were measured against a stale `data/modules.h`).

@@ -12,12 +12,29 @@ a toolchain change). banks/headroom run LeakSanitizer, which cannot run under
 ptrace: they rerun untraced and are never cached. `ti-cc` now takes a lock
 (tigcc writes .s/.o next to shared sources such as runtime/core/rt_core.o).
 Validated: the first parallel run gave the serial run's hashes for all 37. `--all` adds the 26
-older core-*-check suites (63 in all, about 2.5 min more); casting, incantation
-(Death gated in the test since CORE_TERMINAL), elements, magic (Holy AI rank)
-and jump (Jump deferred) were already red before 2026-11-01, identical with or
-without Guts: stale expectations to repair, not regressions.
+older core-*-check suites (63 in all, about 2.5 min more); five of them were red
+before 2026-11-01 (identical with or without Guts) and are repaired:
+casting/incantation asserted Death still gated (enabled since CORE_TERMINAL;
+Float is the gated control now); incantation's 68000 binary was 2136 bytes over,
+it now leaves casting_trials out natively (core-casting runs them) and a PC twin
+with the same define must print the same digest (429 checks, 08918B2C; full PC
+799, FD122519); elements expected the reaction Potion's kind before
+restore_prepare ran at launch (CORE_RESTORATION); magic assumed one AI draw,
+now it replays ai_choose's ranking draw (one per ranked action until one passes);
+jump's oracle modelled only the middle obstruction: it now also applies the
+source's landing rule (battle_move_propagate_destination 8/9) and steep-panel
+rule (init_source_panel / propagate_destination 3), and counts walk-edge
+differences separately (core-step/surface): 536 and 544 changed jump edges agree.
 
-Current Guts + module rebalance closure (2026-11-01): `core-guts-check`
+Current stat breaks + chapter-loading closure (2026-11-01): `closure.py --all`,
+65 suites green in 471 s; `core-breaks-check` 2016 (AE26B19D) joins the standard
+list. Every hash equals the Steal Exp closure except `actions` (F091239D: the
+two new break records and Speed Break's source record). banks/headroom/cell
+check ModCtx ABI 47 (388 bytes: `rt_file`, `chapter_ugfx`); `check_banks.c`
+expects them. Steal Exp's profiles now unequip the thief (the source rows are
+bare-handed; Martial Arts is bare-handed only): hash unchanged.
+
+Historical Guts + module rebalance closure (2026-11-01): `core-guts-check`
 1546 (F8F2AD6B); all 37 suites green through `closure.py`, every hash equal to
 the Spin Fist closure except `actions` (42026132: the three Guts entries only,
 E0988BD3 without them). banks/headroom updated for ModCtx ABI 46 (384 bytes,

@@ -8,6 +8,12 @@ with this requested model in `games/fft/RE_NOTES.md`.
 
 ## Delivery rule and current coverage (2026-10-30)
 
+CORE_BREAKS.md adds the Knight's Speed/Power/Mind Break (formula 0x2b, source rules;
+123 records, 117/201 generic entries); Magic Break keeps its Orbonne adaptation.
+
+CORE_STEAL_EXP.md adds the Thief's Steal Exp (121 records, 115/201 generic entries);
+equipment steals, Gil Taking and Steal Heart (Charm) stay gated.
+
 CORE_GUTS.md adds Ramza's Yell, Cheer Up and Scream (always hit, Speed/Brave/
 PA/MA gains): 120 normalized records, 87 casts; generic entries stay 114/201.
 CORE_PUNCH_ART.md's Spin Fist (area physical hits, no knockback) came before it.
