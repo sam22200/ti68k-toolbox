@@ -647,8 +647,10 @@ static void act_start(u8 a,u8 t);
 #include "batch_forecast.inc"
 #include "area_preview.inc"
 #if !MOD_CORE
+#include "skill_range.inc"           // the resident's own copy on the PC
 u16 mod_entry(u8 op,u8 a)
 {
+    if(op==5){skill_range(st.formula.actor,st.formula.ability);return 0;}
     if(op==1)return batch_prepare(M.cast_batch_out,0);
     if(op==2)return batch_owned_prepare();
     if(op==3)return batch_forecast(M.cast_batch_out);
@@ -704,13 +706,11 @@ u16 mod_entry(u8 op,u8 a)
 #include "ability_access.inc"
 #include "magic_prepare.inc"
 #include "command.inc"
-#include "skill_range.inc"
 #include "incantation.inc"
 u16 mod_entry(u8 op,u8 a)
 {
     (void)a;
     if(!op)return command_skill(st.formula.actor,st.formula.target,st.formula.ability);
-    if(op==2){skill_range(st.formula.actor,st.formula.ability);return 0;}
     if(op==3)return command_cast(M.cast_actor,M.cast_ref,M.cast_ability,a);
     if(op==4)return command_pending(a);
     command_defend(st.formula.actor);return 0;
@@ -2139,7 +2139,9 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
     // Stat breaks 0x2b (CORE_BREAKS): PA and Y (element byte) the same way. Both apply Martial
     // Arts bare-handed only.
     if(b->formula==0x28)xa=ua->sp;
-    if(b->formula<0x31)ya=b->element;
+    // Equipment breaks 0x25: Y + the attacker's WP, which the caller passes as r (X = 0: a
+    // multiplier of 1 below; Steal Exp and stat breaks pass 0).
+    if(b->formula<0x31)ya=b->element+r;
     if(st.support[a]==SUPPORT_ATTACK_UP)xa=magic_third(xa<<2);
     if(st.support[a]==SUPPORT_MARTIAL_ARTS&&(b->formula>=0x31||hand_weapon(ua,0)==255))xa+=xa>>1;
     xa=unit_status_xa(ut,xa);
@@ -2156,7 +2158,7 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
 {
     u8 f=abilities[ab].formula;
-    if((u8)(f-0x31)<=1||f==0x28||f==0x2b)return punch_strike(a,t,ab,roll);
+    if((u8)(f-0x31)<=1||f==0x28||f==0x2b||f==0x25)return punch_strike(a,t,ab,roll);
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }
@@ -2295,10 +2297,10 @@ AbId known(u8 who, u8 k)
 
 // the tiles at most `range` steps away (FFT spreads the range over the map, heights aside),
 #ifdef FFT_MODULES
-// COMMAND owns cold range construction; caller has returned from every image.
+// TARGETS owns cold range construction; caller has returned from every image.
 void skill_range(u8 who,AbId ab)
 {
-    st.formula.actor=who;st.formula.ability=ab;mod_call(MOD_COMMAND,2,0);
+    st.formula.actor=who;st.formula.ability=ab;mod_call(MOD_TARGETS,5,0);
 }
 #else
 #include "skill_range.inc"
@@ -2430,6 +2432,7 @@ void skill(u8 a,u8 t,AbId ab)
 #else
     charged=command_skill(a,t,ab);
 #endif
+    if(charged==3){attack(a,t);return;}           // an equipment break with nothing to break
     if(charged==2&&st.ai)ai_next();
 }
 void defend(u8 a)
@@ -2916,6 +2919,10 @@ static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
 #ifdef FFT_CHAPTER
     if(ab!=NO_ABIL&&((abilities[ab].flags&AF_CAST)||restore_ability(ab)))kind=skill_kind(a,t,ab);
 #endif
+#ifdef FFT_CHAPTER
+    // Conservative guest/enemy action policy, before any evaluation (no copy in the AI image).
+    if (kind == AB_BREAK||kind==AB_STEAL_EXP||kind==AB_EQUIP_BREAK) return AI_BAD;
+#endif
     *hit = ab == NO_ABIL ? hit_chance(a, t) : skill_hit(a, t, ab);
     if (!*hit) return AI_BAD;
     if (ab != NO_ABIL && abilities[ab].range > 1 && (!(abilities[ab].flags & AF_ITEM)
@@ -2951,7 +2958,6 @@ static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
     if (blue(ut) != blue(ua)) d = -d;
 #ifdef FFT_CHAPTER
     if (kind == AB_RAISE) return 0; // no unlimited self-buffing in guest AI
-    if (kind == AB_BREAK||kind==AB_STEAL_EXP) return AI_BAD; // conservative guest/enemy action policy
     if(ab!=NO_ABIL&&(abilities[ab].flags&AF_CHARGE)
         && ut->ct+(u16)ut->sp*charge_ticks[ab-0x196]>=100) d >>= 1;
 #endif
@@ -3507,10 +3513,16 @@ void battle_units(void) { mod_call(MOD_PARTY, 2, 0); }
 static void fixed_units(void) { mod_call(MOD_PARTY, 4, 0); }
 // Keep a resident AI overlay resident: it already contains the identical evaluator.
 // Otherwise load the much smaller formula image. No hot AI/formula copy ping-pong.
-static u16 formula_call(u8 op)
+// Formulas 0x25..0x2b (breaks, steals, Talk) always use FORMULA: the AI/ACTION copies leave the
+// breaks and Steal Exp out (the AI rejects them first; ACTION never evaluates them).
+static u16 __attribute__((noinline)) formula_call(u8 op)
 {
-    if(mod_id==MOD_ACTION+1)return mod_call(MOD_ACTION,(u8)(op+8),0);
-    return mod_id == MOD_AI + 1 ? mod_call(MOD_AI, (u8)(op + 2), 0) : mod_call(MOD_FORMULA, op, 0);
+    u16 ab=st.formula.ability;u8 id=mod_id;
+    if(ab<512&&(u8)(abilities[ab].formula-0x25)<=6)id=0;
+    if(id==MOD_ACTION+1&&op)op+=8;          // ACTION's copy: the amount only
+    else if(id==MOD_AI+1)op+=2;
+    else id=MOD_FORMULA+1;
+    return mod_call((u8)(id-1),op,0);
 }
 u8 skill_hit(u8 a, u8 t, AbId ab)
 {
@@ -4712,7 +4724,8 @@ static void aim(AbId ab)
 #ifdef FFT_CHAPTER
     if(ab<512&&cast_area_supported(&abilities[ab],cj_range(common,ab))&&!st.ai)st.mode=M_CAST_RANGE;
 #endif
-    if (ab == NO_ABIL || abilities[ab].formula == 0x2b) attack_range(st.act);   // breaks: weapon range
+    if (ab == NO_ABIL || abilities[ab].formula == 0x2b || abilities[ab].formula == 0x25)
+        attack_range(st.act);                                                     // breaks: weapon range
     else skill_range(st.act, ab);
     if (W) W->win_k[0] = 0;                        // the preview: for this ability
 }

@@ -20,7 +20,7 @@ static inline u8 magic_formula(u8 f){return f<104&&(magic_formula_bits[f>>3]>>(f
 enum { SUPPORT_HALF_MP=0x1ce, SUPPORT_SHORT_CHARGE=0x1e2,
        SUPPORT_NON_CHARGE=0x1e3, SOURCE_JOB_MIME=0x5d,
        SUPPORT_MAGIC_ATTACK_UP=0x1d3,SUPPORT_MAGIC_DEFENSE_UP=0x1d4,
-       SUPPORT_ATTACK_UP=0x1d1,SUPPORT_MARTIAL_ARTS=0x1d8 };
+       SUPPORT_ATTACK_UP=0x1d1,SUPPORT_MARTIAL_ARTS=0x1d8,SUPPORT_MAINTENANCE=0x1db };
 static inline u8 core_cast_cost(u8 cost,u8 menu,u8 mime,u8 half_mp)
 {
     if(menu||mime)return 0;

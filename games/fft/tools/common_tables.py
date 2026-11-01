@@ -184,6 +184,13 @@ def break_record(r):
     return 7,r[9],0,255,2
 
 
+def equip_break_record(r):
+    """Equipment breaks 0x25 (Head/Armor/Shield/Weapon Break): weapon range, the slot by ability id
+    (none: the default Attack), physical evasion, then (PA'+zodiac(WP+Y))%; Maintenance resists."""
+    if r[8]!=0x25 or r[0]or r[1]or r[2]or r[3]!=0x20 or r[4]!=0x10 or r[5]or r[6]!=0x12 or r[7]or r[9]or r[11]:return None
+    return 23,r[10],0,255,2
+
+
 def percent_magic_record(r):
     """Retail percent HP and single-panel HP/MP drains, with separate caster packets."""
     if r[8]not in(9,15,16)or r[9]==0 or r[11]or r[3]&~9 or r[4]&~0xe1 or r[5]&~0xe2 or r[6]&~0x42:return None
@@ -233,6 +240,7 @@ def battle_records(d):
         guts = guts_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x96<=a<=0x99 else None
         steal = steal_exp_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if a==0x73 else None
         stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8f<=a<=0x91 else None
+        gear_break = equip_break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8a<=a<=0x8d else None
         if a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
@@ -282,6 +290,8 @@ def battle_records(d):
             kind,y,rng,vert,flags=punch;formula=art[8]
         elif strike:
             kind,y,rng,vert,flags=strike;formula=art[8]
+        elif gear_break:
+            kind,y,rng,vert,flags=gear_break;formula=0x25;element=y   # Y, the hit percent's addend
         elif stat_break:
             kind,y,rng,vert,flags=stat_break;formula=0x2b;element=d.at(battle.ABILITY_RANGE + 14*a, 14)[10]   # Y
         elif steal:
@@ -298,6 +308,7 @@ def battle_records(d):
     assert len(out) == 512 * 12
     out.extend(d.at(0x80061044, 16)[::2])        # Charge's eight CT counts
     out.extend(b'Charge +1\0Charge +2\0')         # reviewed battle label spacing
+    out.extend(bytes(d.item(i)['level'] for i in range(ITEMS)))   # required levels (Weapon Break)
     return bytes(out)
 
 

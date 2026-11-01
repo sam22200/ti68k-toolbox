@@ -56,6 +56,9 @@ static void action_rewards(u8 kill)
 #ifdef FFT_CHAPTER
 #include "magic_commit.inc"
 #endif
+#ifdef FFT_CHAPTER
+#include "equip_loss.inc"
+#endif
 static u8 action_commit(void)
 {
 #ifdef FFT_CHAPTER
@@ -85,6 +88,8 @@ static u8 action_commit(void)
     }
     if (kind == AB_RAISE) { if (ua->pa < 99) ua->pa++; action_rewards(0); return 0; }
     if (kind == AB_STEAL_EXP) { steal_exp(st.atk,ut,(u8)st.dmg); action_rewards(0); return 0; }
+    // Equipment breaks: the item and its bonuses lost; 1: the order again (a Speed bonus).
+    if (kind == AB_EQUIP_BREAK) { equip_loss(); action_rewards(0); return 1; }
     if (kind == AB_BREAK) {
         // Source stat by ability id (0x2b); Magic Break's Orbonne adaptation lowers MA.
         u8 *v = st.abil == 0x90 ? &ut->pa : st.abil == 0x8f ? &ut->sp : &ut->ma;

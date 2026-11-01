@@ -2,8 +2,12 @@
 // candidate never evicts its executing overlay. RNG stays in the caller.
 #ifdef FFT_CHAPTER
 #include "charge_math.inc"
+#if !defined(FFT_MODULE) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_NUMBERS) || MOD_PART(MOD_COMMAND)
+#include "equip_break.inc"    // forecasts and COMMAND only: ACTION commits, the AI never chooses breaks
+#endif
 #endif
 u16 skill_amount(u8 a, u8 t, AbId ab, u16 r);   // Steal Exp: nothing to steal, no hit
+#if !defined(FFT_MODULE) || !MOD_PART(MOD_ACTION)   // ACTION keeps only the amount (formula_call)
 // Execution has already paid. It must not test the remaining MP a second time.
 static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
 {
@@ -19,10 +23,21 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
     if(magic_formula(b->formula))return magic_applicable(t,ab)&&skill_kind(a,t,ab)!=AB_NULL&&
         (!magic_status_formula(b->formula)||magic_heal(a,t,ab,0))?magic_hit(a,t,ab,0):0;
 #endif
-    if (b->formula == 0x28 || b->formula == 0x2b) {   // Steal Exp, breaks: evasion x the percent;
+#if !defined(FFT_MODULE) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_NUMBERS)   // forecasts only
+    if (b->formula == 0x25) {           // equipment: nothing to break, the Attack's; Maintenance: 0
+        u16 c, h = hit_chance(a, t);
+        if (equip_break_slot(ut, ab) == 255) return (u8)h;
+        if (st.support[t] == SUPPORT_MAINTENANCE) return 0;
+        c = equip_break_percent(a, t, ab);
+        return (u8)(c >= 100 ? h : h * c / 100);
+    }
+#endif
+#if !defined(FFT_MODULE) || !MOD_PART(MOD_AI)    // the AI rejects them first (ai_score)
+    if (b->formula == 0x28 || b->formula == 0x2b) {   // Steal Exp, stat breaks: evasion x the percent;
         u16 c = charge_query(a, t, ab, 0, 0), h = hit_chance(a, t);   // nothing left to steal: no hit
         return b->formula == 0x28 && !skill_amount(a, t, ab, 0) ? 0 : (u8)(c >= 100 ? h : h * c / 100);
     }
+#endif
     if (b->kind == AB_CURE) return status_curable(ut,b->y) ? 100 : 0;
     if (b->kind == AB_REVIVE) return ut->hp ? 0 : 100;
     return b->flags & AF_EVADE ? hit_chance(a, t) : 100;
@@ -35,6 +50,7 @@ u8 skill_hit(u8 a,u8 t,AbId ab)
 #endif
     return skill_effect_hit(a,t,ab);
 }
+#endif
 u16 skill_amount(u8 a, u8 t, AbId ab, u16 r)
 {
 #ifdef FFT_CHAPTER
@@ -52,10 +68,12 @@ u16 skill_amount(u8 a, u8 t, AbId ab, u16 r)
 #ifdef FFT_CHAPTER
     // Punch Art strikes share the resident physical evaluator (CORE_PUNCH_ART.md).
     if ((u8)(b->formula - 0x31) <= 1) return charge_query(a, t, ab, 0, r);
+#if !defined(FFT_MODULE) || !(MOD_PART(MOD_AI) || MOD_PART(MOD_ACTION))   // formula_call: FORMULA
     if (b->formula == 0x28) {           // the EXP stolen: raw Speed + Y, at most 100 and the target's
         k = ua->sp + b->y; if (k > 100) k = 100;
         return k < st.unit[t].exp ? k : st.unit[t].exp;
     }
+#endif
     if (b->formula == 0x36 || b->formula == 0x2B || b->formula == 0x2C) return b->y;
     if (b->formula == 0x2D || b->formula == 0x30 || (b->formula == 1 && b->flags & AF_CHARGE)) {
         u8 weapon=hand_weapon(ua,0);

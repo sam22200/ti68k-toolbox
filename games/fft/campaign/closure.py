@@ -12,7 +12,7 @@ tools/gcc4ti-bin) are excluded from the key; pass --force after changing them.
   closure.py                 all suites, cached, -j 12
   closure.py guts talk-skill only these (still cached)
   closure.py --first guts    run guts first; --fail-fast stops scheduling at the first red
-  closure.py --all           also the 26 older suites (65 core-*-check targets)
+  closure.py --all           also the 26 older suites (66 core-*-check targets)
 """
 import argparse,concurrent.futures as cf,hashlib,json,os,re,subprocess,sys,threading,time
 from pathlib import Path
@@ -23,7 +23,7 @@ CACHE=HERE/'x/closure-cache'
 SUITES=('guts punch-strikes punch-art talk-skill area-impact area-ui area-forecast targets batch knockback '
         'headroom protect control-status status-lifetime sleep terminal scheduler actions ai-pause reactions '
         'banks area-ai restoration cleanse control incapacity area-ct buffs charge-hands hands healing '
-        'offensive-magic percent reflect status-state strikes surface steal-exp breaks').split()
+        'offensive-magic percent reflect status-state strikes surface steal-exp breaks equip-breaks').split()
 # Older family suites outside the usual closure: run with --all after a core-wide change.
 # All 63 suites are green since 2026-11-01 (five stale expectations repaired, CORE_TESTING.md).
 EXTRA=('affinity boundaries capacity-render casting cell compact context deferred elements full-grid grid '

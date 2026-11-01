@@ -26,12 +26,13 @@ static u8 command_effect(u8 a,u8 t,AbId ab)
 #ifdef FFT_CHAPTER
     if(restore_ability(ab)){restore_prepare(t,ab);return 0;}
     if(b->kind==AB_CLEANSE)st.effect_kind=AB_CLEANSE;
-    if(b->formula==0x28||b->formula==0x2b){
+    if(b->formula==0x28||b->formula==0x2b||b->formula==0x25){
         // Steal Exp, breaks: physical evasion, then the percent roll (none at 100), then the effect.
         u16 c;st.hit=roll_hit(a,t);if(!st.hit)return 0;
-        c=charge_query(a,t,ab,0,0);
+        c=b->formula==0x25?equip_break_percent(a,t,ab):charge_query(a,t,ab,0,0);
         if(c<100&&(u16)((u32)rand15()*100>>15)>=c){st.hit=0;return 0;}
         if(b->formula==0x2b){st.dmg=b->y;return 0;}            // a break: the stat loss (commit)
+        if(b->formula==0x25){st.hit=st.support[t]!=SUPPORT_MAINTENANCE;st.dmg=equip_break_slot(&st.unit[t],ab);return 0;}
         st.dmg=skill_amount(a,t,ab,0);st.hit=st.dmg!=0;return 0;
     }
     if((u8)(b->formula-0x31)<=1){
@@ -77,6 +78,7 @@ static u8 command_skill(u8 a, u8 t, AbId ab)
 #endif
     const Ability *b = &abilities[ab];
 #ifdef FFT_CHAPTER
+    if(b->formula==0x25&&(st.dmg=equip_break_slot(&st.unit[t],ab))==255)return 3;   // the default Attack
     if (!st.open_resolving) {
         st.pending[a].state = 0;
         unit_status_action(&st.unit[a],0);

@@ -42,6 +42,7 @@ static void number_single(void)
 #ifdef FFT_CHAPTER
         else if (kind == AB_RAISE) n=put_s(s,0,"PA+1");
         else if (kind == AB_STEAL_EXP) { n=put_s(s,0,"EXP-"); n=put_n(s,n,st.dmg); }
+        else if (kind == AB_EQUIP_BREAK) n=put_s(s,0,"Break");
         else if (kind == AB_BREAK){n=put_s(s,0,st.abil==0x90?"PA-":st.abil==0x8f?"SP-":"MA-");n=put_n(s,n,abilities[st.abil].y);}
         else if (kind == AB_QUICK||kind==AB_GOLEM) n=put_s(s,0,kind==AB_GOLEM?"Golem":st.dmg>>8?"CT 0":"Quick");
         else if (kind == AB_STATUS) n=put_s(s,0,status_label(st.dmg));

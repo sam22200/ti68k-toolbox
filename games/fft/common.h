@@ -23,7 +23,7 @@ static inline u8 cj_valid(const u8 *b, u16 size)
 {
     static const u16 minimum[CJ_SECTIONS] = {
         160 * 14, 160 * 14, 160, 256 * 30, 512 * 8, 0x170 * 14,
-        14 * 3, CJ_AFFINITY + CJ_AFFINITY_ROWS + 5, 0xB0 * 25, 48 * 5, 512 * 2, 64 * 2, 128 * 6 + 40 * 16 + 10, 512 * 12 + 8 + 20
+        14 * 3, CJ_AFFINITY + CJ_AFFINITY_ROWS + 5, 0xB0 * 25, 48 * 5, 512 * 2, 64 * 2, 128 * 6 + 40 * 16 + 10, 512 * 12 + 8 + 20 + 256
     };
     u16 end, previous = CJ_HEADER;
     u8 k;

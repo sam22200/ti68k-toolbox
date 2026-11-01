@@ -563,6 +563,11 @@ x/core-guts/oracle/source.h: ../tools/guts_oracle.py ../tools/status_state_oracl
 	$(PY) ../tools/guts_oracle.py
 core-guts-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-guts/oracle/source.h
 	$(PY) check_guts.py
+.PHONY: core-equip-breaks-check
+x/core-equip-breaks/oracle/source.h: ../tools/equip_break_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/equip_break_oracle.py
+core-equip-breaks-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-equip-breaks/oracle/source.h
+	$(PY) check_equip_breaks.py
 .PHONY: core-breaks-check
 x/core-breaks/oracle/source.h: ../tools/break_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/break_oracle.py
