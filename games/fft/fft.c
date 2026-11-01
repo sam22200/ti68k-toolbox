@@ -576,7 +576,7 @@ static u8 action_available(u8 a,u8 t)
 }
 #include "cast_target.h"
 #endif
-#if defined(FFT_CHAPTER) && (MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_RESPONSE))
+#if defined(FFT_CHAPTER) && (MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_RESPONSE) || MOD_PART(MOD_ORDER))
 #include "status_policy.inc"
 #include "status_runtime.inc"
 #if !MOD_CORE
@@ -609,6 +609,23 @@ static u16 status_apply_request(void)
     return result;
 }
 #endif
+#endif
+#if !MOD_CORE && MOD_PART(MOD_ORDER)
+#include "facing_arrows.inc"
+#include "banners.inc"            // turn/objective banners: moved from NUMBERS (never with numbers)
+// Turn-end status runtime (moved from FORMULA: the turn order follows it anyway).
+u16 mod_entry(u8 op,u8 a)
+{
+    if(op==1)return battle_outcome();
+    if(op==2){draw_arrows();return 0;}
+    if(op==6){bn_shade();return 0;}
+    if(op==7){bn_draw();return 0;}
+    if(op==14)return status_dead_turn(a);
+    if(op==15){Unit *u=&st.unit[a];u->ct=core_status_end_ct(&u->statuses,u->ct,st.formula.roll&1,st.formula.roll&2);return status_upkeep(a);}
+    if(op==4){status_tick();return 0;}
+    if(op==5)return status_upkeep(a);
+    turn_order();return 0;
+}
 #endif
 #if MOD_PART(MOD_AI) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_NUMBERS)
 #include "formula.inc"
@@ -673,7 +690,6 @@ u8 act_kind(void)
     return st.abil==NO_ABIL?AB_DAMAGE:st.abil==ABIL_DEFEND?AB_DEFEND:abilities[st.abil].kind;
 }
 #include "numbers.inc"
-#include "banners.inc"
 #include "forecast_text.inc"
 #include "forecast_panel.inc"
 u16 mod_entry(u8 op,u8 a)
@@ -681,7 +697,7 @@ u16 mod_entry(u8 op,u8 a)
     (void)a;
     if(op==5)return forecast_text(st.formula.actor,st.formula.target,st.formula.ability,M.forecast_out);
     if(op==6){make_forecast(st.formula.actor,st.formula.target,st.formula.ability);return 0;}
-    if(op==2)return area_number_prepare();if(op==3){bn_shade();return 0;}if(op==4){bn_draw();return 0;}numbers_draw();return 0;
+    if(op==2)return area_number_prepare();numbers_draw();return 0;
 }
 #endif
 #if !MOD_CORE && MOD_PART(MOD_COMMAND)
@@ -930,7 +946,7 @@ u8 ct_next(void)
             // All due Charge actions finish before this tick expires statuses.
             if(st.status_clock){
 #ifdef FFT_MODULES
-                mod_call(MOD_FORMULA,4,0);
+                mod_call(MOD_ORDER,4,0);
 #else
                 status_tick();
 #endif
@@ -960,7 +976,7 @@ u8 ct_next(void)
         if (u->hp) return best;
 #ifdef FFT_CHAPTER
 #ifdef FFT_MODULES
-        if(mod_call(MOD_FORMULA,14,best))return best;
+        if(mod_call(MOD_ORDER,14,best))return best;
 #else
         if(status_dead_turn(best))return best;
 #endif
@@ -975,13 +991,13 @@ u8 ct_next(void)
     }
 }
 
-// FORMULA15 is loaded at every turn end anyway: CT credit, then the source
+// ORDER15 (the turn order follows): CT credit, then the source
 // upkeep (Poison/Regen, Brave +1 below 10); a no-op upkeep changes nothing.
 u8 ct_end(u8 who, u8 moved, u8 acted)
 {
 #ifdef FFT_CHAPTER
 #ifdef FFT_MODULES
-    st.formula.roll=(moved?1:0)|(acted?2:0);return (u8)mod_call(MOD_FORMULA,15,who);
+    st.formula.roll=(moved?1:0)|(acted?2:0);return (u8)mod_call(MOD_ORDER,15,who);
 #else
     Unit *u=&st.unit[who];u->ct=core_status_end_ct(&u->statuses,u->ct,moved,acted);
     return status_upkeep(who);
@@ -6252,8 +6268,8 @@ static void __attribute__((noinline)) bn_start(u8 kind)
 }
 
 #ifdef FFT_MODULES
-static void bn_shade(void){mod_call(MOD_NUMBERS,3,0);}
-static void bn_draw(void){mod_call(MOD_NUMBERS,4,0);}
+static void bn_shade(void){mod_call(MOD_ORDER,6,0);}
+static void bn_draw(void){mod_call(MOD_ORDER,7,0);}
 #else
 #include "banners.inc"
 #endif

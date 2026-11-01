@@ -1,4 +1,4 @@
-// Unchanged banner rasterization, shared by PC and NUMBERS image.
+// Unchanged banner rasterization, shared by PC and ORDER image.
 #define BN_Y (st.banner == BN_START ? 2 : 34)
 static const u8 bn_width[4] = BN_WIDTHS;
 static u8 bn_line(u8 kind,u8 line){return kind==BN_START?line:kind;}

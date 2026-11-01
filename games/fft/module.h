@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 45U
+#define MOD_ABI 46U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 typedef struct {
     u16 sig;                            // MOD_SIG, from the module's own build
@@ -77,6 +77,8 @@ typedef struct {
     void (*draw_rect)(s16 x, s16 y, s16 w, s16 h, u8 color);
     void (*draw_text)(s16 x, s16 y, const char *s, u8 font, u8 color);
     u8 (*job_level)(const Unit *u);
+    u8 (*hand_weapon)(const Unit *u,u8 hand);   // resident helpers shared instead of copied per image
+    u8 (*restore_ability)(AbId ab);
     void (*gauge)(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
 #ifdef FFT_CHAPTER
     const u8 **opening_story, **pgfx;

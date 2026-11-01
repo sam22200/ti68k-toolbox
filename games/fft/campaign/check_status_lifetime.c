@@ -73,7 +73,7 @@ static u16 apply(u8 who,u8 bits)
 static void tick(void)
 {
 #ifdef FFT_MODULES
-    mod_call(MOD_FORMULA,4,0);
+    mod_call(MOD_ORDER,4,0);
 #else
     status_tick();
 #endif
@@ -81,7 +81,7 @@ static void tick(void)
 static u8 upkeep(u8 who)
 {
 #ifdef FFT_MODULES
-    return (u8)mod_call(MOD_FORMULA,5,who);
+    return (u8)mod_call(MOD_ORDER,5,who);
 #else
     return status_upkeep(who);
 #endif

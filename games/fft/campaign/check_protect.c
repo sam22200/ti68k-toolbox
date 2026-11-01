@@ -10,7 +10,7 @@ static void prepare_protect(AbId ab)
 static u8 dead_tick(u8 id)
 {
 #ifdef FFT_MODULES
-    return mod_call(MOD_FORMULA,14,id);
+    return mod_call(MOD_ORDER,14,id);
 #else
     return status_dead_turn(id);
 #endif

@@ -57,6 +57,7 @@ static void expected_context(void)
         c->unit_card_battle=unit_card_battle;c->area_paint=area_paint;
         c->draw_hand = draw_hand; c->copy_box = copy_box; c->draw_rect = draw_rect;
         c->draw_text = draw_text; c->job_level = job_level;
+        c->hand_weapon = hand_weapon; c->restore_ability = restore_ability;   // shared resident helpers (ABI 46)
 #ifdef FFT_CHAPTER
         c->opening_story = &opening_story; c->pgfx = &pgfx; c->opening_battle = opening_battle;
         // opening_after compiles into BEATS (CORE_CONTROL_STATUS): its slot stays zero.
@@ -81,7 +82,7 @@ static void bindings(void)
     u8 id,pass;u32 seed=rng32;u16 size;const u8 *bank;
     u8 actual_w=map_w,actual_h=map_h,actual_units=encounter_units;
     u16 actual_n=map_n;s16 actual_sc_h=sc_h,actual_sc_top=sc_top;
-    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,376);
+    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,384);
     for(pass=0;pass<2;pass++){
         if(pass){map_w=1;map_h=1;map_n=1;encounter_units=13;sc_h=200;sc_top=1;}
         expected_context();

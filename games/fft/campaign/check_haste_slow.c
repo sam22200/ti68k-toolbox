@@ -126,7 +126,7 @@ static void thirteen(void)
     for(i=0;i<ORDER_N;i++)CHECK(st.turns[i]<NUNIT,1);
     st.unit[12].status_ct[SID_HASTE-SID_POISON]=1;
 #ifdef FFT_MODULES
-    mod_id=0;ZB(43);mod_call(MOD_FORMULA,4,0);ZE(43);
+    mod_id=0;ZB(43);mod_call(MOD_ORDER,4,0);ZE(43);
 #else
     status_tick();
 #endif

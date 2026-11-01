@@ -1,10 +1,14 @@
 #ifndef FFT_ITEM_RESTORE_H
 #define FFT_ITEM_RESTORE_H
 // Scalar resource-item family. No costs, rewards, image loads or allocation.
+#ifdef FFT_MODULE
+#define restore_ability M.restore_ability   // the resident copy (ModCtx)
+#else
 static u8 restore_ability(AbId ab)
 {
     return ab<512&&(abilities[ab].flags&AF_ITEM)&&(u8)(abilities[ab].formula-0x48)<=3;
 }
+#endif
 static u8 restore_undead(const Unit *u){return core_status_current(&u->statuses,0)&16;}
 static u8 restore_possible(u8 t,AbId ab)
 {

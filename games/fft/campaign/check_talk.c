@@ -69,7 +69,7 @@ static void talk_production(void)
 static u8 upkeep(u8 id)
 {
 #ifdef FFT_MODULES
-    return (u8)mod_call(MOD_FORMULA,15,id);
+    return (u8)mod_call(MOD_ORDER,15,id);
 #else
     return status_upkeep(id);
 #endif

@@ -54,8 +54,5 @@ void turn_order(void)
     for (; n < ORDER_N; n++) st.turns[n] = 0xFF;
 }
 
-#if !MOD_CORE && MOD_PART(MOD_ORDER)
-#include "facing_arrows.inc"
-u16 mod_entry(u8 op,u8 a){(void)a;if(op==1)return battle_outcome();if(op==2){draw_arrows();return 0;}turn_order();return 0;}
-#endif
+// ORDER's mod_entry follows the status runtime in fft.c.
 

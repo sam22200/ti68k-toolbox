@@ -103,11 +103,7 @@ u16 mod_entry(u8 op, u8 a)
     (void)a;
     if(op==12)return a?batch_status_commit(M.cast_batch_out):(batch_status_commit(&W->cast)&2);
     if(op==13)return status_scalar_commit();
-    if(op==14)return status_dead_turn(a);
-    if(op==15){Unit *u=&st.unit[a];u->ct=core_status_end_ct(&u->statuses,u->ct,st.formula.roll&1,st.formula.roll&2);return status_upkeep(a);}
     if(op==3)return status_apply_request();
-    if(op==4){status_tick();return 0;}
-    if(op==5)return status_upkeep(a);
     if(op==7)return strike_target();
     if(op==8){strike_launch(a);return 0;}
     if(op==9)return charge_amount(st.formula.actor,st.formula.target,st.formula.ability,a&1,(a>>1)&1,(a>>2)&1,st.formula.roll);

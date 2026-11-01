@@ -1,5 +1,8 @@
 // Compact equipment keeps one item per physical hand: a weapon or a shield.
 // No swapping live equipment to evaluate the other hand (stats/evade stay stable).
+#ifdef FFT_MODULE
+#define hand_weapon M.hand_weapon      // the resident copy (ModCtx), not one per image
+#else
 static u8 hand_weapon(const Unit *u,u8 hand)
 {
     u8 right=u->eq[EQ_WEAPON],left=u->eq[EQ_SHIELD];
@@ -8,6 +11,7 @@ static u8 hand_weapon(const Unit *u,u8 hand)
     if(right==255)return hand?255:left;
     return hand?left:right;
 }
+#endif
 static u8 weapon_reach(const Unit *u)
 {
     return u->eq[EQ_WEAPON]!=255&&!UNIT_FROG(u)?items[u->eq[EQ_WEAPON]].reach:1;
