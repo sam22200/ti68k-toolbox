@@ -1,6 +1,24 @@
 # Opening -> Academy -> Gariland
 
-**Current addition — Steal Exp, 2026-11-01:** [CORE_STEAL_EXP.md](CORE_STEAL_EXP.md).
+**Current addition — stat breaks, 2026-11-01:** [CORE_BREAKS.md](CORE_BREAKS.md).
+Speed, Power and Mind Break (formula 0x2b): weapon reach, physical evasion,
+then (PA' + zodiac(Y))%; the stat (by ability id) loses X, at least 1. Speed
+Break leaves its Orbonne adaptation; Magic Break (0x2c) keeps its own. Martial
+Arts applies bare-handed only (source; Steal Exp's hash unchanged). 213
+original profiles; `core-breaks-check` 2016 assertions, AE26B19D. Production:
+123 normalized records, 87 casts, 117/201 generic entries. All 65 suites green
+(`closure.py --all`); only `actions` changes (F091239D, the new records).
+
+**Chapter-loading relocation — 2026-11-01:** the cold part of `chapter_load`
+(bank lookups, view footer and descriptor validation, chapter sizes) moves to
+`chapter_files.inc`, the SAVE image's op 6 on the TI (resident on the PC); the
+resident adopts the image's context afterwards. ModCtx ABI 47 (388 bytes:
+`rt_file`, the `chapter_ugfx` output). Headroom 17 -> 331 before the breaks,
+185 after (zone 8246). The rest of the start-up code mostly calls other images
+(a module cannot call one), so it stays resident; the remaining resident is
+hot engine code or 14-byte image stubs. talk-skill and area-impact fit again.
+
+**Historical Steal Exp addition — 2026-11-01:** [CORE_STEAL_EXP.md](CORE_STEAL_EXP.md).
 The Thief's Steal Exp: physical evasion, then (Speed' + zodiac(X))%; it steals
 min(Speed + Y, 100, target EXP), the thief levelling up at once before the
 ordinary reward. 100 original profiles; `core-steal-exp-check` 1038 assertions.
