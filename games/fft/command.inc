@@ -26,6 +26,14 @@ static u8 command_effect(u8 a,u8 t,AbId ab)
 #ifdef FFT_CHAPTER
     if(restore_ability(ab)){restore_prepare(t,ab);return 0;}
     if(b->kind==AB_CLEANSE)st.effect_kind=AB_CLEANSE;
+    if(b->formula==0x28||b->formula==0x2b){
+        // Steal Exp, breaks: physical evasion, then the percent roll (none at 100), then the effect.
+        u16 c;st.hit=roll_hit(a,t);if(!st.hit)return 0;
+        c=charge_query(a,t,ab,0,0);
+        if(c<100&&(u16)((u32)rand15()*100>>15)>=c){st.hit=0;return 0;}
+        if(b->formula==0x2b){st.dmg=b->y;return 0;}            // a break: the stat loss (commit)
+        st.dmg=skill_amount(a,t,ab,0);st.hit=st.dmg!=0;return 0;
+    }
     if((u8)(b->formula-0x31)<=1){
         // Punch Art strikes: physical evasion, a 4% critical with knockback, then
         // Repeating Fist's 1..X hits (source draw order).

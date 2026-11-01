@@ -2134,8 +2134,14 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
 {
     const Unit *ua=&st.unit[a],*ut=&st.unit[t];const Ability *b=&abilities[ab];
     s16 xa=ua->pa,ya=(s16)((u16)(ua->pa+b->y)>>1);u16 k;
+    // Steal Exp 0x28 (CORE_STEAL_EXP): the hit percent, Speed through the physical stages +
+    // zodiac(X) (X in the record's element byte), the Repeating Fist sum with a multiplier of 1.
+    // Stat breaks 0x2b (CORE_BREAKS): PA and Y (element byte) the same way. Both apply Martial
+    // Arts bare-handed only.
+    if(b->formula==0x28)xa=ua->sp;
+    if(b->formula<0x31)ya=b->element;
     if(st.support[a]==SUPPORT_ATTACK_UP)xa=magic_third(xa<<2);
-    if(st.support[a]==SUPPORT_MARTIAL_ARTS)xa+=xa>>1;
+    if(st.support[a]==SUPPORT_MARTIAL_ARTS&&(b->formula>=0x31||hand_weapon(ua,0)==255))xa+=xa>>1;
     xa=unit_status_xa(ut,xa);
     if(core_status_current(&ut->statuses,2)&6)xa+=xa>>1;   // Chicken or Frog
     xa=zodiac_xa(ua,ut,xa);
@@ -2149,7 +2155,8 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
 }
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
 {
-    if((u8)(abilities[ab].formula-0x31)<=1)return punch_strike(a,t,ab,roll);
+    u8 f=abilities[ab].formula;
+    if((u8)(f-0x31)<=1||f==0x28||f==0x2b)return punch_strike(a,t,ab,roll);
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }
@@ -2944,7 +2951,7 @@ static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
     if (blue(ut) != blue(ua)) d = -d;
 #ifdef FFT_CHAPTER
     if (kind == AB_RAISE) return 0; // no unlimited self-buffing in guest AI
-    if (kind == AB_BREAK) return AI_BAD; // conservative guest/enemy action policy
+    if (kind == AB_BREAK||kind==AB_STEAL_EXP) return AI_BAD; // conservative guest/enemy action policy
     if(ab!=NO_ABIL&&(abilities[ab].flags&AF_CHARGE)
         && ut->ct+(u16)ut->sp*charge_ticks[ab-0x196]>=100) d >>= 1;
 #endif
@@ -4495,59 +4502,33 @@ void game_init(void)
 // chapter c's banks, sizes and tables (1: ready); its work memory starts afresh
 #ifndef FFT_MODULES
 #include "chapter_validate.h"
+#include "chapter_files.inc"
 #endif
 static u8 chapter_load(u8 c)
 {
-    char name[6] = "ff?v0";
-    u16 i, view_size = 0, desc_size = 0, interface_size = 0;
+    u16 i;
     const u8 *surface;
     W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;
     if (!sbuf || !cgfx || c >= sizeof chapter_letter - 1) return 0;
-    name[2] = chapter_letter[c];
-    for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
-        name[4] = (char)('0' + i);             // again each load, the archive may have moved
-        views[i] = rt_file(name, i == 0 ? &view_size : RT_NULL);
-    }
-    // ttbin2oth's OTH/dat variable includes a six-byte trailer on TI; the
-    // PC file is raw. Validate the footer and its offset before any mask read.
-#ifdef __m68k__
-    if(view_size>=6)view_size-=6;
-#endif
-    if(views[0] && !(view_size&1) && view_size>=CONTOUR_BYTES+10){
-        const u8 *f=views[0]+view_size-10;
-        if(RD32(f,0)==0x46433032UL){
-            u16 off=RD16(f,3);
-            if(!(off&1) && off+CONTOUR_BYTES==view_size-10 &&
-               RD16(f,4)==CONTOUR_BYTES)contour_gfx=views[0]+off;
-        }
-    }
-    name[4] = 0;
-    name[3] = 'a'; ugfx = rt_file(name, RT_NULL);
-    name[3] = 'd'; cdesc = rt_file(name, &desc_size);
-    name[3] = 'i'; igfx = rt_file(name, &interface_size);
-    if (!contour_gfx || !ugfx || !igfx || !cdesc) {
-        igfx = RT_NULL; return 0;
-    }
 #ifdef FFT_MODULES
-    // A cold load resets transient inputs. Set both sizes only after preload.
-    mod_id=0; // cdesc/igfx changed; never reuse the previous chapter's binding
-    mod_call(MOD_SAVE,255,0);
-    mod_context(MOD_SAVE)->desc_size=desc_size;
-    mod_context(MOD_SAVE)->interface_size=interface_size;
-    i=mod_call(MOD_SAVE,4,0);
+    // A cold load resets transient inputs; the image adopts the reset names above.
+    mod_id=0; // cdesc/igfx change; never reuse the previous chapter's binding
+    i=mod_call(MOD_SAVE,6,(u8)chapter_letter[c]);
+    {
+        const ModCtx *m=mod_context(MOD_SAVE);
+        contour_gfx=m->contour_gfx; ugfx=m->chapter_ugfx; cdesc=m->cdesc; igfx=m->igfx;
+        encounter_units=m->unit_count; map_w=m->map_w; map_h=m->map_h; map_n=m->map_n;
+        sc_h=m->sc_h; sc_top=m->sc_top; unit_defs=m->unit_defs; map_tiles=m->map_tiles;
+    }
 #else
-    i=chapter_surface_offset(cdesc,desc_size,interface_size);
+    i=chapter_files(chapter_letter[c]);
 #endif
     if(!i){igfx=RT_NULL;return 0;}
     surface=cdesc+i;
-    encounter_units = (u8)CD(UNIT_COUNT);
-    map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u16)map_w * map_h; sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
-    unit_defs = (const UnitDef *)(cdesc + CD(UNIT_DEFS));
     story_after = 0;
     if(flow_bank&&CD(LOCATION)==7)story_after=1;
     if (CD(MAP_SCRIPT))
         for (i = 0; i < cdesc[CD(MAP_SCRIPT) + 1]; i++) story_after |= cdesc[CD(MAP_SCRIPT) + 4 + 8 * i] & 1;
-    map_tiles = (const Tile *)(igfx + UI_TILES);
 #ifdef __m68k__
     sl_l = (const PlaneWord *)UI_SHARED(SLOPES);
 #else
@@ -4731,7 +4712,8 @@ static void aim(AbId ab)
 #ifdef FFT_CHAPTER
     if(ab<512&&cast_area_supported(&abilities[ab],cj_range(common,ab))&&!st.ai)st.mode=M_CAST_RANGE;
 #endif
-    if (ab == NO_ABIL) attack_range(st.act); else skill_range(st.act, ab);
+    if (ab == NO_ABIL || abilities[ab].formula == 0x2b) attack_range(st.act);   // breaks: weapon range
+    else skill_range(st.act, ab);
     if (W) W->win_k[0] = 0;                        // the preview: for this ability
 }
 

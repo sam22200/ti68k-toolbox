@@ -16,6 +16,7 @@ u8 forecast_text(u8 a, u8 t, AbId ab, char *s)
     else if(kind==AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 v=(s8)abilities[ab].y;n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));}
     else if(kind==AB_STATUS||kind==AB_CLEANSE)n=put_s(s,n,hit?"Status":"Miss");
     else if(kind==AB_MP_DAMAGE){n=put_s(s,n,"-");n=put_n(s,n,skill_amount(a,t,ab,0));n=put_s(s,n,"MP");}
+    else if(kind==AB_STEAL_EXP){n=put_s(s,n,"EXP-");n=put_n(s,n,skill_amount(a,t,ab,0));}
     else if(kind==AB_MP_HEAL){
         const Unit *u=&st.unit[t];n=put_s(s,n,"+");
         n=put_n(s,n,action_hp(AB_HEAL,u->mp,u->max_mp,skill_amount(a,t,ab,0))-u->mp);n=put_s(s,n,"MP");

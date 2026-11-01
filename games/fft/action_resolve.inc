@@ -84,8 +84,10 @@ static u8 action_commit(void)
         return changed;
     }
     if (kind == AB_RAISE) { if (ua->pa < 99) ua->pa++; action_rewards(0); return 0; }
+    if (kind == AB_STEAL_EXP) { steal_exp(st.atk,ut,(u8)st.dmg); action_rewards(0); return 0; }
     if (kind == AB_BREAK) {
-        u8 *v = abilities[st.abil].y == 2 ? &ut->sp : &ut->ma;
+        // Source stat by ability id (0x2b); Magic Break's Orbonne adaptation lowers MA.
+        u8 *v = st.abil == 0x90 ? &ut->pa : st.abil == 0x8f ? &ut->sp : &ut->ma;
         *v = *v > abilities[st.abil].y ? *v - abilities[st.abil].y : 1;
         action_rewards(0); return 0;
     }

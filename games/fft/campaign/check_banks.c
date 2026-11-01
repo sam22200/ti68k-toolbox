@@ -70,7 +70,7 @@ static void expected_context(void)
         c->rt_keys = &rt_keys; c->rt_prev = &rt_prev; c->scene_rot = &scene_rot; c->vbuf_rot = &vbuf_rot;
         c->cgfx = cgfx;
         c->gauge = gauge;
-        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->job_names = job_names;
+        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->rt_file = rt_file; c->job_names = job_names;
         c->job_sets = job_sets;
         c->jobs = jobs; c->unit_defs = unit_defs; c->common = common; c->charge_ticks = charge_ticks;
         c->igfx = igfx; c->flow_bank=flow_bank;c->flow_ui=flow_ui;c->rt_seed = &rt_seed;
@@ -82,7 +82,7 @@ static void bindings(void)
     u8 id,pass;u32 seed=rng32;u16 size;const u8 *bank;
     u8 actual_w=map_w,actual_h=map_h,actual_units=encounter_units;
     u16 actual_n=map_n;s16 actual_sc_h=sc_h,actual_sc_top=sc_top;
-    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,384);
+    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,388);
     for(pass=0;pass<2;pass++){
         if(pass){map_w=1;map_h=1;map_n=1;encounter_units=13;sc_h=200;sc_top=1;}
         expected_context();

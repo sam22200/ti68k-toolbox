@@ -3,6 +3,7 @@
 #ifdef FFT_CHAPTER
 #include "charge_math.inc"
 #endif
+u16 skill_amount(u8 a, u8 t, AbId ab, u16 r);   // Steal Exp: nothing to steal, no hit
 // Execution has already paid. It must not test the remaining MP a second time.
 static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
 {
@@ -18,6 +19,10 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
     if(magic_formula(b->formula))return magic_applicable(t,ab)&&skill_kind(a,t,ab)!=AB_NULL&&
         (!magic_status_formula(b->formula)||magic_heal(a,t,ab,0))?magic_hit(a,t,ab,0):0;
 #endif
+    if (b->formula == 0x28 || b->formula == 0x2b) {   // Steal Exp, breaks: evasion x the percent;
+        u16 c = charge_query(a, t, ab, 0, 0), h = hit_chance(a, t);   // nothing left to steal: no hit
+        return b->formula == 0x28 && !skill_amount(a, t, ab, 0) ? 0 : (u8)(c >= 100 ? h : h * c / 100);
+    }
     if (b->kind == AB_CURE) return status_curable(ut,b->y) ? 100 : 0;
     if (b->kind == AB_REVIVE) return ut->hp ? 0 : 100;
     return b->flags & AF_EVADE ? hit_chance(a, t) : 100;
@@ -47,6 +52,10 @@ u16 skill_amount(u8 a, u8 t, AbId ab, u16 r)
 #ifdef FFT_CHAPTER
     // Punch Art strikes share the resident physical evaluator (CORE_PUNCH_ART.md).
     if ((u8)(b->formula - 0x31) <= 1) return charge_query(a, t, ab, 0, r);
+    if (b->formula == 0x28) {           // the EXP stolen: raw Speed + Y, at most 100 and the target's
+        k = ua->sp + b->y; if (k > 100) k = 100;
+        return k < st.unit[t].exp ? k : st.unit[t].exp;
+    }
     if (b->formula == 0x36 || b->formula == 0x2B || b->formula == 0x2C) return b->y;
     if (b->formula == 0x2D || b->formula == 0x30 || (b->formula == 1 && b->flags & AF_CHARGE)) {
         u8 weapon=hand_weapon(ua,0);

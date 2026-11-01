@@ -215,11 +215,17 @@ static void party_load(void)
 #if !MOD_CORE && MOD_PART(MOD_PARTY)
 #include "loot.inc"
 #endif
+#if !MOD_CORE && MOD_PART(MOD_SAVE)
+#define ugfx (M.chapter_ugfx)
+#include "chapter_files.inc"
+#undef ugfx
+#endif
 #if !MOD_CORE
 u16 mod_entry(u8 op, u8 a)
 {
     (void)a;
 #if MOD_PART(MOD_SAVE)
+    if(op==6)return chapter_files((char)a);
     if(op==5)return cj_valid(common,M.desc_size);
     if(op==4)return chapter_surface_offset(cdesc,M.desc_size,M.interface_size);
     if (op == 0) save_campaign();

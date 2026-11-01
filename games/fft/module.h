@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 46U
+#define MOD_ABI 47U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 typedef struct {
     u16 sig;                            // MOD_SIG, from the module's own build
@@ -17,6 +17,7 @@ typedef struct {
         char *forecast_out;              // resident -> NUMBERS5 only
         CastBatch *cast_batch_out;        // resident -> TARGETS1/3 or RESPONSE10 only
         struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; SAVE5: catalogue size in desc_size
+        const u8 *chapter_ugfx;          // SAVE6 -> resident: the chapter's unit frames
     };
     u8 map_w, map_h;
     u16 map_n;                         // the chapter's sizes, as they are at load (fft.h)
@@ -101,6 +102,7 @@ typedef struct {
     u8 (*ranged_reach)(u8 a, u8 o, u8 c);
     u8 (*rt_load)(const char *name, void *data, u16 size);
     u8 (*rt_save)(const char *name, const void *data, u16 size);
+    const void *(*rt_file)(const char *name, u16 *size);   // SAVE6: the chapter's banks
     const char *job_names;
     const u8 *job_sets;
     const Job *jobs;
@@ -203,6 +205,7 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define cgfx (M.cgfx)
 #define rt_load M.rt_load
 #define rt_save M.rt_save
+#define rt_file M.rt_file
 #define job_names (M.job_names)
 #define job_sets (M.job_sets)
 #define jobs (M.jobs)

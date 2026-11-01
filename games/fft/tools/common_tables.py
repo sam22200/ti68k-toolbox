@@ -171,6 +171,19 @@ def guts_record(r):
     return (21 if r[8]==0x39 else 18),(256-r[10])&255,r[0],255,128|32|1,0
 
 
+def steal_exp_record(r):
+    """Steal Exp 0x28: physical evasion, then (SP'+X)%; steals min(SP+Y, 100, target EXP)."""
+    if r[8]!=0x28 or r[1] or r[2]>1 or r[3]!=9 or r[4]&~0x11 or r[5] or r[6] or r[7] or r[11]:return None
+    return 22,r[10],r[0],2*r[2],2
+
+
+def break_record(r):
+    """Stat breaks 0x2b (Speed/Power/Mind Break): weapon range, physical evasion, then (PA'+Y)%;
+    the stat (by ability id) loses X, at least 1. X is the record's Y, the source Y its element."""
+    if r[8]!=0x2b or r[0]or r[1]or r[2]or r[3]!=0x20 or r[4]!=0x10 or r[5]or r[6]!=0x12 or r[7]or r[11]:return None
+    return 7,r[9],0,255,2
+
+
 def percent_magic_record(r):
     """Retail percent HP and single-panel HP/MP drains, with separate caster packets."""
     if r[8]not in(9,15,16)or r[9]==0 or r[11]or r[3]&~9 or r[4]&~0xe1 or r[5]&~0xe2 or r[6]&~0x42:return None
@@ -189,7 +202,7 @@ def battle_records(d):
         0x92: (6, 1, 0, 0, 1), 0x93: (0, 4, 1, 2, 0), 0x94: (0, 2, 4, 255, 2),
         0x98: (2, 0, 1, 6, 0), 0x9B: (0, 2, 2, 255, 8 | 32),
         0xA5: (0, 0, 3, 255, 8 | 16),
-        0x8F: (7, 2, 1, 6, 2), 0x8E: (7, 3, 1, 6, 2),
+        0x8E: (7, 3, 1, 6, 2),
     }
     symbols = dict(AB_DAMAGE=0, AB_CURE=1, AB_WISH=2, AB_HEAL=3, AB_REVIVE=4,
                    ST_DEFEND=1, ST_POISON=2, ST_DARK=4, ST_SILENCE=8,
@@ -218,6 +231,8 @@ def battle_records(d):
         talk = talk_record(d,a,speech) if speech else None
         # Guts (0x96..0x99) is read beyond the magic interval too.
         guts = guts_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x96<=a<=0x99 else None
+        steal = steal_exp_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if a==0x73 else None
+        stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8f<=a<=0x91 else None
         if a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
@@ -267,6 +282,10 @@ def battle_records(d):
             kind,y,rng,vert,flags=punch;formula=art[8]
         elif strike:
             kind,y,rng,vert,flags=strike;formula=art[8]
+        elif stat_break:
+            kind,y,rng,vert,flags=stat_break;formula=0x2b;element=d.at(battle.ABILITY_RANGE + 14*a, 14)[10]   # Y
+        elif steal:
+            kind,y,rng,vert,flags=steal;formula=0x28;element=d.at(battle.ABILITY_RANGE + 14*a, 14)[9]   # X
         elif guts:
             kind,y,rng,vert,flags,element=guts;formula=d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif talk:

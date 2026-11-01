@@ -74,6 +74,7 @@ static const ModCtx mod_defaults={
     .ranged_reach=ranged_reach,
     .rt_load=rt_load,
     .rt_save=rt_save,
+    .rt_file=rt_file,
     .rt_seed=&rt_seed,
     .divsi3=__divsi3,
     .mulsi3=__mulsi3,
