@@ -12,7 +12,7 @@ from review_files import publish_images
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 OUT = HERE / 'x/qa'
-BANKS = 'ffbm ffbn ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split()
+BANKS = 'ffbm ffbn ffbo ffov0 ffov1 ffov2 ffov3 ffoa ffoi ffost ffod ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split()
 
 
 def run(args, cwd):

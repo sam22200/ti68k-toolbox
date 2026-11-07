@@ -1,3 +1,4 @@
+#include "movement_access.inc"
 // Native SCREENS input policy. Return before the resident performs a loading action.
 #define view_w(r) ((r)&1?MAP_H:MAP_W)
 #define view_h(r) ((r)&1?MAP_W:MAP_H)
@@ -40,6 +41,9 @@ static void auto_control(u8 choice)
     if (!choice) {
         st.auto_units=0; st.ai_all=0;
         if (st.unit[st.act].team!=TEAM_PLAYER || !st.ai) return;
+#ifdef FFT_CHAPTER
+        if(st.unit[st.act].status_flags&STATUS_NO_CONTROL)return;
+#endif
     } else if (choice==2) {
         for (i=0;i<NUNIT;i++) if (st.unit[i].team==TEAM_PLAYER) st.auto_units|=(u16)(1U<<i);
     } else st.auto_units|=(u16)(1U<<st.act);
@@ -77,7 +81,7 @@ static u8 menu_keys(void)
             st.mode=M_AUTO; st.sub=1;
         }
     } else if (input_pressed(K_ESC | K_B)) {
-        if (st.moved && !st.acted && !st.pick_t) {   // the move undone (not after a pick-up)
+        if (st.moved && !st.acted && !st.pick_t && !movement_is_teleport(st.act)) {   // the move undone (not after a pick-up)
 #ifdef FFT_CHAPTER
             unit_place(u,st.move_cell);u->face=st.mface;
 #else
@@ -99,16 +103,17 @@ static u8 acts_keys(void)
     if(!unit_can_act(&st.unit[st.act])){to_menu();return 0;}
 #endif
     if (st.mode == M_ACTS) {
-        u8 m = (u8)(2 + st.unit[st.act].defend);  // Attack, the skill set, Defend
+        u8 m=(u8)(2+st.unit[st.act].defend+cj_support(common,st.unit[st.act].job,st.support[st.act],480));  // Attack, the skill set, Defend
         st.sub=choice_move(st.sub,m,rt_keys&~rt_prev);
         if (input_pressed(K_A | K_ENTER)) {
             if (!st.sub) {st.abil=NO_ABIL;return 2;}
+            else if(st.sub==2+st.unit[st.act].defend)return 4;
             else if (st.sub == 2) { st.acted = 1; return 3; }
             else if (known(st.act, 0) != NO_ABIL) { st.mode = M_SKILLS; st.skill = 0; }
         } else if (input_pressed(K_ESC | K_B)) st.mode = M_MENU;
         return 0;
     }
-    while (known(st.act, n) != NO_ABIL) n++;
+    n=(u8)known(st.act,255);
     st.skill=choice_move(st.skill,n,rt_keys&~rt_prev);
     if (input_pressed(K_A | K_ENTER)) {
         AbId ab = known(st.act, st.skill);

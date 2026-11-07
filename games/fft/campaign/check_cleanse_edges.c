@@ -7,6 +7,9 @@ static void ai_cases(void)
     for(j=0;j<sizeof cleanses/sizeof cleanses[0];j++){
         AbId ab=cleanses[j];prepare_cleanse(ab);r=cj_section(common,CJ_STATUS)+6*abilities[ab].y;
         seed_profile(&st.unit[10],r,1);st.unit[U_RAMZA].ma=99;
+        // Dispel's complete source set includes Transparent. Positive hostile
+        // utility needs a visible target; hidden-enemy rejection is checked below.
+        if(ab==56){st.unit[10].statuses.inflicted[2]&=(u8)~16;unit_status_refresh(&st.unit[10]);}
         st.moved=1;W->ai_k=0;steps=0;
         while(!ai_think()&&++steps<2048){}CHECK(steps<2048,1);found=0;
         for(k=0;k<W->ai_n;k++)if(W->ai_rank[k].ab==ab)found=1;
@@ -17,6 +20,9 @@ static void ai_cases(void)
         for(k=0;k<W->ai_n;k++)if(W->ai_rank[k].ab==ab)found=1;
         CHECK(found,0);
     }
+    prepare_cleanse(56);r=cj_section(common,CJ_STATUS)+6*abilities[56].y;seed_profile(&st.unit[10],r,1);
+    st.moved=1;W->ai_k=0;steps=0;while(!ai_think()&&++steps<2048){}CHECK(steps<2048,1);
+    found=0;for(k=0;k<W->ai_n;k++)if(W->ai_rank[k].ab==56)found=1;CHECK(found,0);
 }
 static void reflection(void)
 {

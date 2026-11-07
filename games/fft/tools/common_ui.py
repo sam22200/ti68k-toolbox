@@ -79,6 +79,8 @@ def strip(chapter, data, parts):
 
 
 if __name__ == '__main__':
+    from identity_assets import compact
     data, parts = common()
     for chapter in sys.argv[1:]:
         strip(chapter, data, parts)
+        compact(chapter)

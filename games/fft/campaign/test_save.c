@@ -70,12 +70,41 @@ static void check_hp_roundtrip(void)
     }
 }
 
+static void check_gil_roundtrip(void)
+{
+    Save s;u8 enemy;
+    remove("ffsave.sav");sw_init(61);
+    assert(qlong(battle_save.money)==2000);save_campaign();
+    assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==2000);
+    for(enemy=0;enemy<NUNIT;enemy++)if(st.unit[enemy].team==TEAM_ENEMY)break;
+    assert(enemy<NUNIT);
+    // Until victory, both gains and losses exist only in the battle allocation.
+    steal_gil_commit(U_RAMZA,enemy,600);
+    assert(qlong(battle_save.money)==2600);
+    assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==2000);
+    save_campaign();assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==2600);
+    save_campaign();assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==2600);
+    sw_init(61);assert(qlong(battle_save.money)==2600);
+    steal_gil_commit(enemy,U_RAMZA,600);save_campaign();
+    assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==2000);
+    steal_gil_commit(enemy,U_RAMZA,9801);save_campaign();
+    assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==0);
+    qput(s.money,99999998UL);assert(rt_save(SAVE_NAME,&s,sizeof s));sw_init(61);
+    steal_gil_commit(U_RAMZA,enemy,600);save_campaign();
+    assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==99999999UL);
+    // First campaign save after a scripted battle uses the same starting funds.
+    remove("ffsave.sav");sw_init(61);steal_gil_commit(U_RAMZA,enemy,600);save_campaign();
+    assert(rt_load(SAVE_NAME,&s,sizeof s)&&qlong(s.money)==2600);
+    remove("ffsave.sav");
+}
+
 int main(void)
 {
     u8 i,before,id;Save s;
     if(access("ffgi.bin",R_OK))assert(!chdir("data"));
     check_ko_party();
     check_hp_roundtrip();
+    check_gil_roundtrip();
     remove("ffsave.sav");
     sw_init(61);assert(sw_step(0));
     st.unit[1].hp=0;st.unit[1].dc=DC_CHEST;

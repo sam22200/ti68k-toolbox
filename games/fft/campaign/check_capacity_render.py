@@ -42,6 +42,7 @@ def main():
             frame_costs=values[:-2]
             ordinary=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if not mode>>31]
             cold=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if mode>>31]
+            assert max(ordinary)<360000,(label,max(ordinary))
             if scenario:assert(values[-1]>>16)&255==12
             (out/(label+'.log')).write_text(native)
             results.append(dict(case=label,checksum=match[1],identity=match[2],actors=13,

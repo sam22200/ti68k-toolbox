@@ -50,7 +50,7 @@ static void unit_card_draw(const UnitCard *d,u8 layout,s16 y,u8 part,u8 context,
 #endif
     if(part==UC_PORTRAIT) {
         static const u8 px[]={2,5,0,61,2},py[]={1,15,0,0,1};
-        portrait32(d->portrait,px[layout],y+py[layout]);return;
+        if(d->portrait)portrait32(d->portrait,px[layout],y+py[layout]);return;
     }
 #ifdef CARD_MANAGEMENT_LAYOUTS
     if(layout==UC_FORMATION) {

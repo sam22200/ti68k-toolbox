@@ -5,7 +5,9 @@
 static u16 chapter_files(char letter)
 {
     char name[6];                              // "ff?v0" (no initializer: a module has no memcpy)
-    u16 i, view_size = 0, desc_size = 0, interface_size = 0;
+    u16 i, view_size = 0, desc_size = 0, interface_size = 0,identity_size=0;
+    pgfx=rt_file("ffcp",&identity_size);
+    if(!identity_valid(pgfx,identity_size))return 0;
     name[0] = name[1] = 'f'; name[2] = letter; name[3] = 'v'; name[5] = 0;
     for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
         name[4] = (char)('0' + i);             // again each load, the archive may have moved

@@ -91,7 +91,7 @@ void game_init(void)
 #endif
        4)||tb16(title_bank+4)<8||
        tb16(title_bank+6)<=tb16(title_bank+4)||tb16(title_bank+6)>=size))title_bank=RT_NULL;
-    if(title_mg&&(mg_size<6416||memcmp(title_mg,"FMG2",4)||
+    if(title_mg&&(mg_size<6416||memcmp(title_mg,"FMG3",4)||
        tb16(title_mg+18)>mg_size-2668U||tb16(title_mg+14)>mg_size-6396U))title_mg=RT_NULL;
     title_back=malloc(4000);title_draft=malloc(sizeof *title_draft);title_background=255;
     if(title_draft)title_scan();

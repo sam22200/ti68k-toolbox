@@ -14,7 +14,7 @@ static u8 hand_weapon(const Unit *u,u8 hand)
 #endif
 static u8 weapon_reach(const Unit *u)
 {
-    return u->eq[EQ_WEAPON]!=255&&!UNIT_FROG(u)?items[u->eq[EQ_WEAPON]].reach:1;
+    u8 weapon=hand_weapon(u,0);return weapon!=255?items[weapon].reach:1;
 }
 static u8 hand_count(u8 actor)
 {

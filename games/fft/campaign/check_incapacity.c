@@ -94,10 +94,10 @@ static void terminal_door(void)
 }
 static void ordinary_effects(void)
 {
-    u8 i;u32 random_after[2],seed;u16 hp,jp,bag;
+    u8 i;u32 random_before[2],random_after[2],seed;u16 hp,jp,bag;
     for(i=0;i<2;i++){
         arena();keep_enemy();if(i)stone(10);
-        attack(U_RAMZA,10);random_after[i]=rng32;
+        random_before[i]=rng32;attack(U_RAMZA,10);random_after[i]=rng32;
         hp=st.unit[10].hp;jp=st.unit[U_RAMZA].jp;
         // Supply a prepared hit, matching the original finalizer's fixture input.
         st.hit=1;st.push=0;st.dmg=7;seed=rng32;impact();
@@ -105,7 +105,11 @@ static void ordinary_effects(void)
         CHECK(st.unit[10].hp,hp-(i?0:7));
         if(i){CHECK(st.unit[U_RAMZA].jp,jp);CHECK(rng32==seed,1);CHECK(st.gain,0);}
     }
-    CHECK(random_after[0]==random_after[1],1); // preparation draws are not skipped for stone
+    // Petrify is rejected by hit preparation before a random draw; the
+    // ordinary live-target strike still consumes its preparation prefix.
+    CHECK(random_before[0],random_before[1]);
+    CHECK(random_after[0]!=random_before[0],1);
+    CHECK(random_after[1],random_before[1]);
     // A prepared root is also harmless if the target petrifies before HP commit.
     arena();keep_enemy();attack(U_RAMZA,10);stone(10);st.hit=1;st.dmg=7;st.push=1;st.push_cell=third;
     st.self=999;hp=st.unit[U_RAMZA].hp;impact();

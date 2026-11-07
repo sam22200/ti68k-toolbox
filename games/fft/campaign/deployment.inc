@@ -40,7 +40,7 @@ static void deploy_init(void)
         u8 k;
         for(k=0;k<save.deploy_n&&k<5;k++)for(i=0;i<25;i++) {
             const u8 *c=deploy_cell(i),*p=save.deploy[k];
-            if(c[0]&&c[1]==p[1]&&c[2]==p[2]&&p[0]<save.n&&dp.placed[i]==255&&deploy_where(p[0])==255) {
+            if(c[0]&&c[1]==p[1]&&c[2]==p[2]&&p[0]<save.n&&save.unit[p[0]].type!=3&&dp.placed[i]==255&&deploy_where(p[0])==255) {
                 dp.placed[i]=p[0];dp.n++;break;
             }
         }
@@ -58,6 +58,7 @@ static void deploy_init(void)
 static u8 deploy_place(void)
 {
     u8 cell=(u8)(dp.row*5+dp.col),old=deploy_where(dp.unit);
+    if(save.unit[dp.unit].type==3){dp.note=6;return 0;}
     if(!deploy_cell(cell)[0]){dp.note=1;return 0;}
     if(dp.placed[cell]!=255&&dp.placed[cell]!=dp.unit){dp.note=2;return 0;}
     if(old==255&&dp.n==deploy_rules()[2]){dp.note=3;return 0;}

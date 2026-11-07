@@ -43,10 +43,11 @@ def main():
         # A valid one-image historical envelope suffices for magic rejection.
         # Recombining every current image would exceed the AMS variable limit.
         at=struct.unpack_from('>H',a,14)[0];n=struct.unpack_from('>H',a,at+6)[0]
-        records=[a[at:at+10+n]]
+        end=struct.unpack_from('>H',a,16)[0] if struct.unpack_from('>H',a,6)[0]>1 else len(a)
+        records=[a[at:end]]
         legacy=bytearray(b'FMB2')+struct.pack('>H',len(records))+bytes(2*len(records))
         for i,record in enumerate(records):struct.pack_into('>H',legacy,6+2*i,len(legacy));legacy+=record
-        cases=[('missing',{'ffbn':None}),('token',{'ffbn':bank('token','ffbn',corrupt)}),
+        cases=[('missing',{'ffbn':None}),('missing-third',{'ffbo':None}),('third-truncated',{'ffbo':bank('third-short','ffbo',b'FMB3')}),('token',{'ffbn':bank('token','ffbn',corrupt)}),
             ('truncated',{'ffbn':bank('short','ffbn',b[:16])}),('signature',{'ffbn':bank('signature','ffbn',badsig)}),
             ('legacy',{'ffbm':bank('legacy','ffbm',legacy)}),
             ('swapped',{'ffbm':bank('swapa','ffbm',b),'ffbn':bank('swapb','ffbn',a)}),

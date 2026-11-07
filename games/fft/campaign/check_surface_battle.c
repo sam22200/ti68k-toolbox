@@ -74,6 +74,9 @@ static void trials(void)
     for(i=0;i<NUNIT;i++){st.unit[i].hp=0;st.unit[i].dc=DC_GONE;st.unit[i].x=255;}
     unit_place(&st.unit[U_RAMZA],2);unit_place(&st.unit[1],1);
     st.unit[U_RAMZA].hp=st.unit[1].hp=100;st.unit[U_RAMZA].dc=st.unit[1].dc=3;
+    // battle_line_clear now follows the equipped weapon's trajectory family.
+    // This fixture checks a straight ray under a bridge, in both directions.
+    st.unit[U_RAMZA].eq[EQ_WEAPON]=st.unit[1].eq[EQ_WEAPON]=71;
     st.unit[U_RAMZA].jump=1;st.unit[U_RAMZA].move=4;
     st.act=st.sel=U_RAMZA;st.mode=M_MENU;st.open_stage=0;
     memset(bank,0,sizeof bank);memcpy(bank,"FGS1",4);bank[4]=3;bank[5]=1;bank[7]=3;

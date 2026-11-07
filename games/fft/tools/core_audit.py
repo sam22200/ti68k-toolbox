@@ -168,7 +168,7 @@ def package(path):
         if sum(raw[offset+4:end-2]) & 65535 != check:
             raise ValueError(f'{path}: variable checksum mismatch')
         label = name.rstrip(b'\0').decode('ascii')
-        if label.endswith('core') or kind == 0x21 or label in ('ffbm','ffbn'):
+        if label.endswith('core') or kind == 0x21 or label in ('ffbm','ffbn','ffbo'):
             category = 'code_and_embedded_constants'
         elif re.fullmatch(r'ff[go]v[0-3]', label):
             category = 'battle_views_and_occlusion'

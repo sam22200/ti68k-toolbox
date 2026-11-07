@@ -2,6 +2,7 @@
 void pick_up(u8 who, u8 obj)
 {
     Unit *u = &st.unit[who], *o = &st.unit[obj];
+    st.abil=NO_ABIL; // a loot message supersedes any movement-benefit resource label
     if (o->dc == DC_CRYSTAL) {
         u->hp = u->max_hp; u->mp = u->max_mp;
         st.pick = 0xFF;

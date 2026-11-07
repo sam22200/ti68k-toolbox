@@ -34,18 +34,31 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
         n = put_s(s, 0, entries[k]);
         if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_DGRAY;
     } else if (m == M_ACTS) {
+        #ifdef FFT_CHAPTER
+        if(k==2+u->defend)n=put_s(s,0,"Equip Change");else
+#endif
         n = put_s(s, 0, k == 2 ? window_defend : k ? SKILL_NAME(u->set) : "Attack");
         if (k == 1 && W->win_k[1]) c = C_DGRAY;
     } else if (m == M_SKILLS) {                    // an item: how many are left
         AbId ab = known(W->win_k[2], k + W->win_k[1]);
         n = put_s(s, 0, ABIL_NAME(ab));
-        if (abilities[ab].flags & AF_ITEM && u->team == TEAM_PLAYER) {
-            s[n++] = ' '; n = put_n(s, n, st.bag[abilities[ab].bag]);
+        if (abilities[ab].flags & AF_ITEM &&
+#ifdef FFT_CHAPTER
+            unit_home_team(u)!=TEAM_ENEMY
+#else
+            u->team==TEAM_PLAYER
+#endif
+        ) {
+            s[n++] = ' '; n = put_n(s, n, ab>=512?battle_save.inv[abilities[ab].bag]:st.bag[abilities[ab].bag]);
         }
-        if (!can_use(W->win_k[2], ab)) c = C_DGRAY;
+        if (abilities[ab].kind!=AB_MATH_SELECTOR&&!can_use(W->win_k[2], ab)) c = C_DGRAY;
     } else if (m == M_ACT) {
         n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : st.abil == ABIL_DEFEND ? window_defend : ABIL_NAME(st.abil));
     } else if (m == M_PICK) {                      // a crystal or a chest picked up
+        #ifdef FFT_CHAPTER
+        if(st.pick==254&&(u16)(st.abil-493)<4U){n=put_s(s,0,st.abil==493?"HP+":st.abil==494?"MP+":st.abil==495?"EXP+":"JP+");n=put_n(s,n,st.dmg);}
+        else
+#endif
         if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");
         else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
     }

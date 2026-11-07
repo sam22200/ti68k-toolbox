@@ -95,7 +95,7 @@ static u16 seed_for(u8 critical)
 {
     u16 candidate;
     for(candidate=1;candidate<2048;candidate++){
-        u8 got;rng32=candidate;rand15();got=((u32)rand15()*100>>15)<4;
+        u8 got,n;rng32=candidate;for(n=0;n<4;n++)rand15();got=((u32)rand15()*100>>15)<4;
         if(got==critical)return candidate;
     }
     CHECK(0,1);return 1;

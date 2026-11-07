@@ -7,7 +7,11 @@ static u8 win_lines(u8 m)
     if (m == M_AUTO) return 3;
     if (m == M_QUIT) return 3;
     if (m == M_ORDER) { while (n < ORDER_N && st.turns[n] != 0xFF) n++; return n; }
-    if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend);
+    if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend
+#ifdef FFT_CHAPTER
+        +cj_support(common,st.unit[W->win_k[2]].job,st.support[W->win_k[2]],480)
+#endif
+    );
     if (m == M_ACT || m == M_PICK) return 1;
     while (n < SKILL_ROWS && known(W->win_k[2], n + W->win_k[1]) != NO_ABIL) n++; // M_SKILLS
     return n;
@@ -20,8 +24,10 @@ static void make_window(void)
 
     u16 *l = W->win[0], *d = W->win[1];
     const Unit *u = &st.unit[W->win_k[2]];
-    u8 r, i, k = W->win_n++, m = W->win_k[0], c = C_BLACK;
+    u8 r, i, k, m = W->win_k[0], c = C_BLACK;
     char s[28];
+next_part:
+    k=W->win_n++;
     if (!k) {
         u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_AUTO || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
         const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
@@ -50,7 +56,7 @@ static void make_window(void)
             }
             rt_light = sl; rt_dark = sd;
         }
-        return;
+        goto part_done;
     }
     c = window_label(s);
     k--;
@@ -60,5 +66,9 @@ static void make_window(void)
         if(!(m==M_MENU||m==M_AUTO||m==M_ACTS||m==M_SKILLS||m==M_QUIT))menu.text_x=3;
         rt_light=l;rt_dark=d;choice_row(&menu,k,s,c);rt_light=sl;rt_dark=sd;
     }
+part_done:
+    // The high sub bit identifies Math's staged skill menu; complete it now.
+    if(m==M_SKILLS&&(st.sub&128)&&W->win_n<W->win_m){W->left-=HUD_K;goto next_part;}
+
 }
 

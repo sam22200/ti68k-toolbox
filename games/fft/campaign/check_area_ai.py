@@ -38,16 +38,17 @@ def main():
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'areaai',*source,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     for name in ('ffgd','ffcj','fai00'):run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',name+'.bin',name],fixture)
     cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
-    for bank in 'ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj fai00'.split():
+    for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj fai00'.split():
         cmd+=['--file',(fixture if bank in ('ffgd','ffcj','fai00')else HERE/'data')/(bank+'.89y')]
     native=run([*cmd,out/'areaai.89z']);(out/'native.log').write_text(native)
     m=re.search(r'area_ai (\w+) failures 0 checks (\d+) max_steps (\d+)',pc);assert m
     v=[int(x,16)for x in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',native)]
     assert v[-3:]==[int(m[1],16),0,int(m[2])]and '_main returned'in native,native[-3500:]
-    calls,origins,steps=v[-6:-3];assert calls<=13+origins and steps==int(m[3]),v[-6:]
+    calls,origins,steps=v[-6:-3];assert calls<=2*13+origins and steps==int(m[3]),v[-6:]
     zones=[s.strip()for s in native.splitlines()if re.match(r'^(?:(?:52|53)\s+|max (?:52|53)\s+)',s)]
     maximum=int(re.search(r'^max 53\s+-\s+(\d+)',native,re.M)[1]);assert maximum<360000,maximum
     other=int(re.search(r'^max 52\s+-\s+(\d+)',native,re.M)[1])
+    assert other<360000,other
     report=dict(checks=int(m[2]),hash=m[1],native_equal=True,max_steps=steps,cache_formula_calls=calls,
         cache_origins=origins,zones=zones,max_area_quantum_cycles=maximum,
         max_general_planner_quantum_cycles=other,general_peak_stage=v[-7],

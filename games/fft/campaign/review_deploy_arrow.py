@@ -65,7 +65,7 @@ def main():
             confirm=check.keys(check.OUT/'confirm.keys',[(2,'C')])
             # Same renderer, bank bytes, inputs and saved party on PC/actual68000.
             program='arrbase' if style=='current' else 'arr'+style.lower()
-            results=check.program(program,str(checker),['ffmg','ffcj','ffflow'],0x44504c31,
+            results=check.program(program,str(checker),['ffmg','ffcp','ffcj','ffflow'],0x44504c31,
                     [('initial',200,4,empty),('confirm',200,8,confirm)],prep,temp/'ffsave.89y',None,workdir=data)
             write_changed(out/style/'native/results.txt',(str(results)+'\n').encode())
     sheet=Image.new('RGB',(1476,816),'white');d=ImageDraw.Draw(sheet)

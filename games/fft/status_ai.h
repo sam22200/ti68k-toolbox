@@ -22,6 +22,10 @@ static s16 status_ai_gain(u8 t,u16 value,u8 same)
     s16 score=0;u8 current=core_status_current(&u->statuses,b);
     for(bit=128,k=0;bit;bit>>=1,k++)if(m&bit){
         u8 helpful=0,weight=24;
+        if(b==2&&bit==2&&(current&bit)){
+            if(!(u->statuses.innate[2]&bit))score+=same?48:-48;
+            continue; // Frog on Frog removes the mutable transformation.
+        }
         if(current&bit){
             if(b<3||(u->statuses.innate[b]&bit)||u->status_ct[((b-3)<<3)+k]>3)continue;
             weight=8;

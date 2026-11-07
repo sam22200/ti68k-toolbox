@@ -136,6 +136,16 @@ static void allocation_trial(void)
     game_render(); // missing-State error rendering must not dereference it
 #endif
 }
+#ifdef __m68k__
+// ti-cycles owns a writable synthetic ROM table. Intercept its allocator so
+// the separately compiled bootstrap image sees the same injected failure.
+static void *(__attribute__((stkparm)) *original_malloc)(long);
+static void *__attribute__((stkparm)) boundary_malloc(long bytes)
+{
+    if(fail_next_allocation&&bytes==BATTLE_STORAGE_BYTES){fail_next_allocation=0;return 0;}
+    return original_malloc(bytes);
+}
+#endif
 #ifndef __m68k__
 int main(int argc,char **argv)
 {
@@ -149,8 +159,12 @@ int main(int argc,char **argv)
 #else
 void _main(void)
 {
-    if(BENCH_ARG==298)fail_next_allocation=1;
+    if(BENCH_ARG==298){
+        void **rom=*(void ***)0xc8;
+        fail_next_allocation=1;original_malloc=rom[0xa2];rom[0xa2]=boundary_malloc;
+    }
     boundaries_runtime_main();
+    if(BENCH_ARG==298)(*(void ***)0xc8)[0xa2]=original_malloc;
     if(BENCH_ARG==298)allocation_trial();else if(BENCH_ARG==299)reject_trial();else trials(BENCH_ARG);
     BENCH_VALUE(digest);BENCH_VALUE(failures);BENCH_VALUE(checks);
 }

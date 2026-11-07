@@ -4,9 +4,9 @@
 static const char *status_label(u16 value)
 {
     u8 b=(u8)(value>>8),m=(u8)value;
-    if(b==0)return "Undead";
+    if(b==0)return m==2?"Defend":m?"Undead":"Miss";
     if(b==1)return m&128?"Stone":m&32?"Dark":m&16?"Confuse":"Silence";
-    if(b==2)return m&32?"Reraise":m&8?"Berserk":m&4?"Chicken":"Frog";
+    if(b==2)return m&16?"Hidden":m&32?"Reraise":m&8?"Berserk":m&4?"Chicken":"Frog";
     if(b==3){
         if(m==48)return "Guard";
         if(m&128)return "Poison";if(m&64)return "Regen";

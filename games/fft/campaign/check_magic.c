@@ -1,4 +1,6 @@
 // Source formula08 arithmetic and private Holy through cast/action/AI boundaries.
+#define FFT_CHECK_NATIVE_ORDINAL // keep native assertion IDs within the variable ceiling
+#define FFT_CHECK_NO_ZONES // equality carrier; dedicated planner/frame carriers retain timings
 #define INCANTATION_CHECK
 #include "check_casting.c"
 #include "x/core-magic/oracle/source.h"

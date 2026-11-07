@@ -226,7 +226,7 @@ static void wide_costs(void)
     CHECK(core_nav_start(&f->search,256,0,9,f->dist,f->from,f->blocked,CORE_NAV_WIDE,0,0),1);
     CHECK(core_nav_step(&f->search,&f->graph,1),CORE_NAV_MORE);
     search(255,9,CORE_NAV_WIDE,1,0,0);CHECK(f->dist[255],0);CHECK(f->dist[0],255);
-    CHECK(core_nav_start(&f->search,256,0,9,f->dist,f->from,f->blocked,4,0,0),0);
+    CHECK(core_nav_start(&f->search,256,0,9,f->dist,f->from,f->blocked,16,0,0),0);
     f->edge[0][1]=24;CHECK(core_nav_graph_mode_valid(&f->graph,1),0);
     f->edge[0][1]=8;CHECK(core_nav_graph_mode_valid(&f->graph,1),0);
     f->edge[0][1]=25;CHECK(core_nav_graph_mode_valid(&f->graph,1),0);

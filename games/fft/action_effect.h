@@ -2,7 +2,8 @@
 // Formula/RNG, legality, costs, rewards and actor-side effects are separate.
 #ifndef FFT_ACTION_EFFECT_H
 #define FFT_ACTION_EFFECT_H
-enum { EFFECT_KIND_MASK=63,EFFECT_RETURN=64,EFFECT_OIL=128 };
+enum { EFFECT_KIND_MASK=31,EFFECT_STATUS=32,EFFECT_RETURN=64,EFFECT_OIL=128 };
+typedef char ActionKindFitsPacket[(AB_STEAL_GIL<=EFFECT_KIND_MASK)?1:-1];
 static u8 effect_damage(u8 kind){return kind==AB_DAMAGE||(u8)(kind-AB_HP_DAMAGE_MP_HEAL)<=1;}
 static u16 action_hp(u8 kind,u16 hp,u16 max_hp,u16 amount)
 {

@@ -1,22 +1,20 @@
 // Shared immediate-state evaluator and stable ranking; no image loads or RNG.
-static s16 worth(const Unit *u, u16 hp, u8 status)
-{
-    s16 s;
-    if (!hp) return -192;
-    s = divs32_16((long)hp << 7, (short)u->max_hp);
-    if ((u16)(hp * 5) <= u->max_hp) s -= 32;
-    if (status & ST_POISON) s -= 26;
-    if (status & ST_DARK) s -= 64;
-    return s;
-}
+#include "ai_worth.h"
 
+#ifdef FFT_CHAPTER
+static inline u8 ability_range(u8 who,AbId ab);
+#endif
 static u8 ai_range(u8 a, AbId ab)
 {
 #ifdef FFT_CHAPTER
     if (ab == NO_ABIL) return W->ai_weapon;
 #endif
     if (ab == NO_ABIL) return 1;
+    #ifdef FFT_CHAPTER
+    return ability_range(a,ab);
+#else
     if (abilities[ab].flags & AF_ITEM && st.unit[a].move < abilities[ab].range) return st.unit[a].move;
+#endif
     return abilities[ab].range;
 }
 
@@ -27,9 +25,13 @@ static u8 ai_reaches(u8 a, AbId ab, u8 o, u8 c)
     u8 d = (u8)((dx < 0 ? -dx : dx) + (dz < 0 ? -dz : dz));
     if (!t->walk) return 0;
 #ifdef FFT_CHAPTER
-    if (ab == NO_ABIL && W->ai_weapon > 1) return ranged_reach(a, o, c);   // a bow
+    if(jump_ability(ab))return jump_reaches(a,o,c);
+    if(ab==NO_ABIL||(ab<512&&(abilities[ab].flags&AF_CHARGE)))return ranged_reach(a,o,c);
 #endif
     if (ab == NO_ABIL) return d == 1 && h >= -6 && h <= 5;
+#ifdef FFT_CHAPTER
+    if(cj_range(common,ab)&&(cj_range(common,ab)[3]&16)&&dx&&dz)return 0;
+#endif
     if (d > ai_range(a, ab) || (o==c && !(abilities[ab].flags & AF_SELF))) return 0;
     return abilities[ab].vert == 0xFF || (h < 0 ? -h : h) <= abilities[ab].vert;
 }

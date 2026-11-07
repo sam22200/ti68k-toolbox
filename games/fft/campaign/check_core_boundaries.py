@@ -13,7 +13,7 @@ def descriptor13():
     from surface_data import detach_descriptor,attach_descriptor
     original,surface=detach_descriptor((HERE/'data/ffgd.bin').read_bytes())
     data=bytearray(original)
-    assert data[:4]==b'FCD3'
+    assert data[:4]==b'FCD4'
     unit_field,count_field=17,50
     original=struct.unpack_from('>H',data,2*unit_field)[0]
     count=struct.unpack_from('>H',data,2*count_field)[0]

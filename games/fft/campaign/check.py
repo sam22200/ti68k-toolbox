@@ -47,7 +47,7 @@ def main():
     results=[]
     for name,flags,banks,cases in (
         ('scene',['-DCHECK_SCENE'],['ffs1','ffflow','ffcp','ffcu','ffca','ffcb'],[('narration',1,30,empty),('chapter',1,120,advance),('academy-complete',1,1000,advance)]),
-        ('gariland',['-DCHECK_GAR'],['ffbm','ffbn','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
+        ('gariland',['-DCHECK_GAR'],['ffbm','ffbn','ffbo','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
          [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won),('party',70,90,empty),('wide',70,90,wide)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']
@@ -136,13 +136,13 @@ def manage(pc_save,ti_save):
     def knight(s): assert s['party'][0]['job']==0x4C,'Ramza a Knight'
     if '--carousel-only' in sys.argv:
         spin=keys(OUT/'carousel.keys',[(2,'RIGHT')])
-        return program('manage','check_manage.c',['ffmg','ffcj'],0x4d4e4701,
+        return program('manage','check_manage.c',['ffmg','ffcp','ffcj'],0x4d4e4701,
                        [('spin-start',5,4,spin),('spin-middle',5,6,spin),('spin-settled',5,16,spin)],
                        pc_save,ti_save,None)
     slide=keys(OUT/'formation-slide.keys',[(2,'RIGHT')])
     confirmation=keys(OUT/'job-confirm.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER')])
     change=keys(OUT/'job-change.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER'),(28,'ENTER')])
-    return program('manage','check_manage.c',['ffmg','ffcj'],0x4d4e4701,
+    return program('manage','check_manage.c',['ffmg','ffcp','ffcj'],0x4d4e4701,
                    [('formation',0,4,empty),('status',1,4,empty),('equip',2,4,empty),('abilities',3,4,empty),
                     ('learn',4,4,empty),('jobs',5,4,empty),('menu',6,4,empty),
                     ('slide-start',0,3,slide),('slide-mid',0,5,slide),('slide-done',0,8,slide),

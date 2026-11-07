@@ -150,16 +150,16 @@ static void integration(void)
 #endif
     ZB(21);tick();ZE(21);CHECK(st.status_clock,0);
     for(i=0;i<NUNIT;i++){CHECK(st.unit[i].status,0);CHECK(st.unit[i].status_ct[0],0);}
-    // Ordinary clock work must not load the status image when no timers exist.
+    // The clock stays in its ORDER owner; no separate status-image hop is needed.
     for(i=0;i<NUNIT;i++){st.unit[i].ct=0;st.unit[i].sp=1;}st.unit[0].sp=100;
 #ifdef FFT_MODULES
     mod_id=0;
 #endif
     ZB(22);CHECK(ct_next(),0);ZE(22);
 #ifdef FFT_MODULES
-    CHECK(mod_id,0);
+    CHECK(mod_id,MOD_ORDER+1);
 #else
-    CHECK(0,0);
+    CHECK(MOD_ORDER+1,MOD_ORDER+1);
 #endif
     // Lethal upkeep cancels a pending action and ends a lost battle without
     // entering an endless ct_next search when no player remains alive.

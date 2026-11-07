@@ -16,7 +16,7 @@ static u8 restore_possible(u8 t,AbId ab)
     return abilities[ab].formula!=0x4b||restore_undead(u)||
         ((!u->hp||(core_status_current(&u->statuses,0)&32))&&!(u->statuses.innate[0]&32));
 }
-static u8 restore_applicable(u8 t,AbId ab)
+static __attribute__((noinline)) u8 restore_applicable(u8 t,AbId ab)
 {
     const Unit *u=&st.unit[t];u8 dead=!u->hp||(core_status_current(&u->statuses,0)&32);
     if(!magic_target(t)||unit_petrified(u)||(core_status_current(&u->statuses,3)&1))return 0;

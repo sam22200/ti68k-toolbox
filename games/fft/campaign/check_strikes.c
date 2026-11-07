@@ -93,7 +93,7 @@ static void fresh_target(void)
 }
 static void ranged_pair(void)
 {
-    u8 blocked;u16 c,w,hp;
+    u8 blocked;u16 c,w,hp;const u8 *source=RT_NULL;
     for(blocked=0;blocked<2;blocked++){
         arena();
         for(w=0;w<255;w++)if(items[w].wp&&items[w].reach>=4)break;
@@ -104,11 +104,12 @@ static void ranged_pair(void)
         CHECK(c+3<MAP_N,1);unit_place(&st.unit[U_RAMZA],c);unit_place(&st.unit[10],c+3);
         st.unit[U_RAMZA].eq[EQ_WEAPON]=w;CHECK(attack_sequence(U_RAMZA,10,2),1);
         st.hit=1;st.dmg=1;st.push=0;impact();hp=st.unit[10].hp;
-        if(blocked){unit_place(&st.unit[12],c+1);st.unit[12].hp=100;st.unit[12].dc=3;}
+        if(blocked)source=solid_panel(c+1);
         end_anim();CHECK(st.action.phase,blocked?CTX_IMPACT:CTX_ROOT);CHECK(st.action.left,0);
         if(!blocked){st.hit=1;st.dmg=1;st.push=0;impact();CHECK(st.unit[10].hp,hp-1);end_anim();}
         else CHECK(st.unit[10].hp,hp);
         end_anim();CHECK(st.action.phase,CTX_IDLE);
+        if(blocked)solid_restore(source);
     }
 }
 static void trials_strikes(void){pair_order(REACTION_COUNTER);pair_order(REACTION_POTION);best_exp();rejected_and_empty();misses();fresh_target();ranged_pair();}

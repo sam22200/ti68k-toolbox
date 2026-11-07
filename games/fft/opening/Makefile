@@ -17,9 +17,9 @@ data/%.89y: data/%.bin
 	cd data && ../../../../tools/gcc4ti-bin/bin/ttbin2oth -89 dat $*.bin $*
 	python3 -c "from pathlib import Path; p=Path('$@'); b=bytearray(p.read_bytes()); b[0x49]=3; p.write_bytes(b)"
 # The battle program's shared archive pair: built once by ../campaign
-MODULES := ../campaign/data/ffbm.89y ../campaign/data/ffbn.89y
+MODULES := ../campaign/data/ffbm.89y ../campaign/data/ffbn.89y ../campaign/data/ffbo.89y
 $(MODULES) &: ../fft.c ../fft.h ../module.h opening.inc $(wildcard ../*.inc)
-	$(MAKE) -C ../campaign data/ffbm.89y data/ffbn.89y
+	$(MAKE) -C ../campaign data/ffbm.89y data/ffbn.89y data/ffbo.89y
 ti cycles: $(TI_FILES) $(MODULES)
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../fft.c ../fft.h opening.inc $(wildcard data/*.h)
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../unit_card.h ../unit_card.inc ../portrait32.inc ../choice_menu.h ../choice_menu.inc
@@ -66,8 +66,10 @@ $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../config.inc ../contour.h ../
 
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: | contour-assets
 
-data/ffod.bin: ../tools/chapter_desc.py ../core_limits.h data/battle.h data/interface.h data/map.h data/units.h data/ffcj.bin
+data/ffod.bin: ../tools/chapter_desc.py ../tools/surface_data.py ../core_limits.h data/battle.h data/interface.h data/map.h data/units.h data/ffcj.bin data/ffcp.bin
 	$(PY) ../tools/chapter_desc.py opening
+data/ffcp.bin: ../tools/common_portraits.py ../tools/identity_assets.py ../tools/management_data.py
+	$(MAKE) -C ../campaign ../opening/data/ffcp.bin
 
 data/ffs0.bin: ../tools/scenes.py data/ffost.bin data/story.h
 	$(PY) ../tools/scenes.py

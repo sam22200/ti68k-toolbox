@@ -10,6 +10,6 @@ typedef struct {
     u8 confirm,ready,dirty,forecast_dirty,weather;
 } AreaUi;
 typedef char AreaUiFitsAiScratch[(sizeof(AreaUi)<=256)?1:-1];
-enum { AREA_INPUT,AREA_BEGIN,AREA_DRAW,AREA_HEADER };
+enum { AREA_INPUT,AREA_BEGIN,AREA_DRAW,AREA_HEADER,AREA_NUMBERS,AREA_RESULTS };
 enum { AREA_NONE,AREA_QUERY,AREA_SEND,AREA_BACK };
 #endif

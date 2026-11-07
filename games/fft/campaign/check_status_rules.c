@@ -51,7 +51,9 @@ static void trials(void)
         if(source_evades[k].shield==255){
             for(i=1;i<=12;i++){
                 u8 expected;u16 r,ev=source_evades[k].side==0?jobs[t->job].cev:0;
-                rand_seed(i);r=rand15();expected=((u32)r*source_evades[k].base>>15)>=ev;
+                // Accessory, weapon and shield stages draw even with zero evade;
+                // the class-only comparison therefore uses the fourth draw.
+                rand_seed(i);rand15();rand15();rand15();r=rand15();expected=((u32)r*source_evades[k].base>>15)>=ev;
                 rand_seed(i);CHECK(roll_hit(U_RAMZA,10),expected);
             }
         }

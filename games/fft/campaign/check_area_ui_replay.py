@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='fft-area-full-')as name:
   row=dict(frames=frames,mode=mode,ability=ab,confirm=confirm,acted=acted)
   if '--pc-only'not in sys.argv:
    cmd=[r/'tools/bin/ti-cycles','--frames',frames,'--arg',61,'--max',10000,'--keys',keys]
-   for bank in 'ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():cmd+=['--file',(fixture if bank=='ffcj'else h/'data')/(bank+'.89y')]
+   for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():cmd+=['--file',(fixture if bank=='ffcj'else h/'data')/(bank+'.89y')]
    ti=run([*cmd,o/'fullti.89z']);(o/('full-'+str(frames)+'.log')).write_text(ti)
    v=[int(x,16)for x in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',ti)]
    state=int(re.search(r'state (\w+)',pc)[1],16)

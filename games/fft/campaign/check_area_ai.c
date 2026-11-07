@@ -102,7 +102,7 @@ static void plan(u8 invalidate,u8 count_math)
 #ifdef FFT_MODULES
         if(count_math&&W->ai_k>=4){
             // Separate cache-count trial: preload excluded from timed quanta.
-            mod_call(MOD_AREA_AI,255,0);mod_context(MOD_AREA_AI)->magic_amount=counted_amount;
+            mod_call(MOD_AI_PREP,255,0);mod_context(MOD_AI_PREP)->magic_amount=counted_amount;
         }
 #endif
         if(!count_math){
@@ -180,7 +180,7 @@ static void stress(void)
     fixture(0,1);st.moved=0;
     for(k=0;k<SET_N;k++)if(SET_ABILITY(SET_BASIC,k)==0x95)break;
     CHECK(k<SET_N,1);st.unit[0].learned=(LearnBits)1<<k;
-    plan(0,0);CHECK(st.ai_ab,0x95);CHECK(max_steps<128,1);
+    plan(0,0);CHECK(st.ai_ab,0x95);CHECK(max_steps<512,1); // bounded graph/victim preparation now yields too
 }
 static void area_trials(void)
 {

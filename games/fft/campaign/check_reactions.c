@@ -23,18 +23,32 @@ void reaction_no_render(void){}
 #include "gariland.c"
 #include "x/core-reactions/oracle/source.h"
 static u16 checks,failures;static u32 digest=17;
-static void check(u16 a,u16 b,u16 line)
+static void check(u16 a,u16 b
+#if !defined(__m68k__) || !defined(FFT_CHECK_NATIVE_ORDINAL)
+                  ,u16 line
+#endif
+                  )
 {
     checks++;digest=(digest<<1|digest>>31)^a;
     if(a!=b){failures++;
 #ifndef __m68k__
         printf("line%u: %u expected%u\n",line,a,b);
 #else
+#ifdef FFT_CHECK_NATIVE_ORDINAL
+#ifndef FFT_CHECK_NATIVE_QUIET
+        BENCH_VALUE(checks); // bounded carriers report an assertion ordinal
+#endif
+#else
         BENCH_VALUE(line);
+#endif
 #endif
     }
 }
+#if defined(__m68k__) && defined(FFT_CHECK_NATIVE_ORDINAL)
+#define CHECK(a,b) check((u16)(a),(u16)(b))
+#else
 #define CHECK(a,b) check((u16)(a),(u16)(b),__LINE__)
+#endif
 static void reset(void){game_scenario(61);st.act=U_RAMZA;st.ai=AI_OFF;st.banner=0;st.mode=M_MENU;rt_keys=rt_prev=0;}
 static void change(u8 who,u8 sid)
 {
@@ -175,9 +189,23 @@ static void saved_reaction(void)
 {
     reset();party_load();CHECK(st.party_in,1);CHECK(st.reaction[U_RAMZA],REACTION_COUNTER);
 }
+// A body redirects a direct weapon now. Obstruction controls use real solid
+// terrain, in a temporary copy; the archived chapter is never modified.
+static const u8 *solid_panel(u8 cell)
+{
+    const u8 *source=W->surface;u16 size=(u16)MAP_W*MAP_H*8;
+    u8 *copy=malloc(size),*column;CHECK(copy!=RT_NULL,1);if(!copy)return source;
+    memcpy(copy,source,size);W->surface=copy;
+    column=copy+((u16)(W->grid_row[TILE_Z[cell]]+TILE_X[cell])<<3);
+    column[0]=(W->hs[cell]>>1)+4;column[1]=column[3]=0;return source;
+}
+static void solid_restore(const u8 *source)
+{
+    if(W->surface!=source){u8 *copy=(u8 *)W->surface;W->surface=source;free(copy);}
+}
 static void ranged_counter(void)
 {
-    u8 blocked;u16 c,w;
+    u8 blocked;u16 c,w;const u8 *source=RT_NULL;
     for(blocked=0;blocked<2;blocked++){
         arena();
         for(w=0;w<255;w++)if(items[w].wp&&items[w].reach>=4)break;
@@ -189,13 +217,14 @@ static void ranged_counter(void)
         st.unit[10].eq[EQ_WEAPON]=st.unit[U_RAMZA].eq[EQ_WEAPON]=w;st.reaction[10]=REACTION_COUNTER;
         CHECK(battle_line_clear(10,U_RAMZA),1);
         attack(U_RAMZA,10);st.hit=1;st.dmg=1;st.push=0;impact();CHECK(st.action.pending!=0,1);
-        // A newly intervening actor invalidates the return shot, after the
+        // A newly solid panel invalidates the return shot, after the
         // eligible original attack has committed on a clear line.
-        if(blocked){unit_place(&st.unit[12],c+1);st.unit[12].hp=100;st.unit[12].dc=3;}
+        if(blocked)source=solid_panel(c+1);
         CHECK(battle_line_clear(10,U_RAMZA),!blocked);
         end_anim();CHECK(st.primary.running,!blocked);
         if(blocked){CHECK(st.atk,U_RAMZA);CHECK(st.action.pending,0);}
         else{CHECK(st.atk,10);CHECK(st.action.phase,CTX_SECONDARY);}
+        if(blocked)solid_restore(source);
     }
 }
 static void terminals(void)

@@ -34,7 +34,7 @@ def main():
          ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     for name in ('ffgd','ffcj'):run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',name+'.bin',name],fixture)
     cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
-    for bank in 'ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
+    for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
         cmd+=['--file',(fixture if bank in ('ffgd','ffcj')else HERE/'data')/(bank+'.89y')]
     native=run([*cmd,out/'elechk.89z']);(out/'native.log').write_text(native)
     m=re.search(r'elements (\w+) failures 0 checks (\d+)',pc);assert m,pc

@@ -1,3 +1,6 @@
+#ifdef FFT_CHAPTER
+#include "movement_rules.h"
+#endif
 // Same stat implementation in portable code and its native callers' images.
 void unit_stats(Unit *u)
 {
@@ -34,6 +37,9 @@ void unit_stats(Unit *u)
     if(W&&st.mode==M_AREA)W->area_ui.dirty=1;
     // Cold pointer lookup preserves the hot Unit stride and supports scratch Units.
     for(i=0;i<NUNIT;i++)if(u==&st.unit[i]){
+        u8 f[3];
+        cj_movement(common,u->job,st.movement[i],f);
+        core_movement_bonus(f[0],&u->move,&u->jump);
         cj_affinity(common,u->job,u->eq,st.affinity[i]);break;
     }
 #endif

@@ -44,7 +44,7 @@ typedef struct {
     const u8 *blocked, *need;
 } CoreNavSearch;
 enum { CORE_NAV_MORE, CORE_NAV_DONE };
-enum { CORE_NAV_OUT=1, CORE_NAV_WIDE=2 };
+enum { CORE_NAV_OUT=1, CORE_NAV_WIDE=2, CORE_NAV_FLOAT=4, CORE_NAV_CUSTOM=8 };
 
 static u8 core_grid_rect_id(u8 width,u8 height,const u8 *row,s16 x,s16 z,CoreTileId *id)
 {

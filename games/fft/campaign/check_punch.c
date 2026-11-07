@@ -77,11 +77,8 @@ static void punch_production(void)
 }
 static void gates(void)
 {
-    static const AbId gated[]={103,104};
-    u8 j;Unit *a;
-    // Earth Slash (line) and Secret Fist (0x50) stay gated; Spin, Wave and
-    // Repeating Fist are core-punch-strikes-check's.
-    for(j=0;j<sizeof gated/sizeof gated[0];j++)CHECK(abilities[gated[j]].kind,255);
+    Unit *a;
+    // Every Punch Art producer is enabled; separate family checks cover the others.
     // A Frog may use none of them.
     prepare_punch(106);a=&st.unit[U_RAMZA];CHECK(can_use(U_RAMZA,106),1);
     a->statuses.inflicted[2]|=2;unit_status_refresh(a);CHECK(can_use(U_RAMZA,106),0);

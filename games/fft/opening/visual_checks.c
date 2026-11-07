@@ -39,7 +39,7 @@ int main(void)
     for(i=0;i<NUNIT;i++)for(r=0;r<2;r++) {
         u8 gfx=st.unit[i].gfx,row;const u8 *p;
         if(gfx>1)gfx--;
-        p=igfx+UI_PORTRAITS+(u16)gfx*348+232;
+        p=identity_portrait(pgfx,pgfx[UI_PORTRAITS+gfx])+232;
         W->pan_n[r]=0;make_panel(r,i);
         for(row=0;row<29;row++) {
             const u8 *m=(const u8 *)PAN_MAKE(r)[2]+row*RT_PBYTES;

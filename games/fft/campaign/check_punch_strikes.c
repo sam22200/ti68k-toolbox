@@ -83,10 +83,7 @@ static void spin_fist(void)
 }
 static void strike_gates(void)
 {
-    static const AbId gated[]={103,104};
-    u8 j;
-    // Earth Slash (line) and Secret Fist (physical then percentage status) stay gated.
-    for(j=0;j<sizeof gated/sizeof gated[0];j++)CHECK(abilities[gated[j]].kind,255);
+    // Every Punch Art producer is enabled; separate family checks cover the others.
     CHECK(abilities[101].kind,AB_DAMAGE);CHECK(abilities[102].kind,AB_DAMAGE);
     CHECK(abilities[102].flags,AF_EVADE);CHECK(abilities[102].range,3);
     // Not magic: Silence does not block it; a Frog may not use it.

@@ -6,7 +6,7 @@ BUNDLE_OUTPUT ?= x/fftcampaign.89g
 BUNDLE_BUDGET ?= x/core-audit/budget.json
 BUNDLE_NATIVE_BUDGET ?= x/core-audit/native-budget.json
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: core-area-impact-check
@@ -29,11 +29,11 @@ core-ai-pause-check: $(TI_FILES)
 	$(PY) check_ai_pause.py
 .PHONY: core-audit core-audit-test core-audit-bench core-boundaries-check core-capacity-render-check port-limits
 .PHONY: core-grid-check core-cell-check
-core-cell-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-cell-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_cell_state.py
 
-core-grid-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-grid-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_tactical_grid.py
 	$(PY) check_grid_movement.py
@@ -45,10 +45,10 @@ core-audit:
 	$(PY) ../tools/core_fixtures.py
 core-audit-test:
 	$(PY) ../tools/test_core_audit.py
-core-boundaries-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-boundaries-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_core_boundaries.py
-core-capacity-render-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-capacity-render-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_capacity_render.py
 core-audit-bench:
 	$(PY) ../tools/core_budget.py --native --group $(BUNDLE_OUTPUT) --out $(BUNDLE_NATIVE_BUDGET)
@@ -208,6 +208,7 @@ fftgar_pc: ../config.inc ../contour.h ../contour_art.inc
 
 ../contour.h ../contour_art.inc: ../tools/contour_assets.py ../art.h ../setup_glyphs.inc ../fft.c ../config.inc
 	$(PY) ../tools/contour_assets.py
+	@touch ../contour.h ../contour_art.inc
 
 fftintro_pc fftgar_pc fftgar_status_test: | contour-assets
 
@@ -218,13 +219,17 @@ data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin &: ../tools/campaign
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
 	touch data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin
 
-data/ffgd.bin: ../tools/chapter_desc.py ../core_limits.h data/battle.h data/interface.h ../map.h data/actors.h data/ffcj.bin
+data/ffgd.bin: ../tools/chapter_desc.py ../tools/surface_data.py ../core_limits.h data/battle.h data/interface.h ../map.h data/actors.h data/ffcj.bin data/ffcp.bin
 	$(PY) ../tools/chapter_desc.py campaign
 
-data/ffbm.bin data/ffbn.bin &: ../tools/module.py battle.c ../fft.c ../fft.h ../core_limits.h ../chapter.h ../module.h ../unit_card.h ../choice_menu.h ../action_effect.h ../status_rules.h ../status_policy.h ../status_unit.h ../status_lifetime.h ../status_control.h ../reflect_rules.h ../common.h $(wildcard ../*.inc ../*.h *.inc *.h) ../opening/opening.inc
-	$(PY) ../tools/module.py data/ffbm.bin battle.c 17 --second data/ffbn.bin
+data/ffbm.bin data/ffbn.bin data/ffbo.bin &: ../tools/module.py battle.c ../fft.c ../fft.h ../core_limits.h ../chapter.h ../module.h ../unit_card.h ../choice_menu.h ../action_effect.h ../status_rules.h ../status_policy.h ../status_unit.h ../status_lifetime.h ../status_control.h ../reflect_rules.h ../common.h $(wildcard ../*.inc ../*.h *.inc *.h) ../opening/opening.inc
+	$(PY) ../tools/module.py data/ffbm.bin battle.c 26 --second data/ffbn.bin --third data/ffbo.bin
+	@touch data/ffbm.bin data/ffbn.bin data/ffbo.bin data/modules.h
 
-data/ffmg.bin: ../tools/management_data.py ../tools/battle.py ../tools/units.py ../tools/interface.py
+data/ffcp.bin ../opening/data/ffcp.bin &: ../tools/common_portraits.py ../tools/identity_assets.py ../tools/management_data.py
+	$(PY) ../tools/common_portraits.py "$(DISC)"
+	@touch data/ffcp.bin ../opening/data/ffcp.bin
+data/ffmg.bin: ../tools/management_data.py ../tools/battle.py ../tools/units.py ../tools/interface.py data/ffcp.bin
 	$(PY) ../tools/management_data.py "$(DISC)" $@
 
 data/ffcj.bin ../opening/data/ffcj.bin &: ../tools/common_tables.py ../tools/battle.py ../tools/management_data.py
@@ -255,18 +260,18 @@ white-title-review: $(TI_FILES) $(OPENING_BANKS)
 data/ffbm.bin fftbat_pc fftgar_pc fftintro_pc fftbatflow_pc: ../module_bank.h
 
 .PHONY: core-full-grid-check
-core-full-grid-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-full-grid-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_full_grid.py
 
 .PHONY: core-surface-check
-core-surface-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-surface-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_surface.py
 	$(PY) check_surface_battle.py
 
 .PHONY: core-jump-check
-core-jump-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-jump-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_jump_surface.py
 	$(PY) check_jump_battle.py
@@ -279,23 +284,23 @@ core-profile-deep-check:
 	$(PY) check_surface_profile.py --deep
 
 .PHONY: core-knockback-check
-core-knockback-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-knockback-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_knockback_geometry.py
 	$(PY) check_knockback_battle.py
 
 .PHONY: core-step-check
-core-step-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-step-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_step_geometry.py
 	$(PY) check_step_battle.py
 
 .PHONY: core-step-cache-check core-long-jump-check
-core-step-cache-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-step-cache-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_step_cache.py
 core-long-jump-check:
 	$(PY) check_long_jump.py
 
 .PHONY: core-span-search-check
-core-span-search-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-span-search-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_tactical_grid.py --out x/core-span-search/kernel
 	$(PY) check_span_battle.py
 
@@ -318,18 +323,18 @@ core-jump-cost-check:
 .PHONY: core-status-state-check
 x/core-status-state/oracle/fsp00.bin: ../tools/status_state_oracle.py ../tools/common_tables.py
 	$(PY) $<
-core-status-state-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-status-state/oracle/fsp00.bin
+core-status-state-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-status-state/oracle/fsp00.bin
 	$(PY) check_status_state.py
 
 x/core-status-rules/oracle/source.h: ../tools/status_rules_oracle.py
 	$(PY) $<
-core-status-rules-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-status-rules/oracle/source.h
+core-status-rules-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-status-rules/oracle/source.h
 	$(PY) check_status_rules.py
 
-core-actions-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-actions-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_actions.py
 
-core-compact-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
+core-compact-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(PY) check_tactical_grid.py --out x/core-compact/kernel
 	$(PY) check_compact_graph.py
 	$(PY) check_full_grid.py
@@ -348,134 +353,134 @@ core-compact-check: data/ffbm.89y data/ffbn.89y data/ffgd.89y
 .PHONY: core-elements-check
 x/core-elements/oracle/source.h: ../tools/elements_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-elements-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-elements/oracle/source.h
+core-elements-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-elements/oracle/source.h
 	$(PY) check_elements.py
 x/core-affinity/oracle/source.h: ../tools/affinity_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-affinity-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-affinity/oracle/source.h
+core-affinity-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-affinity/oracle/source.h
 	$(PY) check_affinity.py
 .PHONY: core-magic-check
 x/core-magic/oracle/source.h: ../tools/magic_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-magic-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-magic/oracle/source.h
+core-magic-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-magic/oracle/source.h
 	$(PY) check_magic.py
 x/core-incantation/oracle/source.h: ../tools/incantation_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-incantation-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-incantation/oracle/source.h
+core-incantation-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-incantation/oracle/source.h
 	$(PY) check_incantation.py
 x/core-casting/oracle/source.h: ../tools/casting_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-casting-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-casting/oracle/source.h
+core-casting-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-casting/oracle/source.h
 	$(PY) check_casting.py
 x/core-deferred/oracle/source.h: ../tools/deferred_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-deferred-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-deferred/oracle/source.h
+core-deferred-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-deferred/oracle/source.h
 	$(PY) check_deferred.py
 
 x/core-scheduler/oracle/source.h: ../tools/scheduler_oracle.py
 	$(PY) ../tools/scheduler_oracle.py
 .PHONY: core-scheduler-check
-core-scheduler-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-scheduler/oracle/source.h
+core-scheduler-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-scheduler/oracle/source.h
 	$(PY) check_scheduler.py
 
 x/core-haste-slow/oracle/source.h: ../tools/haste_slow_oracle.py
 	$(PY) ../tools/haste_slow_oracle.py
 .PHONY: core-haste-slow-check
-core-haste-slow-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-haste-slow/oracle/source.h
+core-haste-slow-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-haste-slow/oracle/source.h
 	$(PY) check_haste_slow.py
 
 x/core-incapacity/oracle/source.h: ../tools/incapacity_oracle.py
 	$(PY) ../tools/incapacity_oracle.py
 .PHONY: core-incapacity-check
-core-incapacity-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-incapacity/oracle/source.h
+core-incapacity-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-incapacity/oracle/source.h
 	$(PY) check_incapacity.py
 .PHONY: core-offensive-magic-check
-core-offensive-magic-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y
+core-offensive-magic-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y
 	$(PY) check_offensive_magic.py
 .PHONY: core-reflect-check
 x/core-reflect/oracle/source.h: ../tools/reflect_oracle.py
 	$(PY) ../tools/reflect_oracle.py
-core-reflect-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-reflect/oracle/source.h
+core-reflect-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-reflect/oracle/source.h
 	$(PY) check_reflect.py
 .PHONY: core-percent-check
 .PHONY: core-cleanse-check
 .PHONY: core-terminal-check
 x/core-terminal/oracle/source.h: ../tools/terminal_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/terminal_oracle.py
-core-terminal-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-terminal/oracle/source.h
+core-terminal-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-terminal/oracle/source.h
 	$(PY) check_terminal.py
 .PHONY: core-talk-skill-check
 x/core-talk-skill/oracle/source.h: ../tools/talk_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/talk_oracle.py
-core-talk-skill-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-talk-skill/oracle/source.h
+core-talk-skill-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-talk-skill/oracle/source.h
 	$(PY) check_talk.py
 .PHONY: core-punch-strikes-check
 x/core-punch-strikes/oracle/source.h: ../tools/punch_strike_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/punch_strike_oracle.py
-core-punch-strikes-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-punch-strikes/oracle/source.h
+core-punch-strikes-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-punch-strikes/oracle/source.h
 	$(PY) check_punch_strikes.py
 .PHONY: core-punch-art-check
 x/core-punch-art/oracle/source.h: ../tools/punch_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/punch_oracle.py
-core-punch-art-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-punch-art/oracle/source.h
+core-punch-art-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-punch-art/oracle/source.h
 	$(PY) check_punch.py
 .PHONY: core-protect-check
 x/core-protect/oracle/source.h: ../tools/protect_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/protect_oracle.py
-core-protect-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-protect/oracle/source.h
+core-protect-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-protect/oracle/source.h
 	$(PY) check_protect.py
 .PHONY: core-control-status-check
 x/core-control-status/oracle/source.h: ../tools/control_status_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/control_status_oracle.py
-core-control-status-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-control-status/oracle/source.h
+core-control-status-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-control-status/oracle/source.h
 	$(PY) check_control_status.py
 .PHONY: core-restoration-check
 x/core-restoration/oracle/source.h: ../tools/restoration_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/restoration_oracle.py
-core-restoration-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-restoration/oracle/source.h
+core-restoration-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-restoration/oracle/source.h
 	$(PY) check_restoration.py
 data/ffbm.bin fftgar_pc fftintro_pc fftbatflow_pc: ../item_restore.h ../restoration_ai.h ../menu_input.inc
 x/core-cleanse/oracle/source.h: ../tools/cleanse_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/cleanse_oracle.py
-core-cleanse-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-cleanse/oracle/source.h
+core-cleanse-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-cleanse/oracle/source.h
 	$(PY) check_cleanse.py
 data/ffbm.bin fftgar_pc fftintro_pc fftbatflow_pc: ../cleanse_rules.h ../facing_arrows.inc
 x/core-percent/oracle/source.h: ../tools/percent_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/percent_oracle.py
-core-percent-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-percent/oracle/source.h
+core-percent-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-percent/oracle/source.h
 	$(PY) check_percent.py
 
 .PHONY: core-buffs-check
 x/core-buffs/oracle/source.h: ../tools/buffs_oracle.py
 	$(PY) ../tools/buffs_oracle.py
-core-buffs-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-buffs/oracle/source.h window_reference.inc
+core-buffs-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-buffs/oracle/source.h window_reference.inc
 	$(PY) check_buffs.py
 
 .PHONY: core-healing-check
 x/core-healing/oracle/source.h: ../tools/healing_oracle.py
 	$(PY) ../tools/healing_oracle.py
-core-healing-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-healing/oracle/source.h banner_reference.inc
+core-healing-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-healing/oracle/source.h banner_reference.inc
 	$(PY) check_healing.py
 x/core-charge-hands/oracle/source.h: ../tools/charge_hands_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-charge-hands-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-charge-hands/oracle/source.h
+core-charge-hands-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-charge-hands/oracle/source.h
 	$(PY) check_charge_hands.py
 x/core-hands/oracle/source.h: ../tools/hands_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-hands-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-hands/oracle/source.h
+core-hands-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-hands/oracle/source.h
 	$(PY) check_hands.py
 	$(PY) check_hands_manage.py
 x/core-strikes/oracle/source.h: ../tools/strike_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-strikes-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-strikes/oracle/source.h
+core-strikes-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-strikes/oracle/source.h
 	$(PY) check_strikes.py
 x/core-reactions/oracle/source.h: ../tools/reaction_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-reactions-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-reactions/oracle/source.h
+core-reactions-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-reactions/oracle/source.h
 	$(PY) check_reactions.py
 x/core-context/oracle/source.h: ../tools/context_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-context-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-context/oracle/source.h
+core-context-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-context/oracle/source.h
 	$(PY) check_context.py
 
 data/ffbm.bin fftgar_pc fftintro_pc fftbatflow_pc: ../action_context.h ../action_start.inc
@@ -489,22 +494,22 @@ data/ffbm.bin fftgar_pc fftintro_pc fftbatflow_pc: ../cast_target.h ../incantati
 data/ffbm.bin fftgar_pc fftintro_pc fftbatflow_pc: ../magic_math.inc
 x/core-sleep/oracle/source.h: ../tools/sleep_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-sleep-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-sleep/oracle/source.h
+core-sleep-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-sleep/oracle/source.h
 	$(PY) check_sleep.py
 
 x/core-status-lifetime/oracle/fsl00.bin: ../tools/status_lifetime_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-status-lifetime-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y x/core-status-lifetime/oracle/fsl00.bin
+core-status-lifetime-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y x/core-status-lifetime/oracle/fsl00.bin
 	$(PY) check_status_lifetime.py
 
 .PHONY: core-control-check
 x/core-control/oracle/source.h: ../tools/control_oracle.py ../tools/status_state_oracle.py
 	$(PY) $<
-core-control-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y x/core-control/oracle/source.h
+core-control-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y x/core-control/oracle/source.h
 	$(PY) check_control.py
 
 .PHONY: core-magic-evasion-check
-core-magic-evasion-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y
+core-magic-evasion-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
 	$(PY) check_magic_evasion.py
 ../contour_art.inc: ../window_label.inc
 
@@ -514,7 +519,7 @@ core-weather-check: data/ffbm.89y data/ffbn.89y
 	$(PY) check_weather.py
 
 .PHONY: core-targets-check
-core-targets-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y x/core-targets/oracle/source.json
+core-targets-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y x/core-targets/oracle/source.json
 	$(PY) check_targets.py
 data/ffbm.bin fftgar_pc fftintro_pc fftbatflow_pc: ../area_targets.inc ../area_geometry.h
 
@@ -522,7 +527,7 @@ x/core-targets/oracle/source.json: ../tools/area_oracle.py
 	$(PY) ../tools/area_oracle.py
 
 .PHONY: core-batch-check
-core-batch-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y x/core-batch/oracle/source.json
+core-batch-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y x/core-batch/oracle/source.json
 	$(PY) check_batch.py
 x/core-batch/oracle/source.json: ../tools/batch_oracle.py
 	$(PY) ../tools/batch_oracle.py
@@ -561,30 +566,254 @@ core-area-ct-check: $(TI_FILES) $(OPENING_BANKS)
 .PHONY: core-guts-check
 x/core-guts/oracle/source.h: ../tools/guts_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/guts_oracle.py
-core-guts-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-guts/oracle/source.h
+core-guts-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-guts/oracle/source.h
 	$(PY) check_guts.py
 .PHONY: core-equip-breaks-check
 x/core-equip-breaks/oracle/source.h: ../tools/equip_break_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/equip_break_oracle.py
-core-equip-breaks-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-equip-breaks/oracle/source.h
+core-equip-breaks-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-equip-breaks/oracle/source.h
 	$(PY) check_equip_breaks.py
 .PHONY: core-breaks-check
 x/core-breaks/oracle/source.h: ../tools/break_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/break_oracle.py
-core-breaks-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-breaks/oracle/source.h
+core-breaks-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-breaks/oracle/source.h
 	$(PY) check_breaks.py
 .PHONY: core-steal-equip-check
 x/core-steal-equip/oracle/source.h: ../tools/steal_equip_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/steal_equip_oracle.py
-core-steal-equip-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-steal-equip/oracle/source.h
+core-steal-equip-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-steal-equip/oracle/source.h
 	$(PY) check_steal_equip.py
+.PHONY: core-gil-check
+x/core-gil/oracle/source.h: ../tools/gil_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/gil_oracle.py
+core-gil-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-gil/oracle/source.h
+	$(PY) check_gil.py
+
+.PHONY: core-geomancy-check
+.PHONY: core-secret-fist-check
+x/core-secret-fist/oracle/source.h: ../tools/secret_fist_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/secret_fist_oracle.py
+core-secret-fist-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-secret-fist/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_secret_fist.py
+
+x/core-geomancy/oracle/source.h: ../tools/geomancy_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/geomancy_oracle.py
+core-geomancy-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-geomancy/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y data/ffod.89y
+	$(PY) check_geomancy.py
 .PHONY: core-mp-break-check
 x/core-mp-break/oracle/source.h: ../tools/mp_break_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/mp_break_oracle.py
-core-mp-break-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-mp-break/oracle/source.h
+core-mp-break-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-mp-break/oracle/source.h
 	$(PY) check_mp_break.py
 .PHONY: core-steal-exp-check
 x/core-steal-exp/oracle/source.h: ../tools/steal_exp_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/steal_exp_oracle.py
-core-steal-exp-check: data/ffbm.89y data/ffbn.89y data/ffcj.89y data/ffgd.89y x/core-steal-exp/oracle/source.h
+core-steal-exp-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-steal-exp/oracle/source.h
 	$(PY) check_steal_exp.py
+
+.PHONY: core-line-check
+x/core-line/oracle/source.h: ../tools/line_oracle.py ../tools/status_state_oracle.py ../tools/area_oracle.py
+	$(PY) ../tools/line_oracle.py
+core-line-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-line/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_line.py
+
+.PHONY: core-draw-out-check
+x/core-draw-out/oracle/source.h: ../tools/draw_out_oracle.py ../tools/status_state_oracle.py ../tools/area_oracle.py
+	$(PY) ../tools/draw_out_oracle.py
+core-draw-out-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-draw-out/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_draw_out.py
+
+.PHONY: core-performance-check
+x/core-performance/oracle/source.h: ../tools/performance_oracle.py ../tools/status_state_oracle.py ../tools/surface_data.py
+	$(PY) ../tools/performance_oracle.py
+core-performance-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-performance/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_performance.py
+
+.PHONY: core-allegiance-check
+x/core-allegiance/oracle/source.h: ../tools/allegiance_oracle.py ../tools/status_state_oracle.py ../tools/surface_data.py ../tools/common_tables.py
+	$(PY) ../tools/allegiance_oracle.py
+core-allegiance-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-allegiance/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_allegiance.py
+
+.PHONY: core-float-check
+x/core-float/oracle/source.h: ../tools/float_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/float_oracle.py
+core-float-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-float/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_float.py
+
+.PHONY: core-throw-check
+x/core-throw/oracle/source.h: ../tools/throw_oracle.py
+	$(PY) ../tools/throw_oracle.py
+core-throw-check: $(TI_FILES) x/core-throw/oracle/source.h
+	$(PY) check_throw.py
+
+.PHONY: core-math-check
+x/core-math/oracle/source.h x/core-math/oracle/spells.h &: ../tools/math_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/math_oracle.py
+core-math-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-math/oracle/source.h x/core-math/oracle/spells.h
+	$(PY) check_math.py
+
+.PHONY: core-stat-save-check
+x/core-stat-save/oracle/source.h: ../tools/stat_save_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/stat_save_oracle.py
+core-stat-save-check: $(TI_FILES) x/core-stat-save/oracle/source.h
+	$(PY) check_stat_save.py
+
+.PHONY: core-critical-reactions-check
+x/core-critical-reactions/oracle/source.h: ../tools/critical_reactions_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/critical_reactions_oracle.py
+core-critical-reactions-check: $(TI_FILES) x/core-critical-reactions/oracle/source.h
+	$(PY) check_critical_reactions.py
+
+# Lancer Jump (distinct from ordinary movement jumps).
+.PHONY: core-lancer-jump-check
+core-lancer-jump-check: $(TI_FILES) x/core-lancer-jump/oracle/source.h
+	$(MAKE) -C ../opening data/ffcj.89y
+	$(PY) check_lancer_jump.py
+x/core-lancer-jump/oracle/source.h: ../tools/lancer_jump_oracle.py
+	$(PY) ../tools/lancer_jump_oracle.py
+
+.PHONY: core-status-reactions-check
+x/core-status-reactions/oracle/source.h: ../tools/status_reactions_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/status_reactions_oracle.py
+core-status-reactions-check: $(TI_FILES) x/core-status-reactions/oracle/source.h
+	$(PY) check_status_reactions.py
+
+.PHONY: core-brave-faith-reactions-check
+x/core-brave-faith-reactions/oracle/source.h: ../tools/brave_faith_reactions_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/brave_faith_reactions_oracle.py
+core-brave-faith-reactions-check: $(TI_FILES) x/core-brave-faith-reactions/oracle/source.h
+	$(PY) check_brave_faith_reactions.py
+
+.PHONY: core-counter-reactions-check
+x/core-counter-reactions/oracle/source.h: ../tools/counter_reactions_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/counter_reactions_oracle.py
+core-counter-reactions-check: $(TI_FILES) x/core-counter-reactions/oracle/source.h
+	$(PY) check_counter_reactions.py
+
+.PHONY: core-movement-check
+x/core-movement/oracle/source.h: ../tools/movement_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/movement_oracle.py
+core-movement-check: $(TI_FILES) x/core-movement/oracle/source.h
+	$(PY) check_movement.py
+
+.PHONY: core-equipment-check
+x/core-equipment/oracle/ffeq0.bin x/core-equipment/oracle/ffeq1.bin &: ../tools/equipment_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/equipment_oracle.py
+core-equipment-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y x/core-equipment/oracle/ffeq0.bin x/core-equipment/oracle/ffeq1.bin
+	$(PY) check_equipment.py
+	$(PY) check_equipment_manage.py
+	$(PY) check_equipment_ui.py
+	$(PY) check_equipment_save.py
+
+.PHONY: core-combat-check
+x/core-combat/oracle/ffco0.bin x/core-combat/oracle/ffco1.bin x/core-combat/oracle/counts.h &: ../tools/combat_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/combat_oracle.py
+core-combat-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y x/core-combat/oracle/ffco0.bin x/core-combat/oracle/ffco1.bin x/core-combat/oracle/counts.h
+	$(PY) check_combat.py
+	$(PY) check_combat_ui.py
+
+.PHONY: core-discovery-check
+x/core-discovery/oracle/ffdn0.bin: ../tools/discovery_oracle.py
+	$(PY) $<
+core-discovery-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y data/ffmg.89y data/ffflow.89y x/core-discovery/oracle/ffdn0.bin
+	$(PY) check_discovery.py
+	$(PY) check_discovery_manage.py
+
+.PHONY: core-mime-check core-mime-source-check
+core-mime-source-check:
+	$(PY) ../tools/mime_oracle.py
+x/core-mime/oracle/rotations.h: ../tools/mime_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/mime_oracle.py
+core-mime-check: x/core-mime/oracle/rotations.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_mime.py
+
+.PHONY: core-hamedo-check core-hamedo-source-check
+core-hamedo-source-check:
+	$(PY) ../tools/hamedo_oracle.py
+x/core-hamedo/oracle/source.h: ../tools/hamedo_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/hamedo_oracle.py
+core-hamedo-check: x/core-hamedo/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_hamedo.py
+
+.PHONY: core-weapon-reach-check core-weapon-reach-source-check
+core-weapon-reach-source-check:
+	$(PY) ../tools/weapon_reach_oracle.py
+x/core-weapon-reach/oracle/source.h: ../tools/weapon_reach_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/weapon_reach_oracle.py
+core-weapon-reach-check: x/core-weapon-reach/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_weapon_reach.py
+
+.PHONY: core-common-check
+core-common-check: common-check
+
+.PHONY: core-weapon-formulas-source-check core-weapon-formulas-check
+core-weapon-formulas-source-check:
+	$(PY) ../tools/weapon_formula_oracle.py
+x/core-weapon-formulas/oracle/source.h: ../tools/weapon_formula_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/weapon_formula_oracle.py
+core-weapon-formulas-check: x/core-weapon-formulas/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_weapon_formulas.py
+
+.PHONY: core-weapons-check core-weapons-source-check
+core-weapons-source-check:
+	$(PY) ../tools/weapon_oracle.py
+x/core-weapons/oracle/source.h: ../tools/weapon_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/weapon_oracle.py
+core-weapons-check: x/core-weapons/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_weapons.py
+
+.PHONY: core-ai-interactions-check
+core-ai-interactions-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_ai_interactions.py
+
+.PHONY: core-melee-collision-source-check core-melee-collision-check
+core-melee-collision-source-check:
+	$(PY) ../tools/melee_oracle.py
+x/core-melee-collision/oracle/source.h: ../tools/melee_oracle.py
+	$(PY) ../tools/melee_oracle.py
+core-melee-collision-check: x/core-melee-collision/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_melee_collision.py
+
+.PHONY: core-arcs-source-check core-arcs-check
+core-arcs-source-check:
+	$(PY) ../tools/arc_oracle.py
+x/core-arcs/oracle/source.h: ../tools/arc_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/arc_oracle.py
+core-arcs-check: x/core-arcs/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_arcs.py
+
+.PHONY: core-panel-victims-source-check core-panel-victims-check
+core-panel-victims-source-check:
+	$(PY) ../tools/panel_victims_oracle.py
+x/core-panel-victims/oracle/source.h: ../tools/panel_victims_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/panel_victims_oracle.py
+core-panel-victims-check: x/core-panel-victims/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_panel_victims.py
+
+.PHONY: core-direct-interception-source-check core-direct-interception-check
+core-direct-interception-source-check:
+	$(PY) ../tools/direct_interception_oracle.py
+x/core-direct-interception/oracle/source.h: ../tools/direct_interception_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/direct_interception_oracle.py
+core-direct-interception-check: x/core-direct-interception/oracle/source.h data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_direct_interception.py
+
+.PHONY: core-final-combat-source-check core-final-combat-check
+core-final-combat-source-check:
+	$(PY) ../tools/height_donor_oracle.py
+x/core-final-combat/oracle/source.h x/core-final-combat/oracle/source.json x/core-final-combat/oracle/fheight.bin &: ../tools/height_donor_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/height_donor_oracle.py
+core-final-combat-check: x/core-final-combat/oracle/source.h x/core-final-combat/oracle/fheight.bin data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y
+	$(PY) check_final_combat.py
+
+.PHONY: core-identity-check
+core-identity-check: data/ffcp.89y
+	$(PY) check_identity.py

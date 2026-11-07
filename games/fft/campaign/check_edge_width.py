@@ -9,7 +9,7 @@ HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2];OUT=HERE/'x/edge-width
 sys.path.insert(0,str(HERE.parent/'tools'))
 from review_files import publish_images,save_image
 
-BANKS='ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split()
+BANKS='ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split()
 
 def run(args,cwd=HERE/'data'):
     p=subprocess.run(list(map(str,args)),cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)

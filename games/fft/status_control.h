@@ -11,6 +11,7 @@ static u8 core_status_controls(const CoreStatus *s)
     u8 b0=core_status_current(s,0),b1=core_status_current(s,1);
     u8 b3=core_status_current(s,3),b4=core_status_current(s,4),flags=0;
     if((b0&0x40)||(b1&0x81)||(b3&2)||(b4&0x10))flags|=STATUS_CT_FROZEN;
+    if(b0&4)flags|=STATUS_AIRBORNE;
     if(b4&8)flags|=STATUS_NO_MOVE;
     if(b4&4)flags|=STATUS_NO_ACT;
     if(core_status_no_evade(s))flags|=STATUS_NO_EVADE;

@@ -5,19 +5,24 @@
 // Each layer: base height, depth/half height, slope, ceiling depth | blocked<<7.
 // Collision geometry is independent of compact walkable nodes (blocked upper
 // records can still collide with a projectile in the retail routine).
+// FGS2 retains this stride and appends two source surface bytes per column.
 #define SURFACE_HEADER 8U
 #define SURFACE_ROOM 1U
 #define SURFACE_MOVE_UPPER 2U
 #define SURFACE_HIT_UPPER 4U
 #define SURFACE_GRID_UPPER 8U
+#define SURFACE_TERRAIN 16U
+#define SURFACE_COSTS 32U
 static u8 surface_valid(const u8 *b,u16 bytes,u8 width,u8 height)
 {
-    u16 area,n,i;
+    u16 area,n,i,end;
     if(!b||bytes<8||!width||!height||width>FFT_CORE_AXIS_MAX||height>FFT_CORE_AXIS_MAX)return 0;
     area=(u16)width*height;n=(u16)(8+(area<<3));
-    if(area>256||b[0]!='F'||b[1]!='G'||b[2]!='S'||b[3]!='1'||b[4]!=width||b[5]!=height||
-       ((u16)b[6]<<8|b[7])!=area||(bytes!=n&&bytes!=n+6))return 0;
+    end=n+(b[3]=='2'?(area<<1):0);
+    if(area>256||b[0]!='F'||b[1]!='G'||b[2]!='S'||(b[3]!='1'&&b[3]!='2')||b[4]!=width||b[5]!=height||
+       ((u16)b[6]<<8|b[7])!=area||(bytes!=end&&bytes!=end+6))return 0;
     for(i=11;i<n;i+=4)if(b[i]&0x60)return 0;
+    for(i=n;i<end;i++)if(b[i]>63)return 0;
     return 1;
 }
 static u8 surface_edge(const u8 *layer,u8 shift)

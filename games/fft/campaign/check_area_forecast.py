@@ -43,7 +43,7 @@ def main():
     target=HERE/'x/core-targets/oracle'
     run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','fat00.bin','fat00'],target)
     cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
-    for bank in 'ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj fbf00 fat00'.split():
+    for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj fbf00 fat00'.split():
         origin=fixture if bank in ('ffgd','ffcj','fbf00')else target if bank=='fat00'else HERE/'data'
         cmd+=['--file',origin/(bank+'.89y')]
     native=run([*cmd,out/'forecst.89z']);(out/'native.log').write_text(native)

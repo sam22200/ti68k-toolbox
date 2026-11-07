@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../base.inc"
+#include "../identity_pool.h"
 #include "save.h"
 #include "flow.h"
 #include "flow_draw.inc"
@@ -138,10 +139,12 @@ static void release(void)
 
 void game_init(void)
 {
+    u16 identity_size;
     W = RT_NULL; vbuf = RT_NULL; acache = RT_NULL;   // statics survive between runs
     cgfx = rt_file("ffcu", RT_NULL);
     scene_flow=rt_file("ffflow",RT_NULL);if(!qvalid(scene_flow))scene_flow=RT_NULL;
-    pgfx = rt_file("ffcp", RT_NULL);              // (none: name-only boxes)
+    pgfx = rt_file("ffcp", &identity_size);
+    if(!identity_valid(pgfx,identity_size))pgfx=RT_NULL;
     abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
     if (abank[0]) abank_n0 = RD16(abank[0], 0);
     W = malloc(sizeof(Work));
@@ -161,7 +164,7 @@ void game_scenario(u16 n)
     scene_set_id=(u8)n;
     name[3] = (char)('0' + n);
     set = rt_file(name, RT_NULL);
-    if (!W || !set || !cgfx || !abank[0] || !abank[1] || RD16(set, 0) != 0x4653) { set = RT_NULL; return; }
+    if (!W || !set || !pgfx || !cgfx || !abank[0] || !abank[1] || RD16(set, 0) != 0x4653) { set = RT_NULL; return; }
     {
         char map[7]; memcpy(map, set + 4, 6); map[6] = 0;
         amap = *map ? rt_file(map, RT_NULL) : RT_NULL;   // (no actors: no pose table)

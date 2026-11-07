@@ -8,6 +8,17 @@ static void status_clock_update(u8 id)
 static void status_changed(void)
 {
     if(W){
+        if(W->nature_units){
+#if MOD_CORE
+#ifndef FFT_MODULES
+            monster_refresh();
+#else
+            W->nature_pending|=1;
+#endif
+#else
+            W->nature_pending|=1;
+#endif
+        }
         if(st.mode==M_AREA)W->area_ui.dirty=1;
         W->fc_key=0;W->status_i=0;W->frz=0;W->frz_h=0;
         W->win_k[0]=0;W->from_who=0;
@@ -33,10 +44,16 @@ static u8 status_cleanse(u8 t,AbId ab,u16 packed)
 static void status_damage(u8 id)
 {
     Unit *u=&st.unit[id];
-    u8 sleep=core_status_removable(&u->statuses,4)&0x10,confused=core_status_removable(&u->statuses,1)&0x10;
-    if(!(sleep|confused))return;
+    u8 sleep=core_status_removable(&u->statuses,4)&0x30,confused=core_status_removable(&u->statuses,1)&0x10;
+    u8 hidden=core_status_removable(&u->statuses,2)&16;
+    if(!(sleep|confused|hidden))return;
+    u->statuses.inflicted[2]&=(u8)~hidden;
     u->statuses.inflicted[1]&=(u8)~confused;
-    if(sleep){u->statuses.inflicted[4]&=0xef;u->status_ct[SID_SLEEP-SID_POISON]=0;}
+    if(sleep){
+        u->statuses.inflicted[4]&=(u8)~sleep;
+        if(sleep&0x10)u->status_ct[SID_SLEEP-SID_POISON]=0;
+        if(sleep&0x20)u->status_ct[SID_CHARM-SID_POISON]=0;
+    }
     unit_status_refresh(u);status_clock_update(id);status_changed();
 }
 // Source finalize: a Brave change clamps to 0..100 (a rider's floor 10 is not
@@ -120,4 +137,24 @@ static u8 status_dead_turn(u8 id)
     }
     u->dc=roll&(u->team==TEAM_PLAYER?0x110:0x10)?DC_CRYSTAL:DC_CHEST;
     st.morph_mask|=(u16)1<<id;return 0;
+}
+
+// Reuse an unsaved spare packed flag: source turn-entry arms removal, while a
+// newly inflicted Transparent clears it. No per-unit stride or save growth.
+static void status_transparent_remove(u8 id)
+{
+    Unit *u=&st.unit[id];
+    if(!(core_status_removable(&u->statuses,2)&16))return;
+    u->statuses.inflicted[2]&=(u8)~16;unit_status_refresh(u);status_changed();
+}
+static void status_turn_start(u8 id)
+{
+    Unit *u=&st.unit[id];
+    if(unit_transparent(u))u->allegiance|=UNIT_TRANSPARENT_ARMED;
+    else u->allegiance&=(u8)~UNIT_TRANSPARENT_ARMED;
+    u->statuses.innate[0]&=(u8)~2;u->statuses.inflicted[0]&=(u8)~2;u->status&=(u8)~ST_DEFEND;
+}
+static void status_turn_action(u8 id)
+{
+    if(st.unit[id].allegiance&UNIT_TRANSPARENT_ARMED)status_transparent_remove(id);
 }

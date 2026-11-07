@@ -28,18 +28,29 @@ static void steal_exp(u8 a,Unit *ut,u8 n){ut->exp=ut->exp>n?ut->exp-n:0;exp_gain
 static void award_rewards(u8 a,u8 e)
 {
     Unit *ua=&st.unit[a],*u;
-    u16 jp;
+    u16 jp,spill;
     u8 i, blue = ua->team != TEAM_ENEMY;
     if (!ua->hp) return;
     st.gain = (u8)e;
-    jp = (u16)(8 + 2 * job_level(ua) + (ua->level >> 2));
+    jp = (u16)(8 + 2 * job_level(ua) + (ua->level >> 2));spill=jp>>2;
+    #ifdef FFT_CHAPTER
+    if(cj_support(common,ua->job,st.support[a],463))jp=(jp*3)>>1;
+#endif
     st.jpg = (u8)jp;
     ua->gexp += (u16)e;
     exp_gain(ua,e);
     add_jp(ua, jp);
     for (i = 0, u = st.unit; i < NUNIT; i++, u++)
-        if (u != ua && u->hp && (u->team != TEAM_ENEMY) == blue && jobs[u->job].row == jobs[ua->job].row)
-            add_jp(u, jp >> 2);
+        if (u != ua && u->hp &&
+#ifdef FFT_CHAPTER
+            (unit_home_team(u)!=TEAM_ENEMY)==blue &&
+#else
+            (u->team!=TEAM_ENEMY)==blue &&
+#endif
+            jobs[u->job].row==jobs[ua->job].row)
+            add_jp(u, spill);
 }
+#if !defined(FFT_MODULE) || (MOD_PART(MOD_ACTION)||MOD_PART(MOD_WEAPON))
 void rewards(u8 a,u8 t,u8 kill){award_rewards(a,earned_exp(a,t,kill));}
+#endif
 

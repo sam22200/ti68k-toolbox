@@ -68,7 +68,7 @@ typedef struct {
 // tiles at most `range` steps away (any path), within `vert` half units of the user's height
 // (0xFF: any); AF_SELF: the user's own tile too, AF_EVADE: evaded as an attack, AF_ITEM: from
 // the bag (slot `bag`; the enemies' items do not run out, those of their level `lv` or less).
-enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND, AB_RAISE, AB_BREAK, AB_NULL, AB_REFLECT, AB_STATUS, AB_MP_DAMAGE, AB_MP_HEAL, AB_CLEANSE, AB_HP_MP_HEAL, AB_HP_DAMAGE_MP_HEAL, AB_DEATH, AB_QUICK, AB_BRAVE, AB_GOLEM, AB_FAITH, AB_SPEED, AB_STEAL_EXP, AB_EQUIP_BREAK, AB_STEAL_EQUIP }; // outcome-only markers
+enum { AB_DAMAGE, AB_CURE, AB_WISH, AB_HEAL, AB_REVIVE, AB_DEFEND, AB_RAISE, AB_BREAK, AB_NULL, AB_REFLECT, AB_STATUS, AB_MP_DAMAGE, AB_MP_HEAL, AB_CLEANSE, AB_HP_MP_HEAL, AB_HP_DAMAGE_MP_HEAL, AB_DEATH, AB_QUICK, AB_BRAVE, AB_GOLEM, AB_FAITH, AB_SPEED, AB_STEAL_EXP, AB_EQUIP_BREAK, AB_STEAL_EQUIP, AB_STEAL_GIL, AB_THROW_SELECTOR, AB_MATH_SELECTOR, AB_CATCH }; // outcome-only markers
 enum { AF_SELF = 1, AF_EVADE = 2, AF_ITEM = 4, AF_WEAPON = 8, AF_DRAIN = 16, AF_AREA = 32, AF_CHARGE = 64, AF_CAST=128 };
 #define FORMULA_FORECAST 0x8000U        // Charge query: both hands, potential successful hits
 enum { ST_DEFEND = 1, ST_POISON = 2, ST_DARK = 4, ST_SILENCE = 8 };   // Dead: 0 HP
@@ -132,7 +132,16 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_AREA_UI 14                        // approved manual area inspection/confirmation
 #define MOD_NUMBERS 15                       // shared scalar/area numbers and cold glyph preparation
 #define MOD_ORDER 16                         // cold AT forecast, including finite tempo segments
-#define MOD_COUNT 17
+#define MOD_PERFORMANCE 17                  // recurring performance commands and mixed effects
+#define MOD_MOVEMENT 18                     // cold movement geometry and special destination maps
+#define MOD_EQUIPMENT 19                    // cold inventory, derived-stat rebuild and move rewards
+#define MOD_COMBAT 20                       // cold command effects and combat responses
+#define MOD_NATURE 21                      // discovery, monster capabilities and cold math masks
+#define MOD_WEAPON 22                      // weapon impact and origin-independent scalar utility
+#define MOD_STATUS 23                      // bitmap commits and explicit status requests
+#define MOD_PLANNER 24                     // weapon geometry, recipients, previews and continuation
+#define MOD_AI_PREP 25                     // bounded victim/Math/collateral cache preparation
+#define MOD_COUNT 26
 #define AI_BAD (-0x7FFF)
 #ifdef FFT_MODULE
 #define MOD_CORE 0
@@ -169,7 +178,7 @@ extern s16 sc_h, sc_top;
 #endif
 #define BAG_MAX 14                            // Potion..Phoenix Down, source order
 #define CD(f) RD16(cdesc, CD_##f)
-#define NABIL 512
+#define NABIL CJ_EXECUTABLES
 #define NSET 224
 #define SET_BASIC 5
 #define DRAW_BASIC CD(DRAW_BASIC)
@@ -332,7 +341,7 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 // M_AUTO: Manual / This unit / All allies, reusing the ordinary AI;
 // M_CLOCK: no ready actor yet; resume the bounded clock on the next update
 enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END,
-       M_ORDER, M_QUIT, M_AUTO, M_CAST_RANGE, M_AREA, M_CLOCK };
+       M_ORDER, M_QUIT, M_AUTO, M_CAST_RANGE, M_AREA, M_CLOCK, M_EQUIP };
 enum { CT_DUE = 254, CT_WAIT = 255 }; // clock results, never unit indices
 enum { END_NONE, END_VICTORY, END_DEFEAT };
 // an AI unit's turn (st.ai): thinking (a few frames), its move range shown, its target shown,
@@ -384,6 +393,9 @@ typedef struct {
     u8 dc;                             // death counter: 3, one less per turn at 0 HP, then DC_*
     u8 defend;                         // Defend is its support ability (a command)
     u8 exp, kos, lv0;                  // EXP to the next level; times KO; level at the start
+#ifdef FFT_CHAPTER
+    u8 allegiance;                    // former alignment byte: saved Charm camp and permanent invitation
+#endif
     u16 jp, tjp;                       // its job's JP: left, earned in all (the job level)
     u16 gexp, gjp;                     // EXP and JP earned in this battle (the results)
     u32 raw[5];                        // FFT's raw stats (24 bits): HP MP SP PA MA
@@ -479,9 +491,8 @@ typedef struct {
 #endif
 #endif
 #ifdef FFT_CHAPTER
-    // Deferred actions are separate from the active unit's turn. Only Archer
-    // Charge is exposed; casts use explicit tile/unit tags. Retail spells,
-    // Jump and performances still need their own effect/targeting producers.
+    // Deferred actions are separate from the active unit's turn: Charge, Jump,
+    // casts (explicit tile/unit tags) and recurring performances.
     // tile is a node or CAST_UNIT's actor slot; origin/weapons belong to Charge.
     struct { AbId ability; u8 state, ticks, tile, origin, weapon, off_weapon; } pending[UNIT_CAPACITY];
     struct { AbId ability; u16 roll; u8 actor, target; } formula;
@@ -517,8 +528,9 @@ typedef struct {
 #ifdef FFT_CHAPTER
     CoreAction action;                // transient root/impact/response ownership; never saved
     u16 reaction[UNIT_CAPACITY];       // equipped source IDs; unsupported families stay inert
+    u8 movement[UNIT_CAPACITY];         // source movement ID486..509 encoded1..24; zero:none
     u16 support[UNIT_CAPACITY];        // equipped source IDs, separate from innate job traits
-    u8 hand,effect_kind;               // low7: magical category; bit7: prepared Oil removal
+    u8 hand,effect_kind;               // low5: category; status/return/Oil flags above it
     ActionPacket primary;             // primary presentation packet while a response runs
 #endif
 } State;
@@ -583,6 +595,11 @@ void attack_range(u8 who);
 u8 attack_side(u8 a, u8 t);
 u8 hit_chance(u8 a, u8 t);
 u16 attack_damage(u8 a, u8 t, u8 crit, u16 r);
+#ifdef FFT_MODULE
+static u16 attack_prediction(u8 a,u8 t);
+#else
+u16 attack_prediction(u8 a,u8 t);
+#endif
 #ifdef FFT_CHAPTER
 #include "cast_batch.h"
 #include "area_ai.h"
@@ -593,11 +610,15 @@ enum { TARGETS_INVALID=-1,TARGETS_UNSUPPORTED=-2 };
 s16 cast_targets(u8 actor,u8 ref,AbId ab,u8 follow); // footprint only; no command eligibility or effects
 u8 cast_batch(u8 operation,CastBatch *batch); // gated effect-stage prepare/commit; caller retains storage
 u8 cast_forecast(CastBatch *batch);    // pure current effect set, no cost/RNG/command validation
-u16 attack_prediction(u8 a,u8 t);       // shared no-critical primary+offhand forecast
+#ifdef FFT_MODULE
+static u16 attack_prediction(u8 a,u8 t);
+#else
+u16 attack_prediction(u8 a,u8 t);
+#endif       // shared no-critical primary+offhand forecast
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll); // flags:hand|awake<<1|critical<<2
 u8 skill_cost(u8 who,AbId ab);           // pure effective MP cost; no image loads
 u16 magic_amount(u8 a,u8 t,u16 spec);    // raw source halfword; element<<8 | power
-u16 magic_heal(u8 a,u8 t,AbId ab,u8 query); // pure quantity/chance/category for healing families
+u16 magic_heal(u8 a,u8 t,AbId ab,u8 query); // pure amount/chance/kind/status; Geomancy4: terrain ability
 u8 skill_kind(u8 a,u8 t,AbId ab);        // pure live damage/healing/null outcome
 u8 cast_order(u8 who,u8 target,AbId ab,u8 follow); //0 rejected,1 immediate/empty,2 armed
 #endif
@@ -608,7 +629,7 @@ u8 attack_sequence(u8 a,u8 t,u8 count); // bounded engine API; no Two Swords pro
 // A unit's k-th known action (AbId, NO_ABIL when absent), and whether it can use it.
 // now (an item left), its reach (st.reach 1), the hit chance, the amount (damage or HP healed;
 // r: the random roll 0..32767 of Dash, Throw Stone and Phoenix Down), the ability used
-AbId known(u8 who, u8 k);
+AbId known(u8 who, u8 k);               // k255 queries count in one pass
 u8 can_use(u8 who, AbId ab);
 void skill_range(u8 who, AbId ab);
 u8 skill_hit(u8 a, u8 t, AbId ab);

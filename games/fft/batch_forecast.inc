@@ -7,7 +7,7 @@ static u8 batch_forecast(CastBatch *b)
        (b->phase!=CAST_BATCH_EMPTY&&b->phase!=CAST_BATCH_FORECAST)||
        b->actor>=NUNIT||b->ability>=512)return 0;
     ability=&abilities[b->ability];raw=cj_range(common,b->ability);
-    if(!cast_area_supported(ability,raw))return 0;
+    if(b->follow==MATH_BIND?!math_spell(b->ability):!cast_area_supported(ability,raw))return 0;
     mask=cast_targets(b->actor,b->ref,b->ability,b->follow);
     if(mask<0)return 0;
     // Every rejection precedes writes. Fill spare slots too, for a canonical result.

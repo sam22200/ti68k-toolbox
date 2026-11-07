@@ -4,7 +4,7 @@
 any job and equipment the campaign save holds (a unit's job and equipment are FFT ids).
 
 usage: common_tables.py DISC.cue      (writes opening/data and campaign/data/ffcj.bin)
-Layout: "FCJA", 14 u16 section offsets and the payload length: jobs (Job, 14 bytes, 160 internal job/actor records, not
+Layout: "FCJI", 14 u16 section offsets and the payload length: jobs (Job, 14 bytes, 160 internal job/actor records, not
 160 playable careers: the management menus expose the 20 generic careers; growth and multiplier per raw
 stat, Move, Jump, class evade, career row), job names (14 bytes each), each job's skill set (FFT
 id, a byte), items (Item, 30 bytes,
@@ -13,7 +13,7 @@ name, reach (the weapon's range), shield evade, packed magic evade/shield tag an
 reads them; the names from BATTLE.BIN. Then all 512 primary ability records (JP big-endian,
 other bytes verbatim), 368 default range/formula records, 14 item formula records, special
 ability tables, 176 human and 48 monster packed skill sets, ability/set names, 128 status
-records, and 512 normalized battle records with Charge timing/labels. See common.h and
+records, and 640 normalized battle records (512 source rows plus128 item slots) with Charge timing/labels. See common.h and
 campaign/ABILITIES.md. Retail data is never committed.
 """
 from pathlib import Path
@@ -90,6 +90,13 @@ def healing_magic_record(r):
     return 3 if r[8]==12 else 4,r[10],r[0],2*r[2] if r[3]&8 else 255,128|32|(0 if r[3]&1 else 1)
 
 
+def float_record(d,r):
+    """Retail Float only: existing formula0b plus the implemented Float policy."""
+    if r!=bytes.fromhex('04 01 01 00 00 e2 00 00 0b 8c 00 2e 02 08'):return None
+    if d.at(battle.STATUS_SET+6*46,6)!=bytes((128,0,0,64,0,0)):return None
+    return 10,46,4,255,161
+
+
 def status_magic_record(d,r):
     """Whole all-or-nothing family, one filtered status byte, implemented policy only."""
     if r[8]not in(10,11)or r[3]&~9 or r[4]&~0xe1 or r[5]&~0xe2 or r[6]&~0x42 or r[7]:return None
@@ -149,6 +156,70 @@ def strike_record(r):
     return 0,r[10],r[0],2*r[2],2
 
 
+def draw_out_record(d,a,r):
+    """All ten retail Draw Out producers; inventory item is ability id - 0x26."""
+    if not 76<=a<=85:return None
+    rows=((0,2,3,2,64,2,1,0,32,0,8,0,0,0),
+          (0,2,3,2,64,2,1,0,32,0,12,0,0,0),
+          (0,2,3,2,64,2,1,0,33,0,4,0,0,0),
+          (0,2,3,2,128,2,1,0,35,0,12,0,0,0),
+          (0,2,3,2,64,2,1,0,32,0,14,43,0,0),
+          (0,2,3,2,128,2,1,0,34,0,0,37,0,0),
+          (0,2,3,2,64,2,1,0,32,0,18,77,0,0),
+          (8,8,3,17,85,2,0,0,32,0,16,0,0,0),
+          (0,2,3,2,128,2,1,0,34,0,0,78,0,0),
+          (0,2,3,2,64,2,1,0,32,0,30,0,0,0))
+    if tuple(r)!=rows[a-76]:return None
+    status={0:(0,0,0,0,0,0),43:(128,0,0,0,4,0),37:(128,0,0,0,48,0),
+            77:(64,0,16,0,0,1),78:(128,0,0,0,72,0)}
+    if tuple(d.at(battle.STATUS_SET+6*r[11],6))!=status[r[11]]:return None
+    kind={32:0,33:11,34:10,35:3}[r[8]]
+    return kind,r[11]if kind==10 else r[10],r[0],255,160|(0 if r[3]&1 else 1)
+
+
+def performance_record(d,a,r):
+    """All fourteen retail Songs/Dances; persistent, global and team filtered."""
+    if not 86<=a<=99:return None
+    k=a-86;f=28 if k<7 else 29;j=k%7
+    x=100 if j<2 else 34 if a==99 else 50
+    y=20 if j==0 else 10 if j==1 else 0
+    status=59 if a==91 else 60 if a==98 else 0
+    ticks=(6,6,8,8,10,10,20)[j]
+    if tuple(r)!=(0,255,255,2,128 if k<7 else 64,4,1,0,f,x,y,status,ticks,0):return None
+    sets={0:(0,0,0,0,0,0),59:(64,0,0,32,120,0),60:(64,0,56,2,134,16)}
+    if tuple(d.at(battle.STATUS_SET+6*status,6))!=sets[status]:return None
+    kind=(12,3,21,7,7,10,17)[j]if k<7 else(11,0,21,7,7,10,17)[j]
+    value=status if j==5 else 255 if k<7 and 2<=j<=4 else 1 if 2<=j<=4 else y
+    return kind,value,0,255,161
+
+
+def allegiance_record(d,a,r):
+    """Steal Heart and Invitation: owned status effects with source-specific allegiance."""
+    expected={109:bytes.fromhex('03 00 00 01 51 00 00 00 29 32 00 3e 00 00'),
+              116:bytes.fromhex('03 00 03 09 50 20 00 00 2a 14 00 3f 00 00')}
+    if r!=expected.get(a):return None
+    if d.at(battle.STATUS_SET+6*r[11],6)!=(bytes.fromhex('80 00 00 00 00 20')if a==109 else bytes.fromhex('80 00 40 00 00 00')):return None
+    return 10,r[11],r[0],2*r[2]if r[3]&8 else 255,160
+
+
+def allegiance_immunity(d):
+    """Compact only the two newly executable statuses from all160 jobs/256 items."""
+    rows=[]
+    for job in range(JOBS):rows.append(d.at(battle.JOBS+48*job+0x1f,5))
+    for item in range(ITEMS):
+        attr=d.at(battle.ITEMS+12*item+7,1)[0]
+        rows.append(d.at(battle.ATTRS+25*attr+10,5))
+    out=bytearray(416)
+    for i,r in enumerate(rows):out[i]=int(bool(r[1]&64))|int(bool(r[4]&32))<<1
+    return bytes(out)
+
+
+def line_record(a,r):
+    """Earth Slash: source cardinal selection, origin-based linear area, Earth."""
+    if a!=103 or tuple(r)!=(8,8,2,17,21,2,0,8,49,0,0,0,0,0):return None
+    return 0,0,8,255,128|32
+
+
 def talk_record(d,a,r):
     """Talk Skill 0x2a by source ability id: Persuade (CT 0), Praise/Threaten (Brave),
     Preach/Solution (Faith), Insult/Mimic Daravon (status). Y is a signed loss."""
@@ -175,6 +246,15 @@ def steal_exp_record(r):
     """Steal Exp 0x28: physical evasion, then (SP'+X)%; steals min(SP+Y, 100, target EXP)."""
     if r[8]!=0x28 or r[1] or r[2]>1 or r[3]!=9 or r[4]&~0x11 or r[5] or r[6] or r[7] or r[11]:return None
     return 22,r[10],r[0],2*r[2],2
+
+
+def steal_gil_record(a,r):
+    """Gil Taking and Negotiate share Speed x level gil, capped by a player target's funds.
+    The Thief rolls physical SP'+X; the Mediator rolls Talk Skill's MA'+X."""
+    expected={0x6c:bytes.fromhex('01 00 01 09 51 00 12 00 27 c8 00 00 00 00'),
+              0x7b:bytes.fromhex('03 00 03 09 51 20 00 00 2a 5a 00 00 00 00')}
+    if r!=expected.get(a):return None
+    return 25,0,r[0],2*r[2],2 if a==0x6c else 128|32|1
 
 
 def steal_equip_record(r):
@@ -207,6 +287,59 @@ def percent_magic_record(r):
     return 11 if r[8]==15 else 0,r[10],r[0],2*r[2]if r[3]&8 else 255,128|32|(0 if r[3]&1 else 1)|(2 if r[6]&2 else 0)
 
 
+def secret_fist_record(d,a,r):
+    """Physical status family0x50: the Monk's exact Death Sentence producer.
+
+    Other producers (monster/weapon procs) need their own eligibility fixtures.
+    """
+    if a!=0x68 or bytes(r)!=bytes((1,0,0,9,17,2,0,0,0x50,50,0,61,0,0)):return None
+    if d.at(battle.STATUS_SET+6*r[11],6)!=bytes((128,0,0,0,0,1)):return None
+    return 10,r[11],1,0,128|32
+
+
+def geomancy_record(d,a,r):
+    """All twelve retail terrain attacks: MA*(PA+Y)/2, element and one conditional status."""
+    if not 126<=a<=137:return None
+    elements=(0,4,0,0,8,16,128,4,16,32,16,128)
+    expected=bytes((5,1,0,0,0x11,0,0x80,elements[a-126],0x24,0,2,65+a-126,0,0))
+    if r!=expected:return None
+    row=d.at(battle.STATUS_SET+6*r[11],6)
+    if row[0]!=128 or sum(v.bit_count()for v in row[1:])!=1:return None
+    return 0,r[10],r[0],255,128|32|1
+
+
+THROW_TYPES=(32,1,3,9,5,2,6,15,16,4,14,33)
+
+
+def throw_records(d):
+    """Archive-only item commands; 512+item keeps source learn ids untouched."""
+    assert d.at(0x80061020,12)==bytes(THROW_TYPES)
+    learned=d.at(HUMAN+20*25,25)
+    slots={learned[3+k]|(256 if learned[k>>3]&(128>>(k&7))else 0):k for k in range(16)}
+    out=bytearray()
+    for item in range(128):
+        it=d.item(item);w=d.at(battle.WEAPONS+8*item,8)
+        enabled=bool(it['flags']&128 and w[1]&2 and it['type']in THROW_TYPES)
+        pos=slots[382+THROW_TYPES.index(it['type'])]if enabled else 255
+        jp=int.from_bytes(d.at(battle.ABILITY+8*(382+THROW_TYPES.index(it['type'])),2),'little')if enabled else 0
+        out.extend(struct.pack('>8BH2B',0 if enabled else 255,w[4],255,255,6,item,pos,it['level'],jp,99,w[6]))
+    return out
+
+
+def math_tables(d):
+    """Value predicates and source career/list positions, read in place from Flash."""
+    assert d.at(0x80061054,8)==bytes((128,64,32,16,8,4,2,1))
+    primes=set(d.at(0x80066198,54));values=bytes((int(v in primes)|int(v!=0 and v%5==0)<<1|int(v!=0 and v%4==0)<<2|int(v!=0 and v%3==0)<<3)for v in range(256))
+    slots=bytearray([255]*60)
+    for career in(5,6,7,11):
+        skillset=d.job(0x4a+career)['set'];r=d.at(HUMAN+25*skillset,25)
+        for k in range(16):
+            ab=r[3+k]|(256 if r[k>>3]&(128>>(k&7))else 0)
+            if ab and ab<60 and d.at(battle.ABILITY_RANGE+14*ab+5,1)[0]&64:
+                assert slots[ab]==255;slots[ab]=(career<<4)|k
+    return values+slots
+
+
 def battle_records(d):
     """Shared native execution records. Unverified families remain explicitly disabled.
 
@@ -235,22 +368,33 @@ def battle_records(d):
         art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b else None
         magic = offensive_magic_record(raw) if raw else None
         healing = healing_magic_record(raw) if raw else None
-        status = status_magic_record(d,raw) if raw else None
+        status = (float_record(d,raw) if a==38 else status_magic_record(d,raw)) if raw else None
         percent = percent_magic_record(raw) if raw else None
         decisive = decisive_magic_record(raw) if raw else None
         brave = brave_magic_record(raw) if raw else None
         golem = golem_magic_record(raw) if raw else None
+        draw_out = draw_out_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 76<=a<=85 else None
+        performance = performance_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 86<=a<=99 else None
+        allegiance = allegiance_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a in(109,116) else None
         punch = punch_record(d,art) if art else None
-        strike = strike_record(art) if art else None
+        strike = (line_record(a,art) or strike_record(art)) if art else None
         speech = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x74<=a<=0x7d else None
         talk = talk_record(d,a,speech) if speech else None
         # Guts (0x96..0x99) is read beyond the magic interval too.
         guts = guts_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x96<=a<=0x99 else None
         steal = steal_exp_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if a==0x73 else None
+        gil = steal_gil_record(a,d.at(battle.ABILITY_RANGE + 14*a,14)) if a in(0x6c,0x7b) else None
+        geomancy = geomancy_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 126<=a<=137 else None
+        secret = secret_fist_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a==0x68 else None
         stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8e<=a<=0x91 else None
         gear_steal = steal_equip_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x6e<=a<=0x72 else None
         gear_break = equip_break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8a<=a<=0x8d else None
-        if a in adapted:
+        if a in (265,268,269):
+            r=d.at(battle.ABILITY_RANGE+14*a,14)
+            if a==265:kind,y,rng,vert,flags,formula=0,0,1,4,10,1
+            elif a==268:kind,y,rng,vert,flags,formula=13,r[11],0,255,161,81
+            else:kind,y,rng,vert,flags,formula=3,r[10],0,255,161,76
+        elif a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
         elif 0x170<=a<=0x175 or a==0x17d:
@@ -277,6 +421,14 @@ def battle_records(d):
                 formula = d.at(battle.ITEM_ABILITY + bag * 3, 3)[0]
             else:
                 formula = d.at(battle.ABILITY_RANGE + a * 14, 14)[8]
+        elif 414<=a<422:
+            kind,y,formula=27,d.at(0x80061054+a-414,1)[0],254
+        elif 0x17e<=a<0x18a:
+            # Source learning selectors are not commands without a selected item.
+            kind,formula=26,99
+        elif 394<=a<406:
+            horizontal,vertical=d.at(0x8006102c+2*(a-394),2)
+            kind,rng,vert,formula=0,horizontal,vertical*2,100
         elif 0x196 <= a < 0x19E:
             # CT and power are separate source fields: +7/+10/+20 are not
             # consecutive powers, and power must never index the CT table.
@@ -295,10 +447,17 @@ def battle_records(d):
             kind,y,rng,vert,flags=brave;formula=raw[8]
         elif golem:
             kind,y,rng,vert,flags=golem;formula=raw[8]
+        elif draw_out:
+            kind,y,rng,vert,flags=draw_out;formula=d.at(battle.ABILITY_RANGE+14*a+8,1)[0]
+            level=d.item(a-0x26)["level"]
+        elif performance:
+            kind,y,rng,vert,flags=performance;formula=28 if a<93 else 29
+        elif allegiance:
+            kind,y,rng,vert,flags=allegiance;formula=d.at(battle.ABILITY_RANGE+14*a+8,1)[0]
         elif punch:
             kind,y,rng,vert,flags=punch;formula=art[8]
         elif strike:
-            kind,y,rng,vert,flags=strike;formula=art[8]
+            kind,y,rng,vert,flags=strike;formula=art[8];element=art[7]
         elif gear_break:
             kind,y,rng,vert,flags=gear_break;formula=0x25;element=y   # Y, the hit percent's addend
         elif stat_break:
@@ -307,6 +466,12 @@ def battle_records(d):
             kind,y,rng,vert,flags=gear_steal;formula,element=0x26,d.at(battle.ABILITY_RANGE + 14*a, 14)[9]   # X
         elif steal:
             kind,y,rng,vert,flags=steal;formula=0x28;element=d.at(battle.ABILITY_RANGE + 14*a, 14)[9]   # X
+        elif gil:
+            kind,y,rng,vert,flags=gil;formula,element=d.at(battle.ABILITY_RANGE + 14*a,14)[8:10]
+        elif geomancy:
+            kind,y,rng,vert,flags=geomancy;formula=0x24;element=d.at(battle.ABILITY_RANGE+14*a+7,1)[0]
+        elif secret:
+            kind,y,rng,vert,flags=secret;formula=0x50   # status set in Y; X stays in the raw record
         elif guts:
             kind,y,rng,vert,flags,element=guts;formula=d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif talk:
@@ -317,16 +482,35 @@ def battle_records(d):
             kind,y,rng,vert,flags=status;formula=raw[8]
         out.extend(struct.pack('>8BH2B', kind, y, rng, vert, flags, bag, rate, level, jp, formula, element))
     assert len(out) == 512 * 12
+    out.extend(throw_records(d))
     out.extend(d.at(0x80061044, 16)[::2])        # Charge's eight CT counts
     out.extend(b'Charge +1\0Charge +2\0')         # reviewed battle label spacing
     out.extend(bytes(d.item(i)['level'] for i in range(ITEMS)))   # required levels (Weapon Break)
+    out.extend(d.at(0x8005e9d0,64))             # source surface -> Geomancy ability
+    out.extend(allegiance_immunity(d))        # two bits per source job/item, no new live cache
+    out.extend(math_tables(d))
     return bytes(out)
+
+
+def equipment_tables(d):
+    """Source category/support masks and item kind/slot/weapon flags, cold reads."""
+    out=bytearray()
+    for job in range(JOBS):
+        j=d.job(job);bits=bytearray(4)
+        for ab in j['innate']:
+            if 454<=ab<486:bits[(ab-454)>>3]|=128>>((ab-454)&7)
+        out.extend(j['cats']+bits)
+    for item in range(256):
+        it=d.item(item)
+        out.extend((it['type'],it['flags'],d.at(battle.WEAPONS+8*item+1,1)[0] if it['flags']&128 else 0))
+    assert len(out)==2048
+    return out
 
 
 def build(d):
     job_names = management_data.names(d.bat, management_data.JOB_NAMES, JOBS)
     item_names = management_data.names(d.bat, management_data.ITEM_NAMES, ITEMS)
-    body = bytearray(b'FCJA' + bytes(30))
+    body = bytearray(b'FCJI' + bytes(30))
     offs = [len(body)]
     for j in range(JOBS):
         e = d.job(j)
@@ -342,12 +526,11 @@ def build(d):
         it = d.item(i)
         w = d.at(battle.WEAPONS + 8 * i, 8) if it['flags'] & 0x80 else bytes(8)
         knife = 1 if it['type'] in (KNIFE, 2) else 2 if it['type'] == BOW else 0
-        sev = d.at(SHIELD_EVADE + 2 * (i - 0x80), 1)[0] if 0x80 <= i < 0x90 else 0
+        sev = w[5] if it['flags']&128 else d.at(SHIELD_EVADE + 2 * (i - 0x80), 1)[0] if 0x80 <= i < 0x90 else d.at(ACCESSORY_EVADE+2*d.at(battle.ITEMS+12*i+4,1)[0],1)[0] if it['flags']&8 else 0
         rec = bytes([i, it['hp'], it['mp'], it['pa'], it['ma'], it['sp'], it['move'], it['jump'], w[4], knife])
         assert len(item_names[i]) <= 16, (i, item_names[i])
-        # Verified ordinary melee subset; elemental/proc/special formulas stay gated.
-        dual = bool(it['flags'] & 0x80 and w[1] & 8 and w[2] == 1
-                    and it['type'] in (1, 2, 3) and not w[6] and not w[7])
+        # Every source-compatible hand; each weapon formula owns its effects.
+        dual = bool(it['flags'] & 0x80 and w[1] & 8)
         rec += item_names[i].encode('ascii').ljust(17, b'\0') + bytes([w[0], sev, int(dual) | item_magic(d, i)])
         assert len(rec) == 30
         body += rec
@@ -381,7 +564,16 @@ def build(d):
     name_section(management_data.names(d.bat, management_data.ABILITY_NAMES, 512))
     name_section(management_data.names(d.bat, management_data.SET_NAMES, 64))
     section(d.at(battle.STATUS_SET, 128 * 6)+status_policy_bytes(d))
-    section(battle_records(d))
+    movement=bytearray(d.at(0x8005ea50,384))
+    for job in range(160):
+        bits=bytearray(3)
+        for ab in d.job(job)['innate']:
+            if 486<=ab<510:bits[(ab-486)>>3]|=128>>((ab-486)&7)
+        movement.extend(bits)
+    maps=d.bat[0x800f5e74-battle.BAT:0x800f6674-battle.BAT]
+    assert len(maps)==2048
+    aliases=bytearray([255]*64);aliases[7]=22;aliases[19]=56
+    section(battle_records(d)+movement+equipment_tables(d)+d.at(0x80066064,96)+maps+aliases+b''.join(struct.pack('>H',int.from_bytes(d.at(battle.ITEMS+12*i+8,2),'little'))for i in range(256))+d.at(battle.WEAPONS,128*8))
     assert len(offs) == 14 and len(body) < 65000
     struct.pack_into('>15H', body, 4, *offs, len(body))
     return bytes(body)

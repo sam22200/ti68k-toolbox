@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Approved area UI through actual PC/native input/render paths."""
-import argparse,json,re,struct,tempfile
+import argparse,hashlib,json,re,struct,tempfile
 from pathlib import Path
 from check import HERE,ROOT,run
 from check_flow import data_links
@@ -34,6 +34,7 @@ def main():
     catalogue[raw+14*17+4]|=16
     catalogue[raw+14*18+1]=255
     (fixture/'ffcj.bin').write_bytes(catalogue)
+    (fixture/'source.sha256').write_text(hashlib.sha256((HERE/'data/ffcj.bin').read_bytes()).hexdigest())
     with tempfile.TemporaryDirectory(prefix='fft-area-ai-')as folder:
         data=Path(folder);data_links(data)
         for name in ('ffgd','ffcj'):(data/(name+'.bin')).unlink();(data/(name+'.bin')).symlink_to(fixture/(name+'.bin'))
@@ -43,7 +44,7 @@ def main():
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'areaui',*source,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     for name in ('ffgd','ffcj'):run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',name+'.bin',name],fixture)
     cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
-    for bank in 'ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
+    for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
         cmd+=['--file',(fixture if bank in ('ffgd','ffcj')else HERE/'data')/(bank+'.89y')]
     native=run([*cmd,out/'areaui.89z']);(out/'native.log').write_text(native)
     m=re.search(r'area_ui (\w+) failures 0 checks (\d+)',pc);assert m

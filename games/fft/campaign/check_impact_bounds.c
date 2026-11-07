@@ -32,12 +32,16 @@ static void impact_bounds_trials(void)
     {Feet focus=unit_feet(st.rot,1);st.camx=focus.x-80;st.camy=focus.y-60;}
     draw_clear();image_hash=impact_picture_hash();
 #ifdef FFT_MODULES
-    ZB(60);mod_call(MOD_NUMBERS,0,0);ZE(60);
+    ZB(60);mod_call(MOD_AREA_UI,AREA_RESULTS,0);ZE(60);
 #else
     numbers_draw();
 #endif
     CHECK(impact_picture_hash()!=image_hash,1);image_hash=impact_picture_hash();CHECK(rng32==seed,1);
-    st.action.phase=CTX_SECONDARY;CHECK(area_impact_root(),0);
+    // A secondary area response owns its own FX; stale parent packets do not.
+    st.action.phase=CTX_SECONDARY;CHECK(area_impact_root(),1);
+    st.atk++;CHECK(area_impact_root(),0);st.atk--;
+    st.abil++;CHECK(area_impact_root(),0);st.abil--;
+    st.action.phase=CTX_DRAIN;CHECK(area_impact_root(),0);
     for(i=0;i<3;i++){
         u16 cell;fixture(0,0);st.ai=AI_OFF;cell=UNIT_CELL(&st.unit[1]);
         CHECK(cast_order(0,1,16,1),2);

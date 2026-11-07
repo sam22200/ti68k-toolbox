@@ -8,6 +8,7 @@
 #include "choice_menu.inc"
 #endif
 #include "forecast_box.inc"
+#include "stat_text.h"
 static void area_page(void)
 {
     AreaUi *q=&W->area_ui;
@@ -21,7 +22,7 @@ static void area_line(u8 t,char *s)
     u8 n=0,kind=v->effect&EFFECT_KIND_MASK,harm=effect_damage(kind);u16 amount=v->amount;
     if(!v->hit||kind==AB_NULL)n=put_s(s,n,"Miss");
     else if(kind==AB_QUICK||kind==AB_GOLEM)n=put_s(s,n,kind==AB_GOLEM?"Golem":amount>>8?"CT 0":"Quick");
-    else if(kind==AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED){s8 v=(s8)amount;n=put_s(s,n,kind==AB_BRAVE?"Br":kind==AB_FAITH?"Fa":"Sp");s[n++]=v<0?'+':'-';n=put_n(s,n,(u16)(v<0?-v:v));}
+    else if(kind==AB_BRAVE||kind==AB_FAITH||kind==AB_SPEED||kind==AB_BREAK)n=stat_text(s,kind,W->area_ui.forecast.ability,amount,1);
     else if(kind==AB_STATUS||kind==AB_CLEANSE)n=put_s(s,n,"Status");
     else if(kind==AB_MP_DAMAGE||kind==AB_MP_HEAL){s[n++]=kind==AB_MP_DAMAGE?'-':'+';n=put_n(s,n,amount);n=put_s(s,n,"MP");}
     else{
@@ -38,9 +39,10 @@ static u8 area_input(u8 begin)
 {
     AreaUi *q=&W->area_ui;u32 pressed=rt_keys&~rt_prev;
     if(begin){
-        if(!cast_can_order(st.act,(u8)CURSOR_CELL,st.abil,0)){st.deny=16;return AREA_NONE;}
+        u8 math=st.unit[st.act].set==21,ref=math?st.sub&15:(u8)CURSOR_CELL;
+        if(!cast_can_order(st.act,ref,st.abil,math?MATH_BIND:0)){st.deny=16;return AREA_NONE;}
         memset(q,0,sizeof *q);q->centre=(u8)CURSOR_CELL;
-        q->forecast.actor=st.act;q->forecast.ability=st.abil;q->forecast.ref=q->centre;
+        q->forecast.actor=st.act;q->forecast.ability=st.abil;q->forecast.ref=ref;q->forecast.follow=math?MATH_BIND:0;
         st.mode=M_AREA;return AREA_QUERY;
     }
     if(pressed&(K_ESC|K_B)){
@@ -72,7 +74,7 @@ static void area_draw(u8 header)
         area_paint(q->count?q->ids[q->row]+1:0);
     }
     draw_rect(0,0,160,8,C_BLACK);n=put_s(s,0,ABIL_NAME(st.abil));
-    if(header)n=put_s(s,n," / Select panel");
+    if(header)n=put_s(s,n,st.unit[st.act].set==21?" / Math targets":" / Select panel");
     else{
         for(k=0;k<q->count;k++)if(st.unit[q->ids[k]].team!=TEAM_ENEMY)allies++;
         n=put_s(s,n," / ");n=put_n(s,n,q->count);n=put_s(s,n," targets");
@@ -104,14 +106,16 @@ static void area_draw(u8 header)
             {95,17,64,38,3,CHOICE_TAB,3,1,0,6,10,8,157,-16,7}};
         u8 fixed=q->follow_id==255,count=fixed?2:3;
         const ChoiceLayout *p=&layouts[!fixed];choice_frame(p,"Target");
-        for(k=0;k<count;k++)choice_row(p,k,labels[k+fixed],C_BLACK);
+        for(k=0;k<count;k++)choice_row(p,k,q->forecast.follow==MATH_BIND&&k==0?"Cast":labels[k+fixed],C_BLACK);
         choice_cursor_animated(p,q->answer,st.tick);
     }
 }
 #if !MOD_CORE
 u16 mod_entry(u8 op,u8 a)
 {
-    (void)a;if(op==AREA_DRAW||op==AREA_HEADER){area_draw(op==AREA_HEADER);return 0;}
+    (void)a;if(op==AREA_NUMBERS)return area_number_prepare();
+    if(op==AREA_RESULTS){numbers_draw();return 0;}
+    if(op==AREA_DRAW||op==AREA_HEADER){area_draw(op==AREA_HEADER);return 0;}
     return area_input(op==AREA_BEGIN);
 }
 #endif

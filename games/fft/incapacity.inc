@@ -5,7 +5,7 @@ static u8 battle_outcome(void)
     for(i=0,u=st.unit;i<NUNIT;i++,u++)if(u->hp&&unit_on_field(u)&&
         !(core_status_current(&u->statuses,0)&0x60)&&
         !(core_status_current(&u->statuses,1)&0xc5)){
-        if(u->team==TEAM_ENEMY)foes++;else blue++;
+        if(unit_home_team(u)==TEAM_ENEMY)foes++;else blue++;
     }
     // Preserve the current campaign's mandatory-Ramza permanent-loss contract.
     if(DC_OBJ(st.unit[U_RAMZA].dc)||!blue)return END_DEFEAT;

@@ -172,7 +172,7 @@ void game_init(void)
     bank = rt_file("ffwm", &size);
     if (bank && memcmp(bank, "FWM3", 4)) bank = RT_NULL;
     mgb = rt_file("ffmg", &size);
-    if (mgb && memcmp(mgb, "FMG2", 4)) mgb = RT_NULL;
+    if (mgb && memcmp(mgb, "FMG3", 4)) mgb = RT_NULL;
     save_load(&save);
     if (bank) {
         map.w = bank[14]; map.h = bank[15];

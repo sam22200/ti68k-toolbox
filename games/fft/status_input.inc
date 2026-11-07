@@ -2,7 +2,7 @@
 static u8 status_ability_count(void)
 {
     u8 n = 0;
-    while (known(st.sel, n) != NO_ABIL) n++;
+    n=(u8)known(st.sel,255);
     n += st.unit[st.sel].defend;
     return n ? n : 1;
 }
@@ -38,6 +38,6 @@ static void status_keys(void)
         if (input_pressed(K_ESC | K_B)) st.mode = st.back;
     }
 #ifdef FFT_CHAPTER
-    if(st.mode!=M_STATUS){W->pan_ok[0]=W->pan_ok[1]=0;W->pan_k[0][0]=W->pan_k[1][0]=0;}
+    if(st.mode!=M_STATUS){W->ai_k=0;if(W->edge_phase){W->edge_phase=0;W->ej=255;}W->pan_ok[0]=W->pan_ok[1]=0;W->pan_k[0][0]=W->pan_k[1][0]=0;}
 #endif
 }

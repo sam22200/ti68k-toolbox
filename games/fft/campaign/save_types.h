@@ -2,7 +2,9 @@
 #define FFT_SAVE_TYPES_H
 // Serialized save layout only; no file calls before module context bindings.
 #include "../../../runtime/core/rt.h"
-#define SAVE_MAGIC "FSV3"
+#define SAVE_MAGIC "FSV4"
+#define SAVE_V3_BYTES 3138U
+#define SAVE_DISCOVERY_BYTES 64U
 #define SAVE_FLAGS 4                    // byte offset of the story flags (fftstory reads them)
 #define FLAG_N 256                      // story flags: bit k of flags[k >> 3]
 #define PARTY_MAX 16                    // FFT's roster
@@ -13,7 +15,7 @@
 typedef struct {
     u8 job, gfx, type, name;            // FFT job id; the battle's sprite (units.h UG_*, 0xFF: none
                                         // for its job); generation table (0 male, 1 female, 2
-                                        // Ramza); generic name index
+                                        // Ramza, 3 source monster); generic name index
     u8 level, exp, brave, faith, zodiac;
     u8 secondary;                       // the secondary skill set: FFT id, 0 none
     u8 raw[5][3];                       // FFT's raw stats HP MP SP PA MA (24 bits)
@@ -33,6 +35,7 @@ typedef struct {
     u8 flow;                           // Academy1, deployment2, Gariland title3, complete4
     u8 deploy_n, deploy_battle[2];
     u8 deploy[5][4];                   // roster slot, world x/z, native facing
+    u8 discovered[SAVE_DISCOVERY_BYTES]; //128 source maps, four once-only item locations each
 } Save;
 
 #endif

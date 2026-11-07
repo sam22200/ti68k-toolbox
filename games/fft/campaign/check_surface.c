@@ -39,7 +39,7 @@ static void trials(void)
     data[15]=32;check(surface_valid(data,16,1,1),0);data[15]=0;
     check(surface_valid(data,16,2,1),0);check(surface_valid(data,16,0,1),0);
     data[3]='0';check(surface_valid(data,16,1,1),0);data[3]='1';
-    memset(descriptor,0,sizeof descriptor);memcpy(descriptor,"FCD3",4);
+    memset(descriptor,0,sizeof descriptor);memcpy(descriptor,"FCD4",4);
     memcpy(descriptor+104,data,16);memcpy(descriptor+120,"SGE1",4);
     descriptor[125]=104;descriptor[127]=16;
     check(surface_descriptor(descriptor,128,1,1,104)==descriptor+104,1);

@@ -41,26 +41,26 @@ static void expected_context(void)
         c->contour_gfx = contour_gfx; c->cdesc = cdesc;
         c->views=views;c->highlight_seq=&hl_seq;
         c->rand15 = rand15; c->known = known; c->spread_start = spread_start; c->spread_go = spread_go;
-        c->bfs = bfs; c->hit_chance = hit_chance; c->attack_prediction = attack_prediction;
+        c->bfs = bfs;
         c->charge_query=charge_query;c->skill_cost=skill_cost;
         c->magic_amount=magic_amount;
         c->magic_heal=magic_heal;
         c->skill_kind=skill_kind;
-        c->magic_hit=magic_hit;c->magic_target=magic_target;
-        c->attack_roll=attack_roll;c->roll_hit=roll_hit;c->knockback=knockback;
-        c->skill_hit = skill_hit; c->skill_amount = skill_amount; c->zodiac_xa = zodiac_xa; c->tile_at = tile_at;
+        c->magic_hit=magic_hit;c->target_query=target_query;
+        c->weapon_amount=weapon_amount;c->knockback=knockback;
+        c->zodiac_xa = zodiac_xa; c->tile_at = tile_at;
         c->node_at=node_at;c->unit_place=unit_place;c->unit_at_cell=unit_at_cell;c->cursor_place=cursor_place;
-        c->D = &D; c->rt_light = &rt_light; c->rt_dark = &rt_dark; c->world_of=world_of;c->view_of = view_of;
-        c->scene_x = scene_x; c->scene_y = scene_y; c->draw_unit_covered = draw_unit_covered;
+        c->D=&D;c->rt_light = &rt_light; c->rt_dark = &rt_dark; c->world_of=world_of;c->view_of = view_of;
+        c->scene_x = scene_x; c->scene_y = scene_y;c->draw_unit_covered=draw_unit_covered;
         c->ui_width=ui_width;c->scene_l = &scene_l; c->items = items; c->ui_text = ui_text; c->put_s = put_s; c->put_n = put_n;
-        c->unit_name = unit_name; c->text_into = text_into; c->portrait = portrait;
+        c->unit_name = unit_name; c->text_into = text_into;
         c->unit_card_battle=unit_card_battle;c->area_paint=area_paint;
         c->draw_hand = draw_hand; c->copy_box = copy_box; c->draw_rect = draw_rect;
         c->draw_text = draw_text; c->job_level = job_level;
         c->hand_weapon = hand_weapon; c->restore_ability = restore_ability;   // shared resident helpers (ABI 46)
 #ifdef FFT_CHAPTER
-        c->opening_story = &opening_story; c->pgfx = &pgfx; c->opening_battle = opening_battle;
-        // opening_after compiles into BEATS (CORE_CONTROL_STATUS): its slot stays zero.
+        c->opening_story = &opening_story; c->pgfx = &pgfx;
+        c->can_use=can_use; // pure resident eligibility, replacing the unused opening_after slot
 #endif
 #ifdef FFT_ACTOR_BANK
         c->actor_frame = actor_frame;
@@ -69,9 +69,7 @@ static void expected_context(void)
         c->unit_feet = unit_feet; c->unit_direction = unit_direction; c->draw_sprite = draw_sprite;
         c->rt_keys = &rt_keys; c->rt_prev = &rt_prev; c->scene_rot = &scene_rot; c->vbuf_rot = &vbuf_rot;
         c->cgfx = cgfx;
-        c->gauge = gauge;
-        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->rt_file = rt_file; c->job_names = job_names;
-        c->job_sets = job_sets;
+        c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->rt_file = rt_file;
         c->jobs = jobs; c->unit_defs = unit_defs; c->common = common; c->charge_ticks = charge_ticks;
         c->igfx = igfx; c->flow_bank=flow_bank;c->flow_ui=flow_ui;c->rt_seed = &rt_seed;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
@@ -82,7 +80,7 @@ static void bindings(void)
     u8 id,pass;u32 seed=rng32;u16 size;const u8 *bank;
     u8 actual_w=map_w,actual_h=map_h,actual_units=encounter_units;
     u16 actual_n=map_n;s16 actual_sc_h=sc_h,actual_sc_top=sc_top;
-    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,388);
+    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,348);
     for(pass=0;pass<2;pass++){
         if(pass){map_w=1;map_h=1;map_n=1;encounter_units=13;sc_h=200;sc_top=1;}
         expected_context();
@@ -98,7 +96,8 @@ static void bindings(void)
     bank=rt_file("ffbm",&size);CHECK(MOD_BANK0_COUNT>0&&MOD_BANK0_COUNT<MOD_COUNT,1);
     CHECK(mod_images[0]==bank+RD16(bank,7),1);
     bank=rt_file("ffbn",&size);CHECK(mod_images[MOD_BANK0_COUNT]==bank+RD16(bank,7),1);
-    CHECK(mod_images[MOD_COUNT-1]==bank+RD16(bank,7+MOD_COUNT-1-MOD_BANK0_COUNT),1);
+    bank=rt_file("ffbo",&size);CHECK(mod_images[MOD_BANK1_END]==bank+RD16(bank,7),1);
+    CHECK(mod_images[MOD_COUNT-1]==bank+RD16(bank,7+MOD_COUNT-1-MOD_BANK1_END),1);
     // The1x1 context above is not a playable map. Restore real dimensions before
     // an injection door, which now checks on-field team survival correctly.
     map_w=actual_w;map_h=actual_h;map_n=actual_n;encounter_units=actual_units;

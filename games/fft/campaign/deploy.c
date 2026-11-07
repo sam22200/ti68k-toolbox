@@ -180,7 +180,7 @@ void game_render(void)
         choice_row(&menu,0,"Start Battle",C_BLACK);choice_row(&menu,1,"Return",C_BLACK);
         choice_cursor_animated(&menu,dp.confirm-1,rt_frame);
     } else if(dp.note) {
-        static const char *const notes[]={"","Not a legal tile","Tile occupied","Squad full","Ramza must deploy","Save failed"};
+        static const char *const notes[]={"","Not a legal tile","Tile occupied","Squad full","Ramza must deploy","Save failed","Monster in reserve"};
         draw_rect(12,40,136,21,C_BLACK);draw_rect(13,41,134,19,C_WHITE);
         black(18,44,notes[dp.note]);
     }

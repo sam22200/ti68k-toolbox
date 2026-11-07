@@ -20,6 +20,7 @@ def variants(source,out,data,native_data):
     files={p.stem:p for p in (HERE/'data').glob('*.89y')}
     files['ffbm']=native_data/'ffbm.89y'
     if (native_data/'ffbn.89y').exists():files['ffbn']=native_data/'ffbn.89y'
+    if (native_data/'ffbo.89y').exists():files['ffbo']=native_data/'ffbo.89y'
     for p in files.values():cmd+=['--file',p]
     log=run([*cmd,out.with_suffix('.89z')])
     assert '_main returned'in log,log[-2000:]

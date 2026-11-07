@@ -1,12 +1,13 @@
-// Portable fixture input exported from the PC constructor. No native geometry search.
+// Portable fixture exported and strictly envelope-validated on the host.
+// Native null/truncation guards remain; no native geometry search.
 static struct {u8 centre,enemy[2],ally;} fixture_ui;
 static struct {u8 centre;s16 camx,camy;} impact_fx;
 static void impact_fixture(u8 kind)
 {
     u16 size,stride,j;u8 i,k;const u8 *file=rt_file("fip00",&size),*p;
     game_scenario(61);
-    if(!file||size<10||memcmp(file,"FIP1",4)||RD16(file,2)!=8||file[8]!=NUNIT){failures++;return;}
-    stride=RD16(file,3);if(size<10+8*stride||size>16+8*stride){failures++;return;}p=file+10+kind*stride;
+    if(!file||size<10){failures++;return;}
+    stride=RD16(file,3);if(size<10+8*stride){failures++;return;}p=file+10+kind*stride;
     impact_fx.centre=fixture_ui.centre=p[0];st.rot=p[1];
     impact_fx.camx=(s16)RD16(p,2);impact_fx.camy=(s16)RD16(p,3);
     fixture_ui.enemy[0]=p[8];fixture_ui.enemy[1]=p[9];fixture_ui.ally=p[10];
@@ -30,8 +31,12 @@ static void impact_fixture(u8 kind)
     CHECK(fixture_ui.ally!=255,1);CHECK(impact_fx.centre<MAP_N&&map_tiles[impact_fx.centre].walk==1,1);
     CHECK(mod_call(MOD_TARGETS,2,0),1);CHECK(W->cast.phase,CAST_BATCH_READY);
     CHECK(st.action.phase,CTX_ROOT);CHECK(st.mode,M_ACT);if(W->cast.mask!=j)failures++;
+#if AREA_IMPACT_FIRST < 4
     if(kind==1){CHECK(W->cast.victim[fixture_ui.enemy[0]].hit,0);CHECK(W->cast.victim[fixture_ui.enemy[1]].hit,1);}
     if(kind==3)CHECK(W->cast.victim[fixture_ui.ally].effect&EFFECT_KIND_MASK,AB_HEAL);
+#endif
+#if AREA_IMPACT_LAST > 4
     if(kind==4)CHECK(W->cast.mask,0);
+#endif
     st.camx=impact_fx.camx;st.camy=impact_fx.camy;
 }

@@ -4,22 +4,11 @@
 // (AF_WEAPON, AF_DRAIN, AF_AREA), the units' fixed records (UNIT_RAW).
 
 // A due deferred actor (255: none). Origin/weapon changes cancel only Charge.
-static u8 pending_next(void)
-{
-    u8 i;
-    for (i=0;i<NUNIT;i++) if (st.pending[i].state) {
-        Unit *u=&st.unit[i];
-        u8 kind=st.pending[i].state;
-        if (!u->hp || u->x>=MAP_W || u->z>=MAP_H ||
-            (kind==DEFER_CHARGING&&(UNIT_CELL(u)!=st.pending[i].origin||hand_weapon(u,0)!=st.pending[i].weapon||hand_weapon(u,1)!=st.pending[i].off_weapon))||
-            (kind!=DEFER_CHARGING&&((kind!=DEFER_CAST_TILE&&kind!=DEFER_CAST_UNIT)||!(core_status_current(&u->statuses,0)&8)))) {
-            st.pending[i].state=DEFER_NONE;unit_status_action(u,0);continue;
-        }
-        if(u->status_flags&STATUS_CT_FROZEN)continue;
-        if (!st.pending[i].ticks) return i;
-    }
-    return 255;
-}
+#ifdef FFT_MODULES
+static u8 pending_next(void){return (u8)mod_call(MOD_ORDER,18,0);}
+#else
+#include "pending_next.inc"
+#endif
 
 // Return one while an action owns presentation; zero resumes the same clock
 // phase. Each rejected due slot is consumed once, with no recursive dispatch.
@@ -30,9 +19,9 @@ static u8 charge_resolve(void)
     a=pending_next();
     if(a>=NUNIT)return 0;
 #ifdef FFT_MODULES
-    result=(u8)mod_call(MOD_COMMAND,4,a);
+    result=(u8)mod_call(st.pending[a].state==DEFER_PERFORMING?MOD_PERFORMANCE:MOD_COMMAND,4,a);
 #else
-    result=command_pending(a);
+    result=st.pending[a].state==DEFER_PERFORMING?performance_pending(a):command_pending(a);
 #endif
     return cast_dispatch(result);
 }
@@ -40,18 +29,57 @@ static u8 charge_resolve(void)
 // the units' records as the chapter gives them (stats, signs, equipment: no draw)
 
 
-// a weapon reaching farther than 1 (a bow): from 3 tiles to its reach, more downhill (FFT's
-// bow range); terrain collision is checked separately during targeting
+#include "weapon_range.h"
+// Origin may be a hypothetical AI tile. Source Float/water traits affect only
+// the origin; destination panel heights include the water surface.
+static u8 weapon_origin_height(u8 who,u8 cell)
+{
+    const Unit *u=&st.unit[who];const u8 *p;u8 h,depth,f[3];
+    if(!W->surface)return (u8)(map_tiles[cell].stand+((core_status_current(&u->statuses,2)&64)?2:0));
+    p=W->surface+((u16)(W->grid_row[TILE_Z[cell]]+TILE_X[cell])<<3)+4*node_layer(cell);
+    h=(u8)((p[0]<<1)+(p[1]&31));depth=p[1]>>5;
+    cj_movement(common,u->job,st.movement[who],f);
+    if((f[2]&8)||(core_status_current(&u->statuses,2)&64))h+=(depth<<1)+2;
+    else if(depth){if(f[2]&128)h+=depth<<1;else if(f[2]&64)h+=(depth<<1)-2;}
+    return h;
+}
+static u16 weapon_range_spec(u8 who,u8 origin)
+{
+    u8 weapon=hand_weapon(&st.unit[who],0),flags;
+    if(weapon>=128)weapon=0;
+    flags=cj_equipment_item(common,weapon)[2];
+    return (u16)((flags&240)|items[weapon].reach)<<8|weapon_origin_height(who,origin);
+}
+static u8 __attribute__((noinline)) weapon_range_cell(u8 o,u8 c,u16 spec)
+{
+    u8 flags=(u8)(spec>>8),d;u16 target;const u8 *p;
+    s16 dx=(s16)TILE_X[c]-TILE_X[o],dz=(s16)TILE_Z[c]-TILE_Z[o];
+    if(!map_tiles[c].walk)return 0;
+    d=(dx<0?-dx:dx)+(dz<0?-dz:dz);
+    if(flags&WEAPON_STRIKE){if(d!=1)return 0;}
+    else if(flags&WEAPON_LUNGE){if(!d||d>2||(dx&&dz))return 0;}
+    else if(flags&WEAPON_DIRECT)return d>=3&&d<=(flags&15);
+    else if(d<3)return 0;
+    target=map_tiles[c].stand;
+    if(W->surface){
+        p=W->surface+((u16)(W->grid_row[TILE_Z[c]]+TILE_X[c])<<3)+4*node_layer(c);
+        target=(u16)((p[0]<<1)+(p[1]&31)+((p[1]>>5)<<1));
+    }
+    return core_weapon_reaches(flags,flags&15,dx,dz,(u8)spec,target);
+}
 static u8 ranged_reach(u8 a,u8 o,u8 c)
 {
-    const Unit *u=&st.unit[a];
-    u8 range=WEAPON_REACH(u);
-    s16 dx=(s16)TILE_X[c]-TILE_X[o],dz=(s16)TILE_Z[c]-TILE_Z[o],h=(s16)map_tiles[c].stand-map_tiles[o].stand;
-    u8 d=(u8)((dx<0?-dx:dx)+(dz<0?-dz:dz));
-    if(!map_tiles[c].walk)return 0;
-    if(range==1)return d==1 && h>=-6 && h<=5;
-    range=(u8)(range+(h<0?(-h)>>2:0));
-    return d>=3 && d<=range;
+    u16 spec,i;
+    // Reserved owner255 fills the existing manual mask, preparing the origin
+    // once. Ordinary actor IDs remain pure point queries for AI and reactions.
+    if(a==255){
+        if(o>=NUNIT||c>=MAP_N)return 0;
+        spec=weapon_range_spec(o,c);
+        for(i=0;i<MAP_N;i++)if(weapon_range_cell(c,(u8)i,spec))st.reach[i]=1;
+        return 1;
+    }
+    if(a>=NUNIT||o>=MAP_N||c>=MAP_N)return 0;
+    spec=weapon_range_spec(a,o);return weapon_range_cell(o,c,spec);
 }
 
 // a projectile in flight, a weapon skill's strike

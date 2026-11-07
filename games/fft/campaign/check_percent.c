@@ -114,7 +114,7 @@ static void presentation_and_boot(void)
     CHECK(cast_order(U_RAMZA,10,47,1),1);
     for(k=0;k<NUNIT+2;k++){
 #ifdef FFT_MODULES
-        mod_call(MOD_NUMBERS,2,0);
+        mod_call(MOD_AREA_UI,AREA_NUMBERS,0);
 #else
         area_number_prepare();
 #endif
@@ -129,9 +129,9 @@ static void presentation_and_boot(void)
     for(k=0;k<4;k++){
         u16 bytes=k==0?size:k==1?0:k==2?31:size-1;u8 valid;
 #ifdef FFT_MODULES
-        mod_call(MOD_SAVE,255,0);mod_context(MOD_SAVE)->w=RT_NULL;
-        mod_context(MOD_SAVE)->common=k==3?RT_NULL:bank;mod_context(MOD_SAVE)->desc_size=bytes;
-        valid=(u8)mod_call(MOD_SAVE,5,0);mod_id=0;
+        mod_call(MOD_SCREENS,255,0);mod_context(MOD_SCREENS)->w=RT_NULL;
+        mod_context(MOD_SCREENS)->common=k==3?RT_NULL:bank;mod_context(MOD_SCREENS)->desc_size=bytes;
+        valid=(u8)mod_call(MOD_SCREENS,12,0);mod_id=0;
 #else
         valid=cj_valid(k==3?RT_NULL:bank,bytes);
 #endif

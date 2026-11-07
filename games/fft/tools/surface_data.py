@@ -36,8 +36,12 @@ def column(raw,index):
     return bytes(out)
 
 
-def encode(raw,w,h):
-    return b'FGS1'+bytes((w,h))+struct.pack('>H',w*h)+b''.join(column(raw,i)for i in range(w*h))
+def encode(raw,w,h,with_terrain=False):
+    body=bytes((w,h))+struct.pack('>H',w*h)+b''.join(column(raw,i)for i in range(w*h))
+    if not with_terrain:return b'FGS1'+body
+    # Preserve the eight-byte collision stride. Two surface bytes per source
+    # column follow it, including blocked floors; they stay archived in place.
+    return b'FGS2'+body+bytes(raw[8*(i+256*layer)]&63 for i in range(w*h)for layer in range(2))
 
 
 class Original:

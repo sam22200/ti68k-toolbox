@@ -4,7 +4,7 @@
 #include "core_limits.h"
 #include "status_policy.h"
 enum { CTX_IDLE,CTX_ROOT,CTX_IMPACT,CTX_DRAIN,CTX_SECONDARY,CTX_APPLIED };
-enum { CTX_OK,CTX_BUSY,CTX_INVALID,CTX_DUPLICATE,CTX_NESTED };
+enum { CTX_OK,CTX_BUSY,CTX_INVALID,CTX_DUPLICATE,CTX_NESTED,CTX_QUEUE_SELF=128 };
 typedef struct {
     u16 pending,reaction[FFT_CORE_UNIT_MAX];
     u8 root,actor,phase,cursor;
@@ -28,8 +28,8 @@ static u8 core_action_impact(CoreAction *c,u8 actor)
 }
 static u8 core_action_queue(CoreAction *c,u8 actor,u16 ability,u8 count)
 {
-    u16 bit;
-    if(!count||count>FFT_CORE_UNIT_MAX||actor>=count||actor==c->root||
+    u16 bit;u8 self=count&CTX_QUEUE_SELF;count&=(u8)~CTX_QUEUE_SELF;
+    if(!count||count>FFT_CORE_UNIT_MAX||actor>=count||(!self&&actor==c->root)||
        (u16)(ability-0x1a6)>=32)return CTX_INVALID;
     if(c->phase>=CTX_DRAIN)return CTX_NESTED;
     if(c->phase==CTX_IDLE)return CTX_BUSY;

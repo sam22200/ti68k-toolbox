@@ -22,15 +22,15 @@ ROOT=HERE.parents[2]
 CACHE=HERE/'x/closure-cache'
 SUITES=('guts punch-strikes punch-art talk-skill area-impact area-ui area-forecast targets batch knockback '
         'headroom protect control-status status-lifetime sleep terminal scheduler actions ai-pause reactions '
-        'banks area-ai restoration cleanse control incapacity area-ct buffs charge-hands hands healing '
-        'offensive-magic percent reflect status-state strikes surface steal-exp breaks equip-breaks mp-break steal-equip').split()
+        'banks area-ai final-combat identity restoration cleanse control incapacity area-ct buffs charge-hands hands healing '
+        'offensive-magic percent reflect status-state strikes surface steal-exp breaks equip-breaks mp-break steal-equip gil geomancy secret-fist line draw-out performance allegiance float throw math stat-save critical-reactions lancer-jump status-reactions brave-faith-reactions counter-reactions movement equipment combat discovery mime hamedo weapon-reach weapon-formulas weapons ai-interactions melee-collision arcs panel-victims direct-interception').split()
 # Older family suites outside the usual closure: run with --all after a core-wide change.
 # All 63 suites are green since 2026-11-01 (five stale expectations repaired, CORE_TESTING.md).
 EXTRA=('affinity boundaries capacity-render casting cell compact context deferred elements full-grid grid '
        'haste-slow incantation jump jump-actors jump-cost long-jump magic magic-evasion profile profile-deep '
-       'span-search status-rules step step-cache weather').split()
+        'span-search status-rules step step-cache weather').split()
 # Shared generated data that more than one suite would otherwise rebuild concurrently.
-SHARED=['data/ffbm.89y','data/ffbn.89y','data/ffcj.89y','data/ffgd.89y','data/fftitle.89y']
+SHARED=['data/ffbm.89y','data/ffbn.89y','data/ffbo.89y','data/ffcj.89y','data/ffgd.89y','data/fftitle.89y']
 EXCLUDE=[ROOT/'tools/pyenv',ROOT/'tools/gcc4ti-bin',CACHE]
 BIG=8<<20   # larger files (the disc image) are keyed by size and mtime
 LINE=re.compile(r'^(\d+)\s+(.*)$')

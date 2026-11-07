@@ -35,11 +35,12 @@ static void source(void)
 {
     CoreStatus s;u16 k;memset(&s,0,sizeof s);
     for(k=0;k<sizeof source_controls/sizeof source_controls[0];k++){
-        // Lost control (CORE_CONTROL_STATUS) is checked separately from these restrictions.
-        memcpy(s.inflicted,source_controls[k],5);CHECK(core_status_controls(&s)&~STATUS_NO_CONTROL,source_controls[k][5]);
+        // Lost control and the native airborne cache are checked by their owning
+        // families; compare only the source control-flag domain here.
+        memcpy(s.inflicted,source_controls[k],5);CHECK(core_status_controls(&s)&~(STATUS_NO_CONTROL|STATUS_AIRBORNE),source_controls[k][5]);
         // A trait makes the same status effective; cached context stays separate.
         memcpy(s.innate,s.inflicted,5);memset(s.inflicted,0,5);
-        CHECK(core_status_controls(&s)&~STATUS_NO_CONTROL,source_controls[k][5]);memset(s.innate,0,5);
+        CHECK(core_status_controls(&s)&~(STATUS_NO_CONTROL|STATUS_AIRBORNE),source_controls[k][5]);memset(s.innate,0,5);
     }
     for(k=0;k<sizeof source_ctend/sizeof source_ctend[0];k++){
         const u8 *p=source_ctend[k];memcpy(s.inflicted,p,5);

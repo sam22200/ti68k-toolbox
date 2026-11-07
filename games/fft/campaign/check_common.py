@@ -28,7 +28,7 @@ def main():
     assert bank == (HERE.parent / 'opening/data/ffcj.bin').read_bytes()
     offsets = struct.unpack_from('>15H', bank, 4)
     assert offsets[-1] == len(bank)
-    assert bank[:4] == b'FCJA'
+    assert bank[:4] == b'FCJI'
     item_base=offsets[3]
     maximum=0
     for i in range(256):
@@ -51,6 +51,15 @@ def main():
         assert bank[offsets[section]:offsets[section] + count] == disc.at(address, count)
     assert bank[offsets[7]+168:offsets[7]+168+224] == disc.at(common_tables.ACTION_MENUS,224)
     assert bank[offsets[12]+128*6:offsets[12]+128*6+650] == common_tables.status_policy_bytes(disc)
+    discovery=len(bank)-(96+2048+64+512)-128*8
+    assert bank[discovery:discovery+96]==disc.at(0x80066064,96)
+    assert bank[discovery+96:discovery+96+2048]==disc.bat[0x800f5e74-battle.BAT:0x800f6674-battle.BAT]
+    aliases=bank[discovery+96+2048:discovery+96+2048+64]
+    assert aliases[7]==22 and aliases[19]==56
+    for item in range(256):
+        price=int.from_bytes(disc.at(battle.ITEMS+12*item+8,2),'little')
+        assert struct.unpack_from('>H',bank,discovery+96+2048+64+2*item)[0]==price
+    assert bank[-128*8:]==disc.at(battle.WEAPONS,128*8)
     for ability in range(512):
         at = offsets[4] + ability * 8
         source = disc.at(battle.ABILITY + ability * 8, 8)

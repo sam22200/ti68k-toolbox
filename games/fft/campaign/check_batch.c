@@ -22,7 +22,7 @@ static void prepare_profile(const u16 *p)
         st.reaction[i]=st.support[i]=0;unit_status_refresh(u);
     }
     st.unit[0].mp=7;st.weather=0;st.acted=1;
-    memset(&batch,0,sizeof batch);batch.ability=0x100;batch.ref=first;
+    memset(&batch,0,sizeof batch);batch.ability=0x110;batch.ref=first;
     rng32=0x2545f491UL^((u32)p[0]<<16|p[0]);
 }
 static void read_profile(const u8 *src,u16 index,u16 *p)
@@ -76,18 +76,18 @@ static void rejected_and_empty(void)
     CHECK(cast_batch(2,&batch),0);CHECK(cast_batch(0,RT_NULL),0);CHECK(cast_batch(1,&batch),0);
     st.unit[0].mp=7;batch.actor=13;hash=batch_state_hash();CHECK(cast_batch(0,&batch),0);CHECK(batch_state_hash()==hash,1);
     batch.actor=0;batch.follow=2;CHECK(cast_batch(0,&batch),0);CHECK(batch.phase,0);
-    batch.follow=0;batch.ability=0x26;CHECK(cast_batch(0,&batch),0);CHECK(abilities[0x26].kind,255); // Float: still gated
-    batch.ability=0x10e;CHECK(cast_batch(0,&batch),0);CHECK(batch.phase,0);
-    batch.ability=0x10f;CHECK(cast_batch(0,&batch),0);CHECK(batch.phase,0);
+    batch.follow=0;batch.ability=431;CHECK(cast_batch(0,&batch),0);CHECK(abilities[431].kind,255); // Reaction IDs remain unavailable as commands
+    batch.ability=0x11e;CHECK(cast_batch(0,&batch),0);CHECK(batch.phase,0);
+    batch.ability=0x11f;CHECK(cast_batch(0,&batch),0);CHECK(batch.phase,0);
     CHECK(rng32==seed,1);
     // Private raw flag removes the caster; all other actors are absent.
-    prepare_profile(p);batch.ability=0x10d;
+    prepare_profile(p);batch.ability=0x11d;
     for(i=1;i<NUNIT;i++){st.unit[i].x=255;st.unit[i].dc=DC_GONE;}
     seed=rng32;CHECK(cast_batch(0,&batch),1);CHECK(batch.mask,0);CHECK(rng32==seed,1);
     CHECK(st.unit[0].mp,0);CHECK(cast_batch(1,&batch),1);CHECK(st.primary.reward,0);
     end_anim();CHECK(st.action.phase,CTX_IDLE);CHECK(st.unit[0].gexp,0);
     // A populated but entirely nullified area still pays once, with no reward.
-    prepare_profile(p);batch.ability=0x102;
+    prepare_profile(p);batch.ability=0x112;
     for(i=0;i<NUNIT;i++)st.affinity[i][1]=128;
     seed=rng32;CHECK(cast_batch(0,&batch),1);CHECK(batch.mask!=0,1);
     CHECK(rng32==seed,1);CHECK(cast_batch(1,&batch),1);

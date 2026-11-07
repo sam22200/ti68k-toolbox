@@ -1,3 +1,4 @@
+#include "nature_rules.h"
 // Shared encounter generation, overlaid with campaign saves on the TI.
 
 #ifdef FFT_CHAPTER
@@ -34,7 +35,7 @@ static void fixed_units(void)
         for(k=0;k<5;k++){u->eq[k]=d->eq[k][0];u->raw[k]=RD32(igfx+CD(UNIT_RAW),(u16)(i*10+2*k));}
         unit_stats(u);
     }
-    unit_reward_fields();
+    unit_reward_fields();monster_refresh();
 }
 #endif
 void battle_units(void)
@@ -63,7 +64,7 @@ void battle_units(void)
         for (k = 0; k < 12 && day >= ZODIAC_DAY(k); k++) ;
         u->zodiac = (u8)((k + 9) % 12);
         for (k = 0; k < 5; k++)
-            u->raw[k] = ((u32)gen_base[d->type][k] << 14) + (((u32)rand15() * gen_var[d->type][k]) >> 1);
+            u->raw[k] = ((u32)gen_base[d->type<3?d->type:0][k] << 14) + (((u32)rand15() * gen_var[d->type<3?d->type:0][k]) >> 1);
         for (k = 0; k < EQ_N; k++)                 // one of the two candidates (FFT: of n)
             u->eq[k] = d->eq[k][d->eq[k][1] != 0xFF ? rand15() >> 14 : 0];
         unit_stats(u);

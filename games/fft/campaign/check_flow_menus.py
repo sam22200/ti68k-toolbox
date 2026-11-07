@@ -40,7 +40,7 @@ def main():
              ('return',200,frame+6,return_back),('cancel',200,frame+4,escape)]
         cases += [(f'glove-pose-{i}',200,frame+2+4*i,confirm) for i in range(1,8)]
         cases += [('commit',200,frame+6,commit)]
-        results+=check.program('flowdep','check_deploy.c',['ffmg','ffcj','ffflow'],0x44504c31,
+        results+=check.program('flowdep','check_deploy.c',['ffmg','ffcp','ffcj','ffflow'],0x44504c31,
                                cases,prep,ti,committed,workdir=data)
         if args.deployment_only:
             (target/'results.json').write_text(json.dumps(results,indent=2)+'\n')

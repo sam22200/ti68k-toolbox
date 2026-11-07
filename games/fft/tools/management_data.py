@@ -4,8 +4,8 @@
 
 usage: management_data.py DISC.cue OUT.bin [preview.png]
 Everything the menus show or rule on, by FFT's own ids (campaign/save.h), big-endian:
-- "FMG2", then u16 offsets: jobs, items, two reserved entries (names now in ffcj), icons, sprites,
-  portraits, font, generic names (each from the bank's start);
+- "FMG3", then u16 offsets: jobs, items, two reserved entries (names now in ffcj), icons, sprites,
+  portrait IDs, font, a reserved field (offsets from the bank's start);
 - 21 jobs of JOB_SIZE bytes: the 20 generic ones (Squire 0x4A .. Mime 0x5D, a unit's career
   row) then Ramza's own Squire (0x01): name, FFT id, skill set, growth and multiplier per raw
   stat (HP MP SP PA MA), Move, Jump, equipment type bits, the job levels each career needs
@@ -18,9 +18,9 @@ Everything the menus show or rule on, by FFT's own ids (campaign/save.h), big-en
 - Ability and skill set names are shared with the battle catalogue in ffcj (FCJ2);
 - 8x8 icons (EVENT/ITEM.BIN, 24 bytes: light, dark, mask; 0: empty), 16x26 sprites (one still
   idle frame, white outline, 156 bytes) and 32x29 portraits (348 bytes) per career and sex
-  (2 career + 1 for a woman), then Ramza's (index 40);
+  (2 career + 1 for a woman), then Ramza's (index 40); portraits use IDs into ffcp;
 - the menus' pixel font (management_assets.pixel_fonts);
-- the generic units' names (EVENT/SMALL.OUT, interface.py's): 255 men's, then 255 women's offsets.
+- generic units' names are shared in ffcp: 255 men's, then 255 women's offsets.
 Names come from BATTLE.BIN's lists (FFT's text encoding, 0xFE between entries).
 """
 from pathlib import Path
@@ -35,6 +35,7 @@ import extract
 import interface
 import management_assets
 import units
+HERE=Path(__file__).resolve().parents[1]
 
 JOB_NAMES, ITEM_NAMES, ABILITY_NAMES, SET_NAMES = 0xfad41, 0xfb2c3, 0xfcb88, 0xfe93a   # BATTLE.BIN
 REQUIRE = 0x800660c4                    # 19 rows of 10 bytes (Chemist .. Mime), a nibble per career
@@ -156,7 +157,13 @@ def main():
             previews.append(np.concatenate((np.pad(im, ((3, 0), (0, 16)), constant_values=-1), face), 0))
     font = management_assets.pixel_fonts()
 
-    body = bytearray(b'FMG2' + bytes(18))
+    from identity_assets import section as identity_section
+    pool=(HERE/'campaign/data/ffcp.bin').read_bytes()
+    directory=identity_section(pool,2)
+    for i,face in enumerate(faces):
+        at=int.from_bytes(pool[4:6],'big')+pool[directory+i]*348
+        assert face==pool[at:at+348],('portrait mismatch',i)
+    body = bytearray(b'FMG3' + bytes(18))
     offs = []
 
     def section():
@@ -179,18 +186,14 @@ def main():
     section()
     for p in sprites: body += p
     section()
-    for p in faces: body += p
+    body += pool[directory:directory+len(faces)]
     section(); body += font
-    section(); body += bytes(2 * 510)
-    small = disc.read(*files['EVENT/SMALL.OUT'])
-    entries = small[0xec + struct.unpack_from('<I', small, 0x70)[0]:].replace(b'\xff', b'\xfe').split(b'\xfe')
-    people = [interface.decode(e) for first in (256, 512) for e in entries[first:first + 255]]
+    section()                                  # reserved: generic names live in ffcp
     if len(body) & 1: body.append(0)
     text_at = len(body); body += strings
     put = lambda at, s: struct.pack_into('>H', body, at, 0 if s is None else text_at + s)
     for k, j in enumerate(jobs): put(offs[0] + JOB_SIZE * k, j[0])
     for k, it in enumerate(items): put(offs[1] + ITEM_SIZE * k, it[0])
-    for k, s in enumerate(people): put(offs[8] + 2 * k, string(s))
     body = body[:text_at] + strings                # (the names put last are added here)
     struct.pack_into('>9H', body, 4, *offs)
     assert len(body) < 65000, len(body)

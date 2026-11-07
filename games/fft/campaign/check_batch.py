@@ -21,16 +21,16 @@ def main():
     rows=json.loads((fixture/'source.json').read_text())['cases']
     norm=struct.unpack_from('>H',catalogue,30)[0]
     for i,row in enumerate([*rows,dict(rows[2])]):
-        at=raw+14*(0x100+i);r=bytearray(catalogue[raw+14*(0x10 if row['evade']else 0xf):raw+14*(0x10 if row['evade']else 0xf)+14])
+        at=raw+14*(0x110+i);r=bytearray(catalogue[raw+14*(0x10 if row['evade']else 0xf):raw+14*(0x10 if row['evade']else 0xf)+14])
         r[1]=255;r[2]=255;r[4]=1 if i==13 else 0;r[7]=row['element'];r[10]=row['power'];r[13]=7
         catalogue[at:at+14]=r
         value=bytearray(12);value[:8]=bytes((0,row['power'],5,255,128|32|1|(2 if row['evade']else 0),255,100,0));value[10]=8;value[11]=row['element']
-        catalogue[norm+12*(0x100+i):norm+12*(0x100+i)+12]=value
+        catalogue[norm+12*(0x110+i):norm+12*(0x110+i)+12]=value
     for i in (14,15):
-        catalogue[raw+14*(0x100+i):raw+14*(0x101+i)]=catalogue[raw+14*0x102:raw+14*0x103]
-        catalogue[norm+12*(0x100+i):norm+12*(0x101+i)]=catalogue[norm+12*0x102:norm+12*0x103]
-    catalogue[raw+14*0x10e+5]|=4
-    catalogue[norm+12*0x10f+4]|=16
+        catalogue[raw+14*(0x110+i):raw+14*(0x111+i)]=catalogue[raw+14*0x112:raw+14*0x113]
+        catalogue[norm+12*(0x110+i):norm+12*(0x111+i)]=catalogue[norm+12*0x112:norm+12*0x113]
+    catalogue[raw+14*0x11e+5]|=4
+    catalogue[norm+12*0x11f+4]|=16
     (fixture/'ffcj.bin').write_bytes(catalogue)
     with tempfile.TemporaryDirectory(prefix='fft-batch-')as folder:
         data=Path(folder);data_links(data)
@@ -44,7 +44,7 @@ def main():
          ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     for name in ('ffgd','ffcj','fba00'):run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',name+'.bin',name],fixture)
     cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
-    for bank in 'ffbm ffbn ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj fba00'.split():
+    for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj fba00'.split():
         cmd+=['--file',(fixture if bank in ('ffgd','ffcj','fba00')else HERE/'data')/(bank+'.89y')]
     native=run([*cmd,out/'betchk.89z']);(out/'native.log').write_text(native)
     m=re.search(r'batch (\w+) failures 0 checks (\d+)',pc);assert m,pc

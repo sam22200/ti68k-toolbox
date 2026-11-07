@@ -71,8 +71,9 @@ static void xa_rules(void)
 static void wakes(void)
 {
     u16 k;AbId ab,break_ab=NO_ABIL;
-    reset();for(ab=0;ab<512;ab++)if(abilities[ab].kind==AB_BREAK){break_ab=ab;break;}
-    CHECK(break_ab!=NO_ABIL,1);
+    // Select the MP/stat-break control explicitly: Draw Out also uses AB_BREAK.
+    reset();break_ab=0x8e;
+    CHECK(abilities[break_ab].kind==AB_BREAK,1);
     for(k=0;k<sizeof source_wakes/sizeof source_wakes[0];k++){
         const u16 *p=source_wakes[k];Unit *t;u16 hp;
         // MP-damage and untyped HP are source-only evidence: no native producer yet.

@@ -18,7 +18,11 @@ void no_render(void){}
 #endif
 #include "manage.c"
 static u16 checks,failures;static u32 hash=17;
-static void check(u16 a,u16 b){checks++;hash=(hash<<1|hash>>31)^a;if(a!=b)failures++;}
+static void check(u16 a,u16 b){checks++;hash=(hash<<1|hash>>31)^a;if(a!=b){failures++;
+#ifndef __m68k__
+printf("check%u: %u expected%u\n",checks,a,b);
+#endif
+}}
 #define CHECK(a,b) check((u16)(a),(u16)(b))
 static void trials(void)
 {
@@ -37,7 +41,7 @@ static void trials(void)
     u->job=89;u->type=0;set16(u->support,0);u->eq[EQ_WEAPON]=1;
     CHECK(can_equip(u,EQ_SHIELD,11),1); // source innate trait, no equipped support
     snapshot=save;
-    CHECK(sizeof(SaveUnit),176);CHECK(sizeof(Save),3138);
+    CHECK(sizeof(SaveUnit),176);CHECK(sizeof(Save),SAVE_V3_BYTES+SAVE_DISCOVERY_BYTES);
     CHECK(cj_valid(common,cj_word(common+CJ_LENGTH)),1);
     for(i=0;i<20;i++)hash=(hash<<1|hash>>31)^cj_section(common,CJ_SPECIAL)[168+CJ_SETS+i];
     CHECK(memcmp(&snapshot,&save,sizeof save),0);

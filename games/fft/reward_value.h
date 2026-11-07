@@ -5,6 +5,9 @@ static u8 earned_exp(u8 a,u8 t,u8 kill)
     Unit *ua = &st.unit[a], *ut = &st.unit[t];
     s16 e = (kill ? (ut->kos?20 / ut->kos:20) : 10) + ut->level - ua->level;
     if(e<1)e=1;
+#ifdef FFT_CHAPTER
+    if(cj_support(common,ua->job,st.support[a],464))e<<=1;
+#endif
     return e>99?99:(u8)e;
 }
 #endif

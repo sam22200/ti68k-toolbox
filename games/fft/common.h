@@ -12,6 +12,7 @@ enum { CJ_LENGTH = 4 + 2 * CJ_SECTIONS, CJ_HEADER = CJ_LENGTH + 2, CJ_ABILITIES 
        CJ_HUMANS = 0xB0, CJ_SETS = 0xE0, CJ_NAMED_SETS = 64 };
 enum { CJ_AFFINITY = 168 + CJ_SETS + 20, CJ_AFFINITY_INDEX = 6,
        CJ_AFFINITY_ROWS = CJ_AFFINITY_INDEX + 160 + 256 };
+enum { CJ_EXECUTABLES=640, CJ_ALLEGIANCE = 640*12+8+20+256+64, CJ_ALLEGIANCE_BYTES=416, CJ_MATH=640*12+8+20+256+64+416, CJ_MATH_BYTES=316, CJ_MOVEMENT=CJ_MATH+CJ_MATH_BYTES, CJ_MOVEMENT_BYTES=384+480, CJ_EQUIPMENT=CJ_MOVEMENT+CJ_MOVEMENT_BYTES, CJ_EQUIPMENT_BYTES=2048, CJ_DISCOVERY=CJ_EQUIPMENT+2048, CJ_DISCOVERY_BYTES=96+2048+64+512, CJ_WEAPONS=CJ_DISCOVERY+CJ_DISCOVERY_BYTES, CJ_WEAPON_BYTES=128*8 };
 
 static inline u16 cj_word(const u8 *p) { return (u16)((u16)p[0] << 8 | p[1]); }
 static inline const u8 *cj_section(const u8 *b, u8 section)
@@ -23,11 +24,11 @@ static inline u8 cj_valid(const u8 *b, u16 size)
 {
     static const u16 minimum[CJ_SECTIONS] = {
         160 * 14, 160 * 14, 160, 256 * 30, 512 * 8, 0x170 * 14,
-        14 * 3, CJ_AFFINITY + CJ_AFFINITY_ROWS + 5, 0xB0 * 25, 48 * 5, 512 * 2, 64 * 2, 128 * 6 + 40 * 16 + 10, 512 * 12 + 8 + 20 + 256
+        14 * 3, CJ_AFFINITY + CJ_AFFINITY_ROWS + 5, 0xB0 * 25, 48 * 5, 512 * 2, 64 * 2, 128 * 6 + 40 * 16 + 10, CJ_WEAPONS + CJ_WEAPON_BYTES
     };
     u16 end, previous = CJ_HEADER;
     u8 k;
-    if (!b || size < CJ_HEADER || memcmp(b, "FCJA", 4)) return 0;
+    if (!b || size < CJ_HEADER || memcmp(b, "FCJI", 4)) return 0;
     end = cj_word(b + CJ_LENGTH);          // excludes AMS's optional six-byte OTH trailer
     if (end > size || end < CJ_HEADER) return 0;
     for (k = 0; k < CJ_SECTIONS; k++) {
@@ -59,6 +60,15 @@ static inline void cj_affinity(const u8 *b,u8 job,const u8 *eq,u8 *out)
     }
 }
 
+// Source immunity flags per job/item: Invite1, Charm2. Byte rows avoid hot shifts.
+static inline u8 cj_allegiance_immune(const u8 *b,u8 job,const u8 *eq)
+{
+    const u8 *p=cj_section(b,CJ_BATTLE)+CJ_ALLEGIANCE;u8 i,m=0;u16 id;
+    if(job<160)m=p[job];
+    for(i=0;i<5;i++)if(eq[i]!=255){id=160U+eq[i];m|=p[id];}
+    return m;
+}
+
 static inline const u8 *cj_primary(const u8 *b, u16 id)
 {
     return id < CJ_ABILITIES ? cj_section(b, CJ_PRIMARY) + (id << 3) : RT_NULL;
@@ -84,6 +94,25 @@ static inline u8 cj_two_swords(const u8 *b,u8 job,u16 support)
         (cj_section(b,CJ_SPECIAL)[168U+CJ_SETS+(job>>3)]&(1U<<(job&7))));
 }
 
+// Three source bytes, OR equipped capability with the job's innate movement.
+static inline void cj_movement(const u8 *b,u8 job,u8 code,u8 *flags)
+{
+    const u8 *p=cj_section(b,CJ_BATTLE)+CJ_MOVEMENT+384+(u16)job*3;
+    u8 k;for(k=0;k<3;k++)flags[k]=job<160?p[k]:0;
+    if(code&&code<=24){code--;flags[code>>3]|=0x80>>(code&7);}
+}
+// Job innates and the equipped support share the source MSB-first domain.
+static inline u8 cj_support(const u8 *b,u8 job,u16 equipped,u16 id)
+{
+    u16 bit=id-454;
+    return equipped==id||(job<160&&bit<32&&
+        (cj_section(b,CJ_BATTLE)[CJ_EQUIPMENT+(u16)job*8+4+(bit>>3)]&(128>>(bit&7))));
+}
+static inline const u8 *cj_equipment_item(const u8 *b,u8 item)
+{return cj_section(b,CJ_BATTLE)+CJ_EQUIPMENT+1280+(u16)item*3;}
+// Full source weapon records stay archived;255 is the native bare-hand sentinel.
+static inline const u8 *cj_weapon(const u8 *b,u8 item)
+{return cj_section(b,CJ_BATTLE)+CJ_WEAPONS+((u16)(item<128?item:0)<<3);}
 // Positions 0..15 are actions; 16..21 are R/S/M, matching the save's learned
 // bits. Monster sets have four entries. ID zero is an empty entry, never a sentinel
 // for the end of the list: holes and actions above 255 are preserved.
@@ -119,9 +148,11 @@ static inline const char *cj_set_name(const u8 *b, u8 id)
 }
 static inline const char *cj_battle_name(const u8 *b, u16 id)
 {
+    if(id>=512&&id<CJ_EXECUTABLES)return (const char *)cj_section(b,CJ_ITEMS)+(id-512)*30U+10;
+    if(id>=394&&id<406)return cj_set_name(b,18);
     // Preserve the reviewed battle spacing; management retains FFT's source labels.
     if (id == 0x196 || id == 0x197)
-        return (const char *)cj_section(b, CJ_BATTLE) + 512 * 12 + 8 + (id - 0x196) * 10;
+        return (const char *)cj_section(b, CJ_BATTLE) + CJ_EXECUTABLES * 12 + 8 + (id - 0x196) * 10;
     return cj_ability_name(b, id);
 }
 #endif

@@ -39,7 +39,7 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--native',action='store_true')
     ap.add_argument('--out',type=Path,default=OUT);ap.add_argument('--slot',type=int,choices=(1,2,3))
     args=ap.parse_args();OUT=args.out.resolve();save_name='ffsave'+str(args.slot) if args.slot else 'ffsave'
-    OUT.mkdir(parents=True,exist_ok=True);initial=fixture();write_changed(OUT/'initial.sav',initial)
+    OUT.mkdir(parents=True,exist_ok=True);initial=b'FSV4'+fixture()[4:]+bytes(64);write_changed(OUT/'initial.sav',initial)
     run(['cc','-std=gnu99','-O1','-g','-w','-o',OUT/'battle',HERE/'check_flow_battle.c',
          ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c'])
     with tempfile.TemporaryDirectory(prefix='fft-flow-') as name:

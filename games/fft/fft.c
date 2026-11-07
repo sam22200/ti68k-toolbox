@@ -15,6 +15,8 @@
 #include "step_geometry.h"
 #include "unit_card.h"
 #include "choice_menu.h"
+#include "weapon_panel.h"
+#include "movement_rules.h"
 #include "ct_recip.h"
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +31,9 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 #endif
 
 #include "base.inc"
+#ifdef FFT_CHAPTER
+#include "identity_pool.h"
+#endif
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #include "contour_art.inc"
@@ -153,6 +158,12 @@ static const u8 *wgfx;                  // armed body poses and blades (fftw), r
 static u8 *vbuf, vbuf_rot;
 #endif
 
+#if defined(FFT_CHAPTER) && !defined(FFT_COMPACT_UI)
+#define FFT_PACKED_PANELS
+#endif
+#if defined(FFT_CHAPTER) && defined(FFT_VIEW_SPLIT)
+#define FFT_SHARED_ROTATION_WORK
+#endif
 #define BK_N 128                        // FFT_VIEW_SPLIT: rows kept (a reach touches up to 126)
 // Work memory, allocated with the scene (globals and statics are stored in the program file
 // on the TI: -mno-bss, and the TI-89 refuses programs above 24 KB)
@@ -169,6 +180,9 @@ static u8 *vbuf, vbuf_rot;
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 #define SKILL_ROWS ((WIN_ROWS - 15) / 6) // framed action lists fit five rows, then scroll
 #define SKILL_TOP (st.skill < SKILL_ROWS ? 0 : st.skill - SKILL_ROWS + 1)
+#ifdef FFT_CHAPTER
+#include "mime_state.h"
+#endif
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
     u8 depth, rot, r0, r1, wet;
@@ -196,32 +210,42 @@ typedef struct {
 #endif
     Feet feet[UNIT_CAPACITY];           // its feet (unit_feet) for its tile and the
     u16 feet_k[UNIT_CAPACITY];           // view (cell | rot << 8 | 0x8000; 0: none)
+#ifndef FFT_SHARED_ROTATION_WORK
 #ifdef FFT_TURN_LOWPOLY_NATIVE
     s16 span_l[RT_H + 8], span_r[RT_H + 8];
 #else
     s16 span_l[TH + 8], span_r[TH + 8];
 #endif
-    u8 from[MAP_NMAX];
     u8 half[2][TW / 8 * TH];
+#endif
+    u8 from[MAP_NMAX];
 #ifndef FFT_TABLES_ARCHIVED
     u16 dbl[256];                       // byte -> its bits doubled
 #endif
     u8 order[MAP_NMAX];
+#ifndef FFT_SHARED_ROTATION_WORK
     u16 count[256];
+#endif
 #ifdef FFT_WATER_BANK
     const u8 *puddle[4];                // archived even-x/2,y pairs; no decoded glint arrays
 #else
     struct { s16 x, y; } glint[4][GLINTS];  // the water's glints of each phase (scene pixels)
 #endif
     u8 glints[4];
+#ifndef FFT_SHARED_ROTATION_WORK
     s16 key[MAP_NMAX], gx[MAP_WMAX + 1][MAP_HMAX + 1], gy[MAP_WMAX + 1][MAP_HMAX + 1];
+#endif
 #ifdef FFT_COMPACT_UI
     // No backing tactical panels in the bounded camera renderer. Its full-UI render
     // entry point is excluded below; legacy panel helpers are never called.
     u16 (*hud)[HUD_ROWS * RT_PBYTES / 2];
     u16 (*win)[WIN_ROWS * RT_PBYTES / 2];
 #else
+#ifdef FFT_PACKED_PANELS
+    u16 hud[1][HUD_ROWS * RT_PBYTES / 2]; // black text scratch needs one plane
+#else
     u16 hud[2][HUD_ROWS * RT_PBYTES / 2];   // outlined panel text (0-6) / action numbers (7-13)
+#endif
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
 #endif
     u16 win_k[3]; u8 win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_ACTS: no ability
@@ -294,7 +318,52 @@ typedef struct {
     // the AI (fft.c § the AI): per tile the sets (1: can stop there, 2: to act from), the danger,
     // the steps from the focus, what stepping there gives; the tiles to act from
     // in map order and safest first; the ranking; the usable abilities, the unit's thinking step
+#ifdef FFT_PACKED_PANELS
+    // Status/equipment rendering and AI planning never own this storage together.
+    // Keep the equipment draft/list and all movement/deferred state outside it.
+    union {
+        u16 status[2][RT_H * RT_PBYTES / 2];
+        struct {
+            u8 ai_m[MAP_NMAX],ai_prox[MAP_NMAX];
+            u16 ai_turn_ticks[UNIT_CAPACITY];
+            u16 ai_weapon_value[9][UNIT_CAPACITY];
+            s16 ai_weapon_bonus[9][UNIT_CAPACITY];
+            u8 ai_weapon_kind[UNIT_CAPACITY],ai_weapon_at;
+            union {u16 ai_melee_mask[MAP_NMAX];u8 edge_ceiling_other[2][MAP_NMAX];};
+            u16 ai_melee_at,ai_weapon_left;
+            union {u8 ai_dist[MAP_NMAX];AreaAi area_ai;AreaUi area_ui;};
+            AbId ab;u16 ab_k;u8 ab_n,ab_all,ai_traj;u16 ab_done;AiAct ab_best;
+            union {s16 ai_gain[MAP_NMAX];AreaImpact area_impact;};
+            union {s16 ai_key[MAP_NMAX];u8 edge_ceiling[2][MAP_NMAX];};
+            u8 ai_ord[MAP_NMAX];AiAct ai_rank[8];
+            AbId ai_list[1+SET_N];
+            u8 ai_n,ai_nab,ai_k,ai_a,ai_self,ai_focus,ai_c0,ai_c1,ai_retreat;
+            u8 ai_er,ai_ar,ai_ranged,ai_weapon;u16 ai_use;s16 ai_base;
+            s16 ai_panel_bonus[9][UNIT_CAPACITY];
+            u16 ai_panel_left;u8 ai_panel_at,ai_reflect_hands;
+            u8 ai_reflect[MAP_NMAX][7];s16 ai_proc_gain[2][UNIT_CAPACITY];
+            u8 ab_j,ab_self,ab_walk;
+        };
+    };
+    u16 nature_units,nature_pending,rebuild;
+    u8 move_kind,move_who,move_status,move_weather,move_code,move_job;
+    u8 ai_tt[UNIT_CAPACITY],ai_tu[UNIT_CAPACITY];
+    u8 ai_grid[MAP_NMAX];u16 ai_no; // equipment picker survives full-screen painting
+#else
     u8 ai_m[MAP_NMAX], ai_prox[MAP_NMAX];
+#ifdef FFT_CHAPTER
+    u16 nature_units;                   // source monster actor mask, rebuilt at cold boundaries
+    u16 ai_turn_ticks[UNIT_CAPACITY];        // next-turn clock estimates, fixed during one plan
+    u16 ai_weapon_value[9][UNIT_CAPACITY]; // actor/target scalar cache; origin-independent
+    s16 ai_weapon_bonus[9][UNIT_CAPACITY]; // drain and conditional utility, prepared with the scalars
+    u8 ai_weapon_kind[UNIT_CAPACITY],ai_weapon_at;
+    union {u16 ai_melee_mask[MAP_NMAX];u8 edge_ceiling_other[2][MAP_NMAX];};
+    u16 ai_melee_at; // weapon obstruction at each origin; projectile cursor also carries a slot
+    u16 ai_weapon_left;                 // ordinary plus learned Charge rows to prepare
+    u16 nature_pending;                 // scalar post-impact request, drained after the owner returns
+    u16 rebuild;                        // deferred derived stats; drained after overlay returns
+    u8 move_kind,move_who,move_status,move_weather,move_code,move_job; // prepared graph capability/cache key
+#endif
 #ifdef FFT_CHAPTER
     // Focus search is finished before candidates; reclaim only its idle storage.
     union {u8 ai_dist[MAP_NMAX];AreaAi area_ai;AreaUi area_ui;};
@@ -310,7 +379,7 @@ typedef struct {
 #else
     s16 ai_gain[MAP_NMAX];
 #endif
-    s16 ai_key[MAP_NMAX];   // what stepping there gives, its key
+    union {s16 ai_key[MAP_NMAX];u8 edge_ceiling[2][MAP_NMAX];}; // graph scratch is idle during planning
     u8 ai_grid[MAP_NMAX], ai_ord[MAP_NMAX]; u16 ai_no;
     AiAct ai_rank[8];
     AbId ai_list[1 + SET_N]; u8 ai_n, ai_nab, ai_k, ai_a, ai_self, ai_focus, ai_c0, ai_c1, ai_retreat;
@@ -318,6 +387,7 @@ typedef struct {
     u8 ai_weapon;                       // its weapon's reach (WEAPON_REACH: 1, a bow farther)
     u16 ai_use;                         // the units the ability is worth using on (bits)
     s16 ai_base;                        // the fallback tile's score: to beat
+#endif
     u8 frz, frz_n, hold;                // a unit thinking: the picture stands still (no longer
     u32 frz_h;                          // drawn), its frames so far, one more frame not drawn,
     u32 bg[2][RT_H * RT_W / 32];        // the scene as the screen shows it (copy_view's), from
@@ -337,7 +407,9 @@ typedef struct {
     u16 (*pan)[2][3][PANEL_ROWS * RT_PBYTES / 2];
     u16 (*tag)[3][7 * RT_PBYTES / 2];
 #else
-#ifdef FFT_CHAPTER
+#ifdef FFT_PACKED_PANELS
+    u16 pan[2][2][PANEL_ROWS * RT_PBYTES / 2]; // ten-byte L/D/mask slots,30-byte pitch
+#elif defined(FFT_CHAPTER)
     union {
         u16 status[2][RT_H * RT_PBYTES / 2];
         u16 pan[2][2][3][PANEL_ROWS * RT_PBYTES / 2];
@@ -346,16 +418,59 @@ typedef struct {
     u16 pan[2][2][3][PANEL_ROWS * RT_PBYTES / 2]; // per side, two 80-wide planes and opacity masks:
                                         // the one shown, the one being made (scene shows through)
 #endif
+#ifdef FFT_PACKED_PANELS
+    u16 tag[2][7 * RT_PBYTES / 2];
+#else
     u16 tag[2][3][7 * RT_PBYTES / 2];   // "Enemy" / "Guest" above a portrait, made once
+#endif
 #endif
 #ifdef FFT_VIEW_SPLIT
     // The view's colours of the scene rows the reach rings were drawn on, kept before a ring
     // changes them (the colours are no longer kept whole: VIEW_BYTES)
     u8 bk_of[SC_HMAX];                     // a row's slot (0xFF: the row is still the view's)
     u8 bk_row[BK_N], bk_n, bk_over;     // each slot's row; slots used; rings past the backup
+#ifdef FFT_SHARED_ROTATION_WORK
+    // Rotation replaces the view before reach backups can be used again.
+    union {
+    u8 bk[BK_N][2][SC_BYTES] __attribute__((aligned(2)));
+        struct {
+#ifdef FFT_TURN_LOWPOLY_NATIVE
+    s16 span_l[RT_H + 8], span_r[RT_H + 8];
+#else
+    s16 span_l[TH + 8], span_r[TH + 8];
+#endif
+    u8 half[2][TW / 8 * TH];
+    u16 count[256];
+    s16 key[MAP_NMAX], gx[MAP_WMAX + 1][MAP_HMAX + 1], gy[MAP_WMAX + 1][MAP_HMAX + 1];
+        };
+    };
+#else
     u8 bk[BK_N][2][SC_BYTES] __attribute__((aligned(2)));
 #endif
+#endif
+#ifdef FFT_CHAPTER
+    MimeState mime;                      // cold imitation queue; no separate allocation
+    WeaponPanel weapon_panel;           // frozen occupants of one selected weapon panel
+    u8 preview_target,preview_count;     // pure recipient/card output; no unit-state cache
+#ifndef FFT_PACKED_PANELS
+    s16 ai_panel_bonus[9][UNIT_CAPACITY];
+    u16 ai_panel_left;u8 ai_panel_at,ai_reflect_hands;
+    u8 ai_reflect[MAP_NMAX][7];           // two receiver+1 nibbles per origin row
+    s16 ai_proc_gain[2][UNIT_CAPACITY];   // expected spell utility after a reflected weapon hit
+#endif
+    u16 edge_at;u8 edge_phase,edge_jump; // resumable graph construction before AI search
+#ifndef FFT_PACKED_PANELS
+    u8 ab_j,ab_self,ab_walk;           // resumable scalar origin/target cursor
+#endif
+    MoveConfig move_config;            // survives an overlay replacement between graph slices
+#else
+    u8 ab_j,ab_self,ab_walk;
+#endif
 } Work;
+#if defined(__m68k__) && defined(FFT_CHAPTER) && MOD_CORE
+// malloc's hidden handle also belongs to the maximum AMS heap block.
+typedef char SceneWorkFitsAmsBlock[(2UL*SC_BYTES*SC_HMAX+sizeof(Work)+2UL<=65520UL)?1:-1];
+#endif
 #if MOD_CORE
 static Work *W;
 static u8 hl_seq;
@@ -371,7 +486,9 @@ static u8 *navbuf;
 static u16 nav_capacity;
 static u8 nav_reserve(u16 count,u8 upper)
 {
-    u8 shift=upper?6:5;u16 bytes=(u16)((count<<shift)+(count<<2));
+    // Bit1 selects the live builder's proven8/16-link maximum. Diagnostic
+    // graph injection retains its wider16/32-link reserve with flags0/1.
+    u8 shift=(upper&1)?6:5;if(upper&2)shift--;u16 bytes=(u16)((count<<shift)+(count<<2));
     if(bytes>nav_capacity) {
         u8 *next=malloc(bytes);
         if(!next)return 0;
@@ -400,6 +517,16 @@ static ModCtx *mod_context(u8 id);
 #endif
 #ifdef FFT_CHAPTER
 #include "campaign/flow.h"
+#include "funds.inc"
+#endif
+#if defined(FFT_CHAPTER) && MOD_CORE
+#ifdef FFT_MODULES
+static void equipment_control(u8 op){mod_call(MOD_EQUIPMENT,op,st.act);}
+static void movement_settle(u8 who){mod_call(MOD_EQUIPMENT,4,who);}
+#else
+static void equipment_control(u8 op);
+static void movement_settle(u8 who);
+#endif
 #endif
 static u8 bg_usable(void);
 
@@ -478,7 +605,11 @@ static void tile_order(void)
 #define gx (W->gx)
 #define gy (W->gy)
 #define HUD_L ((u8 *)W->hud[0])
+#ifdef FFT_PACKED_PANELS
+#define HUD_D HUD_L
+#else
 #define HUD_D ((u8 *)W->hud[1])
+#endif
 
 static u8 node_layer(u8 cell)
 {
@@ -501,9 +632,41 @@ static u8 node_layer(u8 cell)
 #define DRAW_LEARNED 0xFF
 #define HAS_ABILITY(a) ((a) != NO_ABIL)
 #endif
+#ifdef FFT_CHAPTER
+#include "allegiance.h"
+#include "throw_rules.h"
+#endif
 #include "status_unit.h"
 #ifdef FFT_CHAPTER
+#if MOD_CORE
+static u8 magic_target(u8 t);
+#endif
+#define MIME_ACTIVE(i) (W->mime.active&&W->mime.who==(i))
+#include "math_rules.h"
+#endif
+#ifdef FFT_CHAPTER
 #include "hands.inc"
+#ifdef FFT_CHAPTER
+#include "weapon_math.h"
+#endif
+static u16 weapon_total(u8 a,u8 t,AbId ab);
+static u16 weapon_forecast(u8 a,u8 t,AbId ab,u8 hand,u8 awake);
+static u8 weapon_kind(u8 a,u8 t,AbId ab);
+#if !MOD_CORE
+#include "weapon_roll.inc"
+#else
+static void attack_roll(u8 a,u8 t);
+static void weapon_prepare(u8 a,u8 t);
+static u8 ai_clear(u8 a,u8 t);
+static u8 weapon_commit(void);
+static u8 weapon_proc_commit(void);
+static u16 weapon_total(u8 a,u8 t,AbId ab);
+static u16 weapon_forecast(u8 a,u8 t,AbId ab,u8 hand,u8 awake);
+static u8 weapon_kind(u8 a,u8 t,AbId ab);
+static u16 weapon_amount(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge,u16 base_roll);
+#endif
+
+#include "equipment_rules.h"
 #endif
 #if MOD_CORE
 static u16 rand15(void);
@@ -517,16 +680,21 @@ static s16 zodiac_xa(const Unit *a, const Unit *t, s16 xa);
 #ifndef FFT_MODULES
 #include "stats.inc"
 #else
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 void unit_stats(Unit *u)
 {
     ModCtx *c;mod_call(MOD_PARTY,255,0);c=mod_context(MOD_PARTY);
     c->stats_unit=u;mod_call(MOD_PARTY,9,0);
 }
 #endif
-#elif MOD_PART(MOD_PARTY) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_RESPONSE)
-// Level-up/party/save callers execute locally; they never evict their own image.
+#endif
+#elif MOD_PART(MOD_PARTY) || MOD_PART(MOD_EQUIPMENT)
 #undef unit_stats
 #include "stats.inc"
+#elif MOD_PART(MOD_ACTION) || MOD_PART(MOD_RESPONSE) || MOD_PART(MOD_WEAPON)
+// Rebuild after returning to resident code; never evict an executing image.
+#undef unit_stats
+void unit_stats(Unit *u){u8 i;for(i=0;i<NUNIT;i++)if(u==&st.unit[i])W->rebuild|=(u16)1<<i;}
 #endif
 #if MOD_PART(MOD_PARTY)
 #include "unit_setup.inc"
@@ -539,10 +707,12 @@ void unit_stats(Unit *u)
 #endif
 #endif
 #ifdef FFT_CHAPTER
-static u16 magic_status_value(u8 t,AbId ab);
+static u16 magic_status_value(u8 t,AbId ab,u8 choice);
 #include "magic_quantity.inc"
+#include "cast_rules.h"
+#include "jump_rules.h"
 #endif
-#if MOD_PART(MOD_AI) || MOD_PART(MOD_AI_SETUP) || MOD_PART(MOD_AREA_AI)
+#if MOD_PART(MOD_AI) || MOD_PART(MOD_AI_SETUP) || MOD_PART(MOD_AREA_AI) || MOD_PART(MOD_AI_PREP)
 #if MOD_CORE
 static u8 ranged_reach(u8 a,u8 o,u8 c);
 #endif
@@ -554,11 +724,21 @@ static u8 ranged_reach(u8 a,u8 o,u8 c);
 #endif
 #include "status_rules.h"
 #ifdef FFT_CHAPTER
+#include "dash_amount.inc"
+#include "weapon_skill_amount.h"
+#endif
+#ifdef FFT_CHAPTER
 #include "reflect_rules.h"
 #include "item_restore.h"
 #if MOD_CORE
 #include "status_spell.h"
 #endif
+#endif
+#if !MOD_CORE && MOD_PART(MOD_AI)
+#include "weapon_ai.inc"
+#endif
+#if !MOD_CORE && (MOD_PART(MOD_FORMULA)||MOD_PART(MOD_NUMBERS)||MOD_PART(MOD_WEAPON)||MOD_PART(MOD_PLANNER)||MOD_PART(MOD_COMMAND)||MOD_PART(MOD_COMBAT))
+#include "weapon_effects.inc"
 #endif
 #if defined(FFT_CHAPTER) && ((MOD_CORE && !defined(FFT_MODULES)) || (!MOD_CORE && MOD_PART(MOD_ORDER)))
 #include "incapacity.inc"
@@ -569,22 +749,30 @@ static u8 ranged_reach(u8 a,u8 o,u8 c);
 #ifdef FFT_CHAPTER
 #include "area_impact_rules.inc"
 #endif
-#if defined(FFT_CHAPTER) && (MOD_CORE || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_TARGETS) || MOD_PART(MOD_AREA_UI))
+#if defined(FFT_CHAPTER) && (MOD_CORE || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_COMBAT) || MOD_PART(MOD_TARGETS) || MOD_PART(MOD_AREA_UI) || MOD_PART(MOD_PERFORMANCE) || MOD_PART(MOD_RESPONSE))
+static u8 hamedo_begin(u8 a,u8 t,AbId ab);
 static u8 action_available(u8 a,u8 t)
 {
-    return a<NUNIT&&t<NUNIT&&st.action.phase==CTX_IDLE&&st.unit[a].hp&&unit_can_act(&st.unit[a]);
+    return a<NUNIT&&t<NUNIT&&st.action.phase==CTX_IDLE&&st.unit[a].hp&&unit_can_act(&st.unit[a])&&!unit_airborne(&st.unit[t]);
 }
 #include "cast_target.h"
+#include "mime_record.inc"
 #endif
-#if defined(FFT_CHAPTER) && (MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_RESPONSE) || MOD_PART(MOD_ORDER))
+#if defined(FFT_CHAPTER) && (MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_COMBAT) || MOD_PART(MOD_RESPONSE) || MOD_PART(MOD_EQUIPMENT) || MOD_PART(MOD_NATURE) || MOD_PART(MOD_SAVE) || MOD_PART(MOD_PERFORMANCE) || MOD_PART(MOD_ORDER) || MOD_PART(MOD_WEAPON) || MOD_PART(MOD_STATUS))
 #include "status_policy.inc"
 #include "status_runtime.inc"
 #if !MOD_CORE
-#if MOD_PART(MOD_ACTION) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_RESPONSE)
+#if MOD_PART(MOD_ACTION) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_COMBAT) || MOD_PART(MOD_RESPONSE) || MOD_PART(MOD_EQUIPMENT)
 #include "action_start.inc"
 #endif
 #endif
-#if MOD_PART(MOD_FORMULA)
+#if !MOD_CORE && MOD_PART(MOD_STATUS)
+#include "reaction_policy_runtime.inc"
+#endif
+#if !MOD_CORE && MOD_PART(MOD_WEAPON)
+#include "reaction_policy_runtime.inc"
+#endif
+#if MOD_PART(MOD_STATUS)
 static u16 status_apply_request(void)
 {
     u8 t=st.formula.target;u16 result;Unit *u;
@@ -592,6 +780,7 @@ static u16 status_apply_request(void)
     u=&st.unit[t];
     if(!u->hp||u->x>=MAP_W||u->z>=MAP_H||UNIT_CELL(u)>=MAP_N)return STATUS_REJECTED;
     result=core_status_apply(&u->statuses,&st.status_delta,u->status_flags,(u8)st.formula.roll,cj_status_rules(common),u->status_ct);
+    if(st.pending[t].state==DEFER_PERFORMING&&!(core_status_current(&u->statuses,0)&1))st.pending[t].state=DEFER_NONE;
     if((st.pending[t].state==DEFER_CHARGING||st.pending[t].state>=DEFER_CAST_TILE)&&!(core_status_current(&u->statuses,0)&8))
         st.pending[t].state=DEFER_NONE;
     unit_status_refresh(u);
@@ -611,31 +800,44 @@ static u16 status_apply_request(void)
 #endif
 #endif
 #if !MOD_CORE && MOD_PART(MOD_ORDER)
+#include "pending_next.inc"
+#include "ct_next.inc"
 #include "facing_arrows.inc"
 #include "banners.inc"            // turn/objective banners: moved from NUMBERS (never with numbers)
 // Turn-end status runtime (moved from FORMULA: the turn order follows it anyway).
 u16 mod_entry(u8 op,u8 a)
 {
+    if(op==17)return ct_next();
+    if(op==18)return pending_next();
     if(op==1)return battle_outcome();
     if(op==2){draw_arrows();return 0;}
     if(op==6){bn_shade();return 0;}
     if(op==7){bn_draw();return 0;}
+    if(op==16){
+        u8 end;if(a==U_RAMZA)st.rounds++;st.pick_t=0;end=battle_outcome();if(end)return end;
+        status_turn_start(a);if(W){W->ai_k=0;W->frz=W->frz_n=0;W->frz_h=0;}
+        st.menu=MN_MOVE;st.moved=st.acted=0;return 0;
+    }
     if(op==14)return status_dead_turn(a);
-    if(op==15){Unit *u=&st.unit[a];u->ct=core_status_end_ct(&u->statuses,u->ct,st.formula.roll&1,st.formula.roll&2);return status_upkeep(a);}
+    if(op==15){Unit *u=&st.unit[a];u->ct=core_status_end_ct(&u->statuses,u->ct,st.formula.roll&1,st.formula.roll&2);if(st.formula.roll&2)status_turn_action(a);return status_upkeep(a);}
     if(op==4){status_tick();return 0;}
     if(op==5)return status_upkeep(a);
     turn_order();return 0;
 }
 #endif
-#if MOD_PART(MOD_AI) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_NUMBERS)
+#if MOD_PART(MOD_AI) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_COMBAT) || MOD_PART(MOD_NUMBERS)
+#if defined(FFT_CHAPTER) && !MOD_CORE && MOD_PART(MOD_FORMULA)
+#include "weapon_freeze.inc"
+#endif
 #include "formula.inc"
 #endif
-#if defined(FFT_CHAPTER) && (MOD_PART(MOD_TARGETS) || MOD_PART(MOD_AREA_AI))
+#if defined(FFT_CHAPTER) && (MOD_PART(MOD_TARGETS) || MOD_PART(MOD_AREA_AI) || MOD_PART(MOD_AI_PREP))
 static void act_start(u8 a,u8 t);
+static void action_pose_start(u8 a,u8 t);
 #include "area_geometry.h"
 #include "area_targets.inc"
 #if !MOD_CORE
-#include "ability_access.inc"
+
 #if MOD_PART(MOD_TARGETS)
 #include "action_start.inc"
 #endif
@@ -644,19 +846,27 @@ static void act_start(u8 a,u8 t);
 #if MOD_PART(MOD_TARGETS)
 #include "magic_prepare.inc"
 #include "batch_prepare.inc"
+#include "reaction_flood.inc"
 #include "batch_forecast.inc"
 #include "area_preview.inc"
 #if !MOD_CORE
-#include "skill_range.inc"           // the resident's own copy on the PC
+
 u16 mod_entry(u8 op,u8 a)
 {
-    if(op==5){skill_range(st.formula.actor,st.formula.ability);return 0;}
+    if(op==11||op==12){reaction_area_launch(op==12);return 0;}
     if(op==1)return batch_prepare(M.cast_batch_out,0);
     if(op==2)return batch_owned_prepare();
     if(op==3)return batch_forecast(M.cast_batch_out);
     if(op==4)return area_preview();
     return (u16)cast_targets(M.cast_actor,M.cast_ref,M.cast_ability,a);
 }
+#endif
+#endif
+#if MOD_PART(MOD_AI_PREP)
+#include "area_ai_prepare.inc"
+#include "weapon_panel_ai.inc"
+#if !MOD_CORE
+u16 mod_entry(u8 op,u8 a){(void)a;return op==2?weapon_panel_ai():area_ai_prepare();}
 #endif
 #endif
 #if MOD_PART(MOD_AREA_AI)
@@ -678,20 +888,43 @@ static void choice_frame(const ChoiceLayout *p,const char *title);
 static void choice_row(const ChoiceLayout *p,u8 row,const char *label,u8 color);
 static void choice_cursor_animated(const ChoiceLayout *p,u8 row,u16 frame);
 static void choice_list(const ChoiceLayout *p,const char *const *labels,u8 count,u8 selected,u8 color,u8 other,u16 frame);
-#else
-#include "ability_access.inc"
 #endif
-#include "area_ui.inc"
-#endif
-#if !MOD_CORE && MOD_PART(MOD_NUMBERS)
+#if !MOD_CORE
 #define st_names CONTOUR_REF_st_names
 u8 act_kind(void)
 {
+    if(st.abil==NO_ABIL||(st.abil<512&&(abilities[st.abil].flags&AF_CHARGE)))return st.effect_kind&EFFECT_KIND_MASK;
+    if(st.abil>=512&&st.abil<NABIL)return st.effect_kind&EFFECT_KIND_MASK;
+    if(st.effect_kind==AB_CATCH||st.effect_kind==AB_MP_DAMAGE)return st.effect_kind;
     if(st.effect_kind==AB_GOLEM)return AB_GOLEM;   // a Golem cast or guard
-    if(st.abil<512&&((abilities[st.abil].flags&AF_CAST)||restore_ability(st.abil)))return st.effect_kind&EFFECT_KIND_MASK;
+    if(st.abil<512&&((abilities[st.abil].flags&AF_CAST)||restore_ability(st.abil)||reaction_typed(st.abil)))return st.effect_kind&EFFECT_KIND_MASK;
     return st.abil==NO_ABIL?AB_DAMAGE:st.abil==ABIL_DEFEND?AB_DEFEND:abilities[st.abil].kind;
 }
 #include "numbers.inc"
+#endif
+#include "area_ui.inc"
+#endif
+#if !MOD_CORE && MOD_PART(MOD_PERFORMANCE)
+
+#include "reward_value.h"
+#include "reaction_policy_runtime.inc"
+#include "allegiance.inc"
+#include "status_commit.inc"
+#include "performance_commit.inc"
+#include "magic_commit.inc"
+#include "batch_commit.inc"
+#include "performance_lifecycle.inc"
+u16 mod_entry(u8 op,u8 a)
+{
+    if(op==3)return performance_order(M.cast_actor,M.cast_ref,M.cast_ability,a);
+    if(op==5)return can_use(M.cast_actor,M.cast_ability); // isolated capability query
+    if(op==4)return performance_pending(a);
+    if(op==7)return batch_commit(M.cast_batch_out);
+    return batch_commit(&W->cast)&2;
+}
+#endif
+#if !MOD_CORE && MOD_PART(MOD_NUMBERS)
+#define st_names CONTOUR_REF_st_names
 #include "forecast_text.inc"
 #include "forecast_panel.inc"
 u16 mod_entry(u8 op,u8 a)
@@ -699,18 +932,17 @@ u16 mod_entry(u8 op,u8 a)
     (void)a;
     if(op==5)return forecast_text(st.formula.actor,st.formula.target,st.formula.ability,M.forecast_out);
     if(op==6){make_forecast(st.formula.actor,st.formula.target,st.formula.ability);return 0;}
-    if(op==2)return area_number_prepare();numbers_draw();return 0;
+    return 0;
 }
 #endif
 #if !MOD_CORE && MOD_PART(MOD_COMMAND)
-#include "ability_access.inc"
-#include "magic_prepare.inc"
+
 #include "command.inc"
 #include "incantation.inc"
 u16 mod_entry(u8 op,u8 a)
 {
     (void)a;
-    if(!op)return command_skill(st.formula.actor,st.formula.target,st.formula.ability);
+    if(!op)return command_skill(M.cast_actor,M.cast_ref,M.cast_ability);
     if(op==3)return command_cast(M.cast_actor,M.cast_ref,M.cast_ability,a);
     if(op==4)return command_pending(a);
     command_defend(st.formula.actor);return 0;
@@ -720,17 +952,77 @@ u16 mod_entry(u8 op,u8 a)
 #include "rewards.inc"
 #include "magic_prepare.inc"
 #include "reaction_runtime.inc"
-#include "magic_commit.inc"
-#include "batch_commit.inc"
+#include "hamedo.inc"
+#include "attack_start.inc"
+#include "jump_order.inc"
+#include "charge_math.inc"
+#include "strike_runtime.inc"
 u16 mod_entry(u8 op,u8 a)
 {
-    if(op==10)return batch_commit(M.cast_batch_out);
-    if(op==11)return batch_commit(&W->cast)&2;
-    if(!op)return reaction_select();
+    if(op==7){strike_launch(a);return 0;}
+    if(op==5)return jump_order(M.cast_actor,M.cast_ref,M.cast_ability);
+    if(op==4)return attack_sequence(M.cast_actor,M.cast_ref,a);
+
     if(op==1)reaction_launch(a);
     if(op==2)reaction_return();
     if(op==3)reaction_rewards();
     return 0;
+}
+#endif
+#if !MOD_CORE && MOD_PART(MOD_WEAPON)
+#include "rewards.inc"
+#include "weapon_commit.inc"
+u16 mod_entry(u8 op,u8 a)
+{
+    if(op==6)return weapon_ai_prepare();
+    if(op==4)return attack_prediction(M.cast_actor,M.cast_ref);
+    if(op==5)return weapon_forecast(M.cast_actor,M.cast_ref,M.cast_ability,a&1,(a>>1)&1);
+    if(op==1)return weapon_commit();
+    return 0;
+}
+#endif
+#if !MOD_CORE && MOD_PART(MOD_PLANNER)
+#define FFT_DIRECT_NAME direct_target
+#define FFT_DIRECT_PANEL
+#include "direct_trajectory.inc"
+#undef FFT_DIRECT_PANEL
+#undef FFT_DIRECT_NAME
+#include "arc_trajectory.inc"
+#include "melee_target.inc"
+#include "status_policy.inc"
+#include "reaction_restore.inc"
+#include "weapon_prepare.inc"
+#include "strike_target.inc"
+u16 mod_entry(u8 op,u8 a)
+{
+    (void)a;
+    if(op==1){weapon_prepare(st.atk,st.tgt);return 0;}
+    if(op==3||op==4){weapon_preview(st.formula.actor,st.formula.target,st.formula.ability);
+        st.formula.target=W->preview_target;if(op==4)W->nature_pending|=16;return 0;}
+    if(op==5)return strike_target();
+    if(op==2){u8 who=st.formula.actor,t=st.formula.target,w=hand_weapon(&st.unit[who],0);
+        if(w>=128)w=0;return cj_weapon(common,w)[1]&192?melee_target(who,t)!=255:
+            (cj_weapon(common,w)[1]&16?arc_target(who,t)!=255:direct_target(who,t)!=255);}
+    return melee_cache();
+}
+#endif
+#if !MOD_CORE && MOD_PART(MOD_STATUS)
+#include "reward_value.h"
+#include "status_commit.inc"
+#include "weapon_proc.inc"
+#define FFT_STATUS_BATCH
+#define batch_commit batch_status_commit
+#define action_magic_commit status_magic_commit
+#include "batch_commit.inc"
+#undef action_magic_commit
+#undef batch_commit
+#undef FFT_STATUS_BATCH
+u16 mod_entry(u8 op,u8 a)
+{
+    if(op==2)return weapon_proc_commit();
+    if(op==3)return status_apply_request();
+    if(op==12)return a?batch_status_commit(M.cast_batch_out):(batch_status_commit(&W->cast)&2);
+    return status_scalar_commit();
 }
 #endif
 #if !MOD_CORE && MOD_PART(MOD_ACTION)
@@ -750,7 +1042,7 @@ u16 battle_status_apply(u8 target,const CoreStatusDelta *delta,u8 removal_only)
     if(!st.unit[target].hp||st.unit[target].x>=MAP_W||st.unit[target].z>=MAP_H||UNIT_CELL(&st.unit[target])>=MAP_N)return STATUS_REJECTED;
     st.status_delta=*delta;st.formula.target=target;st.formula.roll=removal_only;
 #ifdef FFT_MODULES
-    return mod_call(MOD_FORMULA,3,0);
+    return mod_call(MOD_STATUS,3,0);
 #else
     return status_apply_request();
 #endif
@@ -839,6 +1131,7 @@ u8 unit_at_cell(u8 cell)
 
 // view corner c of a tile is world corner (c - rot) & 3 (both numbered (0,0) (1,0) (1,1) (0,1))
 #ifndef FFT_PRODUCTION_CORE   // test/tool entry, absent from fftbat
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 u8 corner_h(u8 rot, s16 u, s16 v, u8 c)
 {
     s16 x, z;
@@ -846,6 +1139,7 @@ u8 corner_h(u8 rot, s16 u, s16 v, u8 c)
     world_of(rot, u, v, &x, &z);
     {const Tile *t=tile_at(x,z);return t?t->c[(c-rot)&3]:0;}
 }
+#endif
 #endif
 
 s16 scene_x(u8 rot, s16 u, s16 v) {
@@ -857,6 +1151,7 @@ s16 scene_x(u8 rot, s16 u, s16 v) {
 }
 s16 scene_y(s16 u, s16 v) { return (s16)(SC_OY + (u + v) * HH); }
 
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 u8 unit_at(s16 x, s16 z)
 {
 #ifdef FFT_CHAPTER
@@ -869,6 +1164,7 @@ u8 unit_at(s16 x, s16 z)
     return 0;
 #endif
 }
+#endif
 
 // ---------------------------------------------------------------- the battle's units
 // FFT's model (tools/battle.py, checked on the original at Ramza's first turn): raw stats of 24
@@ -903,6 +1199,7 @@ static void map_render(void);
 static void save_campaign(void);
 static void prepare_rewards(void);
 static void party_load(void);
+static void funds_load(void);
 #endif
 
 
@@ -914,82 +1211,11 @@ static void party_load(void);
 // unused at the end, at most 60. A unit at 0 HP keeps its clock: each pick lowers its death
 // counter (3 to 0), the next one turns it into a crystal or a chest (a player's unit 3 times in
 // 4, an enemy 1 in 2) and its clock stops; the guest (Delita) never turns.
-u8 ct_next(void)
-{
-#ifdef FFT_CHAPTER
-    u8 ticks=0,limit=8,live_limit=st.mode==M_CLOCK?16:128;
-    // Keep ordinary turn entry synchronous; an idle-clock wake resumes in small quanta.
-#endif
-    for (;;) {
-        u8 i, best = 0xFF, max = 99;
-        Unit *u;
-#ifdef FFT_CHAPTER
-        // After a due root, only Quick may interrupt the remaining charge wave.
-        if (st.open_ct_phase) max=254;
-#endif
-        for (i = 0, u = st.unit; i < NUNIT; i++, u++)
-            if (!DC_OBJ(u->dc)
-#ifdef FFT_CHAPTER
-                && !(u->status_flags&STATUS_CT_FROZEN)
-#endif
-                && u->ct > max) { max = u->ct; best = i; }
-        if (best == 0xFF) {                        // a tick
-#ifdef FFT_CHAPTER
-            if(ticks>=limit)return CT_WAIT;
-            if (!st.open_ct_phase) {
-                for (i = 0; i < NUNIT; i++)
-                    if (st.pending[i].state && st.pending[i].ticks && !(st.unit[i].status_flags&STATUS_CT_FROZEN)) st.pending[i].ticks--;
-                st.open_ct_phase = 1;
-            }
-            if (pending_next() != 255) return CT_DUE;
-            st.open_ct_phase = 0;
-            // All due Charge actions finish before this tick expires statuses.
-            if(st.status_clock){
 #ifdef FFT_MODULES
-                mod_call(MOD_ORDER,4,0);
+u8 ct_next(void){return (u8)mod_call(MOD_ORDER,17,0);}
 #else
-                status_tick();
+#include "ct_next.inc"
 #endif
-            }
-#endif
-            for (i = 0, u = st.unit; i < NUNIT; i++, u++)
-                if (!DC_OBJ(u->dc)
-#ifdef FFT_CHAPTER
-                    && !(u->status_flags&STATUS_CT_FROZEN)
-#endif
-                ) {
-#ifdef FFT_CHAPTER
-                    u8 gain=unit_ct_gain(u);
-                    if(u->hp&&gain)limit=live_limit;
-#else
-                    u8 gain=u->sp;
-#endif
-                    u16 c=u->ct+gain;u->ct=(u8)(c>254?254:c);
-                }
-#ifdef FFT_CHAPTER
-            ticks++;
-#endif
-            continue;
-        }
-        u = &st.unit[best];
-        u->ct = max==255 ? 0 : (u8)(max >= 200 ? max - 200 : max - 100);
-        if (u->hp) return best;
-#ifdef FFT_CHAPTER
-#ifdef FFT_MODULES
-        if(mod_call(MOD_ORDER,14,best))return best;
-#else
-        if(status_dead_turn(best))return best;
-#endif
-#else
-        if (u->team == TEAM_GUEST) continue;
-        if (u->dc) u->dc--;
-        else {
-            u->dc = rand15() & (u->team == TEAM_PLAYER ? 0x110 : 0x10) ? DC_CRYSTAL : DC_CHEST;
-            st.morph_mask |= (u16)(1U << best); // retain all events even if one clock pass converts several
-        }
-#endif
-    }
-}
 
 // ORDER15 (the turn order follows): CT credit, then the source
 // upkeep (Poison/Regen, Brave +1 below 10); a no-op upkeep changes nothing.
@@ -1000,6 +1226,7 @@ u8 ct_end(u8 who, u8 moved, u8 acted)
     st.formula.roll=(moved?1:0)|(acted?2:0);return (u8)mod_call(MOD_ORDER,15,who);
 #else
     Unit *u=&st.unit[who];u->ct=core_status_end_ct(&u->statuses,u->ct,moved,acted);
+    if(acted)status_turn_action(who);
     return status_upkeep(who);
 #endif
 #else
@@ -1044,16 +1271,17 @@ static void turn_start(void)
 #else
     st.act = ct_next();
 #endif
-    if (st.act == U_RAMZA) st.rounds++;
-    st.pick_t = 0;
-    if (outcome()) { end_battle(outcome()); return; }
-#ifdef FFT_CHAPTER
-    // Start-turn upkeep removes Defend even from the special innate command bit.
-    st.unit[st.act].statuses.innate[0]&=(u8)~2;
-    st.unit[st.act].statuses.inflicted[0]&=(u8)~2;
-    st.unit[st.act].status&=(u8)~ST_DEFEND;
+#ifdef FFT_MODULES
+    {u8 end=(u8)mod_call(MOD_ORDER,16,st.act);if(end){end_battle(end);return;}}
 #else
-    st.unit[st.act].status &= (u8)~ST_DEFEND;
+    if(st.act==U_RAMZA)st.rounds++;
+    st.pick_t=0;
+    if(outcome()){end_battle(outcome());return;}
+#ifdef FFT_CHAPTER
+    status_turn_start(st.act);
+#else
+    st.unit[st.act].status&=(u8)~ST_DEFEND;
+#endif
 #endif
     cursor_place(UNIT_CELL(&st.unit[st.act]));
     me = st.unit[st.act].team == TEAM_PLAYER && !st.ai_all && !(st.auto_units & (1U << st.act))
@@ -1063,9 +1291,11 @@ static void turn_start(void)
         ;
     st.ai = me ? AI_OFF : AI_THINK; st.ai_t = 0;
     if (me && st.prot != 0xFF) { st.want = st.prot; st.prot = 0xFF; }   // the player's view back
-    if (W) { W->ai_k = 0; W->frz = W->frz_n = 0; W->frz_h = 0; }
-    st.mode = me ? M_MENU : M_BROWSE;
-    st.menu = MN_MOVE; st.moved = st.acted = 0;
+#ifndef FFT_MODULES
+    if(W){W->ai_k=0;W->frz=W->frz_n=0;W->frz_h=0;}
+    st.menu=MN_MOVE;st.moved=st.acted=0;
+#endif
+    st.mode=me?M_MENU:M_BROWSE;
     turn_order();
 }
 
@@ -1749,6 +1979,9 @@ static u16 edge_via(u8 id,u8 kind)
 #define EDGE_ROW(id) W->eg[id]
 #endif
 #define CORE_NAV_MAP W
+#ifdef FFT_CHAPTER
+#define FFT_NAV_SPANS
+#endif
 #include "tactical_search.inc"
 #undef CORE_NAV_MAP
 #undef CORE_NAV_COMPACT
@@ -1759,6 +1992,9 @@ static u16 edge_via(u8 id,u8 kind)
 // Jump 2 or more: to a tile no lower by at most Jump half units, over ground no higher than it,
 // no enemy there); a step's height within Jump (out of water: from its surface); enemies block,
 // allies can be crossed. limit: the most it spends (dist 0xFF beyond); from: the previous tile.
+#ifdef FFT_CHAPTER
+#include "movement_runtime.inc"
+#endif
 static u8 lower(u8 c)                    // a tile's height a unit leaves it from (half units)
 {
     return (u8)(map_tiles[c].stand + (map_tiles[c].water << 1));
@@ -1768,93 +2004,15 @@ static u8 tile_h(const Tile *t);
 // the moves out of each tile a unit with that Jump can make whatever the units (to a walkable
 // tile, within its heights; a jump: over lower ground), made once: each its tile and kind (1 a
 // jump, 2 into water)
+#ifdef FFT_MODULES
 static void edges(u8 jump)
 {
-    u16 t;u8 k,j,layers=1;
-#ifdef FFT_CHAPTER
-    static const u8 shift[4]={0,2,6,4};
-    u8 surface_layers=(W->surface_flags&SURFACE_MOVE_UPPER)?2:1;
-    if(W->surface)jump=step_jump_cap(jump);
-    // No search is active during graph construction. Borrow its four queues
-    // for facing-edge heights and blk for steepness/water. spread_start clears
-    // blk and core_nav_begin resets queue sizes before either becomes live.
-    if(W->surface)for(t=0;t<MAP_N;t++) {
-        const u8 *floor=W->surface+((u16)(W->grid_row[TILE_Z[t]]+TILE_X[t])<<3)+4*node_layer((u8)t);
-        W->blk[t]=(u8)(step_steep(floor,jump)|((floor[1]>>5)<<1));
-        for(k=0;k<4;k++)W->nav.queue[k][t]=surface_edge(floor,shift[k]);
-    }
-    if(W->surface_flags&SURFACE_GRID_UPPER)layers=2;
-#endif
-    W->ej=jump;
-    for(t=0;t<MAP_N;t++) {
-        u8 x=TILE_X[t],z=TILE_Z[t],h=W->hl[t],n=0,*e=EDGE_ROW(t);
-        for(k=0;k<4;k++) {
-            u8 room=k==0?MAP_W-1-x:k==1?x:k==2?MAP_H-1-z:z;
-#ifdef FFT_CHAPTER
-            u16 intermediate=jump>=2&&room>=2?node_at(x+dir_x[k],z+dir_z[k],node_layer((u8)t)):MAP_N;
-            W->via[t][k]=intermediate<MAP_N?(u8)intermediate:0;
-#endif
-#ifdef FFT_CHAPTER
-            u8 exit=0,ceiling=127;
-            if(W->surface) {
-                exit=W->nav.queue[k][t];
-                if((W->blk[t]&1)&&exit>=W->nav.queue[k^1][t])continue;
-                if(W->surface_flags&SURFACE_ROOM) {
-                    const u8 *src=W->surface+((u16)(W->grid_row[z]+x)<<3);
-                    ceiling=surface_ceiling_layers(src,shift[k],exit,surface_layers);
-                }
-            }
-#endif
-            for(j=0;j<=(jump>=2)&&j<room;j++) {
-                s16 nx=x+dir_x[k]*(j+1),nz=z+dir_z[k]*(j+1);u8 layer;
-                for(layer=0;layer<layers;layer++) {
-                    u16 next=node_at(nx,nz,layer),via=t;s16 dh;u8 kind;
-                    if(next>=MAP_N||!(W->hw[next]&1))continue;
-#ifdef FFT_CHAPTER
-                    if(W->surface) {
-                        u8 entry=W->nav.queue[k^1][next];
-                        if((W->blk[next]&1)&&W->nav.queue[k][next]>entry)continue;
-                        dh=(s16)(u8)(entry+(W->blk[next]&14))-exit;
-                        if((j&&dh>0)||dh>2*jump||dh<-2*jump)continue;
-                        if(W->surface_flags&SURFACE_ROOM) {
-                            const u8 *dst=W->surface+((u16)(W->grid_row[nz]+nx)<<3);
-                            u8 above=surface_ceiling_layers(dst,shift[k]^2,entry,surface_layers);
-                            if(above<exit+6||ceiling<entry+6||above<entry+6)continue;
-                        }
-                    } else
-#endif
-                    {
-                        dh=(s16)W->hs[next]-h;
-                        if(dh>2*jump||dh<-2*jump||(j&&(dh<0||dh>jump)))continue;
-                    }
-                    kind=(u8)(j|(W->hw[next]&2));
-                    if(j) {
-                        #ifdef FFT_CHAPTER
-                        via=intermediate;
-#else
-                        via=node_at(x+dir_x[k],z+dir_z[k],node_layer((u8)t));
-#endif
-#ifdef FFT_CHAPTER
-                        if(W->surface) {
-                            const u8 *middle=W->surface+((u16)(W->grid_row[z+dir_z[k]]+x+dir_x[k])<<3);
-                            if(!surface_jump_layers(middle,shift[k],exit,6,surface_layers))continue;
-                        } else
-#endif
-                        if(via<MAP_N&&W->hl[via]>W->hs[next])continue;
-                        if(via>=MAP_N)kind|=4; // no intermediate node on this floor; presence is explicit
-                    }
-                    #ifdef FFT_CHAPTER
-                    if(j)kind|=(u8)(k<<6);
-#else
-                    W->evia[t][n>>1]=via<MAP_N?(u8)via:0;
-#endif
-                    e[n++]=(u8)next;e[n++]=kind;
-                }
-            }
-        }
-        W->en[t]=n;
-    }
+    ModCtx *c;mod_call(MOD_MOVEMENT,255,0);c=mod_context(MOD_MOVEMENT);
+    c->cast_ability=jump;mod_call(MOD_MOVEMENT,0,255);
 }
+#else
+#include "movement_edges.inc"
+#endif
 
 #ifdef FFT_CHAPTER
 // Tactical binding only: the chapter frontend supplies matching scenery/depth.
@@ -1903,9 +2061,9 @@ u8 battle_bind_surface(const u8 *bank,u16 bytes)
 {
     if(!W||!surface_valid(bank,bytes,MAP_W,MAP_H))return 0;
     W->surface=bank+SURFACE_HEADER;
-    W->surface_flags=(W->surface_flags&SURFACE_GRID_UPPER)|surface_profile(W->surface,(u16)MAP_W*MAP_H);
+    W->surface_flags=(W->surface_flags&SURFACE_GRID_UPPER)|surface_profile(W->surface,(u16)MAP_W*MAP_H)|(bank[3]=='2'?SURFACE_TERRAIN:0);
     if(W->surface_flags&SURFACE_GRID_UPPER)W->surface_flags|=SURFACE_ROOM;
-    W->ej=255;
+    W->ej=255;movement_profile();
     return 1;
 }
 #endif
@@ -1919,8 +2077,13 @@ static void spread_start(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, con
     u8 *blk = W->blk, i, foe = un->team == TEAM_ENEMY, jump=un->jump;
 #ifdef FFT_CHAPTER
     if(W->surface)jump=step_jump_cap(jump);
+    if(core_status_current(&un->statuses,2)&64)out|=CORE_NAV_FLOAT;
 #endif
-    if (W->ej != jump) edges(jump);
+#ifdef FFT_CHAPTER
+    if (!W->move_kind&&W->ej!=jump) edges(jump);
+#else
+    if(W->ej!=jump)edges(jump);
+#endif
     memset(blk, 0, MAP_N);
     for (i = 0; i < NUNIT; i++) {
         const Unit *u = &st.unit[i];
@@ -1928,6 +2091,12 @@ static void spread_start(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, con
     }
     // Resident callers use validated map IDs, generated edges and bounded
     // Move/AI limits; keep repeated parameter validation outside this hot path.
+#ifdef FFT_CHAPTER
+    if(W->move_kind){
+        if(W->move_kind>=2){movement_direct(who,c,limit,dist,from,out);return;}
+        out|=CORE_NAV_CUSTOM|CORE_NAV_WIDE;
+    }
+#endif
     core_nav_begin(&W->nav,MAP_N,c,limit,dist,from,blk,out,need,left);
 }
 
@@ -1939,65 +2108,39 @@ static u8 spread_go(u16 n)
 
 static void bfs(u8 who, u8 *from)
 {
+#if defined(FFT_CHAPTER) && !defined(FFT_MODULES)
+    movement_ready(who);
+#endif
     const Unit *un = &st.unit[who];
     spread_start(who, (u8)(UNIT_CELL(un)), un->move, st.reach, from, 0, RT_NULL, 0);
     spread_go(0xFFFF);
 }
 
-void compute_reach(u8 who)
-{
-    u16 i;
-#ifdef FFT_CHAPTER
-    if(!unit_can_move(&st.unit[who])){
-        hl_seq++;memset(st.reach,0xff,sizeof st.reach);st.reach[UNIT_CELL(&st.unit[who])]=0;
-        W->from_who=0;return;
-    }
+#ifdef FFT_MODULES
+void compute_reach(u8 who){ModCtx *ctx;movement_ready(who);mod_call(MOD_MOVEMENT,255,0);ctx=mod_context(MOD_MOVEMENT);ctx->cast_actor=who;mod_call(MOD_MOVEMENT,8,0);}
+#else
+#include "reach_menu.inc"
 #endif
-    hl_seq++;
-    bfs(who, bfs_from);                           // the steps kept for make_path
-    W->from_who = who + 1;
-    W->upd_k += REACH_K;
-    for (i = 0; i < NUNIT; i++)                   // can't stop on a unit (a crystal or a chest:
-        if (i != who && st.unit[i].x < MAP_W && st.unit[i].z < MAP_H
-            && unit_at_cell(UNIT_CELL(&st.unit[i])))       // can, it is picked up)
-            st.reach[UNIT_CELL(&st.unit[i])] = 0xFF;
-    for (i = 0; i < MAP_N; i++)            // nor on a tree (crossed only)
-        if (map_tiles[i].walk == 2) st.reach[i] = 0xFF;
-}
 
 // the path to (tx, tz) from the steps of who's reach (made again unless compute_reach made them:
 // a spread costs ~90k)
+#ifndef FFT_PRODUCTION_CORE
 u8 make_path(u8 who, u8 tx, u8 tz)
 {
     u16 cell=node_at(tx,tz,0);
     if(cell>=MAP_N){st.path_n=0;return 0;}
     return make_path_cell(who,(u8)cell);
 }
+#endif
+#ifdef FFT_MODULES
 u8 make_path_cell(u8 who,u8 c)
 {
-    u8 s,n,i,kept;
-    if(who>=NUNIT||c>=MAP_N){st.path_n=0;return 0;}
-#ifdef FFT_CHAPTER
-    if(!unit_can_move(&st.unit[who])){st.path_n=0;W->from_who=0;return 0;}
-#endif
-    s=UNIT_CELL(&st.unit[who]);kept=W->from_who==who+1;
-    W->from_who = 0;
-    if (!kept) bfs(who, bfs_from);
-    n=(u8)core_nav_path(MAP_N,s,c,st.reach,bfs_from,order,PATH_MAX);
-    if(!n){st.path_n=0;return 0;}
-    for (i = 0;i<n;i++) {
-        c=order[i];
-#ifdef FFT_CHAPTER
-        st.path[i]=c;
-#else
-        st.path[i][0]=TILE_X[c];st.path[i][1]=TILE_Z[c];
-#endif
-    }
-    st.path_n = n;                                                 // path[0] = the start
-    if (!kept) { compute_reach(who); W->from_who = 0; }
-    else hl_seq++;
-    return st.path_n;
+    ModCtx *ctx;movement_ready(who);mod_call(MOD_MOVEMENT,255,0);ctx=mod_context(MOD_MOVEMENT);
+    ctx->cast_actor=who;ctx->cast_ref=c;return (u8)mod_call(MOD_MOVEMENT,7,0);
 }
+#else
+#include "path_menu.inc"
+#endif
 
 // ---------------------------------------------------------------- attack
 // FFT's Attack with the battle's weapons (RE_NOTES.md § Attack: read in the decompilation,
@@ -2008,58 +2151,40 @@ u8 make_path_cell(u8 who,u8 c)
 // (PA + Speed) / 2 (a knife), changed by the signs' compatibility, then on a critical hit
 // (4 %) XA + 0..XA - 1 and the target pushed a tile away; damage XA * WP (bare hands: PA *
 // Brave / 100), at most 999.
-void attack_range(u8 who)
-{
-#ifdef FFT_CHAPTER
-    if(!unit_can_act(&st.unit[who])){hl_seq++;memset(st.reach,0xff,sizeof st.reach);return;}
+#ifdef FFT_MODULES
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
+void attack_range(u8 who){st.formula.actor=who;mod_call(MOD_TURN,2,0);}
 #endif
-    const Unit *u = &st.unit[who];
-    s16 h = map_tiles[UNIT_CELL(u)].stand;
-    u8 d,layers=1;
-#ifdef FFT_CHAPTER
-    if(W->grid)layers=2;
+#else
+#include "attack_range.inc"
 #endif
-    hl_seq++;
-    memset(st.reach, 0xFF, sizeof st.reach);
-#ifdef FFT_CHAPTER
-    if (WEAPON_REACH(u) > 1) {
-        u16 c;u8 o = (u8)(UNIT_CELL(u));
-        for (c = 0; c < MAP_N; c++) if (ranged_reach(who, o, c)) st.reach[c] = 1;
-        return;
-    }
-#endif
-    for (d = 0; d < 4; d++) {
-        s16 x = u->x + dir_x[d], z = u->z + dir_z[d];
-        u8 layer;
-        for(layer=0;layer<layers;layer++) {
-            u16 cell=node_at(x,z,layer);const Tile *t;
-            if(cell>=MAP_N)continue;t=&map_tiles[cell];
-            if(t->walk&&t->stand+6>=h&&t->stand<=h+5)st.reach[cell]=1;
-        }
-    }
-}
 
 // from the target: the attack's dominant axis against its facing (a tie: either axis)
 u8 attack_side(u8 a, u8 t)
 {
     const Unit *ua = &st.unit[a], *ut = &st.unit[t];
     s16 dx = (s16)ua->x - ut->x, dz = (s16)ua->z - ut->z;
-    s16 ax = dx < 0 ? -dx : dx, az = dz < 0 ? -dz : dz, c = 0;
-    if (!ax && !az) return SIDE_BACK;
-    if (ax >= az) c += dir_x[ut->face] * (dx < 0 ? -1 : dx > 0);
-    if (az >= ax) c += dir_z[ut->face] * (dz < 0 ? -1 : dz > 0);
-    return c > 0 ? SIDE_FRONT : c < 0 ? SIDE_BACK : SIDE_SIDE;
+    s16 ax=dx<0?-dx:dx,az=dz<0?-dz:dz,d;
+    if(!ax&&!az)return SIDE_BACK;
+    if(ut->face<2){if(ax<az)return SIDE_SIDE;d=dx;}
+    else{if(az<ax)return SIDE_SIDE;d=dz;}
+    if(ut->face&1)d=-d;
+    return d>0?SIDE_FRONT:SIDE_BACK;
 }
 
 // from the front the target evades with its class evade, from the front or a side with its
 // shield's (SHIELD_EV); Defending halves the base hit (100): the chance (base - evade) * 100
 // / base, times (base - shield) / base
-u8 hit_chance(u8 a, u8 t)
+u8 hit_chance(u8 a,u8 t)
 {
 #ifdef FFT_CHAPTER
+    return magic_hit(a,t,NO_ABIL,0);
+#else
+
+#ifdef FFT_CHAPTER
     if(!unit_can_act(&st.unit[a]))return 0;
-    if(unit_petrified(&st.unit[t]))return 0;
-    if(st.unit[t].status_flags&STATUS_NO_EVADE)return 100;
+    if(unit_petrified(&st.unit[t])||unit_airborne(&st.unit[t]))return 0;
+    if((st.unit[t].status_flags&STATUS_NO_EVADE)||unit_transparent(&st.unit[a]))return 100;
 #endif
     const Unit *ut = &st.unit[t];
     u8 side = attack_side(a, t), base = unit_physical_base(&st.unit[a],ut), ev = side == SIDE_FRONT ? jobs[ut->job].cev : 0;
@@ -2073,6 +2198,7 @@ u8 hit_chance(u8 a, u8 t)
     }
 #endif
     return (u8)hit;
+#endif
 }
 
 // XA = x changed by the signs' compatibility (at least 1)
@@ -2088,34 +2214,61 @@ static s16 zodiac_xa(const Unit *ua, const Unit *ut, s16 xa)
     return xa < 1 ? 1 : xa;
 }
 
-static u16 attack_weapon_damage(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge)
+static u16 weapon_amount(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge,u16 base_roll)
 {
     const Unit *ua=&st.unit[a],*ut=&st.unit[t];
     const Item *w=weapon!=255?&items[weapon]:RT_NULL;
-    s16 xa = w && w->knife ? (ua->pa + ua->sp) >> 1 : ua->pa, ya;
-    u16 d;
-    xa+=charge;
+    u8 jump=charge==255;
+    s16 xa,ya;
 #ifdef FFT_CHAPTER
-    // Source order: attacker Berserk x3/2 then Frog XA 1, then target statuses.
+    xa=jump?ua->pa:weapon_plain_gun(weapon)?w->wp:
+        weapon_base_xa(weapon==255?0:cj_equipment_item(common,weapon)[0],ua,base_roll&32767);
+#else
+    xa=w&&w->knife&&!jump?(ua->pa+ua->sp)>>1:ua->pa;
+#endif
+    u16 d;
+    if(jump){if((u8)(weapon-99)<8)xa+=xa>>1;}else{if(awake&2)xa=zodiac_xa(ua,ut,xa);xa+=charge;if(base_roll&32768)xa=(s16)(muls16(xa,5)>>2);}
+#ifdef FFT_CHAPTER
+    // Source support stage, before Berserk/Frog and target status/zodiac.
+    if(!jump){
+        if(core_two_hands(common,ua->job,st.support[a],ua->eq,weapon))xa<<=1;
+        if(st.support[a]==SUPPORT_ATTACK_UP)xa=(s16)(muls16(xa<<2,21846)>>16);
+        if(weapon==255&&st.support[a]==SUPPORT_MARTIAL_ARTS)xa+=xa>>1;
+    }
     if(core_status_current(&ua->statuses,2)&8)xa+=xa>>1;
     if(UNIT_FROG(ua))xa=1;
+    if(st.support[t]==SUPPORT_DEFENSE_UP)xa=(s16)(muls16(xa<<1,21846)>>16);
     xa=unit_protect_xa(ut,xa);
     if((core_status_current(&ut->statuses,0)&8)||
-       ((core_status_current(&ut->statuses,4)&0x10)&&(!awake||(ut->statuses.innate[4]&0x10))))xa+=xa>>1;
+       ((core_status_current(&ut->statuses,4)&0x10)&&(!(awake&1)||(ut->statuses.innate[4]&0x10))))xa+=xa>>1;
     if(core_status_current(&ut->statuses,2)&6)xa+=xa>>1;   // Chicken or Frog
 #endif
-    xa=zodiac_xa(ua,ut,xa);
-    if (crit) xa += (s16)(((u32)r * (u16)xa) >> 15);
+    if(!jump||(ua->zodiac!=12&&ut->zodiac!=12))xa=zodiac_xa(ua,ut,xa);
+    if (crit) xa += (s16)(muls16((s16)r,xa)>>15);
     ya = w ? w->wp : (s16)((u16)(ua->pa * ua->brave) / 100);
     if (ya < 1) ya = 1;
     d = (u16)(xa * ya);
-    return charge?d:d>999?999:d;
+    return d;
+}
+
+static u16 __attribute__((noinline)) attack_weapon_damage(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge)
+{
+    u16 n=weapon_amount(a,t,weapon,crit,r,awake,charge,16384);return charge&&charge!=255?n:n>999?999:n;
 }
 
 #ifdef FFT_CHAPTER
 #include "magic_math.inc"
+#include "reaction_live.h"
 #include "magic_evasion.inc"
+#ifdef FFT_MODULES
+#include "reaction_live.h"
+static u16 target_query(u8 who,u16 criterion){
+    if(criterion&32768U)return criterion<32768U+NABIL?magic_applicable(who,criterion&32767U):0;
+    return criterion==255?magic_target(who):criterion==254?reaction_live(who):criterion==253?reaction_critical_ready(who):criterion==252?jump_limits(who):(u16)TARGETS_INVALID;
+}
 #endif
+#endif
+#if !defined(__m68k__) || !defined(FFT_PRODUCTION_CORE) || defined(FFT_WEAPON_TEST_API)
 u16 attack_damage(u8 a,u8 t,u8 crit,u16 r)
 {
     return attack_weapon_damage(a,t,
@@ -2126,6 +2279,7 @@ u16 attack_damage(u8 a,u8 t,u8 crit,u16 r)
 #endif
         crit,r,0,0);
 }
+#endif
 #ifdef FFT_CHAPTER
 // Punch Art strikes 0x31/0x32 (CORE_PUNCH_ART.md): PA, Attack UP, Martial Arts,
 // target statuses, zodiac. roll bit 15: execution, low bits the critical draw (0
@@ -2138,38 +2292,47 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
     // zodiac(X) (X in the record's element byte), the Repeating Fist sum with a multiplier of 1.
     // Stat breaks 0x2b (CORE_BREAKS): PA and Y (element byte) the same way. Both apply Martial
     // Arts bare-handed only.
-    if(b->formula==0x28||b->formula==0x26)xa=ua->sp;
+    if((u8)(b->formula-0x26)<=2)xa=ua->sp;
     // Equipment breaks 0x25: Y + the attacker's WP, which the caller passes as r (X = 0: a
     // multiplier of 1 below; Steal Exp and stat breaks pass 0).
     if(b->formula<0x31)ya=b->element+r;
-    if(st.support[a]==SUPPORT_ATTACK_UP)xa=magic_third(xa<<2);
-    if(st.support[a]==SUPPORT_MARTIAL_ARTS&&(b->formula>=0x31||hand_weapon(ua,0)==255))xa+=xa>>1;
-    xa=unit_status_xa(ut,xa);
-    if(core_status_current(&ut->statuses,2)&6)xa+=xa>>1;   // Chicken or Frog
-    xa=zodiac_xa(ua,ut,xa);
+    if(b->formula>=0x31)xa=magic_xa(a,t,b->element,1,b->formula);
+    else{
+        if(st.support[a]==SUPPORT_ATTACK_UP)xa=magic_third(xa<<2);
+        if(st.support[a]==SUPPORT_MARTIAL_ARTS&&hand_weapon(ua,0)==255)xa+=xa>>1;
+        xa=unit_status_xa(ut,xa);
+        if(core_status_current(&ut->statuses,2)&6)xa+=xa>>1;
+        xa=zodiac_xa(ua,ut,xa);
+    }
     if(r&0x8000)xa+=(s16)(muls16((s16)(r&0x7fff),xa)>>15);
     if(b->formula==0x31)k=(u16)(xa*ya);
     else{
         k=(u16)(xa+zodiac_xa(ua,ut,ya));
         if(!(r&0x8000))k*=(u16)((muls16((s16)r,cj_range(common,ab)[9])>>15)+1);
     }
+    if(b->formula==0x31&&b->element){s16 n=magic_element_value(t,b->element,(s16)k);return n>999?999:(u16)n;}
     return k>999?999:k;
 }
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
 {
+    if(jump_ability(ab))return jump_reaches(a,t,flags);
     u8 f=(u8)(abilities[ab].formula-0x25);  // 0x25/26 equipment, 0x28 Steal Exp, 0x2b/2c breaks, 0x31/32
-    if(f<=13&&(0x30CBU>>f)&1)return punch_strike(a,t,ab,roll);
+    if(f<=13&&(0x30CFU>>f)&1)return punch_strike(a,t,ab,roll);
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }
+#ifdef FFT_MODULES
+#if !defined(FFT_PRODUCTION_CORE) || defined(FFT_WEAPON_TEST_API)
 u16 attack_prediction(u8 a,u8 t)
 {
-    if(unit_petrified(&st.unit[t])||st.golem[st.unit[t].team&1])return 0;   // Golem guards
-    u16 damage=attack_weapon_damage(a,t,hand_weapon(&st.unit[a],0),0,0,0,0);
-    if(hand_count(a)==2&&damage<st.unit[t].hp)
-        damage+=attack_weapon_damage(a,t,hand_weapon(&st.unit[a],1),0,0,1,0);
-    return damage;
+    ModCtx *m;mod_call(MOD_WEAPON,255,0);m=mod_context(MOD_WEAPON);m->cast_actor=a;m->cast_ref=t;
+    return mod_call(MOD_WEAPON,4,0);
 }
+#endif
+#else
+#include "weapon_effects.inc"
+#endif
+
 #else
 #define attack_prediction(a,t) attack_damage(a,t,0,0)
 #endif
@@ -2177,10 +2340,15 @@ u16 attack_prediction(u8 a,u8 t)
 // the evades rolled, each source in turn (RE_NOTES.md § Attack): a miss when rand() * base /
 // 32768 < the evade (base 100, 50 Defending); the class evade from the front, then a
 // shield's from the front or a side (none: no roll)
-static u8 roll_hit(u8 a, u8 t)
+static u8 roll_hit(u8 a,u8 t)
 {
 #ifdef FFT_CHAPTER
+    return unit_can_act(&st.unit[a])&&magic_hit(a,t,NO_ABIL,1);
+#else
+
+#ifdef FFT_CHAPTER
     if(!unit_can_act(&st.unit[a]))return 0;
+    if(unit_transparent(&st.unit[a])){u8 n=4;do{rand15();}while(--n);return 1;}
     if(st.unit[t].status_flags&STATUS_NO_EVADE)return 1;
 #endif
     const Unit *ut = &st.unit[t];
@@ -2190,6 +2358,7 @@ static u8 roll_hit(u8 a, u8 t)
     if (side != SIDE_BACK && (ev = SHIELD_EV(ut)) != 0) return (u8)(((u32)rand15() * base >> 15) >= ev);
 #endif
     return 1;
+#endif
 }
 
 // the act starts: the user turns to its target (M_ACT)
@@ -2247,24 +2416,32 @@ static void knockback(u8 a, u8 t)
 }
 
 // the hit rolled, then the critical (4 %: XA + 0..XA - 1 and a knockback) and the damage
-static void attack_roll(u8 a,u8 t)
-{
-    st.hit=roll_hit(a,t);if(!st.hit)return;
-    st.crit=(u8)(((u32)rand15()*100>>15)<4);
-    st.dmg=attack_damage(a,t,st.crit,st.crit?rand15():0);
-    if(st.crit)knockback(a,t);
-}
+#if !defined(FFT_MODULES)||!defined(FFT_PRODUCTION_CORE)||defined(RT_CYCLES)
+#include "weapon_roll.inc"
+#endif
+
 #ifdef FFT_CHAPTER
 // Engine entry for consecutive ordinary strikes; no equipment/passive producer
 // selects two yet. Those producers must supply independent hand/formula policy.
+#ifdef FFT_MODULES
+// Pure line query may load AI. Complete it before either effect owner executes.
+static void hamedo_line(u8 a,u8 t)
+{
+    if(a<NUNIT&&t<NUNIT&&st.reaction[t]==REACTION_HAMEDO&&WEAPON_REACH(&st.unit[t])>1){
+        u8 actor=st.formula.actor,target=st.formula.target;
+        W->ai_traj=battle_line_clear(t,a);
+        st.formula.actor=actor;st.formula.target=target;
+    }
+}
 u8 attack_sequence(u8 a,u8 t,u8 count)
 {
-    if(!count||count>2||!action_available(a,t))return 0;
-    st.pending[a].state=0;unit_status_action(&st.unit[a],0);
-    act_start(a,t);
-    st.action.left=count-1;st.action.cell=UNIT_CELL(&st.unit[t]);
-    st.abil=NO_ABIL;attack_roll(a,t);return 1;
+    ModCtx *c;hamedo_line(a,t);mod_call(MOD_RESPONSE,255,0);c=mod_context(MOD_RESPONSE);
+    c->cast_actor=a;c->cast_ref=t;return (u8)mod_call(MOD_RESPONSE,4,count);
 }
+#else
+#include "hamedo.inc"
+#include "attack_start.inc"
+#endif
 void attack(u8 a,u8 t){if(a<NUNIT)attack_sequence(a,t,hand_count(a));}
 #else
 void attack(u8 a, u8 t)
@@ -2281,27 +2458,41 @@ void attack(u8 a, u8 t)
 AbId known(u8 who, u8 k)
 {
     const Unit *u = &st.unit[who];
-    u8 i;
+    u8 i,n=0,count=k==255;
+#ifdef FFT_CHAPTER
+    if(u->set==21&&st.mode!=M_STATUS)return math_known(who,k);
+    if(u->set==18&&st.mode!=M_STATUS)return count?1:k?NO_ABIL:JUMP_FIRST;
+    if(u->set==20){
+        AbId ab;for(ab=512;ab<NABIL;ab++)if(throw_available(who,ab)){
+            if(count)n++;else if(!k--)return ab;
+        }
+        return count?n:NO_ABIL;
+    }
+#endif
     for (i = 0; i < SET_N; i++) if (u->learned & (1U << i)) {
         AbId ab = SET_ABILITY(u->set, i);
 #ifdef FFT_CHAPTER
-        if (ab && abilities[ab].kind != 255 && !k--) return ab;
+        if(ab&&abilities[ab].kind!=255){if(count)n++;else if(!k--)return ab;}
 #else
-        if (ab != NO_ABIL && !k--) return ab;
+        if(ab!=NO_ABIL){if(count)n++;else if(!k--)return ab;}
 #endif
     }
-    return NO_ABIL;
+    return count?n:NO_ABIL;
 }
 
+#if MOD_CORE
 #include "ability_access.inc"
+#endif
 
 // the tiles at most `range` steps away (FFT spreads the range over the map, heights aside),
 #ifdef FFT_MODULES
-// TARGETS owns cold range construction; caller has returned from every image.
+// MOVEMENT owns cold range construction; caller has returned from every image.
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 void skill_range(u8 who,AbId ab)
 {
-    st.formula.actor=who;st.formula.ability=ab;mod_call(MOD_TARGETS,5,0);
+    st.formula.actor=who;st.formula.ability=ab;mod_call(MOD_MOVEMENT,5,0);
 }
+#endif
 #else
 #include "skill_range.inc"
 #endif
@@ -2319,27 +2510,32 @@ void skill_range(u8 who,AbId ab)
 #ifndef FFT_MODULES
 #include "command.inc"
 #ifdef FFT_CHAPTER
+#include "jump_order.inc"
 #include "incantation.inc"
+#include "performance_lifecycle.inc"
 #endif
 #endif
 #ifdef FFT_CHAPTER
 static u8 batch_commit(CastBatch *b);
 static u8 batch_status_commit(CastBatch *b);
+#include "performance_commit.inc"
+#ifndef FFT_PRODUCTION_CORE   // isolated packet API; gameplay uses owned prepare/commit
 u8 cast_batch(u8 op,CastBatch *b)
 {
     u8 result;
     if(op>CAST_BATCH_COMMIT||!b)return 0;
 #ifdef FFT_MODULES
-    u8 status=op&&b->ability<512&&magic_status_formula(abilities[b->ability].formula);
-    u8 id=op?(status?MOD_FORMULA:MOD_RESPONSE):MOD_TARGETS;
+    u8 status=op&&b->ability<512&&b->ability!=109&&b->ability!=116&&magic_status_formula(abilities[b->ability].formula);
+        u8 id=op?(b->ability==109||b->ability==116?MOD_PERFORMANCE:status?MOD_STATUS:(b->ability<512&&performance_formula(abilities[b->ability].formula))?MOD_PERFORMANCE:MOD_SAVE):MOD_TARGETS;
     mod_call(id,255,0);mod_context(id)->cast_batch_out=b;
-    result=(u8)mod_call(id,status?12:op?10:1,status?1:0);
+    result=(u8)mod_call(id,status?12:op?7:1,status?1:0);
 #else
     result=op?(b->ability<512&&magic_status_formula(abilities[b->ability].formula)?batch_status_commit(b):batch_commit(b)):batch_prepare(b,0);
 #endif
     if(result&2)turn_order();
     return result&1;
 }
+#endif
 #ifndef FFT_PRODUCTION_CORE   // test/tool entry, absent from fftbat
 u8 cast_forecast(CastBatch *b)
 {
@@ -2356,10 +2552,17 @@ u8 cast_forecast(CastBatch *b)
 // Called only after COMMAND returns. No image may evict its own executing code.
 static u8 cast_dispatch(u8 result)
 {
-    if(result==CAST_AREA_DISPATCH){
+    if(result==CAST_EFFECT_DISPATCH){
+#ifdef FFT_MODULES
+        hamedo_line(st.formula.actor,st.formula.target);
+        result=(u8)mod_call(MOD_COMBAT,0,0);
+#else
+        result=command_effect(st.formula.actor,st.formula.target,st.formula.ability);
+#endif
+    }
+    else if(result==CAST_AREA_DISPATCH){
 #ifdef FFT_MODULES
         result=(u8)mod_call(MOD_TARGETS,2,0);
-        if(result)mod_call(MOD_RESPONSE,255,0);
 #else
         result=batch_owned_prepare();
 #endif
@@ -2374,11 +2577,12 @@ u8 cast_order(u8 a,u8 ref,AbId ab,u8 follow)
     u8 result;
 #ifdef FFT_MODULES
     ModCtx *c;
-    mod_call(MOD_COMMAND,255,0);c=mod_context(MOD_COMMAND);
+    u8 id=ab<512&&performance_formula(abilities[ab].formula)?MOD_PERFORMANCE:MOD_COMMAND;
+    mod_call(id,255,0);c=mod_context(id);
     c->cast_actor=a;c->cast_ref=ref;c->cast_ability=ab;
-    result=(u8)mod_call(MOD_COMMAND,3,follow);
+    result=(u8)mod_call(id,3,follow);
 #else
-    result=command_cast(a,ref,ab,follow);
+    result=ab<512&&performance_formula(abilities[ab].formula)?performance_order(a,ref,ab,follow):command_cast(a,ref,ab,follow);
 #endif
     result=cast_dispatch(result);
     if(result==2&&st.ai)ai_next();
@@ -2394,7 +2598,7 @@ s16 cast_targets(u8 a,u8 ref,AbId ab,u8 follow)
 }
 #endif
 #ifdef FFT_CHAPTER
-static void aim(AbId ab);
+static u8 aim(AbId ab);
 static void area_control(u8 op)
 {
     u8 result;
@@ -2411,9 +2615,9 @@ static void area_control(u8 op)
 #endif
         if(!result){aim(st.abil);st.deny=16;}
     }else if(result==AREA_SEND){
-        AreaUi *q=&W->area_ui;u8 follow=q->follow_id!=255&&!q->answer;
-        if(!cast_order(st.act,follow?q->follow_id:q->centre,st.abil,follow))st.deny=16;
-    }else if(result==AREA_BACK)aim(st.abil);
+        AreaUi *q=&W->area_ui;u8 follow=q->forecast.follow==MATH_BIND?MATH_BIND:q->follow_id!=255&&!q->answer;
+        if(!cast_order(st.act,follow==MATH_BIND?q->forecast.ref:follow?q->follow_id:q->centre,st.abil,follow))st.deny=16;
+    }else if(result==AREA_BACK){if(st.unit[st.act].set==21){st.mode=M_SKILLS;st.skill=0;}else aim(st.abil);}
 }
 #endif
 
@@ -2424,13 +2628,22 @@ void skill(u8 a,u8 t,AbId ab)
     if(ab<512&&(abilities[ab].flags&AF_CAST)&&!st.open_resolving){cast_order(a,t,ab,1);return;}
 #endif
 #ifdef FFT_MODULES
-    if(!action_available(a,t)||!can_use(a,ab))return;
-    st.formula.actor=a;st.formula.target=t;st.formula.ability=ab;
+    ModCtx *c;mod_call(MOD_COMMAND,255,0);c=mod_context(MOD_COMMAND);
+    c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;
     charged=(u8)mod_call(MOD_COMMAND,0,0);
+    if(charged==5){
+        mod_call(MOD_RESPONSE,255,0);c=mod_context(MOD_RESPONSE);
+        c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;charged=(u8)mod_call(MOD_RESPONSE,5,0);
+    }
+    if(charged==CAST_EFFECT_DISPATCH)charged=cast_dispatch(charged);
+    if(charged==4)return;
     // COMMAND has returned. Prepare impact code during wind-up, not at ACT_HIT.
-    if(st.mode==M_ACT)mod_call(abilities[ab].kind==AB_CLEANSE?MOD_FORMULA:MOD_ACTION,255,0);
+    if(st.mode==M_ACT)mod_call(abilities[ab].kind==AB_CLEANSE?MOD_STATUS:MOD_ACTION,255,0);
 #else
     charged=command_skill(a,t,ab);
+#ifdef FFT_CHAPTER
+    if(charged==5)charged=jump_order(a,t,ab);
+#endif
 #endif
     if(charged==3){attack(a,t);return;}           // an equipment break with nothing to break
     if(charged==2&&st.ai)ai_next();
@@ -2448,8 +2661,11 @@ void defend(u8 a)
 u8 act_kind(void)
 {
 #ifdef FFT_CHAPTER
+    if(st.abil==NO_ABIL||(st.abil<512&&(abilities[st.abil].flags&AF_CHARGE)))return st.effect_kind&EFFECT_KIND_MASK;
+    if(st.abil>=512&&st.abil<NABIL)return st.effect_kind&EFFECT_KIND_MASK;
+    if(st.effect_kind==AB_CATCH||st.effect_kind==AB_MP_DAMAGE)return st.effect_kind;
     if(st.effect_kind==AB_GOLEM)return AB_GOLEM;   // a Golem cast or guard
-    if(st.abil<512&&((abilities[st.abil].flags&AF_CAST)||restore_ability(st.abil)))return st.effect_kind&EFFECT_KIND_MASK;
+    if(st.abil<512&&((abilities[st.abil].flags&AF_CAST)||restore_ability(st.abil)||reaction_typed(st.abil)))return st.effect_kind&EFFECT_KIND_MASK;
 #endif
     return st.abil == NO_ABIL ? AB_DAMAGE : st.abil == ABIL_DEFEND ? AB_DEFEND : abilities[st.abil].kind;
 }
@@ -2474,13 +2690,21 @@ u8 job_level(const Unit *u)
 }
 
 #ifdef FFT_MODULES
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 void rewards(u8 a,u8 t,u8 kill)
 {
     st.formula.actor=a;st.formula.target=t;st.formula.roll=kill;
     mod_call(MOD_ACTION,7,0);
 }
+#endif
 #else
 #include "rewards.inc"
+#ifdef FFT_CHAPTER
+#include "equipment_runtime.inc"
+#include "combat_response.inc"
+#include "nature_runtime.inc"
+static void movement_settle(u8 who){movement_benefit(who);}
+#endif
 #endif
 
 // victory: every enemy KO (or a crystal or a chest); defeat: Ramza a crystal or a chest, or
@@ -2524,10 +2748,15 @@ static void end_battle(u8 e)
 // target pushed; a KO or a revival: the turn order again), the menu comes back at ACT_END or,
 // after the EXP and the JP shown, ACT_GAIN_END (the turn ends if the user fell: Wish)
 #ifndef FFT_MODULES
+static u8 status_magic_commit(void);
+#ifdef FFT_CHAPTER
+#include "allegiance.inc"
+#endif
 #include "action_resolve.inc"
 #ifdef FFT_CHAPTER
 #include "batch_commit.inc"
 #include "status_commit.inc"
+#include "weapon_proc.inc"
 #define FFT_STATUS_BATCH
 #define batch_commit batch_status_commit
 #define action_magic_commit status_magic_commit
@@ -2536,6 +2765,19 @@ static void end_battle(u8 e)
 #undef batch_commit
 #undef FFT_STATUS_BATCH
 #endif
+#endif
+#if defined(FFT_CHAPTER) && !defined(FFT_MODULES)
+#define FFT_DIRECT_NAME direct_target
+#define FFT_DIRECT_PANEL
+#include "direct_trajectory.inc"
+#undef FFT_DIRECT_PANEL
+#undef FFT_DIRECT_NAME
+#include "arc_trajectory.inc"
+#include "melee_target.inc"
+#include "weapon_freeze.inc"
+#include "weapon_prepare.inc"
+#include "weapon_commit.inc"
+#include "weapon_proc.inc"
 #endif
 #if defined(FFT_CHAPTER) && !defined(FFT_MODULES)
 static u8 area_number_prepare(void);
@@ -2553,36 +2795,34 @@ static u8 reaction_step(void)
     }
     while(st.action.pending){
 #ifdef FFT_MODULES
-        kind=(u8)mod_call(MOD_RESPONSE,0,0);
+        kind=(u8)mod_call(MOD_RESULTS,3,0);
 #else
         kind=reaction_select();
 #endif
         if(!kind)return 0;
-        if(kind==1&&WEAPON_REACH(&st.unit[st.action.actor])>1&&
-           !battle_line_clear(st.action.actor,st.action.root)){
 #ifdef FFT_MODULES
-            mod_call(MOD_RESPONSE,2,0);
+        mod_call(kind==7||kind==10?MOD_TARGETS:kind==9||kind==6?MOD_EQUIPMENT:MOD_RESPONSE,
+            kind==10?12:kind==7?11:kind==9?6:kind==6?7:1,kind);
 #else
-            reaction_return();
-#endif
-            return 1; // one expensive rejected trajectory at most per update
-        }
-#ifdef FFT_MODULES
-        mod_call(MOD_RESPONSE,1,kind);
-#else
-        reaction_launch(kind);
+        if(kind==7||kind==10)reaction_area_launch(kind==10);else if(kind==9)combat_response_launch();else reaction_launch(kind);
 #endif
         return 1;
     }
 #endif
     return 0;
 }
+#if defined(FFT_CHAPTER) && !defined(FFT_MODULES)
+#include "mime_runtime.inc"
+#endif
 static void attack_step(void)
 {
 #ifdef FFT_CHAPTER
+    if(st.action.phase==CTX_IDLE)goto action_finished;
+#endif
+#ifdef FFT_CHAPTER
     if(area_impact_root()&&st.act_t<ACT_HIT&&W->area_impact.next<=NUNIT){
 #ifdef FFT_MODULES
-        mod_call(MOD_NUMBERS,2,0);
+        mod_call(MOD_AREA_UI,AREA_NUMBERS,0);
 #else
         area_number_prepare();
 #endif
@@ -2590,15 +2830,18 @@ static void attack_step(void)
 #endif
     if (st.act_t == ACT_HIT) {
 #ifdef FFT_MODULES
-        u8 area=W->cast.phase==CAST_BATCH_READY;
-        u8 status=st.abil<512&&(magic_status_formula(abilities[st.abil].formula)||abilities[st.abil].kind==AB_CLEANSE);
-        if(mod_call(status?MOD_FORMULA:area?MOD_RESPONSE:MOD_ACTION,status?(area?12:13):area?11:0,0))turn_order();
+        u8 area=W->cast.phase==CAST_BATCH_READY,id=MOD_ACTION,op=0;
+        if(st.abil==NO_ABIL||(st.abil<512&&(abilities[st.abil].flags&AF_CHARGE))){id=MOD_WEAPON;op=1;}
+        else if(st.abil==109||st.abil==116){id=MOD_PERFORMANCE;op=8;}
+        else if(st.abil<512&&(magic_status_formula(abilities[st.abil].formula)||abilities[st.abil].kind==AB_CLEANSE||reaction_self(st.abil))){id=MOD_STATUS;op=area?12:13;}
+        else if(area){id=performance_formula(abilities[st.abil].formula)?MOD_PERFORMANCE:MOD_SAVE;op=8;}
+        if(mod_call(id,op,0))turn_order();
 #else
 #ifdef FFT_CHAPTER
         if(W->cast.phase==CAST_BATCH_READY){
             if((magic_status_formula(abilities[W->cast.ability].formula)?batch_status_commit(&W->cast):batch_commit(&W->cast))&2)turn_order();
         }else
-        if (st.abil<512&&(magic_status_formula(abilities[st.abil].formula)||abilities[st.abil].kind==AB_CLEANSE)?status_scalar_commit():action_commit()) turn_order();
+        if (st.abil<512&&(magic_status_formula(abilities[st.abil].formula)||abilities[st.abil].kind==AB_CLEANSE||reaction_self(st.abil))?status_scalar_commit():action_commit()) turn_order();
 #else
         if(action_commit())turn_order();
 #endif
@@ -2609,19 +2852,18 @@ static void attack_step(void)
         if((st.action.phase==CTX_IMPACT||st.action.phase==CTX_APPLIED)&&st.action.left){
             u8 target;
 #ifdef FFT_MODULES
-            target=(u8)mod_call(MOD_FORMULA,7,0);
+            target=(u8)mod_call(MOD_PLANNER,5,0);
 #else
             target=strike_target();
 #endif
             // Trajectory may load AI, only after ACTION has returned.
-            if(target&&(WEAPON_REACH(&st.unit[st.action.actor])==1||
-               battle_line_clear(st.action.actor,target-1))){
+            if(target){
 #ifdef FFT_MODULES
-                mod_call(MOD_FORMULA,8,target-1);
+                mod_call(MOD_RESPONSE,7,target-1);
 #else
                 strike_launch(target-1);
 #endif
-                return;
+                if((st.action.phase&254)!=CTX_IMPACT)return;
             }
         }
         if(st.action.phase>=CTX_SECONDARY||st.action.pending)if(reaction_step())return;
@@ -2634,7 +2876,26 @@ static void attack_step(void)
             if(st.gain)return;
         }
         if(!core_action_close(&st.action)){st.act_t--;return;}
+action_finished:
         W->cast.phase=CAST_BATCH_EMPTY;
+        if(W->mime.active||W->mime.pending){
+            u8 result;
+#ifdef FFT_MODULES
+            result=(u8)mod_call(MOD_NATURE,9,0);
+#else
+            result=mime_next();
+#endif
+            if(result){
+                if(result==7){
+                    u8 a=st.formula.actor,t=st.formula.target;
+                    attack(a,t);
+                }else{
+                    u8 resolving=st.open_resolving;
+                    cast_dispatch(result);st.open_resolving=resolving;
+                }
+                return;
+            }
+        }
 #endif
         if (outcome()) { end_battle(outcome()); return; }
 #ifdef FFT_CHAPTER
@@ -2675,10 +2936,17 @@ static u8 tile_h(const Tile *t)         // FFT's tile height: its lowest corner
 }
 #if defined(FFT_CHAPTER) && MOD_PART(MOD_PARTY)
 // A chapter's cold grid tables after its topology reservation (PARTY10 on the TI).
+#if MOD_CORE
+static void setup_glyphs(void);
+#endif
 static void chapter_grid(void)
 {
     u16 i;
-    W->surface_flags=surface_profile(W->surface,MAP_N);
+#if !MOD_CORE
+    *M.chapter_story_after=flow_bank&&CD(LOCATION)==7;
+    if(CD(MAP_SCRIPT))for(i=0;i<cdesc[CD(MAP_SCRIPT)+1];i++)*M.chapter_story_after|=cdesc[CD(MAP_SCRIPT)+4+8*i]&1;
+#endif
+    W->surface_flags=(W->surface_flags&SURFACE_TERRAIN)|surface_profile(W->surface,MAP_N);
     W->node_x=W->tx;W->node_z=W->tz;
     grid_tables();
     for (i = 0; i < MAP_N; i++) {
@@ -2687,18 +2955,23 @@ static void chapter_grid(void)
         W->hw[i] = (u8)((t->walk != 0) | t->water << 1);
         W->top[i] = (u16)(tile_h(t) * 12);
     }
+    for(i=0;i<NUNIT;i++)W->cover[i].rot=0xFF;
+    W->wrot=0xFF;setup_glyphs();
 }
 #endif
 
 #define AI_SPREAD 90
-#define AI_WORK 50
+#define AI_WORK 12
 #if MOD_PART(MOD_AI) || MOD_PART(MOD_AI_SETUP)
 // a unit's worth with hp HP and those statuses (Poison -26, Darkness -64: FFT's weights)
 
 // clock ticks before a unit acts (a KO one, a crystal or a chest: never)
+#ifdef FFT_CHAPTER
+#include "ai_clock.h"
+#else
 static u16 ai_ticks(const Unit *u)
 {
-    if (!u->hp
+    if (!u->hp || !u->sp
 #ifdef FFT_CHAPTER
         ||unit_petrified(u)
 #endif
@@ -2706,18 +2979,36 @@ static u16 ai_ticks(const Unit *u)
     return u->ct >= 100 ? 0 : (u16)((u16)(100 - u->ct + u->sp - 1) / u->sp);
 }
 
+#endif
+
 // an ability the unit can use now: the enemies' items of their level, the party's in the bag
 static u8 ai_usable(u8 a, AbId ab)
 {
     const Unit *u = &st.unit[a];
 #ifdef FFT_CHAPTER
-    if (ab>=512 || abilities[ab].kind==255 || !unit_can_act(u) || skill_blocked(a,ab)) return 0;
+    if (ab>=NABIL || abilities[ab].kind==255 || !unit_can_act(u) || skill_blocked(a,ab)) return 0;
 #endif
 #ifdef FFT_CHAPTER
     if(hand_count(a)==2&&(abilities[ab].flags&AF_WEAPON)&&!(abilities[ab].flags&AF_CHARGE))return 0;
 #endif
+#ifdef FFT_CHAPTER
+    if(ab>=512){
+        AbId other;if(!throw_available(a,ab))return 0;
+        // Strict damage dominance within one element; cheaper/lower id wins ties.
+        for(other=512;other<NABIL;other++)if(other!=ab&&abilities[other].element==abilities[ab].element&&
+            (abilities[other].y>abilities[ab].y||(abilities[other].y==abilities[ab].y&&other<ab))&&throw_available(a,other))return 0;
+        return 1;
+    }
+    if(abilities[ab].kind==AB_THROW_SELECTOR)return 0;
+#endif
     if (!(abilities[ab].flags & AF_ITEM)) return 1;
-    return u->team == TEAM_ENEMY ? abilities[ab].lv <= u->level : st.bag[abilities[ab].bag] != 0;
+    return
+#ifdef FFT_CHAPTER
+        unit_home_team(u)==TEAM_ENEMY
+#else
+        u->team==TEAM_ENEMY
+#endif
+        ? abilities[ab].lv<=u->level : st.bag[abilities[ab].bag]!=0;
 }
 
 // its range for the AI (an item: at most the unit's Move, as FFT's AI takes it)
@@ -2729,7 +3020,7 @@ static u8 ai_usable(u8 a, AbId ab)
 static u8 ai_useful(u8 a, AbId ab, u8 t)
 {
     const Unit *ua = &st.unit[a], *ut = &st.unit[t];
-    u8 kind = ab == NO_ABIL ? AB_DAMAGE : abilities[ab].kind;
+    u8 kind = weapon_order(ab)?weapon_kind(a,t,ab):abilities[ab].kind;
     if (DC_OBJ(ut->dc)) return 0;
 #ifdef FFT_CHAPTER
     if(restore_ability(ab)){
@@ -2743,7 +3034,7 @@ static u8 ai_useful(u8 a, AbId ab, u8 t)
     if(ab!=NO_ABIL&&abilities[ab].kind==AB_CLEANSE)return magic_applicable(t,ab)&&
         cleanse_ai_gain(t,ab,magic_heal(a,t,ab,0),blue(ut)==blue(ua))>0;
     if(unit_petrified(ut))return 0;
-    if(ab!=NO_ABIL&&magic_formula(abilities[ab].formula))return magic_applicable(t,ab)&&skill_kind(a,t,ab)!=AB_NULL;
+    if(ab!=NO_ABIL&&(magic_formula(abilities[ab].formula)||abilities[ab].formula==99))return magic_applicable(t,ab)&&skill_kind(a,t,ab)!=AB_NULL;
 #endif
     if (kind == AB_DAMAGE) return ut->hp && blue(ut) != blue(ua) && t != a;
     if (blue(ut) != blue(ua)) return 0;
@@ -2773,6 +3064,9 @@ static u8 ai_nearest(u8 a, u8 mode, u16 skip)
         s16 dx = (s16)u->x - ua->x, dz = (s16)u->z - ua->z;
         u8 d;
         if (u->dc == DC_GONE || skip & (1 << i)) continue;
+#ifdef FFT_CHAPTER
+        if(unit_hidden_enemy(ua,u))continue;
+#endif
         if (mode == NT_HEALER && u->dc == DC_CRYSTAL) ;     // a crystal heals too
         else if (!u->hp) continue;
         else if (mode == NT_HEALER) { if (blue(u) != blue(ua) || !ai_heals(i)) continue; }
@@ -2846,102 +3140,48 @@ static u8 ai_select_or_nearest(u8 bit, s16 maxd)
 // thirds of a unit's 36-unit height above its feet; a KO target: 12), a point every 2 units,
 // blocked inside a tile's column (to its height) or another standing unit's 16 x 16 x 36 box
 // (world units: a tile 28, a height level 12)
-static u16 isqrt(u32 v)
-{
-    u16 r = 0, b = 0x100;
-    while (b) { if ((u32)muls16((s16)(r | b), (s16)(r | b)) <= v) r |= b; b >>= 1; }
-    return r;
-}
-
-static u8 ai_clear(u8 a, u8 t)
-{
-    const Unit *ua = &st.unit[a], *ut = &st.unit[t];
-    s16 x0 = (s16)(ua->x * 28 + 14), z0 = (s16)(ua->z * 28 + 14), x1 = (s16)(ut->x * 28 + 14), z1 = (s16)(ut->z * 28 + 14);
-    s16 lx = (x0 < x1 ? x0 : x1) - 8, hx = (x0 < x1 ? x1 : x0) + 8, lz = (z0 < z1 ? z0 : z1) - 8, hz = (z0 < z1 ? z1 : z0) + 8;
-    s32 x = (s32)x0 << 16, z = (s32)z0 << 16, y, dx, dy, dz;
-    s16 ox[UNIT_CAPACITY], oz[UNIT_CAPACITY], oy[UNIT_CAPACITY]; // other standing units
-    u16 l, n, i;                                            // near the line
-    u8 k, m = 0;
-    for (k = 0; k < NUNIT; k++) {
-        const Unit *u = &st.unit[k];
-        s16 ux = (s16)(u->x * 28 + 14), uz = (s16)(u->z * 28 + 14);
-        if (k == a || k == t || !u->hp || ux <= lx || ux >= hx || uz <= lz || uz >= hz) continue;
-        ox[m] = ux; oz[m] = uz; oy[m++] = (s16)(W->hs[UNIT_CELL(u)] * 6);
-    }
-    y = ((s32)W->hs[UNIT_CELL(ua)] * 6 + 24) << 16;
-    dx = ((s32)x1 << 16) - x;
-    dz = ((s32)z1 << 16) - z;
-    dy = (((s32)W->hs[UNIT_CELL(ut)] * 6 + (ut->hp ? 24 : 12)) << 16) - y;
-    {   // the whole-unit offsets fit 16 bits: one MULS each, not __mulsi3
-        s16 ex = (s16)(dx >> 16), ey = (s16)(dy >> 16), ez = (s16)(dz >> 16);
-        l = isqrt((u32)(muls16(ex, ex) + muls16(ey, ey) + muls16(ez, ez)));
-    }
-    if (!l) return 1;
-    n = l >> 1;
-    dx = dx / l * 2; dy = dy / l * 2; dz = dz / l * 2;     // a step: 2 units along the line
-    for (i = 0; i < n; i++) {
-        s16 px, pz, py;
-        u8 c;
-        x += dx; y += dy; z += dz;
-        px = (s16)(x >> 16); pz = (s16)(z >> 16); py = (s16)(y >> 16);
-        if (py <= 0 || (u16)px >= MAP_W * 28 || (u16)pz >= MAP_H * 28) continue;
-        c = (u8)(TILE_COL[px] + TILE_ROW[pz]);
+#include "direct_trajectory.inc"
 #ifdef FFT_CHAPTER
-        if(W->surface) {
-            if(surface_hit_layers(W->surface+((u16)c<<3),py,(W->surface_flags&SURFACE_HIT_UPPER)?2:1))return 0;
-        } else {
-            // Synthetic tactical fixtures without source columns retain their
-            // explicit simplified column geometry. Retail chapters require FGS1.
-            if(W->grid) {
-                if(!(W->grid->present[c>>3]&(1U<<(c&7))))continue;
-                c=W->grid->lookup[c];
-            }
-            if((u16)py<=W->top[c])return 0;
-        }
-#else
-        if((u16)py<=W->top[c])return 0;
+#include "weapon_reflect_score.inc"
 #endif
-        for (k = 0; k < m; k++)
-            if (py > oy[k] && py < oy[k] + 36 && px > ox[k] - 8 && px < ox[k] + 8 && pz > oz[k] - 8 && pz < oz[k] + 8)
-                return 0;
-    }
-    return 1;
-}
 
 // FFT's score of actor a standing on o (already there) using ab on t: the worth changed, the
 // pickup at o; its hit chance (AI_BAD: no use)
-static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
+static s16 __attribute__((noinline)) ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
 {
     Unit *ua = &st.unit[a], *ut = &st.unit[t];
-    u8 kind = ab == NO_ABIL ? AB_DAMAGE : abilities[ab].kind, status = ut->status;
+    u8 isweapon=weapon_order(ab);
+    u8 kind = isweapon?weapon_kind(a,t,ab):abilities[ab].kind, status = ut->status;
     u16 hp = ut->hp, m;
     s16 d;
 #ifdef FFT_CHAPTER
-    if(ab!=NO_ABIL&&((abilities[ab].flags&AF_CAST)||restore_ability(ab)))kind=skill_kind(a,t,ab);
+    if(ab!=NO_ABIL&&((abilities[ab].flags&AF_CAST)||abilities[ab].formula==99||restore_ability(ab)))kind=skill_kind(a,t,ab);
 #endif
 #ifdef FFT_CHAPTER
     // Conservative guest/enemy action policy, before any evaluation (no copy in the AI image).
-    if (kind == AB_BREAK||kind==AB_STEAL_EXP||kind==AB_EQUIP_BREAK||kind==AB_STEAL_EQUIP) return AI_BAD;
+    if (st.pending[a].state==DEFER_PERFORMING||unit_airborne(ut)||unit_hidden_enemy(ua,ut))return AI_BAD;
+    if (kind == AB_BREAK||kind==AB_STEAL_EXP||kind==AB_EQUIP_BREAK||kind==AB_STEAL_EQUIP||kind==AB_STEAL_GIL) return AI_BAD;
 #endif
     *hit = ab == NO_ABIL ? hit_chance(a, t) : skill_hit(a, t, ab);
     if (!*hit) return AI_BAD;
     if (ab != NO_ABIL && abilities[ab].range > 1 && (!(abilities[ab].flags & AF_ITEM)
         || (u8)((ua->x > ut->x ? ua->x - ut->x : ut->x - ua->x) + (ua->z > ut->z ? ua->z - ut->z : ut->z - ua->z)) >= 2)
+        && !jump_ability(ab) && !isweapon
         && (W->ai_traj = 1, !ai_clear(a, t))) return AI_BAD;
     if (effect_damage(kind)) {
         m = ab == NO_ABIL ? attack_prediction(a,t) : skill_amount(a,t,ab,
             (u16)(0x4000|((abilities[ab].flags&AF_CHARGE)?FORMULA_FORECAST:0)));
         hp =
 #ifdef FFT_CHAPTER
-            ab!=NO_ABIL&&magic_formula(abilities[ab].formula)?magic_hp(kind,hp,ut->max_hp,m):
+            (isweapon||(ab!=NO_ABIL&&magic_formula(abilities[ab].formula)))?magic_hp(kind,hp,ut->max_hp,m):
 #endif
             action_hp(kind,hp,ut->max_hp,m);
     } else if (kind == AB_CURE) status = action_status(kind,status,status_curable(ut,abilities[ab].y));
     else {
-        m = skill_amount(a, t, ab, 0x4000);
+        m = ab==NO_ABIL?attack_prediction(a,t):skill_amount(a, t, ab, (u16)(0x4000|((abilities[ab].flags&AF_CHARGE)?FORMULA_FORECAST:0)));
         hp =
 #ifdef FFT_CHAPTER
-            magic_formula(abilities[ab].formula)?magic_hp(kind,hp,ut->max_hp,m):
+            (isweapon||magic_formula(abilities[ab].formula))?magic_hp(kind,hp,ut->max_hp,m):
 #endif
             action_hp(kind,hp,ut->max_hp,m);
     }
@@ -2959,7 +3199,10 @@ static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
 #ifdef FFT_CHAPTER
     if (kind == AB_RAISE) return 0; // no unlimited self-buffing in guest AI
     if(ab!=NO_ABIL&&(abilities[ab].flags&AF_CHARGE)
-        && ut->ct+(u16)ut->sp*charge_ticks[ab-0x196]>=100) d >>= 1;
+        && W->ai_turn_ticks[t]<=charge_ticks[ab-0x196]) d >>= 1;
+#endif
+#ifdef FFT_CHAPTER
+    if(isweapon){u8 row=ab==NO_ABIL?0:ab-0x195;d+=W->ai_panel_bonus[row][t]+weapon_reflect_score(t,row,o);}
 #endif
     if (kind == AB_WISH) {
         m = ua->max_hp / 5;
@@ -2976,6 +3219,9 @@ static s16 ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit)
 // whether it could be tried (a hit chance, a clear trajectory)
 static u8 ai_try(u8 a, AbId ab, u8 o, u8 t, u8 i, AiAct *best)
 {
+#ifdef FFT_CHAPTER
+    if(weapon_order(ab)&&!(W->ai_melee_mask[o]&((u16)1<<i)))return 0;
+#endif
     u8 hit, take;
     s16 p = ai_score(a, ab, i, o, &hit);
     if (p == AI_BAD) return 0;
@@ -3000,10 +3246,11 @@ static void ai_ability(u8 a, AbId ab, u8 self)
     Unit *ua = &st.unit[a];
     u8 home=UNIT_CELL(ua),me=home,i,n;
     AiAct *best = &W->ab_best;
-    W->ab = ab; W->ab_k = 0; W->ab_done = 0; W->ab_n = 0;
+    W->ab = ab; W->ab_k = 0; W->ab_done = 0; W->ab_n = 0;W->ab_walk=0;
     W->ab_all = ab == NO_ABIL || (abilities[ab].flags & AF_ITEM && ai_useful(a, ab, a));
+    best->pri = AI_BAD; best->hit = 0; best->f = 0;
 #ifdef FFT_CHAPTER
-    if(ab<512&&(abilities[ab].flags&(AF_CAST|AF_AREA))==(AF_CAST|AF_AREA)){W->ai_k=4;return;}
+    if((ua->set==21&&ab==414)||(ab<512&&(abilities[ab].flags&(AF_CAST|AF_AREA))==(AF_CAST|AF_AREA))){W->ai_k=4;return;}
 #endif
     W->ai_use = 0;
 #ifdef FFT_CHAPTER
@@ -3018,7 +3265,6 @@ static void ai_ability(u8 a, AbId ab, u8 self)
 #ifdef FFT_CHAPTER
     if (core_status_current(&ua->statuses, 2) & 8) W->ai_use &= (u16)(1 << W->ai_focus);   // Berserk
 #endif
-    best->pri = AI_BAD; best->hit = 0; best->f = 0;
     if (!W->ai_use) { W->ab_k = W->ai_no; return; }
     if (ab != NO_ABIL && abilities[ab].flags & AF_SELF && W->ai_use & (1 << a)) {
         if (ai_try(a, ab, W->ai_c1, me, a, best)) best->t = me;  // from its tile, then to the tile
@@ -3043,22 +3289,31 @@ static u8 ai_ability_go(u8 a, s16 *work)
     Unit *ua = &st.unit[a];
     AbId ab = W->ab; u8 home=UNIT_CELL(ua),n=W->ab_n,i,c,o;
     AiAct *best = &W->ab_best;
-    for (; W->ab_k < W->ai_no && *work > 0; W->ab_k++) {
-        u8 j, self = (u8)(W->ai_use >> a & 1);      // on itself: its tile is the origin
+    while(W->ab_k<W->ai_no&&*work>0){
         o = ab == NO_ABIL ? W->ai_grid[W->ab_k] : W->ai_ord[W->ab_k];
         unit_place(ua,o);
-        *work -= 1;
-        for (j = 0; j <= n; j++) {
-            if (self && (j == n || o < W->ai_tt[j])) {
-                self = 0;
+        if(!W->ab_walk){W->ab_walk=1;W->ab_j=0;W->ab_self=(u8)(W->ai_use>>a&1);*work-=1;}
+        while(*work>0){
+            u8 j=W->ab_j;
+            if(W->ab_self&&(j==n||o<W->ai_tt[j])){
+                W->ab_self=0;*work-=1;
                 if (ai_reaches(a, ab, o, o)) { *work -= 1; ai_try(a, ab, o, o, a, best); }
+                continue;
             }
-            if (j == n) break;
+            if(j==n){W->ab_k++;W->ab_walk=0;break;}
+            W->ab_j++;*work-=1; // rejected pairs also consume their range-query work
             c = W->ai_tt[j]; i = W->ai_tu[j];
-            if (W->ab_done & (1 << i) || !ai_reaches(a, ab, o, c)) continue;
+            if(W->ab_done&(1<<i))continue;
+#ifdef FFT_CHAPTER
+            // The frozen geometry pass already checked range and the actual
+            // recipient for every weapon origin/slot. Do not repeat that query.
+            if(weapon_order(ab)?!(W->ai_melee_mask[o]&((u16)1<<i)):!ai_reaches(a,ab,o,c))continue;
+#else
+            if(!ai_reaches(a,ab,o,c))continue;
+#endif
             W->ai_traj = 0;
             if (ai_try(a, ab, o, c, i, best) && !W->ab_all) W->ab_done |= (u16)(1 << i);
-            *work -= W->ai_traj ? 8 : 1;
+            *work -= weapon_order(ab)?4:W->ai_traj?8:1;
         }
     }
     unit_place(ua,home);
@@ -3072,6 +3327,9 @@ static u8 ai_ability_go(u8 a, s16 *work)
 // and the tiles to act from and to fall back to
 static void ai_setup(u8 a, u8 acted)
 {
+#ifdef FFT_CHAPTER
+    u8 clock_i;for(clock_i=0;clock_i<NUNIT;clock_i++)W->ai_turn_ticks[clock_i]=ai_ticks(&st.unit[clock_i]);
+#endif
     Unit *u = &st.unit[a];
     AbId ab;
     u16 c;
@@ -3090,9 +3348,15 @@ static void ai_setup(u8 a, u8 acted)
     if(ctl&4)acted=1;
 #endif
     if (!acted) W->ai_list[n++] = NO_ABIL;
-    for (k = 0; !acted && !(ctl & 8) && (ab = known(a, k)) != NO_ABIL; k++)
-        if (ai_usable(a, ab)) W->ai_list[n++] = ab;
+    if(!acted&&!(ctl&8)&&u->set==21&&known(a,0)!=NO_ABIL)W->ai_list[n++]=414;
+    for (k = 0; !acted && !(ctl & 8) && u->set!=21 && (ab = known(a, k)) != NO_ABIL; k++)
+        if (n<1+SET_N&&ai_usable(a, ab)) W->ai_list[n++] = ab;
     W->ai_nab = n;
+#ifdef FFT_CHAPTER
+    W->ai_weapon_left=n?513:0;W->ai_weapon_at=0;W->ai_melee_at=0;
+    for(k=0;k<n;k++)if((u16)(W->ai_list[k]-0x196)<8)W->ai_weapon_left|=(u16)2<<(W->ai_list[k]-0x196);
+    W->ai_panel_left=W->ai_weapon_left&511;W->ai_panel_at=0;
+#endif
     for (k = 0; k < n; k++) {                   // the reach: the shortest range against an enemy,
         u8 rg;                                  // for an ally (an item counts half)
         ab = W->ai_list[k];
@@ -3239,11 +3503,12 @@ static void ai_choose(u8 a)
     if (W->ai_n && (core_status_current(&u->statuses, 1) & 16)) i = (u8)(rand15() % W->ai_n);   // Confusion
 #endif
     if (W->ai_n) {
+        if(r[i].f&128)st.sub=192|((r[i].f>>1)&15);
         st.ai_ab = r[i].ab; st.ai_o = r[i].f ? me : r[i].o; st.ai_tgt = r[i].t;
     } else {
         st.ai_ab = u->defend && !st.acted
 #ifdef FFT_CHAPTER
-            && unit_can_act(u) && !(u->status_flags & STATUS_NO_CONTROL)
+            && unit_can_act(u) && !(u->status_flags & STATUS_NO_CONTROL) && st.pending[a].state!=DEFER_PERFORMING
 #endif
             ? ABIL_DEFEND : AI_NONE;
         st.ai_o = W->ai_c0; st.ai_tgt = W->ai_c0;
@@ -3257,7 +3522,7 @@ static void ai_choose(u8 a)
 // choice. 1 once the plan is made
 static u8 ai_candidates(void)
 {
-    u8 a=st.act,done;s16 w=AI_WORK;
+    u8 a=st.act,done;s16 w=weapon_order(W->ab)?48:AI_WORK;
     while (W->ai_a < W->ai_nab) {
 #ifdef FFT_CHAPTER
         if(W->ai_k>=4)return 0;
@@ -3281,12 +3546,21 @@ static u8 ai_think(void)
 {
     u8 a = st.act, done;
     if (W->ai_k == 0) {                             // its abilities, tiles, danger, focus
+#ifdef FFT_CHAPTER
+        if(!movement_poll(a))return 0;
+#endif
         ai_setup(a, st.acted);
         W->ai_k = 1;
     } else if (W->ai_k == 1) {                      // the steps from the focus
         done = spread_go(AI_SPREAD);
         if (done) W->ai_k = 2;
     } else if (W->ai_k == 2) {                      // the tiles to act from and to fall back to
+#ifdef FFT_CHAPTER
+        if(W->ai_weapon_left){
+            if(W->ai_weapon_left==512){if(W->ai_panel_left)weapon_panel_ai();else melee_cache();}
+            else weapon_ai_prepare();return 0;
+        }
+#endif
         ai_setup2(a, st.acted);
         W->ai_k = 3; W->ai_a = 0; W->ai_self = W->ai_retreat;
         if (W->ai_nab) ai_ability(a, W->ai_list[0], W->ai_self);
@@ -3430,8 +3704,10 @@ static u16 mod_call(u8 id, u8 op, u8 a)
 {
     const u8 *m = mod_images[id];
     if (mod_id != id + 1) {
-        ModCtx *c = (ModCtx *)((u8 *)mod_zone + RD16(m, 4));
-        memcpy(mod_zone, m + 10, RD16(m, 3));
+        u16 offset=RD16(m,4);
+        ModCtx *c=(ModCtx *)((u8 *)mod_zone+offset);
+        memcpy(mod_zone,m+10,offset);
+        memcpy((u8 *)c+sizeof *c,m+12+offset,RD16(m,3)-offset-sizeof *c);
         memcpy(c,&mod_defaults,sizeof *c);
         c->map_w=map_w;
         c->map_h=map_h;
@@ -3447,8 +3723,6 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->cdesc=cdesc;
         c->items=items;
         c->cgfx=cgfx;
-        c->job_names=job_names;
-        c->job_sets=job_sets;
         c->jobs=jobs;
         c->unit_defs=unit_defs;
         c->common=common;
@@ -3459,18 +3733,33 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         mod_id = id + 1;
     }
     if(op==255)return 0;                // reserve255 for preload without execution
-    return ((u16 (*)(u8, u8))((u8 *)mod_zone + RD16(m, 2)))(op, a);
+    {u16 result=((u16 (*)(u8,u8))((u8 *)mod_zone+RD16(m,2)))(op,a);
+     if(W){
+         static const struct {u8 mask,id,op;} requests[5]={{4,MOD_PLANNER,1},{3,MOD_NATURE,1},{8,MOD_STATUS,2},{16,MOD_NUMBERS,6},{32,MOD_FORMULA,14}};
+         const typeof(requests[0]) *p=requests;u8 n=5;
+         do{u8 request=W->nature_pending&p->mask;
+             if(request&&(p->mask!=3||id!=MOD_NATURE)){
+                 u16 value;W->nature_pending&=(u16)~p->mask;
+                 value=mod_call(p->id,request==2||request==3?0:p->op,0);
+                 if(p->mask==8)result|=value;
+             }
+             p++;
+         }while(--n);
+     }
+     if(W&&W->rebuild&&id!=MOD_EQUIPMENT)mod_call(MOD_EQUIPMENT,0,0);
+     return result;}
 }
 
 // the bank found, each module of this build and within the zone
 static u8 mod_ready(void)
 {
-    u16 asize=0,bsize=0,id;const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize);
+    u16 asize=0,bsize=0,csize=0,id;
+    const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize),*c=rt_file("ffbo",&csize);
     mod_id=0;
-    if(!module_banks_valid(a,asize,b,bsize,MOD_BANK0_COUNT,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE))return 0;
+    if(!module_three_valid(a,asize,b,bsize,c,csize,MOD_BANK0_COUNT,MOD_BANK1_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE))return 0;
     for(id=0;id<MOD_COUNT;id++){
-        const u8 *bank=id<MOD_BANK0_COUNT?a:b;
-        u16 local=id<MOD_BANK0_COUNT?id:id-MOD_BANK0_COUNT;
+        const u8 *bank=id<MOD_BANK0_COUNT?a:id<MOD_BANK1_END?b:c;
+        u16 local=id<MOD_BANK0_COUNT?id:id<MOD_BANK1_END?id-MOD_BANK0_COUNT:id-MOD_BANK1_END;
         mod_images[id]=bank+RD16(bank,7+local);
     }
     return 1;
@@ -3478,11 +3767,15 @@ static u8 mod_ready(void)
 
 static u8 ai_think(void)
 {
-    if(W->ai_k==0)mod_call(MOD_AI_SETUP,0,0);
+    if(W->ai_k==0){if(!movement_poll(st.act))return 0;mod_call(MOD_AI_SETUP,0,0);}
     else if(W->ai_k==1){if(spread_go(AI_SPREAD))W->ai_k=2;}
-    else if(W->ai_k==2){mod_call(MOD_AI_SETUP,1,0);if(W->ai_nab)mod_call(MOD_AI,1,0);}
+    else if(W->ai_k==2){if(W->ai_weapon_left){
+        u8 geometry=W->ai_weapon_left==512,panels=geometry&&W->ai_panel_left;
+        mod_call(geometry?(panels?MOD_AI_PREP:MOD_PLANNER):MOD_WEAPON,geometry?(panels?2:0):6,0);return 0;
+    }mod_call(MOD_AI_SETUP,1,0);if(W->ai_nab)mod_call(MOD_AI,1,0);}
     else if(W->ai_k>=4){
-        if(mod_call(MOD_AREA_AI,0,0)){
+        if(W->ai_k==4&&st.unit[st.act].set==21)mod_call(MOD_NATURE,5,0);
+        if(mod_call(st.unit[st.act].set==21||W->ai_k==4||W->ai_k==8?MOD_AI_PREP:MOD_AREA_AI,0,0)){
             W->ai_k=3;
             if(++W->ai_a<W->ai_nab)mod_call(MOD_AI,1,0);
         }
@@ -3508,9 +3801,16 @@ static void map_start(u8 after)
 }
 static void save_campaign(void) { mod_call(MOD_SAVE, 0, 0); }
 static void prepare_rewards(void) { mod_call(MOD_SAVE, 3, 0); }
-static void party_load(void) { mod_call(MOD_PARTY, 1, 0); }
+static void party_load(void) { mod_call(MOD_PARTY, 1, 0);if(W->nature_units)mod_call(MOD_NATURE,1,0); }
+static void funds_load(void) { mod_call(MOD_PARTY, 11, 0); }
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 void battle_units(void) { mod_call(MOD_PARTY, 2, 0); }
+#endif
 static void fixed_units(void) { mod_call(MOD_PARTY, 4, 0); }
+static s16 math_targets(u8 a,u8 code)
+{
+ st.formula.actor=a;st.formula.roll=code;return (s16)mod_call(MOD_NATURE,6,0);
+}
 // Keep a resident AI overlay resident: it already contains the identical evaluator.
 // Otherwise load the much smaller formula image. No hot AI/formula copy ping-pong.
 // Formulas 0x25..0x2c (breaks, steals, Talk) always use FORMULA: the AI/ACTION copies leave the
@@ -3519,11 +3819,12 @@ static u16 __attribute__((noinline)) formula_call(u8 op)
 {
     u16 ab=st.formula.ability;u8 id=mod_id;
     if(ab<512&&(u8)(abilities[ab].formula-0x25)<=7)id=0;
-    if(id==MOD_ACTION+1&&op)op+=8;          // ACTION's copy: the amount only
-    else if(id==MOD_AI+1)op+=2;
+    if(ab==265||ab==NO_ABIL||(ab<512&&(abilities[ab].flags&AF_CHARGE)))id=0;
+    if(id==MOD_AI+1)op+=2;
     else id=MOD_FORMULA+1;
     return mod_call((u8)(id-1),op,0);
 }
+#ifndef FFT_PRODUCTION_CORE
 u8 skill_hit(u8 a, u8 t, AbId ab)
 {
     st.formula.actor = a; st.formula.target = t; st.formula.ability = ab;
@@ -3536,19 +3837,23 @@ u16 skill_amount(u8 a, u8 t, AbId ab, u16 r)
 }
 
 #endif
+#endif
 u8 ai_facing(u8 a) { return (u8)mod_call(MOD_AI_SETUP, 2, a); }
 #endif
 
 #ifdef FFT_CHAPTER
-// Resident entry: the shared straight-ray query, never an overlay-to-overlay call.
+// Resident preflight for the equipped weapon's trajectory family; no nested image load.
 u8 battle_line_clear(u8 a,u8 t)
 {
+#ifndef FFT_PRODUCTION_CORE
     if(!W||a>=NUNIT||t>=NUNIT)return 0;
+#endif
 #ifdef FFT_MODULES
     st.formula.actor=a;st.formula.target=t;
-    return (u8)mod_call(MOD_AI,4,0);
+    return (u8)mod_call(MOD_PLANNER,2,0);
 #else
-    return ai_clear(a,t);
+    return cj_weapon(common,hand_weapon(&st.unit[a],0))[1]&192?melee_target(a,t)!=255:
+        (cj_weapon(common,hand_weapon(&st.unit[a],0))[1]&16?arc_target(a,t)!=255:direct_target(a,t)!=255);
 #endif
 }
 #endif
@@ -3910,6 +4215,9 @@ static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
+#ifdef FFT_CHAPTER
+    if(unit_airborne(&st.unit[i]))return;
+#endif
     if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
         draw_unit_water(sx, sy, rot, i, c); return;
     }
@@ -4296,86 +4604,26 @@ static void render_turn(void)
 #endif
 #endif
 #if !MOD_CORE
-u16 mod_entry(u8 op, u8 a) { (void)op; (void)a; draw_turn(); return 0; }
+#include "math_menu.inc"
+#include "math_aim.inc"
+#include "attack_range.inc"
+#include "target_pick.inc"
+u16 mod_entry(u8 op, u8 a) { if(op==4)return aim_ok(a);if(op==5)return pickable(a,M.cast_ref);if(op==6)return twin(a,M.cast_ref);if(op==1)return math_menu();if(op==2){attack_range(st.formula.actor);return 0;}if(op==3){math_aim();return 0;}draw_turn();return 0; }
 #endif
 #endif
 #if MOD_CORE
 
 // ---------------------------------------------------------------- camera
-#define CAM_MX 24                       // the margins (pixels) a unit's feet keep from the edges
-#define CAM_MT 39                       // body, smaller round pointer and six pixels of headroom
-#define CAM_MB 12                       // bottom margin while following the unit
-static void cam_clamp(s16 *x, s16 *y)
+#include "camera_clamp.h"
+#ifdef FFT_MODULES
+static void cam_target(s16 *tx,s16 *ty)
 {
-    if (*x < 0) *x = 0;
-    if (*x > SC_W - RT_W) *x = SC_W - RT_W;
-    if (*y < -CAM_MT) *y = -CAM_MT;       // virtual blank rows preserve actor/number headroom
-    if (*y > SC_H - RT_H) *y = SC_H - RT_H;
+    s16 target[2];mod_call(MOD_BEATS,255,0);mod_context(MOD_BEATS)->camera_out=target;
+    mod_call(MOD_BEATS,4,0);*tx=target[0];*ty=target[1];
 }
-
-// is scene point (x, y) (a unit's feet) on the screen with a margin (its sprite, the HUD)?
-static u8 cam_sees(s16 x, s16 y)
-{
-    x -= st.camx; y -= st.camy;
-    return x >= CAM_MX && x < RT_W - CAM_MX && y >= CAM_MT && y < RT_H - CAM_MB;
-}
-
-// Where the camera goes: the cursor centred; while walking or choosing a facing, it stays
-// until the unit nears the edge, then centres it; while a unit aims or acts, it stays when the unit and its
-// target are both on screen, else centres the point between them
-static void cam_target(s16 *tx, s16 *ty)
-{
-    s16 u, v, x, y;
-    if (st.morph_mask) {
-        Feet f = unit_feet(st.rot, morph_first());
-        *tx = f.x - RT_W / 2; *ty = f.y - RT_H / 2 - 6;
-        cam_clamp(tx, ty); return;
-    }
-    view_of(st.rot, st.cx, st.cz, &u, &v);
-    x = scene_x(st.rot, u, v);
-    y = scene_y(u, v) + HH - map_tiles[CURSOR_CELL].stand * (HU / 2);
-    if (st.mode == M_WALK || st.mode == M_FACE) {
-        Feet f = unit_feet(st.rot, st.mode == M_FACE ? st.act : st.sel);
-        if (cam_sees(f.x, f.y)) { *tx = st.camx; *ty = st.camy; return; }
-        x = f.x; y = f.y;
-    } else if (st.banner == BN_START) {           // the objective: the enemies it lights up
-        s16 sx = 0, sy = 0, n = 0, i;
-        for (i = 0; i < NUNIT; i++)
-            if (st.unit[i].team == TEAM_ENEMY && st.unit[i].hp) { Feet f = unit_feet(st.rot, (u8)i); sx += f.x; sy += f.y; n++; }
-        if (n) { *tx = sx / n - RT_W / 2; *ty = sy / n - 68; cam_clamp(tx, ty); return; }
-    } else if (st.mode == M_AIM || st.mode == M_ACT || st.mode==M_CAST_RANGE || st.mode==M_AREA) {
-        Feet a = unit_feet(st.rot, st.mode == M_ACT ? st.atk : st.act);
-        s16 target_y,target_x=x;
-        if (st.mode == M_ACT) {
-#ifdef FFT_CHAPTER
-            if(area_impact_root()&&W->area_impact.centre<MAP_N){
-                u16 cell=W->area_impact.centre;
-                view_of(st.rot,TILE_X[cell],TILE_Z[cell],&u,&v);
-                x=scene_x(st.rot,u,v);y=scene_y(u,v)+HH-map_tiles[cell].stand*(HU/2);
-            }else
+#else
+#include "camera_target.inc"
 #endif
-            {Feet t=unit_feet(st.rot,st.tgt);x=t.x;y=t.y;}
-        }
-        if (st.mode!=M_CAST_RANGE&&st.mode!=M_AREA&&cam_sees(a.x, a.y) && cam_sees(x, y)) { *tx = st.camx; *ty = st.camy; return; }
-        target_y=y;
-        x = (x + a.x) >> 1; y = (y + a.y) >> 1;
-        *tx=x-RT_W/2;*ty=y-RT_H/2-6;
-        {
-            s16 top=a.y<target_y?a.y:target_y,bottom=a.y>target_y?a.y:target_y;
-            // Preserve both actors' headroom when they fit. Otherwise the target
-            // and its damage number take priority over the distant attacker.
-            if(bottom-top<RT_H-CAM_MT-CAM_MB) {
-                if(*ty>top-CAM_MT)*ty=top-CAM_MT;
-                if(*ty<bottom-(RT_H-CAM_MB-1))*ty=bottom-(RT_H-CAM_MB-1);
-            } else *ty=target_y-RT_H/2-6;
-        }
-        if(st.mode==M_CAST_RANGE||st.mode==M_AREA)*tx=target_x-44;
-        cam_clamp(tx,ty);return;
-    }
-    *tx = x - RT_W / 2;
-    *ty = y - RT_H / 2 - 6;
-    cam_clamp(tx, ty);
-}
 
 static s16 ease(s16 c, s16 t)
 {
@@ -4457,12 +4705,32 @@ void game_init(void)
     navbuf=RT_NULL;nav_capacity=0;
     sbuf=vbuf=RT_NULL;acache=RT_NULL; // reset before any allocation can fail
 #endif
+#ifndef FFT_MODULES
     battle_state=malloc(BATTLE_STORAGE_BYTES);
     if(!battle_state)return;
     memset(battle_state,0,BATTLE_STORAGE_BYTES);rt_state=battle_state;rt_state_size=sizeof(State);
+#endif
 #ifdef __m68k__
     atexit(final_release);
 #endif
+#ifdef FFT_MODULES
+    {
+        static const CoreBoot boot={&flow_bank,&flow_ui,&wgfx,abank,&cgfx,&common,&charge_ticks,&job_sets,
+                                   &abilities,&jobs,&job_names,&items,
+                                   &battle_state,&rt_state,&rt_state_size,&vbuf,&sbuf,&acache,&ac_key,&ac_age,&abank_n0,
+                                   &sl_l,&sl_m,&sc_l,&sc_m,
+#ifdef FFT_CAMPAIGN_FLOW
+                                   1
+#else
+                                   0
+#endif
+        };
+        if(!mod_ready())return;
+        mod_call(MOD_SCREENS,255,0);mod_context(MOD_SCREENS)->boot=&boot;
+        if(!mod_call(MOD_SCREENS,11,0))return;
+        mod_id=0;
+    }
+#else
 #ifdef FFT_CAMPAIGN_FLOW
     flow_bank=rt_file("ffflow",RT_NULL);
     if(!qvalid(flow_bank))flow_bank=RT_NULL;
@@ -4480,17 +4748,19 @@ void game_init(void)
         mod_call(MOD_SAVE,255,0);
         mod_context(MOD_SAVE)->common=cj;
         mod_context(MOD_SAVE)->desc_size=cj_size;
-        if(!mod_call(MOD_SAVE,5,0))return;
+        if(!mod_call(MOD_SCREENS,12,0))return;
         mod_id=0; // next load must bind the newly allocated Work/map pointers
 #else
         if (!cj_valid(cj,cj_size)) return;
 #endif
         common = cj; abilities = (const Ability *)cj_section(cj, CJ_BATTLE);
-        charge_ticks = (const u8 *)abilities + 512U * 12;
+        charge_ticks = (const u8 *)abilities + CJ_EXECUTABLES * 12U;
         jobs = (const Job *)(cj + RD16(cj, 2)); job_names = (const char *)cj + RD16(cj, 3);
         job_sets = cj + RD16(cj, 4); items = (const Item *)(cj + RD16(cj, 5));
     }
     if (!wgfx || !abank[0] || !abank[1] || !cgfx) return;
+#endif
+#ifndef FFT_MODULES
     abank_n0 = RD16(abank[0], 0);
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB; the
         vbuf = malloc(4UL * SC_BYTES * SC_HMAX);   // largest chapter's (VIEW_BYTES)
@@ -4509,6 +4779,7 @@ void game_init(void)
         (void)release;
 #endif
     }
+#endif
 }
 
 // chapter c's banks, sizes and tables (1: ready); its work memory starts afresh
@@ -4525,9 +4796,9 @@ static u8 chapter_load(u8 c)
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
     mod_id=0; // cdesc/igfx change; never reuse the previous chapter's binding
-    i=mod_call(MOD_SAVE,6,(u8)chapter_letter[c]);
+    i=mod_call(MOD_NATURE,8,(u8)chapter_letter[c]);
     {
-        const ModCtx *m=mod_context(MOD_SAVE);
+        const ModCtx *m=mod_context(MOD_NATURE);
         contour_gfx=m->contour_gfx; ugfx=m->chapter_ugfx; cdesc=m->cdesc; igfx=m->igfx;
         encounter_units=m->unit_count; map_w=m->map_w; map_h=m->map_h; map_n=m->map_n;
         sc_h=m->sc_h; sc_top=m->sc_top; unit_defs=m->unit_defs; map_tiles=m->map_tiles;
@@ -4537,6 +4808,7 @@ static u8 chapter_load(u8 c)
 #endif
     if(!i){igfx=RT_NULL;return 0;}
     surface=cdesc+i;
+#ifndef FFT_MODULES
     story_after = 0;
     if(flow_bank&&CD(LOCATION)==7)story_after=1;
     if (CD(MAP_SCRIPT))
@@ -4548,22 +4820,20 @@ static u8 chapter_load(u8 c)
     sl_l = slope_pc;
 #endif
     sl_m = sl_l + SLOPE_ROWS; sc_l = sl_m + SLOPE_ROWS; sc_m = sc_l + SLOPE_ROWS;
+#endif
     W = (Work *)(sbuf + 2UL * SC_BYTES * SC_HMAX);
     memset(W, 0, sizeof(Work));
-    if(!nav_reserve(MAP_N,0)){W=RT_NULL;igfx=RT_NULL;encounter_units=0;return 0;}
+    if(!nav_reserve(MAP_N,2)){W=RT_NULL;igfx=RT_NULL;encounter_units=0;return 0;}
     W->surface=surface+SURFACE_HEADER;
+    W->surface_flags=surface[3]=='2'?SURFACE_TERRAIN:0;
 #ifdef FFT_MODULES
-    mod_id=0;mod_call(MOD_PARTY,10,0);         // rebinds to this chapter's Work/map first
+    mod_id=0;mod_call(MOD_PARTY,255,0);mod_context(MOD_PARTY)->chapter_story_after=&story_after;
+    mod_call(MOD_PARTY,10,0);         // rebinds to this chapter's Work/map first
 #else
     chapter_grid();
 #endif
+    movement_profile();
     edges(3);                                  // Gariland's units all have Jump 3
-    for (i = 0; i < NUNIT; i++) W->cover[i].rot = 0xFF;
-    W->wrot = 0xFF;
-#ifdef FFT_MODULES
-    mod_id=0; // rebind the setup image to this chapter's new Work/archive pointers
-#endif
-    setup_glyphs();
     scene_l = sbuf; scene_d = sbuf + SC_PLANE;
     scene_rot = vbuf_rot = 0xFF;
 #ifdef FFT_MODULES
@@ -4706,34 +4976,36 @@ void game_init(void)
 
 // a target for the weapon or the ability: a living unit (Phoenix Down: a KO one; unit_at never
 // gives a crystal or a chest)
-static u8 aim_ok(u8 t)
-{
-    const Unit *u = &st.unit[t];
-#ifdef FFT_CHAPTER
-    if(restore_ability(st.abil))return restore_applicable(t,st.abil);
-    if(st.abil<512&&(magic_formula(abilities[st.abil].formula)||abilities[st.abil].kind==AB_CLEANSE))return magic_applicable(t,st.abil);
+#ifdef FFT_MODULES
+static u16 pick_query(u8 op,u8 cell,u8 aiming);
+static u8 aim_ok(u8 t){return (u8)pick_query(4,t,0);}
+#else
+static u8 aim_ok(u8 t);
 #endif
-    if (st.abil != NO_ABIL && abilities[st.abil].kind == AB_REVIVE) return !u->hp;
-    return u->hp != 0;
-}
 
-static void aim(AbId ab)
+#ifdef FFT_MODULES
+static u8 aim(AbId ab)
 {
-    if (W) W->upd_k += AIM_K;
-    st.mode = M_AIM; st.abil = ab;
-#ifdef FFT_CHAPTER
-    if(ab<512&&cast_area_supported(&abilities[ab],cj_range(common,ab))&&!st.ai)st.mode=M_CAST_RANGE;
-#endif
-    if (ab == NO_ABIL || (u8)(abilities[ab].formula - 0x2b) <= 1 || abilities[ab].formula == 0x25)
-        attack_range(st.act);                                                     // breaks: weapon range
-    else skill_range(st.act, ab);
-    if (W) W->win_k[0] = 0;                        // the preview: for this ability
+    ModCtx *ctx;mod_call(MOD_MOVEMENT,255,0);ctx=mod_context(MOD_MOVEMENT);
+    ctx->cast_ability=ab;{u8 result=(u8)mod_call(MOD_MOVEMENT,10,0);if(result){st.formula.actor=st.act;mod_call(MOD_TURN,result,0);}}
+    return 0;
 }
+#else
+#ifdef FFT_CHAPTER
+#include "math_aim.inc"
+#endif
+#include "aim_menu.inc"
+#endif
 
+#ifdef FFT_CHAPTER
+static u8 scenario_prepare(u8 n);
+#endif
 void game_scenario(u16 n)
 {
     u8 bag_i;
 #ifdef FFT_CHAPTER
+    if(W)memset(&W->mime,0,sizeof W->mime);
+    u8 manual;
     u8 c = (u8)(n < 100 ? FFT_DEFAULT_CHAPTER : n / 100 - 1);   // the chapter, then its door
     n %= 100;
     if (chapter_now != c + 1 && !chapter_load(c)) return;
@@ -4751,6 +5023,7 @@ void game_scenario(u16 n)
 #ifdef FFT_EXPLORATION
     if (!n) n = 61;                            // exploration launcher: Ramza immediately
 #endif
+#ifndef FFT_MODULES
     memset(&st, 0, sizeof st);
 #ifdef FFT_CONFIG
     st.pzoom = 1; st.psolid = 1;      // unchecked options: low-poly, wide, filled
@@ -4759,6 +5032,7 @@ void game_scenario(u16 n)
     st.reach_contour=1;
 #endif
     st.want = st.prot = st.ai_view = 0xFF;
+#endif
     if (!W) return;
 #ifdef FFT_ACTOR_BANK
     actor_reset();                                // every actor decoded again, at once
@@ -4768,19 +5042,26 @@ void game_scenario(u16 n)
     if (n >= 61 && n <= 68) rt_seed = 61;         // identical actors/equipment for all cameras
 #endif
     rand_seed(rt_seed);
+#ifdef FFT_CHAPTER
+#ifdef FFT_MODULES
+    manual=(u8)mod_call(MOD_PARTY,13,(u8)n);
+    if(W->nature_units)mod_call(MOD_NATURE,1,0);
+#ifdef FFT_CONTOUR_DEFAULT
+    st.reach_contour=1;
+#endif
+#else
+    manual=scenario_prepare((u8)n);
+#endif
+#else
     battle_units();                               // Gariland's eleven units at their start tiles
     for (bag_i = 0; bag_i < NBAG; bag_i++) st.bag[BAG_SLOT(bag_i)] = bag_init[bag_i];
-#ifdef FFT_CHAPTER
-    if (CD(PARTY) & 2 || n == 70||(flow_bank&&CD(LOCATION)==7)) party_load();
-    if(flow_bank&&CD(LOCATION)==7) {
-        opening_story=qpart(flow_bank,Q_GARILAND);pgfx=rt_file("ffcp",RT_NULL);
-    }
-    if(flow_bank&&CD(LOCATION)==7&&!n) {
-        st.act=st.sel=U_RAMZA;cursor_place(UNIT_CELL(&st.unit[U_RAMZA]));st.mode=M_BROWSE;
-        cam_target(&st.camx,&st.camy);map_start(0);return;
-    }
 #endif
+#ifdef FFT_CHAPTER
+    if(manual){cam_target(&st.camx,&st.camy);map_start(0);return;}
+#endif
+#ifndef FFT_CHAPTER
     st.ai_all = n == 16;                          // the AI plays both sides to the end
+#endif
     turn_start();
     while (n && n != 16 && !st.end && st.act != U_RAMZA) turn_end(0, 0); // terminal doors cannot wait for Ramza
     if(st.end)return;                            // do not overwrite the terminal mode with a test door
@@ -4893,6 +5174,9 @@ void game_scenario(u16 n)
     }
     if (n == 59 || n == 60) end_battle(n == 59 ? END_VICTORY : END_DEFEAT);
 #endif
+#if defined(FFT_MODULES) && defined(FFT_CHAPTER)
+    mod_call(MOD_PARTY,14,(u8)n);
+#else
     if (n >= 61 && n <= 68) {                 // direct Ramza; the three shoulder views
         st.ai = AI_OFF; st.mode = M_MENU; st.act = st.sel = U_RAMZA;
         cursor_place(UNIT_CELL(&st.unit[U_RAMZA]));
@@ -4929,6 +5213,7 @@ void game_scenario(u16 n)
     }
 #endif
     W->status_i = 0; W->pan_k[0][0] = W->pan_k[1][0] = 0; W->pan_ok[0] = W->pan_ok[1] = 0; W->fc_key = 0; W->win_k[0] = 0;
+#endif
     if (!n) bn_start(BN_START);                  // a battle: its objective first
     cam_target(&st.camx, &st.camy);
     hl_seq++;
@@ -4991,6 +5276,9 @@ static void auto_control(u8 choice)
     if (!choice) {
         st.auto_units=0; st.ai_all=0;
         if (st.unit[st.act].team!=TEAM_PLAYER || !st.ai) return;
+#ifdef FFT_CHAPTER
+        if(st.unit[st.act].status_flags&STATUS_NO_CONTROL)return;
+#endif
     } else if (choice==2) {
         for (i=0;i<NUNIT;i++) if (st.unit[i].team==TEAM_PLAYER) st.auto_units|=(u16)(1U<<i);
     } else st.auto_units|=(u16)(1U<<st.act);
@@ -5006,11 +5294,20 @@ static void auto_control(u8 choice)
 // the turn menu: Move and Act once each (a move undone with [shift] before acting), Wait
 // (then the facing), Status
 #ifdef FFT_MODULES
-static void menu_keys(void){if(mod_call(MOD_SCREENS,5,0))compute_reach(st.act);}
+static void menu_keys(void)
+{
+    if(input_pressed(K_UP|K_DOWN|K_LEFT|K_RIGHT|K_A|K_ENTER|K_ESC|K_B)&&mod_call(MOD_SCREENS,5,0))compute_reach(st.act);
+}
 static void acts_keys(void)
 {
-    u8 result=(u8)mod_call(MOD_SCREENS,6,0);
-    if(result==2)aim(st.abil);else if(result==3)defend(st.act);
+    if(!unit_can_act(&st.unit[st.act])){to_menu();return;}
+    u8 math=st.unit[st.act].set==21&&(st.mode==M_SKILLS||(st.sub==1&&input_pressed(K_A|K_ENTER)));
+    u8 result=(u8)mod_call(math?MOD_TURN:MOD_SCREENS,math?1:6,0);
+    if(result==2){
+        if(st.unit[st.act].set==21&&st.abil!=NO_ABIL){W->upd_k+=AIM_K;area_control(AREA_BEGIN);}
+        else aim(st.abil);
+    }else if(result==3)defend(st.act);
+    else if(result==4)equipment_control(1);
 }
 #else
 static void menu_keys(void)
@@ -5040,7 +5337,11 @@ static void menu_keys(void)
             st.mode=M_AUTO; st.sub=1;
         }
     } else if (input_pressed(K_ESC | K_B)) {
-        if (st.moved && !st.acted && !st.pick_t) {   // the move undone (not after a pick-up)
+        if (st.moved && !st.acted && !st.pick_t
+#ifdef FFT_CHAPTER
+            && !movement_is_teleport(st.act)
+#endif
+            ) {   // the move undone (not after a pick-up)
 #ifdef FFT_CHAPTER
             unit_place(u,st.move_cell);u->face=st.mface;
 #else
@@ -5054,23 +5355,36 @@ static void menu_keys(void)
 
 // Act's list (Attack, the unit's skill set) and the abilities it knows (an item without any
 // left greyed); [shift] goes back a level
+#ifdef FFT_CHAPTER
+#include "math_menu.inc"
+#endif
 static void acts_keys(void)
 {
     u8 n = 0;
 #ifdef FFT_CHAPTER
     if(!unit_can_act(&st.unit[st.act])){to_menu();return;}
+    if(st.unit[st.act].set==21&&(st.mode==M_SKILLS||(st.sub==1&&input_pressed(K_A|K_ENTER)))){
+        if(math_menu()==2){W->upd_k+=AIM_K;area_control(AREA_BEGIN);}return;
+    }
 #endif
     if (st.mode == M_ACTS) {
-        u8 m = (u8)(2 + st.unit[st.act].defend);  // Attack, the skill set, Defend
+        u8 m = (u8)(2 + st.unit[st.act].defend
+#ifdef FFT_CHAPTER
+            +cj_support(common,st.unit[st.act].job,st.support[st.act],480)
+#endif
+        );  // Attack, the skill set, Defend
         st.sub=choice_move(st.sub,m,rt_keys&~rt_prev);
         if (input_pressed(K_A | K_ENTER)) {
             if (!st.sub) aim(NO_ABIL);
+            #ifdef FFT_CHAPTER
+            else if(st.sub==2+st.unit[st.act].defend){equipment_control(1);}
+#endif
             else if (st.sub == 2) { st.acted = 1; defend(st.act); }
             else if (known(st.act, 0) != NO_ABIL) { st.mode = M_SKILLS; st.skill = 0; }
         } else if (input_pressed(K_ESC | K_B)) st.mode = M_MENU;
         return;
     }
-    while (known(st.act, n) != NO_ABIL) n++;
+    n=(u8)known(st.act,255);
     st.skill=choice_move(st.skill,n,rt_keys&~rt_prev);
     if (input_pressed(K_A | K_ENTER)) {
         AbId ab = known(st.act, st.skill);
@@ -5081,11 +5395,13 @@ static void acts_keys(void)
 #endif
 
 #ifdef FFT_MODULES
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 u8 view_hides(u8 rot,u8 i)
 {
     mod_call(MOD_AI_SETUP,255,0);mod_context(MOD_AI_SETUP)->cast_actor=i;
     return (u8)mod_call(MOD_AI_SETUP,4,rot);
 }
+#endif
 static void ai_camera(void){mod_call(MOD_AI_SETUP,3,0);}
 #else
 #include "ai_camera.inc"
@@ -5184,8 +5500,8 @@ static void ai_step(void)
         } else if (st.ai == AI_AIM) {
             u8 o = unit_at_cell(st.ai_tgt);
 #ifdef FFT_CHAPTER
-            if(st.ai_ab<512&&(abilities[st.ai_ab].flags&(AF_CAST|AF_AREA))==(AF_CAST|AF_AREA)){
-                if(!cast_order(st.act,st.ai_tgt,st.ai_ab,0)){
+            if(st.ai_ab<512&&(st.unit[st.act].set==21||(abilities[st.ai_ab].flags&(AF_CAST|AF_AREA))==(AF_CAST|AF_AREA))){
+                if(!cast_order(st.act,st.unit[st.act].set==21?st.sub&15:st.ai_tgt,st.ai_ab,st.unit[st.act].set==21?MATH_BIND:0)){
                     W->ai_k=0;st.ai=AI_THINK;st.mode=M_BROWSE;
                 }
                 return;
@@ -5200,32 +5516,17 @@ static void ai_step(void)
 }
 
 // can tile c be picked: a reachable tile to walk to, or (aim) a unit in reach to act on?
-static u8 pickable(u8 c, u8 aim)
+#ifndef FFT_MODULES
+#include "target_pick.inc"
+#else
+static u16 pick_query(u8 op,u8 cell,u8 aiming)
 {
-    u8 o;
-    if (!aim) return st.reach[c] != 0xFF && st.reach[c] > 0;
-    if(st.mode==M_CAST_RANGE)return st.reach[c]==1;
-    o = unit_at_cell(c);
-    return st.reach[c] == 1 && o && aim_ok(o - 1);
+    mod_call(MOD_TURN,255,0);mod_context(MOD_TURN)->cast_ref=aiming;
+    return mod_call(MOD_TURN,op,cell);
 }
-
-// [2nd] on a tile that cannot be picked: the tile drawn on the same pixels (in every view a
-// canal tile at height 0 and the street tile 2 units higher one tile diagonally in front of
-// it share 21-27 spots) when that one can be (+ 1; 0: none)
-static u16 twin(u8 c, u8 aim)
-{
-    s16 u, v, x, y;
-    u16 i;
-    view_of(st.rot,TILE_X[c],TILE_Z[c],&u,&v);
-    x = scene_x(st.rot, u, v); y = scene_y(u, v) - map_tiles[c].stand * (HU / 2);
-    for (i = 0; i < MAP_N; i++) {
-        if (i == c) continue;
-        view_of(st.rot,TILE_X[i],TILE_Z[i],&u,&v);
-        if (scene_x(st.rot, u, v) == x && scene_y(u, v) - map_tiles[i].stand * (HU / 2) == y && pickable(i, aim))
-            return i + 1;
-    }
-    return 0;
-}
+static u8 pickable(u8 c,u8 aiming){return (u8)pick_query(5,c,aiming);}
+static u16 twin(u8 c,u8 aiming){return pick_query(6,c,aiming);}
+#endif
 
 #ifdef FFT_MODULES
 static void status_keys(void){mod_call(MOD_SCREENS,4,0);}
@@ -5314,6 +5615,9 @@ static u8 update(u8 fast)
             if (st.path_i + 1 >= st.path_n) {      // back to the menu, on Act (Wait once acted),
                 u8 i;                              // or a crystal or a chest there picked up
                 st.mode = M_MENU; st.moved = 1; st.menu = st.acted ? MN_WAIT : MN_ACT;
+#ifdef FFT_CHAPTER
+                movement_settle(st.sel);
+#endif
                 for (i = 0; i < NUNIT; i++)
                     if (UNIT_CELL(&st.unit[i])==CURSOR_CELL && DC_OBJ(st.unit[i].dc)&&st.unit[i].dc!=DC_GONE) pick_up(st.sel, i);
                 if (st.ai && st.mode == M_MENU) ai_next();
@@ -5344,6 +5648,8 @@ static u8 update(u8 fast)
         else if (input_pressed(K_ESC)) return 0;
 #endif
 #ifdef FFT_CHAPTER
+    } else if(st.mode==M_EQUIP){
+        equipment_control(2);
     } else if(st.mode==M_AREA){
         if(!st.turn)area_control(AREA_INPUT);
 #endif
@@ -5631,14 +5937,21 @@ static void screen_scene(void)
 const char *unit_name(u8 i)
 {
 #ifdef FFT_CHAPTER
+    if(unit_monster(&st.unit[i]))return JOB_NAME(st.unit[i].job);
+#endif
+#ifdef FFT_CHAPTER
     if (CD(UNIT_NAMES)) return (const char *)(igfx+RD16(igfx+OPENING_NAMES,i));
 #endif
     const Unit *u = &st.unit[i];
     if (u->gfx == UG_RAMZA) return "Ramza";
     if (u->gfx == UG_DELITA) return "Delita";
     {
+#ifdef FFT_CHAPTER
+        return identity_name(pgfx,(u16)u->name+(u->female?255:0));
+#else
         const u8 *names = igfx + (u->female ? UI_FEMALE : UI_MALE);
         return (const char *)names + RD16(names, u->name);
+#endif
     }
 }
 
@@ -5672,7 +5985,12 @@ static void portrait(u8 gfx, s16 x, s16 y)
 #ifdef FFT_CHAPTER
     gfx = GFX_PORTRAIT(gfx);
 #endif
-    const u8 *p = igfx + UI_PORTRAITS + (u16)gfx * 348;
+    const u8 *p =
+#ifdef FFT_CHAPTER
+        identity_portrait(pgfx,pgfx[UI_PORTRAITS+gfx]);
+#else
+        igfx + UI_PORTRAITS + (u16)gfx * 348;
+#endif
     portrait32(p,x,y);
 }
 
@@ -5711,10 +6029,17 @@ static void outlined_text(u8 *l, u8 *d, u8 *mask, s16 x, s16 y, const char *s, s
     }
 }
 
-#define PAN_MAKE(side) W->pan[side][W->pan_f[side] ^ 1]   // the panel being made
+#ifdef FFT_PACKED_PANELS
+#define PAN_CACHE(side,buffer,plane) ((u16 *)((u8 *)W->pan[side][buffer]+10*(plane)))
+#define TAG_CACHE(team,plane) ((u16 *)((u8 *)W->tag[team]+10*(plane)))
+#else
+#define PAN_CACHE(side,buffer,plane) W->pan[side][buffer][plane]
+#define TAG_CACHE(team,plane) W->tag[team][plane]
+#endif
+#define PAN_MAKE(side,plane) PAN_CACHE(side,W->pan_f[side]^1,plane)   // the panel being made
 static void panel_text(u8 side, s16 x, s16 y, const char *s, s16 limit)
 {
-    outlined_text((u8 *)PAN_MAKE(side)[0], (u8 *)PAN_MAKE(side)[1], (u8 *)PAN_MAKE(side)[2], x, y, s, limit);
+    outlined_text((u8 *)PAN_MAKE(side,0), (u8 *)PAN_MAKE(side,1), (u8 *)PAN_MAKE(side,2), x, y, s, limit);
 }
 
 static u8 ui_width(const char *s)
@@ -5739,13 +6064,18 @@ static void battle_card_text(s16 x,s16 y,const char *s,u8 color,s16 limit,u8 con
 static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context)
 {
     const Unit *u=&st.unit[i];UnitCard d;u8 gfx=u->gfx;
-    u8 *opacity=layout==UC_BATTLE_LEFT||layout==UC_BATTLE_RIGHT?(u8 *)PAN_MAKE(context)[2]:0;
+    u8 *opacity=layout==UC_BATTLE_LEFT||layout==UC_BATTLE_RIGHT?(u8 *)PAN_MAKE(context,2):0;
 #ifdef FFT_CHAPTER
     gfx=GFX_PORTRAIT(gfx);d.job=JOB_NAME(u->job);
 #else
     d.job=GFX_CHEMIST(gfx)?"Chemist":"Squire";
 #endif
-    d.portrait=igfx+UI_PORTRAITS+(u16)gfx*348;d.name=unit_name(i);
+#ifdef FFT_CHAPTER
+    d.portrait=identity_portrait(pgfx,pgfx[UI_PORTRAITS+gfx]);
+#else
+    d.portrait=igfx+UI_PORTRAITS+(u16)gfx*348;
+#endif
+    d.name=unit_name(i);
     d.hp=u->hp;d.max_hp=u->max_hp;d.mp=u->mp;d.max_mp=u->max_mp;
     d.level=u->level;d.exp=u->exp;d.brave=u->brave;d.faith=u->faith;
     unit_card_draw(&d,layout,0,part,context,opacity);
@@ -5753,6 +6083,11 @@ static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context)
         const u8 *p=d.portrait+232;u8 r;
         for(r=0;r<29;r++) {
             u8 *m=opacity+(u16)r*RT_PBYTES;u32 bits=~RD32(p,r*2);
+#ifdef FFT_PACKED_PANELS
+            // The right portrait extends beyond its80-pixel displayed crop.
+            // Discard its spill into the blank prefix of the next row slot.
+            if(context){WR32((u8 *)PAN_MAKE(context,1)+(u16)r*RT_PBYTES,0,0);WR32(m,0,0);}
+#endif
             if(context){WR16(m,3,(u16)(bits>>29));WR16(m,4,(u16)(bits>>13));}
             else WR32(m,0,bits);
         }
@@ -5766,13 +6101,16 @@ static const char *const st_names[4] = { "Defend", "Poison", "Dark", "Silence" }
 #endif   // ST_*
 
 #ifdef FFT_MODULES
+#ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
 u8 forecast_text(u8 a,u8 t,AbId ab,char *s)
 {
     ModCtx *c;
     st.formula.actor=a;st.formula.target=t;st.formula.ability=ab;
+    mod_call(MOD_PLANNER,3,0);
     mod_call(MOD_NUMBERS,255,0);c=mod_context(MOD_NUMBERS);c->forecast_out=s;
     return (u8)mod_call(MOD_NUMBERS,5,0);
 }
+#endif
 #else
 #include "forecast_text.inc"
 #endif
@@ -5780,7 +6118,7 @@ u8 forecast_text(u8 a,u8 t,AbId ab,char *s)
 #ifdef FFT_MODULES
 static void make_forecast(u8 a,u8 t,AbId ab)
 {
-    st.formula.actor=a;st.formula.target=t;st.formula.ability=ab;mod_call(MOD_NUMBERS,6,0);
+    st.formula.actor=a;st.formula.target=t;st.formula.ability=ab;mod_call(MOD_PLANNER,4,0);
 }
 #else
 #include "forecast_panel.inc"
@@ -5790,8 +6128,8 @@ static void make_panel(u8 side, u8 i)
 {
     void *sl = rt_light, *sd = rt_dark;
     u8 k = W->pan_n[side]++;
-    rt_light = PAN_MAKE(side)[0]; rt_dark = PAN_MAKE(side)[1];
-    if(!k)memset(PAN_MAKE(side),0,sizeof PAN_MAKE(side));
+    rt_light = PAN_MAKE(side,0); rt_dark = PAN_MAKE(side,1);
+    if(!k)memset(PAN_MAKE(side,0),0,sizeof W->pan[side][0]);
     unit_card_battle(i,side?UC_BATTLE_RIGHT:UC_BATTLE_LEFT,k,side);
     if(k==UC_LEVEL) {
         W->pan_f[side] ^= 1; W->pan_ok[side] = 1;  // made: shown from now on
@@ -5815,8 +6153,8 @@ static void draw_forecast(void)
 // The cached panel is aligned to ten bytes on either screen side, so its mask needs no shifts.
 static void draw_panel(u8 side)
 {
-    const u8 *l = (const u8 *)W->pan[side][W->pan_f[side]][0], *d = (const u8 *)W->pan[side][W->pan_f[side]][1];
-    const u8 *m = (const u8 *)W->pan[side][W->pan_f[side]][2];
+    const u8 *l = (const u8 *)PAN_CACHE(side,W->pan_f[side],0), *d = (const u8 *)PAN_CACHE(side,W->pan_f[side],1);
+    const u8 *m = (const u8 *)PAN_CACHE(side,W->pan_f[side],2);
     u8 *p = (u8 *)rt_light + PANEL_Y * RT_PBYTES + (side ? 10 : 0);
     u8 *q = (u8 *)rt_dark + PANEL_Y * RT_PBYTES + (side ? 10 : 0), r;
     for (r = 0; r < PANEL_ROWS; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
@@ -5873,7 +6211,7 @@ static const char *const team_names[2] = { "Enemy", "Guest" };
     u8 t;
     memset(W->tag, 0, sizeof W->tag);
     for (t = 0; t < 2; t++) {
-        outlined_text((u8 *)W->tag[t][0], (u8 *)W->tag[t][1], (u8 *)W->tag[t][2], 1, 1, team_names[t], 31);
+        outlined_text((u8 *)TAG_CACHE(t,0), (u8 *)TAG_CACHE(t,1), (u8 *)TAG_CACHE(t,2), 1, 1, team_names[t], 31);
         W->tag_w[t] = ui_width(team_names[t]);
     }
     W->tag_ok = 1;
@@ -5883,7 +6221,7 @@ static const char *const team_names[2] = { "Enemy", "Guest" };
 static void draw_tag(u8 side, u8 t)
 {
     u8 r, sh = side ? (u8)(30 - W->tag_w[t]) : 0;
-    const u8 *l = (const u8 *)W->tag[t][0], *d = (const u8 *)W->tag[t][1], *m = (const u8 *)W->tag[t][2];
+    const u8 *l = (const u8 *)TAG_CACHE(t,0), *d = (const u8 *)TAG_CACHE(t,1), *m = (const u8 *)TAG_CACHE(t,2);
     u8 *p = (u8 *)rt_light + (PANEL_Y - 7) * RT_PBYTES + (side ? 16 : 0);
     u8 *q = (u8 *)rt_dark + (PANEL_Y - 7) * RT_PBYTES + (side ? 16 : 0);
     for (r = 0; r < 7; r++, l += RT_PBYTES, d += RT_PBYTES, m += RT_PBYTES, p += RT_PBYTES, q += RT_PBYTES) {
@@ -5983,12 +6321,18 @@ static void draw_hud(void)
     }
     if (k[0] == M_AIM) { forecast = k[2] + 1; k[0] = 0; }
     forecast_key = forecast ? (u16)((u16)(AbId)(st.abil + 1) << 4 | forecast) : 0;
+#ifdef FFT_CHAPTER
+    if(forecast&&W->fc_key==forecast_key)pk[1]=(u8)(W->preview_target+1);
+#endif
     // one part even without room (the budget reckons high), but not in a frame already full,
     // unless it waited WAIT_MAX frames
 #ifdef LEFT_TRACE
     BENCH_VALUE((u32)(u16)W->left);
 #endif
     if (W->left >= 0 || (++W->hud_wait > WAIT_MAX && W->bg_drawn)) W->hud_wait = 0;
+#ifdef FFT_CHAPTER
+    if(k[0]==M_SKILLS&&(st.sub&128))W->hud_wait=0; // mandatory first-frame Math feedback
+#endif
     for (parts = W->hud_wait ? 1 : 0; parts == 0 || W->left >= HUD_K; parts++) {
         u8 win = k[0] && (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2] || W->win_n < W->win_m);
         if (win && (!pre || ahead)) {              // a menu first; one made ahead after the panels
@@ -6002,6 +6346,9 @@ static void draw_hud(void)
         else if (forecast && W->fc_key != forecast_key) {   // its own part
             ZB(13); make_forecast(pk[0] - 1, forecast - 1, (AbId)((forecast_key >> 4) - 1)); ZE(13);
             W->fc_key = forecast_key;
+#ifdef FFT_CHAPTER
+            pk[1]=(u8)(W->preview_target+1);
+#endif
         }
         else if (win) { ahead = 1; continue; }
         else break;
@@ -6118,7 +6465,11 @@ static void status_detail(u8 k)
         if (id == ABIL_DEFEND) { if (k == 4) ui_text(6, 47, "Raises evasion until next turn", C_BLACK, 159); return; }
         ab = &abilities[id];
         if (k == 4) {
-            n = put_s(s, n, "Range "); n = put_n(s, n, ab->range); n = put_s(s, n, "   Height ");
+            n = put_s(s, n, "Range "); n = put_n(s, n,
+#ifdef FFT_CHAPTER
+                ab->formula==99?st.unit[st.sel].move:
+#endif
+                ab->range); n = put_s(s, n, "   Height ");
             if (ab->vert == 0xFF) n = put_s(s, n, "Any");
             else { n = put_n(s, n, ab->vert >> 1); if (ab->vert & 1) n = put_s(s, n, ".5"); s[n++] = 'h'; }
         }
@@ -6129,8 +6480,18 @@ static void status_detail(u8 k)
 #else
 static const char *const effects[] = { "Physical damage", "Removes status ailments", "Give HP to an ally", "Restores HP", "Revives a KO ally", "Raises evasion" };
 #endif
-            n = put_s(s, n, effects[ab->kind]);
-        } else if (k == 7 && ab->flags & AF_ITEM) { n = put_s(s, n, "In stock "); n = st.unit[st.sel].team == TEAM_PLAYER ? put_n(s, n, st.bag[ab->bag]) : put_s(s, n, "Unlimited"); }
+            n = put_s(s, n, ab->kind==AB_MATH_SELECTOR?"Selects targets":effects[ab->kind]);
+        } else if (k == 7 && ab->flags & AF_ITEM) { n = put_s(s, n, "In stock "); n =
+#ifdef FFT_CHAPTER
+            unit_home_team(&st.unit[st.sel])!=TEAM_ENEMY
+#else
+            st.unit[st.sel].team==TEAM_PLAYER
+#endif
+            ? put_n(s,n,
+#ifdef FFT_CHAPTER
+                id>=512?battle_save.inv[ab->bag]:
+#endif
+                st.bag[ab->bag]):put_s(s,n,"Unlimited"); }
         else if (k == 8) n = put_s(s, n, ab->flags & AF_EVADE ? "Can be evaded" : "Cannot be evaded");
     }
     s[n] = 0; ui_text(6, 38 + 8 * (k - 3), s, C_BLACK, 159);
@@ -6195,10 +6556,17 @@ static void draw_status(void)
 #if defined(FFT_CHAPTER) && defined(FFT_REACH_CONTOUR)
 #include "config.inc"
 #endif
-#include "ability_access.inc"
+
 #include "menu_input.inc"
+#ifdef FFT_CHAPTER
+#include "bootstrap_files.inc"
+#endif
 u16 mod_entry(u8 op,u8 a)
 {
+#ifdef FFT_CHAPTER
+    if(op==11)return bootstrap_files();
+    if(op==12)return cj_valid(common,M.desc_size);
+#endif
     if(op==10)return ai_shown();
     if(op==5)return menu_keys();if(op==6)return acts_keys();
     if(op==7){auto_control(a);return 0;}
@@ -6232,7 +6600,7 @@ static const u8 bob[8] = { 0, 1, 2, 3, 3, 2, 1, 0 };
 static void draw_number(void)
 {
     if(area_impact_root()&&W->cast.phase==CAST_BATCH_READY)return;
-    mod_call(MOD_NUMBERS,0,0);
+    mod_call(MOD_AREA_UI,AREA_RESULTS,0);
 }
 #else
 #include "numbers.inc"
@@ -6272,7 +6640,7 @@ static void bn_draw(void){mod_call(MOD_ORDER,7,0);}
 #endif
 #if MOD_PART(MOD_RESULTS)
 #if !MOD_CORE
-#include "ability_access.inc"
+
 #define CHOICE_TEXT(x,y,s,c,l) ui_text(x,y,s,c,l)
 #define CHOICE_WIDTH(s) ui_width(s)
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
@@ -6334,9 +6702,12 @@ static void draw_end(void)
     memcpy(rt_light, l, RT_PSIZE); memcpy(rt_dark, d, RT_PSIZE);
 }
 #if !MOD_CORE
+#include "reaction_live.h"
+
+#include "reaction_select.inc"
 u16 mod_entry(u8 op, u8 a)
 {
-    (void)a;if(op==1)return window_label(M.window_out);if(op==2){make_window();return 0;}draw_end();return 0;
+    (void)a;if(op==3)return reaction_select();if(op==1)return window_label(M.window_out);if(op==2){make_window();return 0;}draw_end();return 0;
 }
 #endif
 #endif
@@ -6409,6 +6780,9 @@ void game_render(void)
 #endif
         { draw_end(); FRAME_END(); return; }
     }
+    #ifdef FFT_CHAPTER
+    if(st.mode==M_EQUIP){equipment_control(3);FRAME_END();return;}
+#endif
     if (st.mode == M_STATUS) { draw_status(); FRAME_END(); return; }
     if (st.turn) {                                 // the view it turns to, unpacked meanwhile
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
@@ -6446,7 +6820,11 @@ void game_render(void)
         for (j = i; j > 0 && f[ord[j - 1]].depth > f[i].depth; j--) ord[j] = ord[j - 1];
         ord[j] = i;
         bx = f[i].x - st.camx - 8; by = f[i].y - st.camy - UNIT_FOOT;
-        vis[i] = st.unit[i].x < MAP_W && bx > -16 && bx < RT_W && by > -UNIT_SH && by - FOE_H < RT_H;
+        vis[i] = st.unit[i].x < MAP_W &&
+#ifdef FFT_CHAPTER
+            !unit_airborne(&st.unit[i]) &&
+#endif
+            bx > -16 && bx < RT_W && by > -UNIT_SH && by - FOE_H < RT_H;
 #ifdef FFT_CHAPTER
         if(flow_bank&&st.scene_hide&(1U<<i))vis[i]=0;
 #endif
@@ -6582,8 +6960,101 @@ void game_render(void)
 #endif
 #endif
 #if !MOD_CORE && MOD_PART(MOD_BEATS) && defined(FFT_CHAPTER)
+#include "camera_target.inc"
 #include "opening/opening.inc"                  // its beats only (MOD_PART there)
 #endif
 #if (MOD_PART(MOD_SAVE) || MOD_PART(MOD_PARTY)) && defined(FFT_CHAPTER)
 #include "save.inc"
+#endif
+
+#if !MOD_CORE && MOD_PART(MOD_MOVEMENT)
+static const s8 dir_x[4]={1,-1,0,0},dir_z[4]={0,0,1,-1};
+#define EDGE_ROW(id) (W->eg+((u16)(id)<<W->edge_shift))
+#include "movement_runtime.inc"
+#include "movement_edges.inc"
+#include "tactical_path.h"
+#include "reach_menu.inc"
+#include "path_menu.inc"
+#include "skill_range.inc"
+#include "aim_menu.inc"
+u16 mod_entry(u8 op,u8 a)
+{
+    if(op==10)return aim(M.cast_ability);
+    if(op==9){movement_profile();return 0;}
+    if(op==12){movement_ready(a);return 0;}
+    if(op==13)return movement_poll(a);
+    if(op==8){compute_reach(M.cast_actor);return 0;}
+    if(op==7)return make_path_cell(M.cast_actor,M.cast_ref);
+    if(op==5){skill_range(st.formula.actor,st.formula.ability);return 0;}
+    if(!op){W->move_kind=0;edges((u8)M.cast_ability);return 0;}
+    movement_prepare(a);return 0;
+}
+#endif
+
+#if defined(FFT_CHAPTER) && (MOD_PART(MOD_EQUIPMENT))
+#if !MOD_CORE
+#include "rewards.inc"
+#include "equipment_runtime.inc"
+#include "combat_response.inc"
+#include "reaction_self.inc"
+#define CHOICE_TEXT(x,y,s,c,l) ui_text(x,y,s,c,l)
+#define CHOICE_WIDTH(s) ui_width(s)
+#include "choice_menu.inc"
+#endif
+#include "equipment_ui.inc"
+static void equipment_local_control(u8 op)
+{
+    if(op==1){if(equipment_ready(st.act)){if(W->edge_phase){W->edge_phase=0;W->ej=255;}memcpy(W->ai_tt,st.unit[st.act].eq,5);W->status_i=0;W->pan_ok[0]=W->pan_ok[1]=W->pan_n[0]=W->pan_n[1]=0;st.mode=M_EQUIP;st.status_col=st.sub=0;}}
+    if(op==2)equipment_input();
+    if(op==3)equipment_draw();
+}
+#if MOD_CORE
+static void equipment_control(u8 op){equipment_local_control(op);}
+#else
+u16 mod_entry(u8 op,u8 a)
+{
+    if(!op){equipment_rebuild_pending();return 0;}
+    if(op==4)return movement_benefit(a);
+    if(op==5)return equipment_commit(a,W->ai_tt);
+    if(op==6){combat_response_launch();return 0;}
+    if(op==7){reaction_self_launch(6);return 0;}
+    equipment_local_control(op);return 0;
+}
+#endif
+#endif
+
+#if !MOD_CORE && MOD_PART(MOD_COMBAT)
+#include "magic_prepare.inc"
+#include "hamedo.inc"
+#include "command_effect.inc"
+u16 mod_entry(u8 op,u8 a)
+{
+    (void)op;(void)a;
+    return command_effect(st.formula.actor,st.formula.target,st.formula.ability);
+}
+#endif
+
+#if !MOD_CORE && MOD_PART(MOD_NATURE)
+#include "nature_runtime.inc"
+#include "discovery_move.inc"
+#include "reaction_live.h"
+#include "mime_runtime.inc"
+#include "chapter_validate.h"
+#define ugfx (M.chapter_ugfx)
+#include "chapter_files.inc"
+#undef ugfx
+u16 mod_entry(u8 op,u8 a)
+{
+ u8 i;
+ if(op==9)return mime_next();
+ if(op==8)return chapter_files((char)a);
+ if(op==0){nature_hit_commit();W->nature_pending&=(u16)~3;return 0;}
+ if(op==1){monster_refresh();return 0;}
+ if(op==3)return discovery_find(a,(u8)st.formula.roll);
+ if(op==6)return (u16)math_targets(st.formula.actor,(u8)st.formula.roll);
+ if(op==5){AreaAi *q=&W->area_ai;memset(q,0,sizeof *q);q->next=1;
+  for(i=0;i<16;i++)q->math_mask[i]=math_filters(st.act,i)?(u16)math_targets(st.act,i):0;
+  W->ai_k=7;return 0;}
+ return 0;
+}
 #endif

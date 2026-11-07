@@ -6,17 +6,29 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 47U
+#define MOD_ABI 78U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
+// Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
+typedef struct {
+    const u8 **p_flow_bank,**p_flow_ui,**p_wgfx,**p_abank,**p_cgfx,**p_common,**p_charge_ticks,**p_job_sets;
+    const Ability **p_abilities;const Job **p_jobs;const char **p_job_names;const Item **p_items;
+    State **p_battle_state;void **p_rt_state;u16 *p_rt_state_size;
+    u8 **p_vbuf,**p_sbuf;u16 (**p_acache)[UNIT_FB/2];u16 **p_ac_key,**p_ac_age,*p_abank_n0;
+    const PlaneWord **p_sl_l,**p_sl_m,**p_sc_l,**p_sc_m;
+    u16 campaign_flow;                   // resident build policy, shared images serve both entries
+} CoreBoot;
 typedef struct {
     u16 sig;                            // MOD_SIG, from the module's own build
     union {                             // transient input, never gameplay/save state
         struct {u16 cast_ability;u8 cast_actor,cast_ref;};
+        u8 *chapter_story_after;         // PARTY10 cold script flags
+        const CoreBoot *boot;          // SCREENS11: cold pointer bindings, no gameplay state
         Unit *stats_unit;                // resident -> PARTY9 only
         char *window_out;               // resident -> RESULTS1 only
+        s16 *camera_out;                 // BEATS4: two camera target coordinates
         char *forecast_out;              // resident -> NUMBERS5 only
-        CastBatch *cast_batch_out;        // resident -> TARGETS1/3 or RESPONSE10 only
-        struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; SAVE5: catalogue size in desc_size
+        CastBatch *cast_batch_out;        // resident -> TARGETS1/3 or SAVE7 only
+        struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; SCREENS12: catalogue size in desc_size
         const u8 *chapter_ugfx;          // SAVE6 -> resident: the chapter's unit frames
     };
     u8 map_w, map_h;
@@ -35,20 +47,15 @@ typedef struct {
     void (*spread_start)(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, const u8 *need, u16 left);
     u8 (*spread_go)(u16 n);
     void (*bfs)(u8 who, u8 *from);
-    u8 (*hit_chance)(u8 a, u8 t);
-    u16 (*attack_prediction)(u8 a,u8 t);
     u16 (*charge_query)(u8 a,u8 t,AbId ab,u8 flags,u16 roll);
     u8 (*skill_cost)(u8 who,AbId ab);
     u16 (*magic_amount)(u8 a,u8 t,u16 spec);
     u16 (*magic_heal)(u8 a,u8 t,AbId ab,u8 query);
     u8 (*skill_kind)(u8 a,u8 t,AbId ab);
     u8 (*magic_hit)(u8 a,u8 t,AbId ab,u8 execute);
-    u8 (*magic_target)(u8 t);
-    void (*attack_roll)(u8 a,u8 t);
-    u8 (*roll_hit)(u8 a,u8 t);
+    u16 (*target_query)(u8 who,u16 criterion); // bit15: ability applicability;255/254/253/252: validity/reaction/critical/Jump
+    u16 (*weapon_amount)(u8 a,u8 t,u8 weapon,u8 critical,u16 roll,u8 awake,u8 charge,u16 base_roll);
     void (*knockback)(u8 a,u8 t);
-    u8 (*skill_hit)(u8 a, u8 t, AbId ab);
-    u16 (*skill_amount)(u8 a, u8 t, AbId ab, u16 r);
     s16 (*zodiac_xa)(const Unit *a, const Unit *t, s16 xa);
     const Tile *(*tile_at)(s16 x, s16 z);
     u16 (*node_at)(s16 x,s16 z,u8 layer);
@@ -61,7 +68,7 @@ typedef struct {
     void (*view_of)(u8 rot, s16 x, s16 z, s16 *u, s16 *v);
     s16 (*scene_x)(u8 rot, s16 u, s16 v);
     s16 (*scene_y)(s16 u, s16 v);
-    void (*draw_unit_covered)(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c);
+    void (*draw_unit_covered)(s16 sx,s16 sy,u8 rot,u8 i,const Cover *c);
     u8 **scene_l;
     const Item *items;
     void (*ui_text)(s16 x, s16 y, const char *s, u8 color, s16 limit);
@@ -70,7 +77,6 @@ typedef struct {
     u8 (*put_n)(char *s, u8 n, u16 v);
     const char *(*unit_name)(u8 i);
     void (*text_into)(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color);
-    void (*portrait)(u8 gfx, s16 x, s16 y);
     void (*unit_card_battle)(u8 i,u8 layout,u8 part,u8 context);
     u8 (*area_paint)(u8 who);             // pure card-cache preparation/blits, never an image load
     void (*draw_hand)(s16 x, s16 y);
@@ -80,11 +86,9 @@ typedef struct {
     u8 (*job_level)(const Unit *u);
     u8 (*hand_weapon)(const Unit *u,u8 hand);   // resident helpers shared instead of copied per image
     u8 (*restore_ability)(AbId ab);
-    void (*gauge)(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
 #ifdef FFT_CHAPTER
     const u8 **opening_story, **pgfx;
-    void (*opening_battle)(u8 direct);
-    void (*opening_after)(void);         // unused: opening_after lives in BEATS (kept: layout)
+    u8 (*can_use)(u8 who,AbId ab);        // reused former unused opening_after binding
 #endif
 #ifdef FFT_ACTOR_BANK
     const u8 *(*actor_frame)(u16 logical, u8 slot);
@@ -99,12 +103,10 @@ typedef struct {
     u8 *scene_rot, *vbuf_rot;
     const u8 *cgfx;
 #ifdef FFT_CHAPTER
-    u8 (*ranged_reach)(u8 a, u8 o, u8 c);
+    u8 (*ranged_reach)(u8 a, u8 o, u8 c); // a255: fill manual mask for actor o/origin c
     u8 (*rt_load)(const char *name, void *data, u16 size);
     u8 (*rt_save)(const char *name, const void *data, u16 size);
     const void *(*rt_file)(const char *name, u16 *size);   // SAVE6: the chapter's banks
-    const char *job_names;
-    const u8 *job_sets;
     const Job *jobs;
     const UnitDef *unit_defs;
     const u8 *common, *charge_ticks, *igfx,*flow_bank,*flow_ui;
@@ -116,6 +118,9 @@ typedef struct {
 } ModCtx;
 
 #ifdef FFT_MODULE
+// The archive builder reads this symbol and entry even without C callers.
+const u16 mod_context_size __attribute__((used))=sizeof(ModCtx);
+u16 mod_entry(u8 op,u8 a) __attribute__((externally_visible));
 ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one section)
 #define map_w (M.map_w)
 #define map_h (M.map_h)
@@ -134,27 +139,25 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define hl_seq (*M.highlight_seq)
 #define rand15 M.rand15
 #define known M.known
+#define can_use M.can_use
 #define spread_start M.spread_start
 #define spread_go M.spread_go
 #define bfs M.bfs
-#define hit_chance M.hit_chance
-#define attack_prediction M.attack_prediction
+#define hit_chance(a,t) magic_hit(a,t,NO_ABIL,0)
 #define charge_query M.charge_query
 #define skill_cost M.skill_cost
 #define magic_amount M.magic_amount
 #define magic_heal M.magic_heal
 #define skill_kind M.skill_kind
 #define magic_hit M.magic_hit
-#define magic_target M.magic_target
-#define attack_roll M.attack_roll
-#define roll_hit M.roll_hit
+#define magic_target(t) M.target_query(t,255)
+#define magic_applicable(t,ab) ((u8)M.target_query(t,(u16)(ab)|32768U))
+#define weapon_amount M.weapon_amount
+#define roll_hit(a,t) magic_hit(a,t,NO_ABIL,1)
 #define knockback M.knockback
-#if MOD_PART(MOD_AI) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_NUMBERS)
+#if MOD_PART(MOD_AI) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_COMMAND) || MOD_PART(MOD_COMBAT) || MOD_PART(MOD_NUMBERS)
 #define skill_hit formula_hit
 #define skill_amount formula_amount
-#else
-#define skill_hit M.skill_hit
-#define skill_amount M.skill_amount
 #endif
 #define zodiac_xa M.zodiac_xa
 #define tile_at M.tile_at
@@ -179,10 +182,8 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define put_n M.put_n
 #define unit_name M.unit_name
 #define text_into M.text_into
-#define portrait M.portrait
 #define unit_card_battle M.unit_card_battle
 #define area_paint M.area_paint
-#define gauge M.gauge
 #define draw_hand M.draw_hand
 #define copy_box M.copy_box
 #define draw_rect M.draw_rect
@@ -190,7 +191,6 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define job_level M.job_level
 #define opening_story (*M.opening_story)
 #define pgfx (*M.pgfx)
-#define opening_battle M.opening_battle
 #define actor_frame M.actor_frame
 #define cover(cm, fx, fy, depth) M.cover(cm, fx, fy, depth)   // (W->cover: a field too)
 #define ensure_scene M.ensure_scene
@@ -206,8 +206,7 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define rt_load M.rt_load
 #define rt_save M.rt_save
 #define rt_file M.rt_file
-#define job_names (M.job_names)
-#define job_sets (M.job_sets)
+#define job_sets cj_section(common,CJ_JOB_SETS) // one cold PARTY lookup, no duplicate binding
 #define jobs (M.jobs)
 #define unit_defs (M.unit_defs)
 #define common (M.common)
@@ -216,9 +215,16 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define flow_bank (M.flow_bank)
 #define flow_ui (M.flow_ui)
 #define rt_seed (*M.rt_seed)
-long __attribute__((__stkparm__)) __divsi3(long a, long b) { return M.divsi3(a, b); }
-#if MOD_PART(MOD_PARTY) || MOD_PART(MOD_ACTION) || MOD_PART(MOD_RESPONSE)
-unsigned long __attribute__((__stkparm__)) __udivsi3(unsigned long a,unsigned long b) { return M.udivsi3(a,b); }
+#ifndef FFT_MODULE_ARITH_MASK
+#define FFT_MODULE_ARITH_MASK 7
 #endif
-long __attribute__((__stkparm__)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
+#if FFT_MODULE_ARITH_MASK & 1
+long __attribute__((__stkparm__,externally_visible)) __divsi3(long a, long b) { return M.divsi3(a, b); }
+#endif
+#if FFT_MODULE_ARITH_MASK & 2
+unsigned long __attribute__((__stkparm__,externally_visible)) __udivsi3(unsigned long a,unsigned long b) { return M.udivsi3(a,b); }
+#endif
+#if FFT_MODULE_ARITH_MASK & 4
+long __attribute__((__stkparm__,externally_visible)) __mulsi3(long a, long b) { return M.mulsi3(a, b); }
+#endif
 #endif

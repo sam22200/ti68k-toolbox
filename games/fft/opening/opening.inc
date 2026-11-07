@@ -6,6 +6,7 @@ typedef char OpeningDiskLayout[(sizeof(UnitDef)==28 && sizeof(Item)==30 && sizeo
 #if MOD_CORE
 static const u8 *opening_story, *pgfx;   // pgfx: the speakers' portraits (ffcp)
 static void opening_battle(u8 direct);
+static void opening_setup(u8 letter);
 #endif
 #if MOD_PART(MOD_BEATS)                   // with modules: the beats module (fft.h)
 #if !MOD_CORE && defined(__m68k__) && defined(FFT_REACH_CONTOUR)
@@ -48,6 +49,7 @@ static void opening_after(void)
 #if !MOD_CORE
 u16 mod_entry(u8 op, u8 a)
 {
+    if(op==4){cam_target(M.camera_out,M.camera_out+1);return 0;}
     if (op == 0) return map_step();
     if (op == 1) map_render(); else map_start_step(a);
     return 0;
@@ -86,21 +88,17 @@ static void opening_battle(u8 direct)
 
 static void opening_start(u16 n)
 {
-    u8 i;
 #if defined(FFT_MEASURE) && defined(RT_CYCLES)
     frame_stall=1; // restart/scene-bank preparation, not an ordinary animation frame
 #endif
     memset(&st,0,sizeof st);if(!W)return;
-    st.want=st.prot=st.ai_view=255;rt_seed=97;rand_seed(97);
-    {char name[6]="ff?st";name[2]=chapter_letter[chapter_now-1];opening_story=rt_file(name,RT_NULL);}
-    pgfx=rt_file("ffcp",RT_NULL);                    // (none: name-only boxes)
-    if(opening_story)opening_story+=2;
-    fixed_units();for(i=0;i<NBAG;i++)st.bag[BAG_SLOT(i)]=bag_init[i];
-    actor_reset();W->dialog_key=0xFFFF;
-    W->bg_ok=W->hold=W->frz=W->status_i=0;W->pan_ok[0]=W->pan_ok[1]=0;
-    W->win_k[0]=0;W->pan_k[0][0]=W->pan_k[1][0]=W->fc_key=0;
-    scene_rot=vbuf_rot=0xFF;
-    st.rot=2;st.act=st.sel=U_RAMZA;cursor_place(UNIT_CELL(&st.unit[0]));st.mode=M_BROWSE;
+    rt_seed=97;rand_seed(97);
+#ifdef FFT_MODULES
+    mod_call(MOD_PARTY,12,(u8)chapter_letter[chapter_now-1]);
+#else
+    opening_setup((u8)chapter_letter[chapter_now-1]);
+#endif
+    actor_reset();
     cam_target(&st.camx,&st.camy);
     if(n==5){st.open_stage=OPEN_DONE;return;} // AMS chapter-loader injection door: over at once
     if(n==1||n==2||n==3){

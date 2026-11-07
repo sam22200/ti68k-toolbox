@@ -1,64 +1,40 @@
 #include "reaction_policy_runtime.inc"
-// Every saved field belongs to presentation/effect payload; CT, turn history,
-// inventory, pending casts and live unit positions are never rolled back.
-#define PACKET_FIELDS(X) X(hand) X(effect_kind) X(atk) X(tgt) X(act_t) X(hit) X(crit) X(push) X(kx) X(kz) X(push_cell) X(dmg) X(self) X(abil) X(gain) X(lvup) X(jpg)
-static void reaction_save(void)
-{
-    ActionPacket *p=&st.primary;
-#define SAVE_FIELD(n) p->n=st.n;
-    PACKET_FIELDS(SAVE_FIELD)
-#undef SAVE_FIELD
-    p->running=0;
-}
-static void reaction_return(void)
-{
-    ActionPacket *p=&st.primary;
-    if(st.action.phase!=CTX_SECONDARY&&st.action.phase!=CTX_APPLIED)return;
-#define RESTORE_FIELD(n) st.n=p->n;
-    PACKET_FIELDS(RESTORE_FIELD)
-#undef RESTORE_FIELD
-    p->running=0;core_action_return(&st.action);
-    if(W){W->num_ok=W->hold=W->frz=W->frz_h=0;W->fc_key=0;}
-}
-#undef PACKET_FIELDS
+#if MOD_CORE
+#include "reaction_self.inc"
+#endif
+#include "reaction_restore.inc"
+#if MOD_CORE
+#include "reaction_select.inc"
+#endif
 #include "reflect_launch.inc"
-// Selection consumes invalid requests, revalidates range/stock after the root's
-// damage and knockback, and returns before resident projectile validation runs.
-static u8 reaction_select(void)
-{
-    CoreAction *c=&st.action;u8 who,kind;u16 id;
-    while((who=core_action_take(c,0x1fff))!=255){
-        id=c->reaction[who];kind=0;
-        // Reflect bypasses normal Brave/reaction-incapacity checks, but the
-        // source action restriction (Don't Act/deep water) still applies.
-        if(id==REACTION_REFLECT&&unit_on_field(&st.unit[who])&&
-           !(core_status_current(&st.unit[who].statuses,4)&4)){
-            const Unit *u=&st.unit[who];u8 restricted=0;
-            if(W->surface){
-                const u8 *p=W->surface+((u16)(W->grid_row[u->z]+u->x)<<3)+4*node_layer(UNIT_CELL(u));
-                restricted=(p[1]>>5)>=2&&!(core_status_current(&u->statuses,2)&0x46)&&!(u->status_flags&STATUS_RIDER);
-            }
-            if(!restricted)kind=3;
-        }
-        if(reaction_live(who)){
-            if(id==REACTION_COUNTER&&st.unit[c->root].hp&&
-               ranged_reach(who,UNIT_CELL(&st.unit[who]),UNIT_CELL(&st.unit[c->root])))kind=1;
-            if(id==REACTION_POTION&&reaction_potion(st.bag,st.unit[who].team==TEAM_ENEMY)!=255)kind=2;
-        }
-        if(!kind){core_action_return(c);continue;}
-        reaction_save();return kind;
-    }
-    return 0;
-}
 static void reaction_launch(u8 kind)
 {
+#if MOD_CORE
+    if(kind==6){reaction_self_launch(kind);return;}
+#endif
     CoreAction *c=&st.action;u8 who=c->actor,potion;
-    if(c->phase!=CTX_SECONDARY||st.primary.running||kind<1||kind>3)return;
+    if(c->phase!=CTX_SECONDARY||st.primary.running||kind<1||(kind>5&&kind!=8))return;
     if(kind==3){reflect_launch();return;}
     st.primary.running=1;
-    action_pose_start(who,kind==1?c->root:who);
+    action_pose_start(who,kind==1||kind==8?c->root:who);
     if(W){W->hold=W->frz=W->frz_h=0;W->fc_key=0;}
     if(kind==1){c->left=hand_count(who)-1;c->cell=UNIT_CELL(&st.unit[c->root]);st.abil=NO_ABIL;attack_roll(who,c->root);}
+    else if(kind==8){
+        u16 r;st.abil=0x93;st.hit=magic_target(c->root)==MAGIC_VALID;
+        if(st.hit){
+            st.dmg=dash_amount(who,c->root,(rand15()>>13)+1);
+            r=(u16)(muls16((s16)rand15(),st.unit[who].brave)>>15);
+            if((u16)(muls16((s16)rand15(),st.unit[c->root].brave)>>15)<r)knockback(who,c->root);
+        }
+    }
+    else if(kind==4){st.abil=c->reaction[who];st.hit=1;st.dmg=1;}
+    else if(kind==5){
+        const Unit *u=&st.unit[who];st.abil=reaction_id(c->reaction[who]);
+        st.hit=!(core_status_current(&u->statuses,3)&1);
+        st.effect_kind=st.abil==REACTION_GILGAME?AB_STEAL_GIL:st.abil==REACTION_HP_RESTORE?AB_HEAL:st.abil==REACTION_MP_RESTORE||st.abil==REACTION_ABSORB_MP?AB_MP_HEAL:AB_QUICK;
+        st.dmg=st.abil==REACTION_GILGAME?(c->reaction[who]&0x3fffU):st.abil==REACTION_HP_RESTORE?u->max_hp-u->hp:st.abil==REACTION_MP_RESTORE?u->max_mp-u->mp:st.abil==REACTION_ABSORB_MP?(c->reaction[who]&255):255;
+        if(!st.hit){st.dmg=0;st.effect_kind=AB_NULL;}
+    }
     else{
         potion=reaction_potion(st.bag,st.unit[who].team==TEAM_ENEMY);
         st.abil=(AbId)(0x170+potion);restore_prepare(who,st.abil);

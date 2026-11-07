@@ -16,6 +16,7 @@
 #include "../units.h"
 #include "save.h"
 #include "../common.h"
+#include "../identity_pool.h"
 #include <stdlib.h>
 #include <string.h>
 #ifdef RT_CYCLES
@@ -39,7 +40,7 @@ typedef struct {
 enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED };
 Mg mg;
 Save save;
-static const u8 *bank, *common;
+static const u8 *bank, *common,*identity;
 static u8 *cache;
 static u8 dirty;
 
@@ -98,6 +99,7 @@ u8 unlocked(const SaveUnit *u, u8 c, u8 *what)
 {
     const u8 *j = job_rec(c);
     u8 r, only = j[J_ONLY];
+    if(u->type==3){if(what)*what=255;return 0;}
     if (only && only != (u->type == 1 ? 2 : 1)) { if (what) *what = 0xFF; return 0; }
     for (r = 0; r < CAREERS; r++) {
         u8 need = (u8)(j[J_REQ + (r >> 1)] >> (r & 1 ? 0 : 4) & 15);
@@ -111,6 +113,7 @@ u8 unlocked(const SaveUnit *u, u8 c, u8 *what)
 static u8 job_visible(const SaveUnit *u, u8 c)
 {
     u8 i,only=job_rec(c)[J_ONLY];
+    if(u->type==3)return 0;
     if(only && only!=(u->type==1?2:1))return 0;
     if(c==career(u)||unlocked(u,c,RT_NULL))return 1;
     for(i=0;i<save.n;i++)if(unlocked(unit(i),c,RT_NULL))return 1;
@@ -129,23 +132,20 @@ static void open_jobs(void)
     for(c=0;c<mg.job_n;c++)mg.angle[c]=(u8)((u16)c*32/mg.job_n);
 }
 
+#include "../equipment_rules.h"
 u8 can_equip(const SaveUnit *u, u8 slot, u8 id)
 {
-    const u8 *it = item_rec(id), *j = job_rec(record(u, career(u)));
-    u8 t = it[I_TYPE];
-    if(slot==EQ_SHIELD&&(it[I_FLAGS]&0x80)){
-        const u8 *battle=cj_section(common,CJ_ITEMS);
-        if(!cj_two_swords(common,u->job,b16(u->support))||!(battle[(u16)id*30+29]&HAND_DUAL))return 0;
-        if(u->eq[EQ_WEAPON]&&!(battle[(u16)u->eq[EQ_WEAPON]*30+29]&HAND_DUAL))return 0;
-        return (j[J_CATS+(t>>3)]&(0x80>>(t&7)))!=0;
-    }
-    return (it[I_FLAGS] & slot_flag[slot]) && (j[J_CATS + (t >> 3)] & (0x80 >> (t & 7)));
+    u8 eq[5],k;for(k=0;k<5;k++)eq[k]=u->eq[k]?u->eq[k]:255;
+    return core_equipment_allowed(common,u->job,u->type==1,b16(u->support),eq,slot,id?id:255);
 }
 
 typedef struct { u16 hp, mp; u8 sp, pa, ma, move, jump; } Stats;
+#include "../movement_rules.h"
 Stats stats(const SaveUnit *u)             // fft.c unit_stats, from the save's records
 {
     const u8 *j = job_rec(record(u, career(u)));
+    u8 monster_job[JOB_SIZE];
+    if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
     Stats s;
     u16 v16[5];
     u8 i, k;
@@ -166,6 +166,8 @@ Stats stats(const SaveUnit *u)             // fft.c unit_stats, from the save's 
     }
     if (s.hp > 999) s.hp = 999;
     if (s.mp > 999) s.mp = 999;
+    {u8 f[3];u16 id=b16(u->movement);cj_movement(common,u->job,(u16)(id-486)<24U?(u8)(id-485):0,f);
+     core_movement_bonus(f[0],&s.move,&s.jump);}
     if (s.jump > 7) s.jump = 7;
     s.sp = (u8)(v16[2] > 50 ? 50 : v16[2]);
     s.pa = (u8)(v16[3] > 99 ? 99 : v16[3]);
@@ -175,11 +177,20 @@ Stats stats(const SaveUnit *u)             // fft.c unit_stats, from the save's 
 
 void equip(SaveUnit *u, u8 slot, u8 id)    // id 0: taken off; the inventory keeps the count
 {
+    if(u->type==3||slot>=SLOTS||id==u->eq[slot]||id&&(!save.inv[id]||!can_equip(u,slot,id)))return;
     if (u->eq[slot] && save.inv[u->eq[slot]] < 99) save.inv[u->eq[slot]]++;
     if (id) save.inv[id]--;
     u->eq[slot] = id;
     if(slot==EQ_WEAPON&&u->eq[EQ_SHIELD]&&!can_equip(u,EQ_SHIELD,u->eq[EQ_SHIELD]))equip(u,EQ_SHIELD,0);
     mg.changed = 1;
+}
+
+// Preserve the primary hand when removing Two Swords; then check all permissions.
+static void validate_equipment(SaveUnit *u)
+{
+    u8 s;
+    if(u->eq[EQ_SHIELD]&&!can_equip(u,EQ_SHIELD,u->eq[EQ_SHIELD]))equip(u,EQ_SHIELD,0);
+    for(s=0;s<SLOTS;s++)if(u->eq[s]&&!can_equip(u,s,u->eq[s]))equip(u,s,0);
 }
 
 // k-th entry of the unit's current job: learned with its JP (1), else 0
@@ -188,7 +199,7 @@ u8 learn(SaveUnit *u, u8 k)
     u8 c = career(u);
     const u8 *j = job_rec(record(u, c));
     u16 id = job_ability(j, k), cost = ability_cost(id);
-    if (!id || learned(u, c, k) || jp(u, c) < cost) return 0;
+    if (u->type==3 || !id || learned(u, c, k) || jp(u, c) < cost) return 0;
     set16(u->jp[c], (u16)(jp(u, c) - cost));
     u->learned[c][k >> 3] |= (u8)(0x80 >> (k & 7));
     mg.changed = 1;
@@ -201,12 +212,12 @@ static u8 *slot_of(SaveUnit *u, u8 k) { return k == 1 ? u->reaction : k == 2 ? u
 
 void change_job(SaveUnit *u, u8 c)
 {
-    u8 s;
+    if(u->type==3||c>=CAREERS)return;
     u->job = (u8)(c == 0 && u->type == 2 ? 0x01 : 0x4A + c);
     // the battle's sprite (units.h) when it has one for the job
     u->gfx = u->type == 2 ? UG_RAMZA : c == 0 ? (u->type ? UG_SQUIRE_F : UG_SQUIRE_M)
            : c == 1 ? (u->type ? UG_CHEMIST_F : UG_CHEMIST_M) : 0xFF;
-    for (s = 0; s < SLOTS; s++) if (u->eq[s] && !can_equip(u, s, u->eq[s])) equip(u, s, 0);
+    validate_equipment(u);
     if (u->secondary == job_rec(record(u, c))[J_SET]) u->secondary = 0;
     mg.changed = 1;
 }
@@ -262,10 +273,10 @@ static void foot(const char *s) { draw_rect(0, 93, 160, 1, C_BLACK); black(2, 95
 
 // still pictures of the bank: per career and sex (2 c + 1 for a woman), Ramza's at 40 (FFT draws
 // him alike in every job)
-static u8 picture(const SaveUnit *u, u8 c) { return u->type == 2 ? 40 : (u8)(2 * c + (u->type == 1)); }
+static u8 picture(const SaveUnit *u, u8 c) { return u->type==3?255:u->type == 2 ? 40 : (u8)(2 * c + (u->type == 1)); }
 static void actor(s16 x, s16 y, u8 k)
 {
-    const u8 *p = section(5) + (u16)k * 156;
+    const u8 *p; if(k==255)return; p = section(5) + (u16)k * 156;
 #ifdef __m68k__
     RtSprite sp = { 16, 26, p, p + 52, p + 104 };
 #else
@@ -301,10 +312,11 @@ static void hand(s16 x, s16 y)
 
 static const char *unit_name(const SaveUnit *u)
 {
+    if(u->type==3)return (const char *)(cj_section(common,CJ_JOB_NAMES)+14U*u->job);
     if (u->type == 2) return "Ramza";
-    return str(b16(section(8) + 2 * (u->name + (u->type == 1 ? 255 : 0))));
+    return identity_name(identity,(u16)u->name+(u->type==1?255:0));
 }
-static const char *job_name(const SaveUnit *u, u8 c) { return str(b16(job_rec(record(u, c)))); }
+static const char *job_name(const SaveUnit *u, u8 c) { return u->type==3?unit_name(u):str(b16(job_rec(record(u, c)))); }
 
 static void floor_diamond(s16 x,s16 y)
 {
@@ -326,7 +338,7 @@ static void floor_diamond(s16 x,s16 y)
 #include "../unit_card.inc"
 static void management_card(UnitCard *d,const SaveUnit *u,const Stats *s)
 {
-    d->portrait=section(6)+(u16)picture(u,career(u))*348;
+    d->portrait=u->type==3?RT_NULL:identity_portrait(identity,section(6)[picture(u,career(u))]);
     d->name=unit_name(u);d->job=job_name(u,career(u));
     d->hp=d->max_hp=s->hp;d->mp=d->max_mp=s->mp;
     d->level=u->level;d->exp=u->exp;d->brave=u->brave;d->faith=u->faith;
@@ -478,6 +490,8 @@ static void set_page(void)
 static u8 learn_entry(const SaveUnit *u, u8 row)   // the row-th entry of the list (22: none)
 {
     const u8 *j = job_rec(record(u, career(u)));
+    u8 monster_job[JOB_SIZE];
+    if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
     u8 k;
     for (k = 0; k < 22; k++) if (job_ability(j, k) && !row--) return k;
     return 22;
@@ -496,6 +510,8 @@ static void learn_row(u8 i, s16 y)
 {
     const SaveUnit *u = unit(mg.unit);
     const u8 *j = job_rec(record(u, career(u)));
+    u8 monster_job[JOB_SIZE];
+    if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
     u8 k = learn_entry(u, i);
     black(31, y, ability_name(job_ability(j, k)));
     if (learned(u, career(u), k)) black(118, y, "Learned");
@@ -619,7 +635,8 @@ void game_init(void)
     bank = RT_NULL; cache = RT_NULL;     // (statics survive between runs)
     memset(&mg, 0, sizeof mg);
     bank = rt_file("ffmg", &size);
-    if (bank && memcmp(bank, "FMG2", 4)) bank = RT_NULL;
+    if (bank && memcmp(bank, "FMG3", 4)) bank = RT_NULL;
+    identity=rt_file("ffcp",&size);if(!identity_valid(identity,size))bank=RT_NULL;
     common = rt_file("ffcj", &size);
     if (!cj_valid(common, size)) bank = RT_NULL;
     save_load(&save);
@@ -715,6 +732,7 @@ u8 game_update(void)
         mg.row=choice_move(mg.row,4,key);
         if (key & (K_ENTER | K_A)) {
             static const u8 dest[] = { S_EQUIP, S_SET, S_LEARN, S_JOBS };
+            if(u->type==3){mg.note=NOTE_LOCKED;return 1;}
             mg.screen = dest[mg.row]; mg.row = mg.top = 0;
             if (mg.screen == S_JOBS) open_jobs();
         }
@@ -748,7 +766,7 @@ u8 game_update(void)
             if (mg.back == S_EQUIP) equip(u, mg.slot, (u8)v);
             else if (!mg.slot) { u->secondary = (u8)v; mg.changed = 1; }
             else { set16(slot_of(u, mg.slot), v); mg.changed = 1;
-                if(u->eq[EQ_SHIELD]&&!can_equip(u,EQ_SHIELD,u->eq[EQ_SHIELD]))equip(u,EQ_SHIELD,0);
+                validate_equipment(u);
             }
             mg.screen = mg.back; mg.top = 0;
             if (mg.back == S_EQUIP) { for (at = 0; slot_order[at] != mg.slot; at++) ; mg.row = at; }
@@ -760,6 +778,8 @@ u8 game_update(void)
         at = list_move(key, learn_count(u));
         if ((key & (K_ENTER | K_A)) && !learned(u, career(u), learn_entry(u, at))) {
             const u8 *j = job_rec(record(u, career(u)));
+    u8 monster_job[JOB_SIZE];
+    if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
             if (jp(u, career(u)) < ability_cost(job_ability(j, learn_entry(u, at)))) mg.note = NOTE_JP;
             else mg.confirm = 1;
         }

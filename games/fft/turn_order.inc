@@ -14,7 +14,7 @@ void turn_order(void)
         u8 speed=u->sp?u->sp:1; // original AT forecast clamps0, the real clock does not
         if (!u->hp) continue;
 #ifdef FFT_CHAPTER
-        if(!unit_on_field(u))continue;
+        if(!unit_on_field(u)||unit_airborne(u))continue;
         if(u->status_flags&STATUS_CT_FROZEN){
             u8 stop=core_status_current(&u->statuses,3)&2,sleep=core_status_current(&u->statuses,4)&0x10;
             if((!stop&&!sleep)||(u->statuses.innate[3]&2)||(u->statuses.innate[4]&0x10))continue;

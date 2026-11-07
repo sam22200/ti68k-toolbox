@@ -1,6 +1,7 @@
 // Talk Skill: Persuade, Praise, Threaten, Preach, Solution, Death Sentence, Insult, Mimic Daravon.
 // Source formula/finalizer oracle, production commits, gates and AI use (CORE_TALK_SKILL.md).
 #define CLEANSE_RUNTIME_CHECK
+#define FFT_CHECK_NATIVE_ORDINAL // retain every check; PC keeps source-line diagnostics
 #include "check_cleanse.c"
 #include "x/core-talk-skill/oracle/source.h"
 static void prepare_talk(AbId ab)
@@ -64,7 +65,7 @@ static void talk_production(void)
     // A sleeper never listens: no draw, no effect.
     prepare_talk(119);t=&st.unit[10];t->brave=50;seed_mode(t,1);
     {u32 seed=rng32;CHECK(magic_hit(U_RAMZA,10,119,1),0);CHECK(rng32==seed,1);}
-    CHECK(abilities[116].kind,255);CHECK(abilities[123].kind,255);   // Invitation, Negotiate
+    CHECK(abilities[431].kind,255);CHECK(abilities[432].kind,255);   // Reaction IDs remain unavailable as commands
 }
 static u8 upkeep(u8 id)
 {
@@ -107,9 +108,19 @@ static void talk_ai(void)
     for(k=0;k<W->ai_n;k++)if(W->ai_rank[k].ab==124)found=1;
     CHECK(found,1);
 }
-static void talk_trials(void){profiles();talk_production();sentence();talk_ai();}
+static void talk_trials(void){
+#ifndef TALK_RUNTIME_ONLY
+    profiles();
+#endif
+#ifndef TALK_MATH_ONLY
+    talk_production();sentence();talk_ai();
+#endif
+}
+#ifndef TALK_LABEL
+#define TALK_LABEL "talk"
+#endif
 #ifndef __m68k__
-int main(void){sw_init(61);talk_trials();printf("talk %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
+int main(void){sw_init(61);talk_trials();printf(TALK_LABEL " %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else
 void _main(void){reaction_runtime_main();talk_trials();BENCH_VALUE(digest);BENCH_VALUE(failures);BENCH_VALUE(checks);}
 #endif

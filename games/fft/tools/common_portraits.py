@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""The common dialogue portraits (ffcp), for every known speaker of every chapter's scenes.
+"""Shared FCP2 identity bank: exact dialogue/battle/management portraits and names.
 
 usage: common_portraits.py DISC.cue
-Portraits are converted exactly as the battle ones (tools/interface.py: the SPR's portrait
-quad, 17x27, four greys, white outline, 32x29 light/dark/mask planes). Layout, big-endian:
-  "FCP1", u16 offset of the portraits, u8 names, then per name: u8 portrait, the speaker's
-  name as the scripts write it, NUL; even-aligned, the portraits (348 bytes each).
-Generic speakers (a cadet, a knight) are left out: they keep the name-only box (CLAUDE.md,
-dialogue portraits).
-Written into opening/data and campaign/data.
+The seven-byte prefix retains u16 portrait offset and the speaker-alias count;
+alias records remain (u8 portrait ID, NUL-terminated speaker name). Three byte
+ID directories select Gariland, Orbonne and management pictures. Five u16 words
+immediately before the even-aligned portrait data hold those three offsets,
+the510-entry generic-name directory offset and the unique portrait count.
+Portraits remain unchanged32x29 light/dark/mask records (348 bytes). Generic
+name offsets are relative to their own directory. Records stay in Flash.
+Written identically into opening/data and campaign/data.
 """
 from pathlib import Path
-import sys
+import sys,struct
 
 import numpy as np
 from PIL import Image
@@ -44,22 +45,49 @@ def portrait(disc, files, spr_name):
 
 
 def main():
+    import units,opening_assets,management_data
+    from identity_assets import write_changed
     disc, files = extract.disc_files(sys.argv[1])
     faces = [portrait(disc, files, spr) for _, spr in PORTRAITS]
-    ramza = (HERE / 'opening/data/ffoi.bin').read_bytes()[:348]   # its battle portrait 0
-    assert faces[0] == ramza, 'portrait conversion differs from the battle bank'
+    def store(spr):
+        raw=portrait(disc,files,spr)
+        if raw not in faces:faces.append(raw)
+        return faces.index(raw)
+    gariland=[store(spr)for _,spr,_ in units.CHARS]
+    orbonne=[store(opening_assets.CHARS[i][1])for i in (0,2,3,4,5,6,7,8)]
+    management=[]
+    for k in range(management_data.CAREERS+1):
+        for gender in ('MW'if k<management_data.CAREERS else ' '):
+            spr=management_data.SHEETS[k]+'_'+gender if k<management_data.CAREERS else 'RAMUZA'
+            if 'BATTLE/'+spr+'.SPR'not in files:spr=spr.replace('_W','_M')if gender=='W'else spr.replace('_M','_W')
+            management.append(store(spr))
+    assert len(faces)<=255
     index = {name: i for i, (name, _) in enumerate(PORTRAITS)}
     names = list(index.items()) + [(alias, index[name]) for alias, name in ALIASES.items()]
-    out = bytearray(b'FCP1') + bytes(2) + bytes([len(names)])   # u16: the portraits' offset
+    out = bytearray(b'FCP2') + bytes(2) + bytes([len(names)])
     for name, i in names:
         out += bytes([i]) + name.encode('ascii') + b'\0'
-    if len(out) & 1:
-        out.append(0)
+    directories=[]
+    for ids in (gariland,orbonne,management):directories.append(len(out));out+=bytes(ids)
+    if len(out)&1:out.append(0)
+    meta=len(out);out+=bytes(10)
     out[4:6] = len(out).to_bytes(2, 'big')
     out += b''.join(faces)
+    directories.append(len(out));names_at=len(out);out+=bytes(1020);canonical={}
+    small=disc.read(*files['EVENT/SMALL.OUT'])
+    entries=small[0xec+struct.unpack_from('<I',small,0x70)[0]:].replace(b'\xff',b'\xfe').split(b'\xfe')
+    people=[interface.decode(raw)for first in (256,512)for raw in entries[first:first+255]]
+    for i,name in enumerate(people):
+        raw=name.encode('ascii')+b'\0'
+        if raw not in canonical:canonical[raw]=len(out)-names_at;out+=raw
+        struct.pack_into('>H',out,names_at+2*i,canonical[raw])
+    struct.pack_into('>5H',out,meta,*directories,len(faces))
     for chapter in ('opening', 'campaign'):
-        (HERE / chapter / 'data/ffcp.bin').write_bytes(out)
-    print('ffcp: %d portraits, %d names, %d bytes' % (len(faces), len(names), len(out)))
+        write_changed(HERE/chapter/'data/ffcp.bin',out)
+        from identity_assets import compact,MARK
+        h=HERE/chapter/'data/interface.h'
+        if h.exists()and MARK in h.read_text():compact(chapter)
+    print('ffcp: %d unique portraits, %d aliases,510 generic names,%d bytes'%(len(faces),len(names),len(out)))
 
 
 if __name__ == '__main__':

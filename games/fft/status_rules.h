@@ -28,6 +28,13 @@ u8 skill_cost(u8 who,AbId ab)
         st.unit[who].job==SOURCE_JOB_MIME,st.support[who]==SUPPORT_HALF_MP);
 }
 #endif
+static inline u8 ability_range(u8 who,AbId ab)
+{
+    const Ability *b=&abilities[ab];
+    if(b->flags&AF_ITEM&&b->formula!=99)return st.unit[who].job==SOURCE_JOB_MIME||
+        cj_support(common,st.unit[who].job,st.support[who],474)?4:1;
+    return b->formula==99?st.unit[who].move:b->range;
+}
 static inline u8 status_blocks_skill(u8 status,AbId ab,u8 set)
 {
     const u8 *range;u8 menu;

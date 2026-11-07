@@ -164,7 +164,7 @@ static void status_numbers(void)
         CHECK(cast_order(U_RAMZA,10,buffs[j],1),1);
         for(k=0;k<NUNIT+2;k++){
 #ifdef FFT_MODULES
-            mod_call(MOD_NUMBERS,2,0);
+            mod_call(MOD_AREA_UI,AREA_NUMBERS,0);
 #else
             area_number_prepare();
 #endif

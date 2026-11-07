@@ -46,21 +46,23 @@ static void local_levelup(u8 reaction)
     ZB(44);impact();ZE(44);
     if(!reaction){
 #ifdef FFT_MODULES
-        CHECK(mod_id==MOD_ACTION+1,1);
+        // Immediate level-up has already drained its derived-stat rebuild.
+        CHECK(mod_id==MOD_EQUIPMENT+1,1);
 #else
         CHECK(1,1);
 #endif
     }
-    // Response-owned settlement must likewise keep its local stat implementation.
+    // Settlement returns before the cold equipment owner rebuilds derived stats.
     for(j=0;j<8&&a->level==a->lv0;j++){
         ZB(45);end_anim();ZE(45);
     }
     CHECK(a->level,a->lv0+1);CHECK(st.lvup,1);
 #ifdef FFT_MODULES
-    if(reaction)CHECK(mod_id==MOD_RESPONSE+1,1);
+    if(reaction)CHECK(mod_id==MOD_EQUIPMENT+1,1);
 #else
     if(reaction)CHECK(1,1);
 #endif
+    CHECK(W->rebuild,0);
     for(i=0;i<5;i++)CHECK(st.affinity[U_RAMZA][i],expected[i]);
 }
 static void loaded_party(void)
