@@ -13,6 +13,161 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT factorization (2026-11-07):** Read `games/fft/campaign/CORE_FACTORIZATION.md`
+  before changing banks. ABI78/348, FCP2/FMG3/FCD4 share46 unique portraits and510
+  names. All portrait/name readers use archive pointers; do not restore per-chapter
+  or management copies. Cold identity validation checks bounds/alignment before
+  native word reads. Module compilation discovers arithmetic helpers before its
+  final pass; undefined symbols reject an export. The package is611132 bytes,
+  controlled net saving11240; zone8690, Work37460/FSV4 remain. Resident input64913
+  leaves23 bytes. Preserve current performance gates and old protected artifacts.
+
+
+- **FFT combat finalization (2026-11-07):** Read
+  `games/fft/campaign/CORE_FINAL_COMBAT.md`; it supersedes the older combat
+  remaining-work lists below.201 actions/78 RSM have native consumers; shared
+  donor heights, panel collateral, origin-dependent Reflect and innate status
+  utility are integrated. ABI77/348,26 images; AI_PREP25 owns victim/Math/panel
+  preparation, AREA_AI13 enumerates centres. Work37460, static zone8880, actual
+  TTPack64797/headroom139; Unit112/State2224/FSV4 remain.6605 focused checks agree
+  PC/sanitizers/68000. Ordinary13-actor frames and planner quanta pass360k;
+  all99 suites pass uncached, and two actual packed Titanium boots/exits pass.
+  Cold loads/rotations remain explicitly slower. No mount/rider completion
+  requirement and no implicit new generic-family queue. Exact PS1 future-turn
+  AI, content/editors/future-map certification are separate. Preserve standard
+  groups, live TiEmu and protected proof/save bytes AND both dates. Native
+  RAM saves13810 bytes on Gariland without shrinking48 actor frames. Status
+  aliases AI scratch; rotation aliases reach backups. Keep equipment drafts and
+  movement/deferred state outside these unions. Native
+  graph configuration lives in Work across image reloads; never search a
+  partial graph or restore per-frame idle menu image churn.
+
+
+- **FFT direct projectile interception (2026-11-06):** Read
+  campaign/CORE_DIRECT_INTERCEPTION.md. PLANNER's direct_target returns a unit
+  slot (including0) or255, never a boolean. Preflight accepts any recipient;
+  AI geometry requires the intended one. Keep generic ai_clear unchanged.
+  Shared frozen panels/previews and deferred FORMULA14 remain ABI75/348;
+  PLANNER24 is6744, zone8596, Work46770, actual input64897/headroom39. Only
+  that image changes; save/layouts/five blocks remain.508 logic+24 HUD checks
+  pass PC/sanitizers/68000. Broader height/innate/collateral/Reflect interactions
+  and stabilization remain. Preserve protected bytes/dates, groups and TiEmu.
+
+
+- **FFT weapon panel victims (2026-11-06):** Read campaign/CORE_PANEL_VICTIMS.md.
+  ABI75/348 supersedes ABI74 actual-preparation ownership: PLANNER1 resolves
+  geometry/panel, deferred FORMULA14 freezes or restores packets. PLANNER5 owns
+  continuation (not RESULTS4); PLANNER3/4 preview -> deferred NUMBERS6. WEAPON6
+  still owns scalar cache/impact. Requests16/32 drain only after image return.
+  action.left bit128 is frozen victims, low bits remaining hands. Never reroll
+  frozen cooccupants or run responses before all hands/victims settle. Endpoint
+  cooccupants share direct weapon panels; generic rays retain their old policy.
+  Work46770(+138), zone8596(-8), layouts/FSV4/five blocks remain. Shards58230/
+  61718/56916, actual input64897 leaves39. Focused527+33+66 PC/sanitizer/68000
+  checks and22 unique regression suites pass. Native fixtures that directly
+  call attack_damage must opt into FFT_WEAPON_TEST_API; keep unused diagnostic
+  APIs out of size-bound production/render carriers. Wider direct interception/
+  cooccupant/innate/collateral/Reflect AI
+  remain in interactions, then stabilization. Preserve standard groups, live
+  TiEmu and protected proof/save bytes AND dates; private outputs only.
+
+
+- **FFT native ballistic weapons (2026-11-06):** Read campaign/CORE_ARCS.md.
+  ABI74/348 and PLANNER0/1 versus WEAPON6 ownership remain. Projectile mask
+  cursor is origin*16+slot (one eligible pair/update,64 rejected scans); short
+  weapons keep origin-only/four-origin quanta. Both ordinary Attack and Charge
+  must consume masks before ranking; do not restore their straight-ray veto.
+  Native lower/upper arcs use64 additive steps, not PS1 trig/impulse rounding.
+ 128 retail choice branches and336 separate adapted controls feed1533 checks
+ AEF99E38 on PC/sanitizers/68000. Unit/State/Work/FSV4/five blocks/zone8604 and
+  actual resident bytes remain; input64893 leaves43, shards56364/61580/58740.
+  All panel victims/recipient previews and wider cooccupant/innate/Reflect/AI
+  remain in interactions; stabilization follows. Preserve live TiEmu, standard
+  groups and protected proof/save bytes AND dates; private outputs only.
+
+
+- **FFT short-weapon collisions (2026-11-06):** Read campaign/CORE_MELEE_COLLISION.md.
+  ABI74 supersedes ABI73's scalar-owner restriction: PLANNER24 now prepares
+  actual strikes and pure geometry; WEAPON22 owns scalar-cache op6 and impact.
+  Never restore WEAPON0 preparation or route scalar rows to PLANNER0. The512
+  phase in ai_weapon_left is geometry; lower nine bits select scalar rows.
+  Four origins/update match PC/TI; no image calls a loader on its own stack.
+  Work46632 adds514, zone8604 adds54; Unit112/State2224/FSV4 and five blocks
+  remain.25 images, shards56358/61580/57032; actual input64893 leaves43 bytes.
+  1536 retail interval profiles supply1570 focused checksF5544F48.
+  Exact arcs, all panel victims/preview recipients, broader cooccupant/innate/AI
+  and Reflect work remain in the interaction delivery; stabilization follows.
+  Preserve standard groups, live TiEmu and protected proof/save bytes AND dates.
+
+
+- **FFT temporal/weapon AI interactions (2026-11-05):** Read
+  campaign/CORE_AI_INTERACTIONS.md. The interaction delivery remains open; do
+  not announce it complete or reopen generic families. Source clock expiry/gain,
+  finite versus innate status and timer0 wrap now drive next-turn/Charge risk.
+  PLANNER24 owns four-pair weapon scalar/drain/status/spell utility; never restore
+  WEAPON22 op6 or nested image loads. AI candidates retain local reach/hit/line.
+  ABI73/348, Work46118 (+260),25 images with the same8550 zone; Unit/State/FSV4
+  and five blocks remain. Actual TTPack64931/64936 leaves5 bytes.528 real-clock
+  profiles plus integration pass21127 checks5F8E8515 on PC/sanitizers/68000.
+  Exact collisions/full panel victims and wider Reflect/AI/innate/reaction work
+  remain, followed by TI stabilization. Preserve live TiEmu, standard groups and
+  protected proof/save bytes AND dates; private build/VAT paths only.
+
+- **FFT complete weapon effects (2026-11-05):** Read campaign/CORE_WEAPONS.md.
+  The whole weapon-effects delivery is done: elements/strengthening/affinities,
+  healing/drain/Undead, magical guns, status addition/removal and spell procs.
+  Two final deliveries remain: interactions, then TI stabilization/release.
+  FCJI50330 adds1024 archived bytes and21 dual-compatible weapons. ABI72/348,
+  24 images/zone8550, shards55730/55488/56560; actual TTPack64927 leaves9 bytes.
+  Unit112/State2224/Save3202/FSV4 and five blocks remain; Work45858 adds250.
+  WEAPON22 prepares/commits; STATUS23 owns bitmap commits/requests and spell
+  follow-up. Drain requests after owners return. The encoded self word is a
+  weapon packet here, not a plain self-cost. AI scalar cache quanta must match
+  PC/TI; reach/hit stay candidate-local.770 source profiles,4741 focused checks
+  E4AB8000; physical2421 retained. Direct diagnostic weapon APIs explicitly opt
+  in with FFT_WEAPON_TEST_API; size-bound production-style carriers omit them.
+  Preserve live TiEmu, standard groups, proof/save bytes AND dates; private
+  outputs/VAT only. Current source bounds and the remaining two deliveries are
+  explicit in CORE_WEAPONS.md.
+
+
+- **FFT physical weapon formulas(2026-11-05):** Read campaign/CORE_WEAPON_FORMULAS.md.
+  Shared PA/Speed/Brave/MA/variable/mixed bases and ordinary guns71..73 now feed
+  all existing strike owners; previews use16384 without RNG. Base draws precede
+  critical draws. ABI71 replaces ModCtx.attack_roll with pure weapon_amount in
+  the same slot; weapon_roll.inc stays in RESPONSE/COMBAT. Never restore a loader
+  inside an executing image.26 more plain compatible weapons support Two Swords;
+  FCJH49306 changes27 low hand bits (bare marker included), no format growth.
+  Unit112/State2224/Work45608/Save3202/ModCtx352, five blocks and22 images remain;
+  zone8566, shards51140/51952/53456. Actual packed input64929 leaves7 bytes.
+  2421 focused assertions match PC/sanitizers/68000. Elements, healing/drain,
+  magical guns, status/spell procs and post-formula RNG remain, along with the
+  named frame/stack/residency/release gates. Preserve standard groups/live TiEmu
+  and protected saves/proofs with bytes AND dates; private builds/VAT only.
+- **FFT weapon reach integration(2026-11-05):** Read campaign/CORE_WEAPON_REACH.md
+  before continuing combat fidelity. Shared source strike/lunge/direct/arc ranges
+  feed Attack/Charge, AI, Counter/Hamedo and Mime. Sparse cardinal masks retain
+  neighbor enumeration; arc/direct masks prepare the origin once. Do not restore
+  the old assumption that every reach>1 weapon is a bow. ORDER owns shared CT/
+  pending selection (17/18), with no per-tick swap. ABI70/ModCtx352 keeps22 images,
+  zone8566, Unit112/State2224/Work45608, FSV4/3202 and five allocations. Actual
+  production input64897/64936 leaves39 bytes; do not infer headroom from BENCH.
+  Generic coverage remains201 actions/78 RSM, with no missing-family queue.
+  Exact trajectories, full panel victims, weapon formulas/procs, innate/AI and
+  combined frame/stack/residency/release gates remain open. No standard group or
+  live TiEmu update is authorized by this checkpoint.
+- **FFT Hamedo integration(2026-11-04):** CORE_HAMEDO.md extends returns through
+  existing native reach/line queries. Resident preflight fills idle Work.ai_traj
+  before RESPONSE4/COMBAT0; never let an executing image call a loader. Brave is
+  drawn before incapacity/return geometry rejection. Keep unpaid cancellation,
+  pending/CT, no secondary/Mime recursion and existing shot pixels. ABI69/352,
+  22 images/zone8566, shards51210/51832/52010; actual TTPack64917/64936 leaves19
+  bytes. Unit112/State2224/Work45608/Save3202 and five blocks remain.363 focused
+  PC/sanitizer/68000 assertions plus13 affected suites and private native flows
+  pass. Mime is delivered, generic counts201/78 complete. Broader original
+  weapon geometry/procs/AI and frame/stack/residency/release remain separate.
+  Preserve live TiEmu, standard groups and protected save/proof bytes AND dates.
+
 - **FFT UI/input work:** read `games/fft/GAME_DESIGN.md` first. It records the
   user's mandatory first-frame feedback, shared menus/file slots, physical keys,
   legal deployment, management animation/JP and1px-only scenery decisions.
@@ -21,6 +176,193 @@ Both apply to every agent working in this repository.
   Runtime (C, SDL and TI backends), 2 the Open Flappy Bird port (`games/flappy`), 3 TI-Basic to C
   (`games/ffa`), 4 keypad "touch" gestures, 5 Bubble Ghost (Game Boy ROM reverse engineering),
   6 Prince of Persia.
+- **FFT discovery/monster block D(2026-11-04):** all four generic R/S/M delivery
+  blocks are complete:78/78 bounded consumers and201/201 generic actions.
+  CORE_DISCOVERY.md and CORE_RSM_REMAINING.md define current scope. Next is final
+  integration/Mime, not another generic-family queue. Source Chocobo commands
+  and real map/poach records are executable; recruited monsters remain in reserve
+  until compatible art exists. Never borrow human art or human job changes.
+  Train respects existing Invite/immortal/immunity; Choco Attack shares physical
+  forecasts/Golem. Secret Hunt directly credits capped inventory, no Fur Shop UI.
+  ABI67/ModCtx352:22 images, zone8566, three7/7/8 shards51204/51062/49714; actual
+  TTPack64581/64936. FCJH49306 adds2720 archived bytes. FSV4/3202 adds64
+  discovery bytes and migrates FSV3/3138 and FSV2/3110 without moving old offsets.
+  Unit112/State2224, Work45588, five blocks. NATURE21 owns deferred monster updates,
+  cold Math masks and chapter loading; always return before image loads. Keep a
+  byte donor index beside borrowed Unit pointers: pointer subtraction at stride112
+  emitted __mulsi3. Preserve live TiEmu, standard groups and protected save/proof
+  bytes AND dates; private cwd/VAT only. Final frame/stack/residency and release,
+  broader weapon/proc/AI, ranged Hamedo and full monster content remain open.
+- **FFT Lancer Jump (2026-11-03):** the user re-enabled Jump and explicitly
+  allowed simple terrain rules instead of a large engine rewrite. Jump now uses
+  the same terrain layer, learned range/height, fixed target cell, independent
+  max(1,50/Speed) timer and an untargetable hidden actor with a reserved origin.
+  Speed0 clamps to1. All201 generic entries are enabled; broader R/S/M and release
+  gates remain open. CORE_LANCER_JUMP.md records source/native limits. ABI60/360:
+  RESPONSE5 constructs Jump after COMMAND returns; TURN4/5/6 own the unchanged
+  target picker. FMD2 omits verified zero context bytes from archive images;
+  loader restores exact offsets and defaults. Always size MOD_ZONE from the
+  logical header, not stored payload. Preserve live TiEmu, standard groups,
+  user saves and protected proof bytes/dates; use private cwd/VAT paths.
+- **FFT critical reactions (2026-11-03):** CORE_CRITICAL_REACTIONS.md enables
+  HP Restore/MP Restore/Critical Quick431..433. Post-damage Critical23 uses the
+  HP/5 boundary plus innate/immune traits; Brave0 draws nothing. Freeze effects,
+  retain positive Undead healing and Wall misses; finish the entire response/
+  root reward drain before Quick turn entry. The native gate derives Critical,
+  without adding mutable status/cache/save fields. Source reaction bits at0x8c
+  are0x40/0x20/0x10; battle CT is0x39. ABI59/ModCtx360 shares target_query253;
+  invalid Math criteria must reject before reserved253..255 queries. RESPONSE4
+  owns the unchanged ordinary-attack constructor through existing transient
+  actor/target fields; it must not load another executing image. Its unused
+  public rewards wrapper is excluded. Zone8254, banks63722/63938; keep both
+  archive and actual packed-input limits (64847/64936,89 bytes left).
+  Generic189/201, Jump12 user-deferred,
+  remaining R/S/M/full-frame gates unchanged. Preserve live TiEmu, standard group
+  and protected save/proof bytes AND dates; private VAT/cwd only.
+- **FFT stat-save reactions (2026-11-03):** CORE_STAT_SAVE.md enables equipped
+  PA/MA/Speed Save422..424 through the existing post-damage offer and secondary
+  packet. They remain rejected as direct commands. Post-HP/status staging,
+  self targets, Brave and caps99/99/50 are source-checked. No stock/MP/reaction
+  reward or CT/Charge rollback. ABI58/ModCtx360 removes unused skill evaluator
+  bindings; pure target_query254 shares reaction_live. AREA_UI14 now owns impact
+  numbers and wind-up glyphs; NUMBERS15 retains forecasts. Keep direct native
+  checker entry calls aligned. Zone8254, banks63684/63380, actual TTPack64911/
+  headroom25; recover resident room before another addition. Gameplay/save
+  layouts and all five allocation formulas remain fixed. Generic189/201 and
+  user-deferred Jump12 are unchanged; broader R/S/M/full-frame gates stay open.
+  Preserve live TiEmu, standard group and save/proof hashes AND dates.
+- **FFT Math Skill family (2026-11-02):** CORE_MATH.md enables the eight
+  Calculator selectors and reuses45 learned eligible spells. Source flags3 bit0x40,
+  four saved career rows, global panel selection, caster CT100, nonzero values,
+  whole walking heights and Float/cooccupant borrowing are distinct contracts.
+  Math bypasses Reflect/Counter, retains magical evasion, and costs no MP/CT;
+  ordinary Attack from the same job retains Counter. FCJD adds316 archived lookup
+  bytes, no gameplay/save growth. ABI57/ModCtx368 uses pure resident target_query,
+  removes unused bindings, derives cold job_sets and returns before overlay loads. TURN1/2/3
+  own Math input/Attack range/Math reach; BEATS4 owns camera targets; SCREENS12
+  replaces SAVE5 catalogue validation. Two shards and resident are nearly full.
+  Native checker transport may need parts; keep every assertion and pixel digest.
+  The16 numeric masks reuse32 idle scratch bytes; first-frame menu rows must
+  complete without repeated invalidation. Cross-job acquisition without a saved
+  roster row and stationary Math AI are
+  explicit native policies.189/201 generic entries; Jump12 stays user-deferred.
+  R/S/M/full content/full-frame gates remain open. Preserve live TiEmu, the
+  standard group, save/proof hashes AND dates; use private VAT/cwd paths.
+- **FFT Throw family (2026-11-02):** CORE_THROW.md adds12 learning selectors
+  and80 selected item commands; FCJC keeps512 source metadata rows and640
+  normalized rows. Source commands512..639 are transient native choices, never
+  saved learned ability IDs. Skillset20's Ball bit1 differs from type-table order.
+  `known(who,255)` counts in one pass; keep AI's17 slots bounded. ABI56/388 binds
+  pure resident can_use in the old unused opening_after slot. TARGETS6/7/8/10
+  and PARTY14 own cold preparation; no image may call a loader wrapper while
+  executing. Preserve original four-stage physical evade RNG and final-product
+  rounding. Jump0x62 is the gated target-test control now.181/201 generic,
+  20 remain (Arithmeticks8, Jump12 deferred). Gameplay/save allocations stay
+  fixed; source/RSM/cold-overlay limits and paired cost evidence remain explicit.
+  Preserve live TiEmu, standard group and all save/group hashes and dates.
+- **FFT Float family (2026-11-02):** CORE_FLOAT.md enables the last ordinary
+  spell (id38):16 source profiles,12 Float moves across both navigation queues,
+  12 separate normal controls. Reuse canonical Float17/byte2 bit0x40, owned
+  formula0x0b and search out bit2; no new state/cache/heap. Source status Float
+  differs from equipped Float movement. Earth/Dispel/MP/CT/AI/reach restoration
+  share core paths. Keep original hover/unit-height/equipped movement and the
+  inherited normal-water cost difference explicit.175 records/129 casts/
+  169 of201 generic;32 remain. ABI55/388,18 images/zone8312; raw64771,
+  actual TTPack64773/headroom163, two near64000 shards. Invalid nav flags use8.
+  Preserve live emulator, standard group and all protected save hashes/dates.
+- **FFT Charm/Invitation family (2026-11-02):** CORE_ALLEGIANCE.md adds both
+  Steal Heart and Invitation. Current camp drives targeting/AI/gil; permanent
+  camp drives inventory/roster/victory; original spawn camp retains the fixed
+  enemy-level bonus. Charm lasts32 ticks, refreshes on reinfliction and restores
+  camp on cure/expiry/HP-damage/KO. Invite is permanent, uses AI during battle,
+  and joins a free roster slot at victory under the bounded native policy.
+  Unit.allegiance reuses byte73 padding: Unit112/State2210/Work45576/Save3138/
+  FSV3/allocations unchanged. FCJB adds416 source immunity byte rows, no RAM cache.
+  ABI54/388: PERFORMANCE7/8 social commits; COMMAND0 transient arguments and
+  reject4 before mutation; native can_use is local, with private PERFORMANCE5.
+  Auto-battle cancellation cannot release involuntary control. Compaction must
+  remap live roster slots, repeated saves must not duplicate recruits, full
+  rosters must not overwrite existing identities.174 records/128 casts/168 of201
+  generic entries,33 remain.18 images/zone8312, input64683/headroom253;
+  shards63026/63708 are near64000, so plan the next family with both budgets.
+  Original full recruitment UI, four camps/monsters/Finger Guard and complete
+  control/action dispatch remain separate; keep Jump deferred and preserve
+  live TiEmu, standard group and all protected save/proof bytes and dates.
+- **FFT Songs/Dances family (2026-11-02):** CORE_PERFORMANCE.md adds all14
+  Bard/Dancer performances. Reuse Performing plus the deferred slot for repeat
+  periods, global frozen targets, resources/stat/status/CT results. Movement
+  retains it, commands/cancelling statuses end it; Stop freezes, Don't Act skips
+  and re-arms. Quick waits for whole-pulse settlement.172 records/126 casts/
+  166 of201 generic entries;35 remain. ABI53/388 adds PERFORMANCE17,18 images/
+  zone8240, input64665/headroom271. Cold allocation/slopes move into SCREENS11
+  with102-byte CoreBoot pointer bindings, story setup into PARTY10 and native
+  State reset into PARTY13; gameplay/save layouts and allocation requests fixed.
+  Native allocator failure injection must reach the archived image (synthetic
+  ROM hook in headless checker); geometry fixtures must hide extra capacity
+  actors. Do not repeat full census: select direct dependencies. AI remains
+  immediate-utility, random-status preview shows a filtered byte subset; original
+  acquisition/Mimic/full dispatcher/combined AT listing remain separate.
+- **FFT Draw Out family (2026-11-02):** CORE_DRAW_OUT.md adds all ten
+  Samurai producers with source formulas0x20..0x23, radius/cardinal targeting,
+  frozen status procs and katana inventory/breaks.142 source profiles,36
+  compound groups,12 footprints;4625 PC/sanitizer/68000 assertions5AF7EF14.
+  Last-target loss staging wins; a late invalid target or no successful hit
+  clears it. Native rt_save is deferred: flush private checker writes before
+  reading persisted bytes.158 records/112 casts/152 of201 entries;49 remain.
+  ABI52/ModCtx388: SAVE7/8 ordinary batch commit, SCREENS11 cold bootstrap;
+  pass resident FFT_CAMPAIGN_FLOW explicitly (shared images lack that define).
+  Input64653/headroom283,17 images/zone8240; gameplay/save/allocations fixed.
+  Preserve live TiEmu, user saves and standard group; Jump stays deferred.
+- **FFT line family (2026-11-01):** CORE_LINE.md adds Earth Slash with shared
+  origin-based rays, cardinal command/range/AI selection, nearest-first formula
+  draws, Earth/Float/null/absorption and a frozen scalar push for one critical
+  victim.27 original footprints/75 formula profiles;2786 PC/sanitizer/68000
+  assertions59AFCB33.148 records/102 casts/142 of201 generic entries;59 remain.
+  ABI51/ModCtx388,17 images/zone8236, input64735/headroom201; gameplay/save/
+  allocation layouts stay fixed. Use the same predicate for masks and panels;
+  alternate origin floors can be hit, and linear centres must not be pruned
+  across origins. Do not infer evade/critical/proc RNG from helper names/flags
+  alone. Draw Out still needs its full inventory family; Jump stays deferred.
+  Preserve live TiEmu, saves, standard group and historical proof bytes/dates.
+- **FFT physical-status family (2026-11-01):** CORE_SECRET_FIST.md enables
+  Secret Fist, the generic formula50 producer (147 records/101 casts/141 of201
+  entries;60 remain). MA with physical supports/target modifiers, no Faith;
+  retail flags4=0 bypasses evasion despite the helper call. Shared frozen status
+  and Death Sentence countdown/Undead/reward/AI paths.185 original profiles,
+  4067 PC/sanitizer/68000 assertions1FCD638D. Share modifiers in magic_xa;
+  separate resident math overflowed old native test carriers. PARTY13 groups
+  ordinary cold setup in source order, ABI50/ModCtx388,17 images/zone8186,
+  input64559/headroom377. Layouts/save/allocations and approved pixels stay fixed.
+  Keep Earth Slash for line targeting and Jump deferred; preserve live TiEmu,
+  saves, standard group and historical proof bytes/dates.30 direct suites pass,
+  as do both native pilot flows, common reader and actual prior-ABI49 rejection;
+  260 historical save/group bytes and dates are preserved. Original-rule limits
+  and verification details are in the family note.
+- **FFT Geomancy family (2026-11-01):** CORE_GEOMANCY.md enables all12
+  terrain attacks (146 records/100 casts/140 of201 generic entries). Original
+  formula24 and19% proc, archived64-byte source mapping (FCJB), two-layer
+  surface tails with unchanged collision stride (FGS2); no gameplay/save RAM
+  growth. ABI49/ModCtx388, cold scripted preparation in PARTY12 and glyph/cover
+  preparation in PARTY10. Filter AI origins against their own terrain; reset
+  each ability's best candidate before early area dispatch.8927 PC/sanitizer/
+  68000 assertions4BF14699,279 formula profiles/128 original terrain calls.
+  Headroom195/zone8186;70-suite scope plus final10+3 direct suites, native
+  pilot flows and isolated management pass (CORE_GEOMANCY.md). Rejects consume
+  the AI scan budget; pure terrain queries cost167456 cycles/64 origins
+  versus294256 through repeated can_use.
+  61 generic entries remain; keep Jump deferred and preserve live TiEmu, saves,
+  standard group and historical proof bytes/dates.
+- **FFT gil-transfer family (2026-11-01):** CORE_GIL.md enables Gil Taking
+  and Negotiate together: physical/Talk accuracy, shared raw Speed x level
+  amount, frozen one-time transfer, caps and victory persistence. Live funds
+  reuse the existing Save tail (no State/Work/FSV3/allocation growth); PARTY11
+  initializes ordinary and scripted starts, ABI48/ModCtx388. TEAM_GUEST is
+  blue-camp AI control (Delita ENTD0x184/0 flags0x84), so it shares funds.
+  134 source profiles,3262 PC/sanitizer/68000 assertions2020738D;69 suites
+  green plus7 direct final checks and both native pilot flows.134 records,
+  88 casts,128/201 generic entries; headroom211/zone8186. More job/control/
+  RSM/campaign/tooling/budget work remains; Jump stays deferred. Preserve the
+  live TiEmu, standard group, user saves and historical proof artifacts.
 - **FFT Talk Skill (2026-10-30):** CORE_TALK_SKILL.md adds seven Mediator
   speeches (115 records, 82 casts, 112/201 entries). Signed Brave/Faith loss in
   the record Y; AB_FAITH; AB_QUICK writes the prepared CT. Oracle tables in the
@@ -563,7 +905,7 @@ Both apply to every agent working in this repository.
   returns, with at most one rejected trajectory per update. Reuse ACTION's local
   evaluator while resident to avoid ACTION/FORMULA copy ping-pong. Native
   State2092 (+46), unchanged Unit112/Work45516/FSV3/allocation count; private
-  group482578 (+4008), packed input64605/headroom331, largest image5742.
+  group482578 (+4008), packed input64605/headroom251, largest image5742.
   Fixed/generated encounter traits, other reaction families, source strike
   sequencing and complete timing/residency remain open. Keep Jump deferred and
   live TiEmu/standard group untouched. Older notes are historical measurements.
@@ -828,3 +1170,95 @@ Both apply to every agent working in this repository.
   in this file and in `CLAUDE.md`.
 - Game state to resume from: `games/<game>/PROGRESS.md` (FFA: `games/ffa/PROGRESS.md`, the CT
   test: `games/ffa_ct/PROGRESS.md`).
+
+## Self-status reactions (2026-11-03)
+
+CORE_STATUS_REACTIONS.md / ABI61 retains ModCtx360 and existing storage.
+Caution426 and Dragon Spirit427 use the pre-impact physical flag, even for a
+miss/heal/no-op. Regenerator428 uses post-HP-damage staging; successful zero
+is eligible. Exclude formula7; pre-physical reactions also exclude Math.
+At Brave0 the first two still consume a chance draw, Regenerator does not.
+Freeze Defend/Reraise/Regen requests, then re-filter late immunity at commit.
+A filtered no-op keeps source hit1 with packed request0; do not mutate pending
+casts for it. Wall misses; Regen cancels Poison and refreshes36 ticks. Reuse the
+status owner and preserve Charging/Performing. Source oracle60 stages/33 effects,
+1159 logic+117 UI assertions/18 pictures compare PC/sanitizers/68000. No FCJD,
+gameplay/save allocation or standard campaign group changes; full R/S/M and
+production frame/stack/residency gates remain open. See the family note and
+x/core-status-reactions/verification.json for final packing/regression evidence.
+
+## Brave/Faith/Transparent reactions (2026-11-03)
+
+**OBSERVED IN FFT:** Sunken State425 and Brave Up429 use pre-impact physical
+eligibility, including misses/no-ops; Faith Up430 reads nonzero effective MP
+cost independently of hit/physical flags. Formula7/reaction incapacity still
+exclude them. All three consume a failed chance draw at Brave0. Original self
+effects add3 Brave/Faith (cap100), or Transparent19 with ordinary status filters.
+Transparent clears all four evades (four execution draws), clears on HP-damage
+type even zero and on a later acted turn; a fresh infliction resets turn-removal
+arming. Jump clears it when accepted. Source evidence:69 stages/37 effects,
+three self-target lists and evade/removal fixtures.
+
+**TARGET IMPLEMENTATION:** CORE_BRAVE_FAITH_REACTIONS.md uses existing status,
+response and stat owners; the unsaved allegiance byte's spare bit6 carries
+Transparent arming, and Invite preserves it. Keep the reviewed outlined sprite;
+Hidden reuses the impact-label cache. Manual targeting/occupancy/collateral are
+legal; hostile scalar/nearest AI and area/Math utility skip the hidden actor.
+FORMULA14 prepares typed self packets after RESPONSE returns; RESPONSE6/7 owns
+consecutive strikes, ORDER16 owns turn entry. ABI62/ModCtx360, zone8390,
+banks62374/63840, actual packed input64927/64936:9 bytes remain. No gameplay/save
+layout/heap/FCJD growth.1372 logic+98 UI assertions/14 pictures match
+PC/sanitizers/68000. Broader R/S/M/permanent Brave/Faith carry-over and full-frame,
+stack/residency/release gates remain separate. Preserve live TiEmu, the standard
+campaign group and protected file bytes AND dates.
+
+## Counter Tackle/Flood and Absorb Used MP (2026-11-03)
+
+**OBSERVED IN FFT:** Counter Tackle436 tests raw flags4 bit0x10; Counter
+Flood437 tests bit0x80, which includes ordinary Attack and Geomancy. Either may
+stage on a miss/heal/no-op. Math/formula7 and ordinary reaction restrictions
+still apply. Absorb438 reads the effective incoming MP byte; its self effect
+adds that byte, caps MP, ignores Undead and misses under Wall. Original
+preparation skips the acting slot. Source evidence:60 stages, nine effects and
+four constructors. Constructor calls are Dash147/validation1 and the current
+terrain's Elemental/validation0; isolated preview/MP/strike-init hooks are
+recorded, not a complete original targeting/animation replay.
+
+**TARGET IMPLEMENTATION:** CORE_COUNTER_REACTIONS.md freezes the MP byte in the
+existing pending slot (0x8000|cost), after CoreAction validates ID438. No save
+field grows. Tackle shares Dash math/RNG, with bounded adjacent/height reach;
+special/stacked actor targeting remains open. Flood reuses Work.cast only after
+the root commits, freezes all radius1 victims before HP and uses its own area
+painting. Actor/ability ownership and phase checks reject stale FX/second commits;
+secondary effects grant no EXP/JP and cannot stage nested reactions. ABI63 keeps
+ModCtx360 and18 images: RESULTS3/4 own selection/strike queries, TARGETS11 Flood,
+ORDER16 existing post-clock resets. Zone8452, banks63962/63918 and actual packed
+input64867/64936 leave only38/82 bank bytes and69 input bytes.813 logic+34 UI
+assertions/12 pictures match PC/sanitizers/68000; three UI transport partitions
+retain all checks and pictures. Full-frame/stack/residency/release gates remain
+open. Preserve protected saves/groups, including dates; do not touch live TiEmu.
+
+## Movement delivery block A (2026-11-03)
+
+**OBSERVED IN FFT:**128 retail movement configurations,16 additive Move/Jump
+bonus boundaries and24 Teleport trials are recorded by movement_oracle.py.
+Teleport rolls floor(rand*100/32768) against (distance-Move)*10, even inside the
+guaranteed range. Equipped Float is promoted to innate Float17 by source status
+initialization, protecting from Earth and ordinary removal. Six64-byte terrain
+rows distinguish weather-dependent0, forbidden255 and water/lava classes.
+
+**TARGET IMPLEMENTATION:** CORE_MOVEMENT.md closes blockA's15 generic traversal
+capabilities. One encoded byte/unit and archived innate flags share battle and
+management bonus math. Retain the previous ordinary-water adapter; source dry
+slow costs and severe weather now have real consumers. Cold MOVEMENT18 returns
+before AI_SETUP/TARGETS load. Native SCREENS shares Teleport's no-undo rule.
+Fly/Teleport are bounded direct destinations on the current layer, with legal
+landing/depth/lava/occupancy checks and existing art/target heights. ABI64/360
+keeps one zone8640 and uses three matching FMB3/FMD2 shards6/6/7, with mandatory
+whole-set validation before execution; no decompression/new ASM/new heap block.
+Native Unit112/State2224/Work45582; FSV3/Save3138 unchanged. FCJE44538 adds864
+archive bytes. Actual non-BENCH TTPack input64175 leaves761 bytes; do not quote
+instrumented63227 as production.9957 family assertions and32 pictures agree
+PC/sanitizers/68000. Cold reach can exceed a frame; full-frame/stack/residency/
+release gates remain open. Continue with blockB17, then C12/D6 (35 IDs remain).
+Preserve live TiEmu, standard groups and protected save/proof bytes AND dates.

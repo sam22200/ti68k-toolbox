@@ -1,5 +1,55 @@
 # Final Fantasy Tactics (PS1): study notes
 
+## Throw family (2026-11-02)
+
+**OBSERVED IN FFT:** source formula0x63 uses current Speed times the selected
+throwable weapon power, physical target modifiers/zodiac and elemental effects,
+without Attack Up, Martial Arts, Faith, critical or knockback draws. Four physical
+evade stages retain zero-evade draws and stop at a failure. Physical preview
+rounding retains all factors until the final division. Source skillset20 puts
+Ball before Knife in learning order. See tools/throw_oracle.py and its unchanged
+original function hashes/180 bounded profiles; Catch/RSM/full dispatcher remain
+separate.
+
+**TARGET IMPLEMENTATION:** FCJC keeps source learning metadata and supplies80
+archive-only item commands at512+item. Existing menus, stock ownership, frozen
+category/commit, responses and bounded AI share these records; no new live
+cache/layout/allocation. TARGETS owns native cold reach/path/aim. Full cold
+UI/render budget and broader RSM/source equipment fidelity remain explicit
+open gates in campaign/CORE_THROW.md, including a matched existing-command cost
+control. Live TiEmu, user saves and the standard group remain untouched.
+
+- OBSERVED IN FFT, 2026-11-02: `tools/float_oracle.py` executes16 Float
+  formula/finalizer profiles, the real movement configuration and24 adjacent
+  moves (12 Float,12 normal controls). Float status selects class2/terrain row2
+  without increasing Jump or changing the no-equipped-movement clearance/water
+  flags. Row2 costs1 except surface63. Effective unit height rises2 plus water
+  depth; equipped Float's body/water configuration follows a different path.
+- TARGET IMPLEMENTATION, 2026-11-02: CORE_FLOAT.md enables id38 through owned
+  status effects and a flag in the existing navigation search. Both queue types
+  match the12 Float moves. Earth nullification, Dispel, delayed payment, MP/control
+  gates and AI are shared. Existing tile-height targeting/rendering remains;
+  original hover/height and equipped movement/monster/mount policies are separate.
+  The normal source dry-to-water control costs2 while the existing native adapter
+  charges1 with a spare-point rule; this preexisting normal-movement difference
+  stays explicit, and ordinary navigation regression controls are retained.
+
+- OBSERVED IN FFT, 2026-11-02: `tools/allegiance_oracle.py` pins236 unchanged
+  Steal Heart/Invitation formula/finalizer profiles,18 source camp/control traces,
+  repeated Charm refreshing32 ticks, two ordinary outcomes and four initial-camp
+  item-decrement cases. Charm retains original allegiance; Invite changes it.
+  Source job/item data supplies416 immunity rows. Current camp, original camp
+  and original enemy spawn identity serve different targeting/ownership/bonus rules.
+- TARGET IMPLEMENTATION, 2026-11-02: CORE_ALLEGIANCE.md enables both commands
+  through shared owned status effects and AI. Blue Invite converts are player-camp
+  units with forced AI, preserving generic KO rules. Original retention of manual
+  control for already player-controlled recipients is outside this native model.
+  Victory automatically enrols into a free roster slot, keeps a full roster intact,
+  and removes permanently enemy-converted members; source confirmation/dismissal
+  menus are not implemented. Four-camp/monster/Finger Guard and full original
+  action/menu/recruitment dispatch remain separate.5866 PC/sanitizer/68000 assertions
+  and the affected closure pass; no live emulator or user save is used.
+
 - OBSERVED IN FFT, 2026-10-30: unchanged source handlers 0x48..0x4b and
   finalizers give 80 controlled-RNG item profiles; 38 actual numerical HP/MP
   store traces are pinned by tools/restoration_oracle.py. The dispatcher table
@@ -2513,3 +2563,248 @@ Next: Quick priority/clock liveness, remaining status/reaction/action and broade
 AI/campaign/tooling families. Full core/content production is not complete. Jump
 refinement remains deferred. Reviewed artifacts and user playtest/save state stay
 intact; see campaign/CORE_AREA_IMPACT.md and its local verification report.
+
+## Shared Math Skill core (2026-11-02)
+
+OBSERVED: unmodified retail Calculator targeting compares CT/Level/EXP/whole
+walking height against Prime/5/4/3, excludes zero and odd half-heights, forces
+caster CT100 and marks panels before listing occupants. Source flags3 bit0x40
+selects45 learned White/Black/Time/Yin-Yang spells; Math bypasses Reflect and
+Counter guards but retains magical evasion. Function/terrain hashes,96 masks,
+12 evasion profiles and explicit external helper boundaries are recorded in
+campaign/x/core-math/oracle/source.json.
+
+TARGET: CORE_MATH.md implements the shared owned path, pure forecasts and real
+staged menus with first-frame cached rows. FCJD/ABI57/ModCtx368 retains the same
+gameplay/save layouts and allocations. Nonroster JP-level acquisition and the
+bounded stationary Math origin/utility AI are explicit native adaptations.
+Sixteen cached numeric masks reuse32 bytes of existing idle scratch; the same
+native trial measures15.15M to4.84M cycles, without changing its results. This
+is not a full original action/menu/AI or whole-frame production certificate.
+Jump12 stays user-deferred; remaining R/S/M and broader release gates stay open.
+
+
+## PA/MA/Speed Save reactions (2026-11-03)
+
+**OBSERVED IN FFT:** tools/stat_save_oracle.py runs unmodified retail finalizer,
+post-damage dispatch, reaction preparation, original stat clamps and three
+self-target lists.36 stages/18 effects show successful HP-damage-only triggering,
+including zero damage and Sleep wake, blocked KO/secondary contexts, PA/MA+1
+capped99 and Speed+1 capped50. External unrelated bookkeeping and status-specific
+graphics handlers are isolated; this is not a full original UI/AI/animation trace.
+
+**TARGET IMPLEMENTATION:** source IDs422..424 equip through existing FSV3 storage
+and share bounded response staging, self effects, once-only impact and primary
+packet restoration. No stock/MP/reaction reward or live CT/Charge rollback.
+The existing native single-value stat policy is retained. Pure resident reaction
+eligibility and unused callback removal give ABI58/ModCtx360; AREA_UI owns impact
+numbers, NUMBERS retains forecasts. Generic coverage stays189/201, Jump deferred.
+Evidence and narrow production margins are in campaign/CORE_STAT_SAVE.md.
+
+
+## HP Restore / MP Restore / Critical Quick (2026-11-03)
+
+**OBSERVED IN FFT:** tools/critical_reactions_oracle.py executes unchanged retail
+post-impact dispatch,87 staging profiles,24 effects through final commit and
+three self-target lists. Critical23 is derived after HP, honoring immutable
+traits; successful zero damage can react, while Brave0 draws nothing. HP/MP
+missing quantities freeze before impact, Undead retains positive HP healing,
+Wall makes the prepared result miss and Quick writes CT255. Source CT is+0x39;
+reaction bits at+0x8c are0x40/0x20/0x10. Bookkeeping/graphics external boundaries
+are isolated; these are bounded function trials, not a whole UI/AI replay.
+
+**TARGET IMPLEMENTATION:** equipped IDs431..433 share the existing response owner,
+resources, scalar labels and complete root/Quick settlement. No cost, reaction
+reward, new gameplay/save field or mutable Critical cache. The pure predicate
+uses target_query253. ABI59/360 moves ordinary attack construction to RESPONSE4
+and excludes an unused reward wrapper to recover room. Other R/S/M, original AI
+and full-frame/residency limits remain explicit in campaign/CORE_CRITICAL_REACTIONS.md.
+
+
+## Lancer Jump (2026-11-03)
+
+**OBSERVED IN FFT:** unmodified retail preparation phase2 canonicalizes Jump to
+394, with max(1,floor(50/Speed)) delay. Fourteen timing profiles and sixteen
+formula100 profiles cover PA*WP, polearm PA*3/2, unarmed Brave, target physical
+statuses/Defense Up and zodiac. Original source tables contain five horizontal
+and seven vertical learning upgrades. Hashes are in the local oracle JSON.
+
+**TARGET IMPLEMENTATION:** the user authorized simplified terrain rules. Keep
+same-layer targeting, a fixed compact target cell, a protected airborne actor
+and its reserved origin. Reuse deferred/action/reward ownership and approved
+sprites/UI. Source layer preference, ceilings, PS1 jump animation and full future
+CT/AI are separate. See campaign/CORE_LANCER_JUMP.md for verification and limits.
+
+## Self-status reactions (2026-11-03)
+
+CORE_STATUS_REACTIONS.md / ABI61 retains ModCtx360 and existing storage.
+**OBSERVED:** Caution426 and Dragon Spirit427 use the pre-impact physical flag, even for a
+miss/heal/no-op. Regenerator428 uses post-HP-damage staging; successful zero
+is eligible. Exclude formula7; pre-physical reactions also exclude Math.
+At Brave0 the first two still consume a chance draw, Regenerator does not.
+**TARGET:** Freeze Defend/Reraise/Regen requests, then re-filter late immunity at commit.
+A filtered no-op keeps source hit1 with packed request0; do not mutate pending
+casts for it. Wall misses; Regen cancels Poison and refreshes36 ticks. Reuse the
+status owner and preserve Charging/Performing. Source oracle60 stages/33 effects,
+1159 logic+117 UI assertions/18 pictures compare PC/sanitizers/68000. No FCJD,
+gameplay/save allocation or standard campaign group changes; full R/S/M and
+production frame/stack/residency gates remain open. See the family note and
+x/core-status-reactions/verification.json for final packing/regression evidence.
+
+## Brave/Faith/Transparent reactions (2026-11-03)
+
+**OBSERVED IN FFT:** Sunken State425 and Brave Up429 use pre-impact physical
+eligibility, including misses/no-ops; Faith Up430 reads nonzero effective MP
+cost independently of hit/physical flags. Formula7/reaction incapacity still
+exclude them. All three consume a failed chance draw at Brave0. Original self
+effects add3 Brave/Faith (cap100), or Transparent19 with ordinary status filters.
+Transparent clears all four evades (four execution draws), clears on HP-damage
+type even zero and on a later acted turn; a fresh infliction resets turn-removal
+arming. Jump clears it when accepted. Source evidence:69 stages/37 effects,
+three self-target lists and evade/removal fixtures.
+
+**TARGET IMPLEMENTATION:** CORE_BRAVE_FAITH_REACTIONS.md uses existing status,
+response and stat owners; the unsaved allegiance byte's spare bit6 carries
+Transparent arming, and Invite preserves it. Keep the reviewed outlined sprite;
+Hidden reuses the impact-label cache. Manual targeting/occupancy/collateral are
+legal; hostile scalar/nearest AI and area/Math utility skip the hidden actor.
+FORMULA14 prepares typed self packets after RESPONSE returns; RESPONSE6/7 owns
+consecutive strikes, ORDER16 owns turn entry. ABI62/ModCtx360, zone8390,
+banks62374/63840, actual packed input64927/64936:9 bytes remain. No gameplay/save
+layout/heap/FCJD growth.1372 logic+98 UI assertions/14 pictures match
+PC/sanitizers/68000. Broader R/S/M/permanent Brave/Faith carry-over and full-frame,
+stack/residency/release gates remain separate. Preserve live TiEmu, the standard
+campaign group and protected file bytes AND dates.
+
+## Counter Tackle/Flood and Absorb Used MP (2026-11-03)
+
+**OBSERVED IN FFT:** Counter Tackle436 tests raw flags4 bit0x10; Counter
+Flood437 tests bit0x80, which includes ordinary Attack and Geomancy. Either may
+stage on a miss/heal/no-op. Math/formula7 and ordinary reaction restrictions
+still apply. Absorb438 reads the effective incoming MP byte; its self effect
+adds that byte, caps MP, ignores Undead and misses under Wall. Original
+preparation skips the acting slot. Source evidence:60 stages, nine effects and
+four constructors. Constructor calls are Dash147/validation1 and the current
+terrain's Elemental/validation0; isolated preview/MP/strike-init hooks are
+recorded, not a complete original targeting/animation replay.
+
+**TARGET IMPLEMENTATION:** CORE_COUNTER_REACTIONS.md freezes the MP byte in the
+existing pending slot (0x8000|cost), after CoreAction validates ID438. No save
+field grows. Tackle shares Dash math/RNG, with bounded adjacent/height reach;
+special/stacked actor targeting remains open. Flood reuses Work.cast only after
+the root commits, freezes all radius1 victims before HP and uses its own area
+painting. Actor/ability ownership and phase checks reject stale FX/second commits;
+secondary effects grant no EXP/JP and cannot stage nested reactions. ABI63 keeps
+ModCtx360 and18 images: RESULTS3/4 own selection/strike queries, TARGETS11 Flood,
+ORDER16 existing post-clock resets. Zone8452, banks63962/63918 and actual packed
+input64867/64936 leave only38/82 bank bytes and69 input bytes.813 logic+34 UI
+assertions/12 pictures match PC/sanitizers/68000; three UI transport partitions
+retain all checks and pictures. Full-frame/stack/residency/release gates remain
+open. Preserve protected saves/groups, including dates; do not touch live TiEmu.
+
+## Movement delivery block A (2026-11-03)
+
+**OBSERVED IN FFT:**128 retail movement configurations,16 additive Move/Jump
+bonus boundaries and24 Teleport trials are recorded by movement_oracle.py.
+Teleport rolls floor(rand*100/32768) against (distance-Move)*10, even inside the
+guaranteed range. Equipped Float is promoted to innate Float17 by source status
+initialization, protecting from Earth and ordinary removal. Six64-byte terrain
+rows distinguish weather-dependent0, forbidden255 and water/lava classes.
+
+**TARGET IMPLEMENTATION:** CORE_MOVEMENT.md closes blockA's15 generic traversal
+capabilities. One encoded byte/unit and archived innate flags share battle and
+management bonus math. Retain the previous ordinary-water adapter; source dry
+slow costs and severe weather now have real consumers. Cold MOVEMENT18 returns
+before AI_SETUP/TARGETS load. Native SCREENS shares Teleport's no-undo rule.
+Fly/Teleport are bounded direct destinations on the current layer, with legal
+landing/depth/lava/occupancy checks and existing art/target heights. ABI64/360
+keeps one zone8640 and uses three matching FMB3/FMD2 shards6/6/7, with mandatory
+whole-set validation before execution; no decompression/new ASM/new heap block.
+Native Unit112/State2224/Work45582; FSV3/Save3138 unchanged. FCJE44538 adds864
+archive bytes. Actual non-BENCH TTPack input64175 leaves761 bytes; do not quote
+instrumented63227 as production.9957 family assertions and32 pictures agree
+PC/sanitizers/68000. Cold reach can exceed a frame; full-frame/stack/residency/
+release gates remain open. Continue with blockB17, then C12/D6 (35 IDs remain).
+Preserve live TiEmu, standard groups and protected save/proof bytes AND dates.
+
+## Automatic Mime integration (2026-11-04)
+
+OBSERVED: hash-verified retail `battle_action_set_current_attacker_data` records
+original team/facing/weapons and current unit/fixed target offsets; Mime job93
+returns without replacing it. `battle_action_set_mimic_ability` filters the same
+source team and PREVENT_REACTION, rotates the offset and previews the copied
+action with borrowed weapons. CANNOT_MIMIC is secondary byte5 bit16 and applies
+to default/Math/monster menus. Items/Throw/Jump/Charge use their menu-specific
+rules. The source between-turn controller drains Mime slots after responses and
+rewards; imitators retain primary-action reactions and rewards. Controlled
+MIPS fixtures and isolation details: campaign/x/core-mime/oracle/source.json.
+
+INTERPRETATION: a second primary root in the existing native context is enough;
+recursive secondary ownership would incorrectly suppress ordinary reactions.
+Borrow only weapon/menu state, never another actor's derived stats or CT.
+
+TARGET: CORE_MIME.md documents the bounded implementation. Reuse current action
+presentation; skip invalid/empty scalar centres, retain the existing same-layer
+Jump adaptation, and copy only one immediate performance pulse. These are not
+claims of complete original Mime animations or all weapon/AI fidelity.
+
+## Ranged Hamedo integration (2026-11-04)
+
+OBSERVED: hash-verified retail outer Hamedo draws Brave before PREVENT_REACTION
+and counter-ability target/preview checks, and imposes no melee-only weapon gate.
+36 controlled profiles plus four incoming/target/MP early gates execute the
+original instructions; geometry/preview/list/MP callees are explicitly isolated.
+See campaign/x/core-hamedo/oracle/source.json and CORE_HAMEDO.md.
+
+INTERPRETATION: native ranged returns can reuse the existing pure trajectory
+query, prepared before the effect image is entered. Rejected return geometry
+must retain the already-consumed Brave draw without charging the original twice.
+
+TARGET: reuse idle AI trajectory scratch, original pre-action ownership and the
+ordinary shot renderer. Shared native three-tile extended range, straight-ray
+obstruction and scalar target ownership are bounded policies; full original
+weapon geometry, overlapping-panel selection and broader weapon fidelity remain
+separate. No new image, save format or hardware path is required.
+
+## Source weapon panel reach (2026-11-05)
+
+OBSERVED: the unchanged, hash-verified retail weapon selector and strike/lunge/
+arc/direct marking routines produce54080 panel outputs across160 weapon/hand/
+Frog/height profiles. The direct spread/close-range helpers run unchanged; only
+final target-selection filtering is isolated. The original attack-panel caller
+excludes the origin.64 actual effective-height cases cover water, Float, movement
+traits and byte wrapping. See tools/weapon_reach_oracle.py and its source manifest.
+
+INTERPRETATION: the flags already stored in FCJH identify four distinct shapes;
+item reach alone cannot distinguish a lance from an arc, or a gun from a bow.
+Arc height penalties use signed truncation toward zero, including uphill cases.
+
+TARGET: one pure shared rule supplies Attack, Charge, AI, Counter/Hamedo and
+Mime. Manual masks prepare the origin once with existing scratch storage.
+ORDER owns the unchanged shared CT/pending loop without per-tick image swaps.
+This is panel reach, with existing straight obstruction/presentation; full arc
+trajectories, lunge collisions, overlapping-panel victim lists and broader
+weapon formulas/procs remain open. See campaign/CORE_WEAPON_REACH.md.
+
+## Physical weapon bases and owned preparation (2026-11-05)
+
+OBSERVED: unchanged retail base-XA, Charge, physical modifier, critical and
+ordinary gun routines pass288 controlled scalar profiles. The actual random
+helper returns16384 in preview without calling libc rand. Variable PA draws
+precede the critical chance/amplitude. Ordinary gun formula03 starts at WP*WP
+and omits ordinary physical evasion; outer guards remain before that handler.
+Twenty-six further clean, compatible weapons pass original Two Swords hand
+initialization/selection. Evidence: tools/weapon_formula_oracle.py.
+
+INTERPRETATION: the existing source item-type byte distinguishes all physical
+families without another catalogue field. Scalar/critical correctness does not
+certify elements, healing/absorption, magical guns or the conditional-status/
+spell-proc dispatcher and its subsequent RNG draw.
+
+TARGET: a33-byte family map and a pure resident weapon_amount callback share
+physical arithmetic. Each executing RESPONSE/COMBAT owner prepares its own
+hit/base/critical sequence through weapon_roll.inc, without loading another
+image. The facing-axis refactor retains1024 previous classifications. FCJH
+changes only27 low hand bits, including the unarmed marker;26 real compatible
+weapons gain native Two Swords. No renderer/art or gameplay/save layout changes.
+See campaign/CORE_WEAPON_FORMULAS.md and its private verification manifest.

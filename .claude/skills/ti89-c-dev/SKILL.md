@@ -35,6 +35,19 @@ description: Write, compile, optimise or port C code (GCC4TI/TIGCC) for the TI-8
   an injection door (`game_scenario(n)`) per game; TI checks without UI under `ti-cycles`
   (`make cycles`, `make xcheck`: the TI binary's screen equal to the PC's, per scenario).
 
+## Scope validation to the change
+
+Use the affected mechanic and its direct dependency closure. Start with a small
+set of meaningful PC boundaries and an original-behavior fixture when relevant.
+Run native equality/cycle checks for changed arithmetic, layouts, overlay calls
+or hardware paths. Broaden only after failures or when shared ABI, formats,
+scheduling or rendering change. Do not repeatedly regenerate unchanged assets,
+re-read a complete disc census or rerun exhaustive inputs to report a larger
+assertion count. Keep exhaustive certification explicit (`--deep`); record input
+and source hashes so unchanged evidence can be reused. At a release, run the
+required integration checks once after stabilization. Emulator etiquette and
+visual approval still apply. FFT examples: `games/fft/campaign/CORE_TESTING.md`.
+
 ## Knowledge base — read before writing non-trivial code
 
 - `reference/ti68k-c-patterns.md`: screen and LCD layout, grayscale planes, **interrupts**

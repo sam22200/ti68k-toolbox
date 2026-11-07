@@ -1,5 +1,12 @@
 # Ordinary elimination and Petrify target validity
 
+Historical checkpoint. The current shared physical hit gate rejects an already
+petrified ordinary Attack target before RNG. The2026-11-05 integration reproduced
+the old preparation-RNG assertion failure with preserved ABI69 sources and
+updated that fixture to check this existing native gate explicitly. The retained
+finalizer/resource tests below still apply; this is not a new claim of complete
+original physical RNG parity. See CORE_WEAPON_REACH.md.
+
 Follow-up 2026-10-29: CORE_CLEANSE.md enables Soft, Esuna and Remedy to
 remove a mutable Petrify bitmap using the source cancellation set. HP and cell
 remain fixed while controls, clocks and turn order refresh. Retail Petrify

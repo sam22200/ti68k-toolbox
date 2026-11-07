@@ -1,5 +1,151 @@
 # Validation by affected dependency
 
+Current storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
+ABI78/348, FCP2/FMG3/FCD4;46 shared portraits and510 shared names preserve every
+reviewed use. The packed package is611132 bytes/44 variables; controlled rebuilt
+baseline622372, net-11240. Module shards55616/61352/55200, zone8690; Unit112,
+State2224, Work37460, Save3202/FSV4 and48 actor frames stay. TTPack64913/64936
+leaves23 bytes: preserve this bound and source/image format matching. Arithmetic
+wrappers are retained by two-pass compiler discovery, never by editing opcodes.
+Combat completion remains201 actions/78 RSM; no new family/mount queue.
+
+Current combat integration (2026-11-07):
+[Shared heights, AI evaluations and stabilization](CORE_FINAL_COMBAT.md) is the
+active checkpoint; the remaining-work lists in older entries below are history.
+Shared donor heights, friendly panel collateral, origin-dependent Reflect and
+mutable/innate status utility now feed the native evaluator. AI work is sliced
+and idle menus avoid unnecessary module loads. ABI77/348,26 images, Work37460,
+zone8880; actual TTPack64797/64936 leaves139 bytes. Unit112/State2224/FSV4 stay.
+All6605 focused checks agree PC/sanitizers/68000; ordinary13-actor frames and
+planner quanta pass360k. Cold loads/rotations retain their documented latency.
+RAM residency drops13810 bytes on Gariland without reducing the48-frame actor
+cache. Status/AI and rotation/reach buffers share storage at exclusive phases;
+real grayscale startup and two packed battle boots/exits pass. All99 campaign
+regression suites pass without cached results.
+Generic coverage is201/201 actions and78/78 R/S/M consumers: no implicit new
+combat-family queue, and no mount/rider completion requirement. Content/tools,
+future maps and exact PS1 AI remain separate scope. Preserve standard groups,
+live TiEmu and protected proof/save bytes AND dates; use private outputs.
+
+## Historical checkpoints
+
+Historical direct-interception integration (2026-11-06):
+[CORE_DIRECT_INTERCEPTION.md](CORE_DIRECT_INTERCEPTION.md).508 logic checks
+8B7A2337 and24 HUD pixel checks04F50DC5 match PC/sanitizers/68000. Only
+PLANNER24 changes; ABI75/layouts/zone8596 and actual resident bytes remain.
+All13 affected regression suites pass; former body-obstruction fixtures use
+solid terrain without removing assertions. Panel preflight now accepts the
+interceptor (527 checks8864C72B). Native Gariland81/AE9CFD31 and
+Orbonne14/2CD70391 retain pixels/rules/exact saves. Interactions and subsequent
+TI stabilization remain open.
+
+Current weapon-panel integration (2026-11-06):527 behavior/preview checks
+8864C62B,33 HUD pixel checks3FEC3500 and66 thirteen-slot checksC32255C0
+match PC, ASan/UBSan and actual68000. ABI75/348 moves frozen packet preparation
+to FORMULA14 after PLANNER1 and continuation to PLANNER5. Sixteen initial
+regressions and five final dependencies cover17 unique suites; five dispatcher/bootstrap dependencies also pass,
+for22 in total. Exact loader
+bindings, actual ABI74 three-shard rejection and private native pilot flows
+pass. Source scope, native timing and limits: CORE_PANEL_VICTIMS.md.
+
+Native ballistic integration (2026-11-06):1533 focused assertionsAEF99E38
+match PC, ASan/UBSan and actual68000.128 retail choice branches are distinct
+from336 independent native-model controls. See CORE_ARCS.md for adaptation
+bounds, affected regressions, unchanged resident bytes and release gates.
+
+Current physical weapon formulas(2026-11-05):2421 focused assertions(FEEA07E7)
+agree PC, ASan/UBSan and actual68000.288 retail scalar profiles plus26 source
+hand initializers cover physical families, source midpoint previews, independent
+variable/critical draws and ordinary guns; live commands add Charge, guard
+misses, Counter/Hamedo and new two-hand combinations.1024 relative-facing cases
+retain the previous geometry after its smaller axis selector.
+All33 affected suites pass. Parser140/current bindings203 and actual ABI70
+three-shard rejection pass; Gariland/Orbonne remain81/14 checks with identical
+native pixels and exact FSV4 VAT bytes.555 protected save/group files retain
+bytes and dates. ABI71 repurposes the same callback slot for pure weapon_amount;
+preparation stays in each executing owner. Layouts/heap blocks and FCJH length
+stay fixed;27 source hand bits change (26 weapons plus the bare marker).
+Actual production TTPack64929/64936 leaves7 bytes. Source/query and constructor
+zones are bounded measurements, not whole-frame/stack/residency certification.
+Weapon effects/procs and their later original RNG remain explicit next work.
+See CORE_WEAPON_FORMULAS.md and x/core-weapon-formulas/verification.json.
+
+Historical source weapon reach integration(2026-11-05):55703 assertions(88CBF461)
+agree PC, ASan/UBSan and actual68000.160 retail footprint profiles supply54080
+panels;64 further original height cases cover Float/water movement/wrapping.
+All22 affected suites close through the initial run and two focused repairs:
+status-lifetime now expects the ORDER clock owner, and incapacity asserts the
+existing Petrify pre-RNG rejection. The latter's old failure was reproduced with
+preserved pre-task ABI69 sources; gameplay was not altered to satisfy it.
+Six affected suites were rechecked after the resident batch-mask optimization.
+The final sparse-cardinal improvement changes only TURN/MOVEMENT images; resident
+bytes and20 other images are identical. The focused suite and five native campaign
+carriers pass with final archives, identical pixels and exact FSV4 save bytes.
+Current bindings203/parser140 checks and an actual three-shard ABI69 rejection
+pass. ABI70 keeps all layouts/allocations; actual TTPack64897 leaves39 bytes.
+Manual mask cold/warm average costs in the fixture: strike36328, lunge50324,
+arc223688, direct134750 cycles. These are range zones, not complete frame budgets.
+The100-tick clock stress case costs517844 and warm ready entry1896; combined
+frame/stack/residency and release remain open. See CORE_WEAPON_REACH.md and
+`x/core-weapon-reach/verification.json`.
+
+Historical ranged Hamedo integration(2026-11-04):345 action/RNG assertions
+(1AAFBA6F) and18 render assertions(3DD52CCA) agree PC, ASan/UBSan and actual
+68000.36 retail outer Brave/status/return profiles and four early gates retain
+explicit callee isolation. All13 affected suites pass; Mime remains1734 checks.
+Native Gariland/Orbonne retain81/14 checks and exact private FSV4 VAT bytes.
+ABI69 changes only the preflight semantics; layouts and five heap blocks stay
+fixed. Current-bank parser/bindings and actual ABI68 rejection pass. Production
+TTPack64917/64936 leaves19 bytes. See CORE_HAMEDO.md and its verification file.
+
+Historical Mime integration(2026-11-04):382 action/resource assertions(EFEB855F)
+and1344 source geometry assertions(84088419) agree PC, ASan/UBSan and actual
+68000. Eight additional render assertions(BC452243) compare four action
+frames pixel-for-pixel with the existing renderer. All23 affected suites pass;
+final bank binding/corruption and real ABI67 rejection checks pass, as do five
+final native campaign carriers with exact FSV4 VAT bytes. The source oracle verifies144 rotations,384 layers,384 isolated outer
+selector profiles,40 status eligibility queries and four records. Work45608,
+ABI68,22 images/zone8566 and actual TTPack64805/64936 retain the existing
+allocation/save layout. See CORE_MIME.md and `x/core-mime/verification.json`.
+
+Historical blockD closure(2026-11-04):17635 logic assertions(4880B193) and35
+management assertions(A633E2AD) agree PC, ASan/UBSan and actual68000.
+The2916 retail MIPS profiles cover Talk/Finger Guard, Train/poach, actual hidden
+items/flags, Monster Skill and Chocobo formulas. All35 affected suites close;
+focused repairs preserve every assertion and separate hostile Transparent
+rejection from visible Dispel utility. Native Protect/Combat/bindings and five
+campaign carriers are rechecked after final adjustments. All nine isolated unit
+suites and20 campaign input/pixel/state/save replays pass; FSV4 VAT bytes agree.
+Actual TTPack64581/64936,22 images/zone8566, ModCtx352 and source common-reader
+hashB9686645 pass. Protected522 files retain bytes/dates. See CORE_DISCOVERY.md
+and `x/core-discovery/verification.json`; full-frame/stack/residency is separate.
+
+Historical blockC closure (2026-11-04): `core-combat-check` supplies2975 logic
+assertions plus12 UI assertions/four framebuffer captures, identical across PC,
+ASan/UBSan and actual68000. Its unchanged retail evidence covers116 physical
+profiles,240 resource stages,96 Counter Magic stages,96 MP boundaries and24
+outer Hamedo trials with explicitly isolated target/MP/preview callees.
+Forty-two affected suites ran once; six focused rechecks close Throw Stone's
+physical path, Meatbone range expiry, late-Wall critical-response fixtures and
+the four-draw Charge critical seed helper. No assertion was removed. The final
+Gariland/Orbonne native rules/pixels and private FSV3/VAT bytes still agree,
+including repeat receipt and saturated trophies. Native ABI66 bindings pass195
+checks across21 cold/warm images. Actual production TTPack64861 leaves75 bytes.
+Full tactical frame/stack/residency gates remain separate. Evidence:
+CORE_COMBAT.md and `x/core-combat/verification.json`.
+
+Historical blockB closure (2026-11-04): `core-equipment-check` adds93273 focused
+assertions/10 first-frame and settled UI captures, equal PC, ASan/UBSan and
+actual68000. It includes real private FSV3/VAT serialization and repeat-write
+idempotence. The35 affected suites were run once; focused final rechecks cover
+hands/banks/Charge/range/AI/Jump. Repairs: removing Two Swords validates the
+secondary hand first, the Counter fixture retains current innate support rows
+and reuses one allocation, and impact bounds regenerates its modified catalogue
+from a SHA256-stamped source. No assertion was removed. Gariland/Orbonne native
+flows remain81/14 checks (AE9CFD31/2CD70391). UI own draw/input peaks stay under
+360k; broader tactical whole-frame/stack/residency gates remain open.
+See CORE_EQUIPMENT.md and `x/core-equipment/verification.json` for exact scope.
+
 Run closures with `closure.py` (`make` per suite is unchanged): the
 core-*-check suites run in parallel (`-j 12`, 20 cores here: about 6.5 min for
 all 37 instead of tens of minutes), each under strace; a suite whose recorded
@@ -26,7 +172,245 @@ source's landing rule (battle_move_propagate_destination 8/9) and steep-panel
 rule (init_source_panel / propagate_destination 3), and counts walk-edge
 differences separately (core-step/surface): 536 and 544 changed jump edges agree.
 
-Current equipment steals closure (2026-11-01): `closure.py --all`, 68 suites
+Current movement delivery-block check (2026-11-03): CORE_MOVEMENT.md /
+core-movement-check.9556 rule+288 runtime+113 UI assertions and32 real-renderer
+pictures match PC/sanitizers/68000. Exercise equipped/innate stat loading, source
+terrain/weather costs, landing restrictions, wide/narrow search, native AI,
+Teleport's one draw/spent failed Move/no undo and equipped Float's innate status.
+SCREENS and portable input must share the undo guard. Ordinary actors retain
+the graph fast path; dry slow terrain and severe weather activate source costs.
+ABI64/ModCtx360 has19 images and three FMB3/FMD2 shards: test every cold/warm
+binding, third-shard missing/corrupt rejection and a real ABI63 export. FCJE adds
+864 archived bytes; native State/Work grow14/6, save stays FSV3. Validate layouts
+and private flows with the new archive set. Actual production TTPack input comes
+from non-BENCH raw output/TP header (64175), not the instrumented carrier63227.
+Warm reach peaks316986 cycles; cold reach3243404 is not full-frame certification.
+The broader scoped closure and protected-file evidence stay in verification.json.
+
+Historical counter reaction check (2026-11-03): CORE_COUNTER_REACTIONS.md /
+core-counter-reactions-check.813 logic assertions E904D4F4 and34 UI assertions
+8BBF301F/12 pictures agree on PC/sanitizers/68000. Keep raw0x10/0x80 eligibility,
+frozen effective MP and three Dash RNG draws; exercise all twelve terrain
+responses, collateral, once-only commit and root restoration. The UI carrier
+uses three transport partitions, recombined including picture events.
+ABI63 relocates selectors/strike queries to RESULTS3/4, Flood to TARGETS11 and
+post-clock reset to ORDER16. Test old-export rejection and direct consumers.
+Area bounds now admit a secondary packet owned by the current actor/ability;
+wrong owners and DRAIN remain excluded. Preserve the64 old frame samples.
+Gameplay/save layouts and FCJD remain fixed; packed input has69 bytes left.
+Scoped closure and full-frame limitations are in private verification.json.
+
+Historical Brave/Faith/Transparent reaction check (2026-11-03):
+CORE_BRAVE_FAITH_REACTIONS.md / core-brave-faith-reactions-check.1372 logic and98
+UI assertions/14 pictures match PC/sanitizers/68000. Check physical vs effective
+MP trigger semantics, status-only scalar/batch owners, source four evade draws,
+Transparent's fresh-turn/Act/HP/Jump handling and actual native AI planning.
+ABI62 moves typed self preparation to FORMULA14, strike queries to RESPONSE6/7
+and turn entry to ORDER16; test callers as well as image bindings/old exports.
+Layouts/FCJD/allocation formulas stay fixed. Packing has9 bytes left.
+Affected closures and full-frame/release limits are in private verification.json.
+
+Historical self-status reaction check (2026-11-03): CORE_STATUS_REACTIONS.md /
+core-status-reactions-check.1159 logic and117 UI assertions,18 pictures,
+PC/sanitizers/68000 equal. Keep pre-impact Caution/Dragon staging distinct from
+post-HP Regenerator; compare the source RNG boundaries and status no-op/late
+filtering. Use actual bank ABI consumers and previous-export rejection after
+ABI61. Shared action/status/reaction callers require the scoped closure recorded
+in x/core-status-reactions/verification.json; this is not a full census or a
+whole-frame release measurement. Gameplay/save layouts remain unchanged.
+
+Historical Lancer Jump check (2026-11-03): CORE_LANCER_JUMP.md /
+core-lancer-jump-check. Source timing/formula, learned reach, cell binding,
+untargetability/reserved origin, once-only landing, CT, AI and four-orientation
+UI checks compare PC/sanitizers/68000. FMD2 changes archived image storage;
+run parser/reconstruction/previous-export and all direct ABI consumers, retaining
+logical MOD_ZONE and unchanged gameplay/save layouts. Include action/context,
+strikes/reactions, clock/deferred, targeting, old UI and resource families.
+322 family assertions (298 logic+24 UI),16 pictures and33 older suites pass.
+Source control-flag comparisons exclude the new internal airborne-cache bit;
+their594 assertions retain15C96953 in the targeted rerun. See verification.json
+for the original closure and superseding evidence.
+Whole-frame/release gates and live TiEmu remain separate.
+
+Historical critical-reaction check (2026-11-03): CORE_CRITICAL_REACTIONS.md /
+core-critical-reactions-check.1031 logic assertions5C677F7C plus72 UI assertions
+0EDD7883/eighteen pictures agree on PC/sanitizers/68000. Original87 staging calls,
+24 effect commits and three self-target lists cover the HP/5 boundary, immutable
+Critical, Brave0/no RNG, Wall misses, positive Undead healing, frozen resource
+amounts and CT255. Two queued Quick reactors must wait for full root settlement.
+ABI59/360 moves ordinary attack construction to RESPONSE4 without nested loads;
+its unused public reward wrapper is absent. Run direct action/context/strike/
+reaction/resource/Quick/UI callers, previous-export rejection, layouts, actual
+packing and private chapter flows. Full census/live TiEmu remain separate.
+
+Historical stat-save check (2026-11-03): CORE_STAT_SAVE.md / core-stat-save-check.
+PA/MA/Speed Save adds697 logic assertions and33 UI assertions/nine sampled
+pictures. Original finalizer/staging and secondary stat payloads are captured
+without modifying their MIPS instructions. Pure reaction_live is now resident
+and target_query254 shares it across effect owners. Unsupported source IDs stay
+unavailable as commands. ABI58/360 also removes two unused evaluator callbacks.
+AREA_UI14 owns impact numbers and wind-up glyph preparation; NUMBERS15 keeps
+forecasts. Previous area/Math/Throw pictures must retain their historical hashes.
+Run the directly affected reaction/context/strike/cast/UI closures plus old-export
+rejection, layouts, private chapter flows and actual packing. No full census,
+live TiEmu or standard playtest group is required for this slice.
+
+Historical Math Skill check (2026-11-02): CORE_MATH.md / core-math-check.
+1360 logic assertions9163135B plus238 UI assertions138E34BC agree on PC,
+sanitisers and68000;88 UI pictures and four bounded native carriers. Digest
+recombination counts both assertions and each separate per-frame picture step.
+Reset chapter Work between independent UI fixtures. Original targeting/height,
+Reflect/Counter guards and magical evasion are captured; all45 eligible spells
+use shared owned effects. The16 numeric masks reuse the idle32-byte centre
+bitmap, cutting the same native frozen-AI trial15.15M to4.84M cycles. ABI57/368,
+FCJD; five gameplay allocation formulas and serialized layouts stay fixed.
+The31 direct older suites, targeted final module/camera/AI replays, actual prior
+ABI56 export and FCJC rejection, private chapter flows and preservation evidence
+are recorded in verification.json. Native area-impact transport validates its
+FIP envelope on the host and keeps null/truncation guards, all1012 assertions
+and64 reviewed samples on the calculator. No full census or live TiEmu follows.
+
+Historical Throw check (2026-11-02): CORE_THROW.md / core-throw-check.
+4309/27CD6D9B plus61/38B87D4D UI assertions (4370 total);60 scoped suites.
+Original formula99/finalizer profiles, all80 item records and12 isolated learning
+selectors, stock/payment/cancel/MP/status/Counter/AI/range ownership; PC,
+sanitizers and68000. A separate80-item UI carrier checks real inputs and36
+pictures, with an existing Throw Stone cold-overlay cost control. FCJC, ABI56,
+unchanged gameplay/save layouts; TARGETS cold reach/path/aim and pure resident
+eligibility are covered by the shared closure, exact previous-export rejection,
+both private chapter flows and catalogue rollback. See verification.json for
+final counts, digests, sizes and explicit limits.
+
+Historical Float check (2026-11-02): CORE_FLOAT.md / core-float-check.
+525 assertionsBB53A5B9, PC/sanitizers/68000.
+16 original formula profiles and the actual movement configuration;12 Float
+adjacent moves match native narrow/wide searches.12 normal source controls
+record the inherited dry/wet entry-cost adaptation separately. The producer,
+Dispel/Earth protection, damage retention, MP/CT/control gates, actual AI and
+real reach/restoration run PC/sanitizers/68000. Navigation regression retains
+its independent cost/predecessor controls. ABI55, unchanged layouts/allocations;
+raw64771/actual TTPack64773/headroom163. Scoped results in verification.json.
+
+Current Charm/Invitation check (2026-11-02): CORE_ALLEGIANCE.md / core-allegiance-check.
+5866 assertionsCF70C96D on PC/sanitizers/68000.
+236 unchanged-MIPS formula/finalizer profiles,18 storage/control traces, repeated
+Charm, ordinary victory and initial-team stock cases, all416 job/item immunity
+rows; owned preparation/once-only commit, expiry/cure/damage, allegiance/AI,
+private victory/recruitment/loss/full-roster/repeated-save paths. Native transport
+splits contiguous math/runtime assertions and recombines counts and digests.
+The source's current/permanent camp distinction does not authorize a wholesale
+replacement of team queries: target/AI/gil, inventory/roster/victory and fixed
+spawn-level bonuses have separate policies. ABI54 reuses Unit byte73 padding;
+fresh baseline/final layouts match (State2210/storage5348; prior note sizes
+were stale), and heap requests/save version stay fixed. Native COMMAND0 validates its
+transient request before mutation, returning4 on rejection; capability queries
+are local except the checker-only PERFORMANCE5 wrapper. Scoped closure and
+exact measurements are in the family note and x/core-allegiance/verification.json.
+
+Current Songs/Dances check (2026-11-02): CORE_PERFORMANCE.md / core-performance-check.
+5507 assertions7FF2F648; math3727/3CCC9CCD plus runtime1780/B2313A81
+recombine exactly. All fourteen source rows have strict mutation rejection.
+Unchanged original MIPS
+formulas/finalizer, six global masks, fourteen three-pulse clock traces and a
+Quick wave feed shared PC/sanitizer/68000 assertions. Native transport partitions
+math/runtime and recombines every assertion and rolling digest; no cases removed.
+The direct36-suite closure covers changed targeting/formulas/commit, deferred
+clock/order, AI/UI, module/boot boundaries and existing family controls. The
+new family, targets and allocation-failure carrier have targeted retries; see
+the evidence for exact results. No all74-suite census or live TiEmu follows.
+Native allocation injection intercepts ti-cycles' synthetic ROM allocator in C
+so the archived bootstrap sees it; the original table entry is restored.
+Original geometry has eleven actors even in the thirteen-slot capacity bank.
+
+Current Draw Out check (2026-11-02): CORE_DRAW_OUT.md / core-draw-out-check.
+4625 assertions5AF7EF14 agree on PC, ASan/UBSan and68000
+(math3202/84AED311 plus runtime1423/3377AD43).
+All ten producers compare142 source formula/finalizer profiles,36 compound
+break groups and12 Kikuichimonji footprints. Separate bounded native carriers
+retain every assertion and recombine the full PC digest. Production/inventory
+checks cover pure forecasts, frozen impacts, status timers, command gates,
+actual AI, blue guests/enemy stock and private save/retry/victory roundtrips.
+ABI52/388 keeps gameplay/save/allocation layouts; SAVE7/8 commit and SCREENS11
+cold bootstrap are validated through the direct family closure and both native
+pilot flows. The full census now has73 suites; this change uses a scoped closure.
+All32 selected suites pass after Talk/area-impact switch only their native
+failure diagnostics from source line to assertion ordinal (42/76-byte native
+carrier overflow; no checks removed). Removing the obsolete RESPONSE preload
+then reruns eight directly affected suites green; command preparation saves
+37380 native cycles per tested action, with unchanged impact totals/images.
+The final input64653/headroom283 and both rebuilt native pilot flows pass.
+See CORE_DRAW_OUT.md and x/core-draw-out/verification.json for exact results.
+
+Historical line-family check (2026-11-01): CORE_LINE.md / core-line-check
+compares27 original green/list footprints and75 formula31/finalizer profiles.
+2786 assertions59AFCB33 agree on PC, ASan/UBSan and actual68000; every native
+panel, nearest-first draws, typed Earth/Float, frozen impact/push, gates and
+actual AI are checked. ABI51/388,17 images/zone8236, input64735/headroom201;
+FCJB/FGS2/FCD3/FSV3 and gameplay/allocation layouts remain fixed.
+The26-suite direct closure passes (26 run,0 cached,0 red,235s). A final
+monotonic radial-slot cursor removes redundant rescans: seven affected suites
+are rerun green (224s): line,batch,Geomancy,area-forecast,area-impact,buffs,healing.
+Their digests are unchanged; this scoped rerun supersedes their earlier
+carriers. Other unchanged-family evidence is reused. All72 suites were not
+rerun. The first closure's Talk native carrier exceeded the limit by14 bytes;
+removing redundant packet formula guards shrank the largest image28 bytes.
+No assertion or source profile was removed to make that carrier fit.
+Actions changes to5324E3C7 only through id103; its previous normalized bytes
+recover the exact old catalogue SHA and current-engine actionsD4899EEB.
+Punch Art/strikes drop only their obsolete gated103 assertion (1253/BE27214C,
+6522/891FD13C). Existing rendered area hashesF9BACFF5/9DE20073 and manual-area
+replays remain equal. Final native pilot/bank and protected-file checks are
+recorded in CORE_LINE.md and x/core-line/verification.json. Standard group and
+live TiEmu are preserved; Jump remains deferred.
+
+Historical Secret Fist check (2026-11-01): CORE_SECRET_FIST.md /
+core-secret-fist-check compares185 original formula50 profiles, including its
+retail evasion bypass.4067 assertions1FCD638D agree on PC, sanitizers and
+actual68000. The shared MA/physical-modifier path preserves pure forecasts,
+frozen status packets, no HP/MP damage, command/control gates, countdown/Undead,
+refresh/immunity and actual AI policy. ABI50/ModCtx388 groups ordinary cold
+setup in PARTY13; input64559/headroom377/zone8186. FCJB/FGS2/FCD3/FSV3,
+gameplay layouts and allocation requests stay fixed. All30 direct suites pass (30 run,0 cached,0 red,373s), including native
+renderer/area callers, statuses/magic/physical families and chapter/hand paths.
+Both native pilot flows and the catalogue reader remain equal. Eight bad-bank
+starts include the real prior ABI49 export;162 bindings pass. Actions changes
+to D4899EEB solely through id104 (60795172 with its old bytes); Punch Art/strikes
+drop the obsolete gated-entry assertion (1254/4EA46E40 and6523/65EAACF8).
+Other checked summaries stay equal. Evidence: CORE_SECRET_FIST.md and
+x/core-secret-fist/; historical geometry/Jump evidence is reused.
+
+Historical Geomancy check (2026-11-01): CORE_GEOMANCY.md / core-geomancy-check
+covers279 original formula profiles and128 source terrain calls. Its8927
+assertions4BF14699 agree on PC/sanitizers and recombined68000 carriers:
+math6403/229FDD40 plus runtime2524/59D8BB4C. Production146 records,100 casts,
+140/201 generic entries; ABI49/ModCtx388. FCJB appends64 source mapping bytes;
+FGS2 appends both layer surface types in archive, retaining collision stride.
+The wrapper checks both chapter extractions, while native tests cover all64
+surfaces/layer, commands/AI origins, frozen procs, timers, terminal effects,
+interruption and twelve stacked victims. PARTY12/10 cold relocation preserves
+core layouts/FSV3/allocations; input64741/headroom195/zone8186. The70-suite run
+and corrected rejection carrier preserve all69 historical summaries except
+catalogue actions60795172. Ten final direct suites pass after bounding AI
+origin scans; native Orbonne/Gariland save/results flows and the catalogue
+reader remain equal, with an isolated management test. The final pure-lookup control passes Geomancy/area-AI/banks again unchanged;
+64 rejected origins fall294256 ->167456 native cycles. Exact evidence lives
+in CORE_GEOMANCY.md / x/core-geomancy/.
+
+Historical gil-transfer closure (2026-11-01): `core-gil-check` compares 134 original
+profiles; 3262 assertions (2020738D) agree on PC, sanitizers and 68000, including
+blue-camp guests (Delita's ENTD flags 0x84), frozen amounts, empty funds, caps,
+no HP/MP effect, one commit, source gates and conservative actual AI. The wrapper
+runs the existing save tests in a temporary data directory, including uncommitted
+funds, victory/reload, enemy losses and repeated saving. Full `closure.py --all`:
+69 suites green, all historical summaries unchanged except `actions` (D164D1B0,
+the two records). The final guest-camp correction has a separate direct closure
+(gil/actions/talk-skill/banks/area-impact/steal-equip/steal-exp) and both native
+pilot save/results flows. ABI 48/ModCtx 388: PARTY11 initializes the existing
+Save tail in ordinary and scripted starts; Unit/State/Work/FSV3 and allocations
+stay fixed. Production input64725/headroom211/zone8186. Evidence lives under
+`x/core-gil/` (full and final closures, final-flow, oracle, verification.json).
+
+Historical equipment steals closure (2026-11-01): `closure.py --all`, 68 suites
 green; `core-steal-equip-check` 4478 (F66BB1DC) joins the standard list. Every
 hash equals the Magic Break closure except `actions` (69BA66A5: five records).
 `make save-test` (outside the closure) checks a stolen item reaching the inventory.

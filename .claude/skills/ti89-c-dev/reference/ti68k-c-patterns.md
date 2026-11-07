@@ -17,6 +17,15 @@ intermediates or link an object built with different flags. Run native builds
 sequentially, or give each build isolated source/object paths. Host-only tests and
 independent asset reads may still run concurrently.
 
+**Unused type declarations can change GCC4TI output (native headless check,
+FFT2026-10-28):** adding a four-byte view to an existing same-size context union
+regenerates different branch/register choices in three unrelated images at-Os;
+two retain their length and one shrinks6 bytes. Controlled preprocessed rebuilds
+with only that declaration removed reproduce all three previous images exactly.
+Source logic/sizeof equality does not prove binary identity. Compare actual
+affected image bytes and validate their callers; do not describe a size-only
+comparison as unchanged code. See `games/fft/campaign/CORE_HEADROOM.md`.
+
 **Runtime data length (verified headlessly and in TiEmu, FFT affine textures):**
 `rt_file(name, &size)` on TI reports the AMS variable's payload length including the
 OTH/dat trailer (six bytes in generated `.89y` banks), while the PC backend reports
@@ -855,6 +864,11 @@ Unarchive first and archive after if needed, as above.
 - Read in place with `HeapDeref` (works for archived files too); lock only if not already locked.
 - The runtime does it for games: `rt_save` records the data, `rt_ti.c` writes and archives the
   variable after the teardown (**verified**, Titanium, FFA save/Continue, 2026-09-27).
+- **Borrowed save buffer (verified headlessly on68000, FFT,2026-10-24):** `rt_save`
+  retains the pointer, not a copy. Its bytes must survive frame-buffer/Work release
+  and code-overlay eviction until `save_write` finishes. FFT keeps a save tail
+  beside its longer-lived battle State, freed only by final exit cleanup. A
+  temporary cache or an evictable module's static array cannot provide that lifetime.
 - Write saves **after the teardown** (grayscale off, vectors restored): `SymAdd` can open a
   "create folder?" dialog and archive operations can start a garbage-collect dialog, both need AMS.
   Archive afterwards (`EM_moveSymToExtMem`) if the save must survive a RAM reset.
@@ -946,3 +960,152 @@ directory with a bare variable name (`cd data; ttbin2oth -89 dat ffov0.bin ffov0
 The eight-bank opening fixture in `games/fft/opening/` checks actual VAT loading.
 Archive attributes are set in the TI file header at 0x49, outside the payload
 checksum. This packaging check is headless; it does not validate a Flash transfer.
+
+### Headless PNG comparisons: viewport and palette (FFT,2026-10-25)
+
+**Verified headless PC/68000, not a TiEmu hardware observation:** FFT software
+captures are160x100 with palette24/88/152/216. `ti-cycles --png` captures the
+full240x128 LCD with palette0/85/170/255. Identical gameplay planes therefore
+do not imply identical PNG files, dimensions or literal RGB bytes. Compare
+the same160x100 viewport at(0,0), map the KNOWN palettes to fixed shade IDs,
+and retain plane/state checksum checks. Do not dynamically renumber only the
+shades present: an all-black image and an all-white image must remain different.
+See `games/fft/campaign/check_step_views.py`.
+
+### Portable checksums and native word order (FFT,2026-10-28)
+
+Checked with64 actual PC/68000 tactical framebuffers: a local screen-change hash
+which reads `u32` words is not a portable golden checksum. FFT's `planes_sum`
+intentionally uses native words; the same bytes yield different numbers on a
+little-endian PC and the big-endian68000. Keep it for local freeze detection.
+Cross-platform tests must read the visible20 bytes of each100-row plane in a
+fixed order, or decode words explicitly. `campaign/area_impact_pixels.inc` does
+this; the individual frames then agree. Exclude the unused LCD padding. This
+is native headless evidence, not a new hardware/emulator timing measurement.
+
+### Bounded queue representation in existing scratch (FFT,2026-10-25)
+
+**Verified headless PC/68000, not a TiEmu hardware observation:** an optional
+linked Dial frontier for costs1..5 uses one next/previous byte per pending node
+and eight bucket head/tail/count records. It fits inside the existing four256-
+byte append-only queues; native Search1054 and Work45514 stay unchanged. Unlink
+before requeueing a strict improvement, retain FIFO ties, and reset metadata
+when switching representations or borrowing those bytes for edge geometry.
+Byte255 can stay a valid node because counts express list presence. This is a
+measured storage contract, not a general speed win: ordinary costs1..3 keep the
+faster old path. Resident code size still matters independently: the optional
+routine crosses TTPack's64936-byte input ceiling in the current FFT build and
+stays test-only there. Details: `games/fft/campaign/CORE_SPAN_SEARCH.md`.
+
+### Resident module zone versus packed input (FFT,2026-10-25)
+
+**Verified headless PC/68000, not new TiEmu evidence:** a module zone reserved
+inside the program contributes to the unpacked TTPack input, even when its
+initial zero bytes compress well. Splitting the largest combined initialization/
+save image and moving Status input to its existing screens image reduces the
+zone6074→5734 and allows the wider-cost search to fit. Total archive bytes rise
+1438; native Work/State/Save sizes do not grow. ABI6/count9 prevents stale-bank
+mixing. Keep stat calculations resident and do not evict an executing overlay.
+TTPack's first two bytes are a little-endian input length, then TP magic (checked
+with a known100-byte pack). FFT's new report records64831 input bytes/105 margin
+separately from compressed code size; its raw TI payload is64829 bytes because
+the packed input includes the length word. Scope: `games/fft/campaign/CORE_RESIDENT.md`.
+
+### GCC4TI packed output paths (2026-11-04)
+
+**Verified host build, not TiEmu hardware evidence:** with the bundled TTPack1.9,
+passing an absolute `ti-cc -o /.../name -pack variable` path can make TTPack parse
+the path as flags (`Unknown option "o"`, `invalid number`). Build from a private
+working directory with a relative `-o name`; absolute input-source/library
+paths work. The FFT blockC proof builds both raw and packed there and verifies
+raw variable length+2 equals the packed little-endian input length. This avoids
+mistaking a path/parser failure for a resident-size overflow.
+
+### Cache a few directional neighbors before deleting per-link data (FFT,2026-10-25)
+
+**Verified headless PC/68000, not new TiEmu evidence:** replacing every via ID
+by on-demand coordinate lookup saved RAM but slowed ordinary search about35%
+in the scoped FFT fixture. Retain four first-neighbor IDs per node instead:
+two-byte link rows plus that cache cost36 bytes/node on one floor and68 on two,
+versus the previous48-byte16-link allocation. The two-floor reserve now supports
+32 links; node255 validity is explicit. Same-state native ordinary search CPU
+is preserved; pilot heap requests fall1798/1678 bytes with Work growing2 bytes.
+This is a measured example, not a universal compression/speed rule. Reject an
+optimization if reconstruction moves expensive lookup into the hot path.
+ABI7/count9, current evidence/limitations: `games/fft/campaign/CORE_COMPACT.md`.
+
+
+### FFT executable archive partition (2026-10-27, native68000 checked)
+
+A ~65K archive variable can be split without another execution buffer: keep
+position-independent records in two validated ID ranges, then cache archived
+record pointers at startup. FFT FMB3 uses matching export tokens, explicit first/
+count/total and aligned directories; all spans/signatures pass before any image
+executes. An export token comparison is not a runtime content checksum. Require
+both shards and reject old/mixed/truncated pairs rather than partial execution.
+
+Fixed callback/address binding can be a const struct template with dynamic
+map/State/asset fields refreshed after copying. This trades repeated initializer
+code for resident constants and an additional cold memcpy. Measure both program
+input and cold cycles: in this build private package-27 bytes, resident input+62
+(91 bytes left), directory52 instead of6, one6204-byte zone, unchanged State/
+Work/save/five allocations. Native130 parser cases,112 exact old-context byte
+checks/26 cold+26 warm preloads and6 failure-before-execution startups pass;
+13 image bodies differ only by ABI. Not a TiEmu or hardware peak-memory claim.
+Details and reproduction: games/fft/campaign/CORE_BANKS.md.
+
+
+### TTPack output paths (host verified, 2026-11-05)
+
+GCC4TI's TTPack interprets an absolute output path beginning with `/` as a DOS
+option. For a private `ti-cc -pack` build, change into the destination directory
+and pass a relative output name (`-o fftbat -pack ffbcore`); absolute C/library
+input paths work. This was checked with the host tools, not on a calculator.
+When measuring capacity, the packed input also includes the raw TI variable's
+two-byte length prefix; read both the raw header and the TP input-size header.
+
+
+### Exclusive scratch storage and actual AMS startup (FFT, 2026-11-07)
+
+**Verified on isolated Titanium TiEmu and headless PC/68000:** a program can
+pass headless allocations while its packed production launch fails under AMS.
+Include the unpacked executable, supervisor, GrayDBuf and GrayOn residency;
+RT_CYCLES does not model those costs. FFT's actual grayscale startup probe uses
+15,382 bytes for GrayOn plus double buffering in this build. This number is
+configuration-specific, not a generic AMS allowance.
+
+Exclusive UI/AI storage, three ten-byte portrait plane slots at the unchanged
+30-byte pitch, and rotation/reach scratch reuse reduce native Work by11,410
+bytes. Reserve graph rows for the actual builder degree, separately from wider
+injected diagnostics: this saves another2,400 bytes on150-node Gariland.
+Keep equipment drafts and deferred/movement configuration outside the UI/AI
+union, and invalidate incomplete work when changing owner. Preserve enough
+padding or explicitly clear sprite overhang before using adjacent plane slots.
+Four13-actor rendered states remain pixel-identical, and actual packed battle
+startup/rotation/exit passes twice with an extra4,096-byte allocation. Free heap
+is identical after both exits. See `games/fft/campaign/CORE_FINAL_COMBAT.md`.
+
+
+### Compiler-discovered overlay arithmetic wrappers (FFT, 2026-11-07)
+
+**Verified headless PC/68000:** GCC4TI's whole-program elimination runs before
+some arithmetic libcalls are introduced. Retaining every forwarding wrapper
+with externally_visible prevents missing helpers but stores unused copies in
+each independent overlay. FFT now first compiles to inspect actual libcall
+references, then compiles the C wrappers under the discovered mask. Final
+undefined-symbol/relocation checks remain mandatory. This removes unused code
+without rewriting instructions or changing the348-byte callback context.
+See `games/fft/tools/module.py` and its focused parser checks.
+
+Shared source includes do not imply one compiled copy across overlays. Sharing
+one eligibility helper through an existing resident callback saves archive
+bytes, but moves code into the resident and changes the largest execution-zone
+size. Measure both effects, compressed input headroom and planner cycles.
+FFT's current total package falls11240 bytes, while resident TTPack headroom
+is only23 bytes; this is not an unconditional speed/size recommendation.
+
+Exact portrait/name pooling can use direct archived pointers and tiny ID
+indexes. Current FCP2 uses46 unique portraits for61 reviewed uses and510 names;
+all bytes agree with the original records. Native validators must reject odd
+word-directory offsets before any native word read. No expansion heap is needed.
+Details and measured limits: `games/fft/campaign/CORE_FACTORIZATION.md`.

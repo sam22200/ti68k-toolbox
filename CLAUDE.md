@@ -19,6 +19,10 @@ benchmarks and verdicts of `experiments/` (game-techniques §13):
   `long` only when the range requires it.
 - **Static lookup tables instead of computing**: trigonometry, rotations, square roots,
   reciprocals, row offsets… generated with `tools/bin/ti-table` (picks the smallest type).
+- **Factor code and data whenever practical**: reuse shared rules, renderers and asset records
+  before adding another copy. Check the compiled modules too: a shared source file can still
+  produce duplicate machine code. Keep factorizations that preserve the reviewed output and
+  fit the measured CPU, RAM and executable-size budgets; performance remains the first priority.
 - **Shifts instead of divisions and multiplications**, reciprocal multiplies for constant
   divisors, never a division or a 32-bit multiply in a loop, never a float at run time
   (a float op costs ~7,500 cycles).
@@ -309,7 +313,9 @@ that kind of task.
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
 - `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
-  `zx0pack.py` (ZX0 packer on the PC; recipe in `ti68k-c-patterns.md` §10).
+  `zx0pack.py` (ZX0 packer on the PC; recipe in `ti68k-c-patterns.md` §10), archived proportional
+  bitmap fonts (`bitmap_font.c`/`.h`/`.py`, `BITMAP_FONT.md`) and the offline SVG outline
+  converter (`svgfont.py`, `SVGFONT.md`).
 - `experiments/`: small verified tests (`hwinfo/`: HW version, AMS, timer values; `bench/`:
   micro-benchmark harness, `bench7.c` PRNGs and bit-sliced CA; `codegen/`: what C compiles to; `tables/`: table-driven rotation and
   atan2 demo; `timers/`: int-5 rate per start value; `gray/`: GrayDBuf; `keys/`: keyboard latch;

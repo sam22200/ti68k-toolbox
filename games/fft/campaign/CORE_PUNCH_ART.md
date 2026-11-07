@@ -1,5 +1,16 @@
 # Punch Art: Stigma Magic, Chakra, Revive, Wave Fist and Repeating Fist
 
+Current follow-up: CORE_LINE.md enables Earth Slash with source cardinal line
+footprints and Earth damage. Together with CORE_SECRET_FIST.md and the strike
+checks, all eight generic Punch Art producers are now executable. This does
+not certify the Monk's passives, innate combinations or full reaction set.
+
+
+Current follow-up: CORE_SECRET_FIST.md enables Secret Fist (formula50).
+Its source calls physical evasion, but flags4=0 bypasses evasion and its RNG.
+Earth Slash still requires line targeting; older gating statements below are
+historical.
+
 2026-10-30. The first job family after CORE_PROTECT, in two batches. Support:
 Stigma Magic (105), Chakra (106) and Revive (107) through the shared owned area
 pipeline. Strikes: Wave Fist (102) and Repeating Fist (101) through the

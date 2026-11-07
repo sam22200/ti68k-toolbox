@@ -5,8 +5,9 @@ Talk Skill entries (formula 0x2a) are enabled as immediate owned area casts
 (no CT, no MP); Death Sentence followed with its turn countdown. Production:
 116 normalized records, 83 casts, 113/201 generic action entries (88
 remaining entries are not 88 effects). Invitation (recruitment and guest
-identity) and Negotiate (Gil) stay gated; Secret Fist (0x50: physical evasion
-then a percentage status) also inflicts Death Sentence and stays gated.
+identity) and Negotiate (Gil) stay gated; Secret Fist also inflicts Death Sentence; it is now enabled by
+CORE_SECRET_FIST.md. Its flags4=0 bypasses evasion despite the formula50 helper
+call (the previous note here incorrectly inferred evasion from that call).
 
 ## Source behavior (decompiled MIPS, `sources/fft_decomp`)
 

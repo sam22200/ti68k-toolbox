@@ -1,5 +1,11 @@
 # Shared abilities: source IDs and modular evaluation
 
+Current generic milestone(2026-11-04): CORE_DISCOVERY.md completes the last six
+R/S/M producers, for78/78 bounded consumers alongside201/201 generic actions.
+Source Chocobo265/268/269 have actual core commands. FCJH/FSV4 and ABI67 are the
+current formats; older dated entries below retain their historical counts and
+limits. Automatic Mime imitation and final integration remain separate.
+
 **Current healing family —2026-10-29:** [CORE_HEALING.md](CORE_HEALING.md).
 Cure1–4/Raise1–2/Moogle/Fairy are enabled together:33 executable casts,
 55 normalized actions and52/201 generic entries (149 unavailable entries,

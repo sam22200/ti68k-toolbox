@@ -1021,3 +1021,36 @@ the six-byte AMS OTH trailer. Generated header offsets and bank data must be
 prepared before the binary prerequisite compiles, not merely before the parent
 `test` recipe runs: an order-only prerequisite on `test` alone still allowed a
 stale header/new bank pair. `games/fft/REACH_CONTOUR.md` records sizes and checks.
+
+## Targeted validation and exhaustive audits (2026-10-25)
+
+Distinguish validation workload from runtime cost. An exhaustive kernel sweep
+is useful when certifying a new classifier/algorithm, but its assertion count
+is neither a game-performance measurement nor a reason to repeat it after
+local edits. Save provenance, keep a small boundary suite as the default, and
+make exhaustive regeneration explicit. Test the changed dependency closure;
+broaden when shared layout/ABI, timing, renderer or format changes justify it.
+FFT's layer classifier was certified by3,234,825 PC/68000 comparisons; its
+focused default now has2574 checks. The full sweep remains `--deep`. This is
+headless evidence, not a new hardware observation. See campaign/CORE_TESTING.md.
+
+### Headless benchmark zone IDs (source-checked,2026-11-02)
+
+`ti-cycles` accepts marker IDs0..63 only (`tools/m68kbench/ti-cycles.c` BEGIN,
+END and NAME handlers). Higher IDs are silently ignored. Use a free ID below64
+for a new zone; a compiled marker at64 is not evidence that the zone was timed.
+This is a host-runner limit, not a calculator timing measurement.
+
+
+### Compiler-checked: retain an index when borrowing a struct pointer (FFT, 2026-11-04)
+
+Under GCC4TI `-Os -mpcrel`, converting a pointer back to its index with
+`unit - units` for a112-byte unit struct emitted a32-bit reciprocal multiply
+through `__mulsi3`, even when the final array index fit in one byte. In FFT's
+bounded monster-height scan, retaining the original `u8 source` and updating
+it together with the borrowed pointer removes that helper entirely. This keeps
+pointer-based field access while avoiding an unnecessary pointer-difference
+conversion inside repeated queries. The generated `monster_height` has no
+32-bit multiply/divide helper after the change; local before/after listings are
+in `games/fft/campaign/x/core-discovery/codegen/`. This is a compiler check, not
+an emulator or whole-frame timing claim.
