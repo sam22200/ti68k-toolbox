@@ -1,0 +1,373 @@
+#!/usr/bin/env python3
+"""A chapter's descriptor (campaign/ENGINE.md, M1): the per-chapter numbers the engine used to
+take from generated headers, as one small archived variable read at load.
+
+usage: chapter_desc.py opening|campaign ...
+Reads <chapter>/data/{battle,interface,map}.h and the actor offsets (opening/data/units.h,
+campaign/data/actors.h); writes <chapter>/data/<ffod|ffgd>.bin and the shared layout
+chapter.h (CD_* word indices, identical for every chapter). Layout: "FCD4", then u16
+fields (FIELDS), then the small tables (u8 rows; zodiac_days u16), each at a field's
+byte offset from the start of the descriptor (0: the chapter has none).
+"""
+from pathlib import Path
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+
+HERE = Path(__file__).resolve().parents[1]
+# Numbers: header #define name (None: computed here)
+NUMBERS = [('NABIL', 'NABIL'), ('NSET', 'NSET'),
+           ('SET_BASIC', 'SET_BASIC'), ('NRSM_PRE', 'NRSM_PRE'), ('DEFEND_JP', 'DEFEND_JP'),
+           ('DEFEND_RATE', 'DEFEND_RATE'), ('NBAG', 'NBAG'), ('MAP_H', 'MAP_H'), ('MAP_W', 'MAP_W'),
+           ('ACTOR_ARMED', 'ACTOR_ARMED'), ('ACTOR_OBJECTS', 'ACTOR_OBJECTS'),
+           ('SC_H', None), ('SC_TOP', None)]
+# Rows cut above the scenery of every view (tools/campaign_assets.py TOP); SC_H is measured
+# on the views themselves (Orbonne's are cut at the bottom by tools/opening_assets.py).
+SC_TOP = {'opening': 0, 'campaign': 16}
+VIEW = {'opening': 'ffov1', 'campaign': 'ffgv1'}
+# Interface offsets; PORTRAITS instead selects its ID directory in shared FCP2.
+IGFX = [('ABILITIES', 'abilities'), ('SKILL_SETS', 'skill_sets'),
+        ('UNIT_DEFS', 'unit_defs'), ('PORTRAITS', 'UI_PORTRAITS'), ('MALE', 'UI_MALE'),
+        ('FEMALE', 'UI_FEMALE'), ('TILES', 'UI_TILES'), ('UNIT_RAW', 'OPENING_RAW'),
+        ('UNIT_NAMES', 'OPENING_NAMES')]
+# Small tables stored in the descriptor: field, header array, element type
+TABLES = [('RSM_PRE', 'rsm_pre', 'B'), ('BAG_INIT', 'bag_init', 'B'), ('GEN_BASE', 'gen_base', 'B'),
+          ('GEN_VAR', 'gen_var', 'B'), ('ZODIAC_DAYS', 'zodiac_days', 'H'),
+          ('ZODIAC_COMPAT', 'zodiac_compat', 'B'), ('UNIT_ZODIAC', 'opening_zodiac', 'B'),
+          ('CHARGE_TICKS', 'opening_charge_ticks', 'B'),
+          ('SET_POS', 'set_pos', 'B'), ('SET_ID', 'set_ids', 'B'), ('BAG_ITEM', 'bag_items', 'B'), ('RSM_POS', 'rsm_pos', 'B')]
+# WATER: the map's water glints per view (fft.c make_glints): Orbonne's from its ffoi,
+# Gariland's computed by the engine itself (campaign/water_dump.c).
+# MAP_SCRIPT: the beats played on the battle map (fft.c mapbeats.inc): u16 count, then per
+# sequence its stage (st.open_stage), the beats' event, MS_* flags (1 after the victory,
+# 2 fades in, 4 actors placed by the beats, 8 camera set), rot, s16 camx, camy
+MS_AFTER, MS_FADE, MS_PLACED, MS_CAMERA = 1, 2, 4, 8
+SCRIPT = {'opening': [(3, 4, MS_FADE, 0, 0, 0),                     # the gate, from the scene
+                      (6, 5, 0, 0, 0, 0),                           # player's fade; the banter
+                      (4, 6, MS_AFTER | MS_FADE | MS_PLACED | MS_CAMERA, 0, 108, 68)]}   # aftermath
+# Per chapter (campaign/ENGINE.md M4): Ramza's unit, a unit's frame cost (k cycles: Orbonne's
+# dry shader, Gariland's water check); per sprite (units.h UG_*) its portrait (0: the same
+# index) and whether it is a Chemist's body (armed frames, Status)
+RAMZA = {'opening': 0, 'campaign': 6}
+UNIT_K = {'opening': 16, 'campaign': 20}
+START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc), 0: the battle at once
+# The campaign save (campaign/save.h): PARTY bit 1, the player's units are the campaign's party
+# (written at the victory; Orbonne's are not: the flashback starts a new party), bit 2 they come
+# from the save (the battles after Gariland, which creates it); WON, the story
+# flag + 1 its victory sets (0 none). SET_POS, BAG_ITEM, DEFEND_ID, EQUIP_CHANGE_ID: FFT's ids of
+# the chapter's skill sets (SET_ID) and their entries (their learned bit), bag slots and supports (a unit's job and
+# equipment are FFT ids, the shared tables ffcj);
+# RSM_POS, EQUIP_CHANGE_POS: the learned bits of the reactions and supports a unit draws.
+PARTY = {'opening': 0, 'campaign': 1}
+LOCATION = {'opening': 19, 'campaign': 7}       # its world map location: FFT id + 1 (Orbonne, Gariland)
+WON = {'opening': 1, 'campaign': 2}
+SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
+FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
+    ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'START',
+     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS) + ['DRAW_BASIC', 'UNIT_COUNT', 'UNIT_REWARDS']
+NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
+
+
+def unzx0(stream):
+    with tempfile.TemporaryDirectory() as d:
+        src = Path(d) / 'i'; dst = Path(d) / 'o'; src.write_bytes(stream)
+        subprocess.run([HERE.parents[1] / 'tools/bin/dzx0', '-f', src, dst], check=True, capture_output=True)
+        return dst.read_bytes()
+
+
+def numbers(text, values):
+    """Evaluate #define name <expr> for simple numeric expressions (NUNIT-sized tables)."""
+    for name, expr in re.findall(r'#define (\w+) ([^\n/]+)', text):
+        expr = expr.strip().rstrip('UL')
+        try:
+            values[name] = int(eval(expr.replace('UL', ''), {}, dict(values)))
+        except Exception:
+            pass
+    return values
+
+
+def table(text, name, values):
+    m = re.search(r'\b' + name + r'((?:\[[^]]*\])+)(?:\s*__attribute__\(\(unused\)\))?\s*=\s*\{', text)
+    if not m:
+        return None
+    depth, at = 0, m.end() - 1                 # the balanced initializer (several per line)
+    for end in range(at, len(text)):
+        depth += text[end] == '{'
+        depth -= text[end] == '}'
+        if not depth:
+            break
+    init = text[at:end + 1]
+    dims = [int(eval(d, {}, dict(values))) for d in re.findall(r'\[([^]]*)\]', m[1])]
+    count = 1
+    for d in dims:
+        count *= d
+
+    def flat(s):
+        """Nested braces, zero-padded per row (C initializer rules for these tables)."""
+        s = s.strip()
+        if not s.startswith('{'):
+            return [int(s, 0)]
+        inner, depth, parts, at = s[1:-1], 0, [], 0
+        for i, c in enumerate(inner):
+            depth += c == '{'
+            depth -= c == '}'
+            if c == ',' and depth == 0:
+                parts.append(inner[at:i]); at = i + 1
+        parts.append(inner[at:])
+        return [x for p in parts if p.strip() for x in flat(p)]
+
+    def shaped(s, dims):
+        s = s.strip()
+        if len(dims) == 1:
+            row = flat(s)
+            return row + [0] * (dims[0] - len(row))
+        inner = s[1:-1]
+        depth, parts, at = 0, [], 0
+        for i, c in enumerate(inner):
+            depth += c == '{'
+            depth -= c == '}'
+            if c == ',' and depth == 0:
+                parts.append(inner[at:i]); at = i + 1
+        parts.append(inner[at:])
+        rows = [shaped(p, dims[1:]) for p in parts if p.strip()]
+        size = 1
+        for d in dims[1:]:
+            size *= d
+        out = [x for r in rows for x in r]
+        return out + [0] * (dims[0] * size - len(out))
+
+    out = shaped(init, dims)
+    assert len(out) == count, (name, dims, len(out))
+    return out
+
+
+def build(chapter):
+    folder = HERE / chapter / 'data'
+    maps = folder / 'map.h'                    # Gariland's is the root map.h
+    texts = [(folder / n).read_text() for n in ('battle.h', 'interface.h')]
+    texts.append((maps if maps.exists() else HERE / 'map.h').read_text())
+    actors = folder / ('units.h' if chapter == 'opening' else 'actors.h')
+    texts.append(actors.read_text())
+    values = {'SET_N': 6}                    # legacy extractor records; converted below
+    for t in texts:
+        numbers(t, values)
+    offsets = {}
+    for t in texts:
+        offsets.update({k: int(v) for k, v in re.findall(r'#define (\w+) \(\(const \w+ \*\)\(igfx \+ (\d+)UL\)\)', t)})
+        offsets.update({k: int(v) for k, v in re.findall(r'#define ((?:UI|OPENING)_\w+) (\d+)UL', t)})
+    unit_count=values['NUNIT']
+    limit=int(re.search(r'^#define FFT_CORE_UNIT_MAX (\d+)',(HERE/'core_limits.h').read_text(),re.M)[1])
+    if not 1<=unit_count<=limit:
+        raise ValueError(f'{chapter}: {unit_count} actors exceed the accepted1..{limit} envelope')
+    head = b'FCD4' + bytes(2 * len(FIELDS))
+    body = bytearray(head)
+    fields = {}
+    fields['UNIT_COUNT']=unit_count
+    values['SC_TOP'] = SC_TOP[chapter]
+    view = (folder / (VIEW[chapter] + '.bin')).read_bytes()
+    if view[:2] in (b'V2',b'V3'):             # split banks; V3 also carries a width mask
+        head=6 if view[:2]==b'V3' else 4
+        values['SC_H'] = len(unzx0(view[head:head + int.from_bytes(view[2:4], 'big')])) // (2 * 40)
+    else:
+        values['SC_H'] = len(unzx0(view)) // (6 * 40)
+    for f, name in NUMBERS:
+        fields[f] = values[name or f]
+    for f, name in IGFX:
+        fields[f] = offsets.get(name, 0)
+    text = '\n'.join(texts)
+    for f, name, typ in TABLES:
+        rows = table(text, name, values)
+        if rows is None:
+            fields[f] = 0; continue
+        if len(body) & 1:
+            body.append(0)
+        fields[f] = len(body)
+        body += struct.pack('>%d%s' % (len(rows), typ), *rows)
+    water = water_block(chapter, folder, offsets)
+    if water:
+        if len(body) & 1:
+            body.append(0)
+        fields['WATER'] = len(body); body += water
+    else:
+        fields['WATER'] = 0
+    fields['MAP_SCRIPT'] = 0
+    if chapter in SCRIPT:
+        if len(body) & 1:
+            body.append(0)
+        fields['MAP_SCRIPT'] = len(body)
+        body += struct.pack('>H', len(SCRIPT[chapter]))
+        for seq in SCRIPT[chapter]:
+            body += struct.pack('>4B2h', *seq)
+    fields['RAMZA'], fields['UNIT_K'] = RAMZA[chapter], UNIT_K[chapter]
+    fields['START'] = START[chapter]
+    fields['PARTY'], fields['WON'], fields['LOCATION'] = PARTY[chapter], WON[chapter], LOCATION[chapter]
+    for f in SAVE_IDS:
+        fields[f] = values.get(f, 0)
+    convert_units(chapter, folder, offsets, values, fields, body)
+    # Per-actor result data belongs to the encounter, not the two-chapter flow
+    # table. This also prevents a13-actor encounter from reading11-row rewards.
+    if len(body)&1:body.append(0)
+    fields['UNIT_REWARDS']=len(body)
+    rewards=bytearray(2*unit_count)
+    if chapter=='campaign':
+        import battle
+        source=battle.Disc(str(HERE.parents[1]/'roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'))
+        if len(battle.UNITS)!=unit_count:raise ValueError('Encounter/reward definitions disagree')
+        for i,definition in enumerate(battle.UNITS):
+            if isinstance(definition[0],int):
+                record=source.entd(*definition);rewards[2*i:2*i+2]=record[0x1E:0x20]
+    body.extend(rewards)
+    gfx = sprites((folder / 'units.h' if chapter == 'opening' else HERE / 'units.h').read_text())
+    portrait = [g if g <= 1 else g - 1 for g in range(len(gfx))] if chapter == 'opening' else None
+    for f, rows in (('GFX_PORTRAIT', portrait), ('GFX_CHEMIST', [int('CHEMIST' in g) for g in gfx])):
+        fields[f] = 0
+        if rows:                               # (opening: its portrait table has no Delita)
+            if len(body) & 1:
+                body.append(0)
+            fields[f] = len(body); body += bytes(rows)
+    struct.pack_into('>%dH' % len(FIELDS), body, 4, *(fields[f] for f in FIELDS))
+    import surface_data
+    disc,files=surface_data.extract.disc_files(str(HERE.parents[1]/'roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'))
+    raw,geometry,_=surface_data.terrain(disc,files,56 if chapter=='opening'else 22)
+    body=surface_data.attach_descriptor(body,surface_data.encode(raw,geometry['width'],geometry['height'],with_terrain=True))
+    (folder / (NAMES[chapter] + '.bin')).write_bytes(bytes(body))
+    print(NAMES[chapter], len(body), 'bytes')
+
+
+def convert_units(chapter, folder, offsets, values, fields, body):
+    """Initial encounter data, converted once offline to source IDs/action positions.
+
+    Original extraction controls retain their six-entry records. Their production
+    descriptor contains only native 28-byte UnitDefs, with no runtime remapping.
+    Draw masks preserve the exact former generation RNG calls independently of
+    which formula families the common interpreter later gains.
+    """
+    bank = (folder / ('ffoi.bin' if chapter == 'opening' else 'ffgi.bin')).read_bytes()
+    common = (HERE / 'campaign/data/ffcj.bin').read_bytes()
+    assert common[:4] == b'FCJI', 'rebuild ffcj before the chapter descriptors'
+    sections = struct.unpack_from('>14H', common, 4)
+    names = {}
+    for a in range(512):
+        at = struct.unpack_from('>H', common, sections[10] + 2 * a)[0]
+        if at:
+            name = common[at:common.index(0, at)].decode('ascii')[:12]
+            names.setdefault(name.replace(' ', ''), []).append(a)
+    old_ids = []
+    for a in range(values['NABIL']):
+        at = offsets['abilities'] + 24 * a
+        name = bank[at:at + 13].split(b'\0')[0].decode('ascii')
+        old_ids.append(names[name.replace(' ', '')])
+
+    # Older fixed encounters did not need a bag-ID map. Give every production
+    # descriptor one: the shared runtime indexes Potion..Phoenix Down uniformly.
+    bag = [None] * values['NBAG']
+    for a in range(values['NABIL']):
+        at = offsets['abilities'] + 24 * a
+        if bank[at + 17] & 4:
+            ids = [i for i in old_ids[a] if 0x170 <= i < 0x17E]
+            assert len(ids) == 1, (a, ids)
+            bag[bank[at + 18]] = ids[0] - 0x170 + 0xF0
+    assert None not in bag
+    if fields['BAG_ITEM']:
+        assert list(body[fields['BAG_ITEM']:fields['BAG_ITEM'] + len(bag)]) == bag
+    else:
+        fields['BAG_ITEM'] = len(body); body.extend(bag)
+
+    def actions(set_id):
+        at = sections[8] + 25 * set_id
+        p = common[at:at + 25]
+        return [p[3 + k] | (0x100 if p[k >> 3] & (0x80 >> (k & 7)) else 0) for k in range(16)]
+
+    def positions(old_set, source_set):
+        at = offsets['skill_sets'] + old_set * 18 + 12
+        source = actions(source_set)
+        out = []
+        for a in bank[at:at + 6]:
+            if a == 255: continue
+            matches = [k for k, ability in enumerate(source) if ability in old_ids[a]]
+            assert len(matches) == 1, (old_set, source_set, old_ids[a], matches)
+            out.append(matches[0])
+        return out
+
+    fields['DRAW_BASIC'] = sum(1 << p for p in positions(values['SET_BASIC'], 5))
+    if len(body) & 1: body.append(0)
+    fields['UNIT_DEFS'] = len(body)            # now an offset in the descriptor, not igfx
+    for i in range(values['NUNIT']):
+        at = offsets['unit_defs'] + 24 * i
+        rec = bank[at:at + 24]
+        set_id = common[sections[2] + rec[1]]
+        pos = positions(rec[22], set_id)
+        mask = sum(1 << p for p in pos)
+        learned = 0xFFFF if rec[23] == 255 else sum(1 << p for k, p in enumerate(pos) if rec[23] & (1 << k))
+        body.extend(rec[:22] + bytes([set_id, 0]) + struct.pack('>2H', learned, mask))
+
+
+def sprites(text):
+    """units.h's UG_* names in order (UNIT_GFX_N ends them)."""
+    m = re.search(r'enum\s*\{\s*(UG_RAMZA[^}]*)\}', text)
+    names = [n.strip() for n in m[1].split(',')]
+    return [n for n in names[:names.index('UNIT_GFX_N')]]
+
+
+def water_block(chapter, folder, offsets):
+    if chapter == 'opening':
+        bank = (folder / 'ffoi.bin').read_bytes(); at = offsets['OPENING_WATER']
+        end = 8
+        for rot in range(4):
+            p = struct.unpack_from('>H', bank, at + 2 * rot)[0]
+            for _ in range(4):
+                p += 2 + 2 * struct.unpack_from('>H', bank, at + p)[0]
+            end = max(end, p)
+        return bank[at:at + end]
+    path = folder / 'water.bin'
+    return path.read_bytes() if path.exists() else b''
+
+
+def dump_water():
+    """Gariland's glints, computed by the engine with the descriptor just written."""
+    exe = HERE / 'campaign/x/water_dump'
+    exe.parent.mkdir(exist_ok=True)
+    root = HERE.parents[1]
+    subprocess.run(['cc', '-std=gnu99', '-O1', '-w', '-o', exe, HERE / 'campaign/water_dump.c',
+                    root / 'runtime/core/rt_core.c', root / 'runtime/platform-sw/rt_sw.c'], check=True)
+    subprocess.run([exe], cwd=HERE / 'campaign/data', check=True)
+
+
+def header():
+    lines = ['// Generated by tools/chapter_desc.py: a chapter descriptor\'s layout (campaign/ENGINE.md).',
+             '#define CD_MAGIC 0x46434434UL   // "FCD4"',
+             '#define CD_HEADER_BYTES %dU' % (4+2*len(FIELDS))]
+    lines += ['#define CD_%s %d' % (f, 2 + i) for i, f in enumerate(FIELDS)]   # u16 word index
+    path = HERE / 'chapter.h'
+    text = '\n'.join(lines) + '\n'
+    if not path.exists() or path.read_text() != text:
+        path.write_text(text)
+
+
+def maxima():
+    """chapters.h: the largest map and scene of every chapter's descriptor (fft.h: the
+    battle engine's buffers, one program for all of them, campaign/ENGINE.md M4)."""
+    index = {f: 2 + i for i, f in enumerate(FIELDS)}
+    top = {'MAP_W': 0, 'MAP_H': 0, 'SC_H': 0}
+    for chapter, name in NAMES.items():
+        path = HERE / chapter / 'data' / (name + '.bin')
+        if path.exists():
+            desc = path.read_bytes()
+            for f in top:
+                top[f] = max(top[f], struct.unpack_from('>H', desc, 2 * index[f])[0])
+    text = ('// Generated by tools/chapter_desc.py: the largest map and scene of the chapters.\n'
+            '#define MAP_WMAX %d\n#define MAP_HMAX %d\n#define SC_HMAX %d\n' % (top['MAP_W'], top['MAP_H'], top['SC_H']))
+    path = HERE / 'chapters.h'
+    if not path.exists() or path.read_text() != text:
+        path.write_text(text)
+
+
+if __name__ == '__main__':
+    header()
+    for chapter in sys.argv[1:]:
+        build(chapter)
+        if chapter == 'campaign':
+            dump_water(); build(chapter)
+    maxima()

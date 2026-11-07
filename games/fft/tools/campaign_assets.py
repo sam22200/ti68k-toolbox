@@ -62,13 +62,11 @@ def main():
     Image.fromarray(np.uint8(255-canvas*85)).save(OUT/'academy.png')
     # Flip colours and masks bitwise; depth values are reversed in byte order only.
     # No retail texture is replaced or recomputed, preserving reviewed relief art.
-    rev=np.array([int(f'{i:08b}'[::-1],2) for i in range(256)],np.uint8)
     def mirror_view(rot):
-        raw=OUT/('view%d.raw'%rot)
-        subprocess.run([HERE/'../../tools/bin/dzx0','-f',HERE/f'fftv{rot}.bin',raw],check=True,capture_output=True)
-        planes=np.frombuffer(raw.read_bytes(),np.uint8).reshape(6,-1,40)[:,:,::-1].copy()
-        for i in (0,1,3,5):planes[i]=rev[planes[i]]
-        (OUT/f'ffgv{rot}.bin').write_bytes(extract.zx0pack.pack(planes.tobytes()));raw.unlink()
+        # Same reviewed contrast/height contours as the camera build; this helper
+        # checks original depths, reflects every plane and applies the shared crop.
+        from campaign_scenery import view
+        (OUT/f'ffgv{rot}.bin').write_bytes(view(rot))
     if not args.reuse_views:
         with ThreadPoolExecutor(4) as pool:list(pool.map(mirror_view,range(4)))
     # Move unchanged byte tables out of the 64K executable, as in Orbonne.
@@ -77,7 +75,7 @@ def main():
     exporter.write_text('''#include <stdio.h>
 #include <stddef.h>
 #include "../../fft.h"
-_Static_assert(sizeof(Job)==14 && sizeof(Item)==23 && sizeof(UnitDef)==24,"disk layout");
+_Static_assert(sizeof(Job)==14 && sizeof(Item)==26 && sizeof(UnitDef)==24,"disk layout");
 _Static_assert(offsetof(UnitDef,day)==6,"birthday offset");
 int main(void){
 const void *p[5]={jobs,items,unit_defs,abilities,skill_sets};unsigned sizes[5]={sizeof jobs,sizeof items,sizeof unit_defs,sizeof abilities,sizeof skill_sets};
@@ -86,10 +84,17 @@ unsigned i;for(i=0;i<5;i++){putchar(sizes[i]>>8);putchar(sizes[i]&255);fwrite(p[
     subprocess.run(['cc','-std=gnu11','-o',work/'tables',exporter],check=True)
     tables=subprocess.check_output([work/'tables']);offset=0
     data=bytearray((HERE/'ffti.bin').read_bytes());header=(HERE/'battle.h').read_text()
+    # A unit's job and equipment are FFT's ids (the shared tables ffcj, tools/common_tables.py)
+    job_ids=[int(v,16) for v in re.search(r'job_ids\[NJOB\][^=]*= \{([^}]*)\}',header)[1].split(',')]
+    item_ids=[int(v,16) for v in re.findall(r'^    \{ (0x[0-9A-F]{2}), ',re.search(r'static const Item items\[NITEM\] = \{.*?\n\};',header,re.S)[0],re.M)]
     for name,typ in (('jobs','Job'),('items','Item'),('unit_defs','UnitDef'),('abilities','Ability'),('skill_sets','SkillSet')):
         count=struct.unpack_from('>H',tables,offset)[0];offset+=2;block=bytearray(tables[offset:offset+count]);offset+=count
+        if name in ('jobs','items'):continue
         if name=='unit_defs':
-            for at in range(0,count,24):block[at+6:at+8]=struct.pack('>H',struct.unpack_from('<H',block,at+6)[0])
+            for at in range(0,count,24):
+                block[at+6:at+8]=struct.pack('>H',struct.unpack_from('<H',block,at+6)[0])
+                block[at+1]=job_ids[block[at+1]]
+                for k in range(12,22):block[at+k]=255 if block[at+k]==255 else item_ids[block[at+k]]
         if name=='abilities':
             for at in range(0,count,24):block[at+20:at+22]=struct.pack('>H',struct.unpack_from('<H',block,at+20)[0])
         if len(data)&1:data.append(0)
@@ -101,4 +106,10 @@ unsigned i;for(i=0;i<5;i++){putchar(sizes[i]>>8);putchar(sizes[i]&255);fwrite(p[
         target=OUT/(name+'.bin');target.unlink(missing_ok=True);target.symlink_to(HERE/(name+'.bin'))
     print('Campaign: Academy',len(messages),'source messages,',len(data),'bytes; four mirrored Gariland views')
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()
+    import subprocess
+    subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffgv0.bin'],check=True)
+    subprocess.run([sys.executable,HERE/'tools/common_ui.py','campaign'],check=True)  # ffcu, shared with the other chapter
+    subprocess.run([sys.executable,HERE/'tools/common_actors.py'],check=True)  # ffca/ffcb/ffcw, shared
+    subprocess.run([sys.executable,HERE/'tools/chapter_desc.py','campaign'],check=True)  # its descriptor

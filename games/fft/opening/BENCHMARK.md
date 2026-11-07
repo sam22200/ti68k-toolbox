@@ -1,4 +1,35 @@
-## Current opening review checkpoint (2026-10-18)
+## Configurable reach and tactical facing (2026-10-19)
+
+CATALOG now switches filled movement tiles and the exterior contour in both
+active chapters, default filled. State is1,090 bytes (+4); Work remains35,540.
+Sixteen exact PC/native pixel/state checkpoints pass, including settings open,
+contour on screen, rotation and restored fills, plus320 focused scene/cache
+comparisons across both maps. Existing animation, source-pose and combat checks
+still pass. Mask/render constants are archived to respect TTPack's64,936-byte
+input ceiling; see `../REACH_CONTOUR.md`.
+
+Ramza's original tactical face is read from unit+0x49, never a transient scene
+actor angle. The initial source actor was still facing3072 while his tactical
+face was0 (-z). The importer now uses the latter for every actor. Ramza's four
+projected facings are checked. `opening_assets.py --facings-only DISC` refreshes
+existing unit metadata without regenerating scenery or duplicating sprites.
+
+Settled player-camera workloads and their compression cost are documented in
+`../MAP_COSTS.md`; no TiEmu/FPS claim follows from these CPU measurements.
+
+## Reach-cache follow-up (2026-10-19)
+
+The reach-cache change adds 20 Work bytes (now 35,540), with no new asset bank.
+Historical follow-up: thirteen PC/68000 checkpoints matched, including range/rotation/cancel,
+launch-key and complete-title replays;
+the previous ten-case figures below remain a historical checkpoint. The player
+control changes from 238,602/284,862 mean/peak cycles to 238,606/284,866.
+Large-range entry measurements, tradeoffs and reproduction: `../REACH_CACHE.md`.
+The four-camera Orbonne control confirms a6.9–9.4% reduction in entry-frame CPU
+time. The experimental exterior contour saves another16.6–19.0% compared with
+optimized filled tiles, with no tactical reach change; see `../REACH_CONTOUR.md`.
+
+## Opening review checkpoint (2026-10-18)
 
 This section supersedes the initial-slice numbers below. Reproduce with
 `make -C games/fft/opening check`; full details: `x/check/checked.json`.

@@ -1,0 +1,13 @@
+// The world map as a program: fftmap() returns what the campaign does next (worldmap.c).
+#define USE_TI89
+#define MIN_AMS 200
+#define RETURN_VALUE
+#include <tigcclib.h>
+#undef _main
+#define _main map_runtime_main
+#include "../../../runtime/platform-ti68k/rt_ti.c"
+#undef _main
+#define _main __main
+#undef off
+#include "worldmap.c"
+void _main(void) { map_runtime_main(); push_shortint((short)map_result()); }

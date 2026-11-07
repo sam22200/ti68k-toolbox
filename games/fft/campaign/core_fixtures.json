@@ -1,0 +1,275 @@
+{
+  "schema": "FFT_CORE_FIXTURE_PLAN_1",
+  "meaning": "Fixture specifications, not passing implementations. Missing original traces stay explicit. User scope:13 actors and256 compact u8 tile IDs across both floors; see PORT_LIMITS.md.",
+  "cases": [
+    {
+      "id": "C01",
+      "family": "capacity",
+      "example": "Zirekile Falls:9 always-present ENTD195 plus4 declared deployed",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "13 actors, all camps, KO/resurrection and off-field transitions; reject encounters above13 without truncating",
+      "status": "synthetic13_native_pass_source_activation_pending",
+      "runner": "check_core_boundaries.py",
+      "runner_scope": "11/13-slot CT, due Charge, KO/revive/loot, targeting/AI, rewards, malformed descriptors and allocation failure; renderer checked separately Source-affinity cache covers all13 live slots without changing Unit stride; State2190 and native generation/load/level paths pass (CORE_AFFINITY.md)."
+    },
+    {
+      "id": "C02",
+      "family": "layered_geometry",
+      "example": "MAP001 upper floor",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "Same x/y, different floor; independent occupancy, range, landing, projection and cover",
+      "status": "battle_identity_and_source_queries_pass_full_source_paths_and_cover_pending",
+      "runner": "check_cell_state.py",
+      "runner_scope": "128 canonical-cell checks plus55 bridge checks including cold real-map graph controls;9462 source-kernel/schema checks; original-MIPS solid/ceiling/headroom queries checked separately; full source traversal and raster cover still pending; intermediate-jump candidate:47301 kernel checks,156 battle checks and298 original-verified edge changes, visual review accepted2026-10-25; per-map profile:3234825 native equivalence checks,169 accepted PNGs unchanged (CORE_MAP_PROFILE.md); recoil:172 source/kernel checks and82 actual battle checks (CORE_KNOCKBACK.md); current source endpoints, recoil and actor-column prerequisites are indexed in CORE_ROADMAP.md/CORE_RESIDENT.md; runtime long links and full bridge cover remain open CORE_TARGETS.md verifies nearest/upper-only radial layer selection, hidden untargetable upper surfaces, tie-lower and whole-map both-floor footprints; not full traversal/render cover."
+    },
+    {
+      "id": "C03",
+      "family": "tile_count",
+      "example": "Synthetic256-node boundary; MAP029 two floors; MAP0264x18",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "Compact tile255 is valid; u16 count256; coordinates/layer separate; no source-address alias or reserved invalid ID",
+      "status": "battle256_native_pass_source_render_and_maximum_residency_pending",
+      "runner": "check_full_grid.py",
+      "runner_scope": "13 actors/256 nodes including upper node255; movement/path/occupancy/Charge,256 requested nodes, AI origins/iteration/fallback,256-node sort, ring membership, allocation-failure rollback and cleanup; source render/extreme scene and full residency pending"
+    },
+    {
+      "id": "C04",
+      "family": "status_policy",
+      "example": "Petrify, Undead, Reraise, Stop, Charm",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "Immunity/cancellation/duration; KO recovery; effective team and victory eligibility",
+      "status": "bitmap_lifetime_command_controls_and_sleep_pass_other_handlers_pending",
+      "runner": "check_sleep.py; check_control.py; check_status_lifetime.py; check_status_state.py; check_status_rules.py",
+      "runner_scope": "Canonical bitmap/lifetime/protected subset plus Stop/command controls; Sleep passes1070 PC/sanitizer/68000 assertions with140 original XA cases,9 scoped finalize/wake cases and4 source AT lists. Other incapacitation/team/control/reaction handlers, producers and presentation remain open. Counter/Auto-Potion now use the shared prevention/wake/KO policy (CORE_REACTIONS.md); remaining status effects/producers stay open. Formula08 reads canonical Shell/Frog/Chicken/Faith/Innocent scalars, without enabling their addition/upkeep/other effects or producers (CORE_MAGIC.md). FCJ9 elemental metadata/cache does not enable innate statuses, immunity, or other status producers (CORE_AFFINITY.md).",
+      "tempo_followup": {
+        "document": "CORE_HASTE_SLOW.md",
+        "runner": "check_haste_slow.py",
+        "checks": 748,
+        "hash": "30A798F0",
+        "native_equal": true,
+        "source": "45 original CT gains,4 charge phases,33 AT lists; expiry/upkeep isolated and lifetime staging reused.",
+        "covered": "Public tempo requests/cures/immune/cancel; real gain and finite/innate AT; Slow1 idle/wake; unscaled Charge; KO/revive;13 actors.",
+        "limits": "Retail spells and other status/response/AI families remain gated; no full-frame/stack/residency certificate."
+      },
+      "incapacity_followup": {
+        "document": "CORE_INCAPACITY.md",
+        "runner": "check_incapacity.py",
+        "checks": 193,
+        "hash": "55D44C55",
+        "native_equal": true,
+        "source": "30 original ordinary outcomes/4 finalizers; graphical sort isolated. Source-only importance3 objectives and cancellation branch are not native support.",
+        "covered": "Ordinary team KO eligibility/presence; retained stone HP/occupancy; final ordinary immunity/reactions/AI; node255; safe terminal injection.",
+        "limits": "Petrify producers/cure/art/persistence and general scenario objective metadata remain gated; no full-frame/stack/residency certificate."
+      }
+    },
+    {
+      "id": "C05",
+      "family": "action_order",
+      "example": "Two Swords, Hamedo, Auto-Potion",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "Pre-action response, miss/strike1, reaction eligibility, strike2, KO and terminal condition; exact source trace required",
+      "status": "ordinary_hands_strikes_responses_and_area_presentation_pass_broader_families_pending",
+      "runner": "check_charge_hands.py; check_hands.py; check_hands_manage.py; check_strikes.py; check_reactions.py; check_context.py",
+      "runner_scope": "Ordinary unarmed/plain dagger/ninja-blade/sword Two Swords and dual Counter, distinct first/second weapons, mutable/innate Sleep, prediction/AI purity and management support removal pass PC/sanitizers/native. Source10 hand selections/20 XA-status-zodiac scalars plus earlier phase/EXP fixtures; not full original dual-weapon target/animation/probabilistic AI. Dual Archer Charge now passes eight original initializations/60 scalars, per-hand criticals, both delayed weapon IDs, fixed-tile recoil/KO requery and unique settlement. Other weapon skills/elements/procs/Hamedo remain gated (CORE_CHARGE_HANDS.md). Runtime rt_seed is not battle rng32; the new fixture checks query purity and the legitimate AI choice draw. Private Holy formula08 impact, Sleep wake, Auto-Potion root ownership and terminal settlement pass1352 scoped PC/sanitizer/68000 checks; source104 scalar profiles do not certify other magical reaction families (CORE_MAGIC.md). Formula08 typed impact now preserves prepared category/quantity and signed HP semantics; normal absorbed healing avoids damage-only wake/Auto-Potion, with an explicit injected packet-transport fixture.77 original profiles/1525 scoped checks pass; full original reaction/status/EXP trace remains open (CORE_ELEMENTS.md). CORE_MAGIC_EVASION.md adds238 original unmounted-human profiles/7510 PC/sanitizer/68000 checks: pure magical probability, sequential execution draws, ordinary presence/final validity, actual AI/paid due/miss behavior; FCJA/ABI24 retain battle/save layout and reject old contracts. Retail spells, areas and full original target-list/reaction/EXP/presentation remain gated. CORE_WEATHER.md adds254 original formula08/environment profiles and6493 PC/sanitizer/native checks8685AD66: source signed weather/Oil bug/Float null, due climate, actual AI ranking, MP/HP/removal/response ownership and four forecast caches. State2192(+2), ABI25/ModCtx364; FCJA/FSV3 unchanged. Live climate/Oil/Float infliction/movement and full cold-HUD/frame/residency gates remain open. CORE_TARGETS.md:1193 PC/sanitizer/native checksFC02B091,79 source footprints/42 columns. Query only: all target formula results must be prepared before HP commits; one-cost batch, source slot/RNG order, per-target responses/rewards and production spells remain gated. CORE_BATCH.md adds a gated60-byte caller-owned compound backend:1202 PC/sanitizer/native checks94558E80,13 source preparation groups, one payment/all formulas before HP, once-only impact, existing two-Auto-Potion drain and deferred maximum reward. Live producer/presentation and full original AoE reaction/reward trace remain open. CORE_AREA_CT.md connects the owned formula08 area root to automatic ACT_HIT, existing response/reward drain and13 equal-tick roots;353 PC/sanitizer/native lifecycle checks11D6FCB4. Retail producer/presentation/other reaction families remain gated. CORE_AREA_FORECAST.md adds pure current effect sets (359 PC/sanitizer/native checks7E9BBEF7): caller FORECAST phase, protected live owner, source52 target previews, binding refresh and node255/two floors. Actual area AI/targeting UI/presentation remain gated. CORE_AREA_AI.md adds cached immediate hostile HP area choice via actual ai_think/AI_AIM (676 checksD04607FA), empty centres, absorption/friendly fire, eviction/resume and safe late rejection. Both AF_CAST and AF_AREA are required; AREA-only weapon splash keeps legacy behavior. Future CT/status/Reflect/MP utility and reviewed area presentation remain gated. CORE_AREA_UI.md: approved manual selection/list/confirmation now submits actual cast_order, never chooses a victim subset. Browsing preserves live action/MP/RNG; complete per-target/empty impact and broader action families remain open. CORE_AREA_IMPACT.md: approved shared presentation uses per-victim execution results, waits for APPLIED, suppresses root effects during responses and retains existing reward/terminal drain.1012 PC/sanitizer/native checks12D9C238/64 full framesD7A684DC and416 accepted candidate captures pass. Other action/response families stay open."
+    },
+    {
+      "id": "C06",
+      "family": "deferred_targets",
+      "example": "Charge versus unit-targeted Fire",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "Move/KO target, move/KO caster, re-equip, equal-tick casts; CT pauses in menus",
+      "status": "charge_incantation_and_ordinary_area_pipeline_pass_other_deferred_families_pending",
+      "runner": "check_incantation.py; check_casting.py; check_deferred.py; check_charge.py",
+      "runner_scope": "Archer Charge, not magic: canonical state agrees; Stop pauses/resumes CT/Charge, Don't Act rejects at due-time or allows after cure, charge precedes status expiry and menus pause timers. General casting/equal-tick bounded scheduler remains open. Sleep cancels canonical Charging and its pending record together; wake never restores the cancelled command (CORE_SLEEP.md). Dual Archer Charge validates both weapons through the existing eight-byte pending record, cancels on either change and preserves per-hand power/criticals, Stop/menu pause and one CT resume/reward; full magic/unit-following/AoE/equal-tick families remain open (CORE_CHARGE_HANDS.md). Iterative13-slot due-wave dispatch, busy root/response ownership, late invalidation, terminal priority and one post-wave expiry/CT advance pass CORE_DEFERRED.md. Source tile/unit coordinate binding observed only; native magic/MP/AoE, Quick255 and all-permanent-freeze liveness remain open. Shared MP eligibility/once-only execution payment and source preparation arithmetic pass CORE_CASTING.md; a synthetic Dash carrier exercises resources, not live spell/cast/area effects. Holy/Fire, unit-following/empty-target payment and interruption remain open. CORE_INCANTATION.md adds actual fixed-tile/unit-bound cast records, CT/menu pause, late restrictions/MP, displacement/weapon survival,13 casts, Auto-Potion and node255/layer binding. Exact-cost paid effects fix a hidden preview-affordability recheck. Carriers remain synthetic; retail spell formulas/areas/UI remain gated. Private Holy now covers actual formula08 payment/due/impact and live delayed stats; retail Holy/Fire remain disabled pending traits/target policy/presentation (CORE_MAGIC.md). Single-centre private elemental casts read live traits/stats at due launch, latch the result and preserve it through later queries/trait changes; paid nullification has no effect RNG/reward. Broader target-list/refund/empty-centre policy remains open (CORE_ELEMENTS.md). CORE_MAGIC_EVASION.md adds238 original unmounted-human profiles/7510 PC/sanitizer/68000 checks: pure magical probability, sequential execution draws, ordinary presence/final validity, actual AI/paid due/miss behavior; FCJA/ABI24 retain battle/save layout and reject old contracts. Retail spells, areas and full original target-list/reaction/EXP/presentation remain gated. CORE_WEATHER.md adds254 original formula08/environment profiles and6493 PC/sanitizer/native checks8685AD66: source signed weather/Oil bug/Float null, due climate, actual AI ranking, MP/HP/removal/response ownership and four forecast caches. State2192(+2), ABI25/ModCtx364; FCJA/FSV3 unchanged. Live climate/Oil/Float infliction/movement and full cold-HUD/frame/residency gates remain open. CORE_TARGETS.md verifies radial follow-centre coordinates even after Crystal/Jump removes that actor from the list. The prior single-target cast binder is unchanged; batch integration must retain the footprint centre without relying on victim presence. CORE_BATCH.md provides effect-stage preparation/commit only; durable owner, area CT/command dispatch and use of the area follow-centre contract remain next. Single-target CT dispatch stays unchanged. CORE_AREA_CT.md now routes supported areas through cast_order/real CT/due dispatch: fixed empty centres, moved live unit, Crystal/Jump coordinates and paid vanished centre; status/resource revalidation and owned impact.5 Orbonne retry checks00000230 clear both owner stores. Area AI/forecast/presentation remain next. CORE_AREA_FORECAST.md adds pure current effect sets (359 PC/sanitizer/native checks7E9BBEF7): caller FORECAST phase, protected live owner, source52 target previews, binding refresh and node255/two floors. Actual area AI/targeting UI/presentation remain gated. CORE_AREA_AI.md adds cached immediate hostile HP area choice via actual ai_think/AI_AIM (676 checksD04607FA), empty centres, absorption/friendly fire, eviction/resume and safe late rejection. Both AF_CAST and AF_AREA are required; AREA-only weapon splash keeps legacy behavior. Future CT/status/Reflect/MP utility and reviewed area presentation remain gated. CORE_AREA_UI.md supersedes the earlier pending-UI note:499 PC/sanitizer/native checks67EED097, eight HUD hashes and four actual full-screen/state replays cover centre binding, empty/no-follow centres, late rejection and node255/two floors. The228-byte cache is separate from live CastBatch. Complete victim/empty-centre impact presentation and retail activation remain gated. CORE_AREA_IMPACT.md:154 native-equal bounds checksC56EC8B9 preserve followed Crystal/Jump coordinates, absent centres, both floors/node255 and public Work-owner preparation. Cache412 stages13 glyphs plus Oil before impact. Ordinary area presentation passes; retail and other deferred families remain gated.",
+      "scheduler_followup": {
+        "document": "CORE_SCHEDULER.md",
+        "runner": "check_scheduler.py",
+        "checks": 263,
+        "hash": "3056BFD2",
+        "native_equal": true,
+        "source": "Six selections, two intervening Quick turns, three stalled clocks and three AT lists; expiry/upkeep isolated; no retail Quick producer.",
+        "covered": "Quick255 priority/CT0; stable slot ties; pending wave ownership; bounded all-frozen/Speed0/KO-guest/absent clocks; mutable Stop/Sleep timer0 wrap and wake; quit/cancel/rotation; AT zero-speed clamp and source55 forecast quirk.",
+        "limits": "Other statuses/reactions/targeting/recurring actions and broader AI remain open; no full-frame/stack/residency certificate."
+      },
+      "tempo_followup": {
+        "document": "CORE_HASTE_SLOW.md",
+        "runner": "check_haste_slow.py",
+        "checks": 748,
+        "hash": "30A798F0",
+        "native_equal": true,
+        "source": "45 original CT gains,4 charge phases,33 AT lists; expiry/upkeep isolated and lifetime staging reused.",
+        "covered": "Public tempo requests/cures/immune/cancel; real gain and finite/innate AT; Slow1 idle/wake; unscaled Charge; KO/revive;13 actors.",
+        "limits": "Retail spells and other status/response/AI families remain gated; no full-frame/stack/residency certificate."
+      },
+      "incapacity_followup": {
+        "document": "CORE_INCAPACITY.md",
+        "runner": "check_incapacity.py",
+        "checks": 193,
+        "hash": "55D44C55",
+        "native_equal": true,
+        "source": "30 original ordinary outcomes/4 finalizers; graphical sort isolated. Source-only importance3 objectives and cancellation branch are not native support.",
+        "covered": "Ordinary team KO eligibility/presence; retained stone HP/occupancy; final ordinary immunity/reactions/AI; node255; safe terminal injection.",
+        "limits": "Petrify producers/cure/art/persistence and general scenario objective metadata remain gated; no full-frame/stack/residency certificate."
+      }
+    },
+    {
+      "id": "C07",
+      "family": "memory_and_blocks",
+      "example": "Separate dynamic topology cache; max256 nodes; scene/Work block stays below64KB",
+      "severity": 5,
+      "probability": 5,
+      "minimum": "Repeated max-map loads/rotations, largest free block, heap high-water, allocation failure and retained supervisor children",
+      "status": "five_block_layout_and_growth_failure_checked_peak_residency_pending",
+      "runner_scope": "ABI18/twelve images; unchanged Unit112/State2124/Work45516/FSV3 and five allocation requests (Gariland114834, Orbonne114474, max126842). Input64845/headroom91, largest5814, ModCtx332. Shared physical math stays resident; cold pickup moves unchanged to PARTY6. Layout formulas only; combined residency/stack remains pending (CORE_CHARGE_HANDS.md). Deferred follow-up has unchanged ABI18/types/image bank and allocation formulas; private490379, input64857/headroom79 (CORE_DEFERRED.md). Casting-resource follow-up ABI19/ModCtx336/zone5860; unchanged battle/save types/five blocks, private491065, input64743/headroom193. Pure cost is resident; cold range moved to COMMAND2 (CORE_CASTING.md). Incantation follow-up ABI20/ModCtx344/zone5862, same battle/save types and allocation count; private492546, input64859/headroom77. Validation/due launch move to COMMAND3/4 (CORE_INCANTATION.md). Magical-scalar follow-up ABI21/ModCtx348/zone5882; unchanged battle/save types and five blocks, private493049, input64919/headroom17. Pure magic stays resident, unchanged cold banner/cache metadata moves to PARTY7/8; end-turn CT stays resident (CORE_MAGIC.md). Affinity follow-up ABI22/ModCtx348/zone6060, native Unit112/State2190/Work45516/FSV3; five blocks with first5328 (+66). Native Gariland114900/max126908 allocation formulas, not peak residency. Private495758 (+2709), input64859/headroom77. Stat code local in PARTY/ACTION/RESPONSE; no evicting unit_stats callback (CORE_AFFINITY.md). Elemental outcomes reuse State/ActionPacket padding: native2190/22, Unit112/Work45516/FSV3/five allocations unchanged. ABI23/ModCtx352/zone6096; private496819 (+1061), input64795/headroom141. FORMULA10 cold formatting46180 cycles below60k task envelope; not a full-frame/residency certificate (CORE_ELEMENTS.md). CORE_TARGETS.md native query cold avg30764/max40642, warm avg18700/max28578; ABI26/ModCtx364,13 images/largest6172. No heap/State/save growth; full cold-HUD/frame/stack/residency remain open. CORE_BATCH.md:ABI27/ModCtx364/largest6204; State/Work/Unit/FSV3 unchanged,60-byte caller storage, no new batch heap. Full-frame/cold-HUD/stack/residency remains open. CORE_BANKS.md:resident directory+46 bytes, same execution zone6204; template364 bytes replaces binding stores, dynamic fields refreshed. Batch cold prepare max97692/commit104998; no full-frame/residency certificate. CORE_AREA_CT.md:Work+60(native45576), same5 allocations/State/save; scene+Work/totals+60, near packet offset independently checked. Command/prepare127872, impact41372, due avg85304/max85376 backend cycles, no full-frame/residency certificate. CORE_AREA_FORECAST.md: no State/Work/save/allocation growth; caller60-byte output, largest6204 unchanged. Cold query avg81566/max110258, warm57812/max86504; no full-frame/stack/residency certificate. Reuse/cache and bound future AI calls. CORE_AREA_AI.md:84-byte cache aliases idle256-byte ai_dist; Work45576/State2192/FSV3/five allocations unchanged. ABI32/fourteen images, static directory+4/zone+14. New area max319968 cycles, but general setup/reach stage0 peaks12059828 (about1.005s at12MHz), so full planner360K fails. Bound general setup next; frame/stack/residency remain open. CORE_AI_PACING.md: user accepts the roughly1s setup quantum inside the1\u20132s frozen pause;360K per-frame setup is no longer a priority blocker. Elapsed1.5s includes thinking;171 checks58CBDE4E/native equality, no extra post-plan hold. Resident static+2/input+20, fourteen images/ABI/layouts/five allocations unchanged. Full-plan worst latency/stack/residency and interactive budgets remain open. CORE_AREA_UI.md: ABI33/ModCtx372/signature64143,15 images, split8/7, zone6264. Cache228 aliases idle256-byte ai_dist; fresh20-field PC/native layouts and five allocation formulas unchanged. Private515564(+6146), resident64719/headroom217. Cold13-unit whole-map HUD375252 and update279866 are separate zones, not a360K frame certificate. AI camera moves unchanged to AI_SETUP3/4;1321 native-equal checks4CC4400E. Full frame/stack/residency/total AI latency stay open. CORE_AREA_IMPACT.md: cache412 aliases idle ai_gain512; same core State/Work/Unit/FSV3/five allocations, ABI34/ModCtx372/sig64400/16 images/zone6264, resident64473/headroom463. Per-glyph20178/cold13-number96350 are not full scenes. Full-render cold view2528106 and prior cold UI375K keep full-frame/stack/residency open. No new bitmap bank."
+    },
+    {
+      "id": "C08",
+      "family": "persistent_identity",
+      "example": "16 Formation slots plus4 guest slots",
+      "severity": 5,
+      "probability": 4,
+      "minimum": "Guest joins/leaves, reserve survives, recruit/monster occupies stable identity; save/load/compaction preserves references",
+      "status": "guest_persistence_incomplete",
+      "runner_scope": " Derived affinities reload from stable saved job/item IDs with no FSV3 fields; broader identity/monster equipment remains open (CORE_AFFINITY.md)."
+    },
+    {
+      "id": "C09",
+      "family": "campaign_atomicity",
+      "example": "Consecutive battles and Gariland receipt",
+      "severity": 5,
+      "probability": 4,
+      "minimum": "Win/save/reload never doubles rewards; defeat/retry; interruption between transition and save; data-version mismatch",
+      "status": "opening_receipt_subset_only",
+      "runner": "check_flow.py",
+      "runner_scope": "Orbonne/Gariland, not complete campaign"
+    },
+    {
+      "id": "C10",
+      "family": "geometry_extrema",
+      "example": "MAP036/MAP056 unblocked corner31;18-cell axes",
+      "severity": 5,
+      "probability": 4,
+      "minimum": "All4 asymmetric rotations, projection clipping, slope exits, actor cover after knockback; tall scenery",
+      "status": "source_census_done_runtime_incomplete"
+    },
+    {
+      "id": "C11",
+      "family": "protected_jump",
+      "example": "Lancer Jump",
+      "severity": 4,
+      "probability": 5,
+      "minimum": "Airborne absent from occupancy/targets/AI; tile empty on landing; death/status interruption observed separately",
+      "status": "reserved_enum_only"
+    },
+    {
+      "id": "C12",
+      "family": "area_and_multihit",
+      "example": "Magic areas; Truth/Untruth; Math Skill",
+      "severity": 4,
+      "probability": 5,
+      "minimum": "All eligible actors, friendly fire, per-hit outcomes/rewards; no fixed four-neighbor shortcut",
+      "status": "unimplemented_general_case",
+      "runner_scope": " Typed elemental outcomes currently cover one centre only; no new area target list/per-target settlement is enabled (CORE_ELEMENTS.md)."
+    },
+    {
+      "id": "C13",
+      "family": "reaction_cycles",
+      "example": "Counter/Counter Magic/Reflect/Mime",
+      "severity": 5,
+      "probability": 3,
+      "minimum": "Explicit root/context; no illegal recursive reaction; bounded queue overflow traps rather than drops",
+      "status": "counter_auto_potion_bounded_execution_pass_other_families_pending",
+      "runner": "check_reactions.py; check_context.py",
+      "runner_scope": "53 original guards/3 isolated selections plus27 staging,16 stock,20 Brave and2 EXP contexts. Live equipped Counter/Auto-Potion execute once in slot order, revalidate status/range/shared stock and suppress secondary recursion. Packet restore, delayed root rewards and terminal outcomes pass; no Hamedo/Reflect/Mime or full multistrike trace certificate. Bounded two-strike primary roots now defer response drain until the last impact; secondary recursion remains forbidden (CORE_STRIKES.md). Ordinary dual Counter now finishes both hands before restoring the primary hand/packet (CORE_HANDS.md). Dual Archer Charge also completes primary hands before Counter/Auto-Potion, with deferred one-time EXP/JP and restored packet (CORE_CHARGE_HANDS.md). Ordinary-human formula08 scalar/prediction/AI and private Holy integration pass104 original profiles/1352 scoped checks. Elements, magic evasion, monster zodiac, innate producers and full display/capping remain open (CORE_MAGIC.md). Affinity preparation covers source masks/cache only. Absorbed healing/nullified effects must gain a typed result through root/response packets before live producers enable them (CORE_AFFINITY.md). Prepared elemental category is copied through primary/response packets; no natural healing Auto-Potion is claimed. Injected transport and existing actual damage responses pass; Reflect/Mime/other cycles remain open (CORE_ELEMENTS.md). CORE_TARGETS.md adds the ordinary radial/whole-map formula08 membership backend, not committed AoE effects or playable spells; source slot order, batch formula preparation/one-cost effects/reactions/rewards/presentation are next. CORE_BATCH.md prepares/commits the supported ordinary formula08 compound subset with source-order native IDs and existing responses/rewards; no retail AF_CAST producer or area AI/command/presentation yet. CORE_AREA_CT.md completes supported owned ordinary area command/CT/automatic impact plumbing; no retail AF_CAST, area forecast/AI or reviewed per-target/empty presentation. CORE_AREA_FORECAST.md adds pure current effect sets (359 PC/sanitizer/native checks7E9BBEF7): caller FORECAST phase, protected live owner, source52 target previews, binding refresh and node255/two floors. Actual area AI/targeting UI/presentation remain gated.",
+      "incapacity_followup": {
+        "document": "CORE_INCAPACITY.md",
+        "runner": "check_incapacity.py",
+        "checks": 193,
+        "hash": "55D44C55",
+        "native_equal": true,
+        "source": "30 original ordinary outcomes/4 finalizers; graphical sort isolated. Source-only importance3 objectives and cancellation branch are not native support.",
+        "covered": "Ordinary team KO eligibility/presence; retained stone HP/occupancy; final ordinary immunity/reactions/AI; node255; safe terminal injection.",
+        "limits": "Petrify producers/cure/art/persistence and general scenario objective metadata remain gated; no full-frame/stack/residency certificate."
+      }
+    },
+    {
+      "id": "C14",
+      "family": "dual_equipment",
+      "example": "Two Swords; broken/stolen second weapon",
+      "severity": 4,
+      "probability": 5,
+      "minimum": "Independent hands, costs, strike source, equipment loss, save round-trip and job recalculation",
+      "status": "five_equipment_fields_only"
+    },
+    {
+      "id": "C15",
+      "family": "performance",
+      "example": "Bard/Dancer recurring songs",
+      "severity": 4,
+      "probability": 4,
+      "minimum": "Multiple equal-tick performers, repeated effect, status interruption; targets reselected each pulse",
+      "status": "reserved_enum_only"
+    },
+    {
+      "id": "C16",
+      "family": "movement_modes",
+      "example": "Teleport, Fly, Float, blocked jumps",
+      "severity": 4,
+      "probability": 4,
+      "minimum": "Unreachable tile, upper/lower crossing, terrain restrictions, special cost and bounded path search",
+      "status": "ordinary_movement_subset_only",
+      "runner": "check_core_boundaries.py",
+      "runner_scope": "Current ordinary/one-gap gameplay; cost6 and32-link storage are tested. Common storage is closed (CORE_COMPACT.md); Jump refinement is low priority by user decision, and L2 shared actions/statuses is next. Fly/Float/Teleport and full actor policies remain pending.",
+      "additional_runners": [
+        "check_jump_actors.py",
+        "check_jump_cost.py",
+        "check_span_battle.py"
+      ]
+    },
+    {
+      "id": "C17",
+      "family": "scene_concurrency",
+      "example": "Actors moving while camera/dialogue advances",
+      "severity": 4,
+      "probability": 4,
+      "minimum": "Four motions, spawn/despawn, condition and barrier; interpreter versus specialized code on identical output",
+      "status": "script_vm_comparison_pending",
+      "runner_scope": "CORE_CONTROL checks a deferred scene-to-battle image-return boundary; general interpreter/parallel scene semantics remain open."
+    },
+    {
+      "id": "C18",
+      "family": "world_mutation",
+      "example": "Scenario terrain opcode40; geomancy surface lookup",
+      "severity": 4,
+      "probability": 3,
+      "minimum": "Tile policy changes invalidate topology/LoS/cover ownership consistently; no per-map patches",
+      "status": "source_opcode_known_not_implemented"
+    },
+    {
+      "id": "C19",
+      "family": "formats_and_tools",
+      "example": "FCD3/FCJ8/FQF2 and future maps/scenes",
+      "severity": 5,
+      "probability": 3,
+      "minimum": "Truncation, bad offsets/IDs, mismatched modules, deterministic export, compatibility rejection; minimal editors",
+      "status": "audit_validators_and_FCD3_actor_bounds_only",
+      "runner_scope": "FCJ8 source hand metadata/innate bits, version and span rejection; unchanged FSV3 five equipment slots represent both hands. ABI18/FMB2 count12 rejects ABI17 despite unchanged State/save sizes; all28 non-code banks unchanged, packing headroom91 (CORE_CHARGE_HANDS.md). Full map/scene v1/editors remain pending. Deferred follow-up changes only the resident battle payload, with no schema/ABI/data change (CORE_DEFERRED.md). ABI19 rejects old18 images for the shared resource callback/policy; FCJ8 and all28 non-code banks remain unchanged (CORE_CASTING.md). ABI20 rejects19 for transient cast arguments and pure unit lookup callback; FCJ8/all28 non-code banks remain unchanged (CORE_INCANTATION.md). ABI21 rejects20 for pure magical scalar callback; FCJ8/FSV3 and all28 non-code banks remain unchanged (CORE_MAGIC.md). FCJ9/FEA1 dictionary validates416 indices, spans/count/neutral row; old FCJ8 rejects. ABI22 rejects21 after State/cache and stat-ownership changes. One shared catalogue reader checks all shifted names and unchanged existing records (CORE_AFFINITY.md). ABI23 rejects22 for pure typed callbacks/formatter entry despite unchanged State/packet sizes. FCJ9/all28 non-code banks unchanged; production normalized element bytes stay zero and all AF_CAST records remain disabled (CORE_ELEMENTS.md). CORE_MAGIC_EVASION.md adds238 original unmounted-human profiles/7510 PC/sanitizer/68000 checks: pure magical probability, sequential execution draws, ordinary presence/final validity, actual AI/paid due/miss behavior; FCJA/ABI24 retain battle/save layout and reject old contracts. Retail spells, areas and full original target-list/reaction/EXP/presentation remain gated. CORE_WEATHER.md adds254 original formula08/environment profiles and6493 PC/sanitizer/native checks8685AD66: source signed weather/Oil bug/Float null, due climate, actual AI ranking, MP/HP/removal/response ownership and four forecast caches. State2192(+2), ABI25/ModCtx364; FCJA/FSV3 unchanged. Live climate/Oil/Float infliction/movement and full cold-HUD/frame/residency gates remain open."
+    },
+    {
+      "id": "C20",
+      "family": "ai_and_cache_pressure",
+      "example": "Full roster, many learned actions and cover changes",
+      "severity": 4,
+      "probability": 4,
+      "minimum": "Every family scored by same evaluator; bounded thinking; pose/cover invalidation after push/rotation; no missing actors",
+      "status": "baseline_only_B06_B07_open",
+      "runner_scope": " Private Holy formula08 prediction/actual native AI ranking responds to Faith without MP/HP mutation and with the existing legitimate chooser draw (CORE_MAGIC.md); broader family scoring and full thinking budgets remain open. Affinities are cached outside Unit to avoid per-candidate equipment scans; not yet connected to damage/healing/AI outcome classification (CORE_AFFINITY.md). Actual native AI uses shared signed elemental HP changes, considers beneficial absorbed healing on allies and ignores nullified targets. Original complete probabilistic/delayed-turn/healer-role scoring is not certified (CORE_ELEMENTS.md). CORE_TARGETS.md private500606(+1564), raw bank62070,13 images, resident input64749/headroom187; all28 non-code banks unchanged. Future growth must budget both bank and resident limits. CORE_BATCH.md:private503633(+3027), raw module bank64984, resident input64783/headroom153.28 non-code banks unchanged; next growth must budget module-bank capacity and resident activation. CORE_BANKS.md:FMB3 pair33772/31234, all13 code images unchanged except ABI28;130 PC/sanitizer/native parser checks,112 exact context checks,6 rejected native startup cases. Private503606(-27), resident input64845/headroom91;28 non-code banks unchanged. Module-variable limit relieved; resident activation budget remains tight. CORE_AREA_CT.md:ABI29/ModCtx364/signature63107, zone6204, shards33782/31632, private504139(+533), resident input64927/headroom9. Next resident addition needs a cold budget; data/save formats unchanged. CORE_HEADROOM/CORE_AREA_FORECAST.md: current ABI31/ModCtx364/signature63621, private504604, shards34396/32002, resident input64295/headroom641. All28 non-code banks unchanged; layouts/save stable. Native bank parser/binding/retry and previous-ABI30 rejection pass. Future live forecast callers still need resident/storage budget."
+    }
+  ]
+}

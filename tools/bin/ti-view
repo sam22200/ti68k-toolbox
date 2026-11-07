@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 """Image gallery on the LAN: view the PNG/GIF captures (ti-shot, ti-cycles --png, PC --shot) from
-an iPad or any browser, newest first, the page reloads by itself when a new capture appears.
+an iPad or any browser, pending decisions first, then newest captures. The page reloads
+when captures or decision markers change.
 
   ti-view [--port 8000] [DIR...]     then open http://<PC IP>:8000 in Safari
                                      (/?only=gif: the GIFs only, e.g. ti-gif recordings)
+  ti-view --decision IMAGE...       pin these images with a Decision badge
+  ti-view --clear-decision IMAGE... remove their decision markers after a verdict
+
+Pending decisions stay visible even with the GIF-only filter and beyond the normal limit.
+Markers are local IMAGE.ti-view-decision sidecars; the images themselves are untouched.
 
 Default DIRs: the repo and this repo's agent scratchpads (/tmp/claude-<uid>/<repo path, / as ->). Only .png/.gif/.jpg files
 under those DIRs are served (nothing else is readable); tools/, sources/, .git are skipped.
 """
-import argparse, html, os, socket, sys, time, urllib.parse
+import argparse, hashlib, html, os, socket, sys, time, urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 EXTS = ('.png', '.gif', '.jpg', '.jpeg')
 SKIP = {'.git', 'tools', 'sources', 'node_modules', '__pycache__'}
 LIMIT = 80
+DECISION_SUFFIX = '.ti-view-decision'
+LISTING_VERSION = 2                    # full file dates; reload already-open gallery pages
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 def scan(roots, exts=EXTS):
@@ -22,20 +30,45 @@ def scan(roots, exts=EXTS):
         for d, dirs, files in os.walk(root):
             dirs[:] = [x for x in dirs if x not in SKIP]
             for f in files:
-                if f.lower().endswith(exts):
+                if f.lower().endswith(EXTS):
                     p = os.path.join(d, f)
                     try:
-                        found.append((os.path.getmtime(p), p))
+                        decision = os.path.getmtime(p + DECISION_SUFFIX) if os.path.isfile(p + DECISION_SUFFIX) else None
+                        if decision is not None or f.lower().endswith(exts):
+                            found.append((os.path.getmtime(p), p, decision))
                     except OSError:
                         pass
-    found.sort(reverse=True)
-    return found[:LIMIT]
+    found.sort(key=lambda row: (row[2] is not None, row[2] if row[2] is not None else row[0], row[1]), reverse=True)
+    pending = sum(row[2] is not None for row in found)
+    return found[:max(LIMIT, pending)]
+
+
+def stamp(captures):
+    # Any visible change matters, including a newly pinned old image or a cleared marker.
+    return hashlib.sha256(repr((LISTING_VERSION, captures)).encode()).hexdigest()
+
+
+def mark_decisions(paths, pending):
+    images = [os.path.realpath(p) for p in paths]
+    for p in images:
+        if not p.lower().endswith(EXTS) or not os.path.isfile(p):
+            raise ValueError('not an existing image: ' + p)
+    for p in images:
+        marker = p + DECISION_SUFFIX
+        if pending:
+            with open(marker, 'a'):
+                pass
+            os.utime(marker, None)
+        elif os.path.exists(marker):
+            os.unlink(marker)
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>ti-view</title><style>
 body{{margin:0;padding:12px;background:#222;color:#ddd;font:14px -apple-system,sans-serif}}
 .c{{margin:0 0 18px}} nav{{margin:0 0 12px}} nav a{{color:#9cf;margin-right:14px}}
 .g{{background:#9cf;color:#222;border-radius:3px;padding:0 4px;font-size:12px}} .c p{{margin:4px 0;word-break:break-all}} .t{{color:#888}}
+.decision{{border:2px solid #ffc857;border-radius:5px;padding:8px}}
+.badge{{background:#ffc857;color:#222;border-radius:3px;padding:2px 6px;font-weight:bold}}
 img{{max-width:100%;image-rendering:pixelated;background:#555;min-width:min(480px,100%)}}
 </style></head><body>{body}<script>
 const v={stamp!r};setInterval(()=>fetch('/stamp'+location.search).then(r=>r.text()).then(s=>{{if(s!==v)location.reload()}}),2000);
@@ -62,7 +95,7 @@ class Handler(BaseHTTPRequestHandler):
         exts = ('.gif',) if urllib.parse.parse_qs(url.query).get('only') == ['gif'] else EXTS
         if url.path == '/stamp':
             s = scan(self.roots, exts)
-            return self.send(200, 'text/plain', (f'{s[0][0]}{s[0][1]}{len(s)}' if s else '').encode())
+            return self.send(200, 'text/plain', stamp(s).encode())
         if url.path == '/img':
             p = os.path.realpath(urllib.parse.parse_qs(url.query).get('p', [''])[0])
             if p.lower().endswith(EXTS) and any(p.startswith(r + os.sep) for r in self.roots) \
@@ -75,14 +108,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, 'text/plain', b'not found')
         s = scan(self.roots, exts)
         body = ''.join(
-            f'<div class="c"><p>{html.escape(self.rel(p))} '
+            f'<div class="c{" decision" if decision is not None else ""}"><p>'
+            f'{"<span class=badge>Décision</span> " if decision is not None else ""}{html.escape(self.rel(p))} '
             f'{"<span class=g>GIF</span> " if p.lower().endswith(".gif") else ""}<span class="t">'
-            f'{time.strftime("%H:%M:%S", time.localtime(m))}</span></p>'
-            f'<img src="/img?p={urllib.parse.quote(p)}&m={m}"></div>' for m, p in s) \
+            f'Fichier modifié le {time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(m))}</span></p>'
+            f'<img src="/img?p={urllib.parse.quote(p)}&m={m}"></div>' for m, p, decision in s) \
             or '<p>No PNG/GIF yet.</p>'
         body = '<nav><a href="/">All</a><a href="/?only=gif">GIF only</a></nav>' + body
-        stamp = f'{s[0][0]}{s[0][1]}{len(s)}' if s else ''
-        self.send(200, 'text/html; charset=utf-8', PAGE.format(body=body, stamp=stamp).encode())
+        self.send(200, 'text/html; charset=utf-8', PAGE.format(body=body, stamp=stamp(s)).encode())
 
     def log_message(self, *a):
         pass
@@ -96,10 +129,20 @@ def lan_ip():
             return '127.0.0.1'
 
 def main():
-    ap = argparse.ArgumentParser(description='PNG/GIF gallery on the LAN (newest first, auto-reload)')
+    ap = argparse.ArgumentParser(description='LAN image gallery (decisions first, newest captures, auto-reload)')
     ap.add_argument('--port', type=int, default=8000)
+    actions = ap.add_mutually_exclusive_group()
+    actions.add_argument('--decision', nargs='+', metavar='IMAGE', help='pin images awaiting a decision')
+    actions.add_argument('--clear-decision', nargs='+', metavar='IMAGE', help='remove decision markers')
     ap.add_argument('dirs', nargs='*')
     a = ap.parse_args()
+    if a.decision or a.clear_decision:
+        try:
+            mark_decisions(a.decision or a.clear_decision, bool(a.decision))
+        except (OSError, ValueError) as e:
+            ap.error(str(e))
+        print('ti-view: decision markers ' + ('set' if a.decision else 'cleared'))
+        return
     dirs = a.dirs or [REPO, f'/tmp/claude-{os.getuid()}/' + REPO.replace('/', '-')]
     Handler.roots = [os.path.realpath(d) for d in dirs if os.path.isdir(d)]
     if not Handler.roots:

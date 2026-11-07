@@ -1,6 +1,6 @@
 ---
 name: ti-port-ps1
-description: "Study a PlayStation 1 (PS1 / PSX) game from its disc image and rebuild a small, TI-89-sized interpretation of one of its mechanics through the Portable Game Runtime (first target: Alundra's movement, jumps and terrain heights in one room; second: Final Fantasy Tactics' Gariland battle map as an isometric engine with four camera orientations and occlusion): read the .cue/.bin (ISO 9660, SYSTEM.CNF, PS-X EXE header, level data files in a documented format), decompile the executable or a RAM dump with Ghidra's built-in MIPS processor (headless), run the disc headless on the PC (pcsx_rearmed libretro core driven from Python, HLE BIOS, no Sony BIOS) for RAM traces, RAM diffs, save states and screenshots, grill the user on the experiment first (/grilling), keep RE_NOTES.md with every finding labelled OBSERVED / INTERPRETATION / TARGET, derive a behavioural model (never translate MIPS functions), then build it in milestones: simulation on the PC with unit tests, a purpose-built test room, 16x16 presentation, TI under ti-cycles, the emulator last. Use it whenever the user wants to port, remake, study, reverse-engineer, decompile or \"porter\" a PlayStation / PS1 / PSX game or a mechanic from one for the calculator, mentions a .cue/.bin/.iso PS1 image, roms/ps1/, SLUS/SCUS/SCES executables, PCSX, DuckStation, Alundra, Final Fantasy Tactics or an isometric / tactics map, even without saying \"PlayStation\"."
+description: "Study a PlayStation game from a local disc and rebuild a small TI-89 interpretation on the Portable Game Runtime. Use for PS1/PSX ports, remakes and reverse engineering; .cue/.bin/.iso images; roms/ps1; SCUS/SLUS/SCES executables; PCSX or DuckStation references; Alundra; and Final Fantasy Tactics or its isometric/tactical maps. Covers disc extraction, headless original-game observations, MIPS analysis, documented behavioral models, milestones, source art, native cycle measurements and PC/TI checks."
 ---
 
 # ti-port-ps1 (study a PS1 game, rebuild one of its mechanics on the TI-89)
@@ -42,12 +42,27 @@ Constraints (`CLAUDE.md`): **1. performance**, **2. visibility** (white outline 
 sprites), Titanium only, **ASM only after asking**. Answer the user in French, write files in
 English.
 
+**Reuse artwork before creating it (FFT user requirement):** before generating or
+extracting a new sprite, inspect the game's existing banks for an identical or
+visually close character, prop or terrain asset. Reuse or adapt a suitable match
+(crop, mirror, palette or scale) before adding another stored asset. Check the
+result at TI size and preserve its transparency/occlusion masks. Exact-byte
+deduplication alone does not satisfy this visual search.
+
+The general `CLAUDE.md` portrait and coordinate-handedness rules apply to every
+porting milestone: known dialogue speakers need their portraits, and source
+camera alignment must include every active rendering/input path. Check an
+asymmetric source view before accepting placement or matching PC/TI checksums;
+mirroring only the backdrop leaves sprites, depth masks and controls inconsistent.
+
 References (read when the step says so):
 - `reference/ps1-facts.md`: the machine as a study sees it (memory map, frame and logic rates,
   pad, disc layout, overlays, MIPS decompilation pitfalls), the tools and their traps.
 - `reference/behaviour-study.md`: the method: `RE_NOTES.md` layout, the three labels, how to
   find and measure a mechanic with the tools, stop rules, what not to study.
 - `reference/grilling.md`: the questions to put to the user before any study (defaults).
+- `reference/fft-job-actions.md`: read before extending FFT jobs, deferred actions
+  or targeting; preserves the user's twenty-job requirements and implementation status.
 
 ## 0. Tools (once per machine)
 

@@ -1,5 +1,530 @@
 # Final Fantasy Tactics (PS1): study notes
 
+## Throw family (2026-11-02)
+
+**OBSERVED IN FFT:** source formula0x63 uses current Speed times the selected
+throwable weapon power, physical target modifiers/zodiac and elemental effects,
+without Attack Up, Martial Arts, Faith, critical or knockback draws. Four physical
+evade stages retain zero-evade draws and stop at a failure. Physical preview
+rounding retains all factors until the final division. Source skillset20 puts
+Ball before Knife in learning order. See tools/throw_oracle.py and its unchanged
+original function hashes/180 bounded profiles; Catch/RSM/full dispatcher remain
+separate.
+
+**TARGET IMPLEMENTATION:** FCJC keeps source learning metadata and supplies80
+archive-only item commands at512+item. Existing menus, stock ownership, frozen
+category/commit, responses and bounded AI share these records; no new live
+cache/layout/allocation. TARGETS owns native cold reach/path/aim. Full cold
+UI/render budget and broader RSM/source equipment fidelity remain explicit
+open gates in campaign/CORE_THROW.md, including a matched existing-command cost
+control. Live TiEmu, user saves and the standard group remain untouched.
+
+- OBSERVED IN FFT, 2026-11-02: `tools/float_oracle.py` executes16 Float
+  formula/finalizer profiles, the real movement configuration and24 adjacent
+  moves (12 Float,12 normal controls). Float status selects class2/terrain row2
+  without increasing Jump or changing the no-equipped-movement clearance/water
+  flags. Row2 costs1 except surface63. Effective unit height rises2 plus water
+  depth; equipped Float's body/water configuration follows a different path.
+- TARGET IMPLEMENTATION, 2026-11-02: CORE_FLOAT.md enables id38 through owned
+  status effects and a flag in the existing navigation search. Both queue types
+  match the12 Float moves. Earth nullification, Dispel, delayed payment, MP/control
+  gates and AI are shared. Existing tile-height targeting/rendering remains;
+  original hover/height and equipped movement/monster/mount policies are separate.
+  The normal source dry-to-water control costs2 while the existing native adapter
+  charges1 with a spare-point rule; this preexisting normal-movement difference
+  stays explicit, and ordinary navigation regression controls are retained.
+
+- OBSERVED IN FFT, 2026-11-02: `tools/allegiance_oracle.py` pins236 unchanged
+  Steal Heart/Invitation formula/finalizer profiles,18 source camp/control traces,
+  repeated Charm refreshing32 ticks, two ordinary outcomes and four initial-camp
+  item-decrement cases. Charm retains original allegiance; Invite changes it.
+  Source job/item data supplies416 immunity rows. Current camp, original camp
+  and original enemy spawn identity serve different targeting/ownership/bonus rules.
+- TARGET IMPLEMENTATION, 2026-11-02: CORE_ALLEGIANCE.md enables both commands
+  through shared owned status effects and AI. Blue Invite converts are player-camp
+  units with forced AI, preserving generic KO rules. Original retention of manual
+  control for already player-controlled recipients is outside this native model.
+  Victory automatically enrols into a free roster slot, keeps a full roster intact,
+  and removes permanently enemy-converted members; source confirmation/dismissal
+  menus are not implemented. Four-camp/monster/Finger Guard and full original
+  action/menu/recruitment dispatch remain separate.5866 PC/sanitizer/68000 assertions
+  and the affected closure pass; no live emulator or user save is used.
+
+- OBSERVED IN FFT, 2026-10-30: unchanged source handlers 0x48..0x4b and
+  finalizers give 80 controlled-RNG item profiles; 38 actual numerical HP/MP
+  store traces are pinned by tools/restoration_oracle.py. The dispatcher table
+  is checked. Undead Elixir sets only HP_DAMAGE in attack_type but retains
+  mp_healing: HP 100/300 and MP 20/100 become HP 0 and MP 100. The original
+  commit reads numeric channels independently of those flags. Store traces
+  isolate reaction dispatch and MP Switch/Distribute/Damage Split, stopping
+  before unrelated status/reward handlers. Source outcome/EXP code is read
+  separately: no resource/stat/status/timer change means no earned outcome.
+- LIKELY INTERPRETATION, 2026-10-30: source attack_type flags alone are not a
+  complete description of an item's numerical resource result. A model that
+  drops Elixir's MP quantity after Undead reversal loses observed behavior.
+- OBSERVED, 2026-10-30 (decompiled MIPS): Punch Art formulas 0x33/0x34/0x35
+  use PA with Attack UP x4/3 and Martial Arts x3/2; Punch Art has no weapon
+  flags, so the strike is always unarmed. No Faith. Chakra (0x34) heals PA*Y
+  HP and half that MP without Undead reversal; Revive (0x35) is Raise with
+  (PA+X)% accuracy. Stigma's attacker Berserk/Frog XA is natively unreachable.
+- OBSERVED, 2026-10-30 (decompiled MIPS): Talk Skill 0x2a hits (zodiac(MA) +
+  zodiac(X))% without Magic AttackUP or Faith; a sleeper is a forced miss
+  before any draw; effects by ability id (Persuade CT zero, Praise/Preach +Y,
+  Threaten/Solution -Y, Insult/Mimic Daravon status). TARGET IMPLEMENTATION:
+  CORE_TALK_SKILL.md (301 profiles); Invitation/Death Sentence/Negotiate gated.
+- OBSERVED, 2026-10-30 (decompiled MIPS): Wave Fist 0x31 = PA' x (PA+Y)/2,
+  Repeating Fist 0x32 = (PA' + zodiac((PA+Y)/2)) x (rand x X / 32768 + 1);
+  both use Attack's physical evasion (four evade draws), the physical support
+  stage, a 4% critical after the zodiac; knockback only for a single target.
+  0x31 draws a conditional status proc after the damage.
+- TARGET IMPLEMENTATION, 2026-10-30: CORE_PUNCH_ART.md enables Stigma Magic,
+  Chakra and Revive (99 original profiles, controlled RNG), then Wave and
+  Repeating Fist (276 profiles; native evasion keeps Attack's draw model). CORE_PROTECT.md
+  enables Reraise (KO-turn revival) and Golem (side pool guard).
+- OBSERVED, 2026-10-30 (decompiled MIPS): Foxbird is formula 0x61
+  (`battle_formula_lower_brave_y`), formula 0x0a's evasion/accuracy with a
+  Brave loss; finalize sets Chicken below 10 Brave and upkeep adds +1 Brave.
+  Frog's AI flags are 0x30 (adds and cancels: it toggles). HP damage removes
+  Confusion. Frog attacks with no weapon (XA 1, reach 1).
+- TARGET IMPLEMENTATION, 2026-10-30: CORE_CONTROL_STATUS.md enables Frog,
+  Blind Rage, Confusion Song and Foxbird with shared lost-control handlers
+  (56 original formula/finalizer profiles; adapted AI policies).
+- TARGET IMPLEMENTATION, 2026-10-30: CORE_TERMINAL.md enables Death, Quick,
+  Zombie and Petrify through the source formula dispatchers and final target
+  clamp (56 profiles, controlled RNG; 12 KO-upkeep traces for Zombie revival).
+  Not a claim of full original upkeep RNG, animation, reward or AI replay.
+- TARGET IMPLEMENTATION, 2026-10-30: CORE_RESTORATION.md adds five compatible
+  items together and shares preparation/commit with Potion and Phoenix Down.
+  Explicit paired-resource tags alias existing scalar self-cost bytes; no
+  gameplay/save layout or heap growth. Forecasts invalidate on action start;
+  no-effect resource items pay stock but grant no EXP/JP. This does not claim
+  a full original inventory/reward/AI/Auto-Potion-selection or graphics replay.
+
+- OBSERVED2026-10-29: original MIPS outcome query uses original team flags,
+  defeat priority and KO mask60c5000000 (Crystal/Dead/Petrify/Blood Suck/Traitor/
+  Treasure).30 ordinary cases/4 prepared finalizers are pinned by
+  tools/incapacity_oracle.py; graphical sorting isolated. Five importance3
+  branches and the Petrify-cancelling finalizer are source-only future work.
+- TARGET/CHECKED2026-10-29: CORE_INCAPACITY.md separates occupancy, effect
+  eligibility and team survival.193 PC/sanitizer/68000 checks55D44C55 cover stone/
+  off-field outcomes, ordinary misses/AI, node255 and terminal injection setup.
+  ORDER1 owns pure outcome; ABI37/17 images/zone6316. Private518827(+245),
+  resident64765/headroom171, same core layouts/save/five heap requests. Old
+  frames/pilot saves pass. No Petrify producer/cure/art/persistence or general
+  objective metadata is enabled; full-core/frame/stack/residency gates stay open.
+
+- OBSERVED2026-10-28:45 original MIPS gain profiles,4 charge phases/33 AT
+  lists pin Haste floor(3*Speed/2), Slow floor(Speed/2), Slow priority and Dead
+  exclusion. Real Slow1 gains0; AT clamps base/gain to1. Finite/innate duration,
+  Stop/Sleep wait and gains51..75 are covered. Upkeep/expiry callbacks isolated;
+  prior lifetime staging reused. tools/haste_slow_oracle.py is not a full spell trace.
+- TARGET/CHECKED2026-10-28: CORE_HASTE_SLOW.md integrates tempo requests/CT/AT/
+  cure/cancel/KO with748 PC/sanitizer/68000 checks30A798F0. AT skips constant-rate
+  intervals with the existing table; ORDER1018 replaces FORMULA6. No retail/data/
+  art change. ABI36/17 images, private518582(+650), resident64803/headroom133;
+  same core layouts/save/five heap requests. Old frames/pilot saves pass; full
+  core and full-frame/stack/residency gates remain open.
+
+- OBSERVED2026-10-28: unchanged original clock/check/AT instructions consume
+  Quick255 to0, allow it in phase9 before another due charge, and yield event
+  NONE0xff00 after1201 phases when stalled. Expiry/upkeep callbacks are isolated;
+  CT255 and completed-turn phase9 are injected inputs. AT clamps Speed0 to1 and
+  forecasts Quick remainder55, unlike real consumption. Six choices/one wave/
+  three stalled clocks/three AT lists: tools/scheduler_oracle.py.
+- TARGET/CHECKED2026-10-28: CORE_SCHEDULER.md adds bounded native idle/wake
+  resumption, shared Quit/rotation and original Quick ordering;263 PC/sanitizer/
+  68000 checks3056BFD2, two unchanged browse HUD hashes and affected pilot/action
+  regressions pass. No retail Quick or full-core production claim. ABI35,
+  resident64681/headroom255, private517932(+195), no heap/save/data growth.
+
+- OBSERVED2026-10-26: ten unchanged-MIPS initializer/weapon selections verify
+  both hands and lone-left promotion. Twenty original base-XA/status/support/
+  zodiac cases cover unarmed, dagger, ninja blade and plain sword scalars.
+  The fixture multiplies original XA/YA without crit/element/proc; not a full
+  original battle/target/animation/probabilistic-AI trace. Source job records
+  15/45/46/89 carry innate Two Swords; source flags select compatible weapons.
+- TARGET/CHECKED2026-10-26: ordinary supported Two Swords and dual Counter use
+  distinct hands without equipment swaps; preview/AI share potential damage
+  and first-hit mutable Sleep wake. Management capability removal returns stock;
+  FSV3 sizes remain unchanged. FCJ8 adds20 innate bytes/reuses Item.pad; ABI17
+  splits COMMAND/RESPONSE from impact. See
+  [campaign/CORE_HANDS.md](campaign/CORE_HANDS.md).
+
+- OBSERVED2026-10-26:32 unchanged-MIPS strike initializers distinguish support,
+  menu and empty/single/dual-hand combinations. Five resume branches execute
+  continuation before reaction-phase dispatch and rewards after that phase.
+  UI/animation/getters/announcement/reward callbacks are isolated and logged;
+  not an original full dual-weapon/retargeting battle. Ten original EXP pairs
+  retain the maximum award rather than adding each strike's result.
+- TARGET/CHECKED2026-10-26:250 PC/sanitizer/68000 assertions verify a bounded
+  two-impact ordinary-Attack engine entry, one reaction drain, best EXP/one JP,
+  duplicate/miss and early KO/recoil/control paths. ABI16/CoreAction34 adds two
+  State bytes. Normal commands remain single-strike; independent hands and
+  shared preview/AI must precede a Two Swords producer. See
+  [campaign/CORE_STRIKES.md](campaign/CORE_STRIKES.md).
+
+- OBSERVED2026-10-26:27 original MIPS finalize/staging cases,16 stock choices,
+  20 Brave boundaries and two EXP contexts cover Counter/Auto-Potion dispatch.
+  Counter uses range flag4 bit0x10 and pre-impact status; Dash/Throw Stone lack
+  that flag. Auto-Potion checks successful HP-damage type after wake/KO, even
+  zero damage. Stock selects Potion/Hi/X in order; initial affiliation owns
+  inventory. Source action phases select responses before post-action rewards.
+  Graphics/equipment/MP Switch/unrelated bookkeeping and BIOS RNG are isolated;
+  full secondary animation/JP/weapon-target/multistrike trace remains open.
+- TARGET/CHECKED2026-10-26:267 PC/sanitizer/68000 assertions execute Counter and
+  all three Auto-Potions, restore a20-byte primary packet, revalidate shared
+  stock/range/status and defer root rewards. Secondary actions cannot recurse
+  or earn EXP/JP. FSV3 equipped IDs supply party reactions; other producers and
+  families remain gated. ACTION/ABI15 adds46 transient State bytes; local
+  evaluation avoids overlay copy ping-pong. See
+  [campaign/CORE_REACTIONS.md](campaign/CORE_REACTIONS.md).
+
+- OBSERVED2026-10-26:53 original MIPS reaction-block cases verify the initializer's
+  prevention set64950e0214, primary/secondary suppression and pending/global
+  reaction conflicts. Three original selection cases verify unit-slot priority,
+  root/Stop skips and actor12; counter construction/MP/strike setup are isolated.
+  Not an original complete reaction-effect, Brave or multistrike trace.
+- TARGET/CHECKED2026-10-26: explicit32-byte root/impact/response context; active
+  commands cannot be overwritten and commit consumes each hit/miss once. The
+  bounded per-actor response primitives and source guard are checked, without
+  enabling Counter/Auto-Potion/Hamedo/Reflect/Mime or a multistrike executor.
+  See [campaign/CORE_CONTEXT.md](campaign/CORE_CONTEXT.md).
+
+- OBSERVED2026-10-26:140 original physical-status/support XA cases verify
+  Sleeping/Charging3/2 once before zodiac. Nine finalize cases distinguish
+  hit/HP-damage-type wake (including zero) from misses/heals/MP/stat effects;
+  actual bitmap/timer resolution runs with external reaction/equipment/reward
+  and graphics handlers isolated. Four AT lists use max(Stop,Sleep) wait.
+- TARGET/CHECKED2026-10-26:1070 PC/sanitizer/68000 assertions enable Sleep's
+  API effect:60-tick freeze, Charge cancellation, protected wake at impact,
+  actual evaluator/AI/CT/AT and cross-splash adapters. No new producer or Sleep
+  art; reaction/elemental/MP Switch behavior stays open. See
+  [campaign/CORE_SLEEP.md](campaign/CORE_SLEEP.md).
+
+- OBSERVED2026-10-26:48 original MIPS control profiles,84 end-turn cases and two
+  Stop AT lists verify freeze/evasion/command flags, blocked-command CT credit
+  and remaining-wait ordering. Dry terrain/no mounts; not Sleep damage/wake or
+  full original scheduling. Charging and Don't Act targets lose evasion too.
+- TARGET/CHECKED2026-10-26:594 PC/sanitizer/68000 assertions with13 actors share
+  Stop/Don't Move/Don't Act across menus/starts/forecasts/AI and deferred Charge.
+  Stop pauses rather than cancels Charge; Don't Act is checked when due. Existing
+  flags carry the cache, ABI12. Cold AT/glyph setup relocation requires the
+  scene module to return before battle entry loads FORMULA. See
+  [campaign/CORE_CONTROL.md](campaign/CORE_CONTROL.md).
+
+- OBSERVED2026-10-26: original MIPS78 expiry,85 timed bitmap commit and42
+  Poison/Regen staging cases verify counter reset/cancellation/innate protection,
+  zero underflow, rounding and blocked actors. External status-specific handlers
+  are isolated; original timer setters/removers execute. The between-turn source
+  phases put expiry after charges and Poison/Regen after a unit's turn.
+- TARGET/CHECKED2026-10-26:4140 PC/sanitizer/68000 assertions exercise13 actors,
+  timed masks, menus, actual FORMULA/CT/end-turn adapters and KO cleanup. ABI11,
+  +210 RAM bytes; sparse-bit13-actor cold expiry57674 cycles versus88166 before.
+  Not a full scheduler/HP-original/reaction/presentation certificate. Details:
+  [campaign/CORE_STATUS_LIFETIME.md](campaign/CORE_STATUS_LIFETIME.md).
+
+- OBSERVED2026-10-26:177 original MIPS filter/remove/store bitmap trials cover
+  all40 IDs, immunity/innate protection, cancellation, Frog and rider/immortal
+  context. External status-specific handlers return without side effects;
+  bitmap instructions are unchanged. Timers, team/control, HP and graphics
+  are outside this oracle's native certification scope.
+- TARGET/CHECKED2026-10-26: canonical15-byte status state plus derived hot cache,
+  existing protected cures/AI/preview and Charge/Defend consistency pass4842
+  PC/sanitizer/native assertions. FCJ7/ABI10; +218 native State bytes, unchanged
+  FSV3. Public application rejects unsupported effects (including new Poison
+  until upkeep); equipment trait production and status lifetime/handlers remain
+  open. See [campaign/CORE_STATUS_STATE.md](campaign/CORE_STATUS_STATE.md).
+
+- OBSERVED/CHECKED2026-10-26: original Darkness halves physical base-hit before
+  Defend halves it again; source Silence restrictions depend on ability flags
+  and skillset menu dispatch.86 original MIPS queries feed433 actual-core
+  PC/sanitizer/68000 checks. The native hooks share player/preview/AI policy;
+  FCJ6 adds224 menu bytes in the archive without extra allocation. Full status
+  application/expiry/upkeep remains open. See campaign/CORE_STATUS_RULES.md.
+
+- TARGET/CHECKED2026-10-25: first shared-primary-action L2 slice separates impact
+  commit from animation, with common pure HP/status transitions in combat/AI/
+  healing forecasts. Existing original-recorded primary effects and six PC/TI
+  action pictures/forecasts are unchanged. ABI8, nine images; no new battle/save
+  fields or heap allocation. This does not establish full PS1 status/reaction/
+  multistrike order. See [campaign/CORE_ACTIONS.md](campaign/CORE_ACTIONS.md).
+
+## Common compact topology —2026-10-25
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:** cached four-neighbor rows
+replace per-link via storage. ABI7/count9;36-byte lower-only and68-byte two-floor
+node allocation. Ordinary paths/costs/pixels are preserved, pilot heap requests
+fall1798/1678 bytes, and ordinary search CPU stays at baseline in same-state
+native comparisons. Direct neighbor reconstruction was measured and rejected.
+Cost6 and32-link capacity pass generic/actual Work fixtures; gameplay still
+emits one-gap links. Private group472001 bytes (+119), packed input64825.
+Jump refinements are now low priority by user decision; proceed to L2
+shared actions/statuses. See [campaign/CORE_COMPACT.md](campaign/CORE_COMPACT.md).
+
+
+## Long-span cost boundary —2026-10-25
+
+**OBSERVED IN ORIGINAL INSTRUCTIONS:**57 original full-spread queries with
+supplied terrain costs/budgets verify remaining = source remaining - gap -
+destination cost, and require a positive result. Cost3 plus three intervening
+cells costs6; remaining7 succeeds with1, remaining6 fails. The portable prototype
+matches68 PC/sanitized/native checks. Source/weather producer was not executed:
+the raw384-byte tables and severe-weather→3 mapping are static source evidence.
+The current1..5 link/evaluator needs extension before runtime hookup. No game
+behavior or assets changed. See [campaign/CORE_JUMP_COSTS.md](campaign/CORE_JUMP_COSTS.md).
+The consolidated overall scope is [campaign/CORE_ROADMAP.md](campaign/CORE_ROADMAP.md).
+
+
+## Resident capacity and actor-column query —2026-10-25
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:** splitting PARTY from SAVE
+and moving unchanged Status input to SCREENS reduces the resident zone6074→5734.
+ABI6/nine images; wider-cost search is linked by default, while graph generation
+still has one-gap links. Targeted flow/save/Status/search and accepted pixels
+pass. Private group471882 bytes (+1438);28 data hashes unchanged. Packed input
+64831 bytes leaves105 below TTPack's64936 ceiling; reports now expose this.
+
+**OBSERVED IN ORIGINAL INSTRUCTIONS:**88 queries execute the intermediate-column
+routine with explicit records/frontier flags on both layers. Other-team bodies,
+blocked occupants, mountable flags, strict endpoints, standing+3 and one shared
+lowest-span reduction are checked.99 PC/sanitized/native checks agree with the
+pure prototype, which is not linked to runtime actor generation. One synthetic
+lowest-span pair is a byte-contract test, not a played placement. Details:
+[campaign/CORE_RESIDENT.md](campaign/CORE_RESIDENT.md).
+
+
+## Wider-cost search prerequisite —2026-10-25
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:** optional linked FIFO buckets
+support abstract costs1..5, stable ties and256 IDs in existing queue storage.
+27592 graph and1219/1065 actual battle-caller checks pass PC/sanitizers/native.
+Search1054 and Work45514 bytes are unchanged. Ordinary production costs retain
+the four-bucket algorithm. Enabling the new routine in the resident program
+exceeds TTPack's64936-byte input limit, so `FFT_NAV_SPANS` stays test-only for
+bound builds. Private ordinary group470444 bytes (+37),28 identical data hashes;
+accepted movement views unchanged. See
+[campaign/CORE_SPAN_SEARCH.md](campaign/CORE_SPAN_SEARCH.md).
+
+**STATIC ORIGINAL EVIDENCE, NOT NEW EXECUTED TRIALS:**
+`battle_move_check_horizontal_jump` checks other-team body records on both
+layers, frontier flags and an extra standing-height+3 boundary. The current
+single-via Boolean blocker cannot be generalized by checking only the mover's
+floor. Execute targeted original actor trials before runtime long-span hookup.
+
+
+## Forward movement and long-span evidence —2026-10-25
+
+**OBSERVED IN ORIGINAL INSTRUCTIONS:**112 focused terrain-flag/source-panel/
+forward-propagation cases verify asymmetric steep exit/entry gates, facing
+edges, destination self-headroom and ordinary water height. Horizontal-jump
+endpoints may be level/lower, not higher.22 additional full horizontal-spread
+trials execute original MIPS in an eastward lane, covering gaps, intervening
+solids, bridges, both layers and bounds. Terrain costs are1, no actors present.
+
+**STATIC ORIGINAL EVIDENCE:** unit movement configuration caps ordinary Jump
+at7, then derives `jump_half`. The fixtures configure this policy but do not
+execute that unit-config function. Fly/IgnoreHeight override it separately.
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:**451 endpoint and80 battle
+checks pass. User accepted Gariland's ring change; Orbonne is unchanged. Scratch
+caching preserves accepted graphs/pixels and saves30.77%/28.18% mean cold graph
+CPU at Jump1..4, no extra workspace. Private package470407 bytes (+178),
+28 unchanged non-code hashes. See [campaign/CORE_STEPS.md](campaign/CORE_STEPS.md).
+The long-span prototype passes278 geometry checks, including native directional
+symmetry checks, but is NOT linked to shipping search. Storage, queue costs and
+actor spans must be extended before enabling it. See
+[campaign/CORE_LONG_JUMPS.md](campaign/CORE_LONG_JUMPS.md).
+
+## Source recoil landing —2026-10-25
+
+**OBSERVED IN ORIGINAL INSTRUCTIONS:**68 focused queries select the highest
+eligible floor by facing edges, lower on ties, and four-half-unit headroom.
+This query subtracts ceiling depth once; chosen-floor occupancy/untargetability
+rejects without another-floor fallback. Original occupancy lookup executes in
+explicit fixture RAM. No complete played battle trace is claimed.
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:**172 kernel and82 actual
+hit/placement/feet-key checks pass. Source-bound recoil uses that drop for fall
+HP; the per-map lower-only fast path remains. ABI5/layouts unchanged, private
+470229-byte group (+395),28 unchanged non-code variable hashes. Remaining actor
+lifecycle/raster/special-movement gates are explicit in
+[campaign/CORE_KNOCKBACK.md](campaign/CORE_KNOCKBACK.md). Validation is targeted;
+unchanged exhaustive certificates are retained rather than rerun.
+
+## Per-map layer profile —2026-10-25
+
+**OBSERVED IN RETAIL DATA:**109 maps are referenced by ATTACK events or active
+WLDCORE random routes;214 terrain variants.77 have no upper stop tile,66 no
+unblocked upper movement geometry,64 no positive-height upper ray geometry.
+Static references include scenes, not a complete played conditional trace.
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:** cached independent flags
+skip absent upper kernels;3,234,825 equivalence checks and169 unchanged accepted
+PNGs pass. ABI5/eight overlays reduce the resident zone from7406 to6074. Work/
+save/allocation layouts stay unchanged; private group469834 bytes (+734 against
+CORE_SURFACES, including accepted jump rules). Source upper paths, raster bridge
+cover and complete action/status handling remain open. Details:
+[campaign/CORE_MAP_PROFILE.md](campaign/CORE_MAP_PROFILE.md).
+
+## Source solid spans and headroom —2026-10-25
+
+**OBSERVED IN ORIGINAL INSTRUCTIONS:**9294 controlled MIPS queries establish
+solid-span inclusive top/exclusive bottom, distinct zero-depth lower/upper
+fallbacks, blocked-upper projectile collision, byte-valued slope ceilings and
+ordinary headroom equality boundaries. Four function byte hashes and fixture
+RAM are recorded; this is not a full PS1 movement/render trace.
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:**9462 shared kernel/schema
+checks and55 permuted-floor battle integration checks pass; source geometry is
+required in both retail FCD3 descriptors via FGS1/SGE1. AI straight rays and
+ordinary endpoint headroom use it, with a proof-based simple-map bypass.
+ABI4, Work45514 (+4), private group469100 bytes (+3033);169 images unchanged.
+Source upper-floor traversal/rendering, special movement, knockback and complete
+action/status handling remain open. See [campaign/CORE_SURFACES.md](campaign/CORE_SURFACES.md).
+
+## Compact geometry/search kernel —2026-10-24
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:**8-bit compact IDs support256
+nodes across two floors with separate presence and16-bit full counts. Graph
+edges carry leap intermediates instead of averaging IDs.13887 kernel/oracle/
+sanitizer checks pass;91186 actual-map distance/predecessor comparisons preserve
+current behavior. Battle search/path extraction now use the shared implementation.
+Unit/cursor/target/cover/count adapters still use the current lower-floor model.
+Synthetic inter-floor links are not original-game movement evidence.
+
+**OBSERVED IN THE NATIVE RUNTIME:** rt_save borrows its source through teardown.
+The3138-byte FSV3 buffer now lives after State in a4632-byte core allocation,
+surviving victory's Work release and overlay eviction. Native flow verifies
+ownership and saved bytes after handoff; no serialized-save migration. Work is
+44434 bytes; four battle allocations request107722 bytes, excluding combined
+residency/stack/allocator overhead. Details: [campaign/CORE_GEOMETRY.md](campaign/CORE_GEOMETRY.md).
+
+## Native thirteen-actor milestone —2026-10-24
+
+**TARGET IMPLEMENTATION, VERIFIED HEADLESS68000:** the core accepts1..13 actors
+from FCD3 descriptors, with13-capacity storage and count-aware modules, AI,
+rendering and result metadata. Existing Orbonne/Gariland counts remain11.
+1813 boundary checks, four actual13-actor rendering cases,37 campaign and24
+opening/scene/control replays pass. Nine fixed11 pictures are byte-identical.
+No original Zirekile conditional trace or layered gameplay is claimed.
+State now lives in a1494-byte heap allocation so the expanded native program
+fits the packer; its lifetime includes the supervisor handoff. Private candidate
+467425 bytes, +1380; four requested battle heap blocks total102936 bytes, excluding
+combined program/module/grayscale residency, stack and allocator overhead.
+Details, limits and reproducer: [campaign/CORE_CAPACITY.md](campaign/CORE_CAPACITY.md).
+No live TiEmu input, standard-bundle replacement or new handwritten ASM.
+
+## Reduced port envelope —2026-10-24
+
+**TARGET IMPLEMENTATION, user decision:**13 battle actors; the eleven-Monk
+random encounter is excluded.256 compact8-bit tile IDs across both floors,
+16-bit counts, explicit validity and separate coordinates/elevation. Original
+source addresses can remain16-bit offline; no512-node runtime requirement.
+`core_limits.h` is the shared target-limit declaration. Current gameplay supports
+13 actors, existing encounters use11, and terrain remains one floor. See
+[campaign/PORT_LIMITS.md](campaign/PORT_LIMITS.md).
+
+**OBSERVED IN FFT DATA:** ENTD195 (MAP083 Zirekile) has nine always-present
+records and two initially absent definitions. Prior live-overlay squad270 has
+four deployment slots. Retained source resources, excluding Test Maps0..4,
+fit225 complete lower-coordinate plus unblocked-upper candidates. Largest
+stoppable upper-bearing resource: MAP029155+4=159; most upper cells: MAP05318.
+These are static source counts, not complete conditional encounter/movement traces.
+
+**COMMUNITY COMPARISON:** reproduced122 JSON files at pinned revisionc4f8252.
+Their MAP120 is explicitly labelled fake; some no_walk classifications and
+test geometry differ from retail US. Both reports are retained; the community
+table is not silently used as the source collision oracle.
+
+## Core envelope audit —2026-10-24
+
+**OBSERVED IN FFT DATA:** the full retail-US census reads121 GNS files,
+228 terrain resources,512 ENTD encounter definitions and480 scenario records.
+MAP125 is16x16; observed axes reach18.47 map IDs have unblocked upper-layer
+cells. Terrain layers use a fixed256-cell stride, not the grid's populated
+area. Source status policy has40 entries and five-byte masks. Full evidence,
+scope and commands: [campaign/CORE_AUDIT.md](campaign/CORE_AUDIT.md).
+
+**STATIC CODE OBSERVATION:** pinned decompilation reserves21 battle records:
+16 ENTD plus five normal deployed records. Persistent party storage is16
+Formation plus four guest records. Initial-load presence/sprite/count filters
+prevent equating allocated slots with simultaneously active actors. The existing
+controlled Gariland state has present slots0..5 and16..20. Raw deployment
+event445 declares5+2; its actual runtime interpretation remains unverified.
+
+**HISTORICAL TARGET, superseded above:**21 stable battle identities,16-actor
+minimum stress and layer-aware16-bit TileId were the initial audit proposal.
+The accepted reduced scope is13 actors and256 compact8-bit nodes.1070 current
+eleven-unit PC/68000 boundary assertions and48 native ZX0 decode repetitions
+establish a baseline. Hamedo requires a pre-action hook; multistrike/reaction/
+KO/victory order needs original traces before implementation.
+
+**OBSERVED IN FFT (title,2026-10-23):** cold-boot controller inputs reach the source logo/map title with New Game, Continue, Tutorial and Sound. Continue enters the zodiac-wheel card screen; a blank card reports No saved data. Source card code iterates15 records with four visible rows. `tools/title_assets.py --observe` reproduces the captures.
+
+**TARGET IMPLEMENTATION:** [campaign/TITLE.md](campaign/TITLE.md): source logo/map plus68k, two requested choices, shared animated glove and three independent TI save slots. Three is the user's adaptation. Legacy ffsave survives explicit migration; metadata is written separately after native teardown so it cannot replace a pending save. Visual review remains pending.
+
+## Deployment, scene order and rewards —2026-10-23
+
+**OBSERVED IN FFT (multiple areas):** script variables0x34..0x38 in the live
+Gariland deployment are1/256/0/0/0. Both squad fields at scenario offsets0x09/
+0x0b are nonzero in85 source records, not85 distinct maps. Event39/MAP034 uses
+IDs260/261 with limits2/2, centers(0,5)/(5,9), flags0x02/0x23. The original
+ATTACK controller keeps four25-cell squad buffers, advances groups on Start
+and returns on Cross. L1/R1 selects previous/next roster members. The cursor
+marker and orientation arrow are drawn even with a single squad. These findings
+come from the disc/live table and local controller study; no MAP034 playthrough
+or precise meaning of every source arrow graphic is claimed. Reproduce with
+`tools/deployment_research.py DISC campaign/x/mandalia/gariland-deployment.state`.
+
+**TARGET IMPLEMENTATION (review refinements):** Gariland uses a white title on
+black, the exact shared Formation stats layout, raised white-rimmed placement
+slabs and correctly sorted actors. F1/F5 is verified using actual keys; trophy
+icons/text are centred as one row. A separate four-view Gariland colour proposal
+prefers white geometric edges on gray/dark faces and black only on white ones,
+without changing edge visibility, geometry or depth/masks. Active map colours
+are retained pending review. Future multi-area encounters must carry actual
+grids, capacities, upper-level records and unique units; current Gariland has
+one area and does not pretend to offer a second.
+
+**OBSERVED IN FFT:** the unmodified event9 Gariland deployment state generated by
+the existing boot door has seven occupied party records at0x80057f74, stride256:
+Ramza, four Squires and two Chemists; script variable0x2c is2,000gil. Party
+byte6's high nibble is zodiac. Source equipment is adapted in head/body/accessory/
+weapon/shield order using source indices0/1/2/3/6. Inventory is at0x800596e0.
+The local source-state SHA256 is
+`b1d78e072a39093200c28926c495f83ec52019578d158f5ca63b217e4298d6f6`.
+
+**OBSERVED IN FFT:** squad256's record is `8610c600050c002305160001`:
+capacity5, center(5,12), oriented legal rows00000/00011/11111/10000/00000.
+The initial deployment contains only Ramza at grid cell8, world(4,11). Source
+left increments grid column; right decrements it. The same projection/facing
+conversion is applied to the native renderer, controls and tactical placements.
+
+**OBSERVED IN FFT:** the victory routines separate initial enemy levels times100
+from live present-unit money modifiers times100 and their trophy item fields.
+Nonexistent/off-field holders do not contribute trophies/modifiers. The original
+also computes a conditional level term which these payout routines do not credit;
+it is not added to native funds. Gariland ENTD184 records include Mythril Knife,
+Potion and Phoenix Down. Overflow at99 owned including equipped copies credits
+the item's quarter price; the gil cap is99,999,999. Prices are read from the main
+executable Item table, not an incorrectly offset BATTLE overlay.
+
+**OBSERVED IN FFT:** event8 message0 supplies Academy narration;1..14 are its
+dialogue. Event10 messages0..5 precede Gariland and message6 supplies its aftermath
+(also present in events11/12). Orbonne's abduction focus corresponds to source
+Ovelia at world(4,3). Existing source portraits and map/actor banks are reused.
+
+**TARGET IMPLEMENTATION:** FQF1 stores these source-derived fields/text separately
+from portable rules. FSV3 extends the existing save with funds, flow checkpoints
+and explicit selected placements. Native starting recruits are fixed to this
+observed roster; matching the source random recruitment generator is not claimed.
+Serif chapter/location/result strips adapt the reviewed typeface for160x100;
+the world texture and source item icons are reused. Enemy aftermath visibility
+is separate from tactical/reward state; neutral bystanders face the focus while
+KO allies retain their pose. Scripted actors retain adapted choreography, rather
+than claiming the PS1's complete camera/scene movements. Source fields, rules,
+runtime checks and pending visual/package gates are documented in campaign/FLOW.md.
+
 ## Management/font exploration — 2026-10-18
 
 **OBSERVED IN FFT:** `EVENT/FONT.BIN` contains 2,200 glyphs, each 35 bytes,
@@ -1555,3 +2080,731 @@ poses and text, a short native punch/collapse/Chocobo substitute for movie
 choreography, then a separately loaded Academy/Gariland chapter. The rear
 shot draws actors in the foreground because its static battle mesh lacks
 original event visibility changes; tactical terrain occlusion is unchanged.
+
+
+## Title/QA follow-up,2026-10-23
+
+**OBSERVED IN THE NATIVE ADAPTATION:** a private Titanium AMS3.10 reproduces the plain-title campaign group stopping with Missing data or memory after Orbonne chapel. The matching packed-child candidate reaches Agrias dialogue with the same normal New Game/Data2 inputs; a second Continue/Data2 invocation resumes Orbonne. The title writes both slot and selector through AMS after teardown. This is a bounded startup/save check, not a complete campaign or hardware FPS measurement.
+
+**TARGET IMPLEMENTATION:** title A reuses existing logo/map with a brighter centre; B uses the existing serif face on black, title then rule then68k, any-key skip consumed before enabling choices. Shared bare choices/file selection; no extra actor sprites. Chapter/results reuse one left-to-right strip reveal. Source-order result drawing is gated until aftermath completes; Academy pan clamps to target; shortcut99 retains deployment/Gariland dialogue/map. Scenery1px/2px and title A/B remain visual decisions. Campaign close/wide perspective and B06/B07 ghosts remain open. Details: `campaign/QA_TITLE_FOLLOWUP.md`.
+
+
+## Canonical native battle cells,2026-10-24
+
+**TARGET / NATIVE-CHECKED ADAPTATION:** units, cursor, paths, movement undo,
+Charge binding/interruption, knockback/falls and AI hypothetical placement carry
+compact node identity through actual battle logic.128 checks on an asymmetric
+synthetic two-floor graph agree PC/sanitizers/68000. This is not an OBSERVED PS1
+upper-floor movement, line-of-sight or bridge-cover claim. Existing169 reference
+pictures remain identical; source floor/render and full256-node battle-count
+migration remain open. FMB2 validates seven code images and explicit ABI;68
+malformed/valid-bank checks pass. See `campaign/CORE_CELL_STATE.md` for limits,
+111320-byte requested battle heap formula and465566-byte private package.
+
+
+## Full256-node native tactical envelope,2026-10-24
+
+**TARGET / NATIVE-CHECKED ADAPTATION:** actual battle state/search/AI/selection
+accept256 compact nodes and13 actors; node255 is valid across floors. Counts,
+AI endpoints, range completion and counting-sort offsets use16 bits.3181
+PC/sanitized/68000 checks include the full envelope, frozen AI order, Charge,
+failed cache growth and ownership.169 existing images remain identical.
+Topology uses a separate48-byte-per-node cache; the pathological AI setup zone
+is about9.25× faster with merge sorting and unchanged ties. This is not an
+OBSERVED source upper-floor traversal/LoS/cover claim. Full scene and combined
+memory gates remain open. See `campaign/CORE_FULL_GRID.md` for exact layouts,
+116090-byte current Gariland heap formula and466067-byte private package.
+
+
+## Dual Archer Charge,2026-10-26
+
+**OBSERVED (isolated unchanged MIPS):** `tools/charge_hands_oracle.py` executes
+eight Charge menu initializations/used-hand selections and sixty scalar cases.
+The tested Two Swords pair gives two strikes; Charge power enters each hand's
+base XA before target statuses/zodiac. Critical threshold is4%, then amplitude
+adds floor(roll*XA/32768). A zero-amplitude critical still calls recoil. Source
+RNG helper values are supplied by the fixture; recoil is isolated/counted, and
+the fixture multiplies original XA/YA. This is not an observed full delayed HP/
+target/terrain/animation trace. Function/disc/input hashes are in
+`campaign/x/core-charge-hands/oracle/source.json`.
+
+**TARGET / NATIVE-CHECKED ADAPTATION:** all eight powers use independent hands,
+both delayed weapon IDs, fixed-tile requery after recoil/KO, one root reward and
+post-primary Counter/Auto-Potion.586 PC/sanitizer/68000 checks pass. Shared
+forecast/AI retains its potential-hit approximation; source range/projectile/
+layered target completeness remains open. ABI18/twelve images; no State/Work/
+Unit/FSV3 growth. Battle randomness is rng32, distinct from runtime rt_seed; the
+new fixture checks pure queries and the legitimate existing AI chooser draw.
+See `campaign/CORE_CHARGE_HANDS.md` for storage/timing/source limits.
+
+
+## Due-wave order and target identity,2026-10-26
+
+**OBSERVED (isolated unchanged MIPS):** `tools/deferred_oracle.py` runs six
+between-turn sequences and four attacker-coordinate cases. Ready turns precede
+the next decrement; simultaneous charges return in slot order before expiry/
+next CT, Stop holds its countdown and a later cancelled record is skipped.
+CT255/Quick can interrupt the due wave. Expiry/upkeep callbacks are isolated;
+cancellation/Quick mutations are injected between calls. Original target-kind5
+uses stored coordinates while kind6 reads the selected unit's current location.
+This is not original full HP/MP/area/interruption/target-validity certification.
+Provenance and function hashes: `campaign/x/core-deferred/oracle/source.json`.
+
+**TARGET / NATIVE-CHECKED ADAPTATION:** iterative due Charge dispatch replaces
+recursive turn entry for empty/invalid records, and busy roots protect all
+pending/request/RNG state. Thirteen roots or empty records share one clock phase;
+late caster invalidation, Counter ownership and terminal priority are covered.
+ABI18/types unchanged. Magic/MP/AoE, Quick255 priority and all-permanent-freeze
+clock liveness remain open; unit-following targeting is not enabled yet. See
+`campaign/CORE_DEFERRED.md`.
+
+
+## Casting MP and preparation policy,2026-10-27
+
+**OBSERVED (unchanged isolated MIPS):** `tools/casting_oracle.py` records33 MP
+and12 preparation cases, plus retail Holy arming at999 MP then a separate
+resolution payment to943. Six CT/action-used are set without movement-used or
+MP subtraction on arm. Default-menu non-Mime execution uses range MP cost;
+Half MP rounds down. Preview checks affordability/records cost without debiting.
+Silence/Frog/Don't Act reject before payment. Short Charge rounds odd half up;
+Non-Charge then zeroes delay; persevering actions ignore both. External status
+handlers are isolated, dry/unmounted; no elapsed CT/effect/target trace is
+certified. No source job among160 has innate Half MP. Provenance/hashes:
+`campaign/x/core-casting/oracle/source.json`.
+
+**TARGET / NATIVE-CHECKED ADAPTATION:** pure resident cost callback shared by
+player/forecast/AI; actual COMMAND pays once before effect start, with deferred
+Charge arming returning before payment. Whole-State invalid-order purity differs
+from original resolution-entry bookkeeping; preview scratch may change while
+world resources/RNG do not. A private Dash cost7/Silence flag is a synthetic
+carrier, not retail behavior. No new Holy/Fire producer/formula/area/caster is
+enabled. Cold range construction moves unchanged to COMMAND2; ABI19/twelve
+images. See `campaign/CORE_CASTING.md` for evidence and packing/remaining limits.
+
+
+## Incantation lifecycle,2026-10-27
+
+**OBSERVED (unchanged isolated MIPS):** `tools/incantation_oracle.py` checks four
+action-initializer payment/binding sequences (empty tile, living/KO/absent unit)
+and twelve Charge-only recoil predicates. The initializer pays56 MP before
+strike initialization and coordinate binding; strike initialization and external
+status handlers are isolated. No full target-list/effect/refund/presentation
+trace is certified. Recoil cancellation applies to Charge skillset8, not White
+Magic10; movement/equipment mutations do not make the predicate reject ordinary
+casts. Hashes/provenance: `campaign/x/core-incantation/oracle/source.json`.
+
+**TARGET / NATIVE-CHECKED ADAPTATION:** eight-byte pending records distinguish
+fixed tiles and live actor slots, including node255 and layer changes. Actual
+CT/menus, source support timing, caster displacement/weapon survival, late MP/
+status rejection,13 due casts and Auto-Potion/root settlement pass. Empty/KO/
+absent centres pay and skip effects/rewards; full empty-spell presentation is
+still future. Synthetic carriers certify the lifecycle, not retail Holy/Fire
+formulas/traits/areas. Native exact-cost effects now use a post-payment evaluator,
+fixing the preceding resource slice's hidden second affordability check. ABI20/
+ModCtx344; gameplay/save types unchanged. See `campaign/CORE_INCANTATION.md`.
+
+
+## Holy scalar / formula08 (2026-10-27)
+
+**OBSERVED:** `tools/magic_oracle.py` runs the unchanged original Holy damage
+pipeline on104 ordinary-human profiles, with explicit normal-weather and zero-
+element-trait conditions. It records per-step modifier rounding, zodiac/Faith/
+Innocent behavior and actual MEV shield/Defend bypass. Holy flags4=0x40 lacks
+magic-evasion bit0x02; Fire flags4=0x42 differs. Preview consumes no RNG; execution
+calls the generic proc roll once with(100,19). This is not a full target-list/
+HP-commit/display/cap or monster/element/evasion certificate. Provenance:
+`campaign/x/core-magic/oracle/source.json`.
+
+**TARGET, implemented:** pure resident formula08 callback, shared native AI/
+prediction and a private normalized Holy through vulnerable cast/payment/impact/
+Sleep wake/Auto-Potion/terminal settlement.1352 PC/sanitizer/68000 checks pass
+(4DCFDD40); production Holy/Fire and every AF_CAST producer remain disabled.
+Canonical Shell/Frog/Chicken/Faith/Innocent scalar reads do not enable their
+other effects or producers. ABI21/ModCtx348; battle/save allocations unchanged.
+Private group493049 (+503), input64919/headroom17. Cold banner/cache setup uses
+PARTY7/8; frequent end-turn CT stays resident. Details: campaign/CORE_MAGIC.md.
+
+**INTERPRETATION:** single-target Holy isolates non-evadeable magical damage
+without conflating Fire's target policy. Element/target eligibility, magic
+evasion, areas and reviewed casting/empty-centre presentation are the next
+separate gates. No general playable-magic or full-core claim follows.
+
+
+## Elemental trait producers and stat images (2026-10-27)
+
+**OBSERVED:**178 executions of original job-copy/equipment loops match four job
+masks plus zero Strengthen, then item-mask OR. All160 internal job bases,
+13 distinct nonzero item masks and overlapping/duplicate equipment are covered;
+these are20 generic playable careers plus other templates, not160 careers.
+Actual-stat arithmetic is isolated, ordinary-human flags are used, and arbitrary
+fixture gear does not prove legal equipment or monster policy. Provenance:
+campaign/x/core-affinity/oracle/source.json. Source formula reading distinguishes
+absorption/healing from nullification; full typed effect traces remain next.
+
+**TARGET, implemented:** FCJ9/FEA1 stores416 references to32 shared masks in582
+bytes and rejects old/malformed data. A65-byte cache outside Unit is rebuilt by
+existing battle/party/stat producers; native State adds66 bytes with alignment,
+Unit/Work/FSV3 stay unchanged.1881 PC/sanitizer/native assertions C0B66CFB pass.
+Native stats are local in PARTY/ACTION/RESPONSE; no evicting callback remains.
+Resident pointer entry uses PARTY9/transient input. ABI22/ModCtx348/signature
+61226, largest6060, private495758 (+2709), input64859/headroom77. No new asm.
+Details: campaign/CORE_AFFINITY.md.
+
+**INTERPRETATION:** This is a prerequisite, not active elemental damage or
+absorption. A typed outcome must survive forecast/AI/impact/response packets;
+source narrowing/caps need proof before widening the former magic bounds.
+Production Holy/Fire stay disabled. Cached data and unchanged pictures do not
+certify monster equipment, status traits, frame budget or combined residency.
+
+
+## Elemental formula08 outcomes and signed HP (2026-10-27)
+
+**OBSERVED:**77 profiles execute unchanged original formula08/finalizer and the
+HP/MP commit prefix. Strengthen precedes support/status/zodiac; signed halfword
+narrowing precedes Half/Weak/Faith, and only positive quantities cap at999.
+Nullification wins over absorption and skips the proc draw; absorbed results
+use the healing category. Source signed HP subtraction/addition can reverse
+actual HP direction at overflow boundaries. Reaction/MP split are isolated and
+commit stops before stat/status/KO/EXP: no full spell trace is claimed. Other
+than real Holy50/element2/no-evasion, modified power/element carriers are synthetic.
+Provenance: campaign/x/core-elements/oracle/source.json.
+
+**TARGET, implemented:** pure cached classification/scalar, signed HP transform
+shared by forecast/AI/impact, prepared effect_kind through response packets,
+paid nullification without effect RNG/reward, normal absorption without damage-
+only wake/Auto-Potion.1525 PC/sanitizer/native checks92063E01 pass. Both category
+bytes occupy former padding: State2190/ActionPacket22/Unit112/Work45516/FSV3
+unchanged. ABI23/ModCtx352/signature61487, zone6096; FORMULA10 owns cold format.
+Private496819 (+1061), input64795/headroom141; all28 data banks unchanged.
+The old magic1352 fixture now expects positive999 finalization (B5895FED), while
+its104 raw scalar profiles retain source values. Details: campaign/CORE_ELEMENTS.md.
+
+**INTERPRETATION:** Event category and signed HP direction are distinct. Cache
+or formula support does not imply magic evasion, full target eligibility,
+weather/Oil/Float/Undead/monster policy, areas or reviewed spell presentation.
+Retail Holy/Fire stay disabled; no bulk-content or full-core certificate follows.
+
+
+## Magical evasion and ordinary formula08 final validity (2026-10-27)
+
+**OBSERVED:**238 original-MIPS profiles in
+`campaign/x/core-magic-evasion/oracle/source.json` execute magical evasion,
+formula08, presence predicate and finalizer with source equipment secondary
+records. Evasion channels are accessory/right shield/left shield/class0;
+even zero channels roll, in order. Holy bypasses, Fire does not. Defend/Abandon
+halve base100, Transparent/no-evasion statuses zero channels. Percentages multiply
+before final division. Abandon's water exception is canonical byte2&0x46.
+
+**OBSERVED:** Crystal/Treasure/Jump are absent from the target-presence query;
+Dead/Petrify/Wall are present and ordinarily rejected after formula/proc draws.
+The external pass/fail helper is deterministic with exact source scaling; normal
+weather/unmounted humans, graphical target sorting isolated. No complete original
+HP/status/reaction/reward/area/presentation trace is claimed.
+
+**TARGET, implemented:** resident pure percentage/target callbacks shared by
+FORMULA/AI/COMMAND; source sequential draws only at execution. Native late due
+invalidation, one payment, no-effect misses and AI rejection pass7510 PC/
+sanitizer/68000 assertions (995C7993). FCJA stores six-bit MEV plus shield tag in
+Item.pad, preserving HAND_DUAL; source maximum50, all256 items checked, raw
+catalogue41086 unchanged. Old FCJ9/ABI23 reject. ABI24/ModCtx360/signature61752,
+zone6146. Cold RESULTS1 row labels cost45716 below the60k task budget; callbacks
+cannot evict their executing image. Private498763 (+1944), input64899/headroom37;
+Unit112/State2190/Work45516/FSV3/five allocations unchanged. Retail spells remain
+unavailable; next weather/Oil/Float and area/presentation work. Jump deferred.
+
+
+## Formula08 weather, Oil ordering and Float (2026-10-27)
+
+**OBSERVED:**254 original-MIPS profiles execute effective weather, formula08,
+status filtering, finalizer and signed HP-prefix, with supplied script weather/
+proc helpers and isolated reaction/MP-split paths. Calendar weather is clamped
+0..4; indoor2 disables, snow1 adds3 for raw>=2. Weather modifies the signed HP
+halfword sequentially (storm: fire3/4 then lightning5/4; snowstorm: ice5/4), before
+Half/Weak/Faith and positive999 caps. Source function/disc hashes and inputs are
+in campaign/x/core-weather/oracle/source.json.
+
+**OBSERVED:**Oil doubles XA after the HP product, so formula08 damage is unchanged.
+It prepares protected mutable Oil removal; innate Oil is retained. Float nullifies
+earth; a source null packet can retain a removal mask, but commit returns on miss.
+Preview attack type136 is a bitfield (HP damage plus status). The original live
+status/KO/reaction/EXP tail is not newly certified by the HP-prefix oracle.
+
+**TARGET, implemented:**weather byte/shared query/AI/command math, protected latched
+Oil removal bit, pure forecasts, current due-climate and immutable prepared damage,
+actual Auto-Potion packet transport.6493 PC/sanitizer/68000 checks8685AD66, four
+forecast cache hashes and targeted prior closure. Native State2192(+2), Unit112/
+Work45516/packet22/FSV3 stable; five battle allocations, first5330. ABI25/ModCtx364/
+signature62019/zone6172. FORMULA11 owns unchanged forecast-cache drawing with pure
+resident width callback. Private499042 (+279), input64735/headroom201;28 non-code
+banks unchanged. Full cold forecast reaches92032 cycles in the fixture, beyond
+its old60k HUD estimate; complete-frame cold-work accounting stays open in C07/L4.
+Live climate/calendar/GNS, bow/movement weather and Oil/Float infliction/movement
+producers remain gated. Next source areas/per-target effects/reactions/rewards
+and reviewed casting presentation. Jump remains low priority.
+
+
+## Ordinary radial area footprints (2026-10-27)
+
+**OBSERVED:**79 original-MIPS green-panel/list profiles and42 vertical boundaries
+cover Manhattan/whole-map, nearest-layer/tie-lower/highest-only, hidden upper
+surfaces, raw water/half-height, u8 reference/signed16 candidates/-255 blocked
+sentinel, unit-follow centres and panel team-filter overlap quirks. Whole-map255
+bypasses vertical; KO/Petrify/Wall are present, Crystal/Treasure/Jump absent.
+Follow-centre coordinates are still read for an absent target. Raw ability flags
+occupy offsets3/4/5/6. Source lists ascend slots; ordinary strike resets nearest
+sorting and prepares every formula before HP commits. Inputs/hashes/source lists:
+campaign/x/core-targets/oracle/source.json. These are synthetic actors, with two
+real terrain maps, not complete encounter/reaction/reward traces.
+
+**TARGET, implemented:**pure formula08 radial mask cast_targets(), stable native
+IDs, explicit invalid/unsupported, compact tile255, no resource/RNG/State changes,
+one-floor upper-read fast path.1193 PC/sanitizer/68000 checksFC02B091; cold query
+max40642, warm max28578 cycles. New TARGETS1564-byte image, ABI26/ModCtx364/
+signature62276/largest6172; State/save/Work unchanged. Private500606(+1564), raw
+bank62070, input64749/headroom187,28 non-code banks unchanged. Broader source
+slot mapping, batch formula preparation/one-cost commit/reactions/rewards and
+reviewed presentation remain next; live spells and Charm/mount/special shapes
+remain gated. No full frame/stack/residency closure; Jump deferred.
+
+
+## Compound formula08 preparation and impact (2026-10-27)
+
+**OBSERVED:**Original ordinary strike prepares all ascending-slot target formulas
+before HP. batch_oracle.py drives presence/formula08/finalizer on13 compound groups,
+including13 present actors, with a supplied deterministic RNG/normal weather and
+no intervening HP commits. It records copied per-group draw lists, not references
+to a subsequently cleared list. This reconstructs observed order; it does not
+execute the full original cost/HP/reaction/reward/presentation dispatcher.
+
+**TARGET, implemented:**CORE_BATCH.md:60-byte caller-owned CastBatch, shared
+magic_prepare/magic_commit, one MP debit, all outcomes frozen before HP, once-only
+commit, self-KO cannot skip later victims, late Oil protection recheck, empty/null
+sets and existing two-Auto-Potion/deferred maximum-reward drain.1202 PC/sanitizer/
+68000 checks94558E80. ABI27/ModCtx364/signature62533; TARGETS1 preparation/RESPONSE10
+commit avoid nested image loads. State2192/Unit112/Work45516/FSV3 unchanged; largest
+6204. Private503633(+3027), raw bank64984, input64783/headroom153;28 non-code banks
+unchanged. New batch entry remains unused by retail commands/CT/AI/attack_step;
+retain packet until explicit commit, then existing State owns response drain.
+Do not use the old single-target impact path in between. Next durable owner,
+source-order encounter mapping, live area CT/command/AI/impact routing and reviewed
+per-target presentation; full original magical response/reward families remain
+open. C07/L4 full-frame/cold-HUD/residency stays open; Jump deferred. Playtest group,
+live TiEmu and existing gallery bytes/dates stay untouched.
+
+
+## Owned area command, CT and impact (2026-10-27)
+
+**OBSERVED, reused:**CORE_INCANTATION original initializer pays before target
+setup, including empty/KO/absent centres. CORE_TARGETS original green/list kernels
+retain followed Crystal/Jump coordinates while excluding them as victims.
+CORE_BATCH prepares every target before HP; prior CT/cost/binding fixtures remain
+the timing/order evidence. This milestone adds native composition, not a full
+original spell/campaign/HP/reaction/reward/presentation dispatcher trace.
+
+**TARGET, implemented:**CORE_AREA_CT.md routes supported ordinary formula08 areas
+through cast_order, real CT and attack_step ACT_HIT. One60-byte Work owner survives
+wind-up/queries/image loads/responses; COMMAND returns3 before TARGETS2 preparation,
+RESPONSE11 owns impact, then existing response/reward/terminal drain completes.
+No nested image loads, new heap allocation or retail spell activation.353 PC/
+sanitizer/68000 checks11D6FCB4 and5 Orbonne retries00000230 pass. State-only scenario
+reset left a stale READY packet; both battle_units/fixed_units now clear Work
+phase. Missing raw geometry is invalid, not a paid empty spell; vanished centres
+follow existing payment-before-target-setup policy. Work45576(+60), State2192/
+Unit112/packet22/FSV3 stable,5 allocations/totals+60. ABI29/ModCtx364/signature63107/
+zone6204, private504139(+533), shards33782/31632, input64927/headroom9. Next area
+forecast/AI and reviewed per-target/empty presentation; broader status/reaction/
+reward families and C07/L4 cold-HUD/frame/residency remain open. Jump deferred.
+Keep TiEmu/playtest/gallery unchanged. Separate PC chapter processes respect the
+runtime's16-file cache; no runtime change was made solely for the retry fixture.
+
+## Compound current-effect forecasts (2026-10-28)
+
+**OBSERVED, bounded:** tools/area_forecast_oracle.py executes original presence,
+formula08 and finalizer in preview mode2 for four groups of13 ordinary human
+slots, reusing hashed CORE_BATCH inputs. Per-target probability, signed capped
+quantity, null/absorption/status eligibility and Oil flags are recorded. Source
+preview still invokes evasion RNG helpers; failure is not an execute miss in
+this mode. Calls are observed/stubbed pass. The native pure-preview policy
+intentionally omits them. This is not a full original AoE UI/AI dispatcher trace.
+
+**TARGET, implemented:** CORE_AREA_FORECAST.md adds cast_forecast on caller-owned
+60-byte CastBatch storage, FORECAST probability phase and pure rejected/refresh
+queries. READY/APPLIED and W->cast aliases reject, protecting a live paid root.
+Initial command eligibility is separate; exact-cost post-payment inspection
+still works. Shared magic_quantity preserves signed narrowing/positive999 cap in
+old single-target prediction, preparation and the area API.359 PC/sanitizer/native
+checks7E9BBEF7, original52 target inputs, node255/two floors/four views pass.
+Layouts/FSV3/five allocations stable; ABI31/ModCtx364/signature63621/zone6204,
+private504604(+391), resident64295/headroom641. Warm query max86504/cold110258
+are backend costs, not full-frame/residency certification. Next source-backed
+AI area candidate/score/cache/scheduling and reviewed targeting/presentation;
+retail casts remain disabled, Jump deferred and playtest/live TiEmu/gallery kept.
+
+## Cached current-world area AI (2026-10-28)
+
+**OBSERVED, bounded:** tools/area_ai_oracle.py runs original score-state phase,
+hostile hit accounting, ranking and empty-panel scanning:12 thirteen-slot HP/
+Dead/Critical profiles, five comparisons and three empty panels on two layers.
+Source averaging uses counted hit probabilities; allied hits subtract one even
+when absorbed. Preparation/effects/reactions, range/coordinates and VSync are
+isolated supplied boundaries. This is not the full original delayed-turn chooser,
+MP utility or broad status/Reflect/Charm simulation. Hashes and source commit are
+recorded in campaign/x/core-area-ai/oracle/source.json.
+
+**TARGET, implemented:** CORE_AREA_AI.md connects actual ai_think/AI_AIM to cached
+immediate hostile formula08 area evaluation. Empty panels, friendly fire,
+absorption and whole-map footprints use the shared selector/effect math. An84-byte
+cache borrows idle256-byte ai_dist after setup. Stage quanta restore the actor,
+preserve area RNG and survive forecast image eviction; rejected casts replan.
+Require CAST+AREA together so AREA-only weapon splash keeps its legacy execution.
+676 PC/sanitizer/68000 checksD04607FA pass; ABI32/fourteen images, Work/State/FSV3/
+five allocations unchanged. Native area max319968 cycles, but existing general
+setup/reach stage0 reaches12059828 (~1.005s at12MHz): the full planner360K gate
+fails, and general setup must be bounded next. Private509442(+4838), input64447/
+headroom489. Retail casts/reviewed area UI and broader core gates remain closed;
+Jump stays deferred; playtest/live TiEmu/gallery bytes and dates are preserved.
+
+## User-selected AI pause (2026-10-28)
+
+**TARGET, implemented:** CORE_AI_PACING.md includes thinking in a1.5s elapsed
+256Hz minimum, preserving the frozen picture. It no longer adds48 frames after
+planning; a plan taking longer than the deadline adds no further full pause.
+The user explicitly accepts the measured roughly1s setup inside this pause;
+do not treat that quantum alone as a30fps production blocker.171 PC/sanitizer/
+68000 checks58CBDE4E cover injected elapsed time/wrap/replan/cancel/frozen planes.
+No original-game timing claim is added. All fourteen images/ABI32/layouts and
+five heap requests remain unchanged; resident static+2 bytes, input64467 (+20),
+headroom469. Private509418(-24 compressed), only ffbcore changes. Total worst
+plan latency and remaining RAM/stack/residency/interactive-frame gates stay open.
+
+## Private area selection UI candidate (2026-10-28)
+
+**STATIC original evidence:** targeting_range accepts marked panels, then
+select_tile enters ability_preview with marked targets. action_confirm chooses
+occupied/empty and UNIT_OR_TILE/TILE_ONLY variants. confirm_action stores a fixed
+panel(type5) or stable unit ID(type6/7), with tile fallback for absent occupants.
+set_panels_for_action reads secondary flags_2 NO_FOLLOW_TARGET0x10: existing raw
+range byte4. These are bounded code readings, not new original UI run traces.
+
+**OBSERVED, native integration2026-10-28:** user approved the UI candidate.
+CORE_AREA_UI.md now records actual shared range/list/Unit-Panel ordering.499
+PC/sanitizer/native checks67EED097, eight HUD hashes and four full tactical replay
+frames/states agree. This is synthetic supported spell activation, not an original
+encounter replay. AreaUi228 reuses idle ai_dist256; Work/State/save/five allocations
+remain fixed. New AREA_UI image4096, ABI33/ModCtx372/15 images/zone6264. Resident
+loads TARGETS/COMMAND only after UI returns. The unchanged AI camera is in
+AI_SETUP3/4;1321 PC/sanitizer/native checks4CC4400E agree. Private515564(+6146),
+resident64719/headroom217,28 data banks unchanged. Cold synthetic13-target HUD
+375252 cycles leaves interactive timing open; no full-frame/residency certificate.
+Approval and immutable prototype artifacts are recorded locally. Next per-target/
+empty impact presentation; retail/full core gates remain open and Jump deferred.
+
+
+## Area-impact visual candidate (2026-10-28)
+
+**STATIC original evidence:** battle_effect_store_targets_and_display_types
+stores each victim ID/result animation; no victims and animate_on_miss_flag==0
+produce a tile-coordinate effect target. battle_effect_run_keyframe_actions_all_targets
+runs display/pose events across the target list with a caster-only exception.
+battle_action_build_targets_post_action_message queues messages per victim.
+These three bounded source readings are SHA-pinned in the local review report;
+no new original spell animation/timing trace is claimed.
+
+**OBSERVED in the current TI model:** the scalar draw_number can cache Miss when
+act_t first reaches ACT_HIT but the owned batch is still READY. Commit occurs on
+the next update, leaving that cached scalar glyph. Only st.tgt receives the old
+pose/flash/label even though every batch victim has its HP applied. The zero-set
+case can consequently display a false Miss above the caster.
+
+**TARGET, private visual candidate only:** preview_area_impact.c uses six hooks
+in a generated engine copy, retaining existing update/batch/response/reward code.
+Per-victim execution labels, harmful-hit flashes/poses, a covered sloped centre
+pulse and an Oil- message share the current sprites/font/number primitives.
+Wait for APPLIED instead of a speculative scalar glyph. Root effects are suppressed
+during secondary reactions; ordinary EXP/JP and terminal settlement remain.
+Before/after use one common fixture camera. This is a proposed TI presentation,
+not original spell art or a native implementation. Eight PC/sanitizer scenarios
+and exact metrics are in campaign/CORE_AREA_IMPACT_REVIEW.md / its local report.
+No active catalogue/module/package/image date or live TiEmu change. Native scratch,
+resident/camera/layer/frame budgets follow visual approval. Full core remains
+open; Jump is deferred.
+
+
+## Approved area-impact integration (2026-10-28)
+
+**OBSERVED, headless PC/68000:** the approved per-victim/empty-centre presentation
+now runs in the shared engine.1012 actual-renderer checks12D9C238/64 individual
+full screensD7A684DC agree;416 candidate captures match with the same scenario/
+cache history.154 bounds checksC56EC8B9 cover13 prepared glyphs, both floors,
+node255, signed quantities, Oil, followed Crystal/Jump/vanished centres and public
+Work-owner preparation. The number-backend picture9DE20073 is not a full13-actor
+scene certificate. No new original source oracle or complete spell timeline.
+
+Cache412 aliases idle ai_gain512. Stage one glyph per wind-up update; prepare
+thirteen plus Oil before ACT_HIT16. Shared resolution-centre identity differs
+from new-command eligibility: Crystal/Jump coordinates still anchor an already
+armed area. The root painter waits for APPLIED and yields to secondary reactions;
+existing costs/HP/RNG/EXP/JP/outcome ordering is preserved. NUMBERS2416 holds the
+unchanged scalar raster and new cache/blits through existing pure callbacks.
+ABI34/ModCtx372/sig64400,16 images/zone6264; raw banks41072/38606. Resident input
+64473/headroom463. No authored asm, new bitmap bank or live TiEmu operation.
+
+**Measurement boundary:** native glyph-step peak20178, cold13-number backend
+96350, full-render cold-orientation peak2528106. These are different tasks, not
+a universal360K pass. Cached interactive/HUD/stack/combined residency remain
+open. The roughly1s AI setup remains accepted inside its elapsed frozen pause.
+
+**Portable-test finding:** planes_sum reads native32-bit words; its value differs
+on a little-endian PC even with identical frame bytes. The new tests hash visible
+plane bytes in a fixed order. Native fixture files include the existing DAT
+trailer; keep the portable fixture constructor outside the limited native checker.
+
+Next: Quick priority/clock liveness, remaining status/reaction/action and broader
+AI/campaign/tooling families. Full core/content production is not complete. Jump
+refinement remains deferred. Reviewed artifacts and user playtest/save state stay
+intact; see campaign/CORE_AREA_IMPACT.md and its local verification report.
+
+## Shared Math Skill core (2026-11-02)
+
+OBSERVED: unmodified retail Calculator targeting compares CT/Level/EXP/whole
+walking height against Prime/5/4/3, excludes zero and odd half-heights, forces
+caster CT100 and marks panels before listing occupants. Source flags3 bit0x40
+selects45 learned White/Black/Time/Yin-Yang spells; Math bypasses Reflect and
+Counter guards but retains magical evasion. Function/terrain hashes,96 masks,
+12 evasion profiles and explicit external helper boundaries are recorded in
+campaign/x/core-math/oracle/source.json.
+
+TARGET: CORE_MATH.md implements the shared owned path, pure forecasts and real
+staged menus with first-frame cached rows. FCJD/ABI57/ModCtx368 retains the same
+gameplay/save layouts and allocations. Nonroster JP-level acquisition and the
+bounded stationary Math origin/utility AI are explicit native adaptations.
+Sixteen cached numeric masks reuse32 bytes of existing idle scratch; the same
+native trial measures15.15M to4.84M cycles, without changing its results. This
+is not a full original action/menu/AI or whole-frame production certificate.
+Jump12 stays user-deferred; remaining R/S/M and broader release gates stay open.
+
+
+## PA/MA/Speed Save reactions (2026-11-03)
+
+**OBSERVED IN FFT:** tools/stat_save_oracle.py runs unmodified retail finalizer,
+post-damage dispatch, reaction preparation, original stat clamps and three
+self-target lists.36 stages/18 effects show successful HP-damage-only triggering,
+including zero damage and Sleep wake, blocked KO/secondary contexts, PA/MA+1
+capped99 and Speed+1 capped50. External unrelated bookkeeping and status-specific
+graphics handlers are isolated; this is not a full original UI/AI/animation trace.
+
+**TARGET IMPLEMENTATION:** source IDs422..424 equip through existing FSV3 storage
+and share bounded response staging, self effects, once-only impact and primary
+packet restoration. No stock/MP/reaction reward or live CT/Charge rollback.
+The existing native single-value stat policy is retained. Pure resident reaction
+eligibility and unused callback removal give ABI58/ModCtx360; AREA_UI owns impact
+numbers, NUMBERS retains forecasts. Generic coverage stays189/201, Jump deferred.
+Evidence and narrow production margins are in campaign/CORE_STAT_SAVE.md.
+
+
+## HP Restore / MP Restore / Critical Quick (2026-11-03)
+
+**OBSERVED IN FFT:** tools/critical_reactions_oracle.py executes unchanged retail
+post-impact dispatch,87 staging profiles,24 effects through final commit and
+three self-target lists. Critical23 is derived after HP, honoring immutable
+traits; successful zero damage can react, while Brave0 draws nothing. HP/MP
+missing quantities freeze before impact, Undead retains positive HP healing,
+Wall makes the prepared result miss and Quick writes CT255. Source CT is+0x39;
+reaction bits at+0x8c are0x40/0x20/0x10. Bookkeeping/graphics external boundaries
+are isolated; these are bounded function trials, not a whole UI/AI replay.
+
+**TARGET IMPLEMENTATION:** equipped IDs431..433 share the existing response owner,
+resources, scalar labels and complete root/Quick settlement. No cost, reaction
+reward, new gameplay/save field or mutable Critical cache. The pure predicate
+uses target_query253. ABI59/360 moves ordinary attack construction to RESPONSE4
+and excludes an unused reward wrapper to recover room. Other R/S/M, original AI
+and full-frame/residency limits remain explicit in campaign/CORE_CRITICAL_REACTIONS.md.
+
+
+## Lancer Jump (2026-11-03)
+
+**OBSERVED IN FFT:** unmodified retail preparation phase2 canonicalizes Jump to
+394, with max(1,floor(50/Speed)) delay. Fourteen timing profiles and sixteen
+formula100 profiles cover PA*WP, polearm PA*3/2, unarmed Brave, target physical
+statuses/Defense Up and zodiac. Original source tables contain five horizontal
+and seven vertical learning upgrades. Hashes are in the local oracle JSON.
+
+**TARGET IMPLEMENTATION:** the user authorized simplified terrain rules. Keep
+same-layer targeting, a fixed compact target cell, a protected airborne actor
+and its reserved origin. Reuse deferred/action/reward ownership and approved
+sprites/UI. Source layer preference, ceilings, PS1 jump animation and full future
+CT/AI are separate. See campaign/CORE_LANCER_JUMP.md for verification and limits.
+
+## Self-status reactions (2026-11-03)
+
+CORE_STATUS_REACTIONS.md / ABI61 retains ModCtx360 and existing storage.
+**OBSERVED:** Caution426 and Dragon Spirit427 use the pre-impact physical flag, even for a
+miss/heal/no-op. Regenerator428 uses post-HP-damage staging; successful zero
+is eligible. Exclude formula7; pre-physical reactions also exclude Math.
+At Brave0 the first two still consume a chance draw, Regenerator does not.
+**TARGET:** Freeze Defend/Reraise/Regen requests, then re-filter late immunity at commit.
+A filtered no-op keeps source hit1 with packed request0; do not mutate pending
+casts for it. Wall misses; Regen cancels Poison and refreshes36 ticks. Reuse the
+status owner and preserve Charging/Performing. Source oracle60 stages/33 effects,
+1159 logic+117 UI assertions/18 pictures compare PC/sanitizers/68000. No FCJD,
+gameplay/save allocation or standard campaign group changes; full R/S/M and
+production frame/stack/residency gates remain open. See the family note and
+x/core-status-reactions/verification.json for final packing/regression evidence.
+
+## Brave/Faith/Transparent reactions (2026-11-03)
+
+**OBSERVED IN FFT:** Sunken State425 and Brave Up429 use pre-impact physical
+eligibility, including misses/no-ops; Faith Up430 reads nonzero effective MP
+cost independently of hit/physical flags. Formula7/reaction incapacity still
+exclude them. All three consume a failed chance draw at Brave0. Original self
+effects add3 Brave/Faith (cap100), or Transparent19 with ordinary status filters.
+Transparent clears all four evades (four execution draws), clears on HP-damage
+type even zero and on a later acted turn; a fresh infliction resets turn-removal
+arming. Jump clears it when accepted. Source evidence:69 stages/37 effects,
+three self-target lists and evade/removal fixtures.
+
+**TARGET IMPLEMENTATION:** CORE_BRAVE_FAITH_REACTIONS.md uses existing status,
+response and stat owners; the unsaved allegiance byte's spare bit6 carries
+Transparent arming, and Invite preserves it. Keep the reviewed outlined sprite;
+Hidden reuses the impact-label cache. Manual targeting/occupancy/collateral are
+legal; hostile scalar/nearest AI and area/Math utility skip the hidden actor.
+FORMULA14 prepares typed self packets after RESPONSE returns; RESPONSE6/7 owns
+consecutive strikes, ORDER16 owns turn entry. ABI62/ModCtx360, zone8390,
+banks62374/63840, actual packed input64927/64936:9 bytes remain. No gameplay/save
+layout/heap/FCJD growth.1372 logic+98 UI assertions/14 pictures match
+PC/sanitizers/68000. Broader R/S/M/permanent Brave/Faith carry-over and full-frame,
+stack/residency/release gates remain separate. Preserve live TiEmu, the standard
+campaign group and protected file bytes AND dates.
+
+## Counter Tackle/Flood and Absorb Used MP (2026-11-03)
+
+**OBSERVED IN FFT:** Counter Tackle436 tests raw flags4 bit0x10; Counter
+Flood437 tests bit0x80, which includes ordinary Attack and Geomancy. Either may
+stage on a miss/heal/no-op. Math/formula7 and ordinary reaction restrictions
+still apply. Absorb438 reads the effective incoming MP byte; its self effect
+adds that byte, caps MP, ignores Undead and misses under Wall. Original
+preparation skips the acting slot. Source evidence:60 stages, nine effects and
+four constructors. Constructor calls are Dash147/validation1 and the current
+terrain's Elemental/validation0; isolated preview/MP/strike-init hooks are
+recorded, not a complete original targeting/animation replay.
+
+**TARGET IMPLEMENTATION:** CORE_COUNTER_REACTIONS.md freezes the MP byte in the
+existing pending slot (0x8000|cost), after CoreAction validates ID438. No save
+field grows. Tackle shares Dash math/RNG, with bounded adjacent/height reach;
+special/stacked actor targeting remains open. Flood reuses Work.cast only after
+the root commits, freezes all radius1 victims before HP and uses its own area
+painting. Actor/ability ownership and phase checks reject stale FX/second commits;
+secondary effects grant no EXP/JP and cannot stage nested reactions. ABI63 keeps
+ModCtx360 and18 images: RESULTS3/4 own selection/strike queries, TARGETS11 Flood,
+ORDER16 existing post-clock resets. Zone8452, banks63962/63918 and actual packed
+input64867/64936 leave only38/82 bank bytes and69 input bytes.813 logic+34 UI
+assertions/12 pictures match PC/sanitizers/68000; three UI transport partitions
+retain all checks and pictures. Full-frame/stack/residency/release gates remain
+open. Preserve protected saves/groups, including dates; do not touch live TiEmu.
+
+## Movement delivery block A (2026-11-03)
+
+**OBSERVED IN FFT:**128 retail movement configurations,16 additive Move/Jump
+bonus boundaries and24 Teleport trials are recorded by movement_oracle.py.
+Teleport rolls floor(rand*100/32768) against (distance-Move)*10, even inside the
+guaranteed range. Equipped Float is promoted to innate Float17 by source status
+initialization, protecting from Earth and ordinary removal. Six64-byte terrain
+rows distinguish weather-dependent0, forbidden255 and water/lava classes.
+
+**TARGET IMPLEMENTATION:** CORE_MOVEMENT.md closes blockA's15 generic traversal
+capabilities. One encoded byte/unit and archived innate flags share battle and
+management bonus math. Retain the previous ordinary-water adapter; source dry
+slow costs and severe weather now have real consumers. Cold MOVEMENT18 returns
+before AI_SETUP/TARGETS load. Native SCREENS shares Teleport's no-undo rule.
+Fly/Teleport are bounded direct destinations on the current layer, with legal
+landing/depth/lava/occupancy checks and existing art/target heights. ABI64/360
+keeps one zone8640 and uses three matching FMB3/FMD2 shards6/6/7, with mandatory
+whole-set validation before execution; no decompression/new ASM/new heap block.
+Native Unit112/State2224/Work45582; FSV3/Save3138 unchanged. FCJE44538 adds864
+archive bytes. Actual non-BENCH TTPack input64175 leaves761 bytes; do not quote
+instrumented63227 as production.9957 family assertions and32 pictures agree
+PC/sanitizers/68000. Cold reach can exceed a frame; full-frame/stack/residency/
+release gates remain open. Continue with blockB17, then C12/D6 (35 IDs remain).
+Preserve live TiEmu, standard groups and protected save/proof bytes AND dates.
+
+## Automatic Mime integration (2026-11-04)
+
+OBSERVED: hash-verified retail `battle_action_set_current_attacker_data` records
+original team/facing/weapons and current unit/fixed target offsets; Mime job93
+returns without replacing it. `battle_action_set_mimic_ability` filters the same
+source team and PREVENT_REACTION, rotates the offset and previews the copied
+action with borrowed weapons. CANNOT_MIMIC is secondary byte5 bit16 and applies
+to default/Math/monster menus. Items/Throw/Jump/Charge use their menu-specific
+rules. The source between-turn controller drains Mime slots after responses and
+rewards; imitators retain primary-action reactions and rewards. Controlled
+MIPS fixtures and isolation details: campaign/x/core-mime/oracle/source.json.
+
+INTERPRETATION: a second primary root in the existing native context is enough;
+recursive secondary ownership would incorrectly suppress ordinary reactions.
+Borrow only weapon/menu state, never another actor's derived stats or CT.
+
+TARGET: CORE_MIME.md documents the bounded implementation. Reuse current action
+presentation; skip invalid/empty scalar centres, retain the existing same-layer
+Jump adaptation, and copy only one immediate performance pulse. These are not
+claims of complete original Mime animations or all weapon/AI fidelity.
+
+## Ranged Hamedo integration (2026-11-04)
+
+OBSERVED: hash-verified retail outer Hamedo draws Brave before PREVENT_REACTION
+and counter-ability target/preview checks, and imposes no melee-only weapon gate.
+36 controlled profiles plus four incoming/target/MP early gates execute the
+original instructions; geometry/preview/list/MP callees are explicitly isolated.
+See campaign/x/core-hamedo/oracle/source.json and CORE_HAMEDO.md.
+
+INTERPRETATION: native ranged returns can reuse the existing pure trajectory
+query, prepared before the effect image is entered. Rejected return geometry
+must retain the already-consumed Brave draw without charging the original twice.
+
+TARGET: reuse idle AI trajectory scratch, original pre-action ownership and the
+ordinary shot renderer. Shared native three-tile extended range, straight-ray
+obstruction and scalar target ownership are bounded policies; full original
+weapon geometry, overlapping-panel selection and broader weapon fidelity remain
+separate. No new image, save format or hardware path is required.
+
+## Source weapon panel reach (2026-11-05)
+
+OBSERVED: the unchanged, hash-verified retail weapon selector and strike/lunge/
+arc/direct marking routines produce54080 panel outputs across160 weapon/hand/
+Frog/height profiles. The direct spread/close-range helpers run unchanged; only
+final target-selection filtering is isolated. The original attack-panel caller
+excludes the origin.64 actual effective-height cases cover water, Float, movement
+traits and byte wrapping. See tools/weapon_reach_oracle.py and its source manifest.
+
+INTERPRETATION: the flags already stored in FCJH identify four distinct shapes;
+item reach alone cannot distinguish a lance from an arc, or a gun from a bow.
+Arc height penalties use signed truncation toward zero, including uphill cases.
+
+TARGET: one pure shared rule supplies Attack, Charge, AI, Counter/Hamedo and
+Mime. Manual masks prepare the origin once with existing scratch storage.
+ORDER owns the unchanged shared CT/pending loop without per-tick image swaps.
+This is panel reach, with existing straight obstruction/presentation; full arc
+trajectories, lunge collisions, overlapping-panel victim lists and broader
+weapon formulas/procs remain open. See campaign/CORE_WEAPON_REACH.md.
+
+## Physical weapon bases and owned preparation (2026-11-05)
+
+OBSERVED: unchanged retail base-XA, Charge, physical modifier, critical and
+ordinary gun routines pass288 controlled scalar profiles. The actual random
+helper returns16384 in preview without calling libc rand. Variable PA draws
+precede the critical chance/amplitude. Ordinary gun formula03 starts at WP*WP
+and omits ordinary physical evasion; outer guards remain before that handler.
+Twenty-six further clean, compatible weapons pass original Two Swords hand
+initialization/selection. Evidence: tools/weapon_formula_oracle.py.
+
+INTERPRETATION: the existing source item-type byte distinguishes all physical
+families without another catalogue field. Scalar/critical correctness does not
+certify elements, healing/absorption, magical guns or the conditional-status/
+spell-proc dispatcher and its subsequent RNG draw.
+
+TARGET: a33-byte family map and a pure resident weapon_amount callback share
+physical arithmetic. Each executing RESPONSE/COMBAT owner prepares its own
+hit/base/critical sequence through weapon_roll.inc, without loading another
+image. The facing-axis refactor retains1024 previous classifications. FCJH
+changes only27 low hand bits, including the unarmed marker;26 real compatible
+weapons gain native Two Swords. No renderer/art or gameplay/save layout changes.
+See campaign/CORE_WEAPON_FORMULAS.md and its private verification manifest.

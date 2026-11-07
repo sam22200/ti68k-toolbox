@@ -145,3 +145,12 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
   Linux PCKEY table (XFree86 keycodes, US layout: HOME=97, UP=98, DOWN=104…), so this works
   whatever the host keyboard layout (AZERTY here).
 - TiEmu menu (right-click on the calculator): F10 = Send file, F11 = debugger, F12 = Set ROM.
+
+- **Short private mount paths (FFT, isolated Titanium, 2026-11-07):** this build
+  of TiEmu aborts with a host buffer-overflow error when a deeply nested QA
+  directory is used directly for HOME and `-send`. A short container alias
+  (`/tmp/fftqa`) for those paths runs the same group. Keep the OS image path
+  referenced by the copied `.sav` valid, with a private image overlay. Do not
+  infer a precise path-length threshold from this observation. Wait until the
+  `Sending var(s)` window disappears before typing; the700KB archived group
+  takes over a minute here, and its progress dialog can obscure the LCD.

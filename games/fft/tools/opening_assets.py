@@ -181,7 +181,7 @@ def map_assets(disc,files,number,prefix,chapel=False):
     (OUT/'map.h').write_text('// Local disc-generated; never committed.\n#define MAP_W %d\n#define MAP_H %d\n'%(nx,nz))
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(4) as ex:
-        for rot,data in enumerate(ex.map(extract.zx0pack.pack,raw)):(OUT/('ffov%d.bin'%rot)).write_bytes(data)
+        for rot,data in enumerate(ex.map(extract.pack_view,raw)):(OUT/('ffov%d.bin'%rot)).write_bytes(data)
     return tiles,(nx,nz)
 
 def source_title(disc,files):
@@ -290,10 +290,27 @@ def dialogue(disc,files,chapel_tiles,cam,scene_pose):
     return beats
 
 def main():
-    ap=argparse.ArgumentParser(__doc__);ap.add_argument('disc');ap.add_argument('--reuse-scenes',action='store_true');args=ap.parse_args();OUT.mkdir(parents=True,exist_ok=True)
+    ap=argparse.ArgumentParser(__doc__);ap.add_argument('disc');ap.add_argument('--reuse-scenes',action='store_true');ap.add_argument('--facings-only',action='store_true');args=ap.parse_args();OUT.mkdir(parents=True,exist_ok=True)
     disc,files=extract.disc_files(args.disc);read=lambda s:disc.read(*files[s]);extract.SOURCE_CAMERA=True
     import oracle
     p=oracle.PSX(args.disc);p.load(str(REF/'event-05.state'))
+    if args.facings_only:
+        import re
+        header=(OUT/'battle.h').read_text()
+        offset=int(re.search(r'#define unit_defs .*?igfx \+ (\d+)UL',header)[1])
+        path=OUT/'ffoi.bin';bank=bytearray(path.read_bytes())
+        for i in range(11):
+            a=oracle.UNITS+i*448;at=offset+24*i
+            assert bank[at+8:at+10]==bytes((p.read(a+0x47),p.read(a+0x48)))
+            bank[at+10]=battle.FACE[p.read(a+0x49)&3]
+        path.write_bytes(bank)
+        metadata=OUT/'units.json'
+        if metadata.exists():
+            records=json.loads(metadata.read_text())
+            for i,record in enumerate(records):record['face']=bank[offset+24*i+10]
+            metadata.write_text(json.dumps(records,indent=2)+'\n')
+        print('Refreshed all opening tactical facings from unit records, not transient actor angles')
+        return
     # Confirm actor files against the original's resolved sheet table and packed body.
     bat=read('BATTLE.BIN');source=[];bd=battle.Disc(args.disc)
     for i in range(11):
@@ -313,8 +330,9 @@ def main():
                 assert prev+prev//den==v
                 raw[k]=prev
         name=interface.decode(bytes(p.ram[p.addr(a+0x12c):p.addr(a+0x13c)]).split(b'\xfe')[0]);name='Ramza' if i==0 else name
+        # Tactical facing is authoritative; the scene actor angle may still be turning.
         source.append(dict(gfx=GFX[i],job=r(3),type=1 if r(6)&64 else 0,level=r(0x22),brave=r(0x24),faith=r(0x26),day=r(8,2)&511,
-                           x=r(0x47),z=r(0x48),face=battle.FACE[(p.read(0x800b7308+i*0x440+0x70,2)//1024)&3],team=0 if i==0 else 1 if 5<=i<=9 else 2,
+                           x=r(0x47),z=r(0x48),face=battle.FACE[r(0x49)&3],team=0 if i==0 else 1 if 5<=i<=9 else 2,
                            eq=eq,raw=raw,name=name,ct=0,exp=r(0x21),zodiac=r(9)>>4,stats=got))
     # Data tables for the common combat model. No fixture positions leak into code.
     jobs=sorted({u['job'] for u in source});items=sorted({v for u in source for v in u['eq'] if v!=255})
@@ -328,15 +346,12 @@ def main():
     f=['// Generated from local original data; never committed.','#define NJOB %d\n#define NITEM %d\n#define NUNIT 11'%(len(jobs),len(items)),'static const Job jobs[NJOB] = {']
     for j in jobs:
         q=bd.job(j);f.append('{ {%s}, {%s}, %d,%d,%d,%d },'%(','.join(map(str,q['growth'])),','.join(map(str,q['mult'])),q['move'],q['jump'],q['cev'],j-0x4a if j>=0x4a else 0))
-    f+=['};','static const Item items[NITEM] = {'];ev=[];rng=[]
+    f+=['};','static const Item items[NITEM] = {']
     # Item names are original labels, IDs/values are read from the disc.
     names={2:'Mythril Knife',20:'Long Sword',21:'Iron Sword',22:'Mythril Sword',83:'Long Bow',128:'Escutcheon',129:'Buckler',132:'Bronze Shield',133:'Round Shield',145:'Leather Helmet',146:'Bronze Helmet',148:'Iron Helmet',149:'Barbut',150:'Mythril Helm',157:'Leather Hat',158:'Feather Hat',159:'Red Hood',173:'Leather Armor',174:'Linen Cuirass',175:'Bronze Armor',177:'Chain Mail',178:'Mythril Armor',186:'Clothes',187:'Leather Outfit',189:'Leather Vest',208:'Battle Boots',215:'Power Wrist'}
     for item in items:
         q=bd.item(item);wp=read('SCUS_942.21')[battle.WEAPONS-battle.EXE+8*item+4] if q['flags']&128 else 0
         f.append('{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,"%s"},'%(item,q['hp'],q['mp'],q['pa'],q['ma'],q['sp'],q['move'],q['jump'],wp,2 if q['type']==12 else int(q['type']==1),names.get(item,'Item %02X'%item)[:12]))
-        rng.append(5 if q['type']==12 else 1)
-        # Shield table entries are two physical/magical evade bytes.
-        base=0x80063eb8;ev.append(bd.at(base+2*(item-128),1)[0] if 128<=item<144 else 0)
     f+=['};','#define NABIL %d\nstatic const Ability abilities[NABIL] = {'%len(abil)]
     for name,kind,y,r,v,fl,bag in abil:f.append('{"%s",%s,%s,%d,%d,%s,%d,100,0,1},'%(name,kind,y,r,v,fl,bag))
     f+=['};','#define NSET %d\nstatic const SkillSet skill_sets[NSET] = {'%len(sets)]
@@ -344,7 +359,7 @@ def main():
     f+=['};','#define SET_BASIC 6\n#define NRSM_PRE 1\n#define DEFEND_JP 50\n#define DEFEND_RATE 0\n#define NBAG 2','static const u8 rsm_pre[1][2]={{0,0}};','static const u8 bag_init[2]={5,1};','static const u8 gen_base[3][5]={{0}}, gen_var[3][5]={{0}};','static const u16 zodiac_days[12]={%s};'%','.join(map(str,struct.unpack('<12H',bd.at(battle.ZODIAC,24)))),'static const u8 zodiac_compat[12]={%s};'%','.join(map(str,bd.bat[battle.ZCOMPAT-battle.BAT:battle.ZCOMPAT-battle.BAT+12])),'static const UnitDef unit_defs[NUNIT] = {']
     for i,u in enumerate(source):
         f.append('{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,{%s},%d,%d},'%(u['gfx'],jobs.index(u['job']),u['type'],u['level'],u['brave'],u['faith'],u['day'],u['x'],u['z'],u['face'],u['team'],','.join('{%d,255}'%(items.index(v) if v in items else 255) for v in u['eq']),unitsets[i],learned[i]))
-    f+=['};','static const u32 opening_raw[NUNIT][5]={'+','.join('{'+','.join(str(v)+'UL' for v in u['raw'])+'}' for u in source)+'};','static const char *const opening_names[NUNIT]={'+','.join(json.dumps(u['name']) for u in source)+'};','static const u8 opening_zodiac[NUNIT]={'+','.join(str(u['zodiac']) for u in source)+'};','static const u8 opening_range[NITEM]={'+','.join(map(str,rng))+'};','static const u8 opening_evade[NITEM]={'+','.join(map(str,ev))+'};']
+    f+=['};','static const u32 opening_raw[NUNIT][5]={'+','.join('{'+','.join(str(v)+'UL' for v in u['raw'])+'}' for u in source)+'};','static const char *const opening_names[NUNIT]={'+','.join(json.dumps(u['name']) for u in source)+'};','static const u8 opening_zodiac[NUNIT]={'+','.join(str(u['zodiac']) for u in source)+'};']
     charge=bd.at(0x80061044,16)[::2]
     f+=['static const u8 opening_charge_ticks[8]={'+','.join(map(str,charge))+'};']
     (OUT/'battle.h').write_text('\n'.join(f)+'\n');(OUT/'units.json').write_text(json.dumps(source,indent=2)+'\n')
@@ -407,14 +422,7 @@ def main():
     blob=struct.pack('>%dH'%len(mapping),*mapping)+directory+data
     (OUT/'ffoa.bin').write_bytes(blob)
     (OUT/'units.h').write_text('// Generated locally; never committed.\nenum {'+','.join('UG_'+n for n,_,_ in CHARS)+',UNIT_GFX_N};\n#define UNIT_FRAMES 22\n#define UNIT_SH 26\n#define UNIT_FOOT 21\n#define UNIT_FB 208\nenum {P_HIT=10,P_WIND=12,P_BLOW=14,P_KNEEL=16,P_KO=18,P_THROW=20};\nenum {OBJ_CRYSTAL,OBJ_CHEST,OBJ_CHEST_UP1=9,OBJ_CHEST_UP2,OBJ_N};\n#define CRYSTAL_FRAMES 8\n#define UG_CHEMIST_F UG_CHEMIST_M\n#define UG_SQUIRE_F UG_KNIGHT_F\n#define ACTOR_ARMED %d\n#define ACTOR_OBJECTS %d\n#define ACTOR_DIR %d\n#define ACTOR_DATA %d\n'%(base,objbase,2*len(mapping),2*(len(mapping)+len(records))))
-    # The existing bounded blade cache reads unchanged blade records. Bodies are elsewhere.
-    oldw=(HERE/'fftw.bin').read_bytes();wh=(HERE/'weapons.h').read_text();(OUT/'weapons.h').write_text(wh)
-    import re
-    body=19968
-    for name in ('WEAPON_INDEX','WEAPON_ZOFF','WEAPON_OFF'):
-        wh=re.sub(r'(#define '+name+r' )(\d+)UL',lambda m:m[1]+str(int(m[2])-body)+'UL',wh)
-    (OUT/'weapons.h').write_text(wh)
-    (OUT/'ffow.bin').write_bytes(oldw[body:])
+    # Blades: tools/common_actors.py writes the shared ffcw and its weapons.h.
     # Only eight battle portraits and no unused 510-name dictionary. Scripted
     # characters use the fitted name badge, never their own portrait image.
     import re
@@ -429,17 +437,10 @@ def main():
     # Read immutable byte-only combat tables directly from archive. UnitDef's
     # sole 16-bit field (birthday) is unused here and serialized as zero.
     tables={}
-    tables['jobs']=bytes(v for j in jobs for v in (*bd.job(j)['growth'],*bd.job(j)['mult'],bd.job(j)['move'],bd.job(j)['jump'],bd.job(j)['cev'],j-0x4a if j>=0x4a else 0))
-    itdata=bytearray()
-    for item in items:
-        q=bd.item(item);wp=bd.at(battle.WEAPONS+8*item+4,1)[0] if q['flags']&128 else 0
-        itdata+=bytes((item,q['hp'],q['mp'],q['pa'],q['ma'],q['sp'],q['move'],q['jump'],wp,2 if q['type']==12 else int(q['type']==1)))
-        itdata+=names.get(item,'Item %02X'%item)[:12].encode('ascii').ljust(13,b'\0')
-    tables['items']=bytes(itdata)
     ud=bytearray()
     for i,u in enumerate(source):
-        ud+=bytes((u['gfx'],jobs.index(u['job']),u['type'],u['level'],u['brave'],u['faith'],0,0,u['x'],u['z'],u['face'],u['team']))
-        ud+=bytes(v for eq in u['eq'] for v in (items.index(eq) if eq in items else 255,255))
+        ud+=bytes((u['gfx'],u['job'],u['type'],u['level'],u['brave'],u['faith'],0,0,u['x'],u['z'],u['face'],u['team']))
+        ud+=bytes(v for eq in u['eq'] for v in (eq,255))   # FFT's ids (ffcj: tools/common_tables.py)
         ud+=bytes((unitsets[i],learned[i]))
     assert len(ud)==11*24
     tables['unit_defs']=bytes(ud)
@@ -449,7 +450,7 @@ def main():
     tables['abilities']=b''.join(struct.pack('>13s7BHBx',name.encode('ascii'),value(kind),value(y),r,v,value(flags),bag,100,0,1) for name,kind,y,r,v,flags,bag in abil)
     tables['skill_sets']=b''.join(name.encode('ascii').ljust(12,b'\0')+bytes(ids+[255]*(6-len(ids))) for name,ids in sets)
     bank=bytearray((OUT/'ffoi.bin').read_bytes());hdr=(OUT/'battle.h').read_text()
-    for name,typ in (('jobs','Job'),('items','Item'),('unit_defs','UnitDef'),('abilities','Ability'),('skill_sets','SkillSet')):
+    for name,typ in (('unit_defs','UnitDef'),('abilities','Ability'),('skill_sets','SkillSet')):
         if len(bank)&1:bank.append(0)
         replacement='#define %s ((const %s *)(igfx + %dUL))'%(name,typ,len(bank))
         hdr,n=re.subn(r'static const '+typ+r' '+name+r'\[[^]]+\] = \{.*?\n\};',replacement,hdr,flags=re.S);assert n==1,name
@@ -469,4 +470,11 @@ def main():
     report=dict(actor_logical_frames=len(mapping),actor_unique_frames=len(records),actor_raw_with_mirrors=len(mapping)*208,actor_bank_bytes=(OUT/'ffoa.bin').stat().st_size,chapel_only_raw_frames=2*44*208,chapel_only_unique_bytes=sum(len(packed[k]) for k in set(v&32767 for v in mapping[9*44:11*44])),archive={p.name:p.stat().st_size for p in OUT.glob('*.bin')},original_units_checked=11,source_disc_sha256=__import__('hashlib').sha256(read('SCUS_942.21')).hexdigest(),dialogue_beats=len(beats),scene_pose_count=len(scene_keys),charge_ticks=list(charge),potion_hp=bd.ability(0x170)['y']*10,view_crop='Orbonne decorative towers above native scene; walkable terrain unmodified')
     (OUT/'storage.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()
+    import subprocess
+    subprocess.run([sys.executable,HERE/'tools/contour_assets.py','--attach',OUT/'ffov0.bin'],check=True)
+    subprocess.run([sys.executable,HERE/'tools/common_ui.py','opening'],check=True)  # ffcu, shared with the other chapter
+    subprocess.run([sys.executable,HERE/'tools/common_actors.py'],check=True)  # ffca/ffcb/ffcw, shared
+    subprocess.run([sys.executable,HERE/'tools/chapter_desc.py','opening'],check=True)  # its descriptor
+    subprocess.run([sys.executable,HERE/'tools/scenes.py'],check=True)  # the scene player's sets

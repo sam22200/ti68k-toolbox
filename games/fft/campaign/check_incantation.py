@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Targeted incantation lifecycle, PC/sanitizers and actual 68000 modules."""
+import argparse,json,re,tempfile
+from pathlib import Path
+from check import HERE,ROOT,run
+from check_flow import data_links
+from check_core_boundaries import descriptor13
+import struct
+
+
+def main():
+    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--pc-only',action='store_true')
+    ap.add_argument('--out',type=Path,default=HERE/'x/core-incantation/check');args=ap.parse_args()
+    out=args.out.resolve();out.mkdir(parents=True,exist_ok=True)
+    source=[HERE/'check_incantation.c',ROOT/'runtime/core/rt_core.c']
+    run(['cc','-std=gnu99','-O1','-g','-w','-o',out/'check',*source,ROOT/'runtime/platform-sw/rt_sw.c'])
+    run(['cc','-std=gnu99','-O1','-g','-w','-fsanitize=address,undefined','-fno-sanitize=shift',
+         '-o',out/'check-san',*source,ROOT/'runtime/platform-sw/rt_sw.c'])
+    fixture=HERE/'x/core-incantation/oracle';(fixture/'ffgd.bin').write_bytes(descriptor13())
+    catalogue=bytearray((HERE/'data/ffcj.bin').read_bytes());at=struct.unpack_from('>H',catalogue,14)[0]+0x93*14
+    catalogue[at+13]=7;catalogue[at+5]|=0x20
+    raw=struct.unpack_from('>H',catalogue,14)[0];norm=struct.unpack_from('>H',catalogue,30)[0]
+    catalogue[raw+0x94*14+13]=7;catalogue[raw+0x94*14+12]=3;catalogue[raw+0x94*14+5]|=0x20
+    catalogue[norm+0x94*12+4]=128|1
+    catalogue[norm+0x95*12+4]|=128;catalogue[raw+0x95*14+5]|=4
+    (fixture/'ffcj.bin').write_bytes(catalogue)
+    with tempfile.TemporaryDirectory(prefix='fft-incantation-')as folder:
+        data=Path(folder);data_links(data)
+        (data/'ffgd.bin').unlink();(data/'ffgd.bin').symlink_to(fixture/'ffgd.bin')
+        (data/'ffcj.bin').unlink();(data/'ffcj.bin').symlink_to(fixture/'ffcj.bin')
+        pc=run([out/'check'],data);assert run(['env','ASAN_OPTIONS=detect_leaks=0',out/'check-san'],data)==pc
+    print(pc.strip(),flush=True)
+    if args.pc_only:return
+    # 68000 part: without casting_trials (core-casting); its PC twin prints the same digest.
+    run(['cc','-std=gnu99','-O1','-g','-w','-DINCANTATION_NATIVE_SPLIT','-o',out/'split',*source,ROOT/'runtime/platform-sw/rt_sw.c'])
+    with tempfile.TemporaryDirectory(prefix='fft-incantation-')as folder:
+        data=Path(folder);data_links(data)
+        (data/'ffgd.bin').unlink();(data/'ffgd.bin').symlink_to(fixture/'ffgd.bin')
+        (data/'ffcj.bin').unlink();(data/'ffcj.bin').symlink_to(fixture/'ffcj.bin')
+        split=run([out/'split'],data)
+    print(split.strip(),flush=True)
+    run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-DINCANTATION_NATIVE_SPLIT','-o',out/'incchk',*source,
+         ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
+    for name in ('ffgd','ffcj'):run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',name+'.bin',name],fixture)
+    cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
+    for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
+        cmd+=['--file',(fixture if bank in ('ffgd','ffcj')else HERE/'data')/(bank+'.89y')]
+    native=run([*cmd,out/'incchk.89z']);(out/'native.log').write_text(native)
+    m=re.search(r'incantation (\w+) failures 0 checks (\d+)',pc);assert m,pc
+    n=re.search(r'incantation (\w+) failures 0 checks (\d+)',split);assert n,split
+    values=[int(v,16)for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',native)]
+    assert values[-3:]==[int(n[1],16),0,int(n[2])] and '_main returned'in native,native[-3000:]
+    result=dict(checks=int(m[2]),hash=m[1],native_equal=True,native_part=dict(hash=n[1],checks=int(n[2])),
+        zones=[line.strip()for line in native.splitlines()if re.match(r'^(?:3[58]\s+|max 3[58]\s+)',line)])
+    (out/'results.json').write_text(json.dumps(result,indent=2)+'\n');print(result,flush=True)
+
+
+if __name__=='__main__':main()

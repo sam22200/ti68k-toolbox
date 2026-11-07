@@ -225,6 +225,33 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
     return out, shade.astype(int)
 
 
+def rowxor_masks(raw):
+    """Chapter views (ffov*, ffgv*): each occlusion mask row (planes 3 and 5) XORed with
+    the row above before ZX0 (~3 KB less per map); fft.c unxor_masks() undoes it."""
+    p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40).copy()
+    for k in (3, 5):
+        p[k, 1:] ^= p[k, :-1].copy()
+    return p.tobytes()
+
+
+def pack_view(raw):
+    """A chapter view (ffov*, ffgv*): b'V2', u16 length of the colour stream, the ZX0 stream of
+    the two colour planes (fft.c decodes it straight into the scene buffer), then the ZX0
+    stream of the four depth/mask planes, mask rows XORed (rowxor_masks)."""
+    raw = rowxor_masks(raw)
+    plane = len(raw) // 6
+    colours = zx0pack.pack(raw[:2 * plane])
+    return b'V2' + len(colours).to_bytes(2, 'big') + colours + zx0pack.pack(raw[2 * plane:])
+
+
+def unrowxor_masks(raw):
+    p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40).copy()
+    for k in (3, 5):
+        for y in range(1, p.shape[1]):
+            p[k, y] ^= p[k, y - 1]
+    return p.tobytes()
+
+
 def main():
     disc, files = disc_files(sys.argv[1])
     _, sector, size = [r for r in gns_records(disc, files) if r[0] == 0x2E01][-1]

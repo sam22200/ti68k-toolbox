@@ -231,6 +231,13 @@ This is a standalone UI milestone, not evidence that all screens fit the tactica
 game's combined frame budget. Native screen parity does not validate LCD timing,
 keyboard or archive hardware paths; those await the requested emulator review.
 
+## Campaign program (2026-10-22)
+
+The user chose layout A without animation. `campaign/manage.c` (`fftmng`) is the real
+program built from this prototype: it reads and writes the campaign save, with every job,
+item and name from the disc (`tools/management_data.py`); see `campaign/README.md` and
+`campaign/ENGINE.md`. This prototype stays as the visual laboratory.
+
 ## Next
 
 Select the layout, implement persistent party/inventory with conservation, equipment,

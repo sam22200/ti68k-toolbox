@@ -22,7 +22,7 @@ $(VIEWS:=.bin) tiles.bin: map.h
 fftu.bin: units.h
 fftw.bin: weapons.h
 ffti.bin: interface.h
-interface.h: tools/interface.py tools/units.py tools/art.py tools/banner.py map.h
+interface.h: tools/interface.py tools/units.py tools/art.py tools/banner.py ../../lib/svgfont.py map.h
 	$(PY) tools/interface.py $(DISC)
 ti cycles: $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
 TI_FILES := $(VIEWS:=.89y) fftu.89y fftw.89y ffti.89y
@@ -61,6 +61,13 @@ $(AI): $(ORACLE).state
 oracle.h: tools/battle.py $(ORACLE).state $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 	$(PY) tools/battle.py $(DISC) --check $(ORACLE).state $(ORACLE).txt $@ $(TURNS) $(ATTACKS) $(SKILLS) $(REWARDS) $(AI)
 $(NAME)_test: oracle.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: stats.inc unit_setup.inc formula.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: action_effect.h action_resolve.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: status_rules.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: status_policy.h status_unit.h status_policy.inc status_lifetime.h status_control.h status_runtime.inc turn_order.inc setup_glyphs.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftcam_pc fftcam.89z fftcamc.89z: core_limits.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftcam_pc fftcam.89z fftcamc.89z: tactical_grid.h tactical_search.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftcam_pc fftcam.89z fftcamc.89z: unit_card.h unit_card.inc portrait32.inc choice_menu.h choice_menu.inc
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: map.h units.h weapons.h interface.h battle.h art.h fft.h ct_recip.h $(VIEWS:=.bin) fftu.bin fftw.bin ffti.bin
 XCHECK := 0 1 2 3 4 5 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60
 FRAMES := 40
@@ -69,6 +76,19 @@ FRAMES := 40
 management-review management-check management-pc management-ti: units.h interface.h fftu.bin ffti.bin $(ORACLE).state
 	$(MAKE) -C management $(patsubst management-%,%,$@)
 test: auto-battle-test
+test: rings-test
+.PHONY: rings-test rings-variant-test
+rings-test:
+	@mkdir -p x/rings
+	$(CC) $(PC_CFLAGS) -o x/rings/base test_rings.c $(RT_CORE) $(RT_SW)
+	./x/rings/base
+rings-variant-test:
+	$(PY) tools/contour_assets.py --attach opening/data/ffov0.bin campaign/data/ffgv0.bin
+	@mkdir -p x/rings
+	$(CC) $(PC_CFLAGS) -DTEST_CAMPAIGN -o x/rings/gariland test_rings.c $(RT_CORE) $(RT_SW)
+	./x/rings/gariland
+	$(CC) $(PC_CFLAGS) -DTEST_OPEN -o x/rings/opening test_rings.c $(RT_CORE) $(RT_SW)
+	./x/rings/opening
 auto-battle-test: map.h units.h weapons.h interface.h battle.h art.h
 	@mkdir -p x/auto-battle
 	$(CC) $(PC_CFLAGS) -o x/auto-battle/test test_autobattle.c $(RT_CORE) $(RT_SW)
@@ -91,6 +111,9 @@ chest-review: pc
 .PHONY: storage-audit
 storage-audit:
 	$(PY) tools/storage_audit.py
+.PHONY: contour-bench
+contour-bench:
+	$(PY) tools/bench_contour.py
 .PHONY: storage-cleanup-check
 storage-cleanup-check: pc
 	$(PY) tools/check_storage_cleanup.py
@@ -351,5 +374,7 @@ camera-prefetch-filter-check:
 	cd x/config/data && ../test-config-filter
 
 .PHONY: iso-silhouette-check
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: action_context.h action_start.inc
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: reaction_policy.h reaction_runtime.inc action_module.inc rewards.inc
 iso-silhouette-check:
 	$(PY) tools/iso_silhouette_review.py

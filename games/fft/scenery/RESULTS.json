@@ -1,0 +1,546 @@
+{
+  "storage": {
+    "scope": "Shared terrain metadata/material sprites; original geometry heights, simplified architectural appearance. Exact residual control restores original six-plane views.",
+    "common_bank_bytes": 27956,
+    "sprite_count": 143,
+    "material_sources": {
+      "14": {
+        "map": "gariland",
+        "tile": [
+          5,
+          14
+        ],
+        "palette": 13,
+        "page": 2
+      },
+      "3": {
+        "map": "gariland",
+        "tile": [
+          9,
+          14
+        ],
+        "palette": 3,
+        "page": 0
+      },
+      "31": {
+        "map": "gariland",
+        "tile": [
+          4,
+          14
+        ],
+        "palette": 5,
+        "page": 2
+      },
+      "20": {
+        "map": "gariland",
+        "tile": [
+          3,
+          14
+        ],
+        "palette": 5,
+        "page": 0
+      },
+      "22": {
+        "map": "gariland",
+        "tile": [
+          1,
+          14
+        ],
+        "palette": 12,
+        "page": 0
+      },
+      "21": {
+        "map": "gariland",
+        "tile": [
+          7,
+          13
+        ],
+        "palette": 2,
+        "page": 0
+      },
+      "33": {
+        "map": "gariland",
+        "tile": [
+          1,
+          13
+        ],
+        "palette": 5,
+        "page": 1
+      },
+      "35": {
+        "map": "gariland",
+        "tile": [
+          4,
+          10
+        ],
+        "palette": 2,
+        "page": 0
+      },
+      "30": {
+        "map": "gariland",
+        "tile": [
+          8,
+          3
+        ],
+        "palette": 2,
+        "page": 0
+      },
+      "6": {
+        "map": "orbonne",
+        "tile": [
+          1,
+          2
+        ],
+        "palette": 3,
+        "page": 2
+      },
+      "17": {
+        "map": "orbonne",
+        "tile": [
+          1,
+          13
+        ],
+        "palette": 5,
+        "page": 1
+      }
+    },
+    "maps": [
+      {
+        "name": "gariland",
+        "metadata_bytes": 1216,
+        "terrain_tiles": 150,
+        "changed_color_fraction": [
+          0.30465883027522933,
+          0.3296875,
+          0.3198967889908257,
+          0.27838302752293576
+        ],
+        "original_stream_bytes": 38848,
+        "view_bytes": 52320,
+        "color_bytes": 17440,
+        "exact_residual": {
+          "bytes": 49344,
+          "patch_counts": [
+            162,
+            163,
+            159,
+            152
+          ],
+          "unique_patch_streams": 599
+        }
+      },
+      {
+        "name": "orbonne",
+        "metadata_bytes": 1136,
+        "terrain_tiles": 140,
+        "changed_color_fraction": [
+          0.373779296875,
+          0.34454752604166666,
+          0.368408203125,
+          0.397119140625
+        ],
+        "original_stream_bytes": 38681,
+        "view_bytes": 46080,
+        "color_bytes": 15360,
+        "exact_residual": {
+          "bytes": 52429,
+          "patch_counts": [
+            170,
+            143,
+            140,
+            156
+          ],
+          "unique_patch_streams": 602
+        }
+      }
+    ],
+    "pieces_shared_between_maps": 37,
+    "common_wall_pieces": 28
+  },
+  "native": {
+    "method": "MC68000 datasheet cycles / 12 MHz; not TiEmu or hardware FPS. Preparation/copy only, no actors, gameplay, turn animation, I/O or gray interrupts. Four-full policies exceed full-game RAM.",
+    "results": [
+      {
+        "map": "gariland",
+        "policy": "shared_one",
+        "cache_and_scratch_ram": 61040,
+        "cold_cycles": 10232106,
+        "cold_ms": 852.6755,
+        "rotation_cycles": [
+          10367756,
+          10504798,
+          10296118,
+          10232080
+        ],
+        "rotation_ms": [
+          863.9796666666666,
+          875.3998333333333,
+          858.0098333333333,
+          852.6733333333333
+        ],
+        "warm_copy_cycles": 63940.6875,
+        "warm_copy_ms": 5.328390625,
+        "full_source_fidelity": false,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "shared_four",
+        "cache_and_scratch_ram": 218000,
+        "cold_cycles": 41400622,
+        "cold_ms": 3450.0518333333334,
+        "rotation_cycles": [
+          88,
+          88,
+          88,
+          88
+        ],
+        "rotation_ms": [
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": false,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "shared_four_colors",
+        "cache_and_scratch_ram": 113360,
+        "cold_cycles": 41400622,
+        "cold_ms": 3450.0518333333334,
+        "rotation_cycles": [
+          9353600,
+          9461802,
+          9318642,
+          9252084
+        ],
+        "rotation_ms": [
+          779.4666666666667,
+          788.4835,
+          776.5535,
+          771.007
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": false,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "exact_one",
+        "cache_and_scratch_ram": 61296,
+        "cold_cycles": 17409838,
+        "cold_ms": 1450.8198333333332,
+        "rotation_cycles": [
+          17645982,
+          17729044,
+          17090340,
+          17409812
+        ],
+        "rotation_ms": [
+          1470.4985,
+          1477.4203333333332,
+          1424.195,
+          1450.8176666666666
+        ],
+        "warm_copy_cycles": 63940.6875,
+        "warm_copy_ms": 5.328390625,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "exact_four",
+        "cache_and_scratch_ram": 218256,
+        "cold_cycles": 69875048,
+        "cold_ms": 5822.920666666667,
+        "rotation_cycles": [
+          88,
+          88,
+          88,
+          88
+        ],
+        "rotation_ms": [
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "exact_four_colors",
+        "cache_and_scratch_ram": 113616,
+        "cold_cycles": 69875048,
+        "cold_ms": 5822.920666666667,
+        "rotation_cycles": [
+          15449860,
+          15669970,
+          15115218,
+          15413738
+        ],
+        "rotation_ms": [
+          1287.4883333333332,
+          1305.8308333333334,
+          1259.6015,
+          1284.4781666666668
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "current_one",
+        "cache_and_scratch_ram": 52320,
+        "cold_cycles": 2105954,
+        "cold_ms": 175.49616666666665,
+        "rotation_cycles": [
+          2226550,
+          2326374,
+          2102414,
+          2105966
+        ],
+        "rotation_ms": [
+          185.54583333333332,
+          193.8645,
+          175.20116666666667,
+          175.49716666666666
+        ],
+        "warm_copy_cycles": 63954.6875,
+        "warm_copy_ms": 5.329557291666666,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "gariland",
+        "policy": "current_four",
+        "cache_and_scratch_ram": 209280,
+        "cold_cycles": 8761182,
+        "cold_ms": 730.0985,
+        "rotation_cycles": [
+          94,
+          94,
+          94,
+          94
+        ],
+        "rotation_ms": [
+          0.007833333333333333,
+          0.007833333333333333,
+          0.007833333333333333,
+          0.007833333333333333
+        ],
+        "warm_copy_cycles": 63954.6875,
+        "warm_copy_ms": 5.329557291666666,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "shared_one",
+        "cache_and_scratch_ram": 53760,
+        "cold_cycles": 12458072,
+        "cold_ms": 1038.1726666666666,
+        "rotation_cycles": [
+          11850600,
+          11671584,
+          12519484,
+          12458046
+        ],
+        "rotation_ms": [
+          987.55,
+          972.632,
+          1043.2903333333334,
+          1038.1705
+        ],
+        "warm_copy_cycles": 63940.6875,
+        "warm_copy_ms": 5.328390625,
+        "full_source_fidelity": false,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "shared_four",
+        "cache_and_scratch_ram": 192000,
+        "cold_cycles": 48499584,
+        "cold_ms": 4041.632,
+        "rotation_cycles": [
+          88,
+          88,
+          88,
+          88
+        ],
+        "rotation_ms": [
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": false,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "shared_four_colors",
+        "cache_and_scratch_ram": 99840,
+        "cold_cycles": 48499584,
+        "cold_ms": 4041.632,
+        "rotation_cycles": [
+          10692164,
+          10482488,
+          11257588,
+          11276090
+        ],
+        "rotation_ms": [
+          891.0136666666667,
+          873.5406666666667,
+          938.1323333333333,
+          939.6741666666667
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": false,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "exact_one",
+        "cache_and_scratch_ram": 54016,
+        "cold_cycles": 20140364,
+        "cold_ms": 1678.3636666666666,
+        "rotation_cycles": [
+          18416990,
+          18063776,
+          19603596,
+          20140338
+        ],
+        "rotation_ms": [
+          1534.7491666666667,
+          1505.3146666666667,
+          1633.633,
+          1678.3615
+        ],
+        "warm_copy_cycles": 63940.6875,
+        "warm_copy_ms": 5.328390625,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "exact_four",
+        "cache_and_scratch_ram": 192256,
+        "cold_cycles": 76224570,
+        "cold_ms": 6352.0475,
+        "rotation_cycles": [
+          88,
+          88,
+          88,
+          88
+        ],
+        "rotation_ms": [
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333,
+          0.007333333333333333
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "exact_four_colors",
+        "cache_and_scratch_ram": 100096,
+        "cold_cycles": 76224570,
+        "cold_ms": 6352.0475,
+        "rotation_cycles": [
+          16152620,
+          15768746,
+          17235766,
+          17852448
+        ],
+        "rotation_ms": [
+          1346.0516666666667,
+          1314.0621666666666,
+          1436.3138333333334,
+          1487.704
+        ],
+        "warm_copy_cycles": 63930.6875,
+        "warm_copy_ms": 5.3275572916666665,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "current_one",
+        "cache_and_scratch_ram": 46080,
+        "cold_cycles": 2141632,
+        "cold_ms": 178.46933333333334,
+        "rotation_cycles": [
+          2044680,
+          2166780,
+          2304154,
+          2141644
+        ],
+        "rotation_ms": [
+          170.39,
+          180.565,
+          192.01283333333333,
+          178.47033333333334
+        ],
+        "warm_copy_cycles": 63954.6875,
+        "warm_copy_ms": 5.329557291666666,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      },
+      {
+        "map": "orbonne",
+        "policy": "current_four",
+        "cache_and_scratch_ram": 184320,
+        "cold_cycles": 8657136,
+        "cold_ms": 721.428,
+        "rotation_cycles": [
+          94,
+          94,
+          94,
+          94
+        ],
+        "rotation_ms": [
+          0.007833333333333333,
+          0.007833333333333333,
+          0.007833333333333333,
+          0.007833333333333333
+        ],
+        "warm_copy_cycles": 63954.6875,
+        "warm_copy_ms": 5.329557291666666,
+        "full_source_fidelity": true,
+        "native_checksums_match": true
+      }
+    ],
+    "executable_bytes": 6729,
+    "production_game_work_bytes": 35540,
+    "orbonne_scene_cache_bytes": 15360,
+    "runtime_gray_and_saved_lcd_bytes": 11528
+  },
+  "native_binary_sha256": "bd66dfa991431d514106e6920c1d15d3c11da8538a0e8ce42b130f34da413c43",
+  "source_sha256": {
+    "bank.c": "c9e61ecba22af1e9bdfe983b4fa4aa7a56b8af37dd36075578950ec2936ead6e",
+    "bank.h": "f5bc89952dfd9fdf53e9d748d23fd76c4a54b50fbf13f42234f5de631cada047",
+    "bench.c": "d8b1c3fdb66eb1832b8db00da22e531b0641092d98e9adbb69a3f94e276fe80b",
+    "build.py": "09ff8a192596b4c22147df2381869c9e73aef02ebb17683069cb76f7dd7580be",
+    "measure.py": "6ff61347a44f69d182e85c8311f985bc9a17b07915b1a5db0efdf317271f3a90",
+    "test.c": "6710ad50812957998d7cda22efc029535b53b00ee383e6e5495798c8d841f41b"
+  }
+}

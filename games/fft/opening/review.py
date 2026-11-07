@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Portable presentation GIFs; playback is not a calculator FPS measurement."""
 from pathlib import Path
-import subprocess, json
+import subprocess, json, argparse
 from PIL import Image
 HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2];OUT=HERE/'x/review'
 def main():
+    parser=argparse.ArgumentParser(__doc__);parser.add_argument('--title-only',action='store_true');args=parser.parse_args()
     OUT.mkdir(parents=True,exist_ok=True)
     subprocess.run(['cc','-std=gnu99','-O1','-g','-o',str(OUT/'replay'),str(HERE/'review.c'),str(ROOT/'runtime/core/rt_core.c'),str(ROOT/'runtime/platform-sw/rt_sw.c')],check=True)
-    for scenario,name in ((0,'orbonne-opening'),(2,'orbonne-battle'),(3,'orbonne-ending'),(2,'orbonne-animation')):
+    cases=((0,'orbonne-title'),) if args.title_only else ((0,'orbonne-opening'),(2,'orbonne-battle'),(3,'orbonne-ending'),(2,'orbonne-animation'))
+    for scenario,name in cases:
         frames=OUT/name;frames.mkdir(exist_ok=True)
         for p in frames.glob('*.png'):p.unlink()
-        subprocess.run([str(OUT/'replay'),str(scenario),str(frames)]+(['normal'] if name=='orbonne-animation' else []),check=True,cwd=HERE/'data')
+        subprocess.run([str(OUT/'replay'),str(scenario),str(frames)]+(['title'] if args.title_only else ['normal'] if name=='orbonne-animation' else []),check=True,cwd=HERE/'data')
         source=sorted(frames.glob('*.png'));images=[]
         # Battle playback: show its first 40 seconds, the complete replay is checked
         # separately. Source frames are every third 30Hz engine update (100 ms).

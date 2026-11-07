@@ -136,14 +136,14 @@ void draw_text(s16 x, s16 y, const char *s, u8 font, u8 color)
 // ---------------------------------------------------------------- data files
 const void *rt_file(const char *name, u16 *size)   // NAME.bin, loaded once, kept
 {
-    static struct { char name[12]; void *data; u16 size; } cache[8];
+    static struct { char name[12]; void *data; u16 size; } cache[16];   // FFT's opening: 9
     char path[32];
     FILE *f;
     long n;
     u8 k;
-    for (k = 0; k < 8 && cache[k].data; k++)
+    for (k = 0; k < 16 && cache[k].data; k++)
         if (!strcmp(cache[k].name, name)) { if (size) *size = cache[k].size; return cache[k].data; }
-    if (k == 8 || strlen(name) > 10) return RT_NULL;
+    if (k == 16 || strlen(name) > 10) return RT_NULL;
     snprintf(path, sizeof path, "%s.bin", name);
     if (!(f = fopen(path, "rb"))) return RT_NULL;
     fseek(f, 0, SEEK_END);

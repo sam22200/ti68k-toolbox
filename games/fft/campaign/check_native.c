@@ -11,8 +11,8 @@
 #endif
 #ifdef CHECK_GAR
 #include "gariland.c"
-#else
-#include "academy.c"
+#else                                   // CHECK_SCENE: the scene player
+#include "scene.c"
 #endif
 #ifndef __m68k__
 #include <stdio.h>
@@ -33,8 +33,8 @@ static u32 state_hash(void)
     }
     HASH(st.act);HASH(st.mode);HASH(st.ai);HASH(st.abil);HASH(st.end);HASH(st.rot);HASH(rng32);
 #else
-    HASH(academy.message);HASH(academy.offset);HASH(academy.reveal);
-    HASH(academy.tick);HASH(academy.white);HASH(academy.done);
+    HASH(st.step);HASH(st.open_stage);HASH(st.open_beat);HASH(st.open_reveal);HASH(st.open_offset);
+    HASH(st.open_pan);HASH(st.open_white);HASH(st.done);
 #endif
 #undef HASH
     return h;
@@ -47,8 +47,15 @@ int main(int argc,char**argv)
     sw_init((u16)atoi(argv[1]));
     for(f=0;f<limit;f++)if(!sw_step(sw_script_keys(&script,rt_frame)))break;
     printf("executed %u checksum %04X state %08lX\n",rt_frame,sw_checksum(),(unsigned long)state_hash());
+#ifdef CHECK_GAR
+    printf("identity %08lX\n", (unsigned long)((u32)st.abil << 16 | st.unit[U_RAMZA].learned));
+#endif
     return sw_write_png(argv[4],1);
 }
 #else
-void _main(void){chapter_runtime_main();BENCH_VALUE(0xACAD0001UL);BENCH_VALUE(state_hash());}
+void _main(void){chapter_runtime_main();BENCH_VALUE(0xACAD0001UL);BENCH_VALUE(state_hash());
+#ifdef CHECK_GAR
+    BENCH_VALUE((u32)st.abil << 16 | st.unit[U_RAMZA].learned);
+#endif
+}
 #endif

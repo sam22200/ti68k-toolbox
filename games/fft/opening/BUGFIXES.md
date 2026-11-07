@@ -77,6 +77,9 @@ sprite adaptations; they do not reproduce the original movie. Source KO bodies
 are observable after the fight; their battle countdowns are omitted in scenes.
 Dialogue restores a white border and fitted speaker badge. Management actors
 are static at both roster sizes and in job previews.
+This reproduces only part of the reviewed management dialogue presentation:
+opening/Academy do not yet draw the speaker portraits. The current opening bank
+keeps battle portraits only; scripted speakers have name badges without images.
 
 The end returns a continuation flag. It never silently restarts the prologue.
 `../campaign/` supplies the Academy and Gariland handoff, loading programs one at
@@ -97,3 +100,12 @@ actors above the static battle mesh. That mesh does not contain the original
 event's foreground visibility changes; it must not turn the punch and princess
 into opaque-terrain silhouettes. This adaptation is confined to the scripted
 shot. Battle/chapel terrain coverage and depth-sorted actor order remain intact.
+
+### Orbonne initial tactical facing (2026-10-19)
+
+The asset importer used the render actor's interpolating angle at scene+0x70.
+In the observed event-05 snapshot Ramza still had3072 (+x) there, while his
+tactical unit+0x49 was0 (-z), confirmed again at the original first Ramza turn.
+Every imported unit now uses its tactical facing. Only Ramza differed in that
+snapshot. No unit position, shared camera transform or sprite mirror rule is
+patched. The regression checks world face3 and all four projected directions.

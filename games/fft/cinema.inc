@@ -256,7 +256,7 @@ static void chud(void)
     char text[60]; u8 n;
     const Unit *t = &st.unit[st.tgt];
     draw_rect(0, 0, 160, 8, C_WHITE);
-    draw_text(2, 0, st.abil == NO_ABIL ? "Attack" : abilities[st.abil].name, F_SMALL, C_BLACK);
+    draw_text(2, 0, st.abil == NO_ABIL ? "Attack" : ABIL_NAME(st.abil), F_SMALL, C_BLACK);
     draw_rect(0, 93, 160, 7, C_WHITE);
     n = put_s(text, 0, unit_name(st.tgt)); n = put_s(text, n, " HP ");
     n = put_n(text, n, t->hp); text[n] = 0;

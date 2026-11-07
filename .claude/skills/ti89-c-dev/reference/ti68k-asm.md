@@ -12,8 +12,16 @@ a C version instead. Verified asm routines to reuse:
 | LZ4 block decoder | `lib/unpack68k.s` (prototypes `lib/unpack68k.h`) | 1.5–1.6× | `u8 *lz4_asm(const u8 *s asm("%a0"), u16 slen asm("%d0"), u8 *d asm("%a1")) __attribute__((__regparm__(3)));` |
 | ZX0 v2 decoder (used by `games/campfire`; packer `lib/zx0pack.py`, recipe in `ti68k-c-patterns.md` §10) | `lib/unpack68k.s` | 2.5× | `u8 *zx0_asm(const u8 *s asm("%a0"), u8 *d asm("%a1")) __attribute__((__regparm__(2)));` |
 | `muls16` (16×16 → 32 multiply) | inline `asm()`, `ti68k-performance.md` §4 | avoids `__mulsi3` | |
+| `TriSpans` / `Span2` (verified with ti-cycles; mono caller launched on Titanium) | `games/mode7/src/render.s`; verbatim extraction by `games/tenchu/tools/reuse_mode7.py` | existing flat triangle scanline walker | stack parameters; declarations in `games/mode7/src/mode7.h` |
 
 Add each new verified asm routine to this table.
+
+`TriSpans` requires 30-byte rows, two writable planes 0xF00 bytes apart and
+clips X to 0..127. Even a monochrome caller must provide both planes; do not
+pass a packed 20-byte-row framebuffer or a single plane. Tenchu's reuse supplies
+scratch planes and falls back to its C spans for 160-wide or portal-clipped faces.
+The extracted 960-byte masks/span/triangle block matches the existing object's
+machine code exactly. No new assembly was required for that integration.
 
 Old ASM sources studied: `sources/asm/` (SMA 0.38, Chrono Fantasy, BomberBoy, MegaCar, small demos; 1998–2001,
 Fargo/DoorsOS kernel era, A68k syntax). Motorola manual: https://www.nxp.com/docs/en/reference-manual/MC68000UM.pdf

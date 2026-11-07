@@ -48,7 +48,14 @@ def project(v,rot,nx,nz):
                      extract.SC_OY+(u+w)*6-h*6,u+w+2*h],axis=1)
 
 
-def outline(grey,depth,edges,rot,nx,nz):
+def edge_colours(grey,mask,prefer_white=False):
+    result=grey.copy()
+    # The white-priority candidate keeps black only against an already white face.
+    result[mask]=np.where(grey[mask]>=(1 if prefer_white else 2),0,3)
+    return result
+
+
+def outline(grey,depth,edges,rot,nx,nz,prefer_white=False):
     height,width = grey.shape; mask = np.zeros_like(grey,dtype=bool)
     for edge in edges:
         a,b = project(edge,rot,nx,nz)
@@ -66,10 +73,7 @@ def outline(grey,depth,edges,rot,nx,nz):
             if depth[sy,sx] < -1e8:
                 continue
             mask[y,x] = True
-    result = grey.copy()
-    # Extremes chosen from the underlying tone: white on dark, black on light.
-    result[mask] = np.where(grey[mask] >= 2,0,3)
-    return result,mask
+    return edge_colours(grey,mask,prefer_white),mask
 
 
 def prepare_iso():

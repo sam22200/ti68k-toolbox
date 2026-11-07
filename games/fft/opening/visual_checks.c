@@ -6,7 +6,7 @@
 #include <unistd.h>
 static void view_unit(u8 i,u8 rot)
 {
-    st.rot=rot;st.cx=st.unit[i].x;st.cz=st.unit[i].z;
+    st.rot=rot;cursor_place(UNIT_CELL(&st.unit[i]));
     st.mode=M_BROWSE;st.ai=0;st.turn=0;W->frz=W->hold=0;
     cam_target(&st.camx,&st.camy);scene_rot=vbuf_rot=255;W->bg_ok=0;
 }
@@ -26,7 +26,7 @@ int main(void)
     // Cold enemy browsing: target complete panel is ready, not only its first pixels.
     sw_init(1);for(f=0;f<80;f++)assert(sw_step(0));
     for(i=1;i<NUNIT;i++) {
-        st.mode=M_BROWSE;st.cx=st.unit[i].x;st.cz=st.unit[i].z;
+        st.mode=M_BROWSE;cursor_place(UNIT_CELL(&st.unit[i]));
         cam_target(&st.camx,&st.camy);W->frz=W->hold=0;
         for(f=1;f<=16;f++) {
             assert(sw_step(0));
@@ -39,7 +39,7 @@ int main(void)
     for(i=0;i<NUNIT;i++)for(r=0;r<2;r++) {
         u8 gfx=st.unit[i].gfx,row;const u8 *p;
         if(gfx>1)gfx--;
-        p=igfx+UI_PORTRAITS+(u16)gfx*348+232;
+        p=identity_portrait(pgfx,pgfx[UI_PORTRAITS+gfx])+232;
         W->pan_n[r]=0;make_panel(r,i);
         for(row=0;row<29;row++) {
             const u8 *m=(const u8 *)PAN_MAKE(r)[2]+row*RT_PBYTES;
