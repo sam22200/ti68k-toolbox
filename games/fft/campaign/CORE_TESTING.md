@@ -1,6 +1,18 @@
 # Validation by affected dependency
 
-Current package checks (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+Current shared-resource checks (2026-11-07): [Resource ownership and sharing](CORE_RESOURCES.md).
+`core-resources-check` is registered as `resources`.237 host checks and33 C
+reference checks agree PC/sanitizers/68000; nine scene replays retain pixels and
+state, including different text on one shared backdrop. Seven real encounter
+routes include a second encounter borrowing every arena bank. Native binding
+checks cover27 images and nine rejected archive variants. Actual normalized
+pilot flows retain AE9CFD31/2CD70391 and exact FSV4 saves/rewards/overflow.
+Four13-actor render carriers retain0546/ECF7/A87E/AA26 and stay below360k.
+The host file directory grows without moving borrowed data; runtime renderer
+self-tests remain green. Evidence: `x/chapter-dedup/verification.json`. This is
+affected-format integration, not a new all-combat-family certification.
+
+Previous package checks (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
 `core-packages-check` is registered as `packages` in closure.py. It checks
 ownership/compatibility, corruption, supervisor resume/cancel behavior and
 save-preserving replacement on PC/sanitizers/68000. With a fresh source group,

@@ -1,6 +1,15 @@
 # One engine for every chapter
 
-Current distribution (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+Current shared resources (2026-11-07): [Resource policy and formats](CORE_RESOURCES.md).
+Arena/scene/intro consumers share physical data by chapter; universal engine
+artwork is stored once in core ffcu. FRF1 references and FSC2/FSP1 scene pools
+resolve on entry, retaining direct archive pointers during frames. ABI80 adds
+RESOURCES26 load10/route11, returning before PARTY12;27 images retain ModCtx348,
+zone8690, five battle allocations,48 actor frames and unchanged FSV4/layouts.
+Mandatory shipping normalization/audit removes obsolete copies and rejects new
+unreferenced duplicate banks. Read the sharing rules before adding content.
+
+Previous distribution (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
 FKR1/FKP1 separate executable/shared resources from replaceable chapter data.
 Sequence and encounter routing come from the active pack; ABI79 adds cold
 NATURE10/11 without changing ModCtx348, gameplay/save layouts or the8690-byte

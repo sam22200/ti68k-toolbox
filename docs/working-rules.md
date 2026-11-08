@@ -13,6 +13,20 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT shared campaign resources (2026-11-07):** Read
+  `games/fft/campaign/CORE_RESOURCES.md` before adding arenas/scenes/introductions.
+  Pool exact chapter resources across every consumer; universal engine artwork
+  stays once in core `ffcu`. `chapter_packages.py` always normalizes shipping
+  data and writes `resources.json`; never distribute `source.89g`. FCD4 retains
+  active units/water/collision data, dropping obsolete interface copies. FRF1
+  resolves single-hop archive references at entry; FSC2/FSP1 pool scene blobs
+  across sets, splitting to bounded variables when needed. ABI80/348/signature
+  0A92,27 images; RESOURCES26 owns load10/route11 and returns before PARTY12.
+  Zone8690, Unit112/State2224/Work37460/FSV4/five allocations/48 frames remain.
+  Preserve CPU/size gates and protected proof/save bytes AND dates; no new
+  combat queue or live emulator work. Host-only file-cache growth keeps borrowed
+  data pointers stable when aliases open more than16 files.
+
 - **FFT core/chapter distribution (2026-11-07):** Read
   `games/fft/campaign/CORE_PACKAGES.md`. `make packages` separates core and
   active chapter; `make chapter-package` reuses the exact installed core with

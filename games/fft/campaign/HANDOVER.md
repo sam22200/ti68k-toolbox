@@ -1,6 +1,20 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-Current distribution checkpoint (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+Current resource checkpoint (2026-11-07): [Shared resources](CORE_RESOURCES.md).
+Shipping normalization removes duplicate engine-art tails and legacy encounter
+tables, keeps sprites/identities pooled, removes the unused Orbonne title strip,
+and shares arena banks and scene blobs across the active chapter. Read the
+ownership rules before adding any arena/scene/intro. `resources.json` audits the
+delivery. ABI80/348/signature0A92,27 images; RESOURCES26 load10/route11 replaces
+NATURE's cold loader, returning before PARTY12. Zone8690 and gameplay/save/heap
+layouts remain; actual TTPack64873 leaves63 bytes. Core393134 + chapter213249
+transport bytes, net9135 saved versus the preceding two groups, including code.
+Use `x/chapter-dedup/release/`, its INSTALL and variable lists. Existing ABI79
+cores must be replaced once; later content-only builds reuse the core exactly.
+PC/sanitizers/68000 sharing/scene/routing, pilot flow/save and native budget
+evidence is in `x/chapter-dedup/verification.json`. The pilot is still incomplete.
+
+Previous distribution checkpoint (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
 Build `make packages` for separate core/content groups; `make chapter-package`
 reuses the exact installed core without compiling. FKR1/FKP1 metadata validates
 dependencies and build matching; the chapter supplies sequence and encounter
