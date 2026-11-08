@@ -65,7 +65,7 @@ static const u8 *scene_flow;
 static Save scene_save;
 static u8 scene_set_id;
 #define PIC_STRIDE_MAX 40                // a picture is 320 pixels wide at most
-static u16 pic_stride, pic_plane;
+static u16 pic_stride, pic_plane, picture_bytes;
 #define CHAPEL_STRIDE pic_stride
 #define CHAPEL_PLANE pic_plane
 #define OPENING_BEATS RD16(opening_story, 0)
@@ -137,12 +137,17 @@ static void release(void)
     if (vbuf) free(vbuf);
     if (W) free(W);
     acache = RT_NULL; vbuf = RT_NULL; W = RT_NULL;
+    picture_bytes = 0;
 }
 
 void game_init(void)
 {
     u16 identity_size;
+#ifndef __m68k__
+    release();
+#endif
     W = RT_NULL; vbuf = RT_NULL; acache = RT_NULL;   // statics survive between runs
+    picture_bytes = 0;
     cgfx = rt_file("ffcu", RT_NULL);
     scene_flow=rt_file("ffflow",RT_NULL);if(!qvalid(scene_flow))scene_flow=RT_NULL;
     pgfx = rt_file("ffcp", &identity_size);
@@ -150,8 +155,7 @@ void game_init(void)
     abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
     if (abank[0]) abank_n0 = RD16(abank[0], 0);
     W = malloc(sizeof(Work));
-    vbuf = W ? malloc(6U * PIC_STRIDE_MAX * 100) : RT_NULL;
-    acache = vbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
+    acache = W ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
     if (!acache) { release(); return; }
     ac_key = (u16 *)acache[AC_N]; ac_age = ac_key + AC_N;
 #ifdef __m68k__
@@ -162,7 +166,7 @@ void game_init(void)
 void game_scenario(u16 n)
 {
     char name[6] = "ffs0";
-    u16 size,asset_size,i;
+    u16 size,asset_size,i,required=0;
     memset(&st, 0, sizeof st);
     scene_set_id=(u8)n;
     name[3] = (char)('0' + n);
@@ -181,12 +185,23 @@ void game_scenario(u16 n)
         const u8 *s=step_at((u8)i);
         if(s[0]<STEP_TITLE||s[0]>STEP_OVERLAY||RD16(s,1)>=asset_size||
            ((s[0]==STEP_STORY||s[0]==STEP_NARRATE||s[0]==STEP_OVERLAY)&&
-            (!RD16(s,2)||RD16(s,2)>PIC_STRIDE_MAX||RD16(s,3)>=asset_size))){set=RT_NULL;return;}
+            (RD16(s,2)<RT_W/8||RD16(s,2)>PIC_STRIDE_MAX||RD16(s,3)>=asset_size))){set=RT_NULL;return;}
+        if(s[0]==STEP_STORY||s[0]==STEP_NARRATE||s[0]==STEP_OVERLAY){
+            u16 bytes=RD16(s,2)*600U;
+            if(bytes>required)required=bytes;
+        }
     }
     {
         char map[7]; memcpy(map, set + 4, 6); map[6] = 0;
         amap = *map ? resource_file(map, RT_NULL) : RT_NULL;   // (no actors: no pose table)
         if (*map && !amap) { set = RT_NULL; return; }
+    }
+    // Reserve once for this set's widest picture, including all four depth
+    // planes. Titles/cards need none; narrower sets release the old excess.
+    if(required!=picture_bytes){
+        if(vbuf)free(vbuf);
+        vbuf=RT_NULL;picture_bytes=0;
+        if(required){vbuf=malloc(required);if(!vbuf){set=RT_NULL;return;}picture_bytes=required;}
     }
     memset(W, 0, sizeof *W);
     actor_reset(); W->dialog_key = 0xFFFF;

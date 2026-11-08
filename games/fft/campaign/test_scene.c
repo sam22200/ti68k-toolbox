@@ -1,7 +1,12 @@
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
+static unsigned char fail_picture; // only armed for game_scenario's picture allocation
+static void *scene_malloc(size_t bytes){return fail_picture?NULL:malloc(bytes);}
+#define malloc scene_malloc
 #include "scene.c"
+#undef malloc
 #include "../../../runtime/platform-sw/rt_sw.h"
 static void press(u32 k){assert(sw_step(k));assert(sw_step(0));}
 int main(void)
@@ -10,6 +15,7 @@ int main(void)
     // ffs0, Orbonne's title and chapel (opening/data)
     assert(!chdir("../opening/data"));
     sw_init(0);assert(st.open_stage==OPEN_TITLE);
+    assert(vbuf&&picture_bytes==6U*28*100); // widest picture in this set, not the engine maximum
     press(K_ENTER);assert(st.open_stage==OPEN_TITLE);   // the launch key cannot hide the title
     for(i=0;i<110;i++)assert(sw_step(0));
     press(K_ENTER);assert(st.open_stage==OPEN_CHAPEL);
@@ -27,6 +33,7 @@ int main(void)
     // ffs1: narration, dark chapter/location titles, then all Academy dialogue.
     assert(!chdir("../../campaign/data"));
     sw_init(1);assert(st.open_stage==OPEN_CHAPEL&&st.open_fade==9);
+    assert(vbuf&&picture_bytes==6U*20*100);
     assert(st.open_pan==0); // fade-in flag must never become a camera offset
     assert(step_at(0)[0]==STEP_NARRATE&&step_at(1)[0]==STEP_OVERLAY);
     assert(step_at(2)[0]==STEP_OVERLAY&&step_at(3)[0]==STEP_STORY);
@@ -52,10 +59,27 @@ int main(void)
     press(K_ENTER);assert(st.step==3&&st.open_stage==OPEN_CHAPEL);
     for(i=0;i<2000&&sw_step(i%2?0:K_ENTER);i++){}
     assert(i<2000&&chapter_completed());
+    fail_picture=1;game_scenario(0);assert(!set&&!vbuf&&!picture_bytes&&W&&acache);
+    fail_picture=0;game_scenario(0);assert(vbuf&&picture_bytes==6U*28*100);
+    game_scenario(1);assert(vbuf&&picture_bytes==6U*20*100); // shrink on same-process reuse
     sw_init(2);assert(step_at(0)[0]==STEP_OVERLAY);
     press(K_ENTER);assert(!chapter_completed());
     for(i=0;i<160&&sw_step(0);i++){}
     assert(i<160&&chapter_completed());
+    {
+        // Title/card-only sets reserve no picture; reject a narrower-than-LCD
+        // picture before allocating or asking the decoder to write anything.
+        char folder[]="/tmp/fft-scene-memory-XXXXXX",cwd[4096];FILE *f;
+        u8 card[22]={'F','S','C','1',0,0,0,0,0,0,0,1,STEP_CARD,0,0,20,0,0,0,0,0,0};
+        assert(getcwd(cwd,sizeof cwd)&&mkdtemp(folder)&&!chdir(folder));
+        f=fopen("ffs3.bin","wb");assert(f&&fwrite(card,1,sizeof card,f)==sizeof card);fclose(f);
+        game_scenario(3);assert(set&&!vbuf&&!picture_bytes&&st.open_stage==OPEN_DONE);
+        card[12]=STEP_STORY;card[17]=19;
+        f=fopen("ffs4.bin","wb");assert(f&&fwrite(card,1,sizeof card,f)==sizeof card);fclose(f);
+        game_scenario(4);assert(!set&&!vbuf&&!picture_bytes);
+        assert(!unlink("ffs3.bin")&&!unlink("ffs4.bin")&&!chdir(cwd)&&!rmdir(folder));
+    }
+    release();assert(!W&&!vbuf&&!acache&&!picture_bytes);
     printf("Scene player: chapel, narration, timed titles, Academy, Gariland and cancellation passed\n");
     return 0;
 }
