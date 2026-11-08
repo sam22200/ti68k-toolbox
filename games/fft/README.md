@@ -719,6 +719,8 @@ Ownership, installation and save preservation: [campaign/CORE_PACKAGES.md](campa
 Resource ownership and mandatory sharing across arenas, scenes and introductions:
 [campaign/CORE_RESOURCES.md](campaign/CORE_RESOURCES.md). Packaging emits a duplicate
 audit and pools exact reusable content before writing the installation groups.
+Shared actor-cache and scene-allocation regression rules, measurements and
+current size bounds: [campaign/CORE_OPTIMIZATION.md](campaign/CORE_OPTIMIZATION.md).
 A victory writes the campaign save (`ffsave`: story flags, Gariland's party and bag, FFT's
 ids), from which `fftstory()` resumes; `fftstory(1)` starts a new game.
 

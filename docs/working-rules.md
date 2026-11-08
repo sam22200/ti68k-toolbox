@@ -13,6 +13,19 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT final optimization pass (2026-11-07):** Read
+  `games/fft/campaign/CORE_OPTIMIZATION.md`. Shared actor lookup first checks
+  the remembered entry's current key; retain eviction validation and the
+  animation budget. Scene pictures allocate once for their set's widest six
+  planes, not the engine maximum; keep depth, grow/shrink/failure handling and
+  PC reentry cleanup. ABI80/layouts/27 images/zone8690 remain. TTPack64911
+  leaves25 bytes; core393176 + chapter213249 transport bytes, matching package
+  keys required. PC/sanitizer/68000 cache/scene/render/pilot flows pass. No
+  new combat queue or live-emulator work; evidence in `x/final-opt-pass/`.
+  The note's subsequent-change rules are mandatory: validate remembered cache
+  keys, preserve set-sized allocations and compare packed panels through their
+  accessors. Measure full affected frames separately from cache microbenchmarks.
+
 - **FFT shared campaign resources (2026-11-07):** Read
   `games/fft/campaign/CORE_RESOURCES.md` before adding arenas/scenes/introductions.
   Pool exact chapter resources across every consumer; universal engine artwork

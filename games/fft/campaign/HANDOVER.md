@@ -1,6 +1,16 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-Current resource checkpoint (2026-11-07): [Shared resources](CORE_RESOURCES.md).
+Current optimization checkpoint (2026-11-07): [Final pass](CORE_OPTIMIZATION.md).
+The shared actor cache tries its remembered entry, validating its current key
+before using it. Scene pictures reserve their actual maximum width per set:
+Orbonne16800 instead of24000 bytes, Academy/title12000. PC scene reentry frees
+old allocations. Board/rotation-replay ordinary averages improve2.1%/2.7%, with
+identical pixels; all ordinary13-actor peaks remain below360k. ABI80/layouts,
+27 images and zone8690 remain; TTPack64911 leaves25 bytes. Core393176 and
+chapter213249 transport bytes. Use matching `x/final-opt-pass/release/` groups;
+the core key changes. Evidence: `x/final-opt-pass/verification.json`.
+
+Previous resource checkpoint (2026-11-07): [Shared resources](CORE_RESOURCES.md).
 Shipping normalization removes duplicate engine-art tails and legacy encounter
 tables, keeps sprites/identities pooled, removes the unused Orbonne title strip,
 and shares arena banks and scene blobs across the active chapter. Read the

@@ -27,6 +27,12 @@ benchmarks and verdicts of `experiments/` (game-techniques §13):
   classify ownership by reuse, not by the first consumer. Share physical sprites,
   backgrounds and tables through IDs/references rather than copying banks. FFT's
   mandatory shipping pass/audit and reuse rules: `games/fft/campaign/CORE_RESOURCES.md`.
+- **Preserve measured cache and allocation gains**: try a remembered cache entry before
+  scanning, but validate its current key because another consumer can evict it. Reserve
+  scene buffers once for the active set's validated maximum, retaining every colour/depth
+  plane; handle shrink, failure and reentry. Test packed buffers through their accessors,
+  not an obsolete contiguous layout. FFT's regression rules and measurements:
+  `games/fft/campaign/CORE_OPTIMIZATION.md`.
 - **Shifts instead of divisions and multiplications**, reciprocal multiplies for constant
   divisors, never a division or a 32-bit multiply in a loop, never a float at run time
   (a float op costs ~7,500 cycles).
