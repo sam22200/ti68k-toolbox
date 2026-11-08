@@ -13,6 +13,8 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 
 | Command | Purpose |
 |---|---|
+| `ti-mem log [--clear]` / `heap` / `peek ADDR` / `dump F` | **read the live calculator RAM, no screenshot** (0.2 s): the `tilog` event ring (`lib/tilog.h`; send the variable made by `ti-mem mkvar F.89y`), every AMS heap block with its size, lock and variable name, raw bytes |
+| `ti-emu save NAME`, `TI_STATE=NAME ti-emu restart file…` | a named saved state (e.g. a game's core installed once) next to the clean default, which stays untouched; boots from it and sends only the files under test (FFT chapter: 17 s instead of ~60 s for core + chapter) |
 | `ti-emu start\|stop\|restart\|status\|save` | TiEmu in Docker. `TI_CALC=89t` (default, Titanium AMS 3.10) or `TI_CALC=89` (TI-89 HW2, AMS 2.09 AMSpatch) or `TI_CALC=89u` (TI-89 HW2, official unpatched AMS 2.09: the one to test program size limits and execution protection; no saved state, boots to a fresh HOME) |
 | `ti-run prog.89z [extra…]` | **the way to test a build**: `ti-emu restart` from the clean saved state with the files sent at boot (`-send=`, several files merged by `ti-group`), then `prog($TI_ARGS)` |
 | `ti-emu restart file…` | clean state + files sent at boot, without running |
@@ -23,8 +25,11 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 | `ti-play keys/x.txt [FPS]` | plays a runtime key script (`<frame> <keys>` lines) in real time through the PC keyboard: several keys held at once (diagonals), which `ti-key`'s clicks cannot; start it right after `ti-key ENTER`. Open loop: end each move against a wall, check the script on the PC with its timeline scaled ±10 % |
 
 **Not everything needs the emulator.** TiEmu 3.04 (Ubuntu) has no command line control, no D-Bus
-interface and no GDB, and exports none of its internals: memory and registers are only in its GUI
-debugger (F11). For cycle counts and for checking what a routine drew, run the program on the PC
+interface and no GDB. Its RAM is readable from the host anyway: `tools/tiemu-memread.c`
+(preloaded by the image) lets the same user read `/proc/PID/mem`, and `ti-mem` finds the 256 KB
+RAM block (68000 vectors, 0x41000-byte glibc chunk; the 4 MB ROM block starts with the same
+vectors). Prefer `ti-mem log` and `ti-mem heap` to screenshots for program outcomes, transitions
+and memory; registers are still only in the GUI debugger (F11). For cycle counts and for checking what a routine drew, run the program on the PC
 with `ti-cycles` (datasheet cycles per marked zone, the screen from memory as a PNG and a
 checksum, data files `--file`, saves `--save-dir`, key scripts `--keys`, no window; runtime games:
 `make xcheck`; `CLAUDE.md`, performance §10). Keep TiEmu for what touches the hardware: grayscale
@@ -45,7 +50,22 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 4. Quit the program (often `ti-key --hold 0.5 ESC`) before sending a new version: sending fails
    while a program is running.
 
+## Logs instead of screenshots
+
+1. Programs call `tilog("...", ...)` (`lib/tilog.h`, printf format) at transitions and outcomes;
+   it writes only when an unarchived `tilog` variable exists, so the calls can stay in release
+   builds (a test sends `ti-mem mkvar tilog.89y`, 1 KB by default: count it in RAM budgets).
+2. `ti-mem log` after each step; `--clear` empties the ring (its capacity stays).
+3. `ti-mem heap`: AMS handle table pointer at 0x7FCE, block size
+   `((word before the data & 0x7FFF) - 1) * 2`, bit 15 locked. Free RAM = `HeapAvail()` logged
+   by the program; the heap list shows who holds it (twins, executable copies, buffers).
+
 ## Known pitfalls
+
+- **Saving a state** (`ti-emu save`, 2026-11-08): a path typed into the GTK chooser was mangled by
+  autocompletion (a folder duplicated, a leading `=` kept): the script types a bare file name and
+  moves the saved file. A state holds the RAM and the archive, so a core installed once survives
+  every `TI_STATE` restart; rebuild the state whenever the core changes.
 
 - **Session without a desktop `DISPLAY`** (Minish, Titanium, 2026-10-08): do not drive the
   user's live KDE display `:1` (TiEmu opens over their windows, `ti-play` keys follow the

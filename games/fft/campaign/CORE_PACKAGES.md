@@ -101,6 +101,15 @@ supervisor entry, never in a game frame. On the current fixture, that check
 costs 26,307,772 datasheet cycles, about 2.19 seconds at 12 MHz; AMS ROM-call
 costs remain estimates, not wall-clock hardware timing.
 
+`ffcore` lists every core member except `fftstory` itself: the running supervisor's image
+differs from its file (tigcclib's startup writes into it), so checking it always failed with
+"Damaged/mixed file fftstory". The key still binds its exact bytes. After each child returns,
+the supervisor deletes that child's RAM copy (`SymDelTwin`): AMS would otherwise keep ~1 KB
+per program run until the supervisor exits, and the battle's ~183 KB of allocations then
+failed ("Missing data or memory") after title → scene. A normal start (`fftstory()`) goes back
+to the title when a step returns 0 (Game Over, quit battle), as in FFT; Continue resumes before
+that step. Direct doors (`fftstory(2)`, `fftstory(99)`) still stop at HOME.
+
 FSV4, all three slots, original source IDs, party/inventory/progression and
 legacy migration stay unchanged. Step predicates read persisted story flags;
 the existing Academy/deployment `flow` byte retains its pilot-specific meaning.
@@ -124,6 +133,52 @@ The fixed envelope remains 13 actors, 256 tactical nodes, 18 cells per axis,
 two layers and 202 scenery rows. Larger content must be adapted or the core
 revised with fresh RAM/cycle measurements. Package splitting does not expand
 those runtime capacities.
+
+## Native test loop (2026-11-08)
+
+Install the core once into a named TiEmu state, then send only the chapter under test:
+
+```sh
+ti-emu restart x/packages/fft-core.89g     # wait for the transfer, HOME
+ti-emu save fftcore                         # again whenever the core changes
+ti-mem mkvar x/packages/tilog.89y           # optional: the supervisor's event log
+TI_STATE=fftcore ti-emu restart x/packages/chapter-01.89g x/packages/tilog.89y
+ti-key 'fftstory()' ENTER; ti-mem log       # story start/call/back lines with free RAM
+```
+
+`ti-mem heap` lists the AMS heap blocks (executable copies, battle buffers) when an
+allocation fails. Measured on Titanium AMS 3.10 with the 1 KB log: 187,152 bytes free at
+every child call through Orbonne, Academy, deployment and Gariland; the battle reserves
+182,950 bytes (program 65,014, scene buffers 32,322 + 53,622, actor cache 10,178, State 5,428,
+grayscale 15,378, its stub 1,008), leaving only a few KB. Verified natively: New Game →
+Orbonne scene → battle won → Academy → deployment → Gariland; Gariland lost → title →
+Continue → Gariland again. The Gariland victory path was not replayed natively here.
+
+## Saves, debug aids and logs (2026-11-08)
+
+**Saves as in FFT.** Every program reads and writes the session `ffsave` (party, flags, flow,
+deployment, rewards). The player's slots `ffsave1..3` are written only by the title's Save:
+the world map's Save, or a chapter step marked `"save_prompt": true` in its JSON (step byte 1
+bit 0; the supervisor opens `ffttitle(3)` once the step completes, SHIFT/ESC declines). New
+Game starts a fresh session without choosing a slot; Continue copies a slot into the session;
+`ffslot` only remembers the last slot. A lost or quit battle returns to the title and the
+slots are as last saved.
+
+**Skips and debug.** In a scene, ESC asks "Skip scene?" (No/Yes; Yes ends it exactly as played
+through). In battle, Settings (MODE/CATALOG) then [alpha] opens the hidden DEBUG page: God
+mode (allied blows kill, damage on allies misses; single blows and area batches, not the
+deferred weapon panel/line victims), Fast AI (AI turns as with [2nd] held, no 1.5 s hold) and
+"Skip this fight?" (No/Yes: every enemy at 0 HP, the ordinary victory, rewards, aftermath and
+session save follow). Flags live in `st.dbg` (State's former alignment byte) for the current
+battle. The turn order ([APPS]) now takes UP/DOWN: the cursor and camera go to the selected
+unit, other keys close it and restore the cursor. While an AI thinks, the units keep their
+idle animation: one picture in four is drawn (every one during its final hold).
+
+**Reading the game without screenshots.** `python3 games/fft/tools/fftmem.py battle | watch |
+set god|fast on|off` reads/writes the live battle State in TiEmu's RAM (offsets from the TI
+compiler itself, `tools/state_layout.c`): units, HP, turns, modes, KOs, outcome; no code in
+fftbat. Scene, deployment, title, map, management and the runtime's save writes log to
+`tilog` (`ti-mem log`), as does the supervisor (each call, result and free RAM).
 
 ## Native integration and verification
 

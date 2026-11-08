@@ -72,12 +72,18 @@ ti-cc -o name src.c             # build → name.89z (skill ti89-c-dev)
 ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 HW2 AMSpatch, 89u unpatched)
 ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
+ti-mem log | heap               # live RAM, no screenshot: the tilog event ring (lib/tilog.h), AMS heap blocks
+ti-emu save NAME; TI_STATE=NAME ti-run x.89z  # a saved state (e.g. a core installed once), only x sent
 ti-gif /path/x.gif 20 &         # animated GIF of the LCD (20 s) while ti-key plays
 ti-play keys/win.txt            # a runtime key script played in TiEmu in real time (held keys, diagonals)
 ti-view                         # PNG/GIF captures on the LAN, newest first: http://<PC IP>:8000 (iPad Safari, /?only=gif)
 ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycles per zone (average, max), screen as PNG
 make xcheck                     # runtime game: TI binary under ti-cycles = PC headless, per scenario
 ```
+
+**FFT battle without screenshots:** `python3 games/fft/tools/fftmem.py watch` prints a live
+battle's turns, moves, HP changes and outcome from TiEmu's RAM; `set god|fast on` toggles the
+debug flags (hidden DEBUG page: Settings then [alpha]). Saves, skips: `games/fft/campaign/CORE_PACKAGES.md`.
 
 **FFT campaign packaging:** `make -C games/fft/campaign packages` builds separate core and
 chapter groups. `make chapter-package` in that directory reuses an existing core without
@@ -327,7 +333,8 @@ that kind of task.
   local. Decisions and milestones: its `README.md`, `RE_NOTES.md`, `ROADMAP.md`.
 - `runtime/`: Portable Game Runtime (core API, PC software/SDL backends, TI backend, `rt.mk`,
   self-tests, demo). `tools/sdl2/`: SDL2 headers extracted locally (the library is the system's).
-- `lib/`: shared code to link into programs: `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
+- `lib/`: shared code to link into programs: `tilog.h` (opt-in event log read by `ti-mem log`),
+  `unpack68k.s`/`.h` (ZX0 and LZ4 decoders in asm),
   `zx0pack.py` (ZX0 packer on the PC; recipe in `ti68k-c-patterns.md` §10), archived proportional
   bitmap fonts (`bitmap_font.c`/`.h`/`.py`, `BITMAP_FONT.md`) and the offline SVG outline
   converter (`svgfont.py`, `SVGFONT.md`).
