@@ -22,6 +22,7 @@ void game_init(void)
 }
 void game_scenario(u16 n){(void)n;if(flowbank&&bank)deploy_init();}
 u8 chapter_completed(void){return dp.done;}
+#include "../../../lib/tilog.h"
 static u8 deploy_exit(void){if(cache)free(cache);cache=RT_NULL;return 0;}
 u8 game_update(void)
 {
@@ -30,10 +31,10 @@ u8 game_update(void)
     if(dp.confirm) {
         if(key&(K_B|K_ESC)){dp.confirm=0;return 1;}
         dp.confirm=choice_move(dp.confirm-1,2,key)+1;
-        if(key&(K_ENTER|K_A)){if(dp.confirm==1&&deploy_commit())return deploy_exit();dp.confirm=0;}
+        if(key&(K_ENTER|K_A)){if(dp.confirm==1&&deploy_commit()){tilog("deploy start battle: %u units",dp.n);return deploy_exit();}dp.confirm=0;}
         return 1;
     }
-    if(key&K_ESC)return deploy_exit();
+    if(key&K_ESC){tilog("deploy cancelled");return deploy_exit();}
     if(key)dp.note=0;
     if(key&K_F1)dp.unit=dp.unit?dp.unit-1:save.n-1;
     if(key&K_F5)dp.unit=dp.unit+1<save.n?dp.unit+1:0;

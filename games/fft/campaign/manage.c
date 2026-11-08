@@ -655,8 +655,10 @@ void game_scenario(u16 n)                // test doors: a screen of the first un
     dirty = 1;
 }
 
+#include "../../../lib/tilog.h"
 static void leave(void)
 {
+    tilog("manage leave%s", mg.changed ? " (session saved)" : "");
     if (mg.changed) rt_save(SAVE_NAME, &save, sizeof save);
     if (cache) { free(cache); cache = RT_NULL; }
 }

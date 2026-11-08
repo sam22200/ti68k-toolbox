@@ -5,6 +5,7 @@
 #include <tigcclib.h>
 #undef _main
 #define _main map_runtime_main
+#define RT_TILOG                       // saves logged (lib/tilog.h, ti-mem log)
 #include "../../../runtime/platform-ti68k/rt_ti.c"
 #undef _main
 #define _main __main

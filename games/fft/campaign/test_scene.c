@@ -29,7 +29,12 @@ int main(void)
     sw_init(0);for(i=0;i<110;i++)assert(sw_step(0));press(K_ENTER);press(K_B);
     for(i=0;i<20&&sw_step(0);i++){}
     assert(chapter_completed());   // SHIFT skips the chapel
-    sw_init(0);assert(!sw_step(K_ESC)&&!chapter_completed());
+    // ESC asks "Skip scene?": No (default) or SHIFT/ESC resumes, Yes ends it as played through.
+    sw_init(0);assert(sw_step(K_ESC)&&skip_ask&&!skip_row);assert(sw_step(0));
+    press(K_ENTER);assert(!skip_ask&&!chapter_completed());
+    assert(sw_step(K_ESC)&&skip_ask);assert(sw_step(0));assert(sw_step(K_ESC)&&!skip_ask);assert(sw_step(0));
+    assert(sw_step(K_ESC));assert(sw_step(0));assert(sw_step(K_DOWN)&&skip_row);assert(sw_step(0));
+    assert(!sw_step(K_ENTER)&&chapter_completed());
     // ffs1: narration, dark chapter/location titles, then all Academy dialogue.
     assert(!chdir("../../campaign/data"));
     sw_init(1);assert(st.open_stage==OPEN_CHAPEL&&st.open_fade==9);
@@ -80,6 +85,6 @@ int main(void)
         assert(!unlink("ffs3.bin")&&!unlink("ffs4.bin")&&!chdir(cwd)&&!rmdir(folder));
     }
     release();assert(!W&&!vbuf&&!acache&&!picture_bytes);
-    printf("Scene player: chapel, narration, timed titles, Academy, Gariland and cancellation passed\n");
+    printf("Scene player: chapel, narration, timed titles, Academy, Gariland and the skip prompt passed\n");
     return 0;
 }
