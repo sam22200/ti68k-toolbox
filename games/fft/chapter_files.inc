@@ -2,6 +2,16 @@
 // and tables set (campaign/ENGINE.md). Resident on the PC; on the TI the SAVE image's op 6,
 // where these names are the image's context (module.h) and the resident adopts them after
 // the call. Returns the surface section's descriptor offset, 0: a missing or invalid bank.
+#include "campaign/pack_format.h"
+static char chapter_route(u8 encounter)
+{
+    u16 size;const u8 *pack=rt_file("ffpack",&size);
+    if(pack)return fp_size(pack,size,0)?(char)fp_letter(pack,encounter):0;
+    /* Old headless fixtures have no package metadata. Installed distributions
+       require a pack, including when fftbat is invoked directly from HOME. */
+    if(rt_file("ffcore",RT_NULL))return 0;
+    return encounter<2?"og"[encounter]:0;
+}
 static u16 chapter_files(char letter)
 {
     char name[6];                              // "ff?v0" (no initializer: a module has no memcpy)

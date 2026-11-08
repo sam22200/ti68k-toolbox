@@ -1,0 +1,24 @@
+{
+  "schema": "FFT_CHAPTER_SPEC_1",
+  "id": 1,
+  "title": "Chapter I pilot: Orbonne, Academy and Gariland",
+  "complete": false,
+  "requires_flag": 0,
+  "completion_flag": 2,
+  "previous": 65535,
+  "next": 2,
+  "world_map": true,
+  "routes": [{"band": 1, "prefix": "o"}, {"band": 2, "prefix": "g"}],
+  "steps": [
+    {"program": "scene", "argument": 0, "skip_flag": 1},
+    {"program": "battle", "argument": 100, "skip_flag": 1},
+    {"program": "scene", "argument": 1, "skip_flag": 2, "skip_flow": 1},
+    {"program": "deploy", "argument": 200, "skip_flag": 2, "skip_flow": 2},
+    {"program": "scene", "argument": 2, "skip_flag": 2, "skip_flow": 3},
+    {"program": "battle", "argument": 200, "skip_flag": 2}
+  ],
+  "variables": [
+    "ffca", "ffcb", "ffs0", "ffs1", "ffs2", "ffflow", "ffwm", "ffov0", "ffov1", "ffov2", "ffov3",
+    "ffoa", "ffoi", "ffost", "ffod", "ffgv0", "ffgv1", "ffgv2", "ffgv3", "ffga", "ffgi", "ffgd"
+  ]
+}

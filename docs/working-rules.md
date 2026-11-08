@@ -13,6 +13,19 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT core/chapter distribution (2026-11-07):** Read
+  `games/fft/campaign/CORE_PACKAGES.md`. `make packages` separates core and
+  active chapter; `make chapter-package` reuses the exact installed core with
+  no compiler. FKR1/FKP1 describe ownership, matching build, dependency lengths/
+  checksums, sequence and encounter routes. ABI79/348/signature0991; NATURE10/11
+  are cold dispatch, zone8690, Work37460/FSV4 remain. Actual TTPack64893 leaves43
+  bytes. Keep all saves/selection/configuration outside both groups. Replace
+  only names in the previous chapter's generated list, from HOME. First pack
+  is the existing Chapter I pilot, not a full chapter. Do not put per-chapter
+  actor frames or scripts back into the core; FCP2 identities remain shared.
+  Legacy og routing is for fixtures with neither manifest only. Preserve old
+  proof/save bytes/dates and the live emulator. No new combat-family queue.
+
 - **FFT factorization (2026-11-07):** Read `games/fft/campaign/CORE_FACTORIZATION.md`
   before changing banks. ABI78/348, FCP2/FMG3/FCD4 share46 unique portraits and510
   names. All portrait/name readers use archive pointers; do not restore per-chapter

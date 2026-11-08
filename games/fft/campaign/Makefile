@@ -5,6 +5,12 @@ PY := ../../../tools/pyenv/bin/python
 BUNDLE_OUTPUT ?= x/fftcampaign.89g
 BUNDLE_BUDGET ?= x/core-audit/budget.json
 BUNDLE_NATIVE_BUDGET ?= x/core-audit/native-budget.json
+PACKAGE_OUTPUT ?= x/packages
+PACKAGE_CHAPTERS ?= packages/chapter-01.json
+PACKAGE_BUDGET ?= 2700000
+PACKAGE_RESERVE ?= 131072
+PACKAGE_COMBINED ?=
+PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
@@ -195,10 +201,22 @@ packed: $(TI_FILES)
 	$(ROOT)/tools/bin/ti-cc -o ffttitle -pack ffttcore native_title.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftstory launcher.c
 	python3 -c "from pathlib import Path; files=[Path(n) for n in 'ffbcore.89y ffscore.89y ffpccore.89y ffwmcore.89y ffmgcore.89y ffttcore.89y fftdep.89z fftscn.89z fftbat.89z fftmng.89z fftmap.89z ffttitle.89z'.split()]; [(lambda p,b: (b.__setitem__(0x49,3),p.write_bytes(b)))(p,bytearray(p.read_bytes())) for p in files]"
-bundle: packed
-	@mkdir -p $(dir $(BUNDLE_OUTPUT))
-	$(ROOT)/tools/bin/ti-group $(BUNDLE_OUTPUT) fftstory.89z ffttitle.89z ffttcore.89y fftmap.89z ffwmcore.89y fftmng.89z ffmgcore.89y fftdep.89z ffpccore.89y fftbat.89z ffbcore.89y fftscn.89z ffscore.89y $(OPENING_BANKS) $(TI_FILES)
+bundle: PACKAGE_COMBINED = $(BUNDLE_OUTPUT)
+bundle: packages
 	$(PY) ../tools/core_budget.py --group $(BUNDLE_OUTPUT) --out $(BUNDLE_BUDGET)
+
+.PHONY: packages chapter-package packages-check core-packages-check packages-routing-check
+packages: packed
+	@mkdir -p $(PACKAGE_OUTPUT)
+	$(ROOT)/tools/bin/ti-group $(PACKAGE_OUTPUT)/source.89g fftstory.89z ffttitle.89z ffttcore.89y fftmap.89z ffwmcore.89y fftmng.89z ffmgcore.89y fftdep.89z ffpccore.89y fftbat.89z ffbcore.89y fftscn.89z ffscore.89y $(OPENING_BANKS) $(TI_FILES)
+	$(PY) ../tools/chapter_packages.py --input $(PACKAGE_OUTPUT)/source.89g --out $(PACKAGE_OUTPUT) $(if $(PACKAGE_COMBINED),--combined $(PACKAGE_COMBINED),) $(foreach spec,$(PACKAGE_CHAPTERS),--chapter $(spec)) --budget $(PACKAGE_BUDGET) --reserve $(PACKAGE_RESERVE)
+packages-check:
+	$(PY) check_chapter_packages.py --out $(PACKAGE_OUTPUT)/check
+core-packages-check: packages-check
+chapter-package:
+	$(PY) ../tools/chapter_packages.py --reuse-core $(PACKAGE_CORE) --data-dir data --data-dir ../opening/data --out $(PACKAGE_OUTPUT) $(foreach spec,$(PACKAGE_CHAPTERS),--chapter $(spec)) --budget $(PACKAGE_BUDGET) --reserve $(PACKAGE_RESERVE)
+packages-routing-check: packages
+	$(PY) check_package_routing.py --input $(PACKAGE_OUTPUT)/source.89g --out $(PACKAGE_OUTPUT)/routing
 
 .PHONY: contour-assets
 contour-assets:

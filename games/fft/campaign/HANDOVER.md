@@ -1,6 +1,19 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-Current storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
+Current distribution checkpoint (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+Build `make packages` for separate core/content groups; `make chapter-package`
+reuses the exact installed core without compiling. FKR1/FKP1 metadata validates
+dependencies and build matching; the chapter supplies sequence and encounter
+routes. ABI79/348/signature0991, zone8690, Work37460/FSV4 remain. Shards are
+55616/61352/56298; TTPack64893 leaves43 bytes. Only NATURE's cold code changes;
+25 other images retain exact bytes after signature normalization. Core384601
+and pilot chapter230917 transport bytes; the chapter is not full Chapter I.
+Use `x/chapter-packages/release/` and generated INSTALL/variable lists. Preserve
+all save slots, core variables and historical evidence when swapping packs.
+Next work is campaign content within the existing envelope, not more combat
+families. Existing pilot-specific flow/script hooks are documented limitations.
+
+Previous storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
 ABI78/348, FCP2/FMG3/FCD4;46 shared portraits and510 shared names preserve every
 reviewed use. The packed package is611132 bytes/44 variables; controlled rebuilt
 baseline622372, net-11240. Module shards55616/61352/55200, zone8690; Unit112,
