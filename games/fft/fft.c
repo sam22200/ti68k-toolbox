@@ -4689,7 +4689,6 @@ final_release(void)
 // The battle program's chapters (FFT_BATTLE, campaign/ENGINE.md M4): each one's banks are "ff",
 // its letter, then v0..v3 (views), a (actor frame keys), i (interface), d (descriptor); every
 // chapter shares ffcw, ffca, ffcb, ffcu and the modules (ffbm)
-static const char chapter_letter[] = "og";      // Orbonne, Gariland
 static u8 chapter_now;                          // the chapter loaded + 1 (0: none)
 static u8 story_after;                          // its script plays beats after the victory
 
@@ -4792,11 +4791,11 @@ static u8 chapter_load(u8 c)
     u16 i;
     const u8 *surface;
     W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;
-    if (!sbuf || !cgfx || c >= sizeof chapter_letter - 1) return 0;
+    if (!sbuf || !cgfx) return 0;
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
     mod_id=0; // cdesc/igfx change; never reuse the previous chapter's binding
-    i=mod_call(MOD_NATURE,8,(u8)chapter_letter[c]);
+    i=mod_call(MOD_NATURE,10,c);
     {
         const ModCtx *m=mod_context(MOD_NATURE);
         contour_gfx=m->contour_gfx; ugfx=m->chapter_ugfx; cdesc=m->cdesc; igfx=m->igfx;
@@ -4804,7 +4803,7 @@ static u8 chapter_load(u8 c)
         sc_h=m->sc_h; sc_top=m->sc_top; unit_defs=m->unit_defs; map_tiles=m->map_tiles;
     }
 #else
-    i=chapter_files(chapter_letter[c]);
+    {char letter=chapter_route(c);i=letter?chapter_files(letter):0;}
 #endif
     if(!i){igfx=RT_NULL;return 0;}
     surface=cdesc+i;
@@ -7048,6 +7047,8 @@ u16 mod_entry(u8 op,u8 a)
  u8 i;
  if(op==9)return mime_next();
  if(op==8)return chapter_files((char)a);
+ if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
+ if(op==11)return (u8)chapter_route(a);
  if(op==0){nature_hit_commit();W->nature_pending&=(u16)~3;return 0;}
  if(op==1){monster_refresh();return 0;}
  if(op==3)return discovery_find(a,(u8)st.formula.roll);
