@@ -1,0 +1,9 @@
+{
+  "schema": "FFT_CORE_SPEC_1",
+  "envelope": {"units": 13, "tiles": 256, "axis": 18, "layers": 2, "scene_rows": 202},
+  "variables": [
+    "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",
+    "fftdep", "ffpccore", "fftbat", "ffbcore", "fftscn", "ffscore",
+    "ffbm", "ffbn", "ffbo", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw"
+  ]
+}
