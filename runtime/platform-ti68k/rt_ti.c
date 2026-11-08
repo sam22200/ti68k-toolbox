@@ -155,6 +155,12 @@ u8 rt_save(const char *name, const void *data, u16 size)
     return 1;
 }
 
+#ifdef RT_TILOG                                    // lib/tilog.h: programs with room log saves
+#include "../../lib/tilog.h"
+#define SAVE_LOG(what) tilog("save %s %s", sv_name, what)
+#else
+#define SAVE_LOG(what)
+#endif
 static void save_write(void)                       // after the teardown: c-patterns §10
 {
     char sym[12], *s = symstr(sym, sv_name);
@@ -164,9 +170,9 @@ static void save_write(void)                       // after the teardown: c-patt
     unsigned char *p;
     if (e && e->flags.bits.archived) EM_moveSymFromExtMem(s, HS_NULL);   // unarchive FIRST
     h = HeapAlloc(2 + sv_size + SAV_EXTRA);
-    if (h == H_NULL) return;
+    if (h == H_NULL) { SAVE_LOG("FAILED: no memory"); return; }
     hs = SymAdd(s);
-    if (hs.folder == 0) { HeapFree(h); return; }
+    if (hs.folder == 0) { HeapFree(h); SAVE_LOG("FAILED: no symbol"); return; }
     DerefSym(hs)->handle = h;
     p = HeapDeref(h);
     *(u16 *)p = sv_size + SAV_EXTRA;
@@ -174,6 +180,7 @@ static void save_write(void)                       // after the teardown: c-patt
     p += 2 + sv_size;
     *p++ = 0; *p++ = 's'; *p++ = 'a'; *p++ = 'v'; *p++ = 0; *p = OTH_TAG;
     EM_moveSymToExtMem(s, HS_NULL);                // archived: survives a RAM reset
+    SAVE_LOG("written");
 }
 
 const void *rt_file(const char *name, u16 *size)   // c-patterns §1: data read in place
