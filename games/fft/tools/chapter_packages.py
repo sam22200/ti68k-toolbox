@@ -152,8 +152,12 @@ def core_package(source, spec):
         raise ValueError('Core envelope differs from the compiled headers')
     key = hashlib.sha256(json.dumps(spec, sort_keys=True).encode() + b''.join(
         v.name.encode()+bytes((v.kind, v.attr))+v.payload for v in variables)).digest()[:16]
-    end = CORE_HEADER+12*len(variables)+2
-    meta = manifest('ffcore', b'FKR1'+struct.pack('>HH', end, len(variables))+key+dependencies(variables), variables[0].folder)
+    # The running supervisor cannot check itself: AMS executes it in place (or from a RAM
+    # copy found under the same name) and its startup code writes into that image. The key
+    # above still binds its exact bytes to the chapter.
+    checked = [v for v in variables if v.name != 'fftstory']
+    end = CORE_HEADER+12*len(checked)+2
+    meta = manifest('ffcore', b'FKR1'+struct.pack('>HH', end, len(checked))+key+dependencies(checked), variables[0].folder)
     return variables+[meta], key
 
 
@@ -205,7 +209,12 @@ def chapter_package(source, spec, core_spec, key):
         arg = number(step['argument'], 0, 25499, 'step argument')
         if (op == 1 and (arg > 9 or 'ffs'+str(arg) not in spec['variables'])) or (op != 1 and arg//100 not in bands):
             raise ValueError('Step refers to an unavailable scene/encounter')
-        steps += struct.pack('>BBHHBB', op, 0, arg,
+        # byte 1: bit 0 offers the Save screen after the step completes (FFT's occasional
+        # prompt between battles); the player's slots are written nowhere else.
+        prompt = step.get('save_prompt', False)
+        if type(prompt) is not bool:
+            raise ValueError('save_prompt: expected true/false')
+        steps += struct.pack('>BBHHBB', op, int(prompt), arg,
                              number(step.get('skip_flag', 0), 0, 256, 'skip flag'),
                              number(step.get('skip_flow', 0), 0, 255, 'skip flow'), 0)
     d = dependencies(variables)

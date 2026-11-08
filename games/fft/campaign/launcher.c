@@ -3,6 +3,7 @@
 #define MIN_AMS 200
 #define RETURN_VALUE
 #include <tigcclib.h>
+#include "../../../lib/tilog.h"
 #define SAVE_OFFSETS_ONLY
 #include "save.h"
 #include "pack_story.h"
@@ -13,15 +14,6 @@ static short chapter(const char *command)
     NG_execute(h,0);HeapFree(h);
     result=GetArgType(top_estack)==POSINT_TAG ? GetIntArg(top_estack):0;
     return result;
-}
-static const char *active_save_name(void)
-{
-    SYM_ENTRY *e=SymFindPtr(SYMSTR(SAVE_SELECT_NAME),0);const unsigned char *p;
-    if(e){p=(const unsigned char *)HeapDeref(e->handle);
-        if(*(const unsigned short *)p==SAVE_SELECT_BYTES+6&&
-           !memcmp(p+2,SAVE_SELECT_MAGIC,4)&&p[6]>=1&&p[6]<=3&&!p[7])
-            return save_slot_name(p[6]);}
-    return SAVE_LEGACY_NAME;
 }
 static const unsigned char *package_file(const char *name,unsigned short *size)
 {
@@ -47,18 +39,34 @@ static void progress_reset(void)
     SYM_ENTRY *e=SymFindPtr(SYMSTR(SAVE_NAME),0);
     if(e){if(e->flags.bits.archived)EM_moveSymFromExtMem(SYMSTR(SAVE_NAME),HS_NULL);SymDel(SYMSTR(SAVE_NAME));}
 }
+/* AMS runs an archived child from a RAM copy (twin) and keeps it until HOME's event loop
+   regains control, i.e. until the supervisor exits: each child would retain ~1 KB for the
+   rest of the chapter, enough to starve the battle's allocations. Free it on return,
+   as the event loop would (SymFindPtr on the full name first, as SymDelTwin requires). */
+static void release_twin(const char *name)
+{
+    char sym[16];unsigned short n=(unsigned short)strlen(name);SYM_ENTRY *e;
+    sym[0]=0;memcpy(sym+1,"main\\",5);memcpy(sym+6,name,n+1);
+    e=SymFindPtr(sym+n+6,0);
+    if(e&&e->flags.bits.twin&&!e->flags.bits.hidden)SymDelTwin(e);
+}
 static unsigned short package_call(unsigned char program,unsigned short arg)
 {
     static const char *const names[]={"","fftscn","fftbat","fftdep","ffttitle","fftmap","fftmng"};
-    char command[24];
+    char command[24];unsigned short result;
     sprintf(command,"%s(%u)",names[program],arg);
-    return (unsigned short)chapter(command);
+    tilog("story call %s free %lu max %lu",command,HeapAvail(),HeapMax());
+    result=(unsigned short)chapter(command);
+    release_twin(names[program]);
+    tilog("story back %s -> %u free %lu max %lu",command,result,HeapAvail(),HeapMax());
+    return result;
 }
 static void package_notice(unsigned char result,const FpNotice *notice)
 {
     static const char *const messages[]={"","Install FFT core","Invalid FFT core","Install chapter pack",
         "Invalid chapter pack","Core/pack mismatch","Missing file","Damaged/mixed file",
         "Earlier chapter needed","Next chapter needed"};
+    tilog("story stop %u %s",result,notice->bad);
     ClrScr();FontSetSys(F_4x6);
     printf_xy(2,25,"%s",messages[result]);
     if(notice->bad[0])printf_xy(2,38,"%s",notice->bad);
@@ -70,7 +78,9 @@ void _main(void)
 {
     FpNotice notice;unsigned char result;ESI args;unsigned short arg=0;
     InitArgPtr(args);if(GetArgType(args)==POSINT_TAG)arg=GetIntArg(args);
+    tilog("story start %u free %lu max %lu",arg,HeapAvail(),HeapMax());
     result=fp_story(package_file,package_call,progress_read,progress_reset,arg,&notice);
     if(result)package_notice(result,&notice);
+    tilog("story end %u",result);
     push_shortint(0);
 }
