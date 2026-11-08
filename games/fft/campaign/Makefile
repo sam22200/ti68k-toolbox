@@ -107,6 +107,7 @@ test: manage-test
 test: map-test
 test: dialogue-test
 test: scene-test
+test: actor-cache-test
 test: deploy-test
 test: title-test
 .PHONY: title-test
@@ -123,6 +124,11 @@ deploy-test: data/ffflow.bin data/ffmg.bin data/ffcj.bin
 scene-test: data/ffs1.bin
 	$(CC) $(PC_CFLAGS) -o fftscn_test test_scene.c $(RT_CORE) $(RT_SW)
 	./fftscn_test
+.PHONY: actor-cache-test
+actor-cache-test:
+	@mkdir -p x/qa
+	$(CC) $(PC_CFLAGS) -o x/qa/actor-cache-test test_actor_cache.c
+	./x/qa/actor-cache-test
 .PHONY: dialogue-test
 dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)

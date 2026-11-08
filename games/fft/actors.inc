@@ -4,7 +4,10 @@
 static const u8 *actor_frame(u16 logical, u8 slot)
 {
     u16 frame_key = ACTOR_KEY(logical), id = frame_key & 0x7FFF, best = 0;
-    u8 e, victim = 0;
+    u8 e = W->actor_ent[slot], victim = 0;
+    // A standing actor normally keeps its entry. Check the cache key as well:
+    // another slot may have evicted it since this actor was last drawn.
+    if (ac_key[e] == frame_key) goto found;
     for (e = 0; e < AC_N && ac_key[e] != frame_key; e++) ;
     if (e == AC_N) {
         // Animation alone can wait a frame (its pose still cached); a new actor never
@@ -51,6 +54,7 @@ static const u8 *actor_frame(u16 logical, u8 slot)
         W->actor_misses++;
         ZE(20);
     }
+found:
     ac_age[e] = W->ac_now;
     W->actor_key[slot] = frame_key; W->actor_ent[slot] = e;
     return (const u8 *)acache[e];

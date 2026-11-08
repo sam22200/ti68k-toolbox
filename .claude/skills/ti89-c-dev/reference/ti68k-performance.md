@@ -1054,3 +1054,22 @@ conversion inside repeated queries. The generated `monster_height` has no
 32-bit multiply/divide helper after the change; local before/after listings are
 in `games/fft/campaign/x/core-discovery/codegen/`. This is a compiler check, not
 an emulator or whole-frame timing claim.
+
+### Remembered cache entries and bounded scene buffers (FFT, headless68000, 2026-11-07)
+
+When a consumer already remembers its cache entry, compare that entry's current
+key before scanning the directory. Never trust the index alone: another actor
+may have evicted its frame. FFT keeps its existing48-frame LRU, decode budget
+and mirror keys; the late-entry1000-hit probe drops2636022 ->500022 cycles.
+The corresponding13-actor board/rotation replay averages improve2.1%/2.7%,
+with identical pixels. The probe and whole-frame gains are separate measurements.
+
+Allocate scene scratch once for the validated maximum of the active set, not
+the engine's global maximum or each frame. Retain colour and depth/mask planes,
+release excess on set replacement, and test failure/retry and repeated entry.
+FFT's six-plane picture buffer falls24000 ->16800 or12000 bytes; its cache is
+unchanged. Net installed transport grows42 bytes, illustrating why CPU, RAM and
+archive size must be reported separately. Tests of packed buffers must use their
+accessors and row spans rather than assume contiguous planes. These are PC/
+sanitizer/ti-cycles results, not new emulator observations. Reproduction and
+regression rules: `games/fft/campaign/CORE_OPTIMIZATION.md`.

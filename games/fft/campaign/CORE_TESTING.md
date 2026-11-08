@@ -1,5 +1,14 @@
 # Validation by affected dependency
 
+Current optimization checks (2026-11-07): [Final pass](CORE_OPTIMIZATION.md).
+`make test` includes58 actor-cache boundary checks and scene allocation/reentry
+checks. Cache PC/sanitizers/68000 agree; scene lifetime sanitizers, nine scene
+replays, four13-actor render carriers and actual installed pilot/save flows
+pass. Native picture reservations are16800/12000/12000 bytes. Board/rotation
+ordinary averages218905/248713, peaks332836; equipment peak351228. Production
+input64911/64936, ABI80/zone8690/layouts remain. This is affected-cache/scene
+integration, not a new all-family certification. Evidence: `x/final-opt-pass/`.
+
 Current shared-resource checks (2026-11-07): [Resource ownership and sharing](CORE_RESOURCES.md).
 `core-resources-check` is registered as `resources`.237 host checks and33 C
 reference checks agree PC/sanitizers/68000; nine scene replays retain pixels and

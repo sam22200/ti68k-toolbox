@@ -10,8 +10,11 @@ Install one core and one chapter; retain all saves when replacing chapter data.
 [Shared-resource rules](CORE_RESOURCES.md) apply across every arena, scene and
 introduction in the chapter. Packaging drops obsolete copies, pools scene blobs
 and identical arena banks, and writes `resources.json` with a duplicate audit.
-The core is393134 bytes and the pilot213249 bytes,9135 net transport bytes less
-than the preceding distribution, including new reference code. Rebuild an ABI79
+After the [final optimization pass](CORE_OPTIMIZATION.md), the core is393176
+bytes and the pilot213249 bytes,9093 net transport bytes less than the preceding
+distribution. The shared actor lookup saves2.1%/2.7% in the measured board/rotation
+replay averages; scene picture buffers save7200/12000 RAM bytes. Follow the note's
+cache, allocation, packed-panel testing and budget rules. Rebuild an ABI79
 core once; later content-only packages keep the matching core byte-identical.
 
 Previous storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
