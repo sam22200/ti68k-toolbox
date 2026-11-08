@@ -1,6 +1,13 @@
 # One engine for every chapter
 
-Current storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
+Current distribution (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+FKR1/FKP1 separate executable/shared resources from replaceable chapter data.
+Sequence and encounter routing come from the active pack; ABI79 adds cold
+NATURE10/11 without changing ModCtx348, gameplay/save layouts or the8690-byte
+execution zone. Existing rules stay complete. See the linked build/reuse,
+ownership, compatibility, save-preservation and fixed-envelope contracts.
+
+Previous storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
 ABI78/348, FCP2/FMG3/FCD4;46 shared portraits and510 shared names preserve every
 reviewed use. The packed package is611132 bytes/44 variables; controlled rebuilt
 baseline622372, net-11240. Module shards55616/61352/55200, zone8690; Unit112,

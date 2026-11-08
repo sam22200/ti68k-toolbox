@@ -1,6 +1,13 @@
 # Core roadmap: current state and content-production gate
 
-Current storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
+Current distribution (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+Separate matching core/content groups, data-driven encounter/sequence dispatch,
+save-preserving replacement and content-only builds against an existing core
+are implemented. ABI79 keeps gameplay/save layouts and capacities. The supplied
+chapter remains a two-encounter pilot; future campaign content, scripts and
+map-specific certification are the next scope. Combat closure is unchanged.
+
+Previous storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
 ABI78/348, FCP2/FMG3/FCD4;46 shared portraits and510 shared names preserve every
 reviewed use. The packed package is611132 bytes/44 variables; controlled rebuilt
 baseline622372, net-11240. Module shards55616/61352/55200, zone8690; Unit112,

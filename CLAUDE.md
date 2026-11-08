@@ -69,6 +69,11 @@ ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycl
 make xcheck                     # runtime game: TI binary under ti-cycles = PC headless, per scenario
 ```
 
+**FFT campaign packaging:** `make -C games/fft/campaign packages` builds separate core and
+chapter groups. `make chapter-package` in that directory reuses an existing core without
+compiling it. Ownership, matching versions, installation and save preservation:
+`games/fft/campaign/CORE_PACKAGES.md`.
+
 **Measure cycles with `ti-cycles`, not TiEmu** (`tools/m68kbench/`): a headless 68000 (Musashi) with
 the MC68000 datasheet timings (movem, shifts, mulu/muls: all verified by `test/cyctest.c`), AMS ROM
 calls emulated with an estimated cost, zones marked with `bench.h` (`BENCH_BEGIN/END`, `BENCH_SHOT`

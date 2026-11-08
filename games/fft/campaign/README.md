@@ -1,6 +1,13 @@
 # Opening -> Academy -> Gariland
 
-Current storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
+Current distribution (2026-11-07): [separate core and chapter packages](CORE_PACKAGES.md).
+`make packages` writes `x/packages/fft-core.89g` and `chapter-01.89g` with matching
+metadata, size reports and installation/removal lists. `make chapter-package`
+assembles content against that core without compiling it. The current chapter
+is the existing Orbonne/Academy/Gariland pilot. ABI79; save format FSV4 remains.
+Install one core and one chapter; retain all saves when replacing chapter data.
+
+Previous storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
 ABI78/348, FCP2/FMG3/FCD4;46 shared portraits and510 shared names preserve every
 reviewed use. The packed package is611132 bytes/44 variables; controlled rebuilt
 baseline622372, net-11240. Module shards55616/61352/55200, zone8690; Unit112,

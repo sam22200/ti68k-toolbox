@@ -712,7 +712,10 @@ Opening review and playable continuation: `campaign/README.md` describes the
 local-disc package launched with `fftstory()`: Orbonne, the Academy bridge,
 then the existing Gariland combat. `opening/BUGFIXES.md` records delayed
 Archer actions, camera handedness and source scene-pose corrections. This
-package uses separate archived chapters rather than keeping two maps in RAM.
+distribution separates a shared core from replaceable chapter packs, loading one
+encounter at a time. `make -C campaign packages` builds both groups;
+`make -C campaign chapter-package` reuses an existing core without compiling it.
+Ownership, installation and save preservation: [campaign/CORE_PACKAGES.md](campaign/CORE_PACKAGES.md).
 A victory writes the campaign save (`ffsave`: story flags, Gariland's party and bag, FFT's
 ids), from which `fftstory()` resumes; `fftstory(1)` starts a new game.
 

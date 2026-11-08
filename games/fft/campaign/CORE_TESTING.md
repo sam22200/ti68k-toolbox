@@ -1,6 +1,16 @@
 # Validation by affected dependency
 
-Current storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
+Current package checks (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+`core-packages-check` is registered as `packages` in closure.py. It checks
+ownership/compatibility, corruption, supervisor resume/cancel behavior and
+save-preserving replacement on PC/sanitizers/68000. With a fresh source group,
+`check_package_routing.py` additionally boots real registered/remapped encounters
+and rejects missing routes/packs. Native bindings/ABI78 rejection and exact
+pilot pixel/rule/FSV4 flows pass under ABI79. This is targeted validation of
+the changed cold loader; the prior100-suite combat result is historical and
+is not presented as a new full closure run.
+
+Previous storage checkpoint (2026-11-07): [Shared identities and module factorization](CORE_FACTORIZATION.md).
 ABI78/348, FCP2/FMG3/FCD4;46 shared portraits and510 shared names preserve every
 reviewed use. The packed package is611132 bytes/44 variables; controlled rebuilt
 baseline622372, net-11240. Module shards55616/61352/55200, zone8690; Unit112,
