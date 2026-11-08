@@ -206,6 +206,9 @@ bundle: packages
 	$(PY) ../tools/core_budget.py --group $(BUNDLE_OUTPUT) --out $(BUNDLE_BUDGET)
 
 .PHONY: packages chapter-package packages-check core-packages-check packages-routing-check
+.PHONY: core-resources-check
+core-resources-check: packages
+	$(PY) check_chapter_resources.py --input $(PACKAGE_OUTPUT)/source.89g --out $(PACKAGE_OUTPUT)/resources
 packages: packed
 	@mkdir -p $(PACKAGE_OUTPUT)
 	$(ROOT)/tools/bin/ti-group $(PACKAGE_OUTPUT)/source.89g fftstory.89z ffttitle.89z ffttcore.89y fftmap.89z ffwmcore.89y fftmng.89z ffmgcore.89y fftdep.89z ffpccore.89y fftbat.89z ffbcore.89y fftscn.89z ffscore.89y $(OPENING_BANKS) $(TI_FILES)
@@ -241,7 +244,7 @@ data/ffgd.bin: ../tools/chapter_desc.py ../tools/surface_data.py ../core_limits.
 	$(PY) ../tools/chapter_desc.py campaign
 
 data/ffbm.bin data/ffbn.bin data/ffbo.bin &: ../tools/module.py battle.c ../fft.c ../fft.h ../core_limits.h ../chapter.h ../module.h ../unit_card.h ../choice_menu.h ../action_effect.h ../status_rules.h ../status_policy.h ../status_unit.h ../status_lifetime.h ../status_control.h ../reflect_rules.h ../common.h $(wildcard ../*.inc ../*.h *.inc *.h) ../opening/opening.inc
-	$(PY) ../tools/module.py data/ffbm.bin battle.c 26 --second data/ffbn.bin --third data/ffbo.bin
+	$(PY) ../tools/module.py data/ffbm.bin battle.c 27 --second data/ffbn.bin --third data/ffbo.bin
 	@touch data/ffbm.bin data/ffbn.bin data/ffbo.bin data/modules.h
 
 data/ffcp.bin ../opening/data/ffcp.bin &: ../tools/common_portraits.py ../tools/identity_assets.py ../tools/management_data.py

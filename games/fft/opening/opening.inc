@@ -94,9 +94,9 @@ static void opening_start(u16 n)
     memset(&st,0,sizeof st);if(!W)return;
     rt_seed=97;rand_seed(97);
 #ifdef FFT_MODULES
-    // NATURE returns before PARTY loads; the chapter's resolved prefix is not
+    // RESOURCES returns before PARTY loads; the chapter's resolved prefix is not
     // retained in ModCtx's input union, which already holds chapter_ugfx.
-    mod_call(MOD_PARTY,12,(u8)mod_call(MOD_NATURE,11,(u8)(chapter_now-1)));
+    mod_call(MOD_PARTY,12,(u8)mod_call(MOD_RESOURCES,11,(u8)(chapter_now-1)));
 #else
     opening_setup((u8)chapter_route((u8)(chapter_now-1)));
 #endif

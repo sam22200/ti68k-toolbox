@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import struct
+import chapter_resources as resources
 
 HERE = Path(__file__).resolve().parents[1]
 NAME = re.compile(r'[a-z][a-z0-9]{0,7}\Z')
@@ -185,7 +186,7 @@ def chapter_package(source, spec, core_spec, key):
                 raise ValueError('Encounter names collide with shared core variables')
             if 'ff'+prefix+suffix not in spec['variables']:
                 raise ValueError(f'Route {band}: missing ff{prefix}{suffix}')
-        desc = source['ff'+prefix+'d'].raw
+        desc = resources.resolve(source,'ff'+prefix+'d',set(spec['variables'])|set(core_spec['variables']))
         if len(desc) < 104 or desc[:4] != b'FCD4':
             raise ValueError('Unsupported encounter descriptor')
         words = struct.unpack_from('>52H', desc)
@@ -208,6 +209,13 @@ def chapter_package(source, spec, core_spec, key):
                              number(step.get('skip_flag', 0), 0, 256, 'skip flag'),
                              number(step.get('skip_flow', 0), 0, 255, 'skip flow'), 0)
     d = dependencies(variables)
+    allowed=set(spec['variables'])|set(core_spec['variables'])
+    for v in variables:
+        raw=resources.resolve(source,v.name,allowed)
+        if raw[:4]==b'FSC2':
+            pool=raw[12:20].rstrip(b'\0').decode('ascii')
+            if pool not in allowed or resources.resolve(source,pool,allowed)[:4]!=b'FSP1':
+                raise ValueError('Scene refers to an unavailable resource pool')
     step_at, dep_at = HEADER+len(routes), HEADER+len(routes)+len(steps)
     data = b'FKP1'+struct.pack('>HH', dep_at+len(d)+2, pack_id)+key
     data += struct.pack('>12H', number(spec.get('requires_flag', 0), 0, 256, 'prerequisite'),
@@ -237,12 +245,19 @@ def reuse_core(source, core_path, spec):
     for name in set(source) & set(content):
         if source[name] != content[name]:
             raise ValueError(f'{name}: chapter input attempts to replace installed core')
-    return {**content, **source}
+    merged={**content, **source}
+    normalized=resources.shared_contours(merged)
+    if any(normalized[n]!=v for n,v in content.items()):
+        raise ValueError('Installed core predates shared resources; rebuild the core once')
+    return merged
 
 
 def chapter_files(directories, specs):
     source = {}
-    for name in sorted({n for s in specs for n in s['variables']}):
+    pending=sorted({n for s in specs for n in s['variables']})
+    while pending:
+        name=pending.pop(0)
+        if name in source:continue
         if not NAME.fullmatch(name) or name in RESERVED:
             raise ValueError('Invalid chapter variable')
         for folder in directories:
@@ -256,10 +271,17 @@ def chapter_files(directories, specs):
                 source[name] = entries[name]
         if name not in source:
             raise ValueError(f'{name}: missing built chapter data')
+        raw=source[name].raw
+        if raw[:4]==b'FRF1' and len(raw)==16:
+            pending.append(raw[4:12].rstrip(b'\0').decode('ascii'))
+        elif raw[:4]==b'FSC2':
+            pending.append(raw[12:20].rstrip(b'\0').decode('ascii'))
     return source
 
 
 def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, allow_unused=False):
+    original=source
+    source=resources.shared_contours(source)
     core, key = core_package(source, core_spec)
     packs = []
     ids = set()
@@ -268,7 +290,13 @@ def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, al
         if spec['id'] in ids:
             raise ValueError('Duplicate chapter ID')
         ids.add(spec['id']); used.update(spec['variables'])
-        packs.append((spec, chapter_package(source, spec, core_spec, key)))
+        prepared,names=resources.prepare_chapter(source,spec,core_spec['variables'])
+        # Preserve authored ordering; generated scene pools belong to the pack.
+        optimized={**spec,'variables':[n for n in spec['variables'] if n in names]+
+                   sorted(names-set(spec['variables']))}
+        used.update(names)
+        packs.append((optimized, chapter_package(prepared, optimized, core_spec, key)))
+    used.update(n for n in source if re.fullmatch('ffsp[0-9]?',n))
     if not packs:
         raise ValueError('At least one chapter specification is required')
     if not allow_unused and set(source)-used:
@@ -287,6 +315,9 @@ def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, al
         if row['budget_headroom_after_reserve'] < 0:
             raise ValueError(f"Chapter {spec['id']} exceeds the selected installation budget")
         report['chapters'].append(row)
+    resource_report=dict(core=resources.audit(core,original),chapters=[
+        dict(id=spec['id'],**resources.audit(variables,original)) for spec,variables in packs])
+    for _,variables in packs:resources.audit(core+variables,original)
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
     (out/'fft-core.89g').write_bytes(group_bytes(core))
     (out/'core-variables.txt').write_text('\n'.join(v.name for v in core)+'\n')
@@ -308,6 +339,7 @@ def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, al
         'The supplied Chapter I pack is the existing Orbonne/Academy/Gariland pilot, not a complete chapter.\n\n'
         'Storage figures are planning estimates with a reserve, not a measurement of free Flash or RAM.\n')
     (out/'packages.json').write_text(json.dumps(report, indent=2)+'\n')
+    (out/'resources.json').write_text(json.dumps(resource_report,indent=2)+'\n')
     return report, core, packs
 
 

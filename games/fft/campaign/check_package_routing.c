@@ -38,6 +38,7 @@ static void trials(u16 scenario)
     CHECK(battle_state!=RT_NULL);
     if(scenario==401||scenario==299){CHECK(!W);CHECK(!igfx);CHECK(!encounter_units);return;}
     CHECK(W!=RT_NULL);CHECK(igfx!=RT_NULL);CHECK(encounter_units==11);
+    if(!W||!igfx||!cdesc)return;
     CHECK(CD(LOCATION)==(scenario/100==1?19:7));
     CHECK(chapter_now==scenario/100);
     CHECK(MAP_N==MAP_W*MAP_H);CHECK(MAP_N<=256);

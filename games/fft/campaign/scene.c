@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../base.inc"
+#include "../resource_file.h"
 #include "../identity_pool.h"
 #include "save.h"
 #include "flow.h"
@@ -58,6 +59,7 @@ typedef struct {
 static Work *W;
 static u8 *vbuf;                        // the picture: colour, colour, depth/mask x 2
 static const u8 *set, *amap, *cgfx, *pgfx;   // pgfx: the speakers' portraits (ffcp)
+static const u8 *scene_assets,*scene_steps;
 static const u8 *opening_story, *opening_title;
 static const u8 *scene_flow;
 static Save scene_save;
@@ -76,7 +78,7 @@ static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
 #define BEATS_PICTURE
 #include "../beats.inc"
 
-static const u8 *step_at(u8 i) { return set + 12 + 8 * i; }
+static const u8 *step_at(u8 i) { return scene_steps + 8 * i; }
 static void scene_progress(void)
 {
     if(scene_flow&&(scene_set_id==1||scene_set_id==2)&&save_load(&scene_save)) {
@@ -97,11 +99,11 @@ static void step_start(void)
         st.open_clock = 0; st.open_seen = 0;
         memset(W->actor_key, 255, sizeof W->actor_key);
         W->dialog_key = 0xFFFF;
-        if (s[0] == STEP_TITLE) { st.open_stage = OPEN_TITLE; opening_title = set + RD16(s, 1); return; }
+        if (s[0] == STEP_TITLE) { st.open_stage = OPEN_TITLE; opening_title = scene_assets + RD16(s, 1); return; }
         if (s[0] == STEP_STORY||s[0]==STEP_NARRATE||s[0]==STEP_OVERLAY) {
-            opening_story = set + RD16(s, 3);
+            opening_story = scene_assets + RD16(s, 3);
             pic_stride = RD16(s, 2); pic_plane = (u16)(pic_stride * 100);
-            zx0_unpack(set + RD16(s, 1), vbuf);
+            zx0_unpack(scene_assets + RD16(s, 1), vbuf);
             st.open_stage = OPEN_CHAPEL;
             if(s[0]!=STEP_OVERLAY)opening_find(opening_story[RD16(opening_story, 1)]);
             else st.open_stage=OPEN_DONE;
@@ -160,14 +162,30 @@ void game_init(void)
 void game_scenario(u16 n)
 {
     char name[6] = "ffs0";
+    u16 size,asset_size,i;
     memset(&st, 0, sizeof st);
     scene_set_id=(u8)n;
     name[3] = (char)('0' + n);
-    set = rt_file(name, RT_NULL);
-    if (!W || !set || !pgfx || !cgfx || !abank[0] || !abank[1] || RD16(set, 0) != 0x4653) { set = RT_NULL; return; }
+    set = resource_file(name, &size);asset_size=size;
+    if (!W || !set || size<12 || !pgfx || !cgfx || !abank[0] || !abank[1] ||
+        RD16(set,0)!=0x4653||(RD16(set,1)!=0x4331&&RD16(set,1)!=0x4332)) { set = RT_NULL; return; }
+    scene_assets=set;scene_steps=set+12;
+    if(RD16(set,1)==0x4332){
+        char pool[9];if(size<20){set=RT_NULL;return;}
+        memcpy(pool,set+12,8);pool[8]=0;
+        scene_assets=resource_file(pool,&asset_size);scene_steps=set+20;
+        if(!scene_assets||asset_size<6||RD32(scene_assets,0)!=0x46535031UL){set=RT_NULL;return;}
+    }
+    if(RD16(set,5)>255||RD16(set,5)*8U>size-(u16)(scene_steps-set)){set=RT_NULL;return;}
+    for(i=0;i<RD16(set,5);i++){
+        const u8 *s=step_at((u8)i);
+        if(s[0]<STEP_TITLE||s[0]>STEP_OVERLAY||RD16(s,1)>=asset_size||
+           ((s[0]==STEP_STORY||s[0]==STEP_NARRATE||s[0]==STEP_OVERLAY)&&
+            (!RD16(s,2)||RD16(s,2)>PIC_STRIDE_MAX||RD16(s,3)>=asset_size))){set=RT_NULL;return;}
+    }
     {
         char map[7]; memcpy(map, set + 4, 6); map[6] = 0;
-        amap = *map ? rt_file(map, RT_NULL) : RT_NULL;   // (no actors: no pose table)
+        amap = *map ? resource_file(map, RT_NULL) : RT_NULL;   // (no actors: no pose table)
         if (*map && !amap) { set = RT_NULL; return; }
     }
     memset(W, 0, sizeof *W);
@@ -249,7 +267,7 @@ static void draw_title(void)
 
 static void draw_card(void)
 {
-    const u8 *p = set + RD16(step_at(st.step), 1);
+    const u8 *p = scene_assets + RD16(step_at(st.step), 1);
     u8 n = *p++;
     draw_rect(0, 0, 160, 100, C_BLACK);
     while (n--) {
@@ -287,7 +305,7 @@ void game_render(void)
     if (st.done) return;
     if (st.open_stage == OPEN_TITLE) draw_title();
     else if (st.open_stage == OPEN_DONE&&step_at(st.step)[0]==STEP_OVERLAY) {
-        const u8 *p=set+RD16(step_at(st.step),3);u8 n=*p++;
+        const u8 *p=scene_assets+RD16(step_at(st.step),3);u8 n=*p++;
         draw_picture();qshade();
         if(!scene_flow)ui_text(3,40,"Missing flow data",C_WHITE,158);
         else {

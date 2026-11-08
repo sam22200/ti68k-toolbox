@@ -29,8 +29,8 @@ def fixture():
     b[4]=1;assert len(b)==3138
     return bytes(b)
 
-def data_links(folder):
-    for origin in (HERE.parent/'opening/data',HERE/'data'):
+def data_links(folder,source=None):
+    for origin in ((source,) if source else (HERE.parent/'opening/data',HERE/'data')):
         for src in origin.glob('*.bin'):
             p=folder/src.name;p.unlink(missing_ok=True);p.symlink_to(src)
 
@@ -38,12 +38,14 @@ def main():
     global OUT
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--native',action='store_true')
     ap.add_argument('--out',type=Path,default=OUT);ap.add_argument('--slot',type=int,choices=(1,2,3))
+    ap.add_argument('--data-dir',type=Path,help='validate actual installed pack data in isolation')
     args=ap.parse_args();OUT=args.out.resolve();save_name='ffsave'+str(args.slot) if args.slot else 'ffsave'
+    if args.data_dir:args.data_dir=args.data_dir.resolve()
     OUT.mkdir(parents=True,exist_ok=True);initial=b'FSV4'+fixture()[4:]+bytes(64);write_changed(OUT/'initial.sav',initial)
     run(['cc','-std=gnu99','-O1','-g','-w','-o',OUT/'battle',HERE/'check_flow_battle.c',
          ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c'])
     with tempfile.TemporaryDirectory(prefix='fft-flow-') as name:
-        temp=Path(name);data_links(temp);shots=temp/'shots';shots.mkdir()
+        temp=Path(name);data_links(temp,args.data_dir);shots=temp/'shots';shots.mkdir()
         if args.slot:(temp/'ffslot.sav').write_bytes(b'FSL1'+bytes((args.slot,0)))
         (temp/(save_name+'.sav')).write_bytes(initial)
         pc=run([OUT/'battle',shots],temp);write_changed(OUT/'pc.log',pc.encode());print(pc.strip())
@@ -72,7 +74,7 @@ def main():
             run(['cc','-std=gnu99','-O1','-w','-D'+flag,'-o',OUT/(program+'pc'),HERE/'check_flow_battle.c',
                  ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c'])
             with tempfile.TemporaryDirectory(prefix='fft-flow-split-')as name:
-                data=Path(name);data_links(data);(data/(save_name+'.sav')).write_bytes(initial)
+                data=Path(name);data_links(data,args.data_dir);(data/(save_name+'.sav')).write_bytes(initial)
                 if args.slot:(data/'ffslot.sav').write_bytes(b'FSL1'+bytes((args.slot,0)))
                 argv=[OUT/(program+'pc')]
                 if program=='floworb':
@@ -81,7 +83,7 @@ def main():
         (OUT/(save_name+'.sav')).write_bytes(initial)
         run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','sav',save_name+'.sav',save_name],OUT)
         files={}
-        for origin in (HERE.parent/'opening/data',HERE/'data'):
+        for origin in ((args.data_dir,) if args.data_dir else (HERE.parent/'opening/data',HERE/'data')):
             for p in origin.glob('*.89y'):files[p.stem]=p
         files[save_name]=OUT/(save_name+'.89y')
         if args.slot:

@@ -137,11 +137,12 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_EQUIPMENT 19                    // cold inventory, derived-stat rebuild and move rewards
 #define MOD_COMBAT 20                       // cold command effects and combat responses
 #define MOD_NATURE 21                      // discovery, monster capabilities and cold math masks
+#define MOD_RESOURCES 26                   // cold immutable chapter bank/reference binding
 #define MOD_WEAPON 22                      // weapon impact and origin-independent scalar utility
 #define MOD_STATUS 23                      // bitmap commits and explicit status requests
 #define MOD_PLANNER 24                     // weapon geometry, recipients, previews and continuation
 #define MOD_AI_PREP 25                     // bounded victim/Math/collateral cache preparation
-#define MOD_COUNT 26
+#define MOD_COUNT 27
 #define AI_BAD (-0x7FFF)
 #ifdef FFT_MODULE
 #define MOD_CORE 0
