@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Reads the live TiEmu's calculator RAM from the host: logs and memory without screenshots.
+
+Usage:
+  ti-mem log [--clear]        print the tilog ring (lib/tilog.h); --clear empties it
+  ti-mem mkvar OUT.89y [N]    an empty tilog variable of N bytes (default 1024) to send at boot
+  ti-mem heap [--min BYTES]   allocated AMS heap blocks: handle, address, size, lock, variable
+  ti-mem dump OUT.bin         the whole RAM (256 KB, TI address 0 = file offset 0)
+  ti-mem peek ADDR [LEN]      hex dump of TI addresses (ADDR in hex)
+The emulated RAM is the 256 KB malloc block whose first longs are the 68000 vectors (initial
+SSP 0x4C00, reset vector in ROM). Reading needs tools/tiemu-memread.c preloaded (ti-emu does).
+"""
+import os, struct, subprocess, sys
+
+RAM = 0x40000
+MAGIC = b'TLG1'
+
+
+def tiemu_pid():
+    pids = subprocess.run(['pgrep', '-x', 'tiemu'], capture_output=True, text=True).stdout.split()
+    if not pids:
+        sys.exit('ti-mem: TiEmu is not running')
+    return int(pids[0])
+
+
+def locate(pid):
+    """(file object, host address of TI address 0)."""
+    mem = open(f'/proc/{pid}/mem', 'r+b', buffering=0)
+    for line in open(f'/proc/{pid}/maps'):
+        p = line.split()
+        lo, hi = (int(x, 16) for x in p[0].split('-'))
+        if not p[1].startswith('rw') or len(p) > 5 or hi - lo < RAM:
+            continue
+        # glibc mmaps big blocks page-aligned: 8-byte prev size, 8-byte chunk size, then data.
+        # The ROM block starts with the same vectors (AMS copies them); only the RAM block
+        # has a 256 KB chunk size.
+        for at in range(lo, hi - RAM, 0x1000):
+            try:
+                mem.seek(at); v = mem.read(24)
+            except OSError:
+                break
+            size = struct.unpack_from('<Q', v, 8)[0] & ~0xF
+            ssp, reset = struct.unpack_from('>II', v, 16)
+            if ssp == 0x4C00 and 0x200000 <= reset < 0x1000000 and RAM <= size <= RAM + 0x2000:
+                return mem, at + 16
+    sys.exit('ti-mem: calculator RAM not found (TiEmu started without tiemu-memread.so?)')
+
+
+def ram():
+    mem, base = locate(tiemu_pid())
+    mem.seek(base)
+    return mem, base, mem.read(RAM)
+
+
+def find_log(data):
+    """TI address of the valid tilog header with the most writes (a stale transfer copy can
+    also contain the magic)."""
+    best, at = None, data.find(MAGIC)
+    while at >= 0:
+        head, cap, wraps = struct.unpack_from('>HHH', data, at + 4)
+        size = struct.unpack_from('>H', data, at - 2)[0] if at >= 2 else 0
+        if 0 < cap <= RAM and head < cap and size >= cap + 10:
+            key = (wraps, head)
+            if best is None or key > best[0]:
+                best = (key, at)
+        at = data.find(MAGIC, at + 1)
+    return best and best[1]
+
+
+def cmd_log(args):
+    mem, base, data = ram()
+    at = find_log(data)
+    if at is None:
+        sys.exit('ti-mem: no tilog variable in RAM (send the one made by `ti-mem mkvar`)')
+    head, cap, wraps = struct.unpack_from('>HHH', data, at + 4)
+    ring = data[at + 10:at + 10 + cap]
+    text = (ring[head:] + ring[:head]) if wraps else ring[:head]
+    sys.stdout.write(text.replace(b'\0', b'').decode('latin-1'))
+    if '--clear' in args:                      # head and wraps; the capacity stays
+        mem.seek(base + at + 4); mem.write(b'\0\0')
+        mem.seek(base + at + 8); mem.write(b'\0\0')
+
+
+def cmd_mkvar(args):
+    out, cap = args[0], int(args[1]) if len(args) > 1 else 1024
+    payload = MAGIC + struct.pack('>HHH', 0, cap, 0) + bytes(cap) + b'\0dat\0\xF8'
+    body = struct.pack('>H', len(payload)) + payload
+    block = b'\0\0\0\0' + body + struct.pack('<H', sum(body) & 0xFFFF)
+    head = (b'**TI89**\x01\x00' + b'main'.ljust(8, b'\0') + b'tilog ring'.ljust(40, b'\0') +
+            struct.pack('<H', 1) + struct.pack('<I8sBBH', 0x52, b'tilog'.ljust(8, b'\0'), 0x1C, 0, 0) +
+            struct.pack('<I', 0x52 + len(block)) + b'\xA5\x5A')
+    open(out, 'wb').write(head + block)
+
+
+HANDLE_TABLE = 0x7FCE                           # AMS 2/3: HeapDeref reads the table pointer here
+
+
+def symbols(data):
+    """handle -> variable name, from every VAT-entry-shaped record in RAM (name[8], compat,
+    flags, handle): a heuristic, but VAT entries are the only records with that shape."""
+    names = {}
+    for o in range(0, len(data) - 14, 2):
+        n = data[o:o + 8]
+        k = n.find(0)
+        if k <= 0 or n[k:] != bytes(8 - k) or not all(48 <= c < 58 or 97 <= c < 123 or c == 95 for c in n[:k]):
+            continue
+        h = struct.unpack_from('>H', data, o + 12)[0]
+        if 0 < h < 4000:
+            names.setdefault(h, n[:k].decode())
+    return names
+
+
+def cmd_heap(args):
+    """Every allocated heap block: handle, address, size, owning variable when known."""
+    data = ram()[2]
+    table = struct.unpack_from('>I', data, HANDLE_TABLE)[0]
+    names = symbols(data)
+    rows = []
+    for h in range(1, 4000):
+        at = table + 4 * h
+        if at + 4 > RAM:
+            break
+        p = struct.unpack_from('>I', data, at)[0]
+        if not 0x100 <= p < RAM:
+            continue
+        w = struct.unpack_from('>H', data, p - 2)[0]
+        size = ((w & 0x7FFF) - 1) * 2
+        if 0 < size <= RAM:
+            rows.append((p, h, size, 'L' if w & 0x8000 else ' ', names.get(h, '')))
+    least = int(args[args.index('--min') + 1]) if '--min' in args else 0
+    for p, h, size, lock, name in sorted(rows):
+        if size >= least:
+            print(f'{h:5d} {p:06X} {size:7d} {lock} {name}')
+    print(f'{len(rows)} blocks, {sum(r[2] for r in rows)} bytes allocated')
+
+
+def cmd_dump(args):
+    open(args[0], 'wb').write(ram()[2])
+
+
+def cmd_peek(args):
+    a, n = int(args[0], 16), int(args[1]) if len(args) > 1 else 64
+    data = ram()[2]
+    for i in range(a, min(a + n, RAM), 16):
+        row = data[i:min(i + 16, a + n)]
+        print(f'{i:06X}  {row.hex(" ")}  {"".join(chr(c) if 32 <= c < 127 else "." for c in row)}')
+
+
+if __name__ == '__main__':
+    cmds = {'log': cmd_log, 'mkvar': cmd_mkvar, 'heap': cmd_heap, 'dump': cmd_dump, 'peek': cmd_peek}
+    if len(sys.argv) < 2 or sys.argv[1] not in cmds:
+        sys.exit(__doc__)
+    cmds[sys.argv[1]](sys.argv[2:])

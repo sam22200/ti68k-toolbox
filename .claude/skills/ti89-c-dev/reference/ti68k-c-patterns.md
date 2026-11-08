@@ -114,6 +114,16 @@ void _main(void) { ... }      // entry point, NOT main()
   next chapter; unarchived, 0.2 KB (but its size stays in RAM). A chain of programs therefore
   costs the sum of their files: keep each one a small `-pack` stub (~1.1 KB). Keys queued with
   `OSenqueue(…, kbd_queue())` before returning are not run by HOME (no top-level chaining).
+  **The launcher can free each copy itself** (**verified**, Titanium, FFT `fftstory`,
+  2026-11-08): the copy is a *twin* symbol; after the child returns, `SymFindPtr` on its full
+  name (`main\\name`, flags 0) then, if `flags.bits.twin` and not `hidden` (in use),
+  `SymDelTwin(entry)`: free RAM stayed 187,144 bytes across title → scene → battle instead of
+  losing 1,008 bytes per child (what HOME's event loop does at the end). This is what let the
+  battle's 183 KB of allocations succeed under the supervisor.
+- **A running program differs from its file**: tigcclib's startup writes into the executing
+  image (saved SP…), so a checksum of the running program (in place, or of its twin) never
+  matches the transferred bytes (**verified**: "Damaged/mixed file fftstory"). Integrity checks
+  must skip the program that performs them.
 - **`-mno-bss` stores uninitialised globals in the file** (**verified**): `unsigned short
   buf[5000];` → 10,399-byte program with the `ti-cc` flags, 785 bytes without `-mno-bss` (the BSS
   block is then allocated and zeroed at each start). `-mno-bss` stays the default (Bobble is 160

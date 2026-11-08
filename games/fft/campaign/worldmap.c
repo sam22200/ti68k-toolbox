@@ -199,8 +199,10 @@ void game_scenario(u16 n)                 // the save's location (n: test doors,
     decor_ready=0;
 }
 
+#include "../../../lib/tilog.h"
 static u8 leave(u16 result)
 {
+    tilog("map leave %u at loc %u%s", result, save.loc, wm.changed ? " (session saved)" : "");
     wm.result = result;
     if (wm.changed) rt_save(SAVE_NAME, &save, sizeof save);
     release_map();

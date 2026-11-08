@@ -21,6 +21,10 @@ static unsigned char fp_story(FpRead read,FpCall call,FpProgressRead progress,
     if(arg==1&&prerequisite){notice->requested=fp_word(p+44);return FP_PREVIOUS;}
     /* Later packs expose Continue directly, so an unavailable New Game cannot
        overwrite a slot before the first chapter has been installed. */
+    /* A normal start goes back to the title when a step ends without handing over (a lost
+       or quit battle, an abandoned scene): Game Over -> title as in FFT. Only the session
+       changed since the last Save; Continue reloads a slot. */
+title:
     if(!arg&&!call(FP_TITLE,prerequisite?2:0))return FP_OK;
     if(arg==1)reset();
     if(arg==99){
@@ -38,7 +42,8 @@ static unsigned char fp_story(FpRead read,FpCall call,FpProgressRead progress,
         step=p+fp_word(p+38)+k*FP_STEP_BYTES;
         if(fp_needed(step,state.flags,state.flow)){
             unsigned char op=step[0];unsigned short argument=fp_word(step+2);
-            if(!call(op,argument))return FP_OK;
+            if(!call(op,argument)){if(!arg)goto title;return FP_OK;}
+            if(step[1]&FP_SAVE_PROMPT)call(FP_TITLE,3);   /* SHIFT/ESC declines */
             progress(&state);
         }
     }

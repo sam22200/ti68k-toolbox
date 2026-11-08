@@ -1,7 +1,8 @@
 // The scene player (fftscn, ENGINE.md): what a chapter shows between battles, read from a scene
 // set (tools/scenes.py): a title, scripted beats over a fixed picture with depth (Orbonne's
 // chapel: actors walking behind its pillars, dialogue), a chapter card. fftscn(k) plays ffs<k>
-// and returns 1 once it is over (0: ESC). The beats, dialogue, text and actor bank are the
+// and returns 1 once it is over. ESC asks "Skip scene?" (No/Yes): Yes ends it as if played
+// through (same flow written). The beats, dialogue, text and actor bank are the
 // battle engine's own code (../beats.inc, ../text.inc, ../actors.inc).
 #include "../../../runtime/core/rt.h"
 #include "../core_limits.h"
@@ -15,6 +16,7 @@
 #include "save.h"
 #include "flow.h"
 #include "flow_draw.inc"
+#include "../../../lib/tilog.h"
 
 #ifdef RT_CYCLES
 #include "../../../tools/m68kbench/bench.h"
@@ -57,6 +59,7 @@ typedef struct {
     u16 status[2][RT_H * RT_PBYTES / 2];   // the dialogue's own planes, copied box by box
 } Work;
 static Work *W;
+static u8 skip_ask,skip_row;            // ESC's "Skip scene?" prompt: open, 0 No / 1 Yes
 static u8 *vbuf;                        // the picture: colour, colour, depth/mask x 2
 static const u8 *set, *amap, *cgfx, *pgfx;   // pgfx: the speakers' portraits (ffcp)
 static const u8 *scene_assets,*scene_steps;
@@ -94,7 +97,7 @@ static void step_start(void)
 {
     const u8 *s;
     for (;;) {
-        if (st.step >= RD16(set, 5)) { st.done = 1;scene_progress();return; }
+        if (st.step >= RD16(set, 5)) { st.done = 1;scene_progress();tilog("scene done");return; }
         s = step_at(st.step);
         st.open_clock = 0; st.open_seen = 0;
         memset(W->actor_key, 255, sizeof W->actor_key);
@@ -167,7 +170,7 @@ void game_scenario(u16 n)
 {
     char name[6] = "ffs0";
     u16 size,asset_size,i,required=0;
-    memset(&st, 0, sizeof st);
+    memset(&st, 0, sizeof st); skip_ask = skip_row = 0;
     scene_set_id=(u8)n;
     name[3] = (char)('0' + n);
     set = resource_file(name, &size);asset_size=size;
@@ -205,6 +208,7 @@ void game_scenario(u16 n)
     }
     memset(W, 0, sizeof *W);
     actor_reset(); W->dialog_key = 0xFFFF;
+    tilog("scene %u start: %u steps", n, RD16(set, 5));
     step_start();
     if (!st.done && (step_at(st.step)[0] == STEP_CARD||step_at(st.step)[0]==STEP_NARRATE) && step_at(st.step)[1] & 1)
         st.open_fade = 9;               // the previous program faded out: this card fades in
@@ -216,12 +220,25 @@ u8 game_update(void)
         return 0;
     }
     if (!set) return !input_pressed(K_ESC);
+    if (skip_ask) {
+        if (input_pressed(K_UP | K_DOWN)) skip_row ^= 1;
+        if (input_pressed(K_B | K_ESC)) skip_ask = 0;
+        else if (input_pressed(K_A | K_ENTER)) {
+            skip_ask = 0;
+            if (skip_row) {                  // done, flow written
+                tilog("scene skipped at step %u", st.step);
+                st.step = RD16(set, 5); step_start(); return 0;
+            }
+        }
+        return 1;
+    }
+    if (input_pressed(K_ESC)) { skip_ask = 1; skip_row = 0; return 1; }
     W->actor_budget = 1; W->actor_misses = 0; W->ac_now++;
     st.tick++; if (st.open_clock < 250) st.open_clock++;
     if (st.open_fade) {                 // out over 8 frames, the next step in over 8 more
         if (++st.open_fade == 9) { next_step(); if (st.done) return 0; st.open_fade = 9; }
         else if (st.open_fade >= 17) st.open_fade = 0;
-        return !input_pressed(K_ESC);
+        return 1;
     }
     if (st.open_stage == OPEN_TITLE) {
         // Do not consume the ENTER which launched the program. Finish the source-letter
@@ -347,6 +364,12 @@ void game_render(void)
             if (W->dialog_key != st.open_beat) opening_layout();
             ZB(22); opening_dialog_draw(); ZE(22);
         }
+    }
+    if (skip_ask) {                     // centred, white on black, the hand on its row
+        draw_rect(44, 34, 72, 32, C_WHITE); draw_rect(45, 35, 70, 30, C_BLACK);
+        ui_text(52, 38, "Skip scene?", C_WHITE, 114);   // (limit: the box's right edge)
+        ui_text(62, 48, "No", C_WHITE, 114); ui_text(62, 56, "Yes", C_WHITE, 114);
+        ui_text(54, 48 + 8 * skip_row, ">", C_WHITE, 114);
     }
     if (st.open_fade) {
         u8 level = st.open_fade < 9 ? st.open_fade : 17 - st.open_fade;

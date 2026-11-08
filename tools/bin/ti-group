@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Merges single-variable TI-89 files (.89z .89y .89p...) into one group file (.89g).
+"""Merges TI-89 files (single variables .89z .89y .89p... or groups .89g) into one group file.
 
-Usage: ti-group OUT.89g FILE...
+Usage: ti-group OUT.89g FILE...   (groups are flattened; every variable must be in one folder)
 TiEmu's -send= keeps only the last file given, so ti-emu sends one group instead.
 Layout (TI-GRAPH LINK): 0x3C-byte header (signature, folder, comment, entry count at 0x3A), then
 16-byte entries (offset, name[8], type, attr, u16) - a folder entry (type 0x1F, u16 = its
@@ -11,18 +11,31 @@ variable count) before the variables - then the file size, A5 5A, and each varia
 import struct, sys
 
 
-def read_single(path):
+def read_vars(path):
     d = open(path, 'rb').read()
-    if d[:8] not in (b'**TI89**', b'**TI92P*') or struct.unpack_from('<H', d, 0x3A)[0] != 1:
-        sys.exit(f'ti-group: {path} is not a single-variable TI-89 file')
-    off, name, vtype, attr = struct.unpack_from('<I8sBB', d, 0x3C)
-    size = struct.unpack_from('<I', d, 0x4C)[0]
-    return d[0x0A:0x12], name, vtype, attr, d[off:size]
+    if d[:8] not in (b'**TI89**', b'**TI92P*'):
+        sys.exit(f'ti-group: {path} is not a TI-89 file')
+    n = struct.unpack_from('<H', d, 0x3A)[0]
+    entries = [struct.unpack_from('<I8sBB', d, 0x3C + 16 * i) for i in range(n)]
+    ends = [e[0] for e in entries[1:]] + [struct.unpack_from('<I', d, 0x3C + 16 * n)[0]]
+    folder = d[0x0A:0x12]
+    out = []
+    for (off, name, vtype, attr), end in zip(entries, ends):
+        if vtype == 0x1F:                       # folder entry: its variables follow
+            folder = name
+            continue
+        out.append((folder, name, vtype, attr, d[off:end]))
+    return out
 
 
 def main(out, paths):
-    vars_ = [read_single(p) for p in paths]
+    vars_ = [v for p in paths for v in read_vars(p)]
     folder = vars_[0][0]
+    if any(v[0] != folder for v in vars_):
+        sys.exit('ti-group: variables from several folders')
+    names = [v[1] for v in vars_]
+    if len(set(names)) != len(names):
+        sys.exit('ti-group: duplicate variable names')
     n = len(vars_) + 1
     at = 0x3C + 16 * n + 6
     head = bytearray(b'**TI89**' + b'\x01\x00' + folder + b'group by ti-group'.ljust(40, b'\0'))

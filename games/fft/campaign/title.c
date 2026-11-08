@@ -1,10 +1,14 @@
 // PS1-inspired front end; three independent saves, existing font/glove/neutral Ramza.
+// New Game starts a fresh session (ffsave) without choosing a slot; Continue copies the chosen
+// slot into the session; Save (ffttitle(3): world map, chapter prompts) copies the session into
+// a slot. No other program writes a slot (save.h).
 #include "../../../runtime/core/rt.h"
 #include "../art.h"
 #include "save.h"
 #include <stdlib.h>
 #include "../base.inc"
 #include "flow.h"
+#include "../../../lib/tilog.h"
 #ifndef FFT_TITLE_VARIANT
 #define FFT_TITLE_VARIANT 0             // review1=A faded map;2=B animated serif/black
 #endif
@@ -19,7 +23,7 @@ static const u8 *title_flow;
 
 enum { TITLE_MAIN,TITLE_FILES,TITLE_OVERWRITE };
 enum { SLOT_EMPTY,SLOT_VALID,SLOT_DAMAGED };
-typedef struct {u8 kind,legacy,level,place;} TitleSlot;
+typedef struct {u8 kind,level,place;} TitleSlot;
 typedef struct {
     u8 screen,row,action,answer,notice,result,slot,wrote;
     u8 selected[SAVE_SELECT_BYTES];
@@ -53,9 +57,8 @@ static void title_scan(void)
         memset(s,0,sizeof *s);
         if(!save_load_from(save_slot_name(i+1),title_draft)) {
             if(rt_load(save_slot_name(i+1),title_draft,sizeof *title_draft)||
-               rt_load(save_slot_name(i+1),title_draft,SAVE_V2_BYTES)){s->kind=SLOT_DAMAGED;continue;}
-            if(i||!save_load_from(SAVE_LEGACY_NAME,title_draft))continue;
-            s->legacy=1;
+               rt_load(save_slot_name(i+1),title_draft,SAVE_V2_BYTES))s->kind=SLOT_DAMAGED;
+            continue;
         }
         s->kind=SLOT_VALID;s->level=1;
         for(j=0;j<title_draft->n;j++)if(title_draft->unit[j].type==2){s->level=title_draft->unit[j].level;break;}
@@ -99,7 +102,7 @@ void game_init(void)
 }
 void game_scenario(u16 n)
 {
-    title.screen=n==1||n==2||n==3?TITLE_FILES:TITLE_MAIN;title.action=n==3?2:n==2;
+    title.screen=n==2||n==3?TITLE_FILES:TITLE_MAIN;title.action=n==3?2:n==2;
     title.row=title.answer=title.notice=title.result=title.slot=title.wrote=0;
     if(n==3) {
         u8 selected[SAVE_SELECT_BYTES];
@@ -112,26 +115,28 @@ void game_scenario(u16 n)
     title.reveal=n?180:0;
 #endif
 }
+// The variable the choice writes: the chosen slot for Save, else the session.
+static const char *title_target(void)
+{
+    return title.action==2?save_slot_name(title.slot):SAVE_SESSION_NAME;
+}
 static u8 title_accept(void)
 {
-    TitleSlot *s=&title_slots[title.row];title.slot=title.row+1;
+    TitleSlot *s=&title_slots[title.row];title.slot=title.action?title.row+1:0;
     if(title.action==2) {
         if(!title_save_ready){title.notice=2;return 1;}
-        title.wrote=1;
     }else if(title.action) {
         if(s->kind!=SLOT_VALID){title.notice=s->kind==SLOT_DAMAGED?2:1;return 1;}
-        if(!save_load_from(s->legacy?SAVE_LEGACY_NAME:save_slot_name(title.slot),title_draft)){
-            title.notice=2;return 1;
-        }
-        title.wrote=s->legacy;
+        if(!save_load_from(save_slot_name(title.slot),title_draft)){title.notice=2;return 1;}
     } else {
         memset(title_draft,0,sizeof *title_draft);memcpy(title_draft->magic,SAVE_MAGIC,4);
-        title_draft->money[2]=7;title_draft->money[3]=208;title.wrote=1;
+        title_draft->money[2]=7;title_draft->money[3]=208;
     }
-    if(title.wrote&&!rt_save(save_slot_name(title.slot),title_draft,sizeof *title_draft)){
-        title.notice=3;title.wrote=0;return 1;
-    }
-    title.result=title.action==2?3:title.action?2:1;return 0;
+    title.wrote=1;
+    if(!rt_save(title_target(),title_draft,sizeof *title_draft)){title.notice=3;title.wrote=0;return 1;}
+    title.result=title.action==2?3:title.action?2:1;
+    tilog("title %s slot %u",title.action==2?"save":title.action?"continue":"new game",title.slot);
+    return 0;
 }
 u8 game_update(void)
 {
@@ -147,7 +152,11 @@ u8 game_update(void)
     if(title.screen==TITLE_MAIN) {
         if(pressed&K_ESC)return 0;
         title.row=choice_move(title.row,2,pressed);
-        if(pressed&(K_ENTER|K_A)){title.action=title.row;title.row=0;title.screen=TITLE_FILES;}
+        if(pressed&(K_ENTER|K_A)){
+            title.action=title.row;title.row=0;
+            if(!title.action)return title_accept();   // New Game: a fresh session, no slot
+            title.screen=TITLE_FILES;
+        }
     } else if(title.screen==TITLE_FILES) {
         if(pressed&(K_B|K_ESC)){if(title.action==2)return 0;title.screen=TITLE_MAIN;title.row=title.action;return 1;}
         title.row=choice_move(title.row,3,pressed);
@@ -173,15 +182,17 @@ u8 title_finish(void)
     Save *verified;u8 valid;
     if(!title.result||!title_draft)return 0;
     verified=malloc(sizeof *verified);if(!verified)return 0;
-    valid=save_load_from(save_slot_name(title.slot),verified);
+    valid=save_load_from(title_target(),verified);
     if(title.wrote)valid&=!memcmp(verified,title_draft,sizeof *verified);
     free(verified);if(!valid)return 0;
+    if(!title.slot)return title.result;     // New Game: no slot involved
     memcpy(title.selected,SAVE_SELECT_MAGIC,4);title.selected[4]=title.slot;title.selected[5]=0;
     return rt_save(SAVE_SELECT_NAME,title.selected,sizeof title.selected)?title.result:0;
 }
 u8 title_verified(void)
 {
     u8 selected[SAVE_SELECT_BYTES];
+    if(title.result&&!title.slot)return title.result;
     return title.result&&rt_load(SAVE_SELECT_NAME,selected,sizeof selected)&&
            !memcmp(selected,title.selected,sizeof selected)?title.result:0;
 }

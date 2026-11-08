@@ -87,17 +87,26 @@ static void restarts(void)
     clock_now=800;auto_control(1);W->frz=1;W->ai_k=3;W->ai_nab=W->ai_n=W->ai_self=0;
     ai_step();CHECK(ai_hold_start,800);CHECK(st.ai,AI_GO);
 }
-static void frozen_picture(void)
+static u32 planes_hash(void)
 {
-    u16 i;u32 before,after;
-    ready(100);ai_step();
-    for(i=0;i<RT_PSIZE;i++){
-        ((u8 *)rt_light)[i]=(u8)i;((u8 *)rt_dark)[i]=(u8)~i;
-    }
-    before=planes_sum();clock_now=356;ai_step();game_render();after=planes_sum();
-    CHECK(before==after,1);CHECK(st.ai,AI_GO);CHECK(W->frz,1);
+    u32 h=17;u16 i;
+    for(i=0;i<RT_PSIZE;i++)h=(h<<5|h>>27)^((u8 *)rt_light)[i]^((u32)((u8 *)rt_dark)[i]<<8);
+    return h;
 }
-static void trials(void){deadlines();restarts();frozen_picture();}
+// The units stay animated while an AI thinks: one picture in four is drawn (the others keep
+// the last one, the frames left to thinking), and the animation clock runs.
+static void thinking_cadence(void)
+{
+    u16 i;u32 before;u16 tick;
+    ready(100);
+    for(i=0;i<RT_PSIZE;i++){((u8 *)rt_light)[i]=(u8)i;((u8 *)rt_dark)[i]=(u8)~i;}
+    before=planes_hash();
+    rt_frame=1;game_render();CHECK(planes_hash()==before,1);
+    rt_frame=4;game_render();CHECK(planes_hash()!=before,1);
+    CHECK(st.ai,AI_THINK);
+    tick=st.tick;rt_keys=rt_prev=0;update(0);CHECK(st.tick!=tick,1);
+}
+static void trials(void){deadlines();restarts();thinking_cadence();}
 #ifndef __m68k__
 int main(void){sw_init(61);trials();printf("ai_pause %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else

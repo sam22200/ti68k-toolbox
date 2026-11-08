@@ -5,6 +5,10 @@
 #   Keys never stick: tiemu-keyfix.c (LD_PRELOAD) replays lost key releases; TI_KEYFIX=0 = without.
 #   save: saves the current state into the profile's sav_file (TiEmu menu > Calculator state >
 #         Save state image); the emulator will restart from that state.
+#   save NAME: saves it as a named state instead (tools/tiemu/$TI_CALC/states/NAME), leaving the
+#         clean default untouched; TI_STATE=NAME ti-emu start|restart [FILE...] boots from it.
+#         Example: install a game's core once, `ti-emu save fftcore`, then each test sends
+#         only its chapter files: `TI_STATE=fftcore ti-emu restart chapter.89g`.
 #   TI_CALC=89t (default): TI-89 Titanium, AMS 3.10     TI_CALC=89: TI-89 HW2, AMS 2.09 AMSpatch
 #   TI_CALC=89u: TI-89 HW2, official unpatched AMS 2.09 (24 KB program limit, execution protection)
 # TiEmu 3.04 from Ubuntu 22.04 (tilibs 2011) in Docker, shown on the host display: the TiEmu of
@@ -14,11 +18,16 @@ T=$(cd "$(dirname "$0")/.." && pwd)
 P="$T/tiemu/${TI_CALC:-89t}"
 [ -d "$P" ] || { echo "ti-emu: unknown profile $P" >&2; exit 2; }
 W=$(cd "$T/.." && pwd)
+H="$P"                                          # TiEmu's HOME: the profile, or a named state's copy
+if [ -n "$TI_STATE" ]; then
+  H="$P/states/$TI_STATE"
+  [ -f "$H/.tiemu/state.sav" ] || [ "$1" = save ] || { echo "ti-emu: no state $TI_STATE (ti-emu save $TI_STATE)" >&2; exit 2; }
+fi
 case "$1" in
   start)
     xdotool search --name '^TiEmu \(' >/dev/null 2>&1 && { echo "TiEmu already running"; exit 0; }
     shift; SEND=""; NOFIX=""
-    [ "$TI_KEYFIX" = 0 ] && NOFIX="-e LD_PRELOAD="
+    [ "$TI_KEYFIX" = 0 ] && NOFIX="-e LD_PRELOAD=/usr/local/lib/tiemu-memread.so"
     for f in "$@"; do [ -f "$f" ] || { echo "ti-emu: $f not found" >&2; exit 1; }; done
     if [ $# -gt 1 ]; then                      # -send= keeps only its last file: one group
       "$T/bin/ti-group" "$P/send.89g" "$@" || exit 1; SEND="-send=$P/send.89g"
@@ -26,13 +35,17 @@ case "$1" in
     docker build -q -t tiemu-jammy -f "$T/Dockerfile.tiemu" "$T" >/dev/null || exit 1   # cached: rebuilds only on a change
     docker run -d --rm --name tiemu --network host -u "$(id -u):$(id -g)" \
       -e DISPLAY="$DISPLAY" -e XAUTHORITY=/xauth -v "$XAUTHORITY:/xauth:ro" \
-      -e HOME="$P" $NOFIX -v "$W:$W" -w "$W" tiemu-jammy tiemu $SEND >/dev/null
+      -e HOME="$H" $NOFIX -v "$W:$W" -w "$W" tiemu-jammy tiemu $SEND >/dev/null
     timeout 30 xdotool search --sync --name '^TiEmu \(' >/dev/null || { echo "ti-emu: no window after 30 s ('Set ROM version' dialog?)" >&2; exit 1; }
     sleep $((2 + 3 * ($# > 0))); echo "TiEmu ready" ;;
   stop) docker kill tiemu >/dev/null 2>&1; echo "TiEmu stopped" ;;
   restart) "$0" stop; sleep 1; shift; "$0" start "$@" ;;
   save)
-    SAV="$P/.tiemu/ti${TI_CALC:-89t}.sav"
+    SAV="$P/.tiemu/ti${TI_CALC:-89t}.sav"; INI="$P/.tiemu/tiemu.ini"
+    if [ -n "$2" ]; then                       # named state: a HOME of its own with its ini
+      H="$P/states/$2"; mkdir -p "$H/.tiemu"; SAV="$H/.tiemu/state.sav"; INI="$H/.tiemu/tiemu.ini"
+      cp "$P/.tiemu/tiemu.ini" "$INI"
+    fi
     W=$(xdotool search --name '^TiEmu \(' | head -1)
     [ -n "$W" ] || { echo "ti-emu: TiEmu is not running" >&2; exit 1; }
     xdotool windowactivate --sync "$W"; sleep 0.3
@@ -44,12 +57,18 @@ case "$1" in
     xdotool mousemove $((CX + 220)) $((CY + 131)) mousemove $((CX + 347)) $((CY + 181)) click 1
     D=$(timeout 10 xdotool search --sync --name '^Save File$' | head -1)
     [ -n "$D" ] || { echo "ti-emu: no Save File dialog (menu layout changed?)" >&2; exit 1; }
+    # A typed path triggers GTK's autocompletion (it duplicated folders): type a bare name,
+    # saved in the chooser's current folder under the profile, then move it into place.
+    TMP=tistate-$$.sav
     sleep 0.5; xdotool windowactivate --sync "$D"; sleep 0.3
-    xdotool key ctrl+a BackSpace; xdotool type '='; xdotool key Left
-    xdotool type --delay 15 "$SAV"; xdotool key End BackSpace Return; sleep 1.5
+    xdotool key ctrl+a BackSpace; sleep 0.2; xdotool type --delay 40 "$TMP"; sleep 0.3
+    xdotool key Return; sleep 2
     xdotool search --name '^Save File$' >/dev/null 2>&1 && { echo "ti-emu: save not confirmed" >&2; exit 1; }
-    sed -i "s#^sav_file=.*#sav_file=$SAV#" "$P/.tiemu/tiemu.ini"
+    OUT=$(find "$P" "$H" -name "$TMP" 2>/dev/null | head -1)
+    [ -n "$OUT" ] || { echo "ti-emu: saved file $TMP not found" >&2; exit 1; }
+    mv "$OUT" "$SAV"
+    sed -i "s#^sav_file=.*#sav_file=$SAV#" "$INI"
     echo "state saved: $SAV" ;;
   status) xdotool search --name '^TiEmu \(' >/dev/null 2>&1 && echo "running" || echo "stopped" ;;
-  *) echo "usage: [TI_CALC=89t|89|89u] ti-emu start|stop|restart|status|save" >&2; exit 2 ;;
+  *) echo "usage: [TI_CALC=89t|89|89u] [TI_STATE=NAME] ti-emu start|stop|restart|status|save [NAME]" >&2; exit 2 ;;
 esac

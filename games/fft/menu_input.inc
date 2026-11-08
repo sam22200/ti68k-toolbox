@@ -144,4 +144,4 @@ static u8 ai_shown(void)
     if (!W->hud_ok) return 0;                   // the time shown counts once the HUD is drawn
     return ++st.ai_t >= (st.ai == AI_MOVE ? AI_SHOW : st.ai_ab == NO_ABIL ? AI_PREVIEW : AI_PREVIEW + AI_NAME);
 }
-
+#include "modal_input.inc"

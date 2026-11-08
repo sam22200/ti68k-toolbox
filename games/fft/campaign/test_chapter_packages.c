@@ -69,10 +69,12 @@ static void progress(FpProgress *s)
 {memcpy(s->flags,saved+4,32);s->flow=saved[3114];}
 static void reset(void)
 {memset(saved+4,0,32);saved[3114]=0;reset_count++;}
+static unsigned char lose_once;
 static unsigned short child(unsigned char program,unsigned short arg)
 {
     programs[calls]=program;arguments[calls]=arg;calls++;
     if(calls==stop_at)return 0;
+    if(program==FP_BATTLE&&lose_once){lose_once=0;return 0;}   /* lost: nothing saved */
     if(program==FP_BATTLE&&arg/100==1)saved[4]|=1;
     if(program==FP_BATTLE&&arg/100==2){saved[4]|=2;saved[3114]=4;}
     if(program==FP_SCENE&&arg==1)saved[3114]=1;
@@ -92,7 +94,7 @@ static unsigned short child(unsigned char program,unsigned short arg)
 static void prepare(unsigned char flags,unsigned char flow)
 {
     memset(saved,0x5a,sizeof saved);memcpy(saved,"FSV4",4);memset(saved+4,0,32);
-    saved[4]=flags;saved[3114]=flow;calls=stop_at=map_returns=reset_count=0;
+    saved[4]=flags;saved[3114]=flow;calls=stop_at=map_returns=reset_count=lose_once=0;
     hidden=short_file=0;
 }
 static void trials(void)
@@ -125,7 +127,7 @@ static void trials(void)
     pack[8]^=1;repair(pack);CHECK(fp_preflight(read_file,bad)==FP_WRONG_CORE);pack[8]^=1;repair(pack);
     original=pack[48];pack[48]=0;repair(pack);CHECK(!fp_size(pack,pack_n,0));pack[48]=original;repair(pack);
     original=pack[52];pack[52]=pack[48];repair(pack);CHECK(!fp_size(pack,pack_n,0));pack[52]=original;repair(pack);
-    original=pack[57];pack[57]=1;repair(pack);CHECK(!fp_size(pack,pack_n,0));pack[57]=original;repair(pack);
+    original=pack[57];pack[57]=2;repair(pack);CHECK(!fp_size(pack,pack_n,0));pack[57]=original;repair(pack);
     /* Resume every persisted pilot boundary without replaying a committed step. */
     for(i=0;i<6;i++){
         static const unsigned char flags[6]={0,1,1,1,3,3},flow[6]={0,0,1,2,4,4};
@@ -143,6 +145,19 @@ static void trials(void)
     prepare(3,4);CHECK(fp_story(read_file,child,progress,reset,1,&notice)==FP_OK);CHECK(reset_count==1);
     prepare(0,0);CHECK(fp_story(read_file,child,progress,reset,99,&notice)==FP_OK);
     CHECK(programs[0]==FP_BATTLE&&arguments[0]==105);CHECK(programs[1]==FP_SCENE&&arguments[1]==1);
+    /* A normal start: a lost battle goes back to the title, Continue replays the battle. */
+    prepare(1,3);lose_once=1;CHECK(fp_story(read_file,child,progress,reset,0,&notice)==FP_OK);
+    CHECK(programs[0]==FP_TITLE&&programs[1]==FP_BATTLE&&arguments[1]==200);
+    CHECK(programs[2]==FP_TITLE&&programs[3]==FP_BATTLE&&arguments[3]==200);
+    CHECK(programs[4]==FP_MAP);CHECK(saved[4]==3);
+    /* A step marked save_prompt offers the Save screen once it completes. */
+    prepare(1,3);start=fp_word(pack+38)+5*FP_STEP_BYTES;original=pack[start+1];pack[start+1]=FP_SAVE_PROMPT;repair(pack);
+    CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);
+    CHECK(programs[0]==FP_BATTLE&&programs[1]==FP_TITLE&&arguments[1]==3&&programs[2]==FP_MAP);
+    pack[start+1]=2;repair(pack);CHECK(!fp_size(pack,pack_n,0));pack[start+1]=original;repair(pack);
+    /* A direct start (Continue door 2) still stops at HOME. */
+    prepare(1,3);lose_once=1;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);
+    CHECK(calls==1);
     prepare(3,4);map_returns=1;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);CHECK(programs[1]==FP_MANAGE);
     prepare(3,4);map_returns=2;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);
     CHECK(programs[1]==FP_TITLE&&arguments[1]==3);CHECK(programs[2]==FP_MAP&&arguments[2]==1);

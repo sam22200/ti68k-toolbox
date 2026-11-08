@@ -53,7 +53,9 @@ review: pc
 
 # The battle program and the campaign bundle are ../campaign's (make packed, make bundle).
 .PHONY: banks
-banks: $(TI_FILES)
+banks:                         # the shared contour tail first: ffov0 must match ffcu's
+	$(PY) ../tools/contour_assets.py --attach data/ffov0.bin
+	$(MAKE) $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:

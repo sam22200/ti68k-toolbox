@@ -559,7 +559,6 @@ static u8 bg_usable(void);
                                         // went over the budget once forced)
 #define SAVE_WAIT 2                     // frames the copy waits at most once the camera stops,
 #define WAIT_MAX 8                      // the rings going or a HUD part (then done anyway)
-#define SUM_K 25                        // an AI unit's picture checked (planes_sum)
 #define CUR_K 15                        // the cursor's dashes made again (8-19k)
 #define TURN_K 45                       // the update's own heavy work: a turn's start (the clock,
 #define AIM_K 35                        // the AT list), an aim (the reach, the preview), a Move's
@@ -2831,7 +2830,11 @@ static void attack_step(void)
 #endif
     if (st.act_t == ACT_HIT) {
 #ifdef FFT_MODULES
-        u8 area=W->cast.phase==CAST_BATCH_READY,id=MOD_ACTION,op=0;
+        u8 area,id=MOD_ACTION,op=0;
+#ifdef FFT_REACH_CONTOUR
+        if(st.dbg&DBG_GOD)mod_call(MOD_SCREENS,14,0);   // debug_battle.inc
+#endif
+        area=W->cast.phase==CAST_BATCH_READY;
         if(st.abil==NO_ABIL||(st.abil<512&&(abilities[st.abil].flags&AF_CHARGE))){id=MOD_WEAPON;op=1;}
         else if(st.abil==109||st.abil==116){id=MOD_PERFORMANCE;op=8;}
         else if(st.abil<512&&(magic_status_formula(abilities[st.abil].formula)||abilities[st.abil].kind==AB_CLEANSE||reaction_self(st.abil))){id=MOD_STATUS;op=area?12:13;}
@@ -2839,6 +2842,9 @@ static void attack_step(void)
         if(mod_call(id,op,0))turn_order();
 #else
 #ifdef FFT_CHAPTER
+#ifdef FFT_REACH_CONTOUR
+        {void debug_hit_direct(void);if(st.dbg&DBG_GOD)debug_hit_direct();}
+#endif
         if(W->cast.phase==CAST_BATCH_READY){
             if((magic_status_formula(abilities[W->cast.ability].formula)?batch_status_commit(&W->cast):batch_commit(&W->cast))&2)turn_order();
         }else
@@ -4636,20 +4642,6 @@ static s16 ease(s16 c, s16 t)
 // ---------------------------------------------------------------- game
 static u8 *sbuf;
 
-// a checksum of the picture just drawn, its 160 x 100 pixels (an AI unit thinks once the
-// picture stands still): two sums (Fletcher's), no multiply or long rotation (~25k)
-static u32 planes_sum(void)
-{
-    const u8 *l = rt_light, *d = rt_dark;
-    u32 a = 0, b = 0;
-    u16 y;
-    for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
-        const PlaneWord *p = (const PlaneWord *)l, *q = (const PlaneWord *)d;
-        a += p[0]; b += a; a += p[1]; b += a; a += p[2]; b += a; a += p[3]; b += a; a += p[4]; b += a;
-        a += q[0]; b += a; a += q[1]; b += a; a += q[2]; b += a; a += q[3]; b += a; a += q[4]; b += a;
-    }
-    return a ^ b;
-}
 
 static void
 #ifdef __m68k__
@@ -5298,6 +5290,7 @@ static void menu_keys(void)
 {
     if(input_pressed(K_UP|K_DOWN|K_LEFT|K_RIGHT|K_A|K_ENTER|K_ESC|K_B)&&mod_call(MOD_SCREENS,5,0))compute_reach(st.act);
 }
+static u8 modal_keys(void){return (u8)mod_call(MOD_SCREENS,13,0);}
 static void acts_keys(void)
 {
     if(!unit_can_act(&st.unit[st.act])){to_menu();return;}
@@ -5391,6 +5384,7 @@ static void acts_keys(void)
         if (can_use(st.act, ab)) aim(ab);
     } else if (input_pressed(K_ESC | K_B)) st.mode = M_ACTS;
 }
+#include "modal_input.inc"
 
 #endif
 
@@ -5484,7 +5478,7 @@ static void ai_step(void)
             if (done) st.ai = AI_GO;            // (this frame keeps the picture)
         }
     } else if (st.ai == AI_GO) {                // thinking counts toward the turn's pause
-        if (st.ai_t != AI_HOLD_SKIP && (u16)(rt_ticks()-ai_hold_start)<AI_HOLD_TICKS) return;
+        if (st.ai_t != AI_HOLD_SKIP && !(st.dbg & DBG_FAST) && (u16)(rt_ticks()-ai_hold_start)<AI_HOLD_TICKS) return;
         ai_camera(); ai_next(); W->hold = 1;    // then the plan shown from the next
     }                                           // frame (this one keeps the picture)
     else if (st.ai == AI_FACE ? ++st.ai_t >= AI_SHOW / 2 : ai_shown()) {
@@ -5544,7 +5538,7 @@ static u8 update(u8 fast)
     if (!fast && st.ai && st.mode!=M_END && (st.auto_units || st.ai_all) && input_pressed(K_ESC | K_B)) {
         auto_control(0); return 1;                 // consume cancellation, including during animation
     }
-    if (st.ai != AI_THINK || st.banner || st.morph_mask) {
+    {                                           // the units stay animated while an AI thinks
 #ifdef FFT_CHAPTER
         if(!flow_bank||st.mode!=M_END)
 #endif
@@ -5658,20 +5652,9 @@ static u8 update(u8 fast)
     } else if (!st.turn) {
         if (input_pressed(K_APPS) && (st.mode == M_BROWSE || st.mode == M_MENU || st.mode == M_TARGET
             || st.mode == M_AIM || st.mode == M_CAST_RANGE || st.mode == M_ACTS || st.mode == M_SKILLS)) {
-            st.back = st.mode; st.mode = M_ORDER;  // the turn order, closed by any key
-        } else if (st.mode == M_ORDER) {
-            if (input_pressed(K_A | K_B | K_ENTER | K_ESC | K_APPS | K_UP | K_DOWN | K_LEFT | K_RIGHT)) st.mode = st.back;
-        } else if (st.mode == M_QUIT) {            // "Quit?": No unless Yes is picked
-            if (input_pressed(K_UP | K_DOWN)) st.quit ^= 1;
-            if (input_pressed(K_A | K_ENTER)) { if (!st.quit) return 0; st.mode = st.back==M_CLOCK?M_CLOCK:M_BROWSE; }
-            else if (input_pressed(K_ESC | K_B)) st.mode = st.back==M_CLOCK?M_CLOCK:M_BROWSE;
-        } else if (st.mode == M_AUTO) {
-            if (input_pressed(K_UP)) st.sub=st.sub ? st.sub-1:2;
-            if (input_pressed(K_DOWN)) st.sub=st.sub<2 ? st.sub+1:0;
-            if (input_pressed(K_A | K_ENTER)) {
-                auto_control(st.sub);
-                if (!st.sub) to_menu();
-            } else if (input_pressed(K_ESC | K_B)) to_menu();
+            st.back = st.mode; st.mode = M_ORDER;  // the turn order (modal_input.inc)
+        } else if ((u8)(st.mode - M_ORDER) < 3) {  // turn order, Quit?, Auto-battle (modal_input.inc)
+            if (modal_keys()) return 0;
         } else if (st.mode == M_MENU) {
             menu_keys();
         } else if (st.mode == M_ACTS || st.mode == M_SKILLS) {
@@ -5830,7 +5813,7 @@ static u8 battle_update(void)
 #ifdef FFT_CINEMA
     if (r && cinema_eligible()) { cinema_begin(); return r; }
 #endif
-    for (; r && k < AI_FAST && !st.morph_mask && !st.banner && st.ai && st.ai != AI_THINK && rt_keys & (K_A | K_ENTER) && !W->upd_k
+    for (; r && k < AI_FAST && !st.morph_mask && !st.banner && st.ai && st.ai != AI_THINK && (rt_keys & (K_A | K_ENTER) || st.dbg & DBG_FAST) && !W->upd_k
            && W->left >= FAST_K * k; k++)
     {
         r = update(1);
@@ -6389,8 +6372,9 @@ static const u8 forecast_mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 
                 d[i] = (d[i] & keep) | W->win[1][r * (RT_PBYTES / 2) + i];
             }
         copy_box(W->win[0] + 3 * (RT_PBYTES / 2), W->win[1] + 3 * (RT_PBYTES / 2), 12, y + 3, W->win_w, W->win_h - 3);
-        if (k[0] == M_MENU || k[0] == M_AUTO || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT) {
-            u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS || k[0] == M_AUTO ? st.sub : k[0] == M_SKILLS ? st.skill - W->win_k[1] : st.quit + 1;
+        if (k[0] == M_MENU || k[0] == M_AUTO || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT || k[0] == M_ORDER) {
+            u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS || k[0] == M_AUTO ? st.sub : k[0] == M_SKILLS ? st.skill - W->win_k[1]
+                : k[0] == M_ORDER ? st.status_row : st.quit + 1;
             draw_hand(80, y + 7 + 6 * e);
         }
     }
@@ -6419,7 +6403,13 @@ u8 hud_ready(void) { return W && W->hud_ok; }
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define help_lines CONTOUR_REF_help_lines
 #else
-static const char *const help_lines[2] = { "ENTER: stats/equip   SHIFT: back", "[ENTER] again   [ESC] quit" };
+static const char *const help_lines[2] = { "ENTER: stats/equip   SHIFT: back",
+#ifdef FFT_CHAPTER          // fftstory returns to the title after a lost battle (original FFT)
+    "[ENTER] title"         // (tools/contour_assets.py archives help_lines[1]: this one first)
+#else
+    "[ENTER] again   [ESC] quit"
+#endif
+};
 #endif
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
@@ -6569,6 +6559,7 @@ u16 mod_entry(u8 op,u8 a)
 #endif
     if(op==10)return ai_shown();
     if(op==5)return menu_keys();if(op==6)return acts_keys();
+    if(op==13)return modal_keys();
     if(op==7){auto_control(a);return 0;}
     if(op==8){move_cursor((s8)M.cast_actor,(s8)M.cast_ref);return 0;}
     if(op==9)return face_of((s8)M.cast_actor,(s8)M.cast_ref);
@@ -6576,6 +6567,7 @@ u16 mod_entry(u8 op,u8 a)
     if(op==2)return config_update();
     if(op==3){config_draw();return 0;}
     if(op==4){status_keys();return 0;}
+    if(op==14){debug_hit();return 0;}
 #endif
     draw_status();return 0;
 }
@@ -6755,9 +6747,9 @@ void game_render(void)
 #ifdef FFT_CINEMA
         !st.cphase &&
 #endif
-        (!st.morph_mask && (W->hold || (!st.banner && (st.ai == AI_THINK || st.ai == AI_GO) && W->frz)))) {   // the same picture in
-        W->hold = 0;                                                           // both buffers: the
-        FRAME_END(); return;                                                                // AI thinks
+        (!st.morph_mask && (W->hold || (!st.banner && st.ai == AI_THINK && W->frz && (rt_frame & 3))))) {   // an AI
+        W->hold = 0;                                // thinking: one picture in four, the units' animation
+        FRAME_END(); return;                        // kept (its pause, AI_GO, draws every frame)
     }
 #ifdef FFT_EXPLORATION
 #ifdef FFT_CINEMA
@@ -6840,7 +6832,6 @@ void game_render(void)
     }
     if (AIMING(st.mode) && st.tick & 8 && (tg = unit_at_cell(CURSOR_CELL)) && vis[tg - 1]) n += UNIT_K;
     else tg = 0;
-    if (st.ai == AI_THINK && !st.morph_mask) n += SUM_K;
     if (st.morph_mask) n += 20;
     if (st.banner) n += BN_K + DK_K - HUD_K;   // the banner and its shade instead of the HUD
     n += W->upd_k;
@@ -6935,15 +6926,10 @@ void game_render(void)
             }
         }
     }
-    if (st.ai == AI_THINK && !st.banner && !st.morph_mask) {      // two pictures in a row the same: stop drawing
-        s16 tx, ty;
-        cam_target(&tx, &ty);
-        if (tx != st.camx || ty != st.camy) W->frz_h = 0;   // still panning: not checked
-        else {
-            u32 h = planes_sum();
-            if (h == W->frz_h) W->frz = 1;
-            W->frz_h = h;
-        }
+    if (st.ai == AI_THINK && !st.banner && !st.morph_mask) {      // the camera settled: thinking may
+        s16 tx, ty;                                                  // take the frames (game_render
+        cam_target(&tx, &ty);                                        // draws one in four)
+        if (tx == st.camx && ty == st.camy) W->frz = 1;
     }
 #ifdef FFT_CONFIG
     if(W->left>=60) pidle_tick(48);

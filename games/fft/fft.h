@@ -524,6 +524,8 @@ typedef struct {
     u8 reach_contour;                  // full movement tiles by default; exterior edges when set
 #endif
     u8 banner, banner_t;               // BN_*: the battle's objective, its outcome; its frame
+    u8 dbg;                            // DBG_* (debug_battle.inc; fftmem.py set): the former
+                                       // alignment byte before morph_mask, State size unchanged
     u16 morph_mask;                    // converted units awaiting their visible transformation
     u8 morph_t;                        // current lowest set bit's animation frame, 0..31
 #ifdef FFT_CHAPTER
@@ -536,6 +538,8 @@ typedef struct {
 #endif
 } State;
 enum { BN_NONE, BN_START, BN_VICTORY, BN_DEFEAT };
+#define DBG_GOD 1                      // allied blows kill, enemy actions on allies miss
+#define DBG_FAST 2                     // AI turns run as with [2nd] held, without the 1.5 s hold
 #ifdef FFT_CHAPTER
 #include "campaign/save_types.h"
 #define BATTLE_STORAGE_BYTES (sizeof(State)+sizeof(Save))

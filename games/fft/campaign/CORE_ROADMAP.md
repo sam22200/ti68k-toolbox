@@ -1,5 +1,7 @@
 # Core roadmap: current state and content-production gate
 
+**Next steps (2026-11-08): [Chapter I readiness](CHAPTER1_READINESS.md)** — first the battle RAM margin (~1.2 KB left; Chapter I has ~20 maps), then the archive budget, a one-command native chapter run and a frozen core interface.
+
 Current resource checkpoint (2026-11-07): [Sharing policy and implementation](CORE_RESOURCES.md).
 Chapter packaging now drops obsolete copies, shares arena resources by FRF1 and
 scene payloads by bounded FSC2/FSP1 pools, and audits installed duplicates.

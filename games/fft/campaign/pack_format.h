@@ -11,6 +11,7 @@ typedef const unsigned char *(*FpRead)(const char *, unsigned short *);
 #define FP_ROUTE_BYTES 4U
 #define FP_NONE 65535U
 enum { FP_SCENE=1, FP_BATTLE, FP_DEPLOY };
+#define FP_SAVE_PROMPT 1   /* step byte 1: offer the Save screen once the step completes */
 enum { FP_OK, FP_MISSING_CORE, FP_BAD_CORE, FP_MISSING_PACK, FP_BAD_PACK,
        FP_WRONG_CORE, FP_MISSING_FILE, FP_BAD_FILE, FP_PREVIOUS, FP_NEXT };
 static unsigned short fp_word(const unsigned char *p)
@@ -54,7 +55,7 @@ static unsigned short fp_size(const unsigned char *p,unsigned short n,unsigned c
     for(i=0;i<steps;i++){
         const unsigned char *s=p+at+i*FP_STEP_BYTES;
         unsigned short arg=fp_word(s+2);
-        if(s[0]<FP_SCENE||s[0]>FP_DEPLOY||s[1]||s[7]||fp_word(s+4)>256)return 0;
+        if(s[0]<FP_SCENE||s[0]>FP_DEPLOY||s[1]>FP_SAVE_PROMPT||s[7]||fp_word(s+4)>256)return 0;
         if(s[0]==FP_SCENE){if(arg>9)return 0;}
         else{
             for(j=0;j<routes;j++)if(p[FP_HEADER+j*FP_ROUTE_BYTES]==arg/100)break;

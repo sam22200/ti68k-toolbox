@@ -73,6 +73,8 @@ def main():
 
     report, shared, packs = packages.build(source, core, [chapter], out/'delivery')
     variables = shared+packs[0][1]
+    # The running supervisor's own image differs from its file: never a checked dependency.
+    verify(b'fftstory' not in next(v for v in shared if v.name == 'ffcore').payload)
     verify(len({v.name for v in variables}) == len(source)+2)
     verify(not set(v.name for v in shared)&set(v.name for v in packs[0][1]))
     verify(set(source) == set(v.name for v in variables)-{'ffcore', 'ffpack'})

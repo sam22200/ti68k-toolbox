@@ -30,10 +30,17 @@ static u8 config_update(void)
 }
 static void config_draw(void){mod_call(MOD_SCREENS,3,0);}
 #else
+#ifdef FFT_CHAPTER
+#include "debug_battle.inc"
+#endif
 static u8 config_update(void)
 {
     if (!W) return 0;
     if (st.config) {
+#ifdef FFT_CHAPTER
+        if (st.config >= 2) return debug_config();
+        if (input_pressed(K_D)) { st.config = 2; st.config_row = 0; return 1; }   // hidden: [alpha]
+#endif
         if (input_pressed(K_CATALOG | K_ESC | K_B
 #ifdef FFT_CHAPTER
                           | K_MODE
@@ -99,6 +106,9 @@ static u8 config_update(void)
 
 static void config_draw(void)
 {
+#ifdef FFT_CHAPTER
+    if (st.config >= 2) { debug_draw(); return; }
+#endif
 #ifndef FFT_CONFIG
     // Compact chapter settings; strings live in the existing shared archive tail.
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)

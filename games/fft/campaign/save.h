@@ -1,8 +1,10 @@
 #ifndef FFT_CAMPAIGN_SAVE_H
 #define FFT_CAMPAIGN_SAVE_H
-// The campaign save: one selected slot shared by every program (legacy ffsave when no
-// selector exists). fftbat writes it after a victory, fftmng edits the party, fftmap moves on
-// the world map, and fftstory reads where to resume. Bytes only, u16 big-endian:
+// The campaign save: the session (ffsave) shared by every program. fftbat writes it after a
+// victory, fftmng edits the party, fftmap moves on the world map, and fftstory reads where to
+// resume. Nothing writes the player's slots ffsave1..3 but the title: Continue copies a slot
+// into the session, Save (world map, a chapter's save prompt) copies the session into a slot,
+// as in FFT; ffslot only remembers the last slot used. Bytes only, u16 big-endian:
 // the same file on the PC and TI. Every id is
 // FFT's own (jobs, items, abilities, skill sets), never a chapter's table index, so any chapter
 // reads it.
@@ -10,15 +12,7 @@
 #include "save_types.h"
 #ifndef SAVE_OFFSETS_ONLY
 #include <string.h>
-static const char *save_name(void)
-{
-    unsigned char selected[SAVE_SELECT_BYTES];
-    if(rt_load(SAVE_SELECT_NAME,selected,sizeof selected)&&
-       !memcmp(selected,SAVE_SELECT_MAGIC,4)&&selected[4]>=1&&selected[4]<=3&&!selected[5])
-        return save_slot_name(selected[4]);
-    return SAVE_LEGACY_NAME;
-}
-#define SAVE_NAME save_name()
+#define SAVE_NAME SAVE_SESSION_NAME
 // FSV2 had no funds or deployment. Preserve its entire party/flags/inventory;
 // initialize the newly introduced balance to the source's starting2000gil.
 static u8 save_load_from(const char *name,Save *s)
@@ -37,6 +31,6 @@ static u8 save_load_from(const char *name,Save *s)
 }
 static u8 save_load(Save *s){return save_load_from(SAVE_NAME,s);}
 #else
-#define SAVE_NAME active_save_name()
+#define SAVE_NAME SAVE_SESSION_NAME
 #endif
 #endif
