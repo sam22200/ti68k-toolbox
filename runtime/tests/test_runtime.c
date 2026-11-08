@@ -3,7 +3,9 @@
 // calculator build of xcheck.c (ti_sums below, read on the Titanium, 2026-09-27).
 // Run: make -C runtime test
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "../platform-sw/rt_sw.h"
 
 extern u16 xcheck_sums[8];
@@ -75,6 +77,32 @@ static void test_rand(void)
     CHECK(a[0] != a[1]);
 }
 
+static void test_file_growth(void)
+{
+    char folder[]="/tmp/rt-file-cache-XXXXXX",previous[4096],name[12],path[20];
+    const u8 *first=0;unsigned i;u16 size;FILE *f;
+    CHECK(getcwd(previous,sizeof previous)!=0);
+    if(!mkdtemp(folder)){CHECK(0);return;}
+    if(chdir(folder)){CHECK(0);rmdir(folder);return;}
+    for(i=0;i<70;i++){
+        snprintf(name,sizeof name,"rtcache%02u",i);
+        snprintf(path,sizeof path,"%s.bin",name);
+        f=fopen(path,"wb");CHECK(f!=0);if(!f)break;
+        fputc(i,f);fputc(255-i,f);fclose(f);
+        {const u8 *p=rt_file(name,&size);
+         CHECK(p&&size==2);if(p)CHECK(p[0]==i&&p[1]==255-i);
+         if(!i)first=p;}
+        remove(path);
+    }
+    /* Directory reallocations must not invalidate the game's borrowed bytes,
+       and cached reads still work after the source file has disappeared. */
+    CHECK(first&&first[0]==0&&first[1]==255);
+    CHECK(rt_file("rtcache00",&size)==first&&size==2);
+    f=fopen("empty.bin","wb");CHECK(f!=0);if(f)fclose(f);
+    CHECK(!rt_file("empty",&size));remove("empty.bin");
+    CHECK(chdir(previous)==0);CHECK(rmdir(folder)==0);
+}
+
 int main(void)
 {
     u16 k;
@@ -82,6 +110,7 @@ int main(void)
     test_render();
     test_input_and_script();
     test_rand();
+    test_file_growth();
 
     sw_init(0);                                    // xcheck: one frame renders the scenes
     CHECK(sw_step(0) == 1);

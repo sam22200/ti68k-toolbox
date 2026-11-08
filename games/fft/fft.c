@@ -516,6 +516,7 @@ static ModCtx *mod_context(u8 id);
 #endif
 #endif
 #ifdef FFT_CHAPTER
+#include "resource_file.h"
 #include "campaign/flow.h"
 #include "funds.inc"
 #endif
@@ -4795,9 +4796,9 @@ static u8 chapter_load(u8 c)
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
     mod_id=0; // cdesc/igfx change; never reuse the previous chapter's binding
-    i=mod_call(MOD_NATURE,10,c);
+    i=mod_call(MOD_RESOURCES,10,c);
     {
-        const ModCtx *m=mod_context(MOD_NATURE);
+        const ModCtx *m=mod_context(MOD_RESOURCES);
         contour_gfx=m->contour_gfx; ugfx=m->chapter_ugfx; cdesc=m->cdesc; igfx=m->igfx;
         encounter_units=m->unit_count; map_w=m->map_w; map_h=m->map_h; map_n=m->map_n;
         sc_h=m->sc_h; sc_top=m->sc_top; unit_defs=m->unit_defs; map_tiles=m->map_tiles;
@@ -7038,17 +7039,10 @@ u16 mod_entry(u8 op,u8 a)
 #include "discovery_move.inc"
 #include "reaction_live.h"
 #include "mime_runtime.inc"
-#include "chapter_validate.h"
-#define ugfx (M.chapter_ugfx)
-#include "chapter_files.inc"
-#undef ugfx
 u16 mod_entry(u8 op,u8 a)
 {
  u8 i;
  if(op==9)return mime_next();
- if(op==8)return chapter_files((char)a);
- if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
- if(op==11)return (u8)chapter_route(a);
  if(op==0){nature_hit_commit();W->nature_pending&=(u16)~3;return 0;}
  if(op==1){monster_refresh();return 0;}
  if(op==3)return discovery_find(a,(u8)st.formula.roll);
@@ -7057,5 +7051,18 @@ u16 mod_entry(u8 op,u8 a)
   for(i=0;i<16;i++)q->math_mask[i]=math_filters(st.act,i)?(u16)math_targets(st.act,i):0;
   W->ai_k=7;return 0;}
  return 0;
+}
+#endif
+
+#if !MOD_CORE && MOD_PART(MOD_RESOURCES)
+#include "chapter_validate.h"
+#define ugfx (M.chapter_ugfx)
+#include "chapter_files.inc"
+#undef ugfx
+u16 mod_entry(u8 op,u8 a)
+{
+    if(op==11)return (u8)chapter_route(a);
+    if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
+    return 0;
 }
 #endif

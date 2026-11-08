@@ -136,26 +136,38 @@ void draw_text(s16 x, s16 y, const char *s, u8 font, u8 color)
 // ---------------------------------------------------------------- data files
 const void *rt_file(const char *name, u16 *size)   // NAME.bin, loaded once, kept
 {
-    static struct { char name[12]; void *data; u16 size; } cache[16];   // FFT's opening: 9
+    typedef struct { char name[12]; void *data; u16 size; } File;
+    static File *cache;
+    static unsigned count,capacity;
     char path[32];
     FILE *f;
     long n;
-    u8 k;
-    for (k = 0; k < 16 && cache[k].data; k++)
+    unsigned k;
+    for (k = 0; k < count; k++)
         if (!strcmp(cache[k].name, name)) { if (size) *size = cache[k].size; return cache[k].data; }
-    if (k == 16 || strlen(name) > 10) return RT_NULL;
+    if (strlen(name) > 10) return RT_NULL;
     snprintf(path, sizeof path, "%s.bin", name);
     if (!(f = fopen(path, "rb"))) return RT_NULL;
     fseek(f, 0, SEEK_END);
     n = ftell(f);
     fseek(f, 0, SEEK_SET);
+    /* Host-only directory growth: a shared-bank reference can open two files.
+       Reallocating entries never moves the immutable data borrowed by games. */
+    if(count==capacity){
+        unsigned next=capacity?capacity*2:16;
+        File *grown=realloc(cache,next*sizeof *cache);
+        if(!grown){fclose(f);return RT_NULL;}
+        cache=grown;capacity=next;
+    }
+    cache[k].data=RT_NULL;
     if (n <= 0 || n > 65518 || !(cache[k].data = malloc(n)) || fread(cache[k].data, 1, n, f) != (size_t)n) {
-        fclose(f);
+        fclose(f);if(cache[k].data)free(cache[k].data);cache[k].data=RT_NULL;
         return RT_NULL;
     }
     fclose(f);
     strcpy(cache[k].name, name);
     cache[k].size = (u16)n;
+    count++;
     if (size) *size = (u16)n;
     return cache[k].data;
 }

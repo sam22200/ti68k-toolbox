@@ -282,7 +282,7 @@ static void opening_setup(u8 letter)
     u8 i;char name[6];
     funds_load();st.want=st.prot=st.ai_view=255;
     name[0]='f';name[1]='f';name[2]=(char)letter;name[3]='s';name[4]='t';name[5]=0;
-    opening_story=rt_file(name,RT_NULL);pgfx=rt_file("ffcp",RT_NULL);
+    opening_story=resource_file(name,RT_NULL);pgfx=rt_file("ffcp",RT_NULL);
     if(opening_story)opening_story+=2;
     fixed_units();for(i=0;i<NBAG;i++)st.bag[BAG_SLOT(i)]=bag_init[i];
     W->dialog_key=0xFFFF;W->bg_ok=W->hold=W->frz=W->status_i=0;

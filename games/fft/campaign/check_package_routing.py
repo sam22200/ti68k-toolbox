@@ -30,8 +30,13 @@ def main():
     report=[]
     for label,scenario,remap in [('orbonne',101,False),('gariland',201,False),
                                   ('remapped-gariland',301,True),('continuation-only',301,True),
+                                  ('shared-arena',301,False),
                                   ('absent-route',401,True),('missing-pack',299,False)]:
         spec=deepcopy(chapter)
+        case_source=source
+        if label=='shared-arena':
+            from check_chapter_resources import expanded_fixture
+            case_source,spec=expanded_fixture(source,spec)
         if remap:
             spec['routes'][1]['band']=3
             for step in spec['steps']:
@@ -42,7 +47,7 @@ def main():
             spec['variables']=[n for n in spec['variables'] if not n.startswith('ffo') and n!='ffs0']
         with tempfile.TemporaryDirectory(prefix='fft-installed-pack-')as folder:
             data=Path(folder)
-            _,shared,packs=packages.build(source,core,[spec],data/'delivery',allow_unused=label=='continuation-only')
+            _,shared,packs=packages.build(case_source,core,[spec],data/'delivery',allow_unused=label=='continuation-only')
             variables=shared+packs[0][1]
             if label=='missing-pack':variables=[v for v in variables if v.name!='ffpack']
             for v in variables:

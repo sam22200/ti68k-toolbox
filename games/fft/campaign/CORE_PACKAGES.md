@@ -3,18 +3,20 @@
 2026-11-07. This is the active distribution checkpoint after
 [combat closure](CORE_FINAL_COMBAT.md) and [factorization](CORE_FACTORIZATION.md).
 The combat inventory stays complete: 201 actions and 78 R/S/M consumers.
-The change concerns loading, distribution and content ownership.
+The change concerns loading, distribution and content ownership. Current
+shipping normalization and ABI80 supersede the original ABI79 loader below;
+see [shared resources and authoring rules](CORE_RESOURCES.md).
 
 ## What is installed
 
 | Package | Ownership | Current transport bytes |
 | --- | --- | ---: |
-| `fft-core.89g` | Supervisor, packed engine/scene/menu programs, executable overlays, shared catalogue, identity pool, management/title/interface/weapon resources | 384,601 |
-| `chapter-01.89g` | Active chapter manifest, encounter descriptors, maps/views/depth, scripts/dialogue, world-map progression, actor frames and pose tables | 230,917 |
+| `fft-core.89g` | Supervisor, packed engine/scene/menu programs, executable overlays, shared catalogue, identity pool, management/title/interface/weapon resources | 393,134 |
+| `chapter-01.89g` | Active chapter manifest, encounter descriptors, maps/views/depth, scripts/dialogue, world-map progression, actor frames and pose tables | 213,249 |
 | Existing saves/configuration | User-owned; present in neither package | Unchanged |
 
 Both groups have 23 variables. Their installed variable payloads plus size words
-total 614,342 bytes. Transport bytes include PC transfer headers; neither
+total 605,207 bytes. Transport bytes include PC transfer headers; neither
 measurement includes all AMS VAT/archive metadata, fragmentation or other
 installed programs. The builder defaults to a **planning** budget of 2,700,000
 bytes with a separate 131,072-byte reserve. This is not a measurement of free
@@ -40,7 +42,7 @@ rtk proxy make -C games/fft/campaign packages
 ```
 
 Outputs under `campaign/x/packages/` are `fft-core.89g`, `chapter-01.89g`,
-`packages.json`, `INSTALL.md` and explicit core/chapter variable lists.
+`packages.json`, `resources.json`, `INSTALL.md` and explicit core/chapter variable lists.
 `source.89g` is a build intermediate, not an installation group. The old
 `make bundle` still provides an optional combined group with both manifests;
 `make packages` does not overwrite the historical standard combined group.
@@ -111,8 +113,10 @@ The pack maps a band to its archived bank prefix, rather than the resident
 assuming the fixed `"og"` table. Prefixes are lowercase letters or digits;
 `c` is reserved because `ffca` is the actor-frame bank. Every registered
 encounter needs `ff?v0..3`, `ff?a`, `ff?i`, `ff?d`; scripted starts additionally
-need their `ff?st` data. Scene sets currently use `ffs0..ffs9`. All referenced
-assets must be listed in the pack. Unregistered encounters fail to load.
+need their `ff?st` data. Scene sets currently use `ffs0..ffs9`. Identical encounter
+banks may be single-hop FRF1 references to another declared bank. All referenced
+assets must be listed in the pack; generated scene pools are added automatically.
+Unregistered encounters fail to load.
 The old `og` fallback exists only for historical headless fixtures with neither
 manifest; an installed core without `ffpack` never takes that fallback.
 
@@ -122,6 +126,11 @@ revised with fresh RAM/cycle measurements. Package splitting does not expand
 those runtime capacities.
 
 ## Native integration and verification
+
+Current ABI80 adds a dedicated RESOURCES26 cold image; load10/route11 replace
+NATURE10/11, still returning before PARTY12. ModCtx and execution zone remain.
+See CORE_RESOURCES for current figures and verified sharing cases. The following
+paragraphs record the original ABI79 packaging checkpoint.
 
 ABI79/ModCtx348/signature0991 adds NATURE10 (registered encounter load) and
 NATURE11 (resolved prefix for scripted starts). NATURE returns before PARTY12

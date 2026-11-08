@@ -1,6 +1,13 @@
 # Core roadmap: current state and content-production gate
 
-Current distribution (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
+Current resource checkpoint (2026-11-07): [Sharing policy and implementation](CORE_RESOURCES.md).
+Chapter packaging now drops obsolete copies, shares arena resources by FRF1 and
+scene payloads by bounded FSC2/FSP1 pools, and audits installed duplicates.
+Apply this to scenes/intros and every encounter in one chapter. ABI80,27 images,
+unchanged combat/save capacities; no new combat family. Future campaign content
+must use these pools rather than independently packaging each consumer.
+
+Previous distribution (2026-11-07): [Core and chapter packages](CORE_PACKAGES.md).
 Separate matching core/content groups, data-driven encounter/sequence dispatch,
 save-preserving replacement and content-only builds against an existing core
 are implemented. ABI79 keeps gameplay/save layouts and capacities. The supplied

@@ -52,6 +52,9 @@ void game_render(void);      // draw the whole frame
   missing. Every `draw_*` writes through `rt_light`/`rt_dark` on both targets, so a game can
   point them at its own plane-format buffer (`RT_PSIZE` bytes each, even address) to render
   once (FFA's dialogue box, Desolate's room background).
+  The PC caches immutable file data for the process lifetime; its directory grows
+  as needed without moving borrowed data pointers. This includes chapter-bank
+  aliases opening more than16 files. The TI still reads variables in place.
 - `rt_load(name, data, size)` / `rt_save(name, data, size)`: a game's save. PC: `NAME.sav` at
   once. TI: the OTH variable NAME ("sav"), written **when the program exits**, after the
   grayscale teardown, then archived (c-patterns §10: SymAdd and Flash writes may need AMS
