@@ -39,17 +39,20 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--native',action='store_true')
     ap.add_argument('--out',type=Path,default=OUT);ap.add_argument('--slot',type=int,choices=(1,2,3))
     ap.add_argument('--data-dir',type=Path,help='validate actual installed pack data in isolation')
-    args=ap.parse_args();OUT=args.out.resolve();save_name='ffsave'+str(args.slot) if args.slot else 'ffsave'
+    args=ap.parse_args();OUT=args.out.resolve();save_name='ffsave'   # the session; a --slot is seeded and must stay untouched
     if args.data_dir:args.data_dir=args.data_dir.resolve()
     OUT.mkdir(parents=True,exist_ok=True);initial=b'FSV4'+fixture()[4:]+bytes(64);write_changed(OUT/'initial.sav',initial)
     run(['cc','-std=gnu99','-O1','-g','-w','-o',OUT/'battle',HERE/'check_flow_battle.c',
          ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c'])
     with tempfile.TemporaryDirectory(prefix='fft-flow-') as name:
         temp=Path(name);data_links(temp,args.data_dir);shots=temp/'shots';shots.mkdir()
-        if args.slot:(temp/'ffslot.sav').write_bytes(b'FSL1'+bytes((args.slot,0)))
+        if args.slot:
+            (temp/'ffslot.sav').write_bytes(b'FSL1'+bytes((args.slot,0)))
+            (temp/f'ffsave{args.slot}.sav').write_bytes(initial)
         (temp/(save_name+'.sav')).write_bytes(initial)
         pc=run([OUT/'battle',shots],temp);write_changed(OUT/'pc.log',pc.encode());print(pc.strip())
         saved=(temp/(save_name+'.sav')).read_bytes();write_changed(OUT/'settled.sav',saved)
+        if args.slot:assert (temp/f'ffsave{args.slot}.sav').read_bytes()==initial,'a battle never writes a slot'
         result=save_dump.decode(saved);assert result['money']==4500 and len(result['party'])==7,result
         assert result['inventory'][2]==1 and result['inventory'][253]==initial[38+253]+1
         # The ordinary KO and the two unselected reserve records must survive.

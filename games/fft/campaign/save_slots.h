@@ -1,6 +1,9 @@
 #ifndef FFT_SAVE_SLOTS_H
 #define FFT_SAVE_SLOTS_H
 #define SAVE_LEGACY_NAME "ffsave"
+// The session: the working copy every program reads and writes (party, story flags, flow,
+// deployment, rewards). The player's slots change only through the title's Save.
+#define SAVE_SESSION_NAME SAVE_LEGACY_NAME
 #define SAVE_SELECT_NAME "ffslot"
 #define SAVE_SELECT_MAGIC "FSL1"
 #define SAVE_SELECT_BYTES 6
