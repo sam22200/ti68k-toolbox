@@ -86,10 +86,48 @@ sizing `vbuf` per chapter (RAM would vary per map; the envelope keeps one number
 
 ## 2. Archive budget for 20 maps
 
-Core 395,780 + pilot chapter 213,249 transport bytes for 2 maps and 2 scenes; the planning
-budget leaves about 1.96 MB. Measure the archive cost per battle map and per scene from the
-pilot packs, project 20 + 20, and decide before ripping content whether Chapter I needs two
-installable packs (the pack/supervisor format already chains `previous`/`next` packs).
+**Status 2026-11-10: Chapter I fits in one pack (~1.0 MB of ~2.17 MB); the core reads only two
+actor banks (~131 KB), likely too few for Chapter I.**
+
+Budget: 2,700,000 planning bytes − 131,072 reserve − core 396,473 = **2,172,455 bytes** for
+the installed chapter (one chapter at a time, INSTALL.md). Pilot pack: 211,686 bytes.
+
+Views of the 13 distinct Chapter I battle maps (`tools/map_budget.py --archive`, four greys
+from the disc, first 202 content rows, R2 banks; × 1.12, the pilot's measured ratio of
+shipped to estimated bytes: Gariland 37,980/35,328, Orbonne 34,762/31,024):
+
+| Map | Views (estimate) | Map | Views (estimate) |
+|---|---:|---|---:|
+| 056 Orbonne | 31,024 (shipped 34,762) | 091 Thieves Fort | 27,748 |
+| 022 Gariland | 35,328 (shipped 37,980) | 077 Lenalia Plateau | 24,336 |
+| 085 Mandalia Plains | 37,384 | 072 Fovoham Plains | 20,087 |
+| 074 Sweegy Woods | 36,170 | 073 Inside of Windmill Shed | 24,864 |
+| 031 Dorter Trade City | 23,774 | 103 Windmill Shed | 22,727 |
+| 034 Cellar of Sand Mouse | 24,955 | 049 Fort Zeakden | 27,405 |
+| 076 Zeklaus Desert | 40,105 | **13 maps** | **375,907 → ~421,000** |
+
+Projection for Chapter I (20 battles on the 13 maps, 20 scenes):
+
+| Part | Pilot | Chapter I estimate | Basis |
+|---|---:|---:|---|
+| map views | 72,742 (2 maps) | ~421,000 | the table above |
+| per-map banks (`a`, `i`, `d`, story) | 15,719 (2 maps) | ~105,000 | ~8 KB a map |
+| extra battles on a map already shipped | – | ~35,000 | 7 × ~5 KB of encounter data |
+| actor frames `ffca` + `ffcb` | 84,455 (597 frames) | ~170,000–250,000 | ~2–3× the pilot's job/monster sheets |
+| scenes (`ffs*`, pools) | 10,344 (2 scenes) | ~100,000 | ~5 KB a scene; event scenes reuse map views |
+| flow, dialogue, results | 9,742 | ~100,000 | ~40 steps of script |
+| world map `ffwm` | 17,674 | ~18,000 | shared |
+| **total** | **211,686** | **~0.95–1.03 MB** | **~45 % of the budget** |
+
+**Decision: one installable Chapter I pack** (no split; the chained `previous`/`next` packs stay
+for later chapters). Margin: ~1.1 MB for estimate errors and other programs.
+
+**Core limits found (to fix before freezing the core, step 4):**
+- **Actor banks:** `bootstrap_files.inc` and `fft.c` read only `ffca` and `ffcb` (frames
+  numbered across two variables of at most 65,512 bytes: ~131 KB). Chapter I's estimate
+  exceeds it: the core needs N actor banks (`ffca..`, a bank table and per-bank first frame).
+- **Map letters:** one letter a map (`ff?v0`), `c` reserved: ~25 distinct maps a pack, enough.
+- **Width:** 076 Zeklaus Desert is 336 px wide (scene 320): crop 16 px in its views.
 
 ## 3. One-command native chapter run
 

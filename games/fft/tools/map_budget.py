@@ -132,11 +132,33 @@ def ragged(disc, files, m, nx, nz, b):
         extract.SC_W, extract.SC_OY = old
 
 
+def archive(disc, files, m):
+    """Estimated archive bytes of the map's four R2 views (extract.views() default four greys,
+    rows cropped to the first SC_HMAX content rows, extract.pack_view): ZX0 is slow, about 10 s
+    a map."""
+    mesh, nx, nz, maxh = load(disc, files, m)
+    rec, records = mesh_record(disc, files, m), extract.gns_records
+    # extract.views() reads the first 0x2E01 record: hand it this map's primary mesh
+    extract.gns_records = lambda d, f: [(0x2E01,) + rec[1:]] + [r for r in records(d, f) if r[0] != 0x2E01]
+    try:
+        raw, _ = extract.views(disc, files, nx, nz, maxh)
+    finally:
+        extract.gns_records = records
+    total = []
+    for v in raw:
+        p = np.frombuffer(v, np.uint8).reshape(6, -1, 40)
+        used = np.nonzero(p[:2].any((0, 2)) | p[3].any(1) | p[5].any(1))[0]
+        r0 = int(used[0]) if len(used) else 0
+        total.append(len(extract.pack_view(p[:, r0:r0 + SC_HMAX].tobytes())))
+    return total
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('disc', nargs='?', type=Path, default=core_audit.DEFAULT_DISC)
     ap.add_argument('--render', type=int, default=0, help='rasterize the N largest maps')
     ap.add_argument('--maps', default='', help='also rasterize these map numbers')
+    ap.add_argument('--archive', default='', help='estimate the archive bytes of these maps\' views')
     ap.add_argument('--out', type=Path, default=HERE / 'campaign/x/map-budget.json')
     args = ap.parse_args()
     disc, files = extract.disc_files(str(args.disc))
@@ -165,6 +187,14 @@ def main():
                  uncropped_depth_bytes=full, content_rows=content_rows, canvas_px=canvas)
         print('map %3d %2dx%-2d h%-2d rows %3d width %5.1f shipped depth %s uncropped %s' % (
             r['map'], nx, nz, r['maxh'], content_rows, r['width_px'], sizes, full), flush=True)
+    for m in [int(m) for m in args.archive.split(',') if m]:
+        r = next(r for r in rows if r['map'] == m)
+        r['view_archive_bytes'] = archive(disc, files, m)
+        print('map %3d views %s = %d archive bytes' % (m, r['view_archive_bytes'], sum(r['view_archive_bytes'])), flush=True)
+    if not args.render and not args.maps and args.out.exists():   # keep the rendered depth figures
+        old = {r['map']: r for r in json.loads(args.out.read_text())['rows']}
+        for r in rows:
+            r.update({k: v for k, v in old.get(r['map'], {}).items() if k not in r})
     report = dict(schema='FFT_MAP_BUDGET_1', sc_w=320, sc_hmax=SC_HMAX, depth_max=DEPTH_MAX,
                   maps=len(rows), over_width=[r['map'] for r in rows if not r['fits_width']],
                   over_rows=[r['map'] for r in rows if not r['fits_rows']],
