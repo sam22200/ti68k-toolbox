@@ -2,6 +2,8 @@
 # Drives the emulator: [TI_CALC=89t|89|89u] ti-emu start | stop | restart | status | save
 #   start/restart [FILE...]: boot from the profile's clean saved state and send the TI files
 #         (-send=, no file chooser). The way to test a new build: `ti-emu restart a.89z b.89y`.
+#         Returns once the transfer has landed (`ti-mem wait`: the last variable in the VAT);
+#         TI_WAIT=0 returns at once as before.
 #   Keys never stick: tiemu-keyfix.c (LD_PRELOAD) replays lost key releases; TI_KEYFIX=0 = without.
 #   save: saves the current state into the profile's sav_file (TiEmu menu > Calculator state >
 #         Save state image); the emulator will restart from that state.
@@ -26,18 +28,21 @@ fi
 case "$1" in
   start)
     xdotool search --name '^TiEmu \(' >/dev/null 2>&1 && { echo "TiEmu already running"; exit 0; }
-    shift; SEND=""; NOFIX=""
+    shift; SEND=""; SENT=""; NOFIX=""
     [ "$TI_KEYFIX" = 0 ] && NOFIX="-e LD_PRELOAD=/usr/local/lib/tiemu-memread.so"
     for f in "$@"; do [ -f "$f" ] || { echo "ti-emu: $f not found" >&2; exit 1; }; done
     if [ $# -gt 1 ]; then                      # -send= keeps only its last file: one group
-      "$T/bin/ti-group" "$P/send.89g" "$@" || exit 1; SEND="-send=$P/send.89g"
-    elif [ $# = 1 ]; then SEND="-send=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; fi
+      "$T/bin/ti-group" "$P/send.89g" "$@" || exit 1; SEND="-send=$P/send.89g"; SENT="$P/send.89g"
+    elif [ $# = 1 ]; then SENT="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; SEND="-send=$SENT"; fi
     docker build -q -t tiemu-jammy -f "$T/Dockerfile.tiemu" "$T" >/dev/null || exit 1   # cached: rebuilds only on a change
     docker run -d --rm --name tiemu --network host -u "$(id -u):$(id -g)" \
       -e DISPLAY="$DISPLAY" -e XAUTHORITY=/xauth -v "$XAUTHORITY:/xauth:ro" \
       -e HOME="$H" $NOFIX -v "$W:$W" -w "$W" tiemu-jammy tiemu $SEND >/dev/null
     timeout 30 xdotool search --sync --name '^TiEmu \(' >/dev/null || { echo "ti-emu: no window after 30 s ('Set ROM version' dialog?)" >&2; exit 1; }
-    sleep $((2 + 3 * ($# > 0))); echo "TiEmu ready" ;;
+    if [ -n "$SENT" ] && [ "$TI_WAIT" != 0 ]; then   # until the last variable is in the VAT
+      sleep 2; "$T/bin/ti-mem" wait "$SENT" || exit 1
+    else sleep $((2 + 3 * ($# > 0))); fi
+    echo "TiEmu ready" ;;
   stop) docker kill tiemu >/dev/null 2>&1; echo "TiEmu stopped" ;;
   restart) "$0" stop; sleep 1; shift; "$0" start "$@" ;;
   save)

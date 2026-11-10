@@ -13,6 +13,7 @@ Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$P
 
 | Command | Purpose |
 |---|---|
+| `ti-mem wait FILE\|NAME` | **until a transfer has landed** (polls the VAT every 0.3 s): the last variable of the file is there, archived if the file says so, else with its size word. `ti-emu start/restart FILE...` already end with it (`TI_WAIT=0`: return at once): no screenshot or fixed sleep to wait for a transfer |
 | `ti-mem log [--clear]` / `heap` / `peek ADDR` / `dump F` | **read the live calculator RAM, no screenshot** (0.2 s): the `tilog` event ring (`lib/tilog.h`; send the variable made by `ti-mem mkvar F.89y`), every AMS heap block with its size, lock and variable name, raw bytes |
 | `ti-emu save NAME`, `TI_STATE=NAME ti-emu restart file…` | a named saved state (e.g. a game's core installed once) next to the clean default, which stays untouched; boots from it and sends only the files under test (FFT chapter: 17 s instead of ~60 s for core + chapter) |
 | `ti-emu start\|stop\|restart\|status\|save` | TiEmu in Docker. `TI_CALC=89t` (default, Titanium AMS 3.10) or `TI_CALC=89` (TI-89 HW2, AMS 2.09 AMSpatch) or `TI_CALC=89u` (TI-89 HW2, official unpatched AMS 2.09: the one to test program size limits and execution protection; no saved state, boots to a fresh HOME) |

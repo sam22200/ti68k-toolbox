@@ -7,6 +7,9 @@ Usage:
   ti-mem heap [--min BYTES]   allocated AMS heap blocks: handle, address, size, lock, variable
   ti-mem dump OUT.bin         the whole RAM (256 KB, TI address 0 = file offset 0)
   ti-mem peek ADDR [LEN]      hex dump of TI addresses (ADDR in hex)
+  ti-mem wait FILE|NAME [--timeout S]   until a transfer has landed: the last variable of a
+                              .89? file (or NAME) is in the VAT, archived if the file says so,
+                              else with the file's size word (polled every 0.3 s, default 300 s)
 The emulated RAM is the 256 KB malloc block whose first longs are the 68000 vectors (initial
 SSP 0x4C00, reset vector in ROM). Reading needs tools/tiemu-memread.c preloaded (ti-emu does).
 """
@@ -134,6 +137,57 @@ def cmd_heap(args):
     print(f'{len(rows)} blocks, {sum(r[2] for r in rows)} bytes allocated')
 
 
+ARCHIVED = 0x0200                               # SYM_ENTRY flags: the data lives in Flash
+
+
+def last_variable(path):
+    """(name, archived, varsize) of the last variable of a TI-89 file (group or single)."""
+    b = open(path, 'rb').read()
+    if b[:8] != b'**TI89**':
+        sys.exit(f'ti-mem: {path} is not a TI-89 file')
+    count = struct.unpack_from('<H', b, 0x3A)[0]
+    entries = [struct.unpack_from('<I8sBB', b, 0x3C + 16 * i) for i in range(count)]
+    off, name, kind, attr = [e for e in entries if e[2] != 0x1F][-1]      # 0x1F: a folder
+    return name.rstrip(b'\0'), bool(attr & 2), struct.unpack_from('>H', b, off + 4)[0]
+
+
+def landed(data, name, archived, size):
+    """Whether a VAT entry of that name holds the whole variable."""
+    table = struct.unpack_from('>I', data, HANDLE_TABLE)[0]
+    key, o = name.ljust(8, b'\0'), data.find(name.ljust(8, b'\0'))
+    while o >= 0:
+        if not o & 1:
+            flags, h = struct.unpack_from('>HH', data, o + 10)
+            p = struct.unpack_from('>I', data, table + 4 * h)[0] if 0 < h < 4000 else 0
+            if archived and flags & ARCHIVED and p >= 0x200000:
+                return True
+            if not archived and not flags & ARCHIVED and 0x100 <= p < RAM - 2 and \
+                    (size is None or struct.unpack_from('>H', data, p)[0] == size):
+                return True
+        o = data.find(key, o + 1)
+    return False
+
+
+def cmd_wait(args):
+    import time
+    timeout = float(args[args.index('--timeout') + 1]) if '--timeout' in args else 300
+    what = args[0]
+    if os.path.exists(what):
+        name, archived, size = last_variable(what)
+    else:
+        name, archived, size = what.encode(), '--archived' in args, None
+    mem, base = locate(tiemu_pid())
+    t0 = time.time()
+    while True:
+        mem.seek(base)
+        if landed(mem.read(RAM), name, archived, size):
+            print(f'transfer done: {name.decode()} after {time.time() - t0:.1f} s')
+            return
+        if time.time() - t0 > timeout:
+            sys.exit(f'ti-mem: {name.decode()} not received after {timeout:.0f} s')
+        time.sleep(0.3)
+
+
 def cmd_dump(args):
     open(args[0], 'wb').write(ram()[2])
 
@@ -147,7 +201,8 @@ def cmd_peek(args):
 
 
 if __name__ == '__main__':
-    cmds = {'log': cmd_log, 'mkvar': cmd_mkvar, 'heap': cmd_heap, 'dump': cmd_dump, 'peek': cmd_peek}
+    cmds = {'log': cmd_log, 'mkvar': cmd_mkvar, 'heap': cmd_heap, 'dump': cmd_dump, 'peek': cmd_peek,
+            'wait': cmd_wait}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         sys.exit(__doc__)
     cmds[sys.argv[1]](sys.argv[2:])
