@@ -75,7 +75,7 @@ maps are wider than 320 px (`over_width` in `x/map-budget.json`), independent of
 **What does not cost RAM.** The number of maps, scenes and battles in a pack: banks, scene
 pools and manifests are read in place from the archive (one VAT entry each).
 
-**Resident headroom.** TTPack input 64,829 of 64,936 (107 bytes left, `tools/headroom.sh`;
+**Resident headroom.** TTPack input 64,865 of 64,936 (71 bytes left after the actor banks, zone 8,708, `tools/headroom.sh`;
 was 397): ring/cursor/cover readers +~300, the RAM message and the envelope live in cold
 modules (ABI 81). Item 4 (freeze the core) must win room back before any resident growth.
 
@@ -86,8 +86,8 @@ sizing `vbuf` per chapter (RAM would vary per map; the envelope keeps one number
 
 ## 2. Archive budget for 20 maps
 
-**Status 2026-11-10: Chapter I fits in one pack (~1.0 MB of ~2.17 MB); the core reads only two
-actor banks (~131 KB), likely too few for Chapter I.**
+**Status 2026-11-10: Chapter I fits in one pack (~1.0 MB of ~2.17 MB); the core now reads up
+to six actor banks (~390 KB).**
 
 Budget: 2,700,000 planning bytes − 131,072 reserve − core 396,473 = **2,172,455 bytes** for
 the installed chapter (one chapter at a time, INSTALL.md). Pilot pack: 211,686 bytes.
@@ -123,9 +123,12 @@ Projection for Chapter I (20 battles on the 13 maps, 20 scenes):
 for later chapters). Margin: ~1.1 MB for estimate errors and other programs.
 
 **Core limits found (to fix before freezing the core, step 4):**
-- **Actor banks:** `bootstrap_files.inc` and `fft.c` read only `ffca` and `ffcb` (frames
-  numbered across two variables of at most 65,512 bytes: ~131 KB). Chapter I's estimate
-  exceeds it: the core needs N actor banks (`ffca..`, a bank table and per-bank first frame).
+- **Actor banks (fixed 2026-11-10, ABI 82):** the core read only `ffca` and `ffcb` (~131 KB).
+  It now reads `ffca`, `ffcb` (required) then `ffcc..ffcf` while present (`actors.h`
+  `ACTOR_BANKS` 6, ~390 KB); frames are numbered across them in order (`actors.inc` walks the
+  bank counts). `common_actors.py` writes as many banks as needed; `chapter_packages.py`
+  rejects a gap. Checked: the cache test with three banks, and Gariland's manual and AI
+  replays with the pilot's frames split 200/250/147 over three banks (same checksums).
 - **Map letters:** one letter a map (`ff?v0`), `c` reserved: ~25 distinct maps a pack, enough.
 - **Width:** 076 Zeklaus Desert is 336 px wide (scene 320): crop 16 px in its views.
 

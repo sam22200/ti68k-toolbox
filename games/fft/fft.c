@@ -4756,7 +4756,7 @@ void game_init(void)
     {
         static const CoreBoot boot={&flow_bank,&flow_ui,&wgfx,abank,&cgfx,&common,&charge_ticks,&job_sets,
                                    &abilities,&jobs,&job_names,&items,
-                                   &battle_state,&rt_state,&rt_state_size,&vbuf,&sbuf,&navbuf,&nav_capacity,&acache,&ac_key,&ac_age,&abank_n0,
+                                   &battle_state,&rt_state,&rt_state_size,&vbuf,&sbuf,&navbuf,&nav_capacity,&acache,&ac_key,&ac_age,
                                    &sl_l,&sl_m,&sc_l,&sc_m,
 #ifdef FFT_CAMPAIGN_FLOW
                                    1
@@ -4776,7 +4776,7 @@ void game_init(void)
     if(flow_bank)flow_ui=rt_file("ffmg",RT_NULL);
 #endif
     wgfx = rt_file("ffcw", RT_NULL);
-    abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
+    actor_banks(abank);
     cgfx = rt_file("ffcu", RT_NULL);
     {                                          // the jobs and items every chapter shares
         u16 cj_size;const u8 *cj = rt_file("ffcj", &cj_size);
@@ -4800,7 +4800,6 @@ void game_init(void)
     if (!wgfx || !abank[0] || !abank[1] || !cgfx) return;
 #endif
 #ifndef FFT_MODULES
-    abank_n0 = RD16(abank[0], 0);
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB; the
         vbuf = malloc(VIEW_BYTES);              // the core's depth envelope
         sbuf = vbuf ? malloc(2UL * SC_BYTES * SC_HMAX + sizeof(Work)) : RT_NULL;

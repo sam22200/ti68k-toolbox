@@ -6,14 +6,14 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 81U
+#define MOD_ABI 82U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
     const u8 **p_flow_bank,**p_flow_ui,**p_wgfx,**p_abank,**p_cgfx,**p_common,**p_charge_ticks,**p_job_sets;
     const Ability **p_abilities;const Job **p_jobs;const char **p_job_names;const Item **p_items;
     State **p_battle_state;void **p_rt_state;u16 *p_rt_state_size;
-    u8 **p_vbuf,**p_sbuf,**p_navbuf;u16 *p_nav_capacity;u16 (**p_acache)[UNIT_FB/2];u16 **p_ac_key,**p_ac_age,*p_abank_n0;
+    u8 **p_vbuf,**p_sbuf,**p_navbuf;u16 *p_nav_capacity;u16 (**p_acache)[UNIT_FB/2];u16 **p_ac_key,**p_ac_age;
     const PlaneWord **p_sl_l,**p_sl_m,**p_sc_l,**p_sc_m;
     u16 campaign_flow;                   // resident build policy, shared images serve both entries
 } CoreBoot;

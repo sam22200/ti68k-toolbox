@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Common 2D actor and blade banks of the chapter packages (run by both chapter generators).
 
-ffca, ffcb: every distinct 208-byte actor frame of every chapter, stored once as its own
+ffca, ffcb (then ffcc..ffcf when needed, actors.h ACTOR_BANKS): every distinct 208-byte
+actor frame of every chapter, stored once as its own
 ZX0 stream; a frame that is another one mirrored is not stored (bit 15 of a mapping entry:
 fft.c actor_frame() flips it after decoding). Frames are numbered across the two
 variables (one variable holds at most 65,512 bytes). Layout of each: u16 count, u16
@@ -27,7 +28,7 @@ sys.path.insert(0, str(HERE / 'tools'))
 import extract  # noqa: E402
 
 FB = 208
-BANKS = ('ffca', 'ffcb')
+BANKS = ('ffca', 'ffcb', 'ffcc', 'ffcd', 'ffce', 'ffcf')   # actors.h ACTOR_BANKS; two at least
 BODY = 19968                     # fftw: 6 actors x 16 armed bodies, then the blades
 MARK = '// Actor frames live in ffca (tools/common_actors.py).'
 REV = bytes(int('{:08b}'.format(i)[::-1], 2) for i in range(256))
@@ -66,6 +67,7 @@ def opening_frames():
 def read_common(folder):
     out = []
     for name in BANKS:
+        if not (folder / (name + '.bin')).exists(): break
         data = (folder / (name + '.bin')).read_bytes(); count = struct.unpack_from('>H', data)[0]
         offsets = struct.unpack_from('>%dH' % count, data, 2); base = 2 + 2 * count
         ends = list(offsets[1:]) + [len(data) - base]
@@ -82,7 +84,7 @@ def split(streams):
             banks.append([])
         banks[-1].append(s)
     assert len(banks) <= len(BANKS), ('more actor variables needed', len(banks))
-    banks += [[] for _ in range(len(BANKS) - len(banks))]
+    banks += [[] for _ in range(2 - len(banks))]          # ffca and ffcb always exist
     out = []
     for frames in banks:
         table = bytearray(struct.pack('>H', len(frames))); data = bytearray()
@@ -118,6 +120,7 @@ def main():
     for chapter in ('opening', 'campaign'):
         folder = HERE / chapter / 'data'
         for name, data in zip(BANKS, common): (folder / (name + '.bin')).write_bytes(data)
+        for name in BANKS[len(common):]: (folder / (name + '.bin')).unlink(missing_ok=True)
         (folder / 'ffcw.bin').write_bytes(blades)
         (folder / 'weapons.h').write_text(wh)
     (HERE / 'opening/data/ffoa.bin').write_bytes(struct.pack('>%dH' % len(omap), *omap))
@@ -130,8 +133,8 @@ def main():
         '// Generated locally by tools/common_actors.py; never committed.\n'
         '#define ACTOR_OBJECTS %d\n#define ACTOR_ARMED %d\n%s\n' % (6 * 44, armed, MARK))
     shared = len({k & 0x7FFF for k in omap} & {k & 0x7FFF for k in gmap})
-    print('ffca+ffcb: %d frames (%d used by both chapters), %s bytes; Orbonne %d / Gariland %d logical'
-          % (len(records), shared, '+'.join(str(len(c)) for c in common), len(omap), len(gmap)))
+    print('%s: %d frames (%d used by both chapters), %s bytes; Orbonne %d / Gariland %d logical'
+          % ('+'.join(BANKS[:len(common)]), len(records), shared, '+'.join(str(len(c)) for c in common), len(omap), len(gmap)))
 
 
 if __name__ == '__main__':

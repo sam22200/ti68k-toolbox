@@ -27,8 +27,9 @@ static const u8 *actor_frame(u16 logical, u8 slot)
         }
         e = victim;
         {   // frames are numbered across ffca then ffcb (tools/common_actors.py)
-            const u8 *b = abank[0]; u16 r = id;
-            if (r >= abank_n0) { b = abank[1]; r -= abank_n0; }
+            const u8 *const *k = abank, *b; u16 r = id;
+            while (r >= RD16(*k, 0) && k[1]) { r -= RD16(*k, 0); k++; }   // its bank, its index there
+            b = *k;
             b += 2 + 2 * RD16(b, 0) + RD16(b + 2, r);
 #ifdef __m68k__
             if (frame_key & 0x8000) {           // every 16-pixel row of the four planes; the

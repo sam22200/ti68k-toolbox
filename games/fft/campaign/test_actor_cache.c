@@ -42,7 +42,7 @@ static void trials(void)
         }
         abank[j]=banks[j];
     }
-    abank_n0=64;acache=(u16 (*)[UNIT_FB/2])storage;
+    abank[2]=RT_NULL;acache=(u16 (*)[UNIT_FB/2])storage;
     ac_key=(u16 *)acache[AC_N];ac_age=ac_key+AC_N;
     actor_reset();
     for(i=0;i<AC_N;i++){W->ac_now++;p=actor_frame(i,0);check(*p==i);}
@@ -67,6 +67,21 @@ static void trials(void)
     actor_reset();W->actor_budget=0;
     p=actor_frame(97,1);check(*p==97&&decodes==99);
     check(W->actor_misses==1);
+    // Three banks (ffca 64, ffcb 20, ffcc 30 frames): frames are numbered across them in order,
+    // the lookup stops at the last bank present.
+    {
+        static u8 third[2+2*30+30];
+        banks[1][1]=20;
+        for(i=0;i<20;i++){banks[1][3+2*i]=(u8)i;banks[1][42+i]=(u8)(100+i);}
+        third[1]=30;
+        for(i=0;i<30;i++){third[3+2*i]=(u8)i;third[62+i]=(u8)(150+i);}
+        abank[2]=third;abank[3]=RT_NULL;actor_reset();
+        W->ac_now++;p=actor_frame(63,0);check(*p==63);
+        W->ac_now++;p=actor_frame(64,0);check(*p==100);
+        W->ac_now++;p=actor_frame(83,0);check(*p==119);
+        W->ac_now++;p=actor_frame(84,0);check(*p==150);
+        W->ac_now++;p=actor_frame(113,0);check(*p==179);
+    }
 }
 #ifdef __m68k__
 void _main(void){trials();BENCH_VALUE(digest);BENCH_VALUE(failures);BENCH_VALUE(checks);}

@@ -7,8 +7,24 @@
     u8 actor_budget, actor_misses, actor_next; \
     u16 actor_key[ACTOR_SLOTS], ac_now;  /* each slot's pose; frames drawn so far */ \
     u8 actor_ent[ACTOR_SLOTS];           /* its acache entry */
-static const u8 *abank[2];              // the common actor frames (ffca, ffcb: common_actors.py)
-static u16 abank_n0;                    // frames in ffca
+// The chapter's actor frames (tools/common_actors.py): ffca, ffcb (both required), then ffcc..
+// while present, each at most one archive variable; frames are numbered across them in order.
+#define ACTOR_BANKS 6                   // ffca..ffcf: ~390 KB of frames
+static const u8 *abank[ACTOR_BANKS + 1];   // then NULL: the frame lookup stops there
+// The banks found in the archive into b (the missing ones and the one after: NULL); 1: ffca and
+// ffcb are there. (A module builds the name without an initializer: it has no memcpy.)
+static u8 actor_banks(const u8 **b)
+{
+    char name[5];
+    u8 k;
+    name[0] = name[1] = 'f'; name[2] = 'c'; name[4] = 0;
+    for (k = 0; k < ACTOR_BANKS; k++) {
+        name[3] = (char)('a' + k);
+        b[k] = k && !b[k - 1] ? RT_NULL : rt_file(name, RT_NULL);
+    }
+    b[ACTOR_BANKS] = RT_NULL;
+    return b[0] && b[1];
+}
 // Decoded frames shared by every actor: 48 hold Gariland's AI battle at 0.06 decodes
 // a frame (1.8 with one pose per actor). Its own block: Gariland's Work + planes
 // block (57,006 bytes) cannot grow by 7 KB under AMS's ~64 KB block limit.
