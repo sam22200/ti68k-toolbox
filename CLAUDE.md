@@ -73,6 +73,7 @@ ti-emu start                    # TiEmu (Titanium by default; TI_CALC=89 TI-89 H
 ti-run name.89z [data.89y]      # clean restart from the .sav, files sent at boot, run name()
 ti-shot /path/x.png --lcd       # screenshot, then read the image to check
 ti-mem log | heap               # live RAM, no screenshot: the tilog event ring (lib/tilog.h), AMS heap blocks
+ti-mem wait x.89g               # until a transfer has landed (ti-emu start/restart already wait for their files)
 ti-emu save NAME; TI_STATE=NAME ti-run x.89z  # a saved state (e.g. a core installed once), only x sent
 ti-gif /path/x.gif 20 &         # animated GIF of the LCD (20 s) while ti-key plays
 ti-play keys/win.txt            # a runtime key script played in TiEmu in real time (held keys, diagonals)
