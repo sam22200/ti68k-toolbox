@@ -25,11 +25,15 @@ static u8 bootstrap_files(void)
     *p->p_sl_l=(const PlaneWord *)(*p->p_cgfx+UIC_SLOPES);
     *p->p_sl_m=*p->p_sl_l+SLOPE_ROWS;*p->p_sc_l=*p->p_sl_m+SLOPE_ROWS;*p->p_sc_m=*p->p_sc_l+SLOPE_ROWS;
     *p->p_abank_n0=RD16(p->p_abank[0],0);
-    *p->p_vbuf=malloc(4UL*SC_BYTES*SC_HMAX);
+    *p->p_vbuf=malloc(FFT_CORE_DEPTH_MAX);
     *p->p_sbuf=*p->p_vbuf?malloc(2UL*SC_BYTES*SC_HMAX+sizeof(Work)):RT_NULL;
     *p->p_acache=*p->p_sbuf?malloc(AC_N*(UNIT_FB+4)):RT_NULL;
     if(!*p->p_acache&&*p->p_sbuf){free(*p->p_sbuf);*p->p_sbuf=RT_NULL;}
     if(!*p->p_sbuf){if(*p->p_vbuf)free(*p->p_vbuf);*p->p_vbuf=RT_NULL;return 0;}
     *p->p_ac_key=(u16 *)(*p->p_acache)[AC_N];*p->p_ac_age=*p->p_ac_key+AC_N;
+    if(!*p->p_navbuf){                         // the core's map envelope, once: any map fits
+        *p->p_navbuf=malloc(NAV_ENVELOPE);*p->p_nav_capacity=*p->p_navbuf?NAV_ENVELOPE:0;
+    }
     return 1;
 }
+

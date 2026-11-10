@@ -108,12 +108,21 @@ u8 scene_rot;
 // the four views (fftv0..3, ZX0, read in place), unpacked one at a time into vbuf: light and
 // dark planes, then twice (the frontmost pixels of each byte, then the next ones) their view
 // diagonal and their mask (SC_PLANE each)
+// DEPTH_ROW(y, t, x0, w): the depth row y: for x0 <= b < x0 + w, t[b] its depth, then the same
+// byte of the mask, second depth and second mask DEPTH_STRIDE bytes apart; masks are 0 elsewhere.
 #ifdef FFT_VIEW_SPLIT                   // the colours live in the scene buffer only
-#define VIEW_BYTES (4UL * SC_PLANE)
-#define VDEPTH vbuf                     // depth, mask, depth, mask
+// Chapters: ragged depth (extract.ragged_depth): a DepthRow per scene row, then each plane as
+// its rows' spans (the bytes holding mask bits, about half a row): ~18 KB, not 32 KB
+typedef struct { u16 off; u8 x0, w; } DepthRow;   // off: the row's span start - x0
+#define VIEW_BYTES FFT_CORE_DEPTH_MAX
+#define DEPTH_ROW(y, t_, x0_, w_) do { const DepthRow *r_ = (const DepthRow *)vbuf + (y); \
+    t_ = vbuf + r_->off; x0_ = r_->x0; w_ = r_->w; } while (0)
+#define DEPTH_STRIDE vplane
 #else
 #define VDEPTH (vbuf + 2 * SC_PLANE)
 #define VIEW_BYTES (6UL * SC_PLANE)          // 52,320 (Gariland 48,480): above a 16-bit int
+#define DEPTH_ROW(y, t, x0, w) do { t = VDEPTH + (u16)((y) * SC_BYTES); x0 = 0; w = SC_BYTES; } while (0)
+#define DEPTH_STRIDE SC_PLANE
 #endif
 #if MOD_CORE
 static const u8 *views[4];
@@ -156,6 +165,9 @@ static u32 slope_pc[4 * SLOPE_ROWS];    // the PC's native copy (ffti is big-end
 #if MOD_CORE
 static const u8 *wgfx;                  // armed body poses and blades (fftw), read in place
 static u8 *vbuf, vbuf_rot;
+#ifdef FFT_VIEW_SPLIT
+static u16 vplane;                      // bytes of one plane of the unpacked ragged depth
+#endif
 #endif
 
 #if defined(FFT_CHAPTER) && !defined(FFT_COMPACT_UI)
@@ -470,6 +482,13 @@ typedef struct {
 #if defined(__m68k__) && defined(FFT_CHAPTER) && MOD_CORE
 // malloc's hidden handle also belongs to the maximum AMS heap block.
 typedef char SceneWorkFitsAmsBlock[(2UL*SC_BYTES*SC_HMAX+sizeof(Work)+2UL<=65520UL)?1:-1];
+#endif
+#ifdef FFT_CHAPTER
+#define NAV_ENVELOPE (MAP_NMAX * 20U)              // nav_reserve(MAP_NMAX, 2): 16 + 4 bytes a node
+// What a battle allocates beyond its program (game_init, bootstrap_files.inc): State and Save,
+// the depth envelope, the scene and Work, the actor cache, the map envelope, AMS's headers
+#define BATTLE_RAM_BYTES (BATTLE_STORAGE_BYTES + FFT_CORE_DEPTH_MAX + 2UL * SC_BYTES * SC_HMAX \
+    + sizeof(Work) + AC_N * (UNIT_FB + 4UL) + NAV_ENVELOPE + 5 * 4)
 #endif
 #if MOD_CORE
 static Work *W;
@@ -1539,16 +1558,18 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
 #else
         const u8 *ol = vbuf, *od = vbuf + SC_PLANE;
 #endif
+        const u8 *dt; u16 x0, dw;
+        DEPTH_ROW(yy, dt, x0, dw);
         for (k = 0; k < 3; k++) {
-            u16 mw = m3[k], g1, g2, c, oo = (u16)(o + 2 * k);
-            const u8 *t = VDEPTH + oo;     // depths, masks: constant offsets
+            u16 mw = m3[k], g1, g2, c, oo = (u16)(o + 2 * k), b = (u16)(2 * (w0 + k));
+            const u8 *t = dt + b;          // depths, masks: constant offsets
             u8 *q = scene_l + oo;
             if (!mw || (u16)(w0 + k) >= SC_BYTES / 2) continue;
-            if (st.over) c = 0;                         // over the scenery: no depth test
+            if (st.over || (u16)(b - x0) >= dw) c = 0;  // over the scenery, or nothing in front
             else {
                 g1 = (u16)(RD16(t, 0) + dd) & 0x8080; g1 = (u16)((g1 << 1) - (g1 >> 7));
-                g2 = (u16)(RD16(t + 2 * SC_PLANE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
-                c = (u16)(((g1 & RD16(t + SC_PLANE, 0)) | (g2 & RD16(t + 3 * SC_PLANE, 0))) & mw & hp);
+                g2 = (u16)(RD16(t + 2 * DEPTH_STRIDE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
+                c = (u16)(((g1 & RD16(t + DEPTH_STRIDE, 0)) | (g2 & RD16(t + 3 * DEPTH_STRIDE, 0))) & mw & hp);
             }
             WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(ol + oo, 0) & c)));
             WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(od + oo, 0) & c)));
@@ -1566,15 +1587,22 @@ static u8 hl_seq;                       // bumped when the highlights may have c
 #ifdef FFT_TEXTURE_PREVIEW
 static void preview_iso_apply(u8 rot);
 #endif
-#ifdef FFT_CHAPTER
-// Chapter views store each occlusion mask row XORed with the row above (extract.py
-// rowxor_masks: ~3 KB less archive per map); undone here a long at a time.
-static void unxor_masks(u8 *v)          // v: the depth/mask planes
+#ifdef FFT_VIEW_SPLIT
+// The ragged depth just unpacked (extract.ragged_depth): each row's offset, then its mask bytes
+// XORed back with the row above where both spans cover them, a word at a time (even spans)
+static void depth_rows(void)
 {
-    u8 k;
-    for (k = 1; k <= 3; k += 2) {
-        u32 *p = (u32 *)(v + k * SC_PLANE + SC_BYTES), *e = (u32 *)(v + (k + 1) * SC_PLANE);
-        do *p ^= p[-SC_BYTES / 4]; while (++p < e);
+    DepthRow *r = (DepthRow *)vbuf;
+    u16 y, off = (u16)(SC_H * sizeof(DepthRow));
+    for (y = 0; y < SC_H; y++) { r[y].off = (u16)(off - r[y].x0); off += r[y].w; }
+    vplane = (u16)(off - SC_H * sizeof(DepthRow));
+    for (y = 1; y < SC_H; y++, r++) {           // r[1]: row y, r[0]: the row above
+        u8 lo = r[1].x0 > r[0].x0 ? r[1].x0 : r[0].x0;
+        u8 hi = (u8)(r[1].x0 + r[1].w), h2 = (u8)(r[0].x0 + r[0].w);
+        u16 *p = (u16 *)(vbuf + r[1].off + vplane + lo);        // first mask, the second
+        const u16 *q = (const u16 *)(vbuf + r[0].off + vplane + lo);   // vplane words on
+        if (h2 < hi) hi = h2;
+        for (; lo < hi; lo += 2, p++, q++) { p[0] ^= q[0]; p[vplane] ^= q[vplane]; }
     }
 }
 #endif
@@ -1613,9 +1641,8 @@ static u8 bk_save(s16 y)
 typedef char EdgeMaskFitsBackups[sizeof(W->bk) >= SC_BYTES*SC_HMAX ? 1 : -1];
 static const u8 *unpack_colours(u8 rot)
 {
-    const u8 *p=views[rot],*mask;
-    u16 extra=p[1]=='3' ? RD16(p,2) : 0;
-    p+=extra ? 6 : 4;
+    const u8 *p=views[rot]+8,*mask;          // R2/R3 (extract.view_bank)
+    u16 extra=RD16(views[rot],2);           // the width mask's stream (R3), 0 (R2)
     mask=p+RD16(views[rot],1);
     zx0_unpack(p,scene_l);
 #ifdef FFT_EDGE_WIDTH_REVIEW
@@ -1640,12 +1667,9 @@ static void unpack_view(u8 rot)
     if (vbuf_rot == rot) return;
 #ifdef FFT_VIEW_SPLIT
     zx0_unpack(unpack_colours(rot),vbuf);
-    unxor_masks(vbuf);
+    depth_rows();
 #else
     zx0_unpack(views[rot], vbuf);
-#ifdef FFT_CHAPTER
-    unxor_masks(vbuf);
-#endif
 #endif
 #ifdef FFT_TEXTURE_PREVIEW
     preview_iso_apply(rot);
@@ -1653,16 +1677,57 @@ static void unpack_view(u8 rot)
     vbuf_rot = rot;
 }
 
+#if !defined(__m68k__) && defined(FFT_VIEW_SPLIT)
+// the tests: byte b of row y of depth plane k (0 depth, 1 mask, 2 depth, 3 mask), 0 outside
+// the row's span, as the four full planes of the former layout
+u8 depth_byte(u8 k, s16 y, u16 b)
+{
+    const u8 *t; u16 x0, w;
+    DEPTH_ROW(y, t, x0, w);
+    return (u16)(b - x0) < w ? t[b + k * DEPTH_STRIDE] : 0;
+}
+void depth_planes(u8 *out)
+{
+    u16 y, b; u8 k;
+    for (k = 0; k < 4; k++) for (y = 0; y < SC_H; y++) for (b = 0; b < SC_BYTES; b++) *out++ = depth_byte(k, (s16)y, b);
+}
+#endif
+
 // is scene pixel (x, y) in front of everything nearer than view diagonal depth (not covered)?
 #ifndef FFT_WATER_BANK
 static u8 seen(s16 x, s16 y, u8 depth)
 {
-    const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
-    u16 o = (u16)(y * SC_BYTES + (x >> 3));
+    const u8 *t;
+    u16 x0, w, o = (u16)(x >> 3);
     u8 b = (u8)(0x80 >> (x & 7));
-    return !((t1[o] > depth && m1[o] & b) || (t2[o] > depth && m2[o] & b));
+    DEPTH_ROW(y, t, x0, w);
+    if ((u16)(o - x0) >= w) return 1;
+    t += o;
+    return !((t[0] > depth && t[DEPTH_STRIDE] & b) || (t[2 * DEPTH_STRIDE] > depth && t[3 * DEPTH_STRIDE] & b));
 }
 #endif
+
+// n bytes b0.. of scene row y (the last into *tail when given): the pixels with
+// something in front of view depth `depth` (a greater diagonal). The cursor's, the units' and
+// the blade's cover, each made again only when what it covers changes.
+static u32 cover_bytes(s16 y, s16 b0, u8 depth, u8 n, u8 *tail)
+{
+    const u8 *t = vbuf;
+    u16 x0 = 0, w = 0, s = DEPTH_STRIDE;
+    u32 m = 0;
+    u8 h;
+    if ((u16)y < SC_H) DEPTH_ROW(y, t, x0, w);
+    if (!w) n = 0;                              // nothing in front on this row
+    for (t += b0; n; n--, t++, b0++) {
+        h = 0;
+        if ((u16)(b0 - x0) < w) {
+            if (t[0] > depth) h = t[s];
+            if (t[2 * s] > depth) h |= t[3 * s];
+        }
+        if (n == 1 && tail) *tail = h; else m = m << 8 | h;
+    }
+    return m;
+}
 
 // The cursor's mask (marker mk of tile c) dashed as the hidden rings where the view has something
 // in front of it (a canal tile behind a higher street tile): the view's depth bytes compared a
@@ -1670,27 +1735,14 @@ static u8 seen(s16 x, s16 y, u8 depth)
 // Visibility is mandatory on the first frame, including the AI's selected tile.
 static const PlaneWord *cursor_mask(const Marker *mk, u16 c)
 {
-    u16 k = (u16)(c | st.rot << 8 | 0x8000), o;   // c: the tile, | 0x1000 a reach tile's marker
-    s16 r, b0 = mk->x >> 3, sh = mk->x & 7, yy = mk->y, j;
-    const u8 *t1 = VDEPTH;
-    u8 dp = mk->depth;
+    u16 k = (u16)(c | st.rot << 8 | 0x8000);   // c: the tile, | 0x1000 a reach tile's marker
+    s16 r, b0 = mk->x >> 3, sh = mk->x & 7, yy = mk->y;
     if (vbuf_rot != st.rot) return mk->m;
     if (W->cur_k == k) return W->cur_m;
     W->cur_wait = 0; W->left -= CUR_K;
     W->cur_k = k;
-    o = (u16)(yy * SC_BYTES + b0);
-    for (r = 0; r < mk->rows; r++, yy++, o += SC_BYTES) {
-        u32 cv = 0;
-        if ((u16)yy < SC_H)
-            for (j = 0; j < 4; j++) {
-                const u8 *t = t1 + o + j;
-                u8 h = 0;
-                if ((u16)(b0 + j) < SC_BYTES) {
-                    if (t[0] > dp) h = t[SC_PLANE];
-                    if (t[2 * SC_PLANE] > dp) h |= t[3 * SC_PLANE];
-                }
-                cv = cv << 8 | h;
-            }
+    for (r = 0; r < mk->rows; r++, yy++) {
+        u32 cv = cover_bytes(yy, b0, mk->depth, 4, RT_NULL);
         cv &= yy & 1 ? 0xCCCCCCCCUL : 0x33333333UL;  // hidden but for the dashes (hide_pat)
         W->cur_m[r] = mk->m[r] & ~(cv << sh);
     }
@@ -3762,7 +3814,7 @@ static u8 mod_ready(void)
 {
     u16 asize=0,bsize=0,csize=0,id;
     const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize),*c=rt_file("ffbo",&csize);
-    mod_id=0;
+    mod_id=0;mod_images[MOD_RESOURCES]=RT_NULL; // (statics outlive a run: the RAM message's test)
     if(!module_three_valid(a,asize,b,bsize,c,csize,MOD_BANK0_COUNT,MOD_BANK1_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE))return 0;
     for(id=0;id<MOD_COUNT;id++){
         const u8 *bank=id<MOD_BANK0_COUNT?a:id<MOD_BANK1_END?b:c;
@@ -3945,20 +3997,28 @@ static u16 unit_feet_key(u8 i,u8 rot)
 // made again only when its feet, its depth or the view change: a unit standing still costs nothing.
 static void cover(u16 *cm, s16 fx, s16 fy, u8 depth)
 {
-    const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
-    s16 bx = fx - 8, by = fy - UNIT_FOOT, b0 = bx >> 3, sh = 8 - (bx & 7), r, k;
-    for (r = 0; r < COVER_H; r++) {
-        s16 y = by + r;
+    s16 bx = fx - 8, by = fy - UNIT_FOOT, b0 = bx >> 3, sh = 8 - (bx & 7), r;
+#ifdef FFT_VIEW_SPLIT                           // (inline, as before the ragged depth: 13 units'
+    const DepthRow *dr = (const DepthRow *)vbuf + by;   // rows after a turn; dr read only in the scene)
+    const u8 *p0 = vbuf, *p1 = p0 + vplane, *p2 = p1 + vplane, *p3 = p2 + vplane;
+    for (r = 0; r < COVER_H; r++, dr++) {
         u32 m = 0;
-        if ((u16)y < SC_H) {
-            u16 o = (u16)(y * SC_BYTES + b0);
-            for (k = 0; k < 3; k++, o++) {
+        if ((u16)(by + r) < SC_H) {
+            u16 o = (u16)(dr->off + b0), j = (u16)(b0 - dr->x0), w = dr->w;
+            u8 k = 3;
+            do {
                 m <<= 8;
-                if ((u16)(b0 + k) >= SC_BYTES) continue;
-                if (t1[o] > depth) m |= m1[o];
-                if (t2[o] > depth) m |= m2[o];
-            }
+                if (j < w) {
+                    if (p0[o] > depth) m |= p1[o];
+                    if (p2[o] > depth) m |= p3[o];
+                }
+                j++; o++;
+            } while (--k);
         }
+#else
+    for (r = 0; r < COVER_H; r++) {
+        u32 m = cover_bytes(by + r, b0, depth, 3, RT_NULL);
+#endif
         cm[r] = (u16)(m >> sh);
     }
 }
@@ -4352,22 +4412,9 @@ static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
     bx = sx + weapon_x[k]; by = sy - WEAPON_FOOT;
     b0 = bx >> 3; sh = bx & 7;
     if (W->wx != bx || W->wy != by || W->wrot != st.rot || W->wdepth != depth) {
-        const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
         for (r = 0; r < WEAPON_SH; r++) {
-            s16 y = by + r;
-            u32 cm = 0;
-            u8 tail = 0, j;
-            if ((u16)y < SC_H) {
-                u16 o = (u16)(y * SC_BYTES + b0);
-                for (j = 0; j < 5; j++, o++) {
-                    u8 b = 0;
-                    if ((u16)(b0 + j) < SC_BYTES) {
-                        if (t1[o] > depth) b |= m1[o];
-                        if (t2[o] > depth) b |= m2[o];
-                    }
-                    if (j < 4) cm = cm << 8 | b; else tail = b;
-                }
-            }
+            u8 tail = 0;
+            u32 cm = cover_bytes(by + r, b0, depth, 5, &tail);
             W->wcover[r] = (cm << sh) | ((u32)tail >> (8 - sh));
         }
         W->wx = bx; W->wy = by; W->wrot = st.rot; W->wdepth = depth;
@@ -4709,7 +4756,7 @@ void game_init(void)
     {
         static const CoreBoot boot={&flow_bank,&flow_ui,&wgfx,abank,&cgfx,&common,&charge_ticks,&job_sets,
                                    &abilities,&jobs,&job_names,&items,
-                                   &battle_state,&rt_state,&rt_state_size,&vbuf,&sbuf,&acache,&ac_key,&ac_age,&abank_n0,
+                                   &battle_state,&rt_state,&rt_state_size,&vbuf,&sbuf,&navbuf,&nav_capacity,&acache,&ac_key,&ac_age,&abank_n0,
                                    &sl_l,&sl_m,&sc_l,&sc_m,
 #ifdef FFT_CAMPAIGN_FLOW
                                    1
@@ -4755,7 +4802,7 @@ void game_init(void)
 #ifndef FFT_MODULES
     abank_n0 = RD16(abank[0], 0);
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB; the
-        vbuf = malloc(4UL * SC_BYTES * SC_HMAX);   // largest chapter's (VIEW_BYTES)
+        vbuf = malloc(VIEW_BYTES);              // the core's depth envelope
         sbuf = vbuf ? malloc(2UL * SC_BYTES * SC_HMAX + sizeof(Work)) : RT_NULL;
         acache = sbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
         if (!acache && sbuf) { free(sbuf); sbuf = RT_NULL; }
@@ -4770,6 +4817,12 @@ void game_init(void)
 #else
         (void)release;
 #endif
+    }
+#endif
+#ifndef FFT_MODULES
+    if (sbuf && !navbuf) {                     // the core's map envelope, once: any map fits
+        navbuf = malloc(NAV_ENVELOPE);         // (with modules: bootstrap_files.inc)
+        nav_capacity = navbuf ? NAV_ENVELOPE : 0;
     }
 #endif
 }
@@ -6705,13 +6758,24 @@ u16 mod_entry(u8 op, u8 a)
 #endif
 #if MOD_CORE
 
+// The battle cannot start: the RAM its buffers need (RESOURCES op 12 says how much), else a
+// missing bank
+static void missing_message(void)
+{
+    draw_rect(0,0,RT_W,RT_H,C_WHITE);
+#if defined(FFT_MODULES) && defined(__m68k__)
+    if (mod_images[MOD_RESOURCES]) {             // AMS's free RAM in 16-byte units (no ROM calls there)
+        mod_call(MOD_RESOURCES, 255, 0); mod_context(MOD_RESOURCES)->desc_size = (u16)(HeapAvail() >> 4);
+        if (mod_call(MOD_RESOURCES, 12, (u8)((battle_state ? 1 : 0) | (sbuf ? 2 : 0) | (navbuf ? 4 : 0)))) return;
+    }
+#endif
+    draw_text(4,40,"Missing data",F_SMALL,C_BLACK);
+}
+
 void game_render(void)
 {
 #if defined(FFT_CHAPTER) && defined(FFT_COMPACT_UI)
-    if(!battle_state) {
-        draw_rect(0,0,RT_W,RT_H,C_WHITE);
-        draw_text(4,40,"Missing data or memory",F_SMALL,C_BLACK);return;
-    }
+    if(!battle_state) { missing_message(); return; }
 #endif
 #ifndef FFT_COMPACT_UI
     u8 ord[UNIT_CAPACITY], vis[UNIT_CAPACITY], i, j, cached, tg;
@@ -6723,8 +6787,7 @@ void game_render(void)
        !battle_state||
 #endif
        !W||!ugfx||!wgfx||!igfx||!views[0]||!views[1]||!views[2]||!views[3]) {
-        draw_rect(0,0,RT_W,RT_H,C_WHITE);
-        draw_text(4,40,"Missing data or memory",F_SMALL,C_BLACK);
+        missing_message();
 #ifdef FFT_CHAPTER
         if(battle_state)
 #endif
@@ -7045,8 +7108,34 @@ u16 mod_entry(u8 op,u8 a)
 #define ugfx (M.chapter_ugfx)
 #include "chapter_files.inc"
 #undef ugfx
+// The battle could not start (op 12; held: 1 State, 2 the view/scene/cache blocks, 4 the map
+// envelope; M.desc_size: AMS's free RAM / 16, read by the resident): "Not enough RAM" when that
+// free RAM and the blocks held are less than the battle allocates (BATTLE_RAM_BYTES), so a user
+// knows how much to free. 0: a bank is missing instead.
+static u8 ram_message(u8 held)
+{
+    u32 have = ((u32)M.desc_size << 4) + (held & 1 ? BATTLE_STORAGE_BYTES : 0)
+        + (held & 4 ? NAV_ENVELOPE : 0) + (held & 2 ? BATTLE_RAM_BYTES - BATTLE_STORAGE_BYTES - NAV_ENVELOPE : 0);
+    char s[32];                                 // (no initializer: a module has no memcpy)
+    const char *t = "need ";
+    u8 n = 0, i;
+    if (have >= BATTLE_RAM_BYTES) return 0;
+    for (i = 0; i < 2; i++) {                   // "need N KB, free N KB"
+        u16 v = i ? (u16)(have >> 10) : (u16)((BATTLE_RAM_BYTES + 1023) >> 10), d = 10000;
+        while (*t) s[n++] = *t++;
+        while (d > v && d > 1) d /= 10;
+        for (; d; d /= 10) s[n++] = (char)('0' + v / d % 10);
+        t = i ? " KB" : " KB, free ";
+    }
+    while (*t) s[n++] = *t++;
+    s[n] = 0;
+    draw_text(4, 34, "Not enough RAM", F_SMALL, C_BLACK);
+    draw_text(4, 44, s, F_SMALL, C_BLACK);
+    return 1;
+}
 u16 mod_entry(u8 op,u8 a)
 {
+    if(op==12)return ram_message(a);
     if(op==11)return (u8)chapter_route(a);
     if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
     return 0;

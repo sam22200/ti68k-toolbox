@@ -57,7 +57,7 @@ def chapter_planes(styled,rot):
 
 
 def dual_view(one,two,rot):
-    """V3: colour length, mask length,1px colours,2px mask, shared depth (ZX0)."""
+    """R3: 1px colours, 2px width mask, shared ragged depth (extract.view_bank)."""
     one=chapter_planes(one,rot);two=chapter_planes(two,rot);size=plane_size(one)
     assert one[2*size:]==two[2*size:]
     mask=bytes((a^b)|(c^d) for a,b,c,d in zip(one[:size],two[:size],one[size:2*size],two[size:2*size]))
@@ -66,8 +66,7 @@ def dual_view(one,two,rot):
     expected+=bytes(a^m for a,m in zip(one[size:2*size],mask))
     assert expected==two[:2*size]
     colours=extract.zx0pack.pack(one[:2*size]);stroke=extract.zx0pack.pack(mask)
-    depth=extract.zx0pack.pack(extract.rowxor_masks(one)[2*size:])
-    return b'V3'+len(colours).to_bytes(2,'big')+len(stroke).to_bytes(2,'big')+colours+stroke+depth
+    return extract.view_bank(b'R3',colours,stroke,extract.ragged_depth(one))
 
 
 def main():

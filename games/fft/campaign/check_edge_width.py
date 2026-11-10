@@ -28,7 +28,7 @@ def digest(raw):
     return h
 
 def expected():
-    import campaign_scenery
+    import campaign_scenery,extract
     colours=[];depths=[];report=[]
     for rot in range(4):
         # Independent before/after fixture: former reviewed source raw plus
@@ -36,17 +36,14 @@ def expected():
         one=campaign_scenery.chapter_planes((HERE.parent/f'x/isometric-style/variant-{rot}.raw').read_bytes(),rot)
         old=(HERE/f'x/qa/followup/edges/two-pixel/ffgv{rot}.bin').read_bytes()
         size=len(one)//6;count=int.from_bytes(old[2:4],'big');two=decode(old[4:4+count])
-        bank=(HERE/f'data/ffgv{rot}.bin').read_bytes();assert bank[:2]==b'V3'
-        if bank[-10:-6] in (b'FC01',b'FC02'):bank=bank[:int.from_bytes(bank[-6:-4],'big')]
-        a,b=[int.from_bytes(bank[i:i+2],'big')for i in (2,4)]
-        assert decode(bank[6:6+a])==one[:2*size]
-        mask=decode(bank[6+a:6+a+b]);assert len(mask)==size
+        tag,colour,stroke,depth=extract.read_view((HERE/f'data/ffgv{rot}.bin').read_bytes());assert tag==b'R3'
+        a,b=len(colour),len(stroke)
+        assert decode(colour)==one[:2*size]
+        mask=decode(stroke);assert len(mask)==size
         low=np.frombuffer(one[:size],np.uint8);dark=np.frombuffer(one[size:2*size],np.uint8);m=np.frombuffer(mask,np.uint8)
         assert ((low&~m)|(~dark&m)).tobytes()+(dark^m).tobytes()==two
-        depth=np.frombuffer(decode(bank[6+a+b:]),np.uint8).reshape(4,-1,40).copy()
-        for k in (1,3):depth[k]=np.bitwise_xor.accumulate(depth[k],axis=0)
-        assert depth.tobytes()==one[2*size:]
-        colours.append([digest(one[:2*size]),digest(two)]);depths.append(digest(depth.tobytes()))
+        rows=size//40;assert depth==extract.unragged_depth(extract.ragged_depth(one),rows)
+        colours.append([digest(one[:2*size]),digest(two)]);depths.append(digest(depth))
         report.append(dict(view=rot,mask_bytes=b,colour_bytes=a,decoded_mask_bytes=size))
     (OUT/'expected.h').write_text('// Generated local visual fixtures; do not edit.\nstatic const u32 edge_colours[4][2]={'+','.join('{'+','.join('0x%08XUL'%v for v in row)+'}'for row in colours)+'};\nstatic const u32 edge_depth[4]={'+','.join('0x%08XUL'%v for v in depths)+'};\n')
     return report

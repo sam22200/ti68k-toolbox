@@ -71,9 +71,9 @@ static void trial(void)
             for(col=0;col<24;col++) {
                 s16 x=mk.x+col;
                 if((u16)y<SC_H&&(u16)x<SC_W) {
-                    u16 off=(u16)y*SC_BYTES+(x>>3);u8 bit=(u8)(0x80>>(x&7));
-                    if(((VDEPTH[off]>mk.depth&&(VDEPTH[SC_PLANE+off]&bit))
-                       ||(VDEPTH[2*SC_PLANE+off]>mk.depth&&(VDEPTH[3*SC_PLANE+off]&bit)))
+                    u8 bit=(u8)(0x80>>(x&7));
+                    if(((depth_byte(0,y,(u16)(x>>3))>mk.depth&&(depth_byte(1,y,(u16)(x>>3))&bit))
+                       ||(depth_byte(2,y,(u16)(x>>3))>mk.depth&&(depth_byte(3,y,(u16)(x>>3))&bit)))
                        &&((y&1?0xCC:0x33)&bit))expected&=~(0x80000000UL>>col);
                 }
             }

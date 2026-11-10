@@ -19,7 +19,7 @@
 static unsigned long sizes[] = {
     UNIT_CAPACITY, sizeof(Unit), sizeof(State), sizeof(Work), sizeof(Cover), sizeof(Feet),
     sizeof(SaveUnit), sizeof(Save), MAP_NMAX, SC_HMAX,
-    4UL * SC_BYTES * SC_HMAX,
+    (unsigned long)FFT_CORE_DEPTH_MAX,
     2UL * SC_BYTES * SC_HMAX + sizeof(Work),
     AC_N * (UNIT_FB + 4UL),
     // Additional storage per unit with CURRENT fields/algorithms only.

@@ -43,7 +43,6 @@ u8 view_hides(u8 rot, u8 i)
 u8 view_hides_now(u8 i)
 {
     static const s8 col[4] = { -5, -2, 2, 5 };
-    const u8 *t1 = VDEPTH, *m1 = t1 + SC_PLANE, *t2 = m1 + SC_PLANE, *m2 = t2 + SC_PLANE;
     Feet f;
     u8 j, n = 0;
     s16 y;
@@ -53,9 +52,12 @@ u8 view_hides_now(u8 i)
         s16 x = f.x + col[j];
         u8 bit = (u8)(0x80 >> (x & 7));
         for (y = f.y - VIS_H; y < f.y; y++) {
-            u16 o = (u16)(y * SC_BYTES + (x >> 3));
+            const u8 *t; u16 x0, w, o = (u16)(x >> 3);
             if ((u16)y >= SC_H) continue;
-            if ((t1[o] > f.depth && m1[o] & bit) || (t2[o] > f.depth && m2[o] & bit)) n++;
+            DEPTH_ROW(y, t, x0, w);
+            if ((u16)(o - x0) >= w) continue;
+            t += o;
+            if ((t[0] > f.depth && t[DEPTH_STRIDE] & bit) || (t[2 * DEPTH_STRIDE] > f.depth && t[3 * DEPTH_STRIDE] & bit)) n++;
         }
     }
     return n;
