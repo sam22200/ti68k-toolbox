@@ -1,6 +1,6 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-**Next steps (2026-11-08): [Chapter I readiness](CHAPTER1_READINESS.md)** — first the battle RAM margin (~1.2 KB left; Chapter I has ~20 maps), then the archive budget, a one-command native chapter run and a frozen core interface.
+**Next steps (2026-11-10): [Chapter I readiness](CHAPTER1_READINESS.md)** — battle RAM margin: ragged depth, map envelope and the RAM message are done (~11.4 KB free natively, was ~1.2 KB); the hidden gray buffer and ring backups remain to reach 16 KB. Then the archive budget, a one-command native chapter run and a frozen core interface (resident headroom: 107 bytes).
 
 Current optimization checkpoint (2026-11-07): [Final pass](CORE_OPTIMIZATION.md).
 The shared actor cache tries its remembered entry, validating its current key
