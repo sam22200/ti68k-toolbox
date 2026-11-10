@@ -54,6 +54,24 @@ headroom, area-impact and package checks pass):
 3. If still short: tighten `FFT_CORE_DEPTH_MAX` once Chapter I's views are measured (each
    KB of envelope is a KB of RAM), or give the second depth layer its own span (~−0.7 KB).
 
+**Every map of the game against the envelope (2026-11-10, `tools/map_budget.py`).** The
+battle's RAM depends only on the map being fought, never on how many maps a chapter has; with
+the envelopes it is the same number on every map, so the question is whether each map fits
+them. The census rasterizes the 109 maps the game references (`maps.json`) in the four views
+and counts their ragged depth (checked on Gariland: 16,808–18,288 estimated, 16,968–18,304
+shipped). "Uncropped" bounds any crop; the TI canvas is 320 × 202 (`SC_HMAX`).
+
+| Maps | Uncropped depth | Rows | Width | Verdict |
+|---|---:|---:|---:|---|
+| St. Murond Temple 050/051, Hall 003, Chapel 052 (Loffrey, chapter 4) | ≤ 19,348 | 186–222 | ≤ 288 | fit 20,480 (050 needs a 202-row crop) |
+| Chapter I: 056 Orbonne, 022 Gariland, 085 Mandalia, 031 Dorter, 034 Sand Rat, 091 Thieves Fort, 077 Lenalia, 072 Fovoham, 073/103 Windmill, 049 Zeakden, 024 Academy | ≤ 19,760 | 171–292 | ≤ 312 | fit |
+| 074 Sweegy Woods | 22,184 (19,304 cropped to 202 rows) | 244 | 276 | fits once cropped to 202 rows |
+| 076 Zeklaus Desert | 17,248 | 180 | **336** | **wider than the 320-px scene**: crop 16 px or widen the scene (RAM) |
+| 26 other maps (worst 029 Colliery 2F 26,088; 202-row crop: 100 Public Cemetery 23,032) | 20,700–26,088 | | | over: an envelope of ~23,552 (+3 KB RAM) would hold them all once cropped |
+
+Rows above 202 are a crop decision per map (Orbonne keeps its top and cuts its bottom). 22
+maps are wider than 320 px (`over_width` in `x/map-budget.json`), independent of RAM.
+
 **What does not cost RAM.** The number of maps, scenes and battles in a pack: banks, scene
 pools and manifests are read in place from the archive (one VAT entry each).
 
