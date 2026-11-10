@@ -31,6 +31,7 @@ static u16 chapter_files(char letter)
     for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
         name[4] = (char)('0' + i);             // again each load, the archive may have moved
         views[i] = resource_file(name, i == 0 ? &view_size : RT_NULL);
+        if (!views[i] || views[i][0] != 'R' || RD16(views[i], 3) > FFT_CORE_DEPTH_MAX) return 0;
     }
     /* Production stores these identical engine tables once in ffcu. Old
        extraction fixtures retain the same validated tail in their first view. */

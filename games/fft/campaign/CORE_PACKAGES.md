@@ -150,7 +150,12 @@ ti-key 'fftstory()' ENTER; ti-mem log       # story start/call/back lines with f
 allocation fails. Measured on Titanium AMS 3.10 with the 1 KB log: 187,152 bytes free at
 every child call through Orbonne, Academy, deployment and Gariland; the battle reserves
 182,950 bytes (program 65,014, scene buffers 32,322 + 53,622, actor cache 10,178, State 5,428,
-grayscale 15,378, its stub 1,008), leaving only a few KB. Verified natively: New Game →
+grayscale 15,378, its stub 1,008), leaving only a few KB. Since 2026-11-10 (ragged depth,
+[CHAPTER1_READINESS.md](CHAPTER1_READINESS.md)): 187,554 free before `fftbat`, the battle
+reserves 176,158 (program 64,934, depth 20,482, scene and Work 53,622, actor cache 10,178,
+map envelope 5,122, State 5,428, grayscale 15,384, stub 1,008): ~11.4 KB stay free, on every
+map. When the RAM is short the battle says "Not enough RAM / need N KB, free M KB" (free: AMS's
+free RAM plus what the battle already holds). Verified natively: New Game →
 Orbonne scene → battle won → Academy → deployment → Gariland; Gariland lost → title →
 Continue → Gariland again. The Gariland victory path was not replayed natively here.
 

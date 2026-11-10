@@ -226,30 +226,104 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
 
 
 def rowxor_masks(raw):
-    """Chapter views (ffov*, ffgv*): each occlusion mask row (planes 3 and 5) XORed with
-    the row above before ZX0 (~3 KB less per map); fft.c unxor_masks() undoes it."""
+    """The former chapter views (V2/V3): each occlusion mask row (planes 3 and 5) XORed with
+    the row above before ZX0; ragged_depth() replaced them."""
     p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40).copy()
     for k in (3, 5):
         p[k, 1:] ^= p[k, :-1].copy()
     return p.tobytes()
 
 
-def pack_view(raw):
-    """A chapter view (ffov*, ffgv*): b'V2', u16 length of the colour stream, the ZX0 stream of
-    the two colour planes (fft.c decodes it straight into the scene buffer), then the ZX0
-    stream of the four depth/mask planes, mask rows XORed (rowxor_masks)."""
-    raw = rowxor_masks(raw)
-    plane = len(raw) // 6
-    colours = zx0pack.pack(raw[:2 * plane])
-    return b'V2' + len(colours).to_bytes(2, 'big') + colours + zx0pack.pack(raw[2 * plane:])
-
-
 def unrowxor_masks(raw):
+    """rowxor_masks() undone (the former V2/V3 banks, converted by view_split.py)."""
     p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40).copy()
     for k in (3, 5):
         for y in range(1, p.shape[1]):
             p[k, y] ^= p[k, y - 1]
     return p.tobytes()
+
+
+def ragged_depth(raw):
+    """The depth/mask planes of a 6-plane view as a chapter view's depth stream, unpacked by
+    fft.c depth_rows(): a 4-byte record per scene row (u16 0, filled with the row's offset by
+    the decoder; u8 x0, u8 w: the even byte span holding the row's mask bits), then each of the
+    four planes as its rows' spans one after the other, every mask byte XORed with the byte
+    above where both rows' spans cover it (~6 KB less than XORed full rows after ZX0). Bytes
+    outside the span are never read (their masks are zero): about half of a full view's RAM."""
+    p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40)[2:]
+    spans = []
+    for y in range(p.shape[1]):
+        nz = np.nonzero(p[1, y] | p[3, y])[0]
+        x0 = int(nz[0]) & ~1 if len(nz) else 0
+        spans.append((x0, ((int(nz[-1]) + 2) & ~1) - x0 if len(nz) else 0))
+    out = [bytearray() for _ in range(4)]
+    for y, (x0, w) in enumerate(spans):
+        for k in range(4):
+            seg = p[k, y, x0:x0 + w].copy()
+            if k & 1 and y:
+                px0, pw = spans[y - 1]
+                lo, hi = max(x0, px0), min(x0 + w, px0 + pw)
+                if lo < hi:
+                    seg[lo - x0:hi - x0] ^= p[k, y - 1, lo:hi]
+            out[k] += seg.tobytes()
+    return b''.join(bytes((0, 0, x0, w)) for x0, w in spans) + b''.join(out)
+
+
+def unragged_depth(stream, rows):
+    """ragged_depth() back to four full planes (zero outside each row's span)."""
+    p = np.zeros((4, rows, 40), np.uint8)
+    spans = [(stream[4 * y + 2], stream[4 * y + 3]) for y in range(rows)]
+    plane = sum(w for _, w in spans)
+    assert len(stream) == 4 * rows + 4 * plane, 'ragged depth stream size'
+    for k in range(4):
+        o = 4 * rows + k * plane
+        for y, (x0, w) in enumerate(spans):
+            p[k, y, x0:x0 + w] = np.frombuffer(stream[o:o + w], np.uint8)
+            if k & 1 and y:
+                px0, pw = spans[y - 1]
+                lo, hi = max(x0, px0), min(x0 + w, px0 + pw)
+                if lo < hi:
+                    p[k, y, lo:hi] ^= p[k, y - 1, lo:hi]
+            o += w
+    return p.tobytes()
+
+
+def view_bank(tag, colours, stroke, depth):
+    """A chapter view (ffov*, ffgv*): b'R2' (or b'R3' with a width mask), u16 lengths of the
+    colour and mask ZX0 streams (0: none), u16 RAM bytes of the unpacked depth stream (checked
+    against the core's FFT_CORE_DEPTH_MAX), then the three ZX0 streams (fft.c unpack_view())."""
+    return (tag + len(colours).to_bytes(2, 'big') + len(stroke).to_bytes(2, 'big')
+            + len(depth).to_bytes(2, 'big') + colours + stroke + zx0pack.pack(depth))
+
+
+def pack_view(raw):
+    """R2 view: the two colour planes (decoded straight into the scene buffer) and the
+    ragged depth stream."""
+    plane = len(raw) // 6
+    return view_bank(b'R2', zx0pack.pack(raw[:2 * plane]), b'', ragged_depth(raw))
+
+
+def unzx0(stream):
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, 'i'); dst = os.path.join(d, 'o')
+        open(src, 'wb').write(stream)
+        import subprocess
+        subprocess.run([zx0pack.DZX0, '-f', src, dst], check=True, capture_output=True)
+        return open(dst, 'rb').read()
+
+
+def read_view(bank):
+    """A chapter view bank (R2/R3, a contour tail ignored) -> (tag, colour stream, mask stream,
+    the 4 depth/mask planes as full rows)."""
+    if bank[-10:-6] in (b'FC01', b'FC02'):
+        bank = bank[:int.from_bytes(bank[-6:-4], 'big')]
+    assert bank[:2] in (b'R2', b'R3'), 'not a ragged chapter view'
+    a, b, n = (int.from_bytes(bank[i:i + 2], 'big') for i in (2, 4, 6))
+    depth = unzx0(bank[8 + a + b:])
+    assert len(depth) == n, 'depth size field'
+    rows = len(unzx0(bank[8:8 + a])) // 80
+    return bank[:2], bank[8:8 + a], bank[8 + a:8 + a + b], unragged_depth(depth, rows)
 
 
 def main():

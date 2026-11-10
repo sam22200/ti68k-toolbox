@@ -92,13 +92,13 @@ static void trials(void)
         edge_key(0);press(K_MODE);CHECK(!st.config&&(st.scenery&1));
     }
     for(rot=0;rot<4;rot++)for(wide=0;wide<2;wide++) {
-        u32 depth;
+        u32 depth;static u8 full[4*SC_BYTES*SC_HMAX];
         game_scenario(61);st.ai=0;st.banner=0;st.rot=rot;st.mode=M_MENU;st.tick=0;
         st.scenery=wide;rt_frame=0;scene_rot=vbuf_rot=255;cam_target(&st.camx,&st.camy);
         unpack_view(rot);
         ZB(wide?19:18);unpack_colours(rot);ZE(wide?19:18);
         CHECK(hash_bytes(scene_l,2*SC_PLANE)==edge_colours[rot][wide]);
-        depth=hash_bytes(vbuf,4*SC_PLANE);
+        depth_planes(full);depth=hash_bytes(full,4*SC_PLANE);
         CHECK(depth==edge_depth[rot]);
         // A warmed scene and a complete row-backup overflow must retain the same width.
         W->left=30000;ensure_scene(rot);
@@ -106,7 +106,7 @@ static void trials(void)
         ensure_scene(rot);
         CHECK(!W->bk_over&&!W->bk_n);
         CHECK(hash_bytes(scene_l,2*SC_PLANE)==edge_colours[rot][wide]);
-        CHECK(hash_bytes(vbuf,4*SC_PLANE)==depth);
+        depth_planes(full);CHECK(hash_bytes(full,4*SC_PLANE)==depth);
         shot(rot,wide);
         // Toggle with Move rings already cached. Closing/reopening and reloading
         // the other width restores exact depth and clean unhighlighted colours.
@@ -116,7 +116,7 @@ static void trials(void)
         st.mode=M_MENU;hl_seq++;settle();
         W->left=30000;ensure_scene(rot);
         CHECK(hash_bytes(scene_l,2*SC_PLANE)==edge_colours[rot][!wide]);
-        CHECK(hash_bytes(vbuf,4*SC_PLANE)==depth);
+        depth_planes(full);CHECK(hash_bytes(full,4*SC_PLANE)==depth);
     }
 }
 #ifndef __m68k__

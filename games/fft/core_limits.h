@@ -8,6 +8,10 @@
 #define FFT_CORE_TILE_MAX 256U
 #define FFT_CORE_AXIS_MAX 18
 #define FFT_CORE_LAYER_MAX 2
+// RAM of one view's unpacked ragged depth (extract.ragged_depth, fft.c vbuf), 2026-11-10:
+// Orbonne 16,400..18,488, Gariland 16,968..18,304; a bigger view is refused when packaged
+// (chapter_desc.py) and loaded (chapter_files.inc). Full planes would take 32,320.
+#define FFT_CORE_DEPTH_MAX 20480U
 typedef u8 CoreTileId;                  // compact node0..255, includes both floors
 typedef u16 CoreTileCount;              // can represent count256 and loop endpoint
 typedef struct { u8 x, z_layer; } CoreTilePosition; // z in bits0..4; layer in bit5

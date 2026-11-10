@@ -99,14 +99,14 @@ def decode_views(out,repeats):
                                (HERE/'campaign/data','ffgv',202)):
         for rot in range(4):
             path=folder/f'{prefix}{rot}.bin';bank=path.read_bytes()
-            if bank[:2]!=b'V2':raise ValueError(f'{path}: expected selectedV2 bank')
+            if bank[:2]!=b'R2':raise ValueError(f'{path}: expected selected R2 bank')
             tail_bytes=0
             if bank[-10:-6]in (b'FC01',b'FC02'):
                 original=int.from_bytes(bank[-6:-4],'big')
                 tail_bytes=len(bank)-original;bank=bank[:original]
             n=int.from_bytes(bank[2:4],'big')
-            for label,packed,expected in (('colours',bank[4:4+n],2*40*rows),
-                                           ('depth_masks',bank[4+n:],4*40*rows)):
+            for label,packed,expected in (('colours',bank[8:8+n],2*40*rows),
+                                           ('depth_masks',bank[8+n:],int.from_bytes(bank[6:8],'big'))):
                 raw=unpack(packed)
                 if len(raw)!=expected:raise ValueError(f'{path}/{label}: decoded span mismatch')
                 (out/'audpack.bin').write_bytes(struct.pack('>H',len(raw))+packed)
@@ -127,7 +127,7 @@ def decode_views(out,repeats):
                                     raw_sha256=core_audit.sha(raw),native_checksum=checksum(raw),
                                     cycles=timings,cpu_ms_12mhz=max(timings)/12000))
     return dict(streams=results,repeats=repeats,
-                caveat='Verified ZX0 decoder only, datasheet CPU; depth rows remain XOR encoded. '
+                caveat='Verified ZX0 decoder only, datasheet CPU; ragged depth rows remain XOR encoded. '
                        'Contour tail is excluded from compressed stream lengths. '
                        'Not complete loading/rotation/LCD latency; no secondary recompression applied.')
 
