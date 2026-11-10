@@ -171,6 +171,9 @@ def chapter_package(source, spec, core_spec, key):
         raise ValueError('Chapters contain data only')
     if not {'ffca', 'ffcb'} <= set(spec['variables']):
         raise ValueError('Chapter needs both actor-frame banks')
+    actor = [n for n in ('ffcc', 'ffcd', 'ffce', 'ffcf') if n in spec['variables']]
+    if actor != ['ffcc', 'ffcd', 'ffce', 'ffcf'][:len(actor)]:
+        raise ValueError('Actor-frame banks must follow ffca, ffcb without a gap (actors.h)')
     if spec.get('world_map') and 'ffwm' not in spec['variables']:
         raise ValueError('World-map continuation requires ffwm')
     pack_id = number(spec['id'], 0, 65534, 'id')

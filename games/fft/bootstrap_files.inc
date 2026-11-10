@@ -14,7 +14,12 @@ static u8 bootstrap_files(void)
         if(*p->p_flow_bank)*p->p_flow_ui=rt_file("ffmg",RT_NULL);
     }
     *p->p_wgfx=rt_file("ffcw",RT_NULL);
-    p->p_abank[0]=rt_file("ffca",RT_NULL);p->p_abank[1]=rt_file("ffcb",RT_NULL);
+    {                                          // actors.h actor_banks(), with this image's rt_file
+        char name[5];u8 k;
+        name[0]=name[1]='f';name[2]='c';name[4]=0;
+        for(k=0;k<ACTOR_BANKS;k++){name[3]=(char)('a'+k);p->p_abank[k]=k&&!p->p_abank[k-1]?RT_NULL:rt_file(name,RT_NULL);}
+        p->p_abank[ACTOR_BANKS]=RT_NULL;
+    }
     *p->p_cgfx=rt_file("ffcu",RT_NULL);cj=rt_file("ffcj",&size);
     if(!cj_valid(cj,size))return 0;
     *p->p_common=cj;*p->p_abilities=(const Ability *)cj_section(cj,CJ_BATTLE);
@@ -24,7 +29,6 @@ static u8 bootstrap_files(void)
     if(!*p->p_wgfx||!p->p_abank[0]||!p->p_abank[1]||!*p->p_cgfx)return 0;
     *p->p_sl_l=(const PlaneWord *)(*p->p_cgfx+UIC_SLOPES);
     *p->p_sl_m=*p->p_sl_l+SLOPE_ROWS;*p->p_sc_l=*p->p_sl_m+SLOPE_ROWS;*p->p_sc_m=*p->p_sc_l+SLOPE_ROWS;
-    *p->p_abank_n0=RD16(p->p_abank[0],0);
     *p->p_vbuf=malloc(FFT_CORE_DEPTH_MAX);
     *p->p_sbuf=*p->p_vbuf?malloc(2UL*SC_BYTES*SC_HMAX+sizeof(Work)):RT_NULL;
     *p->p_acache=*p->p_sbuf?malloc(AC_N*(UNIT_FB+4)):RT_NULL;

@@ -155,8 +155,7 @@ void game_init(void)
     scene_flow=rt_file("ffflow",RT_NULL);if(!qvalid(scene_flow))scene_flow=RT_NULL;
     pgfx = rt_file("ffcp", &identity_size);
     if(!identity_valid(pgfx,identity_size))pgfx=RT_NULL;
-    abank[0] = rt_file("ffca", RT_NULL); abank[1] = rt_file("ffcb", RT_NULL);
-    if (abank[0]) abank_n0 = RD16(abank[0], 0);
+    actor_banks(abank);
     W = malloc(sizeof(Work));
     acache = W ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
     if (!acache) { release(); return; }
