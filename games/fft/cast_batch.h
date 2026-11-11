@@ -25,6 +25,6 @@ static u8 cast_area_supported(const Ability *b,const u8 *r)
         (CAST_PERFORMANCE(b->formula)||speech_formula(b->formula)||b->kind==(magic_status_formula(b->formula)?(b->formula==18?AB_QUICK:b->formula==97?AB_BRAVE:b->formula==20?AB_GOLEM:b->kind==AB_CLEANSE?AB_CLEANSE:AB_STATUS):b->formula==12||b->formula==76||b->formula==0x23?AB_HEAL:b->formula==13||b->formula==0x35?AB_REVIVE:b->formula==0x34?AB_HP_MP_HEAL:b->formula==15||b->formula==0x21?AB_MP_DAMAGE:b->formula==14?AB_DEATH:AB_DAMAGE))&&
         (b->flags&(AF_CAST|AF_AREA))==(AF_CAST|AF_AREA)&&
         !(b->flags&~(AF_CAST|AF_AREA|AF_SELF|AF_EVADE|(b->formula==0x2D?AF_WEAPON:0)))&&   // Holy Sword: a physical strike
-        r[8]==b->formula&&!(r[3]&32)&&!(r[4]&10)&&(!(r[4]&4)||b->formula==0x31||b->formula==0x20)&&(!(r[5]&4)||CAST_PERFORMANCE(b->formula))&&!(r[6]&32);
+        r[8]==b->formula&&!(r[3]&32)&&!(r[4]&10)&&(!(r[4]&4)||b->formula==0x31||b->formula==0x20||b->formula==0x2D)&&(!(r[5]&4)||CAST_PERFORMANCE(b->formula))&&!(r[6]&32);
 }
 #endif
