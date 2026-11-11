@@ -177,6 +177,13 @@ monsters listed (Dragon, Ahriman) may belong to later progress tiers. **The core
 frozen for Chapter I before monster actions and these special sets exist** (plus monster
 units themselves: no equipment, innate skills, sprites in the actor banks).
 
+**Platform decision (user, 2026-11-10): HW3Patch is required on the Titanium; the TI-89 HW2
+is dropped.** Unpatched, code only runs inside the program's block (`ti68k-c-patterns.md`:
+`experiments/dll`, `experiments/heapcode`), which is why the module zone lives in the program
+and why resident + zone must stay under TTPack's 64,936 bytes. With HW3Patch, modules can run
+from the heap: next step is to measure that natively (TiEmu with HW3Patch), then drop the zone
+(-8.6 KB of program and RAM) and split the resident. INSTALL.md must name the requirement.
+
 Every core change still forces a new `fftcore` state. Chapter content must never require a
 core rebuild: keep chapter data, scripts and encounters in packs.
 
