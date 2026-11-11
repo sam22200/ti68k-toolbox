@@ -40,6 +40,13 @@ the way: Holy/Dark/Mighty Sword use the raw PA (a knight sword's Attack takes PA
    `make check` (project convention). Then `make -k check`, `check.py` (37 replays),
    `tools/headroom.sh`, `tools/chapter_audit.py`.
 
+**Evasion gate (a mistake made and fixed here).** A handler calling the physical or
+magical evade helper does not mean the ability can be evaded: the helper's final stage only
+runs when the record's flags_4 has 0x02. Read `raw[6]&2` before giving a record `AF_EVADE`,
+and put evasive gear on oracle and check targets (zero evasion hides the difference). Holy,
+Mighty, Dark Sword and the Ruins are never evaded; the monster 0x50 strikes (flags_4 0x12)
+are.
+
 **Pitfalls met.** A 68000 check program over 65,514 bytes fails to link: pack oracle rows
 (u8 inputs) or split the program (`check_dark_sword.c` includes `check_holy_sword.c` with
 `DARK_SWORD_CHECK`). A helper used by `magic_prepare`/`action_resolve` must be included

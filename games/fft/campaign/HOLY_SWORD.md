@@ -7,12 +7,20 @@ nothing in the companion: it is a variant of the ordinary weapon strike (user ru
 
 ## Source (`battle_formula_damage_pa_times_wp_plus_y_status`)
 
-Physical evade (Attack's stages), XA = PA, YA = WP + Y of the **equipped weapon**, the
+**Never evaded** (see below), XA = PA, YA = WP + Y of the **equipped weapon**, the
 weapon's element strengthen, the physical support/status/zodiac stages, a 4% critical with
 knockback, the weapon's element Half/Weak, absorb/null, then the record's status at 100% on a
 hit (status set type 0x20, one status). The pre-formula setup copies the equipped weapon into
 `weapon_data`: the record's own element byte (Lightning Stab's lightning + holy) is unused.
 A sword or knight sword must be equipped (flags_4 0x08, `main_unit_set_equipment_attributes`).
+
+**Never evaded (corrected 2026-11-11).** The handlers call the physical-evade helper, but its
+final stage only runs for abilities whose flags_4 has 0x02 (evadeable); every sword skill
+here has flags_4 0x08 alone, so the multiplier and the evade draws are skipped (as
+`CORE_SECRET_FIST.md` found for Secret Fist). The first version wrongly gave these records
+`AF_EVADE`. Oracle proof: a target with an evasive accessory, a shield and class evade 99,
+facing the attacker, is hit 40 times of 40 by 0x9C, 0x9F, 0xA0 and 0xA4; with the bit
+forced on, 0 of 40. The checks put that gear on every target and require each cast to hit.
 
 ## Core
 
@@ -23,7 +31,7 @@ A sword or knight sword must be equipped (flags_4 0x08, `main_unit_set_equipment
 - `sword_skill_amount` (resident, through `charge_query`, formula 0x2D): the primary weapon,
   strengthen, `weapon_amount`, then `magic_half_weak` (factored out of `magic_element_value`);
   `skill_kind` takes null/absorb from the weapon's element.
-- 0x2D is a magic-pipeline formula (`cast_rules.h`): CT-0 cast, physical evasion (AF_WEAPON),
+- 0x2D is a magic-pipeline formula (`cast_rules.h`): CT-0 cast, no evasion (`AF_WEAPON` without `AF_EVADE`),
   `magic_prepare` draws the critical then its amplitude, knockback on a single-target
   critical, `EFFECT_STATUS` from `magic_status_value` (raw status set, type 0x20 accepted).
 - `can_use`: flags_4 0x08 needs a sword/knight sword in a hand.
@@ -42,8 +50,8 @@ footprint, never several.
 
 ## Mighty Sword (0x2E, `battle_formula_break_equipped_damage_pa_times_wp`)
 
-The Lune Knight's Shellbust Stab, Blastar Punch, Hellcry Punch and Icewolf Bite. Physical
-evasion; then the slot (armour, helmet, the weapon of the higher required level, accessory):
+The Lune Knight's Shellbust Stab, Blastar Punch, Hellcry Punch and Icewolf Bite. Never
+evaded; the slot (armour, helmet, the weapon of the higher required level, accessory):
 a monster or an empty slot is a forced failure without further draws, so is Maintenance;
 then Holy Sword's strike with Y 0 (raw PA x WP, the weapon's element, critical,
 half/weak/null/absorb) and, on a hit that is not nullified, the slot broken. In the core:
@@ -54,7 +62,7 @@ Accessory slots; `action_commit` breaks the slot (`equip_loss`) after the HP com
 
 ## Dark Sword (0x2F, `battle_formula_absorb_mp_pa_times_wp`)
 
-Physical evasion, XA = raw PA, YA = WP of the equipped sword (no Y, no element stage), the
+Never evaded, XA = raw PA, YA = WP of the equipped sword (no Y, no element stage), the
 physical support/status/zodiac stages and the 4% critical; the amount becomes the target's
 MP loss and the caster's equal MP gain (`apply_mp_recovery`; not capped by the target's MP,
 the commit clamps at 0). In the core: a magic-pipeline formula and a transfer formula
@@ -72,14 +80,14 @@ swords (two elemental), Attack UP, five target statuses, six element modes and s
 912 profiles, damage/healing/critical/draws. The check replays each profile's draws through
 the core (`charge_query`, `skill_kind`) and runs production casts (sword gate, Death
 Sentence, Dead, Silence at 100% on a hit; Holy Explosion's footprint, cardinal gate,
-status on a hit and critical push): PC = sanitizers = 68000, hash DE3618E6, 8,376
+status on a hit and critical push): PC = sanitizers = 68000, hash D5628615, 7,470
 checks (the oracle header packs 14 bytes a row to fit the 68000 check program). Dark Sword:
 318 original profiles (5 swords, supports, statuses, target MP 999 or 7, seeds) and a
 production drain, in its own program (`check_dark_sword.c`, `dark.h`). Mighty Sword: 272 original profiles
 (the four skills, two swords, supports, six target equipment sets: two weapons, weapon and
 shield, none, a monster, Maintenance, a left-hand weapon only; element modes; seeds): forced
 failures, the broken slot and item, damage/healing and draws, then a production Shellbust
-Stab breaking the armour and an empty slot failing. Dark + Mighty program: 640B3C97, 5,863
+Stab breaking the armour and an empty slot failing. Dark + Mighty program: 2D062201, 5,869
 checks, PC = sanitizers = 68000.
 
 ## Cost
