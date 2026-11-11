@@ -4,6 +4,10 @@
 #include "../../runtime/core/rt.h"
 static inline u8 performance_formula(u8 f){return (u8)(f-0x1c)<=1;}
 static inline u8 draw_out_formula(u8 f){return (u8)(f-0x20)<=3;}
+// Speed/PA/MA losses by the status commit: Dances, and the Ruins (0x1A). PA by ability id
+// (Polka 89, Last Dance 96, Power Ruin 0xC6), else MA; AB_SPEED is Speed.
+static inline u8 stat_loss_formula(u8 f){return performance_formula(f)||f==0x1A;}
+static inline u8 stat_loss_pa(u16 ab){return ab==89||ab==96||ab==0xC6;}
 // Punch Art support 0x33..0x35: PA instead of MA, no Faith (CORE_PUNCH_ART.md).
 static inline u8 punch_formula(u8 f){return (u8)(f-0x33)<=2;}
 // Guts 0x39..0x3b: Speed/Brave/Scream gains that always hit (CORE_GUTS.md).
@@ -15,10 +19,11 @@ static inline u8 speech_formula(u8 f){return (u8)(f-0x29)<=1||guts_formula(f);}
 // 0x4E (formula08 without Faith: magic_amount's power bit7), Holy Sword 0x2D (physical, weapon element),
 // Mighty Sword 0x2E (Holy Sword's strike plus an equipment break), Dark Sword 0x2F (physical
 // PA x WP, MP drained to the caster);
-// Secret Fist0x50 uses the shared status commit and a physical-status accuracy.
-// status (the status batch commit): 10, 11, 18, 20, 97, 0x2a, 0x33, 0x39..0x3b, 0x50.
-static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x30,0x1f,0xe6,0x38,0x0e,0x00,0x50,0x03,0x00,0x0a};
-static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x00,0x04,0x06,0x08,0x0e,0x00,0x00,0x03,0x00,0x02};
+// Secret Fist0x50 uses the shared status commit and a physical-status accuracy;
+// Ruins 0x1A (stat loss, the status commit) and 0x1B (max-MP percent) (campaign/RUINS.md).
+// status (the status batch commit): 10, 11, 18, 20, 0x1A, 97, 0x2a, 0x33, 0x39..0x3b, 0x50.
+static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x3c,0x1f,0xe6,0x38,0x0e,0x00,0x50,0x03,0x00,0x0a};
+static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x04,0x04,0x06,0x08,0x0e,0x00,0x00,0x03,0x00,0x02};
 static inline u8 magic_status_formula(u8 f){return f<104&&(magic_status_bits[f>>3]>>(f&7)&1);}
 static inline u8 magic_percent_formula(u8 f){return f==9||(u8)(f-15)<=1;}
 static inline u8 magic_transfer_formula(u8 f){return (u8)(f-15)<=1||f==0x2F;}

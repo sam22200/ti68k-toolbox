@@ -13,6 +13,7 @@ static u8 area_ai_supported(AbId ab)
         !(p[5]&~0x55)&&(p[6]==0||p[6]==2)&&(p[7]&128)&&!(p[7]&~0xe0);
     if(abilities[ab].formula==0x31)return p[4]==0x82;   // Spin Fist: hostile HP
     if((abilities[ab].formula|2)==0x2F)return p[4]==0x82||p[4]==0x42;   // Holy Sword: hostile HP; Dark Sword: MP
+    if((u8)(abilities[ab].formula-0x1A)<=1)return 1;   // Ruins: stat losses as the Dances, MP damage
     if(abilities[ab].formula==0x24)return p[4]==0x82;   // Geomancy: immediate HP, conditional status unscored
     if(abilities[ab].formula==0x50)return p[4]==0x12&&p[5]==0&&p[6]==1&&p[7]==0x81;   // Secret Fist's status utility
     if(abilities[ab].formula==14||abilities[ab].formula==18||abilities[ab].formula==20||abilities[ab].formula==97)return 1;
@@ -49,8 +50,8 @@ static void area_ai_victim_mode(u8 t,u8 returned)
         if(v.hit){q->gain[t]=cleanse_ai_gain(t,W->ab,v.amount,same);if(q->gain[t]>0)q->useful|=bit;}
         return;
     }
-    if(performance_formula(abilities[W->ab].formula)&&(kind==AB_SPEED||kind==AB_BREAK)){
-        u8 value=kind==AB_SPEED?u->sp:(W->ab==89||W->ab==96)?u->pa:u->ma,max=kind==AB_SPEED?50:99;
+    if(stat_loss_formula(abilities[W->ab].formula)&&(kind==AB_SPEED||kind==AB_BREAK)){
+        u8 value=kind==AB_SPEED?u->sp:stat_loss_pa(W->ab)?u->pa:u->ma,max=kind==AB_SPEED?50:99;
         if(v.hit&&((same&&(s8)v.amount<0&&value<max)||(!same&&(s8)v.amount>0&&value>1))){q->gain[t]=12;q->useful|=bit;}
         return;
     }

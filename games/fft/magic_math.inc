@@ -148,10 +148,11 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
     // Talk: Persuade's CT 0 (high byte keeps it non-zero); Brave/Faith carry a signed loss.
     if(!query&&speech_formula(b->formula)&&b->kind!=AB_STATUS)return b->kind==AB_QUICK?0x100:(u16)(s16)(s8)b->y;
     if(!query&&b->formula==14)return restore_cap(st.unit[t].max_hp);
+    if(!query&&b->formula==0x1A)return b->y;   // Ruin: the stat's loss X
     if(!query&&(magic_status_formula(b->formula)||b->kind==AB_CLEANSE))return magic_status_value(t,ab,0);
     if(query==2)return core_status_current(&ut->statuses,0)&0x10?(b->formula==16||b->formula==14?AB_HEAL:AB_DAMAGE):b->kind;
-    if(!query&&(b->formula==13||b->formula==0x35||magic_percent_formula(b->formula))){
-        n=(u16)divs32_16(muls16((s16)(b->formula==15?ut->max_mp:ut->max_hp),b->y)+99,100);
+    if(!query&&(b->formula==13||b->formula==0x35||b->formula==0x1B||magic_percent_formula(b->formula))){
+        n=(u16)divs32_16(muls16((s16)(b->formula==15||b->formula==0x1B?ut->max_mp:ut->max_hp),b->y)+99,100);
         if(b->formula==9)n=(u16)magic_element_value(t,b->element,(s16)n);
     }else{
         // Golem (formula 20) targets its caster: same sign (neutral zodiac), no
@@ -159,9 +160,9 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
         // Punch Art has no Faith term.
         u16 faith=b->formula==76||b->formula==81||punch_formula(b->formula)||(u8)(b->formula-0x29)<=1||b->formula==0x50?10000:(u16)(magic_faith(ua)*(b->formula==20?100:magic_faith(ut)));
         xa=magic_xa(a,t,b->formula==9?b->element:0,
-            b->formula==10||b->formula==97||b->formula==0x50||(b->formula==14&&!(core_status_current(&ut->statuses,0)&16))||magic_percent_formula(b->formula),b->formula);
-        if(b->formula==13||b->formula==14||b->formula==0x35||magic_status_formula(b->formula)||magic_percent_formula(b->formula)){
-            const u8 *r=cj_range(common,ab);x=r[9];
+            b->formula==10||b->formula==97||b->formula==0x50||(u8)(b->formula-0x1A)<=1||(b->formula==14&&!(core_status_current(&ut->statuses,0)&16))||magic_percent_formula(b->formula),b->formula);
+        if(b->formula==13||b->formula==14||b->formula==0x35||b->formula==0x1B||magic_status_formula(b->formula)||magic_percent_formula(b->formula)){
+            const u8 *r=cj_range(common,ab);x=r[b->formula==0x1A?10:9];   // Ruin 0x1A: MA + Y
             if(ua->zodiac!=12&&ut->zodiac!=12)x=zodiac_xa(ua,ut,x);
             n=(u16)divs32_16(muls16(xa+x,faith),10000);
             return n>100?100:n;

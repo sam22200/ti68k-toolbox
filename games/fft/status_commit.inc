@@ -7,8 +7,8 @@ static u8 status_magic_commit(void)
     if(st.effect_kind==AB_CLEANSE)return status_cleanse(t,st.abil,st.dmg);
     // Quick fills CT (255); Persuade's 0x100 empties it.
     if(st.effect_kind==AB_QUICK){u8 old=u->ct;u->ct=(u8)st.dmg;if(old!=u->ct)status_changed();return old!=u->ct;}
-    if(performance_formula(abilities[st.abil].formula)&&(st.effect_kind==AB_SPEED||st.effect_kind==AB_BREAK)){
-        u8 *v=st.effect_kind==AB_SPEED?&u->sp:(st.abil==89||st.abil==96)?&u->pa:&u->ma;
+    if(stat_loss_formula(abilities[st.abil].formula)&&(st.effect_kind==AB_SPEED||st.effect_kind==AB_BREAK)){
+        u8 *v=st.effect_kind==AB_SPEED?&u->sp:stat_loss_pa(st.abil)?&u->pa:&u->ma;
         s16 next=(s16)*v-(s8)st.dmg;u8 old=*v,max=st.effect_kind==AB_SPEED?50:99;
         *v=(u8)(next<1?1:next>max?max:next);if(old!=*v)status_changed();return old!=*v;
     }
