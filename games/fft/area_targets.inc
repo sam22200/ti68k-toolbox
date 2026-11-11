@@ -44,7 +44,7 @@ s16 cast_targets(u8 a,u8 ref,AbId ab,u8 follow)
 #endif
     }
     // Unsupported shape/family never silently becomes a radial spell.
-    if((!magic_formula(r[8])&&r[8]!=0x31)||(r[3]&32)||(r[4]&10)||((r[4]&4)&&r[8]!=0x31&&r[8]!=0x20)||(r[6]&32))return TARGETS_UNSUPPORTED;
+    if((!magic_formula(r[8])&&r[8]!=0x31)||(r[3]&32)||(r[4]&10)||((r[4]&4)&&r[8]!=0x31&&r[8]!=0x20&&r[8]!=0x2D)||(r[6]&32))return TARGETS_UNSUPPORTED;
     centre=area_resolution_cell(follow,ref);
     if(centre>=MAP_N)return TARGETS_INVALID;
     cx=TILE_X[centre];cz=TILE_Z[centre];flags=r[4];

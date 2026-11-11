@@ -39,8 +39,8 @@ static u8 batch_prepare(CastBatch *b,u8 ordered)
             bit=(u16)1<<t;todo&=(u16)~bit;
             magic_prepare(a,t,b->ability,&b->victim[t]);
             // One linear victim reuses the existing frozen scalar knockback.
-            if(raw[8]==0x31&&(raw[4]&4)&&!(b->mask&(b->mask-1))&&st.crit&&b->victim[t].hit&&
-               b->victim[t].effect==AB_DAMAGE){
+            if((raw[8]==0x31||raw[8]==0x2D)&&(raw[4]&4)&&!(b->mask&(b->mask-1))&&st.crit&&b->victim[t].hit&&
+               (b->victim[t].effect&EFFECT_KIND_MASK)==AB_DAMAGE){
                 st.dmg=b->victim[t].amount;knockback(a,t);b->victim[t].amount=st.dmg;
             }
         }

@@ -95,13 +95,15 @@ def holy_sword_record(d,r):
     """Formula 0x2D (Holy Sword: Stasis Sword, Split/Crush Punch, Lightning Stab, Holy Explosion):
     a physical, evadeable strike with PA x (WP + Y) in the weapon's element (the record's element
     byte is not used) and the record's one status at 100% on a hit (status type 0x20); a sword
-    is required (flags_4 0x08). Single target or radius, no line yet."""
-    if r[8]!=0x2D or r[9] or r[4]!=0x11 or r[5]!=0x12 or r[6]!=0x08 or r[3]&~0x0c or r[1]>1:
+    is required (flags_4 0x08). Single target, radius 1, or Holy Explosion's cardinal line
+    (flags_1 0x15, flags_2 0x15: the Earth Slash line, caster excluded)."""
+    line=r[3]==0x15 and r[4]==0x15
+    if r[8]!=0x2D or r[9] or r[5]!=0x12 or r[6]!=0x08 or not line and (r[4]!=0x11 or r[3]&~0x0c or r[1]>1):
         return None
     row=d.at(battle.STATUS_SET+6*r[11],6)
     if row[0]!=0x20 or sum(v.bit_count() for v in row[1:])!=1:
         return None
-    return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|2|(32 if r[1] else 0)|1
+    return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|2|(32 if r[1] else 0)|(0 if line else 1)
 
 
 def healing_magic_record(r):
