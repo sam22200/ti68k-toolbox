@@ -114,6 +114,10 @@ seconds per check, and flaky): avoid it at all costs. In this order:
 3. **The emulator, last of the last**: once, at a milestone or a release, and only for what the
    PC cannot run (grayscale driver, keyboard matrix, interrupts, timers, link, real archive
    and Flash, AMS dialogs). Prefer printed numbers; one screenshot at most.
+   **In TiEmu, read state from RAM and logs, not PNGs**: `ti-mem wait` for a transfer,
+   `ti-mem log` (the program's `tilog` events), `ti-mem heap` for memory, game decoders such as
+   FFT's `fftmem.py` for the live state. A screenshot only when the look itself is under review;
+   when a check needs one, add the missing log or decoder field instead.
 A change is "done" once 1 and 2 pass; code that touches the hardware also gets 3, at the end.
 Test on the **Titanium** (default profile); the TI-89 HW2 (`TI_CALC=89`/`89u`) only for a release.
 
