@@ -106,6 +106,16 @@ def holy_sword_record(d,r):
     return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|2|(32 if r[1] else 0)|(0 if line else 1)
 
 
+def ruin_record(a,r):
+    """Ruins (Arc Knight): Magic Ruin 0x1B (magical evasion, (MA+X)% Faith accuracy, MP loses
+    ceil(max MP x Y / 100)), Speed/Power/Mind Ruin 0x1A (magical evasion, (MA+Y)% Faith
+    chance, the stat loses X) on radius 1. A sword is required (flags_4 0x08)."""
+    expected={0xC4:(0x1B,0xFA,0x32),0xC5:(0x1A,3,0xFA),0xC6:(0x1A,5,0xFA),0xC7:(0x1A,5,0xFA)}.get(a)
+    if not expected or tuple(r)!=(4,1,0,5,1,0x12,8,0,*expected,0,3,0x14):return None
+    if a==0xC4:return 11, r[10], r[0], 255, 128|32|2
+    return (21 if a==0xC5 else 7), r[9], r[0], 255, 128|32|2
+
+
 def mighty_sword_record(r):
     """Mighty Sword 0x2E (battle_formula_break_equipped_damage_pa_times_wp): Shellbust Stab,
     Blastar Punch, Hellcry Punch, Icewolf Bite. Physical evasion, the slot (armour, helmet,
@@ -490,6 +500,9 @@ def battle_records(d):
         elif 0x9B <= a <= 0x9F and holy_sword_record(d, d.at(battle.ABILITY_RANGE + 14*a, 14)):
             kind, y, rng, vert, flags = holy_sword_record(d, d.at(battle.ABILITY_RANGE + 14*a, 14))
             formula = 0x2D                 # element 0: the weapon's, read at run time
+        elif 0xC4 <= a <= 0xC7 and ruin_record(a, d.at(battle.ABILITY_RANGE + 14*a, 14)):
+            kind, y, rng, vert, flags = ruin_record(a, d.at(battle.ABILITY_RANGE + 14*a, 14))
+            formula = d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif 0xA0 <= a <= 0xA3 and mighty_sword_record(d.at(battle.ABILITY_RANGE + 14*a, 14)):
             kind, y, rng, vert, flags = mighty_sword_record(d.at(battle.ABILITY_RANGE + 14*a, 14))
             formula = 0x2E                 # element 0: the weapon's, read at run time
