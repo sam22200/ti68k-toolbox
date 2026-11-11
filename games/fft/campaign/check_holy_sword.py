@@ -12,6 +12,7 @@ def main():
     out=args.out.resolve();out.mkdir(parents=True,exist_ok=True)
     coverage=catalogue_report();(out/'coverage.json').write_text(json.dumps(coverage,indent=2)+'\n')
     result=trial('holy_sword','check_holy_sword.c',out,args.pc_only)
+    result['dark_sword']=trial('holy_sword','check_dark_sword.c',out/'dark',args.pc_only)
     result.update(production_bank=coverage['bank_sha256'])
     (out/'results.json').write_text(json.dumps(result,indent=2)+'\n')
 

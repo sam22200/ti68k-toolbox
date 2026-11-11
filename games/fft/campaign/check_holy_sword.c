@@ -3,12 +3,16 @@
 // (campaign/HOLY_SWORD.md).
 #define CLEANSE_RUNTIME_CHECK
 #include "check_cleanse.c"
+#ifdef DARK_SWORD_CHECK
+#include "x/core-holy-sword/oracle/dark.h"
+#else
 #include "x/core-holy-sword/oracle/source.h"
+#endif
 static const u8 sword_status[6][5]={{0},{0,0,0,0x20,0},{0,0,0,0,0x10},{8,0,0,0,0},{0,0,4,0,0},{0,0,2,0,0}};
 static void prepare_sword(AbId ab,u8 sword)
 {
     u8 k;Unit *u;prepare_spell(0x13);u=&st.unit[U_RAMZA];
-    u->set=0x1D;                                   // Holy Sword (Agrias)
+    u->set=ab==0xA4?0x20:0x1D;                     // Dark Sword (Gafgarion), Holy Sword (Agrias)
     for(k=0;k<SET_N;k++)if(SET_ABILITY(u->set,k)==ab)break;
     CHECK(k<SET_N,1);u->learned=(LearnBits)1<<k;
     u->eq[EQ_WEAPON]=sword;u->eq[EQ_SHIELD]=255;
@@ -17,6 +21,7 @@ static void prepare_sword(AbId ab,u8 sword)
     memset(st.affinity,0,sizeof st.affinity);
 }
 static u32 seed_of(u16 k){return ((u32)k*0x9E3779B1UL)|1;}
+#ifndef DARK_SWORD_CHECK
 // Original order: the critical roll, then (on a critical) its amplitude; physical evasion is
 // Attack's verified model and is zero in the oracle.
 static void profiles(void)
@@ -25,7 +30,7 @@ static void profiles(void)
     for(i=0;i<sizeof source_sword/sizeof source_sword[0];i++){
         const u8 *p=source_sword[i].in;AbId ab=(AbId)p[0];Unit *a,*t;u8 j,crit,draws,e,kind;u16 cr,amount;
         prepare_sword(ab,(u8)p[1]);a=&st.unit[U_RAMZA];t=&st.unit[10];
-        a->pa=(u8)p[2];a->zodiac=(u8)p[3];t->zodiac=(u8)p[4];a->female=t->female=0;
+        a->pa=(u8)p[2];a->brave=70;a->zodiac=(u8)p[3];t->zodiac=(u8)p[4];a->female=t->female=0;
         st.support[U_RAMZA]=p[5]?SUPPORT_ATTACK_UP:0;st.support[10]=0;
         memset(&t->statuses,0,sizeof t->statuses);
         for(j=0;j<5;j++)t->statuses.inflicted[j]=sword_status[p[6]][j];
@@ -96,6 +101,51 @@ static void explosion_production(void)
     CHECK(hits>=3,1);CHECK(pushes>0,1);
 }
 static void sword_trials(void){profiles();sword_production();explosion_production();}
+#else
+// Dark Sword 0x2F: the original's MP loss (not capped by the target's MP) and the caster's
+// equal MP gain, then a production cast: the drained MP leaves the target and reaches the caster.
+static void dark_profiles(void)
+{
+    u16 i;
+    for(i=0;i<sizeof source_dark/sizeof source_dark[0];i++){
+        const u8 *p=source_dark[i].in;Unit *a,*t;u8 j,crit,draws;u16 cr;
+        prepare_sword(0xA4,p[0]);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        a->pa=p[1];a->brave=70;a->zodiac=p[2];t->zodiac=p[3];a->female=t->female=0;
+        st.support[U_RAMZA]=p[4]?SUPPORT_ATTACK_UP:0;st.support[10]=0;
+        memset(&t->statuses,0,sizeof t->statuses);
+        for(j=0;j<5;j++)t->statuses.inflicted[j]=sword_status[p[5]][j];
+        unit_status_refresh(t);t->mp=p[6]?7:999;t->max_mp=999;
+        rng32=seed_of(p[7]);
+        draws=1;crit=(u8)(((u32)rand15()*100>>15)<4);cr=0;if(crit){cr=rand15();draws++;}
+        CHECK(draws,source_dark[i].draws);CHECK(source_dark[i].hit,1);
+        CHECK(skill_kind(U_RAMZA,10,0xA4),AB_MP_DAMAGE);
+        CHECK(charge_query(U_RAMZA,10,0xA4,(u8)(crit<<2),cr),source_dark[i].mp_damage);
+        CHECK(source_dark[i].mp_healing,source_dark[i].mp_damage);
+    }
+}
+static void dark_production(void)
+{
+    u8 s,hits=0;
+    prepare_sword(0xA4,255);CHECK(can_use(U_RAMZA,0xA4),0);           // no sword: refused
+    prepare_sword(0xA4,33);
+    CHECK(abilities[0xA4].flags,AF_CAST|AF_AREA|AF_WEAPON|AF_EVADE);CHECK(abilities[0xA4].kind,AB_MP_DAMAGE);
+    CHECK(skill_cost(U_RAMZA,0xA4),0);
+    for(s=1;s<40&&hits<3;s++){
+        Unit *a,*t;u16 drained;prepare_sword(0xA4,33);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        CHECK(can_use(U_RAMZA,0xA4),1);
+        memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);
+        t->hp=t->max_hp=999;t->mp=40;t->max_mp=999;a->mp=10;a->max_mp=999;
+        rng32=seed_of(s);
+        CHECK(cast_order(U_RAMZA,10,0xA4,1),1);impact();
+        if(t->mp==40)continue;                                         // evaded
+        hits++;drained=40-t->mp;CHECK(t->hp,999);
+        CHECK(t->mp==0||drained<40,1);
+        CHECK(a->mp>10,1);                                            // the caster's MP rose
+    }
+    CHECK(hits>0,1);
+}
+static void sword_trials(void){dark_profiles();dark_production();}
+#endif
 #ifndef __m68k__
 int main(void){sw_init(61);sword_trials();printf("holy_sword %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else
