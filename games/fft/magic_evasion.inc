@@ -36,8 +36,9 @@ static u8 magic_hit(u8 a,u8 t,AbId ab,u8 execute)
     u8 returned=execute&2;execute&=1; // bit1: pure already-reflected forecast
     const Unit *u=&st.unit[t];const Ability *b=ab<NABIL?&abilities[ab]:RT_NULL;
     const u8 *raw=cj_range(common,ab>=512||ab==NO_ABIL?0:ab);
-    u8 ev[4],k,base=100,scale=1,id,tag,guard=0,physical=!b||b->formula==99||b->formula==0x37||
+    u8 ev[4],k,base=100,scale=1,id,tag,guard=0,physical=!b||b->formula==99||b->formula==0x37||b->formula==0x50||
         (u8)(b->formula-0x25)<=7U||(u8)(b->formula-0x31)<=1U||(b->flags&AF_WEAPON),chance=100;
+    u8 accurate=b&&b->formula==0x50;   // monster status strikes: physical evasion, then the (MA+X)% roll
     u16 product;u8 factor[4];
     if(!b&&(!unit_can_act(&st.unit[a])||unit_petrified(u)||unit_airborne(u)))return 0;
     if(b&&!returned&&magic_reflects_from(a,t,ab))return 0;
@@ -96,13 +97,14 @@ static u8 magic_hit(u8 a,u8 t,AbId ab,u8 execute)
         if(execute){u16 r=rand15();if(ev[k]&&(ev[k]>=base||(u16)(muls16((s16)r,base)>>15)<ev[k]))return 0;}
         else {if(ev[k]>=base)return 0;factor[k]=physical?(u16)((base-ev[k])*100)/base:100-ev[k]*scale;}
     }
-    if(execute)return physical?1:magic_accuracy(a,t,ab,1,1);
+    if(execute)return physical&&!accurate?1:magic_accuracy(a,t,ab,1,1);
     product=(u16)(factor[0]*factor[1]);
     if(physical){
         s32 three=muls16(product,factor[2]);u16 q,rem;
         q=(u16)divs32_16(three,10000);rem=(u16)(three-muls16(q,10000));
         product=(u16)((q*factor[3]+(u16)divs32_16(muls16(rem,factor[3]),10000))/100);
-        return (u8)((product*chance)/100);
+        product=(product*chance)/100;
+        return accurate?magic_accuracy(a,t,ab,(u8)product,0):(u8)product;
     }
     return magic_accuracy(a,t,ab,(u8)divs32_16(muls16(product,factor[2]),10000),0);
 }

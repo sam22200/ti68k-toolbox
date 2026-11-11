@@ -352,6 +352,17 @@ def secret_fist_record(d,a,r):
     return 10,r[11],1,0,128|32
 
 
+def status_strike_record(d,r):
+    """Monster status strikes, formula 0x50 (Eye Gouge, Poison Nail, Beak): Secret Fist's
+    (MA+X)% physical-status accuracy after physical evasion (flags_4 0x12: evadeable, Blade
+    Grasp), one status of an all-or-nothing set, a single target at range 1."""
+    if r[8]!=0x50 or r[0]!=1 or r[1] or r[3]!=9 or r[4]!=0x11 or r[5]!=0x10 or r[6]!=0x12 or r[7] or r[10] or r[12] or r[13]:
+        return None
+    row=d.at(battle.STATUS_SET+6*r[11],6)
+    if row[0]!=0x80 or sum(v.bit_count() for v in row[1:])!=1:return None
+    return 10,r[11],r[0],2*r[2],128|32|2
+
+
 def geomancy_record(d,a,r):
     """All twelve retail terrain attacks: MA*(PA+Y)/2, element and one conditional status."""
     if not 126<=a<=137:return None
@@ -488,7 +499,8 @@ def battle_records(d):
         steal = steal_exp_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if a==0x73 else None
         gil = steal_gil_record(a,d.at(battle.ABILITY_RANGE + 14*a,14)) if a in(0x6c,0x7b,0x133) else None
         geomancy = geomancy_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 126<=a<=137 else None
-        secret = secret_fist_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a==0x68 else None
+        secret = (secret_fist_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a==0x68 else
+                  status_strike_record(d,d.at(battle.ABILITY_RANGE+14*a,14)) if a in (0x111,0x11B,0x132) else None)
         stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8e<=a<=0x91 else None
         gear_steal = steal_equip_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x6e<=a<=0x72 else None
         gear_break = equip_break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8a<=a<=0x8d else None

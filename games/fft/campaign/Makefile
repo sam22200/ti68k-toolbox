@@ -441,6 +441,11 @@ x/core-talk-skill/oracle/source.h: ../tools/talk_oracle.py ../tools/status_state
 	$(PY) ../tools/talk_oracle.py
 core-talk-skill-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-talk-skill/oracle/source.h
 	$(PY) check_talk.py
+.PHONY: core-status-strike-check
+x/core-status-strike/oracle/source.h: ../tools/status_strike_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/status_strike_oracle.py
+core-status-strike-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-status-strike/oracle/source.h
+	$(PY) check_status_strike.py
 .PHONY: core-ruin-check
 x/core-ruin/oracle/source.h: ../tools/ruin_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/ruin_oracle.py
