@@ -1,6 +1,6 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Current state (2026-11-11): Chapter I actions, 152 of 155 executable
+## Current state (2026-11-11): Chapter I actions, 155 of 155 executable
 
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
 [Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
@@ -57,20 +57,26 @@ banks: run through `make`. Check binaries must run inside a data folder
 Brave below 100 (a Brave of 100 hid the knight-sword bug). Known failure, unrelated:
 `manage-test` aborts.
 
-**Numbers now.** Resident TTPack input 57,285, headroom 7,651 bytes; zone 8,698; ABI 85.
+**Numbers now.** Resident TTPack input 57,733, headroom 7,203 bytes; zone 8,698; ABI 86.
 
-**Next (3 actions, all monsters, one missing rule).** Black Ink (0x11E: 0x50 on a line),
-Look of Devil (0x12D: 0x50, random-one set) and Look of Fright (0x12E: formula 0x62, Brave
-- Y with 0x3D's accuracy) share flags_4 0x20 (`DIRECT_TARGETING`: clear line of fire),
-refused today by `cast_area_supported` and `cast_targets` (`r[6]&32`). The formulas' parts
-all exist (0x50 evade/accuracy, the random-one draw in `magic_prepare`, Foxbird's Brave loss
-0x61); what is missing is the trajectory rule in casts (the core has `battle_line_clear`
-for bows). Everything else of [Monster status strikes](MONSTER_STATUS_STRIKES.md) is done.
-Open: Self Destruct is not offered to the AI (needs a sacrifice scoring rule); no battle
-replay shows the AI choosing the new techniques. Test seeds: spread them
-(`(k*0x9E3779B1)|1`), small xorshift seeds give tiny first draws and always pick the first
-random choice. The core id 100 is `FORMULA_AREA_CLEANSE` (source 0x38 on the batch).
+**Chapter I actions are complete (155 of 155, 2026-11-11).** The last three (Black Ink,
+Look of Devil, Look of Fright; flags_4 0x20 `DIRECT_TARGETING`) resolve one panel through
+the weapons' direct trajectory: the resident fetches the recipient from the PLANNER image
+before each TARGETS entry (`cast_direct_fetch`, as `hamedo_line`); do not copy the
+trajectory into TARGETS (it grew the zone by 1,100 bytes). Details and checks:
+[Monster status strikes](MONSTER_STATUS_STRIKES.md).
 
+**Next.** The AI and these techniques: no battle replay shows the AI choosing the new
+monster or sword techniques; Self Destruct is not offered to the AI (needs a sacrifice
+scoring rule); Odd Soundwave's cleanse gain is unverified. Then the rest of
+[Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
+one-command native chapter run. Other open: 0x4E area/line shapes and its direct oracle; a
+direct-targeting cast aimed at an empty panel resolves to nobody (the source can still hit
+a body on the way). Test seeds: spread them (`(k*0x9E3779B1)|1`), small xorshift seeds give
+tiny first draws and always pick the first random choice. The core id 100 is
+`FORMULA_AREA_CLEANSE` (source 0x38 on the batch). A check fixture that goes through
+`cast_order` must respect the order's own range and height rules (a flat `W->hs` is not
+enough: `map_tiles[].stand`).
 
 **Next steps (2026-11-10): [Chapter I readiness](CHAPTER1_READINESS.md)** — battle RAM margin: ragged depth, map envelope and the RAM message are done (~11.4 KB free natively, was ~1.2 KB); the hidden gray buffer and ring backups remain to reach 16 KB. Then the archive budget, a one-command native chapter run and a frozen core interface (resident headroom: 107 bytes).
 
