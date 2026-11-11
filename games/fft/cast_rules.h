@@ -5,9 +5,9 @@
 static inline u8 performance_formula(u8 f){return (u8)(f-0x1c)<=1;}
 static inline u8 draw_out_formula(u8 f){return (u8)(f-0x20)<=3;}
 // Speed/PA/MA losses by the status commit: Dances, and the Ruins (0x1A). PA by ability id
-// (Polka 89, Last Dance 96, Power Ruin 0xC6), else MA; AB_SPEED is Speed.
-static inline u8 stat_loss_formula(u8 f){return performance_formula(f)||f==0x1A;}
-static inline u8 stat_loss_pa(u16 ab){return ab==89||ab==96||ab==0xC6;}
+// (Polka 89, Last Dance 96, Power Ruin 0xC6, Beaking 0x135), else MA; AB_SPEED is Speed.
+static inline u8 stat_loss_formula(u8 f){return performance_formula(f)||f==0x1A||f==0x55;}
+static inline u8 stat_loss_pa(u16 ab){return ab==89||ab==96||ab==0xC6||ab==0x135;}
 // Punch Art support 0x33..0x35: PA instead of MA, no Faith (CORE_PUNCH_ART.md).
 static inline u8 punch_formula(u8 f){return (u8)(f-0x33)<=2;}
 // Guts 0x39..0x3b: Speed/Brave/Scream gains that always hit (CORE_GUTS.md).
@@ -21,12 +21,15 @@ static inline u8 speech_formula(u8 f){return (u8)(f-0x29)<=1||guts_formula(f);}
 // PA x WP, MP drained to the caster);
 // Secret Fist0x50 uses the shared status commit and a physical-status accuracy;
 // Ruins 0x1A (stat loss, the status commit) and 0x1B (max-MP percent) (campaign/RUINS.md).
-// Monster 0x3D (Mind Blast, Death Sentence): formula 10's (MA+X)% without Faith, a random-one set.
+// Monster 0x3D (Mind Blast, Death Sentence): formula 10's (MA+X)% without Faith, a random-one set;
+// Beaking 0x55: the same accuracy after magical evasion, PA - Y by the status commit.
+// Goblin Punch 0x4F (0x50's evade and accuracy) and Self Destruct 0x52 (always, Oil at 100%):
+// damage = the caster's missing HP; Self Destruct's caster takes its own HP.
 // Core id 100 (FORMULA_AREA_CLEANSE): source 0x38 on the batch (Odd Soundwave: a cancel set, always
 // applied, no draw); the item cleanses keep 0x38 outside the magic pipeline.
-// status (the status batch commit): 10, 11, 18, 20, 0x1A, 97, 100, 0x2a, 0x33, 0x39..0x3b, 0x3D, 0x50.
-static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x3c,0x1f,0xe6,0x38,0x2e,0x00,0x50,0x03,0x00,0x1a};
-static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x04,0x04,0x06,0x08,0x2e,0x00,0x00,0x03,0x00,0x12};
+// status (the status batch commit): 10, 11, 18, 20, 0x1A, 97, 100, 0x2a, 0x33, 0x39..0x3b, 0x3D, 0x50, 0x55.
+static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x3c,0x1f,0xe6,0x38,0x2e,0x00,0xd0,0x27,0x00,0x1a};
+static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x04,0x04,0x06,0x08,0x2e,0x00,0x00,0x23,0x00,0x12};
 static inline u8 magic_status_formula(u8 f){return f<104&&(magic_status_bits[f>>3]>>(f&7)&1);}
 static inline u8 magic_percent_formula(u8 f){return f==9||(u8)(f-15)<=1;}
 static inline u8 magic_transfer_formula(u8 f){return (u8)(f-15)<=1||f==0x2F;}

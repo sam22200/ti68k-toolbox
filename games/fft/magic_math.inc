@@ -55,7 +55,7 @@ static s16 magic_quarter(s16 raw,u8 factor)
 // Frog may only Attack or Frog, Berserk only Attack, and Punch Art has no CT.
 static s16 magic_xa(u8 a,u8 t,u8 element,u8 hostile,u8 f)
 {
-    const Unit *ua=&st.unit[a],*ut=&st.unit[t];u8 punch=punch_formula(f)||(u8)(f-0x31)<=1,physical=punch||f==0x50||f==99;
+    const Unit *ua=&st.unit[a],*ut=&st.unit[t];u8 punch=punch_formula(f)||(u8)(f-0x31)<=1,physical=punch||f==0x50||f==0x4F||f==99;
     s16 xa=f==99?ua->sp:punch?ua->pa:ua->ma;
     if(f!=99&&(st.affinity[a][4]&element))xa=(s16)(((u16)xa*5)>>2);   // Earth Slash carries Earth; the other Punch Art passes no element
     if(f!=99&&(u8)(f-0x29)>1&&st.support[a]==(physical?SUPPORT_ATTACK_UP:SUPPORT_MAGIC_ATTACK_UP))xa=magic_third(xa<<2);   // Talk/Steal Heart: plain MA
@@ -149,7 +149,9 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
     // Talk: Persuade's CT 0 (high byte keeps it non-zero); Brave/Faith carry a signed loss.
     if(!query&&speech_formula(b->formula)&&b->kind!=AB_STATUS)return b->kind==AB_QUICK?0x100:(u16)(s16)(s8)b->y;
     if(!query&&b->formula==14)return restore_cap(st.unit[t].max_hp);
-    if(!query&&b->formula==0x1A)return b->y;   // Ruin: the stat's loss X
+    if(!query&&(b->formula==0x1A||b->formula==0x55))return b->y;   // Ruin: the stat's loss X; Beaking: Y
+    if(!query&&(b->formula==0x4F||b->formula==0x52))   // Goblin Punch, Self Destruct: the caster's missing HP (its own HP on itself)
+        return b->formula==0x52&&a==t?st.unit[a].hp:st.unit[a].max_hp-st.unit[a].hp;
     if(!query&&(magic_status_formula(b->formula)||b->kind==AB_CLEANSE))return magic_status_value(t,ab,0);
     if(query==2)return core_status_current(&ut->statuses,0)&0x10?(b->formula==16||b->formula==14?AB_HEAL:AB_DAMAGE):b->kind;
     if(!query&&(b->formula==13||b->formula==0x35||b->formula==0x1B||magic_percent_formula(b->formula))){
@@ -159,10 +161,10 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
         // Golem (formula 20) targets its caster: same sign (neutral zodiac), no
         // target Faith, so the shared path is (MA[+AttackUP]+X)*caster Faith/100.
         // Punch Art has no Faith term.
-        u16 faith=b->formula==76||b->formula==81||punch_formula(b->formula)||(u8)(b->formula-0x29)<=1||b->formula==0x50||b->formula==0x3D?10000:(u16)(magic_faith(ua)*(b->formula==20?100:magic_faith(ut)));
+        u16 faith=b->formula==76||b->formula==81||punch_formula(b->formula)||(u8)(b->formula-0x29)<=1||b->formula==0x50||b->formula==0x4F||b->formula==0x3D||b->formula==0x55?10000:(u16)(magic_faith(ua)*(b->formula==20?100:magic_faith(ut)));
         xa=magic_xa(a,t,b->formula==9?b->element:0,
-            b->formula==10||b->formula==97||b->formula==0x50||b->formula==0x3D||(u8)(b->formula-0x1A)<=1||(b->formula==14&&!(core_status_current(&ut->statuses,0)&16))||magic_percent_formula(b->formula),b->formula);
-        if(b->formula==13||b->formula==14||b->formula==0x35||b->formula==0x1B||magic_status_formula(b->formula)||magic_percent_formula(b->formula)){
+            b->formula==10||b->formula==97||b->formula==0x50||b->formula==0x4F||b->formula==0x3D||b->formula==0x55||(u8)(b->formula-0x1A)<=1||(b->formula==14&&!(core_status_current(&ut->statuses,0)&16))||magic_percent_formula(b->formula),b->formula);
+        if(b->formula==13||b->formula==14||b->formula==0x35||b->formula==0x1B||b->formula==0x4F||magic_status_formula(b->formula)||magic_percent_formula(b->formula)){
             const u8 *r=cj_range(common,ab);x=r[b->formula==0x1A?10:9];   // Ruin 0x1A: MA + Y
             if(ua->zodiac!=12&&ut->zodiac!=12)x=zodiac_xa(ua,ut,x);
             n=(u16)divs32_16(muls16(xa+x,faith),10000);
