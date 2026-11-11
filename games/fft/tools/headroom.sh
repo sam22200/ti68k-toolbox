@@ -1,7 +1,8 @@
 #!/bin/bash
 # Production headroom of the campaign battle core: TTPack input (the .89z's varsize) against the
-# 64936-byte limit. Program = resident + module zone (data/modules.h MOD_ZONE = largest image), so
-# rebuild the banks first: (cd campaign && make data/ffcj.89y data/ffbm.89y data/ffbn.89y).
+# 64936-byte limit. The program is the resident only: the module zone (data/modules.h MOD_ZONE,
+# the largest image, printed for reference) is a heap block since HW3Patch is required. Rebuild
+# the banks first: (cd campaign && make data/ffcj.89y data/ffbm.89y data/ffbn.89y).
 # Keep about 250 bytes: some 68000 test binaries (area-impact) are larger than production.
 set -e
 HERE=$(cd "$(dirname "$0")/.." && pwd); ROOT=$(cd "$HERE/../.." && pwd)

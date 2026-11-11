@@ -74,11 +74,27 @@ static void package_notice(unsigned char result,const FpNotice *notice)
     printf_xy(2,76,"Saves kept. ENTER to exit.");
     GKeyFlush();ngetchx();
 }
+/* The battle runs its modules from a heap block (fft.c mod_zone): an unpatched Titanium
+   freezes there. GCC4TI's _execute_in_ghost_space test: HW3Patch in Flash clears a word of
+   EX_stoBCD (ROM table entry 0xC0), in RAM it leaves 0x100 at 0xAC. */
+static unsigned char hw3patch_missing(void)
+{
+    const unsigned char *ex=(*(const unsigned char *const **)0xC8)[0xC0];
+    return HW_VERSION>=3&&*(const unsigned short *)(ex+92)&&*(const unsigned long *)0xAC!=0x100;
+}
 void _main(void)
 {
     FpNotice notice;unsigned char result;ESI args;unsigned short arg=0;
     InitArgPtr(args);if(GetArgType(args)==POSINT_TAG)arg=GetIntArg(args);
     tilog("story start %u free %lu max %lu",arg,HeapAvail(),HeapMax());
+    if(hw3patch_missing()){
+        tilog("story stop HW3Patch missing");
+        ClrScr();FontSetSys(F_4x6);
+        printf_xy(2,25,"HW3Patch required: run");
+        printf_xy(2,38,"hw3patch() once, see INSTALL.");
+        printf_xy(2,76,"Saves kept. ENTER to exit.");
+        GKeyFlush();ngetchx();push_shortint(0);return;
+    }
     result=fp_story(package_file,package_call,progress_read,progress_reset,arg,&notice);
     if(result)package_notice(result,&notice);
     tilog("story end %u",result);

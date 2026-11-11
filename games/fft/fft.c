@@ -3721,9 +3721,11 @@ u8 ai_frozen(void) { return W->frz; }
 #ifdef FFT_MODULES
 // Two validated FMB3 archive ranges, one execution zone. Cache record pointers
 // once at startup so warm/cold calls need no shard selection or file lookup.
+// The zone is a heap block (mod_ready), not part of the program: HW3Patch is required
+// (campaign/CHAPTER1_READINESS.md § 4), an unpatched Titanium freezes running it.
 #include "module_bank.h"
 #include "campaign/data/modules.h"      // MOD_ZONE: the bank's largest image (ffbm)
-static u16 mod_zone[MOD_ZONE / 2];
+static u16 *mod_zone;
 static const u8 *mod_images[MOD_COUNT];
 static ModCtx *mod_context(u8 id)
 {
@@ -3815,6 +3817,7 @@ static u8 mod_ready(void)
     u16 asize=0,bsize=0,csize=0,id;
     const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize),*c=rt_file("ffbo",&csize);
     mod_id=0;mod_images[MOD_RESOURCES]=RT_NULL; // (statics outlive a run: the RAM message's test)
+    if(!mod_zone&&!(mod_zone=malloc(MOD_ZONE)))return 0;   // freed by final_release
     if(!module_three_valid(a,asize,b,bsize,c,csize,MOD_BANK0_COUNT,MOD_BANK1_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE))return 0;
     for(id=0;id<MOD_COUNT;id++){
         const u8 *bank=id<MOD_BANK0_COUNT?a:id<MOD_BANK1_END?b:c;
@@ -4725,6 +4728,10 @@ final_release(void)
     release();
     if(battle_state)free(battle_state);
     battle_state=RT_NULL;rt_state=RT_NULL;rt_state_size=0;
+#ifdef FFT_MODULES
+    if(mod_zone)free(mod_zone);
+    mod_zone=RT_NULL;
+#endif
 }
 // The battle program's chapters (FFT_BATTLE, campaign/ENGINE.md M4): each one's banks are "ff",
 // its letter, then v0..v3 (views), a (actor frame keys), i (interface), d (descriptor); every
@@ -4743,6 +4750,9 @@ void game_init(void)
 #ifdef __m68k__
     navbuf=RT_NULL;nav_capacity=0;
     sbuf=vbuf=RT_NULL;acache=RT_NULL; // reset before any allocation can fail
+#endif
+#ifdef FFT_MODULES
+    mod_zone=RT_NULL;
 #endif
 #ifndef FFT_MODULES
     battle_state=malloc(BATTLE_STORAGE_BYTES);

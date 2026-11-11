@@ -338,6 +338,10 @@ def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, al
         (out/f"chapter-{spec['id']:02d}-variables.txt").write_text('\n'.join(v.name for v in variables)+'\n')
     (out/'INSTALL.md').write_text(
         '# FFT core and chapter installation\n\n'
+        '**TI-89 Titanium with HW3Patch required.** Send `hw3patch.89z` (HW3Patch 1.03 by Kevin Kofler, '
+        'distributed separately) and run `hw3patch()` once; the battle runs code from RAM, and '
+        '`fftstory()` refuses to start without the patch. Reinstalling AMS removes it. '
+        'The TI-89 HW2 is not supported.\n\n'
         'Install `fft-core.89g` once, then exactly one `chapter-NN.89g`, in `main`. '
         'Run `fftstory()`. Keep the archive attributes in the groups; only the small supervisor stays in RAM.\n\n'
         'To change chapters, exit to HOME. Keep the core and all saves. Remove only the '
