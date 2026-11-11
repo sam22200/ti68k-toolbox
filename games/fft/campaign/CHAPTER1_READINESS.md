@@ -141,11 +141,41 @@ placements (`tilog` in `deploy.c`; today cells are placed blind) and a key scrip
 
 ## 4. Freeze the core interface
 
-Every core change forces a new `fftcore` state (three times on 2026-11-08). Chapter content
-must never require a core rebuild: keep chapter data, scripts and encounters in packs; grow
-resident headroom by moving more cold code into modules and shrinking the largest images
-(WEAPON 8,690 sets the zone, then AI 8,630, PARTY 8,346, SAVE 8,244, RESULTS 8,030). Resident
-fftbat: 64,539 + 4 of 64,936 TTPack input bytes after the 2026-11-08 session.
+**Zone and resident (2026-11-10, ABI 84).** The program is the resident plus the module zone
+(the largest image). The cold start (`bootstrap_files`, `cj_valid`) moved from SCREENS to
+RESOURCES (ops 13, 14; the catalogue now goes through RESOURCES' own context), the AI's
+weapon cache (`weapon_ai_prepare`) from WEAPON to COMMAND op 6 (it already compiles
+`weapon_plan.inc`; AI thinking already switches images every step). SCREENS 8,708 → 7,474,
+WEAPON 8,690 → 6,686, COMMAND 3,338 → 7,520, RESOURCES 5,110: zone 8,708 → **8,630**, the AI
+image, which keeps its own formula evaluator on purpose (no AI/FORMULA ping-pong). TTPack
+input 64,787: **149 bytes left** (was 71), and 78 bytes of RAM. Going lower means splitting
+the AI image. The large resident functions left are hot render paths or call modules.
+
+**Chapter I coverage (2026-11-10, `tools/chapter_audit.py`, `x/chapter1-audit.json`).** The
+units of the 18 story encounters (ATTACK rows up to Fort Zeakden, ENTD 0x180..0x191) and of
+the first-tier random formations of Mandalia, Fovoham, Sweegy, Lenalia and Zeklaus (33
+encounters, 297 units) use **155 action abilities; the core executes 105**. The 50 missing
+ones are deliberately disabled families in `common_tables.py` (`kind` 255: "Monster/special
+producers ... remain independently gated"); the "201/201 generic actions" count covers the
+generic jobs only:
+- **Special character sets:** Holy Sword (Agrias, already at Orbonne: Lightning Stab, Holy
+  Explosion), Dark Sword (Gafgarion at Orbonne), Holy Magic (Ovelia at Orbonne: Mbarrier,
+  Deathspell 2), Wiegraf's sets (Split/Crush Punch; as Lune Knight Shellbust Stab, Blastar/
+  Hellcry Punch, Icewolf Bite), Zalbag's Magic/Speed/Power/Mind Ruin.
+- **Monsters (all):** Goblin (Tackle, Goblin/Turn Punch, Eye Gouge), Bomb/Grenade (Bite,
+  Small Bomb, Self Destruct, Flame Attack), Red Panther (Scratch, Cat Kick, Poison Nail),
+  Chocobos (Choco Ball/Meteor), Pisco Demon, Squidlarkin, Skeleton, Bone Snatch, Flotiball,
+  Ahriman, Juravis, Cocatoris, Steel Hawk, Bull Demon, Dragon.
+- R/S/M used: Auto Potion, Counter, Weapon Guard, Equip Crossbow, Concentrate, Move+1,
+  Jump+1 (all generic: covered by the 78 R/S/M consumers).
+
+Caveat: the random-formation tier is read as "first pair of each route" (WLDCORE); some
+monsters listed (Dragon, Ahriman) may belong to later progress tiers. **The core cannot be
+frozen for Chapter I before monster actions and these special sets exist** (plus monster
+units themselves: no equipment, innate skills, sprites in the actor banks).
+
+Every core change still forces a new `fftcore` state. Chapter content must never require a
+core rebuild: keep chapter data, scripts and encounters in packs.
 
 ## Known open items
 

@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 82U
+#define MOD_ABI 84U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -22,13 +22,13 @@ typedef struct {
     union {                             // transient input, never gameplay/save state
         struct {u16 cast_ability;u8 cast_actor,cast_ref;};
         u8 *chapter_story_after;         // PARTY10 cold script flags
-        const CoreBoot *boot;          // SCREENS11: cold pointer bindings, no gameplay state
+        const CoreBoot *boot;          // RESOURCES13: cold pointer bindings, no gameplay state
         Unit *stats_unit;                // resident -> PARTY9 only
         char *window_out;               // resident -> RESULTS1 only
         s16 *camera_out;                 // BEATS4: two camera target coordinates
         char *forecast_out;              // resident -> NUMBERS5 only
         CastBatch *cast_batch_out;        // resident -> TARGETS1/3 or SAVE7 only
-        struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; SCREENS12: catalogue size in desc_size;
+        struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; RESOURCES14: catalogue size in desc_size;
                                         // RESOURCES12: AMS's free RAM / 16 in desc_size
         const u8 *chapter_ugfx;          // SAVE6 -> resident: the chapter's unit frames
     };

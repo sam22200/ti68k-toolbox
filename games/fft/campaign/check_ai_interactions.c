@@ -52,7 +52,7 @@ static void prepare_plan(AbId ab)
     while(W->ai_weapon_left&&i++<8){
         ZB(61);
 #ifdef FFT_MODULES
-        mod_call(MOD_WEAPON,6,0);
+        mod_call(MOD_COMMAND,6,0);
 #else
         weapon_ai_prepare();
 #endif
