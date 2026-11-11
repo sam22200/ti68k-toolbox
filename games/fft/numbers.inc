@@ -66,7 +66,7 @@ static void number_single(void)
         } else {
             u16 amount=st.dmg;u8 healing=kind!=AB_DAMAGE;
 #ifdef FFT_CHAPTER
-            if((st.abil==NO_ABIL||(st.abil<512&&((abilities[st.abil].flags&AF_CHARGE)||abilities[st.abil].formula==8)))&&(s16)amount<0){
+            if((st.abil==NO_ABIL||(st.abil<512&&((abilities[st.abil].flags&AF_CHARGE)||magic_damage_formula(abilities[st.abil].formula))))&&(s16)amount<0){
                 healing=!healing;amount=(u16)(0U-amount);
             }
 #endif

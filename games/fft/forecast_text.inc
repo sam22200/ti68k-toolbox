@@ -56,7 +56,7 @@ u8 forecast_text(u8 a, u8 t, AbId ab, char *s)
 #endif
         u16 v = b ? skill_amount(a,t,ab,(b->flags&AF_CHARGE)?FORMULA_FORECAST:0) : attack_prediction(a,t);
 #ifdef FFT_CHAPTER
-        if((weapon_order(ab)||(b&&b->formula==8))&&(s16)v<0){harm=!harm;v=(u16)(0U-v);}
+        if((weapon_order(ab)||(b&&magic_damage_formula(b->formula)))&&(s16)v<0){harm=!harm;v=(u16)(0U-v);}
 #endif
         if (harm && ut->hp && v >= ut->hp) n = put_s(s, n, "KO");
         else {

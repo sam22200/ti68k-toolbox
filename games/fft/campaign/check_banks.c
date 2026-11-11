@@ -46,7 +46,7 @@ static void expected_context(void)
         c->magic_amount=magic_amount;
         c->magic_heal=magic_heal;
         c->skill_kind=skill_kind;
-        c->magic_hit=magic_hit;c->target_query=target_query;
+        c->magic_hit=magic_hit;c->special=special;c->target_query=target_query;
         c->weapon_amount=weapon_amount;c->knockback=knockback;
         c->zodiac_xa = zodiac_xa; c->tile_at = tile_at;
         c->node_at=node_at;c->unit_place=unit_place;c->unit_at_cell=unit_at_cell;c->cursor_place=cursor_place;
@@ -80,11 +80,11 @@ static void bindings(void)
     u8 id,pass;u32 seed=rng32;u16 size;const u8 *bank;
     u8 actual_w=map_w,actual_h=map_h,actual_units=encounter_units;
     u16 actual_n=map_n;s16 actual_sc_h=sc_h,actual_sc_top=sc_top;
-    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,348);
+    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,352);
     for(pass=0;pass<2;pass++){
         if(pass){map_w=1;map_h=1;map_n=1;encounter_units=13;sc_h=200;sc_top=1;}
         expected_context();
-        for(id=0;id<MOD_COUNT;id++){
+        for(id=0;id<MOD_COMPANION;id++){   // zone images; the companion has its own block
             ModCtx *c;ZB(61);mod_call(id,255,0);ZE(61);c=mod_context(id);
             CHECK(mod_id,id+1);CHECK(memcmp(c,&expected,sizeof expected)==0,1);
             CHECK(rng32==seed,1);
@@ -115,6 +115,14 @@ static void bindings(void)
         c->desc_size=0;c->interface_size=0;
         ZB(63);CHECK(mod_call(MOD_SAVE,4,0),0);ZE(63);
     }
+    // The companion: its own heap block, installed on first use, called without a zone swap.
+    {u16 i;u8 zone_id;ModCtx *c;
+     CHECK(comp_block==RT_NULL,1);mod_call(MOD_STATUS,255,0);zone_id=mod_id;
+     ZB(58);CHECK(special(3,10,0x123,COMPANION_PROBE),(3<<12^10<<8^0x123));ZE(58);
+     CHECK(comp_block!=RT_NULL,1);CHECK(mod_id,zone_id);c=comp_context();CHECK(c->sig,MOD_SIG);CHECK(c->w==W,1);
+     for(i=0;i<100;i++){ZB(59);CHECK(special((u8)i,(u8)(i>>1),i,COMPANION_PROBE),((i<<12)^((i>>1)<<8)^i)&0xFFFF);ZE(59);}
+     CHECK(mod_call(MOD_STATUS,255,0),0);CHECK(mod_id,zone_id);       // the zone image stayed
+     companion_free();CHECK(comp_block==RT_NULL,1);}
     // Restore real unit state and test the next launch's reset path.
     game_scenario(61);CHECK(mod_ready(),1);CHECK(mod_id,0);
 }

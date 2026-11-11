@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 84U
+#define MOD_ABI 85U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -54,6 +54,7 @@ typedef struct {
     u16 (*magic_heal)(u8 a,u8 t,AbId ab,u8 query);
     u8 (*skill_kind)(u8 a,u8 t,AbId ab);
     u8 (*magic_hit)(u8 a,u8 t,AbId ab,u8 execute);
+    u16 (*special)(u8 a,u8 t,AbId ab,u8 query); // the companion image (MOD_COMPANION), any caller
     u16 (*target_query)(u8 who,u16 criterion); // bit15: ability applicability;255/254/253/252: validity/reaction/critical/Jump
     u16 (*weapon_amount)(u8 a,u8 t,u8 weapon,u8 critical,u16 roll,u8 awake,u8 charge,u16 base_roll);
     void (*knockback)(u8 a,u8 t);
@@ -151,6 +152,7 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define magic_heal M.magic_heal
 #define skill_kind M.skill_kind
 #define magic_hit M.magic_hit
+#define special M.special
 #define magic_target(t) M.target_query(t,255)
 #define magic_applicable(t,ab) ((u8)M.target_query(t,(u16)(ab)|32768U))
 #define weapon_amount M.weapon_amount

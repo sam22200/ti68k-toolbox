@@ -16,6 +16,7 @@ static const ModCtx mod_defaults={
     .magic_heal=magic_heal,
     .skill_kind=skill_kind,
     .magic_hit=magic_hit,
+    .special=special,
     .target_query=target_query,
     .weapon_amount=weapon_amount,
     .knockback=knockback,

@@ -182,7 +182,8 @@ A monster uses only its own set's learned abilities. Checked in `check_discovery
 the human action they copy (PC, sanitizers, 68000). Still needing family work with an oracle:
 Turn Punch (area vertical 1 where Spin Fist has 0), the formula 0x50 status family (Eye
 Gouge, Poison Nail, Black Ink, Look of Devil, Beak), Odd Soundwave (0x38), Holy Sword (0x2D:
-status on hit, area, line), then the ten new formulas (`HW3PATCH_USES.md` § 1).
+status on hit, area, line), then the new formulas, in the core's companion image
+(`COMPANION.md`; 0x4E done: 129 of 155 executable).
 
 Caveat: the random-formation tier is read as "first pair of each route" (WLDCORE); some
 monsters listed (Dragon, Ahriman) may belong to later progress tiers. **The core cannot be

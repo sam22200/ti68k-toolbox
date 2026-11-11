@@ -131,6 +131,23 @@ static void monster_checks(void)
  CHECK(abilities[0xE1].range,1);CHECK(abilities[0xE1].vert,0);
  CHECK(monster_amount(U_RAMZA,10,0x133,0),monster_amount(U_RAMZA,10,0x6C,0));CHECK(monster_hit(U_RAMZA,10,0x133),monster_hit(U_RAMZA,10,0x6C));
  CHECK(monster_amount(U_RAMZA,U_RAMZA,0x143,0),2);CHECK(monster_amount(U_RAMZA,U_RAMZA,0x92,0),1);
+ // Formula 0x4E (companion): formula 0x08's amount with both Faiths at 100, and Faith ignored.
+ {static const u16 truth[]={0x10B,0x114,0x116,0x123,0x124,0x125,0x126,0x134};u8 j;
+  for(j=0;j<sizeof truth/sizeof*truth;j++){
+   AbId tb=truth[j];const Ability *b=&abilities[tb];u16 want;
+   nature_arena();u=&st.unit[U_RAMZA];v=&st.unit[10];u->job=94;u->zodiac=12;refresh();
+   CHECK(b->formula,0x4E);CHECK(magic_formula(b->formula),1);
+   u->faith=100;v->faith=100;want=magic_amount(U_RAMZA,10,((u16)b->element<<8)|b->y);if((s16)want>999)want=999;
+   CHECK(monster_amount(U_RAMZA,10,tb,0),want);CHECK(want>0,1);
+   u->faith=10;v->faith=20;CHECK(monster_amount(U_RAMZA,10,tb,0),want);
+   st.affinity[10][1]=b->element?b->element:0xFF;if(b->element)CHECK(monster_amount(U_RAMZA,10,tb,0),0);st.affinity[10][1]=0;
+   {u16 set;u8 k,found=0;for(set=0xB0;set<0xE0&&!found;set++)for(k=0;k<4;k++)if(SET_ABILITY(set,k)==tb){u->set=(u8)set;u->learned=(LearnBits)1<<k;found=1;break;}
+    CHECK(found,1);CHECK(can_use(U_RAMZA,tb),1);}
+   // CT 0: executed at once (the batch is applied at impact): the HP change is the amount,
+   // or nothing on a magical-evade miss (only evadeable records may miss).
+   {u16 hp=v->hp;st.unit[U_RAMZA].mp=999;CHECK(cast_order(U_RAMZA,10,tb,1),1);impact();
+    CHECK(v->hp==hp-want||((b->flags&AF_EVADE)&&v->hp==hp),1);}
+  }}
  // Choco Ball: the same strike, range 4 at any height.
  CHECK(monster_amount(U_RAMZA,10,0x10A,0),monster_amount(U_RAMZA,10,0x64,0));CHECK(abilities[0x10A].range,4);CHECK(abilities[0x10A].vert,255);
  CHECK(monster_hit(U_RAMZA,10,0x10A),monster_hit(U_RAMZA,10,0x66));
