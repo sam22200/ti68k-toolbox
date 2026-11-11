@@ -11,6 +11,11 @@ SWORDS=(19,24,29,33,37)        # Broad Sword, Ice/Thunder elements (24 lightning
 STATUS={0:(0,0,0,0,0),1:(0,0,0,0x20,0),2:(0,0,0,0,0x10),3:(8,0,0,0,0),4:(0,0,4,0,0),5:(0,0,2,0,0)}
 # element modes: 0 none, 1 target half, 2 target weak, 3 target absorb, 4 target null, 5 actor strengthen
 ELEMENT_MODES=6
+# Mighty Sword target equipment (head, body, accessory, right weapon, right shield, left weapon,
+# left shield): 0 two weapons, 1 weapon + shield, 2 none, 3 monster (full), 4 Maintenance (full),
+# 5 a left-hand weapon only.
+MIGHTY_EQ=((144,172,208,19,255,24,255),(144,172,208,33,255,255,128),(255,)*7,
+           (144,172,208,19,255,24,255),(144,172,208,19,255,24,255),(144,172,208,255,255,24,255))
 
 
 def main():
@@ -19,6 +24,7 @@ def main():
     d=s.battle.Disc(str(s.core_audit.DEFAULT_DISC))
     bind_function('f2d','battle_formula_damage_pa_times_wp_plus_y_status','battle',d)
     bind_function('f2f','battle_formula_absorb_mp_pa_times_wp','battle',d)
+    bind_function('f2e','battle_formula_break_equipped_damage_pa_times_wp','battle',d)
     for k,n in dict(finish='battle_action_finalize_target_current_action',sort='battle_target_sort_list',
             remove='battle_status_remove',random='battle_formula_get_random_0_7fff').items():bind_function(k,n,'battle',d)
     o=s.Original(d);o.uc.mem_write(0x10000,d.exe[0x800:]);o.instruction_limit=2000000
@@ -28,6 +34,7 @@ def main():
     handler=struct.unpack_from('<I',d.bat,0x8018f610-s.battle.BAT+4*0x2D)[0]
     assert handler==s.FUNCTIONS['f2d'][0]      # the retail 0x2D dispatcher entry, not a guessed helper
     assert struct.unpack_from('<I',d.bat,0x8018f610-s.battle.BAT+4*0x2F)[0]==s.FUNCTIONS['f2f'][0]
+    assert struct.unpack_from('<I',d.bat,0x8018f610-s.battle.BAT+4*0x2E)[0]==s.FUNCTIONS['f2e'][0]
     rng=1;draws=0
     seed_of=lambda k:(k*0x9E3779B1&0xffffffff)|1   # spread: small xorshift seeds draw tiny first values
     def rand():
@@ -106,6 +113,39 @@ def main():
         o.call('remove');o.call('f2f')
         v=bytes(o.uc.mem_read((target&0x1fffff)+0x18c,0x10));u=bytes(o.uc.mem_read((actor&0x1fffff)+0x18c,0x10))
         dark_rows.append([*p,v[0],v[1],*struct.unpack_from('<hhhh',v,4),u[0],*struct.unpack_from('<hhhh',u,4),draws])
+    # Mighty Sword 0x2E: ability, sword, pa, actor sign, target sign, Attack UP, target
+    # equipment mode (MIGHTY_EQ), element mode, seed.
+    mighty=[]
+    for ab in range(0xA0,0xA4):
+        for sword in(24,33):
+            mighty+=[(ab,sword,pa,az,tz,up,eq,0,1)for pa,az,tz,up in((5,0,0,0),(14,0,6,1),(20,4,4,0),(31,1,7,1))for eq in range(6)]
+            mighty+=[(ab,sword,18,0,0,0,0,em,1)for em in range(1,ELEMENT_MODES)]
+        mighty+=[(ab,24,18,0,0,0,0,0,seed)for seed in range(2,12)]
+    mighty_rows=[];r_m={ab:d.at(s.battle.ABILITY_RANGE+14*ab,14)for ab in range(0xA0,0xA4)}
+    for p in mighty:
+        ab,sword,pa,az,tz,up,eq,em,seed=p;w=d.at(s.battle.WEAPONS+8*sword,8);element=w[6]
+        for ptr in(actor,target):o.uc.mem_write(ptr&0x1fffff,bytes(448))
+        o.uc.mem_write(ability&0x1fffff,bytes(80));o.uc.mem_write(0x193860,bytes(5))
+        o.write(0x80192d94,actor);o.write(0x80192d98,target);o.write(0x80192d90,target+0x18c);o.write(0x80192d8c,actor+0x18c)
+        for ptr,sign in((actor,az),(target,tz)):
+            o.uc.mem_write((ptr&0x1fffff)+1,b'\0');o.uc.mem_write((ptr&0x1fffff)+6,bytes((128,)))
+            o.uc.mem_write((ptr&0x1fffff)+8,struct.pack('<H',sign<<12));o.uc.mem_write((ptr&0x1fffff)+0x26,bytes((70,)))
+        if eq==3:o.uc.mem_write((target&0x1fffff)+6,bytes((128|0x20,)))
+        if eq==4:o.uc.mem_write((target&0x1fffff)+0x91,bytes((0x04,)))
+        o.uc.mem_write((actor&0x1fffff)+0x36,bytes((pa,)))
+        o.uc.mem_write((actor&0x1fffff)+0x90,bytes((0x10 if up else 0,0)))
+        o.uc.mem_write((target&0x1fffff)+0x28,struct.pack('<HH',999,999))
+        o.uc.mem_write((target&0x1fffff)+0x1a,bytes(MIGHTY_EQ[eq]))
+        if element and em:
+            if em==5:o.uc.mem_write((actor&0x1fffff)+0x71,bytes((element,)))
+            else:o.uc.mem_write((target&0x1fffff)+0x6d+{1:2,2:3,3:0,4:1}[em],bytes((element,)))
+        o.uc.mem_write((ability&0x1fffff)+0x30,r_m[ab]);o.uc.mem_write((ability&0x1fffff)+0x16,struct.pack('<H',ab))
+        o.uc.mem_write((ability&0x1fffff)+0x3e,w)
+        o.uc.mem_write((target&0x1fffff)+0x18c,b'\1');o.uc.mem_write((target&0x1fffff)+0x1b6,struct.pack('<H',100))
+        o.write(0x8018f5fc,0);rng=seed_of(seed);draws=0
+        o.call('remove');o.call('f2e');o.call('finish')
+        v=bytes(o.uc.mem_read((target&0x1fffff)+0x18c,0x20))
+        mighty_rows.append([*p,v[0],v[0x19],v[3],*struct.unpack_from('<hh',v,4),draws])
     # Native header (14 bytes a row, the 68000 check's size limit): inputs, then execute
     # draws, damage, healing (hit is always 1 with zero evasion; the critical is redrawn).
     lines=['/* Original Holy Sword 0x2D damage/critical/element profiles; local source bytes only. */',
@@ -122,8 +162,15 @@ def main():
             'static const DarkProfile source_dark[]={']
     lines+=[' {{%s},%d,%d,%d,%d},'%(','.join(map(str,(*row[:6],int(row[6]==7),row[7]))),row[8],row[19],row[12],row[18])for row in dark_rows]
     lines+=['};']
+    # Mighty Sword: inputs (ability - 0xA0), then hit, slot mask, item lost, damage, healing, draws.
+    lines+=['typedef struct{u8 in[9],hit,draws,slot,lost;u16 damage,healing;}MightyProfile;',
+            'static const u8 mighty_eq[6][7]={'+','.join('{'+','.join(map(str,e))+'}'for e in MIGHTY_EQ)+'};',
+            'static const MightyProfile source_mighty[]={']
+    lines+=[' {{%s},%d,%d,%d,%d,%d,%d},'%(','.join(map(str,(row[0]-0xA0,*row[1:9]))),row[9],row[14],row[10],
+            row[11],row[12],row[13])for row in mighty_rows]
+    lines+=['};']
     (out/'dark.h').write_text('\n'.join(lines)+'\n')
-    (out/'source.json').write_text(json.dumps(dict(cases=rows,dark_cases=dark_rows,functions=o.function_hashes,
+    (out/'source.json').write_text(json.dumps(dict(cases=rows,dark_cases=dark_rows,mighty_cases=mighty_rows,functions=o.function_hashes,
         battle_sha256=s.core_audit.sha(d.bat),exe_sha256=s.core_audit.sha(d.exe),
         columns='ability,sword item,pa,actor sign,target sign,Attack UP,target status mode,element mode,seed index (seed=(k*0x9E3779B1)|1); '
                 'then preview and execute: hit,critical,hp damage,hp healing,draws',
@@ -132,6 +179,9 @@ def main():
               'pre-formula setup does. Physical evasion is the verified Attack path.'),indent=2)+'\n')
     print('holy sword oracle: %d profiles, draws %s, healed %d'%(len(rows),
         sorted({r[18] for r in rows}),sum(1 for r in rows if r[17])))
+    print('mighty sword oracle: %d profiles, hits %d, slots %s, draws %s'%(len(mighty_rows),
+        sum(1 for r in mighty_rows if r[9]),sorted({(r[0],r[10],r[11]) for r in mighty_rows if r[9]}),
+        sorted({r[14] for r in mighty_rows})))
     print('dark sword oracle: %d profiles, hits %d, crit %d, hp fields %s, mp damage>mp %d, healing!=damage %d'%(len(dark_rows),
         sum(r[8] for r in dark_rows),sum(r[9] for r in dark_rows),sorted({(r[10],r[11]) for r in dark_rows})[:3],
         sum(1 for r in dark_rows if r[12]>r[6]),sum(1 for r in dark_rows if r[8] and r[18]!=r[12])))

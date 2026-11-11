@@ -5,6 +5,7 @@
 #include "check_cleanse.c"
 #ifdef DARK_SWORD_CHECK
 #include "x/core-holy-sword/oracle/dark.h"
+#include "../equip_break.inc"   // the module images' slot rule, for the 68000 test program
 #else
 #include "x/core-holy-sword/oracle/source.h"
 #endif
@@ -12,8 +13,11 @@ static const u8 sword_status[6][5]={{0},{0,0,0,0x20,0},{0,0,0,0,0x10},{8,0,0,0,0
 static void prepare_sword(AbId ab,u8 sword)
 {
     u8 k;Unit *u;prepare_spell(0x13);u=&st.unit[U_RAMZA];
-    u->set=ab==0xA4?0x20:0x1D;                     // Dark Sword (Gafgarion), Holy Sword (Agrias)
-    for(k=0;k<SET_N;k++)if(SET_ABILITY(u->set,k)==ab)break;
+    // The first special sword set holding it: Holy Sword (Agrias), Dark Sword, Mighty Sword.
+    for(u->set=0x1D;u->set<0x23;u->set++){
+        for(k=0;k<SET_N;k++)if(SET_ABILITY(u->set,k)==ab)break;
+        if(k<SET_N)break;
+    }
     CHECK(k<SET_N,1);u->learned=(LearnBits)1<<k;
     u->eq[EQ_WEAPON]=sword;u->eq[EQ_SHIELD]=255;
     st.unit[8].hp=0;st.unit[8].dc=DC_GONE;st.unit[8].x=255;
@@ -144,7 +148,57 @@ static void dark_production(void)
     }
     CHECK(hits>0,1);
 }
-static void sword_trials(void){dark_profiles();dark_production();}
+// Mighty Sword 0x2E: the original's forced failures (monster, empty slot, Maintenance),
+// broken slot, damage/healing and draws, then a production cast breaking the armour.
+static const u8 slot_mask[EQ_N]={0x80,0x40,0x20,0x10,0};
+static void mighty_profiles(void)
+{
+    u16 i;
+    for(i=0;i<sizeof source_mighty/sizeof source_mighty[0];i++){
+        const MightyProfile *m=&source_mighty[i];const u8 *p=m->in,*e=mighty_eq[p[6]];
+        AbId ab=(AbId)(0xA0+p[0]);Unit *a,*t;u8 crit,draws,slot,fail,kind,el;u16 cr,amount;
+        prepare_sword(ab,p[1]);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        a->pa=p[2];a->brave=70;a->zodiac=p[3];t->zodiac=p[4];a->female=t->female=0;
+        st.support[U_RAMZA]=p[5]?SUPPORT_ATTACK_UP:0;st.support[10]=p[6]==4?SUPPORT_MAINTENANCE:0;
+        memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);
+        t->eq[EQ_HEAD]=e[0];t->eq[EQ_BODY]=e[1];t->eq[EQ_ACC]=e[2];t->eq[EQ_WEAPON]=e[3];
+        t->eq[EQ_SHIELD]=e[5]!=255?e[5]:e[6];
+        if(p[6]==3)t->job=94;                                         // a monster
+        el=cj_weapon(common,p[1])[6];
+        if(el&&p[7]){if(p[7]==5)st.affinity[U_RAMZA][4]=el;else st.affinity[10][p[7]==1?2:p[7]==2?3:p[7]==3?0:1]=el;}
+        slot=equip_break_slot(t,ab);
+        fail=unit_monster(t)||slot==255||st.support[10]==SUPPORT_MAINTENANCE;
+        if(fail){CHECK(m->hit,0);CHECK(m->draws,0);continue;}
+        CHECK(m->slot,slot==EQ_SHIELD?(e[5]!=255?0x04:0x02):slot_mask[slot]);CHECK(m->lost,t->eq[slot]);
+        rng32=seed_of(p[8]);draws=1;crit=(u8)(((u32)rand15()*100>>15)<4);cr=0;if(crit){cr=rand15();draws++;}
+        kind=skill_kind(U_RAMZA,10,ab);
+        if(kind==AB_NULL){CHECK(m->hit,0);continue;}
+        CHECK(m->hit,1);CHECK(m->draws,draws);
+        amount=charge_query(U_RAMZA,10,ab,(u8)(crit<<2),cr);
+        if(kind==AB_HEAL){CHECK(m->healing,amount);CHECK(m->damage,0);}
+        else{CHECK(kind,AB_DAMAGE);CHECK(m->damage,amount);}
+    }
+}
+static void mighty_production(void)
+{
+    u8 s,hits=0;
+    prepare_sword(0xA0,33);
+    CHECK(abilities[0xA0].flags,AF_CAST|AF_WEAPON|AF_EVADE);CHECK(abilities[0xA0].kind,AB_DAMAGE);
+    for(s=1;s<40&&hits<3;s++){
+        Unit *t;prepare_sword(0xA0,33);t=&st.unit[10];
+        memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);
+        t->hp=t->max_hp=999;t->eq[EQ_BODY]=172;t->eq[EQ_HEAD]=144;rng32=seed_of(s);
+        CHECK(can_use(U_RAMZA,0xA0),1);
+        CHECK(cast_order(U_RAMZA,10,0xA0,1),1);impact();
+        if(t->hp==999)continue;                                        // evaded
+        hits++;CHECK(t->eq[EQ_BODY],255);CHECK(t->eq[EQ_HEAD],144);   // Shellbust Stab: the armour
+    }
+    CHECK(hits>0,1);
+    // An empty slot: a forced failure, no HP lost.
+    prepare_sword(0xA0,33);st.unit[10].eq[EQ_BODY]=255;st.unit[10].hp=st.unit[10].max_hp=999;rng32=seed_of(3);
+    CHECK(cast_order(U_RAMZA,10,0xA0,1),1);impact();CHECK(st.unit[10].hp,999);
+}
+static void sword_trials(void){dark_profiles();dark_production();mighty_profiles();mighty_production();}
 #endif
 #ifndef __m68k__
 int main(void){sw_init(61);sword_trials();printf("holy_sword %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
