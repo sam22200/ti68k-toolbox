@@ -129,6 +129,11 @@ static void monster_checks(void)
  // Shine Lover = Gil Taking, Gather Power = Accumulate with Y2. Same numbers, same rolls.
  CHECK(monster_amount(U_RAMZA,10,0xE1,0),monster_amount(U_RAMZA,10,0x64,0));CHECK(monster_hit(U_RAMZA,10,0xE1),monster_hit(U_RAMZA,10,0x66));
  CHECK(abilities[0xE1].range,1);CHECK(abilities[0xE1].vert,0);
+ // Turn Punch = Spin Fist's amount on radius 1 with area vertical 1 (the raw record the footprint
+ // reads), and never evaded (flags_4 0x01): 100 against the evasive gear that lowers Spin Fist.
+ CHECK(monster_amount(U_RAMZA,10,0x110,0),monster_amount(U_RAMZA,10,0x64,0));CHECK(monster_amount(U_RAMZA,10,0x110,0)>0,1);
+ CHECK(abilities[0x110].flags,AF_CAST|AF_AREA|AF_SELF);CHECK(cj_range(common,0x110)[2],1);CHECK(cj_range(common,0x64)[2],0);
+ CHECK(monster_hit(U_RAMZA,10,0x110),100);CHECK(monster_hit(U_RAMZA,10,0x64)<100,1);
  CHECK(monster_amount(U_RAMZA,10,0x133,0),monster_amount(U_RAMZA,10,0x6C,0));CHECK(monster_hit(U_RAMZA,10,0x133),monster_hit(U_RAMZA,10,0x6C));
  CHECK(monster_amount(U_RAMZA,U_RAMZA,0x143,0),2);CHECK(monster_amount(U_RAMZA,U_RAMZA,0x92,0),1);
  // Formula 0x4E (companion): formula 0x08's amount with both Faiths at 100, and Faith ignored.
