@@ -4,7 +4,7 @@
 static void nature_hit_commit(void)
 {
  Unit *a=&st.unit[st.atk],*t=&st.unit[st.tgt];u8 item;
- if(st.hit&&unit_on_field(t)&&(st.abil==NO_ABIL||st.abil==265)&&unit_monster(t)&&
+ if(st.hit&&unit_on_field(t)&&(st.abil==NO_ABIL||MONSTER_ATTACK(st.abil))&&unit_monster(t)&&
     (st.effect_kind&EFFECT_KIND_MASK)==AB_DAMAGE){
   if(!t->hp&&!(t->status_flags&STATUS_IMMORTAL)&&cj_support(common,a->job,st.support[st.atk],471)){
    const u8 *p=NATURE_DATA+((u16)(t->job-94)<<1);

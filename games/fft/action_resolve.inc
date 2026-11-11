@@ -125,7 +125,7 @@ static u8 action_commit(void)
     }
 #ifdef FFT_CHAPTER
     if(kind==AB_DAMAGE&&st.action.phase==CTX_IMPACT&&st.golem[ut->team&1]&&
-       (st.abil==NO_ABIL||st.abil==265||(abilities[st.abil].flags&AF_CHARGE))){
+       (st.abil==NO_ABIL||MONSTER_ATTACK(st.abil)||(abilities[st.abil].flags&AF_CHARGE))){
         u16 *g=&st.golem[ut->team&1];*g=st.dmg>=*g?0:*g-st.dmg;
         st.effect_kind=AB_GOLEM;st.push=0;return 0;   // whole hit absorbed: no HP, status or push
     }
@@ -167,7 +167,7 @@ static u8 action_commit(void)
     if(kind==AB_DAMAGE&&!redirected)reaction_damage(st.tgt,st.dmg);
 #endif
     action_rewards(kind==AB_DAMAGE&&!ut->hp);
-    if(W->nature_units&&kind==AB_DAMAGE&&!redirected&&(st.abil==NO_ABIL||st.abil==265)){
+    if(W->nature_units&&kind==AB_DAMAGE&&!redirected&&(st.abil==NO_ABIL||MONSTER_ATTACK(st.abil))){
 #if MOD_CORE
         nature_hit_commit();
 #else

@@ -355,6 +355,8 @@ typedef struct { s16 pri; AbId ab; u8 hit, o, t, f; } AiAct;   // a ranked actio
                                                          // then to o), the target's (z * MAP_W + x)
 #ifdef FFT_BATTLE
 #define NO_ABIL 0xFFFF
+// Monster basic physical attacks (Choco Attack 265, Tackle, Bite...: common_tables.monster_attack_record)
+#define MONSTER_ATTACK(ab) ((u16)((ab)-0x100)<0x70U&&abilities[ab].formula==1)
 #define ABIL_DEFEND 0xFFFE
 #define ABIL_FROG 29                   // FFT id: the one ability a Frog may use
 #else

@@ -125,6 +125,17 @@ static void monster_checks(void)
  // Choco Attack forecasts use the same physical evades as its actual roll.
  nature_arena();u=&st.unit[U_RAMZA];v=&st.unit[10];u->job=94;u->zodiac=12;refresh();v->eq[EQ_ACC]=232;v->eq[EQ_SHIELD]=128;v->eq[EQ_WEAPON]=19;
  for(i=0;i<3;i++){u32 before=rng32;v->face=i;CHECK(monster_hit(U_RAMZA,10,265),magic_hit(U_RAMZA,10,NO_ABIL,0));CHECK(rng32==before,1);CHECK(monster_amount(U_RAMZA,10,265,0),attack_prediction(U_RAMZA,10));}
+ // Monster copies of human records (common_tables): Small Bomb = Spin Fist's formula0x31 (Y0),
+ // Shine Lover = Gil Taking, Gather Power = Accumulate with Y2. Same numbers, same rolls.
+ CHECK(monster_amount(U_RAMZA,10,0xE1,0),monster_amount(U_RAMZA,10,0x64,0));CHECK(monster_hit(U_RAMZA,10,0xE1),monster_hit(U_RAMZA,10,0x66));
+ CHECK(abilities[0xE1].range,1);CHECK(abilities[0xE1].vert,0);
+ CHECK(monster_amount(U_RAMZA,10,0x133,0),monster_amount(U_RAMZA,10,0x6C,0));CHECK(monster_hit(U_RAMZA,10,0x133),monster_hit(U_RAMZA,10,0x6C));
+ CHECK(monster_amount(U_RAMZA,U_RAMZA,0x143,0),2);CHECK(monster_amount(U_RAMZA,U_RAMZA,0x92,0),1);
+ // Monster basic attacks share Choco Attack's source record (common_tables.monster_attack_record).
+ {static const u16 same[]={0x10E,0x113,0x118,0x11D,0x122,0x12C,0x131,0x140,0x145,0x14A,0x14F};
+  for(i=0;i<sizeof same/sizeof*same;i++){
+   const Ability *b=&abilities[same[i]];CHECK(b->kind,0);CHECK(b->formula,1);CHECK(b->flags,10);CHECK(b->range,1);
+   CHECK(monster_hit(U_RAMZA,10,same[i]),monster_hit(U_RAMZA,10,265));CHECK(monster_amount(U_RAMZA,10,same[i],0),monster_amount(U_RAMZA,10,265,0));}}
  // Support helper's source mask and total-height boundaries are exported fixtures.
  (void)i;(void)c;(void)row;
 }
