@@ -88,7 +88,7 @@ static void area_ai_victim_mode(u8 t,u8 returned)
         gain+=returned;
         if(!same&&gain>0)q->useful|=bit;
     }
-    q->gain[t]=gain-(same&&abilities[W->ab].formula==8?1:0);
+    q->gain[t]=gain-(same&&magic_damage_formula(abilities[W->ab].formula)?1:0);
 }
 static void area_ai_victim(u8 t){area_ai_victim_mode(t,0);}
 #include "math_ai.inc"

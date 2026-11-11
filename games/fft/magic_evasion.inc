@@ -14,7 +14,7 @@ static u8 magic_target(u8 t)
 static u8 magic_accuracy(u8 a,u8 t,AbId ab,u8 evade,u8 execute)
 {
     u8 chance;
-    if(abilities[ab].formula==8||abilities[ab].formula==0x24||abilities[ab].formula==99)return evade;
+    if(magic_damage_formula(abilities[ab].formula)||abilities[ab].formula==0x24||abilities[ab].formula==99)return evade;
     chance=(u8)magic_heal(a,t,ab,1);
     if(execute)return evade&&(chance>=100||(u16)(muls16((s16)rand15(),100)>>15)<chance);
     return (u8)(((u16)evade*chance)/100);

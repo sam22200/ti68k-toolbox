@@ -727,6 +727,10 @@ void unit_stats(Unit *u){u8 i;for(i=0;i<NUNIT;i++)if(u==&st.unit[i])W->rebuild|=
 #endif
 #ifdef FFT_CHAPTER
 static u16 magic_status_value(u8 t,AbId ab,u8 choice);
+#include "companion.h"
+#if MOD_CORE
+static u16 special(u8 a,u8 t,AbId ab,u8 query);
+#endif
 #include "magic_quantity.inc"
 #include "cast_rules.h"
 #include "jump_rules.h"
@@ -942,7 +946,6 @@ u16 mod_entry(u8 op,u8 a)
     return batch_commit(&W->cast)&2;
 }
 #endif
-#include "companion.inc"
 #if !MOD_CORE && MOD_PART(MOD_NUMBERS)
 #define st_names CONTOUR_REF_st_names
 #include "forecast_text.inc"
@@ -2968,6 +2971,9 @@ action_finished:
     }
 }
 
+#endif
+#ifdef FFT_CHAPTER
+#include "companion.inc"               // after the resident: its PC build reuses magic_stages.h
 #endif
 // ---------------------------------------------------------------- the AI
 // FFT's AI for the enemies and the guest (RE_NOTES.md § Enemy AI: read in the decompilation,

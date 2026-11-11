@@ -81,6 +81,16 @@ def offensive_magic_record(r):
     return 0, r[10], r[0], 2*r[2] if r[3] & 8 else 255, flags
 
 
+def truth_magic_record(r):
+    """Formula 0x4E (MA x Y, formula 0x08 without Faith; arithmetic in the companion image),
+    single-target monster shapes only: no area, no line, no status. flags_4 may carry the
+    evadeable (0x02) and direct-targeting (0x20) bits; flags_2 the no-follow-target bit."""
+    if (r[8] != 0x4E or r[9] or r[11] or r[1] or r[3] & ~0x09 or r[4] & ~0x11 or
+            r[5] != 0x10 or r[6] & ~0x22):
+        return None
+    return 0, r[10], r[0], 2*r[2] if r[3] & 8 else 255, 128 | (0 if r[3] & 1 else 1) | (2 if r[6] & 2 else 0)
+
+
 def healing_magic_record(r):
     """The six heals and two Raises share the owned radial pipeline (radius0 too)."""
     if (r[8] not in (12,13) or r[3]&~0x09 or r[4]&~0xe1 or
@@ -494,6 +504,10 @@ def battle_records(d):
         elif magic:
             kind, y, rng, vert, flags = magic
             formula, element = raw[8], raw[7]
+        elif 0x100 <= a < 0x170 and truth_magic_record(d.at(battle.ABILITY_RANGE + 14*a, 14)):
+            r = d.at(battle.ABILITY_RANGE + 14*a, 14)
+            kind, y, rng, vert, flags = truth_magic_record(r)
+            formula, element = 0x4E, r[7]
         elif healing:
             if raw[8]==13:
                 assert d.at(battle.STATUS_SET+6*raw[11],6)==bytes((16,32,0,0,0,0))

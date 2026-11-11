@@ -29,7 +29,7 @@ static void magic_prepare(u8 a,u8 t,AbId ab,CastVictim *v)
         }else
 #endif
         amount=magic_quantity(a,t,ab);
-        if(b->formula==8||b->formula==9)rand15(); // Cure/Raise have no formula08 proc draw.
+        if(magic_damage_formula(b->formula)||b->formula==9)rand15(); // Cure/Raise have no formula08 proc draw.
 #if MOD_PART(MOD_TARGETS)
         if(b->formula==0x20&&(u16)(muls16((s16)rand15(),100)>>15)<19){
             u8 choice=ab==82?((rand15()>>14)?3:2):1;

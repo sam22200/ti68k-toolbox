@@ -11,15 +11,18 @@ static inline u8 guts_formula(u8 f){return (u8)(f-0x39)<=2;}
 // Talk Skill and Guts: the record's signed change, no Faith or support stage.
 static inline u8 speech_formula(u8 f){return (u8)(f-0x29)<=1||guts_formula(f);}
 // Formula sets as bitmaps over ids 0..103 (a few instructions in the resident and in every image).
-// magic: 8..16, 18, 20, 97, Geomancy0x24, Talk0x2a, Punch Art0x33..0x35, Guts0x39..0x3b;
+// magic: 8..16, 18, 20, 97, Geomancy0x24, Talk0x2a, Punch Art0x33..0x35, Guts0x39..0x3b,
+// 0x4E (formula08 without Faith, arithmetic in the companion: companion.h);
 // Secret Fist0x50 uses the shared status commit and a physical-status accuracy.
 // status (the status batch commit): 10, 11, 18, 20, 97, 0x2a, 0x33, 0x39..0x3b, 0x50.
-static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x30,0x1f,0x06,0x38,0x0e,0x00,0x10,0x03,0x00,0x0a};
+static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x30,0x1f,0x06,0x38,0x0e,0x00,0x50,0x03,0x00,0x0a};
 static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x00,0x04,0x06,0x08,0x0e,0x00,0x00,0x03,0x00,0x02};
 static inline u8 magic_status_formula(u8 f){return f<104&&(magic_status_bits[f>>3]>>(f&7)&1);}
 static inline u8 magic_percent_formula(u8 f){return f==9||(u8)(f-15)<=1;}
 static inline u8 magic_transfer_formula(u8 f){return (u8)(f-15)<=1;}
 static inline u8 magic_formula(u8 f){return f<104&&(magic_formula_bits[f>>3]>>(f&7)&1);}
+// Formula08's damage path; 0x4E only drops Faith (its amount: the companion).
+static inline u8 magic_damage_formula(u8 f){return f==8||f==0x4E;}
 enum { SUPPORT_HALF_MP=0x1ce, SUPPORT_SHORT_CHARGE=0x1e2,
        SUPPORT_NON_CHARGE=0x1e3, SOURCE_JOB_MIME=0x5d,
        SUPPORT_MAGIC_ATTACK_UP=0x1d3,SUPPORT_MAGIC_DEFENSE_UP=0x1d4,
