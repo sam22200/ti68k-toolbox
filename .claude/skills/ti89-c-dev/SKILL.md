@@ -134,6 +134,25 @@ TI-89 HW2. Patches are only for specific needs:
 | AMSpatch (L. Debroux), `tools/rom/TI89_AMS209_amspatch.89u` | TI-89 OS 2.09 pre-patched: no RAM/Flash execution protection, no ASM size limit, unsigned apps, +64 KB archive, English locked | the "asmpatch" the user remembered; emulator profile `TI_CALC=89` |
 | tiosmod (https://github.com/debrouxl/tiosmod) | generic OS patcher (89/89T/92+/V200, AMS 2.05–3.10): the same unlocks plus AMS bug fixes (OSVRegisterTimer, contrast, HeapDeref, 0^0…); outputs xdelta/bsdiff/IPS diffs | to produce a patched Titanium OS; not used here yet |
 
+**What HW3Patch buys a big game** (**verified** in TiEmu, Titanium AMS 3.10;
+`experiments/heapcode/heaplow.c`, FFT 2026-11-10). Unpatched, code only runs where AMS put the
+program: a heap block low in RAM freezes the Titanium. With HW3Patch (run `hw3patch()` once;
+the TiEmu state `hw3` has it):
+- **Code anywhere in RAM**: overlays/modules (position-independent images in archived data
+  files, patterns § interrupts, "Position-independent modules") are copied into a `malloc`
+  block instead of a zone reserved inside the program. FFT: program TTPack input
+  64,787 → 56,193 bytes (the 64,936-byte ceiling gets 8.7 KB back); RAM unchanged (the block
+  replaces the same bytes of program).
+- **Several modules resident at once**, each in its own block: no image copy per switch
+  (costs RAM, measure first).
+- **Code shipped in data files** (e.g. a content pack adding its own rules without a new
+  engine build) and **code generated at run time** (compiled sprites, specialised loops).
+- DLLs, TSRs and GCC nested-function trampolines work.
+Costs: the user must run the patch (an AMS reinstall removes it), so detect it and refuse
+cleanly (GCC4TI's test, patterns § interrupts; FFT `campaign/launcher.c`), and say so in the
+install notes. HW2 has its own +0x40000 mirror bypass; projects that need HW3Patch may drop
+HW2. FFT's options and decisions: `games/fft/campaign/HW3PATCH_USES.md`.
+
 Program size (**verified**, patterns §1): AMS 2.xx refuses programs above **24,576 bytes**
 ("ASAP or Exec string too long"); the Titanium (AMS 3.10) has no such limit, only 64 KB per variable.
 Stay under 24 KB for the TI-89 by moving data into archived data files read in place, or build with
