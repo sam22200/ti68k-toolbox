@@ -93,7 +93,7 @@ def truth_magic_record(r):
 
 def holy_sword_record(d,r):
     """Formula 0x2D (Holy Sword: Stasis Sword, Split/Crush Punch, Lightning Stab, Holy Explosion):
-    a physical, evadeable strike with PA x (WP + Y) in the weapon's element (the record's element
+    a physical strike that is never evaded (flags_4 lacks 0x02) with PA x (WP + Y) in the weapon's element (the record's element
     byte is not used) and the record's one status at 100% on a hit (status type 0x20); a sword
     is required (flags_4 0x08). Single target, radius 1, or Holy Explosion's cardinal line
     (flags_1 0x15, flags_2 0x15: the Earth Slash line, caster excluded)."""
@@ -103,35 +103,35 @@ def holy_sword_record(d,r):
     row=d.at(battle.STATUS_SET+6*r[11],6)
     if row[0]!=0x20 or sum(v.bit_count() for v in row[1:])!=1:
         return None
-    return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|2|(32 if r[1] else 0)|(0 if line else 1)
+    return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|(32 if r[1] else 0)|(0 if line else 1)
 
 
 def ruin_record(a,r):
-    """Ruins (Arc Knight): Magic Ruin 0x1B (magical evasion, (MA+X)% Faith accuracy, MP loses
-    ceil(max MP x Y / 100)), Speed/Power/Mind Ruin 0x1A (magical evasion, (MA+Y)% Faith
+    """Ruins (Arc Knight): Magic Ruin 0x1B (never evaded: flags_4 lacks 0x02; (MA+X)% Faith accuracy, MP loses
+    ceil(max MP x Y / 100)), Speed/Power/Mind Ruin 0x1A ((MA+Y)% Faith
     chance, the stat loses X) on radius 1. A sword is required (flags_4 0x08)."""
     expected={0xC4:(0x1B,0xFA,0x32),0xC5:(0x1A,3,0xFA),0xC6:(0x1A,5,0xFA),0xC7:(0x1A,5,0xFA)}.get(a)
     if not expected or tuple(r)!=(4,1,0,5,1,0x12,8,0,*expected,0,3,0x14):return None
-    if a==0xC4:return 11, r[10], r[0], 255, 128|32|2
-    return (21 if a==0xC5 else 7), r[9], r[0], 255, 128|32|2
+    if a==0xC4:return 11, r[10], r[0], 255, 128|32
+    return (21 if a==0xC5 else 7), r[9], r[0], 255, 128|32
 
 
 def mighty_sword_record(r):
     """Mighty Sword 0x2E (battle_formula_break_equipped_damage_pa_times_wp): Shellbust Stab,
-    Blastar Punch, Hellcry Punch, Icewolf Bite. Physical evasion, the slot (armour, helmet,
+    Blastar Punch, Hellcry Punch, Icewolf Bite. Never evaded (flags_4 lacks 0x02); the slot (armour, helmet,
     weapon, accessory: a monster or an empty slot is a forced failure), Maintenance, then Holy
     Sword's PA x WP strike (weapon element, critical) and the slot broken on a hit."""
     if tuple(r)!=(3,0,0,5,0x11,0x12,8,0,0x2E,0,0,0,0,0):return None
-    return 0, 0, r[0], 255, 128|8|2
+    return 0, 0, r[0], 255, 128|8
 
 
 def dark_sword_record(r):
-    """Dark Sword 0x2F (battle_formula_absorb_mp_pa_times_wp): physical evasion, PA x WP of the
+    """Dark Sword 0x2F (battle_formula_absorb_mp_pa_times_wp): never evaded, PA x WP of the
     equipped sword through Attack's physical stages and critical, no element stage, the amount
     taken from the target's MP and given to the caster (the single-panel drain packets).
     A sword is required (flags_4 0x08)."""
     if tuple(r)!=(3,0,0,5,0x11,0x12,8,1,0x2F,0,0,0,0,0):return None
-    return 11, 0, r[0], 255, 128|32|8|2
+    return 11, 0, r[0], 255, 128|32|8
 
 
 def healing_magic_record(r):

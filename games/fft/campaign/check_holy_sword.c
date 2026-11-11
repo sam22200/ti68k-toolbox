@@ -22,6 +22,8 @@ static void prepare_sword(AbId ab,u8 sword)
     u->eq[EQ_WEAPON]=sword;u->eq[EQ_SHIELD]=255;
     st.unit[8].hp=0;st.unit[8].dc=DC_GONE;st.unit[8].x=255;
     st.unit[10].team=TEAM_ENEMY;st.unit[10].hp=st.unit[10].max_hp=999;
+    // Evasive gear, facing the attacker: sword skills are never evaded (flags_4 lacks 0x02).
+    st.unit[10].eq[EQ_ACC]=232;st.unit[10].eq[EQ_SHIELD]=128;st.unit[10].face=2;
     memset(st.affinity,0,sizeof st.affinity);
 }
 static u32 seed_of(u16 k){return ((u32)k*0x9E3779B1UL)|1;}
@@ -67,7 +69,7 @@ static void sword_production(void)
             memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);t->hp=t->max_hp=999;hp=t->hp;
             rng32=seed_of(s);st.unit[U_RAMZA].mp=999;
             CHECK(cast_order(U_RAMZA,10,skills[i],1),1);impact();
-            if(t->hp==hp)continue;                                   // evaded
+            CHECK(t->hp!=hp,1);                                      // never evaded
             hits++;
             if(skills[i]==0x9D){CHECK(t->hp,0);continue;}           // Crush Punch: Dead
             CHECK((core_status_current(&t->statuses,status_byte[i])&status_bit[i])!=0,1);
@@ -88,7 +90,7 @@ static void explosion_production(void)
 {
     u8 s,hits=0,pushes=0,byte,bit;u16 mask;
     prepare_sword(0x9F,33);byte=sword_status_byte(0x9F,&bit);CHECK(bit!=0,1);
-    CHECK(abilities[0x9F].flags,AF_CAST|AF_AREA|AF_WEAPON|AF_EVADE);CHECK(abilities[0x9F].kind,AB_DAMAGE);
+    CHECK(abilities[0x9F].flags,AF_CAST|AF_AREA|AF_WEAPON);CHECK(abilities[0x9F].kind,AB_DAMAGE);
     CHECK(can_use(U_RAMZA,0x9F),1);
     mask=(u16)cast_targets(U_RAMZA,third,0x9F,0);
     CHECK(!!(mask&((u16)1<<10)),1);CHECK(!!(mask&((u16)1<<U_RAMZA)),0);
@@ -98,7 +100,7 @@ static void explosion_production(void)
         memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);t->hp=t->max_hp=999;
         rng32=seed_of(s);st.unit[U_RAMZA].mp=999;
         CHECK(cast_order(U_RAMZA,third,0x9F,0),1);impact();
-        if(t->hp==999)continue;                                       // evaded
+        CHECK(t->hp!=999,1);                                          // never evaded
         hits++;CHECK((core_status_current(&t->statuses,byte)&bit)!=0,1);
         if(t->x!=x||t->z!=z)pushes++;
     }
@@ -132,7 +134,7 @@ static void dark_production(void)
     u8 s,hits=0;
     prepare_sword(0xA4,255);CHECK(can_use(U_RAMZA,0xA4),0);           // no sword: refused
     prepare_sword(0xA4,33);
-    CHECK(abilities[0xA4].flags,AF_CAST|AF_AREA|AF_WEAPON|AF_EVADE);CHECK(abilities[0xA4].kind,AB_MP_DAMAGE);
+    CHECK(abilities[0xA4].flags,AF_CAST|AF_AREA|AF_WEAPON);CHECK(abilities[0xA4].kind,AB_MP_DAMAGE);
     CHECK(skill_cost(U_RAMZA,0xA4),0);
     for(s=1;s<40&&hits<3;s++){
         Unit *a,*t;u16 drained;prepare_sword(0xA4,33);a=&st.unit[U_RAMZA];t=&st.unit[10];
@@ -141,7 +143,7 @@ static void dark_production(void)
         t->hp=t->max_hp=999;t->mp=40;t->max_mp=999;a->mp=10;a->max_mp=999;
         rng32=seed_of(s);
         CHECK(cast_order(U_RAMZA,10,0xA4,1),1);impact();
-        if(t->mp==40)continue;                                         // evaded
+        CHECK(t->mp!=40,1);                                            // never evaded
         hits++;drained=40-t->mp;CHECK(t->hp,999);
         CHECK(t->mp==0||drained<40,1);
         CHECK(a->mp>10,1);                                            // the caster's MP rose
@@ -183,14 +185,14 @@ static void mighty_production(void)
 {
     u8 s,hits=0;
     prepare_sword(0xA0,33);
-    CHECK(abilities[0xA0].flags,AF_CAST|AF_WEAPON|AF_EVADE);CHECK(abilities[0xA0].kind,AB_DAMAGE);
+    CHECK(abilities[0xA0].flags,AF_CAST|AF_WEAPON);CHECK(abilities[0xA0].kind,AB_DAMAGE);
     for(s=1;s<40&&hits<3;s++){
         Unit *t;prepare_sword(0xA0,33);t=&st.unit[10];
         memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);
         t->hp=t->max_hp=999;t->eq[EQ_BODY]=172;t->eq[EQ_HEAD]=144;rng32=seed_of(s);
         CHECK(can_use(U_RAMZA,0xA0),1);
         CHECK(cast_order(U_RAMZA,10,0xA0,1),1);impact();
-        if(t->hp==999)continue;                                        // evaded
+        CHECK(t->hp!=999,1);                                           // never evaded
         hits++;CHECK(t->eq[EQ_BODY],255);CHECK(t->eq[EQ_HEAD],144);   // Shellbust Stab: the armour
     }
     CHECK(hits>0,1);

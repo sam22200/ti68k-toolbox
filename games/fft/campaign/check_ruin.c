@@ -15,6 +15,7 @@ static void prepare_ruin(AbId ab)
     u->eq[EQ_WEAPON]=33;u->eq[EQ_SHIELD]=255;               // a sword is required
     st.unit[8].hp=0;st.unit[8].dc=DC_GONE;st.unit[8].x=255;
     st.unit[10].team=TEAM_ENEMY;st.unit[10].hp=st.unit[10].max_hp=999;
+    st.unit[10].eq[EQ_ACC]=232;st.unit[10].eq[EQ_SHIELD]=128;st.unit[10].face=2;   // never evaded (flags_4 lacks 0x02)
     memset(st.affinity,0,sizeof st.affinity);
 }
 static u32 seed_of(u16 k){return ((u32)k*0x9E3779B1UL)|1;}
@@ -46,7 +47,7 @@ static void ruin_production(void)
     AbId ab;
     for(ab=0xC4;ab<=0xC7;ab++){
         u8 s,hits=0;
-        prepare_ruin(ab);CHECK(abilities[ab].flags,AF_CAST|AF_AREA|AF_EVADE);
+        prepare_ruin(ab);CHECK(abilities[ab].flags,AF_CAST|AF_AREA);
         st.unit[U_RAMZA].eq[EQ_WEAPON]=255;CHECK(can_use(U_RAMZA,ab),0);   // no sword: refused
         for(s=1;s<40&&hits<2;s++){
             Unit *a,*t;u8 sp,pa,ma;u16 mp;prepare_ruin(ab);a=&st.unit[U_RAMZA];t=&st.unit[10];
@@ -57,7 +58,7 @@ static void ruin_production(void)
             if(s==1){CHECK(cast_order(U_RAMZA,10,ab,1),2);continue;}   // the record's CT: a deferred cast
             st.support[U_RAMZA]=SUPPORT_NON_CHARGE;                     // then resolved at once
             CHECK(cast_order(U_RAMZA,10,ab,1),1);impact();
-            if(t->sp==sp&&t->pa==pa&&t->ma==ma&&t->mp==mp)continue;      // evaded or missed
+            if(t->sp==sp&&t->pa==pa&&t->ma==ma&&t->mp==mp)continue;      // the percent roll missed
             hits++;
             if(ab==0xC4){CHECK(t->mp,150);CHECK(t->pa,pa);}
             else if(ab==0xC5){CHECK(t->sp,5);CHECK(t->pa,pa);}

@@ -146,6 +146,34 @@ def main():
         o.call('remove');o.call('f2e');o.call('finish')
         v=bytes(o.uc.mem_read((target&0x1fffff)+0x18c,0x20))
         mighty_rows.append([*p,v[0],v[0x19],v[3],*struct.unpack_from('<hh',v,4),draws])
+    # Never evaded: flags_4 lacks 0x02 (evadeable), so the evade helper's final stage is skipped.
+    # A target with an evasive accessory and shield and class evade 99, facing the attacker,
+    # is always hit; the same fixture with the bit forced on does evade (the control).
+    def gear_hits(ab,fn,evadeable):
+        nonlocal rng,draws
+        hits=0;r=bytearray(d.at(s.battle.ABILITY_RANGE+14*ab,14));w=d.at(s.battle.WEAPONS+8*33,8)
+        if evadeable:r[6]|=2
+        for seed in range(1,41):
+            for ptr in(actor,target):o.uc.mem_write(ptr&0x1fffff,bytes(448))
+            o.uc.mem_write(ability&0x1fffff,bytes(80));o.uc.mem_write(0x193860,bytes(5))
+            o.write(0x80192d94,actor);o.write(0x80192d98,target);o.write(0x80192d90,target+0x18c);o.write(0x80192d8c,actor+0x18c)
+            for ptr in(actor,target):
+                o.uc.mem_write((ptr&0x1fffff)+6,bytes((128,)));o.uc.mem_write((ptr&0x1fffff)+0x26,bytes((70,)))
+            o.uc.mem_write((actor&0x1fffff)+0x36,bytes((12,)))
+            t=target&0x1fffff
+            o.uc.mem_write(t+0x28,struct.pack('<HHHH',999,999,999,999))
+            o.uc.mem_write(t+0x1a,bytes((144,172,232,255,128,255,255)))   # helmet, armour, evasive accessory, shield
+            o.uc.mem_write(t+0x43,b'\x63');o.uc.mem_write(t+0x47,b'\x01');o.uc.mem_write(t+0x48,struct.pack('<H',0x0100))
+            o.uc.mem_write((ability&0x1fffff)+0x30,bytes(r));o.uc.mem_write((ability&0x1fffff)+0x16,struct.pack('<H',ab))
+            o.uc.mem_write((ability&0x1fffff)+0x1c,bytes((100,)));o.uc.mem_write((ability&0x1fffff)+0x3e,w)
+            o.uc.mem_write(t+0x18c,b'\1');o.uc.mem_write(t+0x1b6,struct.pack('<H',100))
+            o.write(0x8018f5fc,0);rng=seed_of(seed);draws=0
+            o.call('remove');o.call(fn)
+            hits+=bytes(o.uc.mem_read(t+0x18c,1))[0]
+        return hits
+    evasion={hex(ab):(gear_hits(ab,fn,0),gear_hits(ab,fn,1))for ab,fn in((0x9C,'f2d'),(0x9F,'f2d'),(0xA0,'f2e'),(0xA4,'f2f'))}
+    assert all(plain==40 and forced<40 for plain,forced in evasion.values()),evasion
+    print('never evaded (hits of 40 with evasive gear: retail record, evadeable bit forced):',evasion)
     # Native header (14 bytes a row, the 68000 check's size limit): inputs, then execute
     # draws, damage, healing (hit is always 1 with zero evasion; the critical is redrawn).
     lines=['/* Original Holy Sword 0x2D damage/critical/element profiles; local source bytes only. */',
@@ -170,7 +198,7 @@ def main():
             row[11],row[12],row[13])for row in mighty_rows]
     lines+=['};']
     (out/'dark.h').write_text('\n'.join(lines)+'\n')
-    (out/'source.json').write_text(json.dumps(dict(cases=rows,dark_cases=dark_rows,mighty_cases=mighty_rows,functions=o.function_hashes,
+    (out/'source.json').write_text(json.dumps(dict(cases=rows,dark_cases=dark_rows,mighty_cases=mighty_rows,evasion_hits_of_40=evasion,functions=o.function_hashes,
         battle_sha256=s.core_audit.sha(d.bat),exe_sha256=s.core_audit.sha(d.exe),
         columns='ability,sword item,pa,actor sign,target sign,Attack UP,target status mode,element mode,seed index (seed=(k*0x9E3779B1)|1); '
                 'then preview and execute: hit,critical,hp damage,hp healing,draws',

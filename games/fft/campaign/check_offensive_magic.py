@@ -85,13 +85,13 @@ def catalogue_report():
     for a in CONTROL+PROTECT:
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==(0x7F if a==212 else r[11]) and n[10]==r[8]   # Mbarrier: adapted row
     for a in HOLY_SWORD:
-        r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x2D and n[11]==0 and n[4]&(128|8|2)==128|8|2,(a,n)
+        r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x2D and n[11]==0 and n[4]&(128|8|2)==128|8,(a,n)
     for a in RUIN:
-        r,n=raw(a),norm(a);assert n[0]==(11 if a==0xC4 else 21 if a==0xC5 else 7) and n[10]==r[8] and n[4]==128|32|2,(a,n)
+        r,n=raw(a),norm(a);assert n[0]==(11 if a==0xC4 else 21 if a==0xC5 else 7) and n[10]==r[8] and n[4]==128|32,(a,n)
     for a in MIGHTY_SWORD:
-        r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x2E and n[11]==0 and n[4]==128|8|2,(a,n)
+        r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x2E and n[11]==0 and n[4]==128|8,(a,n)
     for a in DARK_SWORD:
-        r,n=raw(a),norm(a);assert n[0]==11 and n[10]==0x2F and n[11]==0 and n[4]==128|32|8|2,(a,n)
+        r,n=raw(a),norm(a);assert n[0]==11 and n[10]==0x2F and n[11]==0 and n[4]==128|32|8,(a,n)
     for a in TRUTH:
         r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x4E and n[11]==r[7] and n[4]&128,(a,n)
     for a in GOLEM:
