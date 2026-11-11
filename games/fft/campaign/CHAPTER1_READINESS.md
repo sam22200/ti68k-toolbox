@@ -184,7 +184,7 @@ Turn Punch (area vertical 1 where Spin Fist has 0), the formula 0x50 status fami
 Gouge, Poison Nail, Black Ink, Look of Devil, Beak), Odd Soundwave (0x38), Holy Sword (0x2D:
 status on hit, area, line), then the new formulas, in the core's companion image
 (`COMPANION.md`; 0x4E done: 129 of 155 executable; Holy Sword 0x2D done, `HOLY_SWORD.md`:
-132 of 155, headroom 8,007).
+133 of 155 with Holy Explosion, headroom 8,007).
 
 Caveat: the random-formation tier is read as "first pair of each route" (WLDCORE); some
 monsters listed (Dragon, Ahriman) may belong to later progress tiers. **The core cannot be
