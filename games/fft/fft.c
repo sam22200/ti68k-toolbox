@@ -2284,7 +2284,7 @@ static u16 weapon_amount(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge,u1
     xa=w&&w->knife&&!jump?(ua->pa+ua->sp)>>1:ua->pa;
 #endif
     u16 d;
-    if(jump){if((u8)(weapon-99)<8)xa+=xa>>1;}else{if(awake&2)xa=zodiac_xa(ua,ut,xa);xa+=charge;if(base_roll&32768)xa=(s16)(muls16(xa,5)>>2);}
+    if(jump){if((u8)(weapon-99)<8)xa+=xa>>1;}else{if(awake&2)xa=zodiac_xa(ua,ut,xa);if(!(awake&4))xa+=charge;if(base_roll&32768)xa=(s16)(muls16(xa,5)>>2);}
 #ifdef FFT_CHAPTER
     // Source support stage, before Berserk/Frog and target status/zodiac.
     if(!jump){
@@ -2304,6 +2304,7 @@ static u16 weapon_amount(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge,u1
     if (crit) xa += (s16)(muls16((s16)r,xa)>>15);
     ya = w ? w->wp : (s16)((u16)(ua->pa * ua->brave) / 100);
     if (ya < 1) ya = 1;
+    if (awake & 4) ya += charge;            // Holy Sword: PA x (WP + Y)
     d = (u16)(xa * ya);
     return d;
 }
@@ -2370,11 +2371,22 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
     if(b->formula==0x31&&b->element){s16 n=magic_element_value(t,b->element,(s16)k);return n>999?999:(u16)n;}
     return k>999?999:k;
 }
+// Holy Sword (formula 0x2D, battle_formula_damage_pa_times_wp_plus_y_status): the primary
+// weapon's ordinary physical stages with XA = PA (swords) and YA = WP + Y, strengthened and
+// halved/doubled by the weapon's element; null/absorb are the category (skill_kind).
+static u16 sword_skill_amount(u8 a,u8 t,AbId ab,u8 crit,u16 roll)
+{
+    u8 w=hand_weapon(&st.unit[a],0),e=w==255?0:cj_weapon(common,w)[6];s16 n;
+    n=(s16)weapon_amount(a,t,w,crit,roll,4,abilities[ab].y,(st.affinity[a][4]&e)?16384|32768:16384);
+    n=magic_half_weak(t,e,n);
+    return n>999?999:(u16)n;
+}
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
 {
     if(jump_ability(ab))return jump_reaches(a,t,flags);
     u8 f=(u8)(abilities[ab].formula-0x25);  // 0x25/26 equipment, 0x28 Steal Exp, 0x2b/2c breaks, 0x31/32
     if(f<=13&&(0x30CFU>>f)&1)return punch_strike(a,t,ab,roll);
+    if(f==8)return sword_skill_amount(a,t,ab,(flags>>2)&1,roll);   // 0x2D Holy Sword
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }

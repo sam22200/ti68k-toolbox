@@ -10,6 +10,10 @@ u8 can_use(u8 who, AbId ab)
         return 0;
     }
     if(jump_ability(ab))return st.unit[who].set==18;
+    if(ab<0x170&&(cj_range(common,ab)[6]&8)){   // flags_4 0x08 (range records only): a sword or knight sword
+        u8 h,w,ok=0;for(h=0;h<2;h++)if((w=hand_weapon(&st.unit[who],h))!=255&&(u8)(cj_equipment_item(common,w)[0]-3)<=1)ok=1;
+        if(!ok)return 0;
+    }
     if(ab>=512)return throw_available(who,ab);
     if(st.unit[who].set==21)return math_available(who,ab);
     // Other dual weapon-skill families still require their own source fixtures.

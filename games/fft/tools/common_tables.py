@@ -91,6 +91,19 @@ def truth_magic_record(r):
     return 0, r[10], r[0], 2*r[2] if r[3] & 8 else 255, 128 | (0 if r[3] & 1 else 1) | (2 if r[6] & 2 else 0)
 
 
+def holy_sword_record(d,r):
+    """Formula 0x2D (Holy Sword: Stasis Sword, Split/Crush Punch, Lightning Stab, Holy Explosion):
+    a physical, evadeable strike with PA x (WP + Y) in the weapon's element (the record's element
+    byte is not used) and the record's one status at 100% on a hit (status type 0x20); a sword
+    is required (flags_4 0x08). Single target or radius, no line yet."""
+    if r[8]!=0x2D or r[9] or r[4]!=0x11 or r[5]!=0x12 or r[6]!=0x08 or r[3]&~0x0c or r[1]>1:
+        return None
+    row=d.at(battle.STATUS_SET+6*r[11],6)
+    if row[0]!=0x20 or sum(v.bit_count() for v in row[1:])!=1:
+        return None
+    return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|2|(32 if r[1] else 0)|1
+
+
 def healing_magic_record(r):
     """The six heals and two Raises share the owned radial pipeline (radius0 too)."""
     if (r[8] not in (12,13) or r[3]&~0x09 or r[4]&~0xe1 or
@@ -408,7 +421,7 @@ def battle_records(d):
     # kind, Y, range, vertical, flags (fft.h); byte 10 is FFT's formula id.
     adapted = {
         0x92: (6, 1, 0, 0, 1), 0x93: (0, 4, 1, 2, 0), 0x94: (0, 2, 4, 255, 2),
-        0x98: (2, 0, 1, 6, 0), 0x9B: (0, 2, 2, 255, 8 | 32),
+        0x98: (2, 0, 1, 6, 0),
         0xA5: (0, 0, 3, 255, 8 | 16),
     }
     symbols = dict(AB_DAMAGE=0, AB_CURE=1, AB_WISH=2, AB_HEAL=3, AB_REVIVE=4,
@@ -454,6 +467,9 @@ def battle_records(d):
             if a==265 or a!=268 and a!=269:kind,y,rng,vert,flags,formula=0,0,r[0],2*r[2],10,1
             elif a==268:kind,y,rng,vert,flags,formula=13,r[11],0,255,161,81
             else:kind,y,rng,vert,flags,formula=3,r[10],0,255,161,76
+        elif 0x9B <= a <= 0x9F and holy_sword_record(d, d.at(battle.ABILITY_RANGE + 14*a, 14)):
+            kind, y, rng, vert, flags = holy_sword_record(d, d.at(battle.ABILITY_RANGE + 14*a, 14))
+            formula = 0x2D                 # element 0: the weapon's, read at run time
         elif a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
