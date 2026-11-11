@@ -14,7 +14,8 @@ bytes free when the supervisor calls `fftbat`, the battle reserves 176,158:
 
 | Block | Bytes | Notes |
 |---|---:|---|
-| decompressed program | 64,934 | ~56 KB code + module zone 8,690 |
+| decompressed program | 56,298 | the resident only (64,934 with the module zone until 2026-11-10) |
+| module zone | 8,632 | heap block since HW3Patch is required (§ 4): RAM unchanged overall |
 | `sbuf` | 53,622 | scene colours 2×40×202 (16,160, hot path) + Work 37,460 |
 | `vbuf` | 20,482 | **ragged depth, `FFT_CORE_DEPTH_MAX` 20,480** (was 32,322 full planes) |
 | `acache` | 10,178 | 48 actor frames: keep (CORE_OPTIMIZATION rule 1) |
@@ -75,9 +76,9 @@ maps are wider than 320 px (`over_width` in `x/map-budget.json`), independent of
 **What does not cost RAM.** The number of maps, scenes and battles in a pack: banks, scene
 pools and manifests are read in place from the archive (one VAT entry each).
 
-**Resident headroom.** TTPack input 64,865 of 64,936 (71 bytes left after the actor banks, zone 8,708, `tools/headroom.sh`;
-was 397): ring/cursor/cover readers +~300, the RAM message and the envelope live in cold
-modules (ABI 81). Item 4 (freeze the core) must win room back before any resident growth.
+**Resident headroom.** TTPack input 56,193 of 64,936: **8,743 bytes left** (`tools/headroom.sh`)
+since the module zone left the program (2026-11-10, § 4; 149 bytes before, 71 after the actor
+banks).
 
 Rejected: reading depth in place from the archive (−32 KB RAM but ~+120 KB archive per map:
 impossible for 20 maps), shrinking the actor cache (rule 1), lowering `BK_N` (800k-cycle
@@ -181,8 +182,18 @@ units themselves: no equipment, innate skills, sprites in the actor banks).
 is dropped.** Unpatched, code only runs inside the program's block (`ti68k-c-patterns.md`:
 `experiments/dll`, `experiments/heapcode`), which is why the module zone lives in the program
 and why resident + zone must stay under TTPack's 64,936 bytes. With HW3Patch, modules can run
-from the heap: next step is to measure that natively (TiEmu with HW3Patch), then drop the zone
-(-8.6 KB of program and RAM) and split the resident. INSTALL.md must name the requirement.
+from the heap.
+
+**Done (2026-11-10): the zone is a heap block.** Measured in TiEmu (Titanium AMS 3.10,
+`experiments/heapcode/heaplow.c`): code in a block at 0x18F18, after 150 KB of allocations,
+freezes unpatched and returns with HW3Patch, also after reloading the saved state (`hw3`).
+`fft.c`: `mod_zone` is `malloc(MOD_ZONE)` in `mod_ready`, freed by `final_release`. Program
+TTPack input 64,787 → 56,193 (**8,743 bytes of headroom**, was 149); RAM is unchanged (the
+8,632-byte block replaces the same bytes of program). Native Orbonne run from the `fftcore`
+state rebuilt on `hw3`: dialogue, AI turns, attacks and a charged action from the heap zone.
+The supervisor (`launcher.c`) stops with "HW3Patch required" on an unpatched Titanium
+(GCC4TI's test: a cleared word in `EX_stoBCD`, or 0x100 at 0xAC); `INSTALL.md` names the
+step. Splitting the resident is now possible but no longer urgent.
 
 Every core change still forces a new `fftcore` state. Chapter content must never require a
 core rebuild: keep chapter data, scripts and encounters in packs.
