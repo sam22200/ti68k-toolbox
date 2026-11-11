@@ -9,6 +9,11 @@ description: Launch, drive and check a TI-89 program in the TiEmu emulator (Dock
 (unit tests, PC headless runs, `ti-cycles`) comes first; the emulator is slow (restart, typed keys,
 screenshots to read) and is used once, at a milestone, for what only the calculator runs.
 
+**Read state, not pictures.** Wait for transfers with `ti-mem wait`, check outcomes with
+`ti-mem log` (`tilog` events), memory with `ti-mem heap`, a game's live state with its RAM
+decoder (FFT: `games/fft/tools/fftmem.py`). Take a screenshot only to review how something
+looks; if a check would need one, add the `tilog` event or decoder field that answers it.
+
 Tools live in `tools/bin/` (put them on the PATH: `export PATH=$PWD/tools/bin:$PATH`).
 
 | Command | Purpose |
