@@ -12,6 +12,7 @@ static u8 area_ai_supported(AbId ab)
     if(abilities[ab].kind==AB_CLEANSE)return (p[4]==0x21||p[4]==0x22)&&
         !(p[5]&~0x55)&&(p[6]==0||p[6]==2)&&(p[7]&128)&&!(p[7]&~0xe0);
     if(abilities[ab].formula==0x31)return p[4]==0x82;   // Spin Fist: hostile HP
+    if((abilities[ab].formula|2)==0x2F)return p[4]==0x82||p[4]==0x42;   // Holy Sword: hostile HP; Dark Sword: MP
     if(abilities[ab].formula==0x24)return p[4]==0x82;   // Geomancy: immediate HP, conditional status unscored
     if(abilities[ab].formula==0x50)return p[4]==0x12&&p[5]==0&&p[6]==1&&p[7]==0x81;   // Secret Fist's status utility
     if(abilities[ab].formula==14||abilities[ab].formula==18||abilities[ab].formula==20||abilities[ab].formula==97)return 1;

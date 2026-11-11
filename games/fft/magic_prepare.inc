@@ -14,12 +14,12 @@ static void magic_prepare(u8 a,u8 t,AbId ab,CastVictim *v)
     if(v->hit&&(v->effect!=AB_NULL||b->formula==0x31)){
         if(b->formula==14&&v->effect==AB_DEATH&&!magic_heal(a,t,ab,3)){v->hit=0;v->effect=AB_NULL;return;}
         u16 amount;
-        if(b->formula==0x2D){   // Holy Sword: 4% critical (knockback), amount, then its status at 100%
+        if(b->formula==0x2D||b->formula==0x2F){   // Holy/Dark Sword: 4% critical (knockback), amount, Holy's status at 100%
             u8 crit=(((u32)rand15()*100>>15)<4);u16 critical=crit?rand15():0;
             amount=charge_query(a,t,ab,(u8)(crit<<2),critical);
-            if(b->flags&AF_AREA)st.crit=crit;   // the batch pushes a sole line victim (batch_prepare)
+            if(b->flags&AF_AREA)st.crit=crit;   // the batch pushes a sole victim (batch_prepare)
             else if(crit){st.dmg=amount;knockback(a,t);amount=st.dmg;}   // lethal test, fall damage
-            if(magic_heal(a,t,ab,3))v->effect|=EFFECT_STATUS;
+            if(b->formula==0x2D&&magic_heal(a,t,ab,3))v->effect|=EFFECT_STATUS;
         }else
         if(b->formula==0x31){   // Punch Art: the 4% critical, then its amount draw
             u8 crit=(((u32)rand15()*100>>15)<4);u16 critical=crit?rand15():0;
