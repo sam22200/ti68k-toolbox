@@ -136,10 +136,13 @@ those runtime capacities.
 
 ## Native test loop (2026-11-08)
 
-Install the core once into a named TiEmu state, then send only the chapter under test:
+Install the core once into a named TiEmu state, then send only the chapter under test.
+The core needs HW3Patch (`CHAPTER1_READINESS.md` § 4): build the core state on the `hw3`
+state (once: `ti-emu restart tools/patches/hw3patch/hw3patch.89z`, `ti-key 'hw3patch()' ENTER`,
+`ti-emu save hw3`):
 
 ```sh
-ti-emu restart x/packages/fft-core.89g     # returns once received (ti-mem wait: ~26 s), HOME
+TI_STATE=hw3 ti-emu restart x/packages/fft-core.89g   # returns once received (~26 s), HOME
 ti-emu save fftcore                         # again whenever the core changes
 ti-mem mkvar x/packages/tilog.89y           # optional: the supervisor's event log
 TI_STATE=fftcore ti-emu restart x/packages/chapter-01.89g x/packages/tilog.89y

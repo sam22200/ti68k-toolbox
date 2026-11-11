@@ -595,7 +595,12 @@ GKeyFlush();                             // don't leave the game's keypresses in
 
   The execution protection is per RAM region on both models; HW2 is bypassed through the
   0x40000 mirror (what gb68k does: `if (HW_VERSION == 2) addr += 0x40000`), the Titanium has no
-  mirror and needs HW3Patch. So self-generated code (dynamic recompilers, code in data files) is not
+  mirror and needs HW3Patch. **With HW3Patch 1.03** (**verified**, TiEmu Titanium AMS 3.10,
+  `heaplow.c`): the block at 0x18F18 after 150 KB of allocations, which freezes unpatched,
+  returns; the patch survives a saved state. FFT's modules run from a heap zone this way.
+  Detect the patch as GCC4TI's `_execute_in_ghost_space` does: HW_VERSION >= 3 and either
+  word 92 bytes into `EX_stoBCD` (ROM table entry 0xC0) is 0 (patch in Flash) or the long at
+  0xAC is 0x100 (patch in RAM); FFT's `launcher.c` refuses to start otherwise. So self-generated code (dynamic recompilers, code in data files) is not
   portable unpatched; keep code in the program itself.
 - ON key as a "boss key" (gb68k): an auto-int 6 handler that only sets a flag, polled by the game to
   quick-save and quit (not tested here).
