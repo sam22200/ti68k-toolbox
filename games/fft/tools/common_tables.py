@@ -206,6 +206,9 @@ def strike_record(r):
     skills; Spin Fist (0x31, radius 1 on the user, the user excluded) an immediate area cast."""
     if r[8]==0x31 and r[0]==0 and r[1]==1 and r[3]==3 and r[4]==0x11 and r[6]==3 and not r[7] and not r[11]:
         return 0,r[10],0,255,128|32|2|1
+    # Turn Punch (Black Goblin): Spin Fist with area vertical 1 and flags_4 0x01: never evaded.
+    if r[8]==0x31 and r[0]==0 and r[1]==1 and r[2]==1 and r[3]==3 and r[4]==0x11 and r[6]==1 and not r[7] and not r[10] and not r[11]:
+        return 0,0,0,255,128|32|1
     if r[8]not in(0x31,0x32)or r[1]or r[3]not in(1,9)or r[4]&~0x11 or r[6]!=2 or r[7]or r[11]:return None
     return 0,r[10],r[0],2*r[2]if r[3]&8 else 255,2   # flags_1 0x08 off (Choco Ball): any height
 
@@ -352,6 +355,15 @@ def secret_fist_record(d,a,r):
     return 10,r[11],1,0,128|32
 
 
+def monster_status_magic_record(d,a,r):
+    """Monster formula 0x3D: Mind Blast (radius 1, one random status of Confusion/Berserk) and
+    Death Sentence (single panel): (MA+X)% without Faith, never evaded (flags_4 0)."""
+    expected={0x120:((3,1,1,0,0x11,0x10,0,0,0x3D,0x23,0,0x67,0,0),bytes((0x40,0,0x10,0x08,0,0))),
+              0x130:((3,0,0,1,0x11,0x30,0,0,0x3D,0x28,0,0x3D,0,0),bytes((0x80,0,0,0,0,1)))}.get(a)
+    if not expected or tuple(r)!=expected[0] or d.at(battle.STATUS_SET+6*r[11],6)!=expected[1]:return None
+    return 10,r[11],r[0],255,128|32|(0 if r[3]&1 else 1)
+
+
 def status_strike_record(d,r):
     """Monster status strikes, formula 0x50 (Eye Gouge, Poison Nail, Beak): Secret Fist's
     (MA+X)% physical-status accuracy after physical evasion (flags_4 0x12: evadeable, Blade
@@ -478,7 +490,7 @@ def battle_records(d):
         # producers outside this source table interval remain independently gated.
         raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 or a in HOLY_MAGIC else None
         # Punch Art (0x64..0x6b) and Talk Skill (0x74..0x7d) are read beyond the magic interval.
-        art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b or a in(0xE1,0x10A) else None   # Grenade's Small Bomb, Choco Ball
+        art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b or a in(0xE1,0x10A,0x110) else None   # Grenade's Small Bomb, Choco Ball, Turn Punch
         magic = offensive_magic_record(raw) if raw else None
         healing = healing_magic_record(raw) if raw else None
         if a == 0xD4: raw = raw[:11] + bytes((MBARRIER_ROW,)) + raw[12:]
@@ -501,6 +513,7 @@ def battle_records(d):
         geomancy = geomancy_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 126<=a<=137 else None
         secret = (secret_fist_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a==0x68 else
                   status_strike_record(d,d.at(battle.ABILITY_RANGE+14*a,14)) if a in (0x111,0x11B,0x132) else None)
+        monster_status = monster_status_magic_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a in (0x120,0x130) else None
         stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8e<=a<=0x91 else None
         gear_steal = steal_equip_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x6e<=a<=0x72 else None
         gear_break = equip_break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8a<=a<=0x8d else None
@@ -610,6 +623,8 @@ def battle_records(d):
             kind,y,rng,vert,flags=geomancy;formula=0x24;element=d.at(battle.ABILITY_RANGE+14*a+7,1)[0]
         elif secret:
             kind,y,rng,vert,flags=secret;formula=0x50   # status set in Y; X stays in the raw record
+        elif monster_status:
+            kind,y,rng,vert,flags=monster_status;formula=0x3D
         elif guts:
             kind,y,rng,vert,flags,element=guts;formula=d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif talk:

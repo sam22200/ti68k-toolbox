@@ -40,9 +40,39 @@ PC = sanitizers = 68000: BC2F369D, 5,199 checks; Secret Fist's check is unchange
 Resident TTPack input 57,103: headroom 7,905 -> 7,833 bytes; zone 8,698. Chapter I: 145
 of 155 actions executable. The 37 campaign replays are unchanged.
 
+## Formula 0x3D: Mind Blast, the monsters' Death Sentence (2026-11-11)
+
+`battle_formula_hit_ma_x_percent_magical_evade`: the status spells' (MA + X)% with the
+magical support/status/zodiac stages but **without Faith**, then the status. flags_4 is 0:
+never evaded (the checks keep evasive gear on the target). Mind Blast (Squidlarkin: range
+3, radius 1) has a random-one set (type 0x40: Confusion or Berserk): on execution one status
+is drawn after the accuracy roll, in status order, and a blocked choice is a miss; the
+forecast treats the set as all-or-nothing (a hit when any status applies). Death Sentence
+(Ahriman: range 3, one panel) has Secret Fist's one-status set.
+
+Core: 0x3D is a magic status formula (`cast_rules.h`), without Faith and with the hostile
+stages in `magic_heal`; `magic_prepare` draws the random choice; `magic_status_value`
+accepts its random-one set for forecasts; `common_tables.monster_status_magic_record`
+holds the two exact records. Oracle: 252 profiles (MA, zodiac, Magic Attack UP, Magic
+Defense UP, statuses already present, Faith pairs that must not matter, seeds); the check
+replays forecast, draws, hit and status, then production casts (Mind Blast leaves both
+statuses over the seeds; Death Sentence its 3-turn countdown).
+
+## Turn Punch (0x31, 2026-11-11)
+
+The Black Goblin's Turn Punch is Spin Fist's record with area vertical 1 (the footprint
+reads the raw record) and flags_4 0x01: never evaded, where Spin Fist (0x03) is.
+`common_tables.strike_record` accepts it; `check_discovery.c` checks the same amount as Spin
+Fist, the raw vertical, and a forecast of 100 against the gear that lowers Spin Fist.
+
+## Numbers after Turn Punch and 0x3D
+
+`make core-status-strike-check`: D0FD4866, 9,779 checks; `make core-discovery-check`:
+FEFE4CC1, 17,811 checks; both PC = sanitizers = 68000. Resident input 57,109 (headroom
+7,827), zone 8,698. Chapter I: 148 of 155. The 37 campaign replays are unchanged.
+
 ## Next in the family
 
 Black Ink (0x11E: a line with flags_4 0x20, direct trajectory) and Look of Devil (0x12D: a
-random-one status set, type 0x40, flags_4 0x20) need the trajectory rule and the random
-choice; Odd Soundwave (0x38) and Mind Blast / Death Sentence (0x3D, magical evade) use the
-same status application.
+random-one status set with flags_4 0x20) need the trajectory rule; Odd Soundwave (0x38)
+uses the same status application with a cancel set.

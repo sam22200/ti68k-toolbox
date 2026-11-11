@@ -66,7 +66,57 @@ static void strike_production(void)
         CHECK(hits,1);
     }
 }
-static void strike_trials(void){strike_profiles();strike_production();}
+// Formula 0x3D (Mind Blast, the monsters' Death Sentence): accuracy without Faith, the random
+// choice drawn after it, a blocked choice a miss; never evaded.
+static void magical_profiles(void)
+{
+    u16 i;u8 k;
+    for(i=0;i<sizeof source_magical/sizeof source_magical[0];i++){
+        const typeof(source_magical[0]) *p=&source_magical[i];Unit *a,*t;u32 seed,expected;CastBatch b;
+        prepare_strike(p->ab);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        a->ma=p->ma;a->zodiac=p->az;t->zodiac=p->tz;a->faith=p->af;t->faith=p->tf;
+        st.support[U_RAMZA]=p->up?SUPPORT_MAGIC_ATTACK_UP:0;st.support[10]=p->defense?SUPPORT_MAGIC_DEFENSE_UP:0;
+        memset(&t->statuses,0,sizeof t->statuses);
+        for(k=0;k<5;k++)t->statuses.inflicted[k]=source_magical_status[p->mode][k];
+        t->eq[EQ_ACC]=STRIKE_ACC;t->eq[EQ_SHIELD]=STRIKE_SHIELD;           // evasive gear: never evaded
+        unit_status_refresh(t);
+        memset(&b,0,sizeof b);b.actor=U_RAMZA;b.ref=10;b.follow=1;b.ability=p->ab;
+        seed=rng32;CHECK(cast_forecast(&b),1);CHECK(!!(b.mask&((u16)1<<10)),1);
+        CHECK(b.victim[10].hit,p->forecast);CHECK(rng32==seed,1);
+        rng32=p->seed;for(k=0;k<p->draws;k++)rand15();expected=rng32;rng32=p->seed;
+        b.phase=CAST_BATCH_EMPTY;CHECK(cast_batch(CAST_BATCH_PREPARE,&b),1);
+        CHECK(b.victim[10].hit,p->hit);CHECK(rng32==expected,1);
+        if(p->hit){
+            u8 byte=(u8)(b.victim[10].amount>>8),mask=(u8)b.victim[10].amount;
+            CHECK(byte<5,1);CHECK(mask,p->add[byte<5?byte:0]);
+            for(k=0;k<5;k++)if(k!=byte)CHECK(p->add[k],0);
+        }
+    }
+}
+// Production: Mind Blast leaves Confusion or Berserk (both seen over the seeds), the monsters'
+// Death Sentence its countdown.
+static void magical_production(void)
+{
+    u8 s,seen=0,sentence=0;
+    for(s=1;s<40&&seen!=3;s++){
+        Unit *t;prepare_strike(0x120);t=&st.unit[10];st.unit[U_RAMZA].ma=99;
+        memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);
+        rng32=((u32)s*0x9E3779B1UL)|1;                     // spread: small seeds draw tiny first values
+        CHECK(can_use(U_RAMZA,0x120),1);CHECK(cast_order(U_RAMZA,10,0x120,1),1);impact();
+        if(core_status_current(&t->statuses,SID_CONFUSION>>3)&(0x80>>(SID_CONFUSION&7)))seen|=1;
+        if(core_status_current(&t->statuses,SID_BERSERK>>3)&(0x80>>(SID_BERSERK&7)))seen|=2;
+        CHECK(t->hp,999);
+    }
+    CHECK(seen,3);
+    for(s=1;s<40&&!sentence;s++){
+        Unit *t;prepare_strike(0x130);t=&st.unit[10];st.unit[U_RAMZA].ma=99;
+        memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);rng32=s;
+        CHECK(can_use(U_RAMZA,0x130),1);CHECK(cast_order(U_RAMZA,10,0x130,1),1);impact();
+        sentence=core_status_current(&t->statuses,4)&1;
+    }
+    CHECK(sentence,1);CHECK(st.unit[10].status_ct[15],3);
+}
+static void strike_trials(void){strike_profiles();strike_production();magical_profiles();magical_production();}
 #ifndef __m68k__
 int main(void){sw_init(61);strike_trials();printf("status_strike %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else

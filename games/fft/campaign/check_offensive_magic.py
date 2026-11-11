@@ -20,6 +20,7 @@ GOLEM=(65,)
 PUNCH=(105,106,107)
 STRIKES=(101,102)
 SPIN=(100,)
+TURN_PUNCH=(0x110,)                    # Spin Fist's 0x31, vertical 1, never evaded (check_discovery.c)
 GUTS=(150,151,153)
 GIL=(123,)
 GEOMANCY=tuple(range(126,138))
@@ -35,6 +36,7 @@ DARK_SWORD=(0xA4,)                     # formula 0x2F (check_holy_sword.c)
 MIGHTY_SWORD=(0xA0,0xA1,0xA2,0xA3)     # formula 0x2E (check_dark_sword.c)
 RUIN=(0xC4,0xC5,0xC6,0xC7)             # formulas 0x1A, 0x1B (check_ruin.c)
 STATUS_STRIKE=(0x111,0x11B,0x132)      # monster formula 0x50, evadeable (check_status_strike.c)
+MONSTER_STATUS=(0x120,0x130)           # monster formula 0x3D (check_status_strike.c)
 TRUTH=(0x10B,0x114,0x116,0x123,0x124,0x125,0x126,0x134)   # formula 0x4E (check_discovery.c)
 TALK=(117,118,119,120,121,122,124,125)
 HEALING=(1,2,3,4,5,6,60,72)
@@ -53,7 +55,7 @@ def catalogue_report():
         n=norm(a)
         if n[0]!=255 and(n[10]in range(8,17)or n[10]==18):assert n[4]&128,(a,n)
     actual=tuple(a for a in range(512)if norm(a)[4]&128)
-    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS+GIL+GEOMANCY+SECRET_FIST+LINE+DRAW_OUT+PERFORMANCE+ALLEGIANCE+FLOAT+CHOCOBO+HOLY_SWORD+MIGHTY_SWORD+DARK_SWORD+RUIN+STATUS_STRIKE+TRUTH)),actual
+    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS+GIL+GEOMANCY+SECRET_FIST+LINE+DRAW_OUT+PERFORMANCE+ALLEGIANCE+FLOAT+CHOCOBO+HOLY_SWORD+MIGHTY_SWORD+DARK_SWORD+RUIN+STATUS_STRIKE+MONSTER_STATUS+TURN_PUNCH+TRUTH)),actual
     assert tuple(norm(265)[:5])==(0,0,1,4,10) and norm(265)[10]==1
     for a,kind,formula in ((268,13,81),(269,3,76)):
         r,n=raw(a),norm(a);assert n[0]==kind and n[4]==161 and n[10]==r[8]==formula
@@ -87,6 +89,8 @@ def catalogue_report():
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==(0x7F if a==212 else r[11]) and n[10]==r[8]   # Mbarrier: adapted row
     for a in HOLY_SWORD:
         r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x2D and n[11]==0 and n[4]&(128|8|2)==128|8,(a,n)
+    for a in MONSTER_STATUS:
+        r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==0x3D and n[4]&~1==128|32,(a,n)
     for a in STATUS_STRIKE:
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==0x50 and n[4]==128|32|2,(a,n)
     for a in RUIN:
@@ -107,6 +111,8 @@ def catalogue_report():
         r,n=raw(a),norm(a);assert tuple(n[:5])==steal_gil_record(a,r)
         assert n[10:12]==r[8:10]
         bad=bytearray(r);bad[9]^=1;assert steal_gil_record(a,bad)is None
+    for a in TURN_PUNCH:
+        r,n=raw(a),norm(a);assert n[0]==0 and n[4]==161 and n[10]==r[8]==0x31 and r[2]==1 and not r[6]&2,(a,n)
     for a in SPIN:
         r,n=raw(a),norm(a);assert n[0]==0 and n[4]==163 and n[10]==r[8]==0x31,(a,n)
     for a in GEOMANCY:

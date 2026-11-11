@@ -158,9 +158,9 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
         // Golem (formula 20) targets its caster: same sign (neutral zodiac), no
         // target Faith, so the shared path is (MA[+AttackUP]+X)*caster Faith/100.
         // Punch Art has no Faith term.
-        u16 faith=b->formula==76||b->formula==81||punch_formula(b->formula)||(u8)(b->formula-0x29)<=1||b->formula==0x50?10000:(u16)(magic_faith(ua)*(b->formula==20?100:magic_faith(ut)));
+        u16 faith=b->formula==76||b->formula==81||punch_formula(b->formula)||(u8)(b->formula-0x29)<=1||b->formula==0x50||b->formula==0x3D?10000:(u16)(magic_faith(ua)*(b->formula==20?100:magic_faith(ut)));
         xa=magic_xa(a,t,b->formula==9?b->element:0,
-            b->formula==10||b->formula==97||b->formula==0x50||(u8)(b->formula-0x1A)<=1||(b->formula==14&&!(core_status_current(&ut->statuses,0)&16))||magic_percent_formula(b->formula),b->formula);
+            b->formula==10||b->formula==97||b->formula==0x50||b->formula==0x3D||(u8)(b->formula-0x1A)<=1||(b->formula==14&&!(core_status_current(&ut->statuses,0)&16))||magic_percent_formula(b->formula),b->formula);
         if(b->formula==13||b->formula==14||b->formula==0x35||b->formula==0x1B||magic_status_formula(b->formula)||magic_percent_formula(b->formula)){
             const u8 *r=cj_range(common,ab);x=r[b->formula==0x1A?10:9];   // Ruin 0x1A: MA + Y
             if(ua->zodiac!=12&&ut->zodiac!=12)x=zodiac_xa(ua,ut,x);
