@@ -1,6 +1,6 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Current state (2026-11-11): Chapter I actions, 145 of 155 executable
+## Current state (2026-11-11): Chapter I actions, 148 of 155 executable
 
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
 [Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
@@ -57,14 +57,15 @@ banks: run through `make`. Check binaries must run inside a data folder
 Brave below 100 (a Brave of 100 hid the knight-sword bug). Known failure, unrelated:
 `manage-test` aborts.
 
-**Numbers now.** Resident TTPack input 57,103, headroom 7,833 bytes; zone 8,698; ABI 85.
+**Numbers now.** Resident TTPack input 57,109, headroom 7,827 bytes; zone 8,698; ABI 85.
 
-**Next (10 actions, all monsters).** Eye Gouge, Poison Nail and Beak are done
-([Monster status strikes](MONSTER_STATUS_STRIKES.md)). Left in the 0x50 family: Black Ink
-(a line with flags_4 0x20, direct trajectory) and Look of Devil (random-one status set,
-type 0x40). Then Turn Punch (0x31, area vertical 1), Odd Soundwave 0x38, Mind Blast and
-Death Sentence 0x3D (magical evade, MA + X without Faith), Goblin Punch 0x4F, Self Destruct
-0x52, Look of Fright 0x62, Beaking 0x55. Also open: the AI choosing sword
+**Next (7 actions, all monsters).** Eye Gouge, Poison Nail, Beak, Turn Punch, Mind Blast
+and Death Sentence are done ([Monster status strikes](MONSTER_STATUS_STRIKES.md)). Left:
+Black Ink (0x50 on a line, flags_4 0x20: direct trajectory) and Look of Devil (0x50,
+random-one set, flags_4 0x20; the random draw exists now in `magic_prepare` for 0x3D), Odd
+Soundwave 0x38 (a cancel set), Goblin Punch 0x4F, Self Destruct 0x52, Look of Fright 0x62,
+Beaking 0x55. Test seeds: spread them (`(k*0x9E3779B1)|1`), small xorshift seeds give tiny
+first draws and always pick the first random choice. Also open: the AI choosing sword
 skills/Ruins is not yet seen in a battle; 0x4E area/line shapes; a direct 0x4E oracle;
 area criticals push only a sole victim (source `target_count` 1, faithful); Dark Sword's
 push adds no fall damage (adaptation).
