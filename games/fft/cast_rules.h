@@ -22,13 +22,18 @@ static inline u8 speech_formula(u8 f){return (u8)(f-0x29)<=1||guts_formula(f);}
 // Secret Fist0x50 uses the shared status commit and a physical-status accuracy;
 // Ruins 0x1A (stat loss, the status commit) and 0x1B (max-MP percent) (campaign/RUINS.md).
 // Monster 0x3D (Mind Blast, Death Sentence): formula 10's (MA+X)% without Faith, a random-one set.
-// status (the status batch commit): 10, 11, 18, 20, 0x1A, 97, 0x2a, 0x33, 0x39..0x3b, 0x3D, 0x50.
-static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x3c,0x1f,0xe6,0x38,0x2e,0x00,0x50,0x03,0x00,0x0a};
-static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x04,0x04,0x06,0x08,0x2e,0x00,0x00,0x03,0x00,0x02};
+// Core id 100 (FORMULA_AREA_CLEANSE): source 0x38 on the batch (Odd Soundwave: a cancel set, always
+// applied, no draw); the item cleanses keep 0x38 outside the magic pipeline.
+// status (the status batch commit): 10, 11, 18, 20, 0x1A, 97, 100, 0x2a, 0x33, 0x39..0x3b, 0x3D, 0x50.
+static const u8 magic_formula_bits[13]={0x00,0xff,0x15,0x3c,0x1f,0xe6,0x38,0x2e,0x00,0x50,0x03,0x00,0x1a};
+static const u8 magic_status_bits[13]={0x00,0x0c,0x14,0x04,0x04,0x06,0x08,0x2e,0x00,0x00,0x03,0x00,0x12};
 static inline u8 magic_status_formula(u8 f){return f<104&&(magic_status_bits[f>>3]>>(f&7)&1);}
 static inline u8 magic_percent_formula(u8 f){return f==9||(u8)(f-15)<=1;}
 static inline u8 magic_transfer_formula(u8 f){return (u8)(f-15)<=1||f==0x2F;}
 static inline u8 magic_formula(u8 f){return f<104&&(magic_formula_bits[f>>3]>>(f&7)&1);}
+enum { FORMULA_AREA_CLEANSE=100 };
+// A raw record's formula as the batch knows it.
+static inline u8 batch_formula(u8 raw){return raw==0x38?FORMULA_AREA_CLEANSE:raw;}
 // Formula08's damage path; 0x4E only drops Faith (magic_amount).
 static inline u8 magic_damage_formula(u8 f){return f==8||f==0x4E;}
 enum { SUPPORT_HALF_MP=0x1ce, SUPPORT_SHORT_CHARGE=0x1e2,

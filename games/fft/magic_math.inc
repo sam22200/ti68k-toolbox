@@ -110,6 +110,7 @@ u16 magic_heal(u8 a,u8 t,AbId ab,u8 query)
         if(st.affinity[t][3]&b->element)xa=(s16)((u16)xa<<1);
         return xa>999?999:(u16)xa;
     }
+    if(query==1&&b->formula==FORMULA_AREA_CLEANSE)return 100;   // Odd Soundwave: no accuracy stage
     if(query==3||(query&128))return magic_status_value(t,ab,(query&128)?(query&127)+1:0);
     ua=&st.unit[a];ut=&st.unit[t];
     if(performance_formula(b->formula)){
