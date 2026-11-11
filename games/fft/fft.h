@@ -626,7 +626,7 @@ u16 attack_prediction(u8 a,u8 t);
 #endif       // shared no-critical primary+offhand forecast
 u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll); // flags:hand|awake<<1|critical<<2
 u8 skill_cost(u8 who,AbId ab);           // pure effective MP cost; no image loads
-u16 magic_amount(u8 a,u8 t,u16 spec);    // raw source halfword; element<<8 | power
+u16 magic_amount(u8 a,u8 t,u16 spec);    // raw source halfword; element<<8 | power (<128), bit7: no Faith (0x4E)
 u16 magic_heal(u8 a,u8 t,AbId ab,u8 query); // pure amount/chance/kind/status; Geomancy4: terrain ability
 u8 skill_kind(u8 a,u8 t,AbId ab);        // pure live damage/healing/null outcome
 u8 cast_order(u8 who,u8 target,AbId ab,u8 follow); //0 rejected,1 immediate/empty,2 armed

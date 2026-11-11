@@ -42,22 +42,26 @@ the core keeps commit, status rules, animation, UI and AI. Never call `mod_call`
 Empty companion: 390 bytes (mostly the context). Resident cost of the mechanism: 250 bytes
 of TTPack input (headroom 8,743 → 8,493); zone 8,630 → 8,648 (the new context pointer).
 
+## Rule: nothing of the battle core is duplicated (user, 2026-11-10)
+
+The companion holds only rules the core lacks. When a technique is a variant of a core
+formula, the variant goes into the core's own code (a flag, a parameter), not a copy in the
+companion; companion code reaches core arithmetic through `ModCtx`, never a second copy.
+
 ## Formula 0x4E (2026-11-10)
 
 `battle_formula_damage_ma_times_y` is formula 0x08 without Faith (magical evade, MA x Y with
-the same element strengthen, support/status, absorb/null stages and status-proc draw). The
-core treats 0x4E as a magic formula (`cast_rules.h`: `magic_formula`, `magic_damage_formula`
-at the six former `formula == 8` sites) and routes only its amount to the companion
-(`magic_quantity` → `special(..., COMPANION_AMOUNT)`); the companion compiles its own copy of
-the magical XA/element stages (`magic_stages.h`, the resident's code unchanged).
+the same element strengthen, support/status, absorb/null stages and status-proc draw). So
+it lives in the core: a magic formula (`cast_rules.h`: `magic_formula`,
+`magic_damage_formula` at the six former `formula == 8` sites) whose power carries bit 7 to
+`magic_amount` = no Faith (formula 0x08 powers are at most 96). No companion code.
 Enabled (`common_tables.truth_magic_record`, single-target shapes): Choco Meteor, Small Bomb,
 Flame Attack, Thunder/Aqua/Ice Soul, 0x126, Feather Bomb. Area and line shapes (0x117,
 0x13B, 0x142, 0x144, 0x14E, 0x151-0x153) wait for their geometry.
-Checked (`check_discovery.c`, 17,804 checks, PC = sanitizers = 68000, the companion running
-from its block): amount = formula 0x08's with both Faiths at 100, unchanged by Faith, 0 on a
-nullified element, the real CT-0 cast's HP change. The reference is the core's formula 0x08
-(itself verified on the original); a direct 0x4E original-function oracle is not yet written.
-Companion 856 bytes, zone 8,668, TTPack headroom 8,459. Chapter I: 129 of 155 executable.
+Checked (`check_discovery.c`, 17,804 checks, PC = sanitizers = 68000): amount = formula
+0x08's with both Faiths at 100, unchanged by Faith, 0 on a nullified element, the real CT-0
+cast's HP change. The reference is the core's formula 0x08 (verified on the original); a
+direct 0x4E original-function oracle is not yet written. Chapter I: 129 of 155 executable.
 
 ## Next
 
@@ -67,5 +71,5 @@ Companion 856 bytes, zone 8,668, TTPack headroom 8,459. Chapter I: 129 of 155 ex
    no allocation during play. Native (TiEmu, Orbonne): the 3,074-byte block sits beside the
    zone (8,670). Cost: ~3 KB less free battle RAM. First call (rebind to the battle's
    Work/map) 7,424 cycles, next 1,078. Raise the envelope with the image.
-2. A direct original-function oracle for 0x4E; area/line shapes.
+2. A direct original-function oracle for 0x4E; its area/line shapes.
 3. Families already in the core for humans (0x50, 0x38, Turn Punch), Holy Sword, the rest.
