@@ -38,6 +38,8 @@ RUIN=(0xC4,0xC5,0xC6,0xC7)             # formulas 0x1A, 0x1B (check_ruin.c)
 STATUS_STRIKE=(0x111,0x11B,0x132)      # monster formula 0x50, evadeable (check_status_strike.c)
 MONSTER_STATUS=(0x120,0x130)           # monster formula 0x3D (check_status_strike.c)
 ODD_SOUNDWAVE=(0x11F,)                 # source 0x38 on the batch, core id 100 (check_status_strike.c)
+DIRECT_STRIKE=(0x11E,0x12D)            # monster formula 0x50, direct targeting (check_status_strike3.c)
+FRIGHT=(0x12E,)                        # formula 0x62, direct targeting (check_status_strike3.c)
 BEAKING=(0x135,)                       # formula 0x55 (check_status_strike.c)
 MISSING_HP=(0x10F,0x115)               # Goblin Punch 0x4F, Self Destruct 0x52 (check_status_strike.c)
 TRUTH=(0x10B,0x114,0x116,0x123,0x124,0x125,0x126,0x134)   # formula 0x4E (check_discovery.c)
@@ -58,7 +60,7 @@ def catalogue_report():
         n=norm(a)
         if n[0]!=255 and(n[10]in range(8,17)or n[10]==18):assert n[4]&128,(a,n)
     actual=tuple(a for a in range(512)if norm(a)[4]&128)
-    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS+GIL+GEOMANCY+SECRET_FIST+LINE+DRAW_OUT+PERFORMANCE+ALLEGIANCE+FLOAT+CHOCOBO+HOLY_SWORD+MIGHTY_SWORD+DARK_SWORD+RUIN+STATUS_STRIKE+MONSTER_STATUS+ODD_SOUNDWAVE+BEAKING+MISSING_HP+TURN_PUNCH+TRUTH)),actual
+    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS+GIL+GEOMANCY+SECRET_FIST+LINE+DRAW_OUT+PERFORMANCE+ALLEGIANCE+FLOAT+CHOCOBO+HOLY_SWORD+MIGHTY_SWORD+DARK_SWORD+RUIN+STATUS_STRIKE+MONSTER_STATUS+ODD_SOUNDWAVE+BEAKING+MISSING_HP+TURN_PUNCH+TRUTH+DIRECT_STRIKE+FRIGHT)),actual
     assert tuple(norm(265)[:5])==(0,0,1,4,10) and norm(265)[10]==1
     for a,kind,formula in ((268,13,81),(269,3,76)):
         r,n=raw(a),norm(a);assert n[0]==kind and n[4]==161 and n[10]==r[8]==formula
@@ -100,6 +102,10 @@ def catalogue_report():
         r,n=raw(a),norm(a);assert n[0]==13 and n[1]==r[11] and n[10]==100 and r[8]==0x38 and n[4]==128|32|1,(a,n)
     for a in MONSTER_STATUS:
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==0x3D and n[4]&~1==128|32,(a,n)
+    for a in DIRECT_STRIKE:
+        r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==r[8]==0x50 and n[4]==128|32|2 and r[6]==0x22,(a,n)
+    for a in FRIGHT:
+        r,n=raw(a),norm(a);assert n[0]==18 and n[1]==r[10]==10 and n[10]==r[8]==0x62 and n[4]==128|32|2 and r[6]==0x22,(a,n)
     for a in STATUS_STRIKE:
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==0x50 and n[4]==128|32|2,(a,n)
     for a in RUIN:

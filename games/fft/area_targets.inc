@@ -28,6 +28,22 @@ static u16 area_resolution_cell(u8 follow,u8 ref)
     }
     return ref<MAP_N?ref:MAP_N;
 }
+// Direct-targeting casts (flags_4 0x20) share the weapons' direct trajectory. TARGETS reads
+// the recipient the resident fetched from the weapon planner before this image ran (no
+// second copy in the largest images; an unprepared query resolves to nobody); the area AI
+// scans many origins inside its image and holds a copy; a one-image build calls the planner's.
+#if defined(FFT_MODULE) && MOD_PART(MOD_TARGETS)
+#define cast_direct(a,t) (W->direct_from==(a)&&W->direct_to==(t)?W->direct_hit:255)
+#elif defined(FFT_MODULE)
+#define FFT_DIRECT_NAME cast_direct
+#define FFT_DIRECT_PANEL
+#include "direct_trajectory.inc"
+#undef FFT_DIRECT_PANEL
+#undef FFT_DIRECT_NAME
+#else
+static u8 direct_target(u8 a,u8 t);
+#define cast_direct direct_target
+#endif
 s16 cast_targets(u8 a,u8 ref,AbId ab,u8 follow)
 {
     const u8 *r,*col;u16 centre,mask=0,bit;u8 i,cx,cz,flags,cell;
@@ -44,12 +60,23 @@ s16 cast_targets(u8 a,u8 ref,AbId ab,u8 follow)
 #endif
     }
     // Unsupported shape/family never silently becomes a radial spell.
-    if((!magic_formula(batch_formula(r[8]))&&r[8]!=0x31)||(r[3]&32)||(r[4]&10)||((r[4]&4)&&r[8]!=0x31&&r[8]!=0x20&&r[8]!=0x2D)||(r[6]&32))return TARGETS_UNSUPPORTED;
+    if((!magic_formula(batch_formula(r[8]))&&r[8]!=0x31)||(r[3]&32)||(r[4]&10)||((r[4]&4)&&r[8]!=0x31&&r[8]!=0x20&&r[8]!=0x2D&&!(r[6]&32)))return TARGETS_UNSUPPORTED;
     centre=area_resolution_cell(follow,ref);
     if(centre>=MAP_N)return TARGETS_INVALID;
     cx=TILE_X[centre];cz=TILE_Z[centre];flags=r[4];
     col=W->surface+((u16)(W->grid_row[cz]+cx)<<3)+4*node_layer((u8)centre);
     if(col[3]&128)return TARGETS_INVALID;
+    if(r[6]&32){
+        // Source direct targeting: the weapon resolver with a direct trajectory. One panel
+        // (a line or a radius in the record is not used): the aimed body, or the first
+        // body on the straight line; terrain in the way leaves nobody.
+        u8 t=NUNIT;
+        for(i=0;i<NUNIT;i++)if(i!=a&&magic_target(i)&&UNIT_CELL(&st.unit[i])==centre){t=i;break;}
+        if(t==NUNIT||(t=cast_direct(a,t))==255)return 0;
+        cell=UNIT_CELL(&st.unit[t]);
+        for(i=0,bit=1;i<NUNIT;i++,bit<<=1)if(i!=a&&magic_target(i)&&UNIT_CELL(&st.unit[i])==cell)mask|=bit;
+        return (s16)mask;
+    }
     for(i=0,bit=1;i<NUNIT;i++,bit<<=1){
         if(!magic_target(i))continue;
         u=&st.unit[i];cell=UNIT_CELL(u);

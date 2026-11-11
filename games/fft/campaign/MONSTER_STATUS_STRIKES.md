@@ -99,9 +99,58 @@ checks; `make core-discovery-check` FEFE4CC1, 17,811 checks; all PC = sanitizers
 Resident input 57,285 (headroom 7,651), zone 8,698. Chapter I: 152 of 155. Secret Fist's
 and the Ruins' checks and the 37 campaign replays are unchanged.
 
-## Next in the family
+## Direct targeting: Black Ink, Look of Devil, Look of Fright (2026-11-11)
 
-Black Ink (0x11E: 0x50 on a line), Look of Devil (0x12D: 0x50 with a random-one set) and
-Look of Fright (0x12E: formula 0x62, Brave - Y with 0x3D's accuracy) all have flags_4 0x20
-(`DIRECT_TARGETING`: the line of fire must be clear), which the cast batch refuses today
-(`cast_area_supported`, `cast_targets`). They need that trajectory rule in the casts.
+flags_4 0x20 (`DIRECT_TARGETING`). In the source the action's target map comes from the
+weapon resolver with a direct trajectory (`battle_target_calculate_map_for_action` ->
+`battle_target_validate_weapon_target`, `WEAPON_FLAG_DIRECT`): one panel, the aimed body or
+the first body on the straight line, nobody when terrain is in the way. The record's line
+and radius are not used (Black Ink has both).
+
+- **Black Ink** (Squidlarkin, 0x11E): formula 0x50, Darkness; range 2 on the four axes
+  (flags_1 0x10), vertical tolerance 2.
+- **Look of Devil** (Ahriman, 0x12D): formula 0x50 with a random-one set (Petrify, Darkness,
+  Silence, Don't Move, Don't Act); range 3. As for Mind Blast, one status is drawn after
+  the accuracy roll, in status order, and a blocked choice is a miss.
+- **Look of Fright** (Ahriman, 0x12E): formula 0x62
+  (`battle_formula_lower_brave_y_without_faith`): Beaking's magical evasion and (MA + X)%
+  without Faith, then Foxbird's Brave - Y (10); range 3.
+
+Core: `cast_targets` (`area_targets.inc`) resolves a direct-targeting record with the
+weapons' direct trajectory (`direct_trajectory.inc`, the panel variant already checked on
+the original for guns, `check_direct_interception.c`). The trajectory stays in the weapon
+planner image: the resident fetches the recipient (`cast_direct_fetch`, PLANNER op 6, the
+pattern of `hamedo_line`) before every TARGETS entry, so the largest images do not grow
+(a copy in TARGETS grew the zone by 1,100 bytes; the fetch costs 414 resident bytes); an unprepared query resolves to nobody. The
+area AI scans many origins inside its image and holds its own copy (AREA_AI 4,108 ->
+5,474 bytes, below the zone). `cast_area_supported` accepts the flag; the area preview
+marks the recipients' panels. 0x62 is a magic status formula of kind `AB_BRAVE`; 0x50 takes
+0x3D's random draw. Records: `status_strike_record` (the two exact 0x50 records),
+`fright_record`. Area AI: the three are offered (AI byte 6: 0x40, direct); the query runs
+from each candidate origin, so a blocked line is not chosen. `MOD_ABI` 86 (the new op and
+three `Work` bytes).
+
+**Adaptation:** an aimed panel without a unit resolves to nobody (the source traces to the
+bare tile and can still hit a body on the way).
+
+Checks (`check_status_strike3.c`, the third program): 432 original 0x50 profiles (MA,
+zodiac, Attack UP, Defense UP, three evade fixtures, statuses already present, spread
+seeds) and 68 original 0x62 profiles replayed (forecast, draws, hit, status or Brave
+loss); the trajectory on a flat row (clear line, a body on the line takes the technique,
+terrain leaves nobody, an empty aimed panel); production casts (Black Ink blinds, also the
+interposed body instead of the aimed unit; Look of Devil leaves each of its five statuses
+over the seeds; Look of Fright lowers Brave 70 -> 60). PC = sanitizers = 68000: 9807256F,
+8,887 checks; the two other programs are unchanged (D0FD4866, 88C99485).
+
+## Numbers (direct targeting, 2026-11-11)
+
+`make core-status-strike-check`: three programs, D0FD4866 (9,779), 88C99485 (3,237),
+9807256F (8,887), all PC = sanitizers = 68000. Resident input 57,733: headroom 7,651 ->
+7,203 bytes; zone 8,698 (TARGETS 8,602). **Chapter I: 155 of 155 actions executable.** The
+other families' checks (discovery, Ruins, Holy/Dark/Mighty Sword, Secret Fist) and the 37
+campaign replays are unchanged.
+
+## Open
+
+No battle replay shows the AI choosing these techniques; Self Destruct is not offered to
+the AI; a direct-targeting cast aimed at an empty panel resolves to nobody (adaptation).

@@ -187,8 +187,9 @@ status on hit, area, line), then the new formulas, in the core's companion image
 133 of 155 with Holy Explosion; Dark Sword 0x2F: 134 of 155; Mighty Sword 0x2E: 138 of 155;
 Ruins 0x1A/0x1B, `RUINS.md`: 142 of 155; monster status strikes,
 `MONSTER_STATUS_STRIKES.md` (with Turn Punch, Mind Blast, Death Sentence, Odd Soundwave,
-Beaking, Goblin Punch, Self Destruct): 152 of 155, headroom 7,651. Left: Black Ink, Look of
-Devil, Look of Fright (flags_4 0x20, direct targeting).
+Beaking, Goblin Punch, Self Destruct): 152 of 155; Black Ink, Look of Devil, Look of Fright
+(flags_4 0x20, direct targeting through the weapons' trajectory): **155 of 155 executable**,
+headroom 7,203, zone 8,698.
 
 Caveat: the random-formation tier is read as "first pair of each route" (WLDCORE); some
 monsters listed (Dragon, Ahriman) may belong to later progress tiers. **The core cannot be

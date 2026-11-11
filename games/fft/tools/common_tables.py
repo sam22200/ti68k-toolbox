@@ -394,11 +394,25 @@ def status_strike_record(d,r):
     """Monster status strikes, formula 0x50 (Eye Gouge, Poison Nail, Beak): Secret Fist's
     (MA+X)% physical-status accuracy after physical evasion (flags_4 0x12: evadeable, Blade
     Grasp), one status of an all-or-nothing set, a single target at range 1."""
+    row=d.at(battle.STATUS_SET+6*r[11],6)
+    # Direct targeting (flags_4 0x20: one panel on a clear straight line). Black Ink: range 2
+    # on the four axes (its line and radius are not used); Look of Devil: range 3, one random
+    # status of its set.
+    if tuple(r)==(2,2,2,0x19,0x15,0x11,0x22,0,0x50,0x32,0,0x30,0,0) and row==bytes((0x80,0,0x20,0,0,0)):
+        return 10,r[11],r[0],2*r[2],128|32|2
+    if tuple(r)==(3,0,0,1,0x11,0x10,0x22,0,0x50,0x23,0,0x6f,0,0) and row==bytes((0x40,0,0xa8,0,0,0x0c)):
+        return 10,r[11],r[0],255,128|32|2
     if r[8]!=0x50 or r[0]!=1 or r[1] or r[3]!=9 or r[4]!=0x11 or r[5]!=0x10 or r[6]!=0x12 or r[7] or r[10] or r[12] or r[13]:
         return None
-    row=d.at(battle.STATUS_SET+6*r[11],6)
     if row[0]!=0x80 or sum(v.bit_count() for v in row[1:])!=1:return None
     return 10,r[11],r[0],2*r[2],128|32|2
+
+
+def fright_record(r):
+    """Look of Fright (Ahriman), formula 0x62: magical evasion (flags_4 0x22), (MA+X)% without
+    Faith, the target's Brave loses Y; one panel at range 3 on a clear straight line."""
+    if tuple(r)!=(3,0,0,1,0x11,0x10,0x22,0,0x62,0x28,0x0a,0,0,0):return None
+    return 18,r[10],r[0],255,128|32|2
 
 
 def geomancy_record(d,a,r):
@@ -538,7 +552,7 @@ def battle_records(d):
         gil = steal_gil_record(a,d.at(battle.ABILITY_RANGE + 14*a,14)) if a in(0x6c,0x7b,0x133) else None
         geomancy = geomancy_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 126<=a<=137 else None
         secret = (secret_fist_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a==0x68 else
-                  status_strike_record(d,d.at(battle.ABILITY_RANGE+14*a,14)) if a in (0x111,0x11B,0x132) else None)
+                  status_strike_record(d,d.at(battle.ABILITY_RANGE+14*a,14)) if a in (0x111,0x11B,0x132,0x11E,0x12D) else None)
         monster_status = monster_status_magic_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a in (0x120,0x130) else None
         stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8e<=a<=0x91 else None
         gear_steal = steal_equip_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x6e<=a<=0x72 else None
@@ -653,6 +667,8 @@ def battle_records(d):
             kind,y,rng,vert,flags=monster_status;formula=0x3D
         elif a in (0x10F,0x115) and missing_hp_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)):
             kind,y,rng,vert,flags=missing_hp_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14));formula=d.at(battle.ABILITY_RANGE+14*a,14)[8]
+        elif a==0x12E and fright_record(d.at(battle.ABILITY_RANGE+14*a,14)):
+            kind,y,rng,vert,flags=fright_record(d.at(battle.ABILITY_RANGE+14*a,14));formula=0x62
         elif a==0x135 and beaking_record(d.at(battle.ABILITY_RANGE+14*a,14)):
             kind,y,rng,vert,flags=beaking_record(d.at(battle.ABILITY_RANGE+14*a,14));formula=0x55
         elif a==0x11F and odd_soundwave_record(d,d.at(battle.ABILITY_RANGE+14*a,14)):

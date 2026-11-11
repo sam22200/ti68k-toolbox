@@ -220,8 +220,147 @@ static void destruct_trials(void)
         if(p->mode==2)CHECK(core_status_current(&t->statuses,2)&0x80,0);
     }
 }
-// Two programs (the 68000 check size limit): check_status_strike2.c defines STRIKE_PART2.
-#ifdef STRIKE_PART2
+// Direct-targeting techniques (flags_4 0x20): Black Ink and Look of Devil (formula 0x50, the
+// random-one set drawn after the accuracy), Look of Fright (0x62: Beaking's stages, Brave - Y).
+static void direct_profiles(void)
+{
+    u16 i;u8 k;
+    for(i=0;i<sizeof source_direct/sizeof source_direct[0];i++){
+        const typeof(source_direct[0]) *p=&source_direct[i];Unit *a,*t;u32 seed,expected;CastBatch b;
+        prepare_strike(p->ab);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        a->ma=p->ma;a->zodiac=p->az;t->zodiac=p->tz;
+        st.support[U_RAMZA]=p->up?SUPPORT_ATTACK_UP:0;st.support[10]=p->defense?SUPPORT_DEFENSE_UP:0;
+        memset(&t->statuses,0,sizeof t->statuses);
+        for(k=0;k<5;k++)t->statuses.inflicted[k]=source_direct_status[p->mode][k];
+        if(p->gear==2){t->eq[EQ_ACC]=STRIKE_ACC;t->eq[EQ_SHIELD]=STRIKE_SHIELD;}
+        if(!p->gear){u8 f;for(f=0;f<4;f++){t->face=f;if(attack_side(U_RAMZA,10)==SIDE_BACK)break;}CHECK(f<4,1);}
+        unit_status_refresh(t);
+        memset(&b,0,sizeof b);b.actor=U_RAMZA;b.ref=10;b.follow=1;b.ability=p->ab;
+        seed=rng32;CHECK(cast_forecast(&b),1);CHECK(b.mask,(u16)1<<10);
+        CHECK(b.victim[10].hit,p->forecast);CHECK(rng32==seed,1);
+        rng32=p->seed;for(k=0;k<p->draws;k++)rand15();expected=rng32;rng32=p->seed;
+        b.phase=CAST_BATCH_EMPTY;CHECK(cast_batch(CAST_BATCH_PREPARE,&b),1);
+        CHECK(b.victim[10].hit,p->hit);CHECK(rng32==expected,1);
+        CHECK(b.victim[10].effect,p->hit?AB_STATUS:AB_NULL);
+        if(p->hit){
+            u8 byte=(u8)(b.victim[10].amount>>8),mask=(u8)b.victim[10].amount;
+            CHECK(byte<5,1);CHECK(mask,p->add[byte<5?byte:0]);
+            for(k=0;k<5;k++)if(k!=byte)CHECK(p->add[k],0);
+        }
+    }
+}
+static void fright_profiles(void)
+{
+    u16 i;u8 k;
+    for(i=0;i<sizeof source_fright/sizeof source_fright[0];i++){
+        const typeof(source_fright[0]) *p=&source_fright[i];Unit *a,*t;u32 seed,expected;CastBatch b;
+        prepare_strike(0x12E);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        a->ma=p->ma;a->zodiac=p->az;t->zodiac=p->tz;a->faith=p->af;t->faith=p->tf;
+        st.support[U_RAMZA]=p->up?SUPPORT_MAGIC_ATTACK_UP:0;st.support[10]=p->defense?SUPPORT_MAGIC_DEFENSE_UP:0;
+        memset(&t->statuses,0,sizeof t->statuses);
+        if(p->gear){t->eq[EQ_ACC]=STRIKE_ACC;t->eq[EQ_SHIELD]=STRIKE_SHIELD;}
+        unit_status_refresh(t);
+        memset(&b,0,sizeof b);b.actor=U_RAMZA;b.ref=10;b.follow=1;b.ability=0x12E;
+        seed=rng32;CHECK(cast_forecast(&b),1);CHECK(b.mask,(u16)1<<10);
+        CHECK(b.victim[10].hit,p->forecast);CHECK(rng32==seed,1);
+        rng32=p->seed;for(k=0;k<p->draws;k++)rand15();expected=rng32;rng32=p->seed;
+        b.phase=CAST_BATCH_EMPTY;CHECK(cast_batch(CAST_BATCH_PREPARE,&b),1);
+        CHECK(b.victim[10].hit,p->hit);CHECK(rng32==expected,1);
+        CHECK(b.victim[10].effect,p->hit?AB_BRAVE:AB_NULL);CHECK(b.victim[10].amount,p->brave);
+    }
+}
+// The trajectory: a flat row, the caster, a free panel, the target. A body on the line takes
+// the technique instead; terrain on the line leaves nobody; an empty aimed panel too.
+static u8 *direct_surface;   // direct_geometry's stack copy of the columns
+static u8 direct_row(AbId ab,u8 gap)
+{
+    u16 c,i;prepare_strike(ab);
+    memcpy(direct_surface,W->surface,(u16)MAP_W*MAP_H*8);W->surface=direct_surface;
+    for(i=0;i<(u16)MAP_W*MAP_H;i++){direct_surface[i*8]=4;direct_surface[i*8+1]=0;direct_surface[i*8+3]=0;direct_surface[i*8+4]=0;direct_surface[i*8+7]=128;}
+    for(i=0;i<MAP_N;i++)W->hs[i]=8;
+    for(c=0;c+4<MAP_N;c++)if(TILE_Z[c]==TILE_Z[c+4]){
+        for(i=0;i<5;i++)if(!map_tiles[c+i].walk||map_tiles[c+i].stand!=map_tiles[c].stand)break;   // the order's own height rule
+        if(i==5)break;
+    }
+    CHECK(c+4<MAP_N,1);
+    for(i=0;i<NUNIT;i++)if(i!=U_RAMZA&&i!=10){st.unit[i].hp=0;st.unit[i].dc=DC_GONE;st.unit[i].x=255;}
+    unit_place(&st.unit[U_RAMZA],(u8)c);unit_place(&st.unit[10],(u8)(c+gap));
+    return (u8)c;
+}
+static void direct_between(u8 c)
+{
+    st.unit[9]=st.unit[10];unit_place(&st.unit[9],(u8)(c+1));
+}
+static void direct_geometry(void)
+{
+    static const AbId skills[]={0x11E,0x12D,0x12E};
+    const u8 *saved=W->surface;u8 saved_hs[MAP_NMAX],columns[2048];u8 i,c,s,hits=0;
+    direct_surface=columns;
+    memcpy(saved_hs,W->hs,sizeof saved_hs);
+    for(i=0;i<3;i++){
+        u8 gap=i?3:2;AbId ab=skills[i];
+        CHECK(abilities[ab].flags,AF_CAST|AF_AREA|AF_EVADE);CHECK(abilities[ab].range,gap);
+        CHECK(cj_range(common,ab)[6]&32,32);
+        c=direct_row(ab,gap);
+        CHECK(can_use(U_RAMZA,ab),1);
+        CHECK(cast_targets(U_RAMZA,(u8)(c+gap),ab,0),(u16)1<<10);          // clear line
+        CHECK(cast_targets(U_RAMZA,10,ab,1),(u16)1<<10);
+        CHECK(cast_targets(U_RAMZA,(u8)(c+1),ab,0),0);                    // an empty aimed panel
+        direct_between(c);
+        CHECK(cast_targets(U_RAMZA,(u8)(c+gap),ab,0),(u16)1<<9);          // the body on the line
+        CHECK(cast_targets(U_RAMZA,(u8)(c+1),ab,0),(u16)1<<9);
+        st.unit[9].hp=0;st.unit[9].dc=DC_GONE;st.unit[9].x=255;
+        direct_surface[((u16)(W->grid_row[TILE_Z[c+1]]+TILE_X[c+1])<<3)]=20;
+        CHECK(cast_targets(U_RAMZA,(u8)(c+gap),ab,0),0);                  // terrain on the line
+        W->surface=saved;memcpy(W->hs,saved_hs,sizeof saved_hs);
+    }
+    // Production: Black Ink aimed past a body blinds that body, not the aimed unit.
+    for(s=1;s<60&&!hits;s++){
+        c=direct_row(0x11E,2);direct_between(c);st.unit[U_RAMZA].ma=70;st.unit[9].team=TEAM_ENEMY;
+        rng32=((u32)s*0x9E3779B1UL)|1;
+        CHECK(cast_order(U_RAMZA,10,0x11E,1),1);CHECK(W->cast.mask,(u16)1<<9);impact();
+        CHECK(core_status_current(&st.unit[10].statuses,1)&0x20,0);
+        if(core_status_current(&st.unit[9].statuses,1)&0x20)hits++;
+        W->surface=saved;memcpy(W->hs,saved_hs,sizeof saved_hs);
+    }
+    CHECK(hits,1);
+}
+// Production: Black Ink blinds; Look of Devil leaves each of its five statuses over the seeds;
+// Look of Fright lowers Brave 70 -> 60.
+static void direct_production(void)
+{
+    u8 s,seen=0,hits=0;
+    for(s=1;s<60&&!hits;s++){
+        Unit *t;prepare_strike(0x11E);t=&st.unit[10];st.unit[U_RAMZA].ma=70;rng32=((u32)s*0x9E3779B1UL)|1;
+        CHECK(cast_order(U_RAMZA,10,0x11E,1),1);impact();
+        if(core_status_current(&t->statuses,1)&0x20)hits++;
+        CHECK(t->hp,999);
+    }
+    CHECK(hits,1);
+    for(s=1;s<200&&seen!=31;s++){
+        Unit *t;prepare_strike(0x12D);t=&st.unit[10];st.unit[U_RAMZA].ma=70;rng32=((u32)s*0x9E3779B1UL)|1;
+        CHECK(can_use(U_RAMZA,0x12D),1);CHECK(cast_order(U_RAMZA,10,0x12D,1),1);impact();
+        if(core_status_current(&t->statuses,1)&0x80)seen|=1;
+        if(core_status_current(&t->statuses,1)&0x20)seen|=2;
+        if(core_status_current(&t->statuses,1)&0x08)seen|=4;
+        if(core_status_current(&t->statuses,4)&0x08)seen|=8;
+        if(core_status_current(&t->statuses,4)&0x04)seen|=16;
+    }
+    CHECK(seen,31);
+    for(s=1,hits=0;s<60&&!hits;s++){
+        Unit *t;prepare_strike(0x12E);t=&st.unit[10];st.unit[U_RAMZA].ma=70;t->brave=70;rng32=((u32)s*0x9E3779B1UL)|1;
+        CHECK(abilities[0x12E].kind,AB_BRAVE);
+        CHECK(can_use(U_RAMZA,0x12E),1);CHECK(cast_order(U_RAMZA,10,0x12E,1),1);impact();
+        if(t->brave==70)continue;
+        hits++;CHECK(t->brave,60);
+    }
+    CHECK(hits,1);
+}
+// Three programs (the 68000 check size limit): check_status_strike2.c defines STRIKE_PART2,
+// check_status_strike3.c STRIKE_PART3.
+#ifdef STRIKE_PART3
+static void strike_trials(void){direct_profiles();fright_profiles();direct_geometry();direct_production();}
+#elif defined(STRIKE_PART2)
 static void strike_trials(void){wave_production();beaking_trials();goblin_trials();destruct_trials();}
 #else
 static void strike_trials(void){strike_profiles();strike_production();magical_profiles();magical_production();}
