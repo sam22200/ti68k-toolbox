@@ -97,9 +97,10 @@ def float_record(d,r):
     return 10,46,4,255,161
 
 
-def status_magic_record(d,r):
-    """Whole all-or-nothing family, one filtered status byte, implemented policy only."""
-    if r[8]not in(10,11)or r[3]&~9 or r[4]&~0xe1 or r[5]&~0xe2 or r[6]&~0x42 or r[7]:return None
+def status_magic_record(d,r,mimic=0):
+    """Whole all-or-nothing family, one filtered status byte, implemented policy only.
+    mimic=0x10 also accepts flags3's Mime bit (Holy Magic: mime_runtime.inc reads it)."""
+    if r[8]not in(10,11)or r[3]&~9 or r[4]&~0xe1 or r[5]&~(0xe2|mimic) or r[6]&~0x42 or r[7]:return None
     row=d.at(battle.STATUS_SET+6*r[11],6)
     # Confusion, Berserk and Frog: control/command handlers (CORE_CONTROL_STATUS.md);
     # Reraise: KO-turn revival (CORE_PROTECT.md)
@@ -340,6 +341,11 @@ def math_tables(d):
     return values+slots
 
 
+# Ovelia's Holy Magic (sets 0x24, 0x31): Deathspell 2 cancels ten statuses (Esuna's family);
+# Mbarrier adds five statuses over two bytes, beyond the one-byte status result.
+HOLY_MAGIC = (0xA7, 0xD4)
+
+
 def battle_records(d):
     """Shared native execution records. Unverified families remain explicitly disabled.
 
@@ -363,12 +369,12 @@ def battle_records(d):
         kind, y, rng, vert, flags, bag, level, formula, element = 255, 0, 0, 255, 0, 255, 0, 0, 0
         # Generic magic skill sets share one tested family. Monster/special
         # producers outside this source table interval remain independently gated.
-        raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 else None
+        raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 or a in HOLY_MAGIC else None
         # Punch Art (0x64..0x6b) and Talk Skill (0x74..0x7d) are read beyond the magic interval.
         art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b else None
         magic = offensive_magic_record(raw) if raw else None
         healing = healing_magic_record(raw) if raw else None
-        status = (float_record(d,raw) if a==38 else status_magic_record(d,raw)) if raw else None
+        status = (float_record(d,raw) if a==38 else status_magic_record(d,raw,0x10 if a in HOLY_MAGIC else 0)) if raw else None
         percent = percent_magic_record(raw) if raw else None
         decisive = decisive_magic_record(raw) if raw else None
         brave = brave_magic_record(raw) if raw else None

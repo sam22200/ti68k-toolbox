@@ -3,16 +3,16 @@
 #include "check_offensive_magic.c"
 #include "x/core-cleanse/oracle/source.h"
 #include "../cleanse_rules.h"
-static const AbId cleanses[]={14,56,377,378,379,380};
+static const AbId cleanses[]={14,56,0xA7,377,378,379,380};
 static void prepare_cleanse(AbId ab)
 {
     u8 j,k;prepare_spell(0x13);
-    for(j=0x4a;j<0x5e;j++){
-        st.unit[U_RAMZA].set=job_sets[j];
+    for(j=0x4a;j<0x5f;j++){                     // generic jobs, then Ovelia's Holy Magic (0x24)
+        st.unit[U_RAMZA].set=j<0x5e?job_sets[j]:0x24;
         for(k=0;k<SET_N;k++)if(SET_ABILITY(st.unit[U_RAMZA].set,k)==ab)break;
         if(k<SET_N)break;
     }
-    CHECK(j<0x5e,1);st.unit[U_RAMZA].learned=(LearnBits)1<<k;
+    CHECK(j<0x5f,1);st.unit[U_RAMZA].learned=(LearnBits)1<<k;
     CHECK(known(U_RAMZA,0),ab);CHECK(known(U_RAMZA,1),NO_ABIL);
     st.unit[8].hp=0;st.unit[8].dc=DC_GONE;st.unit[8].x=255;
     st.unit[10].team=ab==56?TEAM_ENEMY:TEAM_PLAYER;

@@ -159,8 +159,10 @@ ones are deliberately disabled families in `common_tables.py` (`kind` 255: "Mons
 producers ... remain independently gated"); the "201/201 generic actions" count covers the
 generic jobs only:
 - **Special character sets:** Holy Sword (Agrias, already at Orbonne: Lightning Stab, Holy
-  Explosion), Dark Sword (Gafgarion at Orbonne), Holy Magic (Ovelia at Orbonne: Mbarrier,
-  Deathspell 2), Wiegraf's sets (Split/Crush Punch; as Lune Knight Shellbust Stab, Blastar/
+  Explosion), Dark Sword (Gafgarion at Orbonne), Holy Magic (Ovelia at Orbonne: Mbarrier;
+  **Deathspell 2 done 2026-11-10**: it cancels ten statuses, Esuna's family, checked against
+  the original by `cleanse_oracle.py`; Mbarrier adds five statuses over two bytes, beyond the
+  one-byte status result `(byte << 8) | bits`), Wiegraf's sets (Split/Crush Punch; as Lune Knight Shellbust Stab, Blastar/
   Hellcry Punch, Icewolf Bite), Zalbag's Magic/Speed/Power/Mind Ruin.
 - **Monsters (all):** Goblin (Tackle, Goblin/Turn Punch, Eye Gouge), Bomb/Grenade (Bite,
   Small Bomb, Self Destruct, Flame Attack), Red Panther (Scratch, Cat Kick, Poison Nail),
