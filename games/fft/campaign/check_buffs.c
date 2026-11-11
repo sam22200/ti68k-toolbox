@@ -11,16 +11,16 @@
 #undef win_lines
 #undef window_label
 #undef make_window
-static const AbId buffs[]={8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71};
+static const AbId buffs[]={8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71,0xD4};
 static void prepare_buff(AbId ab)
 {
     u8 j,k;prepare_spell(0x13);
-    for(j=0x4a;j<0x5e;j++){
-        st.unit[U_RAMZA].set=job_sets[j];
+    for(j=0x4a;j<0x5f;j++){                     // generic jobs, then Ovelia's Holy Magic (0x24)
+        st.unit[U_RAMZA].set=j<0x5e?job_sets[j]:0x24;
         for(k=0;k<SET_N;k++)if(SET_ABILITY(st.unit[U_RAMZA].set,k)==ab)break;
         if(k<SET_N)break;
     }
-    CHECK(j<0x5e,1);st.unit[U_RAMZA].learned=(LearnBits)1<<k;
+    CHECK(j<0x5f,1);st.unit[U_RAMZA].learned=(LearnBits)1<<k;
     CHECK(known(U_RAMZA,0),ab);CHECK(known(U_RAMZA,1),NO_ABIL);
     st.unit[10].team=abilities[ab].formula==11||ab==49?TEAM_PLAYER:TEAM_ENEMY;
     st.unit[10].set=11;st.unit[10].learned=1; // Faith utility requires a caster.

@@ -4,7 +4,8 @@ import json,struct
 import surface_data as s
 from status_state_oracle import bind_function,mask
 
-SPELLS=(8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71)
+SPELLS=(8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71,0xD4)
+# 0xD4 Mbarrier: the original functions run on its adapted row (common_tables.MBARRIER_STATUSES).
 
 
 def main():
@@ -63,6 +64,8 @@ def main():
             o.uc.mem_write((target&0x1fffff)+0x1a,bytes((255,)*7))
             if gear:o.uc.mem_write((target&0x1fffff)+0x1c,b'\xe8')
             status=d.at(s.battle.STATUS_SET+6*r[11],6)
+            if ab==0xD4:
+                import common_tables;status=common_tables.MBARRIER_STATUSES
             current=bytearray(5)
             if shell:current[3]|=16
             if mode in(2,3):current=bytearray(a|b for a,b in zip(current,status[1:]))
