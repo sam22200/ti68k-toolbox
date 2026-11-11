@@ -19,6 +19,11 @@ u8 skill_kind(u8 a,u8 t,AbId ab)
     if(restore_ability(ab))return restore_kind(t,ab);
     if(magic_status_formula(b->formula))return b->kind;
     if(b->formula==12||b->formula==76||b->formula==13||b->formula==14||b->formula==16||b->formula==0x23||b->formula==0x35)return magic_heal(a,t,ab,2);
+    if(b->formula==0x2D){                  // Holy Sword: the primary weapon's element
+        u8 w=hand_weapon(&st.unit[a],0),e=w==255?0:cj_weapon(common,w)[6];
+        if(st.affinity[t][1]&e)return AB_NULL;
+        return st.affinity[t][0]&e?AB_HEAL:AB_DAMAGE;
+    }
     if(magic_damage_formula(b->formula)||b->formula==9||b->formula==0x24||b->formula==0x31||b->formula==99){
         if((st.affinity[t][1]&b->element)||((b->element&8)&&(core_status_current(&st.unit[t].statuses,2)&0x40)))return AB_NULL;
         if(st.affinity[t][0]&b->element)return AB_HEAL;
@@ -63,15 +68,20 @@ static s16 magic_xa(u8 a,u8 t,u8 element,u8 hostile,u8 f)
     }
     return ua->zodiac!=12&&ut->zodiac!=12?zodiac_xa(ua,ut,xa):xa;
 }
+// The target's Half then Weak affinities (source modify_damage_for_element), all formulas.
+static s16 magic_half_weak(u8 t,u8 element,s16 raw)
+{
+    if(st.affinity[t][2]&element)raw/=2;
+    if(st.affinity[t][3]&element)raw=(s16)((u16)raw<<1);
+    return raw;
+}
 static s16 magic_element_value(u8 t,u8 element,s16 raw)
 {
     if((u8)(st.weather-3)<=1){
         if(element&128)raw=magic_quarter(raw,3);
         if(element&64)raw=magic_quarter(raw,5);
     }else if((u8)(st.weather-6)<=1&&(element&32))raw=magic_quarter(raw,5);
-    if(st.affinity[t][2]&element)raw/=2;
-    if(st.affinity[t][3]&element)raw=(s16)((u16)raw<<1);
-    return raw;
+    return magic_half_weak(t,element,raw);
 }
 u16 magic_amount(u8 a,u8 t,u16 spec)
 {

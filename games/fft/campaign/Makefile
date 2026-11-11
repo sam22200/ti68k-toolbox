@@ -441,6 +441,11 @@ x/core-talk-skill/oracle/source.h: ../tools/talk_oracle.py ../tools/status_state
 	$(PY) ../tools/talk_oracle.py
 core-talk-skill-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-talk-skill/oracle/source.h
 	$(PY) check_talk.py
+.PHONY: core-holy-sword-check
+x/core-holy-sword/oracle/source.h: ../tools/holy_sword_oracle.py ../tools/status_state_oracle.py
+	$(PY) ../tools/holy_sword_oracle.py
+core-holy-sword-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffcj.89y data/ffgd.89y x/core-holy-sword/oracle/source.h
+	$(PY) check_holy_sword.py
 .PHONY: core-punch-strikes-check
 x/core-punch-strikes/oracle/source.h: ../tools/punch_strike_oracle.py ../tools/status_state_oracle.py
 	$(PY) ../tools/punch_strike_oracle.py
