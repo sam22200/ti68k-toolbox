@@ -962,6 +962,7 @@ u16 mod_entry(u8 op,u8 a)
 {
     (void)a;
     if(!op)return command_skill(M.cast_actor,M.cast_ref,M.cast_ability);
+    if(op==6)return weapon_ai_prepare();       // the AI's weapon cache (out of WEAPON: zone)
     if(op==3)return command_cast(M.cast_actor,M.cast_ref,M.cast_ability,a);
     if(op==4)return command_pending(a);
     command_defend(st.formula.actor);return 0;
@@ -993,7 +994,6 @@ u16 mod_entry(u8 op,u8 a)
 #include "weapon_commit.inc"
 u16 mod_entry(u8 op,u8 a)
 {
-    if(op==6)return weapon_ai_prepare();
     if(op==4)return attack_prediction(M.cast_actor,M.cast_ref);
     if(op==5)return weapon_forecast(M.cast_actor,M.cast_ref,M.cast_ability,a&1,(a>>1)&1);
     if(op==1)return weapon_commit();
@@ -3830,7 +3830,7 @@ static u8 ai_think(void)
     else if(W->ai_k==1){if(spread_go(AI_SPREAD))W->ai_k=2;}
     else if(W->ai_k==2){if(W->ai_weapon_left){
         u8 geometry=W->ai_weapon_left==512,panels=geometry&&W->ai_panel_left;
-        mod_call(geometry?(panels?MOD_AI_PREP:MOD_PLANNER):MOD_WEAPON,geometry?(panels?2:0):6,0);return 0;
+        mod_call(geometry?(panels?MOD_AI_PREP:MOD_PLANNER):MOD_COMMAND,geometry?(panels?2:0):6,0);return 0;
     }mod_call(MOD_AI_SETUP,1,0);if(W->ai_nab)mod_call(MOD_AI,1,0);}
     else if(W->ai_k>=4){
         if(W->ai_k==4&&st.unit[st.act].set==21)mod_call(MOD_NATURE,5,0);
@@ -4765,8 +4765,8 @@ void game_init(void)
 #endif
         };
         if(!mod_ready())return;
-        mod_call(MOD_SCREENS,255,0);mod_context(MOD_SCREENS)->boot=&boot;
-        if(!mod_call(MOD_SCREENS,11,0))return;
+        mod_call(MOD_RESOURCES,255,0);mod_context(MOD_RESOURCES)->boot=&boot;
+        if(!mod_call(MOD_RESOURCES,13,0))return;
         mod_id=0;
     }
 #else
@@ -4782,12 +4782,12 @@ void game_init(void)
         u16 cj_size;const u8 *cj = rt_file("ffcj", &cj_size);
 #ifdef FFT_MODULES
         // Bootstrap has a static executable zone but no Work allocation yet.
-        // SAVE5 validates only its supplied catalogue pointer and byte count.
+        // RESOURCES14 validates only its supplied catalogue pointer and byte count.
         if(!mod_ready())return;
-        mod_call(MOD_SAVE,255,0);
-        mod_context(MOD_SAVE)->common=cj;
-        mod_context(MOD_SAVE)->desc_size=cj_size;
-        if(!mod_call(MOD_SCREENS,12,0))return;
+        mod_call(MOD_RESOURCES,255,0);
+        mod_context(MOD_RESOURCES)->common=cj;
+        mod_context(MOD_RESOURCES)->desc_size=cj_size;
+        if(!mod_call(MOD_RESOURCES,14,0))return;
         mod_id=0; // next load must bind the newly allocated Work/map pointers
 #else
         if (!cj_valid(cj,cj_size)) return;
@@ -6600,15 +6600,8 @@ static void draw_status(void)
 #endif
 
 #include "menu_input.inc"
-#ifdef FFT_CHAPTER
-#include "bootstrap_files.inc"
-#endif
 u16 mod_entry(u8 op,u8 a)
 {
-#ifdef FFT_CHAPTER
-    if(op==11)return bootstrap_files();
-    if(op==12)return cj_valid(common,M.desc_size);
-#endif
     if(op==10)return ai_shown();
     if(op==5)return menu_keys();if(op==6)return acts_keys();
     if(op==13)return modal_keys();
@@ -7107,6 +7100,7 @@ u16 mod_entry(u8 op,u8 a)
 #define ugfx (M.chapter_ugfx)
 #include "chapter_files.inc"
 #undef ugfx
+#include "bootstrap_files.inc"
 // The battle could not start (op 12; held: 1 State, 2 the view/scene/cache blocks, 4 the map
 // envelope; M.desc_size: AMS's free RAM / 16, read by the resident): "Not enough RAM" when that
 // free RAM and the blocks held are less than the battle allocates (BATTLE_RAM_BYTES), so a user
@@ -7135,6 +7129,8 @@ static u8 ram_message(u8 held)
 u16 mod_entry(u8 op,u8 a)
 {
     if(op==12)return ram_message(a);
+    if(op==13)return bootstrap_files();         // cold start: allocations, shared banks
+    if(op==14)return cj_valid(common,M.desc_size);
     if(op==11)return (u8)chapter_route(a);
     if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
     return 0;

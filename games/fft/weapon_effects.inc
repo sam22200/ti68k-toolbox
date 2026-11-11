@@ -70,7 +70,7 @@ static u16 weapon_total(u8 a,u8 t,AbId ab)
     }
     return n;
 }
-#if (MOD_CORE && !defined(FFT_MODULES)) || (defined(FFT_MODULE) && MOD_PART(MOD_WEAPON))
+#if (MOD_CORE && !defined(FFT_MODULES)) || (defined(FFT_MODULE) && (MOD_PART(MOD_WEAPON) || MOD_PART(MOD_COMMAND)))
 static u8 melee_target(u8 a,u8 t);
 static u8 melee_cache(void);
 #include "weapon_plan.inc"

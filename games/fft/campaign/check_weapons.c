@@ -158,7 +158,7 @@ static void fx_ai_cache(void)
   combat_arena();st.unit[U_RAMZA].eq[EQ_WEAPON]=weapons[i];status(10,35);seed=rng32;
 #ifdef FFT_MODULES
   W->ai_weapon_left=511;W->ai_weapon_at=0;
-  while(W->ai_weapon_left)mod_call(MOD_WEAPON,6,0);
+  while(W->ai_weapon_left)mod_call(MOD_COMMAND,6,0);
 #endif
   for(row=0;row<9;row++){
    ab=row?0x195+row:NO_ABIL;expected=fx_forecast(U_RAMZA,10,ab);
