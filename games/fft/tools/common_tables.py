@@ -82,7 +82,7 @@ def offensive_magic_record(r):
 
 
 def truth_magic_record(r):
-    """Formula 0x4E (MA x Y, formula 0x08 without Faith; arithmetic in the companion image),
+    """Formula 0x4E (MA x Y, formula 0x08 without Faith: magic_amount power bit 7),
     single-target monster shapes only: no area, no line, no status. flags_4 may carry the
     evadeable (0x02) and direct-targeting (0x20) bits; flags_2 the no-follow-target bit."""
     if (r[8] != 0x4E or r[9] or r[11] or r[1] or r[3] & ~0x09 or r[4] & ~0x11 or
