@@ -1,5 +1,66 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Current state (2026-11-11): Chapter I actions, 142 of 155 executable
+
+Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
+[Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
+
+**User decisions (binding).** Titanium + HW3Patch only (TI-89 HW2 dropped; `launcher.c`
+refuses to run without HW3Patch). Techniques of non-canonical jobs, monsters and bosses
+belong to the core, never to chapter packs. **Nothing of the battle core is duplicated in
+the companion image**: a technique that is a variant of a core formula goes into the core's
+own code (a flag, a parameter); the companion (`MOD_COMPANION` 27, preloaded block of
+`FFT_CORE_COMPANION_MAX` 3,072 bytes) only holds rules the core lacks, and is still empty
+(probe only). Emulator checks read RAM/logs (`ti-mem`, `tilog`, `fftmem.py`), not PNGs.
+French replies; commit with `ti-commit` (branch per task, explicit paths, merge when green).
+
+**Done this session (all merged on `main`):** HW3Patch check + heap module zone; monster
+actions copying verified records (`MONSTER_ATTACK`); companion mechanism + preload; formula
+0x4E (formula 0x08 without Faith); Holy Sword 0x2D incl. Holy Explosion's line; Dark Sword
+0x2F (MP drain); Mighty Sword 0x2E (strike + equipment break); Ruins 0x1A/0x1B. Bug fixed on
+the way: Holy/Dark/Mighty Sword use the raw PA (a knight sword's Attack takes PA x Brave).
+
+**Method that works (repeat it per family).**
+1. `tools/chapter_audit.py`: the missing actions and who uses them.
+2. Read the retail handler in `sources/fft_decomp/src/battle/` (dispatch table at
+   0x8018f610 + 4 x formula; assert the entry in the oracle). Model behaviour, never
+   translate.
+3. Oracle with Unicorn on the real MIPS (`tools/holy_sword_oracle.py`, `tools/ruin_oracle.py`
+   are the templates): controlled RNG hooks, header of compact rows for the C check.
+   The retail pre-formula setup fills fields the handler reads: ability block +0x1C base
+   hit (100), +0x12/+0x13 target/attacker Faith copies, +0x3E the equipped weapon data;
+   attacker/target action data pointers at 0x80192d8c/0x80192d90.
+4. Core: find the family it varies (`cast_rules.h` formula bitmaps, `magic_prepare.inc`,
+   `magic_math.inc`, `charge_query`/`sword_skill_amount` in `fft.c`, `status_commit.inc`),
+   add the exact retail record in `tools/common_tables.py`, register it in
+   `check_offensive_magic.py`'s catalogue lists.
+5. Check program (`check_ruin.c` / `check_holy_sword.c` pattern): replay the oracle rows
+   through the core, then production casts (`cast_order` + `impact`). `make core-*-check`
+   runs PC, sanitizers and the 68000 build under `ti-cycles`; these targets are not in
+   `make check` (project convention). Then `make -k check`, `check.py` (37 replays),
+   `tools/headroom.sh`, `tools/chapter_audit.py`.
+
+**Pitfalls met.** A 68000 check program over 65,514 bytes fails to link: pack oracle rows
+(u8 inputs) or split the program (`check_dark_sword.c` includes `check_holy_sword.c` with
+`DARK_SWORD_CHECK`). A helper used by `magic_prepare`/`action_resolve` must be included
+where those compile (module images): `DISP16 <symbol>` from `module.py` means a missing
+include (`equip_break.inc` is now included by both). `--pc-only` does not rebuild the data
+banks: run through `make`. Check binaries must run inside a data folder
+(`check_flow.data_links`). CT abilities return 2 from `cast_order` (deferred). Test sets: use
+Brave below 100 (a Brave of 100 hid the knight-sword bug). Known failure, unrelated:
+`manage-test` aborts.
+
+**Numbers now.** Resident TTPack input 57,031, headroom 7,905 bytes; zone 8,698; ABI 85.
+
+**Next (13 actions, all monsters).** Formula 0x50 family (Eye Gouge, Poison Nail, Black
+Ink, Look of Devil, Beak; the core has 0x50 for Secret Fist only), Turn Punch (area
+vertical 1), Odd Soundwave 0x38, then new formulas: Goblin Punch, Self Destruct, Mind
+Blast, Look of Fright, Death Sentence (monster), Beaking. Also open: the AI choosing sword
+skills/Ruins is not yet seen in a battle; 0x4E area/line shapes; a direct 0x4E oracle;
+area criticals push only a sole victim (source `target_count` 1, faithful); Dark Sword's
+push adds no fall damage (adaptation).
+
+
 **Next steps (2026-11-10): [Chapter I readiness](CHAPTER1_READINESS.md)** — battle RAM margin: ragged depth, map envelope and the RAM message are done (~11.4 KB free natively, was ~1.2 KB); the hidden gray buffer and ring backups remain to reach 16 KB. Then the archive budget, a one-command native chapter run and a frozen core interface (resident headroom: 107 bytes).
 
 Current optimization checkpoint (2026-11-07): [Final pass](CORE_OPTIMIZATION.md).
