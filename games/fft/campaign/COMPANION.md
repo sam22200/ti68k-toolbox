@@ -73,5 +73,6 @@ direct 0x4E original-function oracle is not yet written. Chapter I: 129 of 155 e
    Work/map) 7,424 cycles, next 1,078. Raise the envelope with the image.
 2. A direct original-function oracle for 0x4E; its area/line shapes.
 3. Done: Holy Sword 0x2D in the core (a weapon-strike variant, `HOLY_SWORD.md`), Holy Explosion on
-   Earth Slash's line, Dark Sword 0x2F (a drain variant): 134 of 155.
+   Earth Slash's line, Dark Sword 0x2F (a drain variant), Mighty Sword 0x2E (a strike plus
+   an equipment break): 138 of 155.
 4. Families already in the core for humans (0x50, 0x38, Turn Punch), the rest.
