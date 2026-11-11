@@ -131,6 +131,14 @@ static void monster_checks(void)
  CHECK(abilities[0xE1].range,1);CHECK(abilities[0xE1].vert,0);
  CHECK(monster_amount(U_RAMZA,10,0x133,0),monster_amount(U_RAMZA,10,0x6C,0));CHECK(monster_hit(U_RAMZA,10,0x133),monster_hit(U_RAMZA,10,0x6C));
  CHECK(monster_amount(U_RAMZA,U_RAMZA,0x143,0),2);CHECK(monster_amount(U_RAMZA,U_RAMZA,0x92,0),1);
+ // Choco Ball: the same strike, range 4 at any height.
+ CHECK(monster_amount(U_RAMZA,10,0x10A,0),monster_amount(U_RAMZA,10,0x64,0));CHECK(abilities[0x10A].range,4);CHECK(abilities[0x10A].vert,255);
+ CHECK(monster_hit(U_RAMZA,10,0x10A),monster_hit(U_RAMZA,10,0x66));
+ // Cat Kick / Tail Swing = Dash's formula0x37 with Y 8/15, evadeable (common_tables.dash_like).
+ CHECK(monster_amount(U_RAMZA,10,0x119,0),monster_amount(U_RAMZA,10,0x93,0));
+ CHECK(monster_amount(U_RAMZA,10,0x119,0x7FFF),2*monster_amount(U_RAMZA,10,0x93,0x7FFF));
+ CHECK(abilities[0x119].flags&AF_EVADE,AF_EVADE);CHECK(abilities[0x93].flags&AF_EVADE,0);CHECK(abilities[0x150].y,15);
+ CHECK(monster_hit(U_RAMZA,10,0x119)<=monster_hit(U_RAMZA,10,0x93),1);
  // Monster basic attacks share Choco Attack's source record (common_tables.monster_attack_record).
  {static const u16 same[]={0x10E,0x113,0x118,0x11D,0x122,0x12C,0x131,0x140,0x145,0x14A,0x14F};
   for(i=0;i<sizeof same/sizeof*same;i++){

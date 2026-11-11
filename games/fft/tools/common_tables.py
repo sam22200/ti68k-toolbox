@@ -153,8 +153,8 @@ def strike_record(r):
     skills; Spin Fist (0x31, radius 1 on the user, the user excluded) an immediate area cast."""
     if r[8]==0x31 and r[0]==0 and r[1]==1 and r[3]==3 and r[4]==0x11 and r[6]==3 and not r[7] and not r[11]:
         return 0,r[10],0,255,128|32|2|1
-    if r[8]not in(0x31,0x32)or r[1]or r[3]!=9 or r[4]&~0x11 or r[6]!=2 or r[7]or r[11]:return None
-    return 0,r[10],r[0],2*r[2],2
+    if r[8]not in(0x31,0x32)or r[1]or r[3]not in(1,9)or r[4]&~0x11 or r[6]!=2 or r[7]or r[11]:return None
+    return 0,r[10],r[0],2*r[2]if r[3]&8 else 255,2   # flags_1 0x08 off (Choco Ball): any height
 
 
 def draw_out_record(d,a,r):
@@ -366,6 +366,15 @@ def status_rows(d):
     return bytes(rows)
 
 
+def dash_like(d,a):
+    """Monster copies of Dash (0x93, formula0x37): only the vertical tolerance, the monster byte,
+    Y and two flags_4 bits may differ: evadeable (0x02) and Blade Grasp (0x10, read raw by the core)."""
+    if not 0x100<=a<0x170:return False
+    r=d.at(battle.ABILITY_RANGE+14*a,14);ref=d.at(battle.ABILITY_RANGE+14*0x93,14)
+    return (r[:2]==ref[:2] and 1<=r[2]<=3 and r[3:5]==ref[3:5] and r[5] in(0,0x10) and not r[6]&~0x12
+            and r[7:10]==ref[7:10] and r[11:]==ref[11:])
+
+
 def accumulate_like(d,a):
     """Accumulate's (0x92) source record but for the monster byte and Y (Gather Power: PA+2)."""
     r=d.at(battle.ABILITY_RANGE+14*a,14);ref=d.at(battle.ABILITY_RANGE+14*0x92,14)
@@ -405,7 +414,7 @@ def battle_records(d):
         # producers outside this source table interval remain independently gated.
         raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 or a in HOLY_MAGIC else None
         # Punch Art (0x64..0x6b) and Talk Skill (0x74..0x7d) are read beyond the magic interval.
-        art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b or a==0xE1 else None   # 0xE1: Grenade's Small Bomb
+        art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b or a in(0xE1,0x10A) else None   # Grenade's Small Bomb, Choco Ball
         magic = offensive_magic_record(raw) if raw else None
         healing = healing_magic_record(raw) if raw else None
         if a == 0xD4: raw = raw[:11] + bytes((MBARRIER_ROW,)) + raw[12:]
@@ -438,6 +447,10 @@ def battle_records(d):
         elif a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
+        elif dash_like(d, a):
+            r = d.at(battle.ABILITY_RANGE + 14*a, 14)   # Cat Kick, Tail Swing: rand(1..Y) x PA, knockback
+            kind, y, rng, vert, flags = 0, r[10], r[0], 2*r[2], 2 if r[6] & 2 else 0
+            formula = 0x37
         elif a == 0x143 and accumulate_like(d, a):
             kind, y, rng, vert, flags = 6, d.at(battle.ABILITY_RANGE + 14*a, 14)[10], 0, 0, 1   # Gather Power: PA+Y
             formula = 0x36
