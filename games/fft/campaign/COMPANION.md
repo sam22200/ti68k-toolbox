@@ -61,8 +61,11 @@ Companion 856 bytes, zone 8,668, TTPack headroom 8,459. Chapter I: 129 of 155 ex
 
 ## Next
 
-1. Preload at battle start when the encounter needs it (monsters or special sets), and
-   count its size in the battle's RAM requirement (`BATTLE_RAM_BYTES`, the RAM message):
-   today the first call allocates, which can fail mid-battle (`special` then returns 0).
+1. Done: preloaded at battle start, before the battle's buffers (`companion_reserve`), into
+   a block of the `FFT_CORE_COMPANION_MAX` envelope (3,072 bytes, `core_limits.h`; module.py
+   refuses a bigger image), counted in `BATTLE_RAM_BYTES` and the RAM message (held bit 8);
+   no allocation during play. Native (TiEmu, Orbonne): the 3,074-byte block sits beside the
+   zone (8,670). Cost: ~3 KB less free battle RAM. First call (rebind to the battle's
+   Work/map) 7,424 cycles, next 1,078. Raise the envelope with the image.
 2. A direct original-function oracle for 0x4E; area/line shapes.
 3. Families already in the core for humans (0x50, 0x38, Turn Punch), Holy Sword, the rest.

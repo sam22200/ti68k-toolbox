@@ -488,7 +488,8 @@ typedef char SceneWorkFitsAmsBlock[(2UL*SC_BYTES*SC_HMAX+sizeof(Work)+2UL<=65520
 // What a battle allocates beyond its program (game_init, bootstrap_files.inc): State and Save,
 // the depth envelope, the scene and Work, the actor cache, the map envelope, AMS's headers
 #define BATTLE_RAM_BYTES (BATTLE_STORAGE_BYTES + FFT_CORE_DEPTH_MAX + 2UL * SC_BYTES * SC_HMAX \
-    + sizeof(Work) + AC_N * (UNIT_FB + 4UL) + NAV_ENVELOPE + 5 * 4)
+    + sizeof(Work) + AC_N * (UNIT_FB + 4UL) + NAV_ENVELOPE + COMPANION_RAM + 5 * 4)
+#define COMPANION_RAM (FFT_CORE_COMPANION_MAX + 4U)  // its block and AMS's header (preloaded)
 #endif
 #if MOD_CORE
 static Work *W;
@@ -3803,17 +3804,24 @@ static void mod_install(u8 id,u8 *dst)
     }
 }
 // The companion (MOD_COMPANION): installed once in its own heap block (HW3Patch), then called
-// directly from the resident or any zone image, never swapped. Reinstalled when the bindings
-// it holds change (a new battle's Work or map); freed with the battle's buffers (release).
+// directly from the resident or any zone image, never swapped. Its block is the
+// FFT_CORE_COMPANION_MAX envelope, reserved at battle start (companion_reserve, before the
+// battle's buffers; counted in BATTLE_RAM_BYTES); reinstalled when the bindings it holds
+// change (Work, map); freed on exit (final_release). No allocation during play.
 static u16 *comp_block;
 static ModCtx *comp_context(void){return (ModCtx *)((u8 *)comp_block+RD16(mod_images[MOD_COMPANION],4));}
+static u8 companion_reserve(void)
+{
+    const u8 *m=mod_images[MOD_COMPANION];
+    if(comp_block)return 1;
+    if(!m||RD16(m,3)>FFT_CORE_COMPANION_MAX||!(comp_block=malloc(FFT_CORE_COMPANION_MAX)))return 0;
+    mod_install(MOD_COMPANION,(u8 *)comp_block);
+    return 1;
+}
 static u16 special(u8 a,u8 t,AbId ab,u8 query)
 {
     const u8 *m=mod_images[MOD_COMPANION];ModCtx *c;
-    if(!comp_block){
-        if(!m||!(comp_block=malloc(RD16(m,3))))return 0;
-        mod_install(MOD_COMPANION,(u8 *)comp_block);
-    }
+    if(!comp_block)return 0;                    // not reserved: the battle never started
     c=comp_context();
     if(c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){mod_install(MOD_COMPANION,(u8 *)comp_block);c=comp_context();}
     c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;
@@ -4748,9 +4756,6 @@ release(void)
     if (vbuf) free(vbuf);
     sbuf = vbuf = RT_NULL;
     scene_l = scene_d = RT_NULL;
-#ifdef FFT_MODULES
-    companion_free();
-#endif
 }
 
 #ifdef FFT_CHAPTER
@@ -4767,7 +4772,7 @@ final_release(void)
     battle_state=RT_NULL;rt_state=RT_NULL;rt_state_size=0;
 #ifdef FFT_MODULES
     if(mod_zone)free(mod_zone);
-    mod_zone=RT_NULL;
+    mod_zone=RT_NULL;companion_free();
 #endif
 }
 // The battle program's chapters (FFT_BATTLE, campaign/ENGINE.md M4): each one's banks are "ff",
@@ -4811,7 +4816,7 @@ void game_init(void)
                                    0
 #endif
         };
-        if(!mod_ready())return;
+        if(!mod_ready()||!companion_reserve())return;   // the companion first: no play-time malloc
         mod_call(MOD_RESOURCES,255,0);mod_context(MOD_RESOURCES)->boot=&boot;
         if(!mod_call(MOD_RESOURCES,13,0))return;
         mod_id=0;
@@ -6805,7 +6810,7 @@ static void missing_message(void)
 #if defined(FFT_MODULES) && defined(__m68k__)
     if (mod_images[MOD_RESOURCES]) {             // AMS's free RAM in 16-byte units (no ROM calls there)
         mod_call(MOD_RESOURCES, 255, 0); mod_context(MOD_RESOURCES)->desc_size = (u16)(HeapAvail() >> 4);
-        if (mod_call(MOD_RESOURCES, 12, (u8)((battle_state ? 1 : 0) | (sbuf ? 2 : 0) | (navbuf ? 4 : 0)))) return;
+        if (mod_call(MOD_RESOURCES, 12, (u8)((battle_state ? 1 : 0) | (sbuf ? 2 : 0) | (navbuf ? 4 : 0) | (comp_block ? 8 : 0)))) return;
     }
 #endif
     draw_text(4,40,"Missing data",F_SMALL,C_BLACK);
@@ -7149,13 +7154,14 @@ u16 mod_entry(u8 op,u8 a)
 #undef ugfx
 #include "bootstrap_files.inc"
 // The battle could not start (op 12; held: 1 State, 2 the view/scene/cache blocks, 4 the map
-// envelope; M.desc_size: AMS's free RAM / 16, read by the resident): "Not enough RAM" when that
+// envelope, 8 the companion's block; M.desc_size: AMS's free RAM / 16, read by the resident): "Not enough RAM" when that
 // free RAM and the blocks held are less than the battle allocates (BATTLE_RAM_BYTES), so a user
 // knows how much to free. 0: a bank is missing instead.
 static u8 ram_message(u8 held)
 {
     u32 have = ((u32)M.desc_size << 4) + (held & 1 ? BATTLE_STORAGE_BYTES : 0)
-        + (held & 4 ? NAV_ENVELOPE : 0) + (held & 2 ? BATTLE_RAM_BYTES - BATTLE_STORAGE_BYTES - NAV_ENVELOPE : 0);
+        + (held & 4 ? NAV_ENVELOPE : 0) + (held & 8 ? COMPANION_RAM : 0)
+        + (held & 2 ? BATTLE_RAM_BYTES - BATTLE_STORAGE_BYTES - NAV_ENVELOPE - COMPANION_RAM : 0);
     char s[32];                                 // (no initializer: a module has no memcpy)
     const char *t = "need ";
     u8 n = 0, i;

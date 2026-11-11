@@ -115,14 +115,17 @@ static void bindings(void)
         c->desc_size=0;c->interface_size=0;
         ZB(63);CHECK(mod_call(MOD_SAVE,4,0),0);ZE(63);
     }
-    // The companion: its own heap block, installed on first use, called without a zone swap.
-    {u16 i;u8 zone_id;ModCtx *c;
-     CHECK(comp_block==RT_NULL,1);mod_call(MOD_STATUS,255,0);zone_id=mod_id;
+    // The companion: its own heap block, reserved at battle start (the envelope), called
+    // without a zone swap; the first call rebinds it to the battle's Work/map.
+    {u16 i;u8 zone_id;ModCtx *c;u16 *block=comp_block;
+     CHECK(comp_block!=RT_NULL,1);mod_call(MOD_STATUS,255,0);zone_id=mod_id;
      ZB(58);CHECK(special(3,10,0x123,COMPANION_PROBE),(3<<12^10<<8^0x123));ZE(58);
      CHECK(comp_block!=RT_NULL,1);CHECK(mod_id,zone_id);c=comp_context();CHECK(c->sig,MOD_SIG);CHECK(c->w==W,1);
      for(i=0;i<100;i++){ZB(59);CHECK(special((u8)i,(u8)(i>>1),i,COMPANION_PROBE),((i<<12)^((i>>1)<<8)^i)&0xFFFF);ZE(59);}
      CHECK(mod_call(MOD_STATUS,255,0),0);CHECK(mod_id,zone_id);       // the zone image stayed
-     companion_free();CHECK(comp_block==RT_NULL,1);}
+     CHECK(comp_block==block,1);                                       // never reallocated
+     companion_free();CHECK(comp_block==RT_NULL,1);CHECK(special(1,2,3,COMPANION_PROBE),0);
+     CHECK(companion_reserve(),1);CHECK(special(1,2,3,COMPANION_PROBE),(1<<12^2<<8^3));}
     // Restore real unit state and test the next launch's reset path.
     game_scenario(61);CHECK(mod_ready(),1);CHECK(mod_id,0);
 }
