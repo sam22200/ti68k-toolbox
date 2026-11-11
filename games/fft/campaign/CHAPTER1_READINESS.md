@@ -193,7 +193,8 @@ TTPack input 64,787 → 56,193 (**8,743 bytes of headroom**, was 149); RAM is un
 state rebuilt on `hw3`: dialogue, AI turns, attacks and a charged action from the heap zone.
 The supervisor (`launcher.c`) stops with "HW3Patch required" on an unpatched Titanium
 (GCC4TI's test: a cleared word in `EX_stoBCD`, or 0x100 at 0xAC); `INSTALL.md` names the
-step. Splitting the resident is now possible but no longer urgent.
+step. Splitting the resident is now possible but no longer urgent. Other uses of HW3Patch
+(code in chapter packs: study; parked options): `HW3PATCH_USES.md`.
 
 Every core change still forces a new `fftcore` state. Chapter content must never require a
 core rebuild: keep chapter data, scripts and encounters in packs.
