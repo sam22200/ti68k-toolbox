@@ -11,7 +11,7 @@ from common_tables import offensive_magic_record,healing_magic_record,percent_ma
 SPELLS=(0x0f,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,
         0x1f,0x2c,0x3d,0x3e,0x3f,0x40,0x43,0x44,0x45,0x46,0x4a,0x4b)
 PERCENT=(42,43,47,48,73)
-CLEANSE=(14,56)
+CLEANSE=(14,56,167)                 # 167: Deathspell 2 (Holy Magic)
 DECISIVE=(30,41,51,59)
 CONTROL=(29,53,55)
 BRAVE=(54,)
@@ -32,7 +32,7 @@ FLOAT=(38,)
 CHOCOBO=(268,269)
 TALK=(117,118,119,120,121,122,124,125)
 HEALING=(1,2,3,4,5,6,60,72)
-BUFFS=(8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71)
+BUFFS=(8,9,10,11,12,13,28,32,33,34,35,36,37,39,46,49,50,52,57,58,66,71,212)   # 212: Mbarrier (adapted row)
 
 
 def catalogue_report():
@@ -64,7 +64,7 @@ def catalogue_report():
         r,n=raw(a),norm(a);expected=healing_magic_record(r)
         assert expected and tuple(n[:5])==expected and n[10]==r[8] and n[11]==0
     for a in BUFFS:
-        r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==r[8]
+        r,n=raw(a),norm(a);assert n[0]==10 and n[1]==(0x7F if a==212 else r[11]) and n[10]==r[8]   # Mbarrier: adapted row
         assert n[4]==128|32|1|(2 if r[6]&2 else 0)
     for a in PERCENT:
         r,n=raw(a),norm(a);assert tuple(n[:5])==percent_magic_record(r)
@@ -78,7 +78,7 @@ def catalogue_report():
         else:assert n[0]==10 and n[1]==r[11]
         assert n[10]==r[8]
     for a in CONTROL+PROTECT:
-        r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==r[8]
+        r,n=raw(a),norm(a);assert n[0]==10 and n[1]==(0x7F if a==212 else r[11]) and n[10]==r[8]   # Mbarrier: adapted row
     for a in GOLEM:
         r,n=raw(a),norm(a);assert tuple(n[:5])==golem_magic_record(r) and n[10]==0x14
     for a in PUNCH:

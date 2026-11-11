@@ -159,8 +159,11 @@ ones are deliberately disabled families in `common_tables.py` (`kind` 255: "Mons
 producers ... remain independently gated"); the "201/201 generic actions" count covers the
 generic jobs only:
 - **Special character sets:** Holy Sword (Agrias, already at Orbonne: Lightning Stab, Holy
-  Explosion), Dark Sword (Gafgarion at Orbonne), Holy Magic (Ovelia at Orbonne: Mbarrier,
-  Deathspell 2), Wiegraf's sets (Split/Crush Punch; as Lune Knight Shellbust Stab, Blastar/
+  Explosion), Dark Sword (Gafgarion at Orbonne), **Holy Magic (Ovelia) done 2026-11-10**:
+  Deathspell 2 cancels ten statuses (Esuna's family, `cleanse_oracle.py`); Mbarrier is adapted
+  (user decision) to Regen, Protect, Shell and Haste, all or nothing, without Reraise: the
+  status result holds one status byte (`(byte << 8) | bits`); its row is ffcj status row 0x7F,
+  checked with the original functions by `buffs_oracle.py`), Wiegraf's sets (Split/Crush Punch; as Lune Knight Shellbust Stab, Blastar/
   Hellcry Punch, Icewolf Bite), Zalbag's Magic/Speed/Power/Mind Ruin.
 - **Monsters (all):** Goblin (Tackle, Goblin/Turn Punch, Eye Gouge), Bomb/Grenade (Bite,
   Small Bomb, Self Destruct, Flame Attack), Red Panther (Scratch, Cat Kick, Poison Nail),

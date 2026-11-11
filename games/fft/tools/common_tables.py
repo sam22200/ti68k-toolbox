@@ -97,9 +97,10 @@ def float_record(d,r):
     return 10,46,4,255,161
 
 
-def status_magic_record(d,r):
-    """Whole all-or-nothing family, one filtered status byte, implemented policy only."""
-    if r[8]not in(10,11)or r[3]&~9 or r[4]&~0xe1 or r[5]&~0xe2 or r[6]&~0x42 or r[7]:return None
+def status_magic_record(d,r,mimic=0):
+    """Whole all-or-nothing family, one filtered status byte, implemented policy only.
+    mimic=0x10 also accepts flags3's Mime bit (Holy Magic: mime_runtime.inc reads it)."""
+    if r[8]not in(10,11)or r[3]&~9 or r[4]&~0xe1 or r[5]&~(0xe2|mimic) or r[6]&~0x42 or r[7]:return None
     row=d.at(battle.STATUS_SET+6*r[11],6)
     # Confusion, Berserk and Frog: control/command handlers (CORE_CONTROL_STATUS.md);
     # Reraise: KO-turn revival (CORE_PROTECT.md)
@@ -340,6 +341,30 @@ def math_tables(d):
     return values+slots
 
 
+# Ovelia's Holy Magic (sets 0x24, 0x31): Deathspell 2 cancels ten statuses (Esuna's family).
+# Mbarrier adds Reraise, Regen, Protect, Shell and Haste over two bytes, beyond the one-byte
+# status result: adapted (user decision 2026-11-10) to its one-byte part, all or nothing,
+# stored in the unreferenced source status row 0x7F (rows 0x7A..0x7F are empty and unused).
+HOLY_MAGIC = (0xA7, 0xD4)
+MBARRIER_ROW = 0x7F
+MBARRIER_STATUSES = bytes((128, 0, 0, 0, 0x78, 0))   # Regen, Protect, Shell, Haste
+
+
+class MbarrierRows:
+    """The disc's status rows with Mbarrier's adapted row at MBARRIER_ROW."""
+    def __init__(self, d): self.d = d
+    def at(self, addr, n):
+        if addr == battle.STATUS_SET + 6 * MBARRIER_ROW and n == 6: return MBARRIER_STATUSES
+        return self.d.at(addr, n)
+
+
+def status_rows(d):
+    rows = bytearray(d.at(battle.STATUS_SET, 128 * 6))
+    assert not any(rows[6 * MBARRIER_ROW:6 * MBARRIER_ROW + 6]), 'status row 0x7F is no longer empty'
+    rows[6 * MBARRIER_ROW:6 * MBARRIER_ROW + 6] = MBARRIER_STATUSES
+    return bytes(rows)
+
+
 def battle_records(d):
     """Shared native execution records. Unverified families remain explicitly disabled.
 
@@ -363,12 +388,13 @@ def battle_records(d):
         kind, y, rng, vert, flags, bag, level, formula, element = 255, 0, 0, 255, 0, 255, 0, 0, 0
         # Generic magic skill sets share one tested family. Monster/special
         # producers outside this source table interval remain independently gated.
-        raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 else None
+        raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 or a in HOLY_MAGIC else None
         # Punch Art (0x64..0x6b) and Talk Skill (0x74..0x7d) are read beyond the magic interval.
         art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b else None
         magic = offensive_magic_record(raw) if raw else None
         healing = healing_magic_record(raw) if raw else None
-        status = (float_record(d,raw) if a==38 else status_magic_record(d,raw)) if raw else None
+        if a == 0xD4: raw = raw[:11] + bytes((MBARRIER_ROW,)) + raw[12:]
+        status = (float_record(d,raw) if a==38 else status_magic_record(MbarrierRows(d) if a == 0xD4 else d,raw,0x10 if a in HOLY_MAGIC else 0)) if raw else None
         percent = percent_magic_record(raw) if raw else None
         decisive = decisive_magic_record(raw) if raw else None
         brave = brave_magic_record(raw) if raw else None
@@ -563,7 +589,7 @@ def build(d):
 
     name_section(management_data.names(d.bat, management_data.ABILITY_NAMES, 512))
     name_section(management_data.names(d.bat, management_data.SET_NAMES, 64))
-    section(d.at(battle.STATUS_SET, 128 * 6)+status_policy_bytes(d))
+    section(status_rows(d)+status_policy_bytes(d))
     movement=bytearray(d.at(0x8005ea50,384))
     for job in range(160):
         bits=bytearray(3)

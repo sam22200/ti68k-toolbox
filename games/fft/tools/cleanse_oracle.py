@@ -4,7 +4,7 @@ import json,struct
 import surface_data as s
 from status_state_oracle import bind_function,mask
 
-SPELLS=(14,56)
+SPELLS=(14,56,0xA7)          # Esuna, Dispel Magic, Deathspell 2 (Holy Magic)
 ITEMS=(374,375,376,377,378,379,380)
 
 
@@ -93,7 +93,7 @@ def main():
     (out/'source.json').write_text(json.dumps(dict(cases=rows,functions=o.function_hashes,
         battle_sha256=s.core_audit.sha(d.bat),exe_sha256=s.core_audit.sha(d.exe),
         scope='Unchanged original status0a/0b and actual item0x38 handler, removal/filter/finalizer. Supplied human states; controlled native-equivalent RNG and isolated target sorting. No live item inventory/reward/render or original future-turn AI trace.'),indent=2)+'\n')
-    print('Original cleansing:',len(rows),'profiles for nine source producers')
+    print('Original cleansing:',len(rows),'profiles for ten source producers')
 
 
 if __name__=='__main__':main()
