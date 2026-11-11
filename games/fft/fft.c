@@ -2387,7 +2387,7 @@ u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
     if(jump_ability(ab))return jump_reaches(a,t,flags);
     u8 f=(u8)(abilities[ab].formula-0x25);  // 0x25/26 equipment, 0x28 Steal Exp, 0x2b/2c breaks, 0x31/32
     if(f<=13&&(0x30CFU>>f)&1)return punch_strike(a,t,ab,roll);
-    if(f==8||f==10)return sword_skill_amount(a,t,ab,(flags>>2)&1,roll);   // 0x2D Holy Sword, 0x2F Dark Sword
+    if((u8)(f-8)<=2)return sword_skill_amount(a,t,ab,(flags>>2)&1,roll);   // 0x2D Holy, 0x2E Mighty, 0x2F Dark Sword
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }

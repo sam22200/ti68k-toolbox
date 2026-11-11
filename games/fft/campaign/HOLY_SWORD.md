@@ -1,4 +1,4 @@
-# Holy Sword (formula 0x2D) and Dark Sword (formula 0x2F)
+# Holy Sword (0x2D), Mighty Sword (0x2E) and Dark Sword (0x2F)
 
 2026-11-10. Agrias's set (Stasis Sword, Split Punch, Crush Punch, Lightning Stab, Holy
 Explosion), also used by the Chapter I Holy/White/Lune Knights. In the battle core,
@@ -40,6 +40,18 @@ A sword or knight sword must be equipped (flags_4 0x08, `main_unit_set_equipment
 `battle_formula_calculate_knockback`): the batch pushes a sole victim of any 0x2D/0x2F
 footprint, never several.
 
+## Mighty Sword (0x2E, `battle_formula_break_equipped_damage_pa_times_wp`)
+
+The Lune Knight's Shellbust Stab, Blastar Punch, Hellcry Punch and Icewolf Bite. Physical
+evasion; then the slot (armour, helmet, the weapon of the higher required level, accessory):
+a monster or an empty slot is a forced failure without further draws, so is Maintenance;
+then Holy Sword's strike with Y 0 (raw PA x WP, the weapon's element, critical,
+half/weak/null/absorb) and, on a hit that is not nullified, the slot broken. In the core:
+a magic-pipeline formula through `sword_skill_amount`; `magic_prepare` makes the forced
+failure; `equip_break_slot` maps the four skills onto the Armor/Head/Weapon Break and Steal
+Accessory slots; `action_commit` breaks the slot (`equip_loss`) after the HP commit.
+`common_tables.mighty_sword_record` accepts the exact retail record.
+
 ## Dark Sword (0x2F, `battle_formula_absorb_mp_pa_times_wp`)
 
 Physical evasion, XA = raw PA, YA = WP of the equipped sword (no Y, no element stage), the
@@ -63,7 +75,11 @@ Sentence, Dead, Silence at 100% on a hit; Holy Explosion's footprint, cardinal g
 status on a hit and critical push): PC = sanitizers = 68000, hash DE3618E6, 8,376
 checks (the oracle header packs 14 bytes a row to fit the 68000 check program). Dark Sword:
 318 original profiles (5 swords, supports, statuses, target MP 999 or 7, seeds) and a
-production drain, in its own program (`check_dark_sword.c`, `dark.h`): 388C79A4, 3,225
+production drain, in its own program (`check_dark_sword.c`, `dark.h`). Mighty Sword: 272 original profiles
+(the four skills, two swords, supports, six target equipment sets: two weapons, weapon and
+shield, none, a monster, Maintenance, a left-hand weapon only; element modes; seeds): forced
+failures, the broken slot and item, damage/healing and draws, then a production Shellbust
+Stab breaking the armour and an empty slot failing. Dark + Mighty program: 640B3C97, 5,863
 checks, PC = sanitizers = 68000.
 
 ## Cost
@@ -72,7 +88,8 @@ Resident TTPack input 56,929: headroom 8,415 → 8,007 bytes; zone 8,692. Chapte
 155 actions executable (Stasis Sword, Split Punch, Crush Punch, Lightning Stab added).
 Holy Explosion: 133 of 155; resident input and zone unchanged (56,929, 8,692).
 Dark Sword, the raw-PA fix and the AI filter: 134 of 155; input 56,965 (headroom 7,971),
-zone 8,698. The 37 campaign replays are unchanged; no replay shows the AI choosing a
+zone 8,698. Mighty Sword: 138 of 155; input 56,969 (headroom 7,967), zone 8,698.
+The 37 campaign replays are unchanged; no replay shows the AI choosing a
 sword skill yet (not verified in a battle).
 
 ## Next

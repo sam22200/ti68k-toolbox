@@ -19,7 +19,7 @@ u8 skill_kind(u8 a,u8 t,AbId ab)
     if(restore_ability(ab))return restore_kind(t,ab);
     if(magic_status_formula(b->formula))return b->kind;
     if(b->formula==12||b->formula==76||b->formula==13||b->formula==14||b->formula==16||b->formula==0x23||b->formula==0x35)return magic_heal(a,t,ab,2);
-    if(b->formula==0x2D){                  // Holy Sword: the primary weapon's element
+    if((u8)(b->formula-0x2D)<=1){          // Holy/Mighty Sword: the primary weapon's element
         u8 w=hand_weapon(&st.unit[a],0),e=w==255?0:cj_weapon(common,w)[6];
         if(st.affinity[t][1]&e)return AB_NULL;
         return st.affinity[t][0]&e?AB_HEAL:AB_DAMAGE;

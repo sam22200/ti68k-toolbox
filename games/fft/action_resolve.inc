@@ -47,6 +47,7 @@ static void skill_extra(void)
 #endif
 #ifdef FFT_CHAPTER
 #include "equip_loss.inc"
+#include "equip_break.inc"   // Mighty Sword 0x2E commits its slot (guarded)
 #endif
 static u8 action_commit(void)
 {
@@ -92,6 +93,9 @@ static u8 action_commit(void)
     }
     if(st.abil<NABIL&&magic_formula(abilities[st.abil].formula)){
         u16 old_hp=ut->hp;u8 changed=action_magic_commit();
+        if(abilities[st.abil].formula==0x2E&&(st.effect_kind&EFFECT_KIND_MASK)!=AB_NULL){
+            u16 n=st.dmg;st.dmg=equip_break_slot(ut,st.abil);equip_loss();st.dmg=n;changed=1;   // Mighty Sword: the slot broken
+        }
         if((st.effect_kind&EFFECT_KIND_MASK)!=AB_NULL&&(st.effect_kind&EFFECT_KIND_MASK)!=AB_CATCH&&(abilities[st.abil].formula!=14||old_hp!=ut->hp))action_rewards(!ut->hp&&!ko);
         return changed;
     }
