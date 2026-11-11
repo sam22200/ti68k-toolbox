@@ -10,6 +10,7 @@
 static u8 equip_break_slot(const Unit *u,AbId ab)
 {
     u8 r=u->eq[EQ_WEAPON],l=u->eq[EQ_SHIELD],shield=l!=255&&!items[l].wp;
+    if((u8)(ab-0xa0)<4)ab=(AbId)(ab==0xa0?0x8b:ab==0xa1?0x8a:ab==0xa2?0x8d:0x72);   // Mighty Sword: Armor, Head, Weapon, Accessory
     if(ab==0x72)return u->eq[EQ_ACC]!=255?EQ_ACC:255;            // Steal Accessory
     if(ab<0x8a)ab+=0x1c;                                          // Steal Helmet..Weapon (0x26)
     if(ab<0x8c){ab-=0x8a;return u->eq[ab]!=255?(u8)ab:255;}   // EQ_HEAD, EQ_BODY
