@@ -116,7 +116,30 @@ static void magical_production(void)
     }
     CHECK(sentence,1);CHECK(st.unit[10].status_ct[15],3);
 }
-static void strike_trials(void){strike_profiles();strike_production();magical_profiles();magical_production();}
+// Odd Soundwave: the original removal set per present/innate statuses, through real casts on
+// radius 2 around the caster (the caster included); nothing removed is a miss, no draw.
+static void wave_production(void)
+{
+    u16 i;u8 k;
+    prepare_strike(0x11F);CHECK(abilities[0x11F].kind,AB_CLEANSE);CHECK(abilities[0x11F].flags,AF_CAST|AF_AREA|AF_SELF);
+    CHECK(abilities[0x11F].formula,FORMULA_AREA_CLEANSE);
+    for(i=0;i<sizeof source_wave/sizeof source_wave[0];i++){
+        const typeof(source_wave[0]) *p=&source_wave[i];Unit *a,*t;u32 seed;s16 mask;
+        prepare_strike(0x11F);a=&st.unit[U_RAMZA];t=&st.unit[10];
+        memset(&t->statuses,0,sizeof t->statuses);memset(&a->statuses,0,sizeof a->statuses);
+        for(k=0;k<5;k++){t->statuses.inflicted[k]=p->current[k];t->statuses.innate[k]=p->innate[k];}
+        a->statuses.inflicted[3]=0x20;                                  // the caster's own Protect
+        unit_status_refresh(t);unit_status_refresh(a);
+        mask=cast_targets(U_RAMZA,UNIT_CELL(a),0x11F,0);
+        CHECK(mask>=0,1);CHECK(!!(mask&((u16)1<<10)),1);CHECK(!!(mask&((u16)1<<U_RAMZA)),1);
+        CHECK(can_use(U_RAMZA,0x11F),1);seed=rng32;
+        CHECK(cast_order(U_RAMZA,UNIT_CELL(a),0x11F,0),1);
+        CHECK(W->cast.victim[10].hit,p->hit);impact();CHECK(rng32==seed,1);
+        for(k=0;k<5;k++)CHECK(t->statuses.inflicted[k],p->current[k]&(u8)~p->remove[k]);
+        CHECK(a->statuses.inflicted[3]&0x20,0);                         // the caster loses its Protect too
+    }
+}
+static void strike_trials(void){strike_profiles();strike_production();magical_profiles();magical_production();wave_production();}
 #ifndef __m68k__
 int main(void){sw_init(61);strike_trials();printf("status_strike %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else

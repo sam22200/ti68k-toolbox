@@ -23,9 +23,10 @@ def main():
         finish='battle_action_finalize_target_current_action',remove='battle_status_remove',
         sort='battle_target_sort_list',random='battle_formula_get_random_0_7fff')
     names['magical']='battle_formula_hit_ma_x_percent_magical_evade'
+    names['apply']='battle_formula_apply_status_to_action'
     for k,n in names.items():bind_function(k,n,'battle',d)
     table=lambda f:struct.unpack_from('<I',d.bat,0x8018f610-s.battle.BAT+4*f)[0]
-    assert table(0x50)==s.FUNCTIONS['formula'][0] and table(0x3D)==s.FUNCTIONS['magical'][0]   # retail dispatch entries
+    assert table(0x50)==s.FUNCTIONS['formula'][0] and table(0x3D)==s.FUNCTIONS['magical'][0] and table(0x38)==s.FUNCTIONS['apply'][0]   # retail dispatch entries
     o=s.Original(d);o.uc.mem_write(0x10000,d.exe[0x800:]);o.instruction_limit=2000000
     for k,n in dict(roll='main_util_roll_pass_fail',lib_rand='rand',init='main_status_init_check_data').items():
         o.function_hashes[k]=bind_function(k,n,'main',d)
@@ -126,6 +127,32 @@ def main():
             outputs.append(dict(hit=action[0],chance=struct.unpack_from('<H',action,42)[0],
                 add=list(action[27:32]),draws=list(draws),miss=action[2]))
         mrows.append(dict(input=p,preview=outputs[0],execute=outputs[1]))
+    # Odd Soundwave (0x11F, formula 0x38: the status application alone, a cancel set): no
+    # evade, no accuracy, no draw; a miss when nothing is removed. Current statuses, innate ones.
+    WAVE=((),(26,),(27,28),(17,18,19),(25,26,27,28,32,38),(24,10),(26,24),(3,),(26,))
+    INNATE=((),(),(),(),(),(),(),(),(26,))
+    wrows=[];raw=d.at(s.battle.ABILITY_RANGE+14*0x11F,14);request=d.at(s.battle.STATUS_SET+6*raw[11],6)
+    assert raw[8]==0x38 and request==bytes((0x10,0,0,0x70,0x78,0x82))
+    for mode in range(len(WAVE)):
+        for seed in(1,4099):
+            outputs=[]
+            for execute in(0,1):
+                for ptr in(actor,target):
+                    at=ptr&0x1fffff;o.uc.mem_write(at,bytes(448));o.uc.mem_write(at+6,bytes((128,)))
+                    o.uc.mem_write(at+0x28,struct.pack('<4H',999,999,999,999));o.uc.mem_write(at+0x1a,bytes((255,)*7))
+                t=target&0x1fffff;v=ability&0x1fffff
+                current=mask(*WAVE[mode]);innate=mask(*INNATE[mode])
+                o.uc.mem_write(t+0x4e,innate+bytes(5)+current);o.uc.mem_write(t+0x1bb,current)
+                o.uc.mem_write(v,bytes(80));o.uc.mem_write(v+0x30,raw);o.uc.mem_write(v+0x46,request)
+                o.uc.mem_write(v+0x16,struct.pack('<H',0x11F));o.uc.mem_write(v+0x1c,bytes((100,)));o.uc.mem_write(0x193860,bytes(5))
+                o.write(0x80192d94,actor);o.write(0x80192d98,target);o.write(0x80192d90,target+0x18c)
+                action=bytearray(44);action[0]=1;action[42]=100;o.uc.mem_write(t+0x18c,bytes(action))
+                o.write(0x8018f5fc,0 if execute else 2);rng=seed;draws.clear()
+                o.call('remove');o.call('apply');o.call('finish')
+                action=bytes(o.uc.mem_read(t+0x18c,44))
+                outputs.append(dict(hit=action[0],remove=list(action[32:37]),add=list(action[27:32]),draws=len(draws)))
+            assert outputs[0]['hit']==outputs[1]['hit'] and outputs[1]['draws']==0 and not any(outputs[1]['add'])
+            wrows.append(dict(mode=mode,seed=seed,preview=outputs[0],execute=outputs[1]))
     lines=['/* Retail monster status strikes, formula 0x50 with evasion. No source code modification. */',
         '#define STRIKE_JOB %d'%JOB,'#define STRIKE_ACC %d'%ACC,'#define STRIKE_SHIELD %d'%SHIELD,
         'static const struct {u16 seed,ab;u8 ma,az,tz,up,defense,gear,forecast,hit,draws,add[5];} source_strike[]={']
@@ -133,6 +160,11 @@ def main():
         p=row['input'];pre=row['preview'];exe=row['execute']
         lines.append(' {%d,%d,%s,%d,%d,%d,{%s}},'%(p[-1],p[0],','.join(map(str,p[1:-1])),
             pre['chance']if pre['hit']else 0,exe['hit'],len(exe['draws']),','.join(map(str,exe['add']))))
+    lines+=['};','static const struct {u8 current[5],innate[5],hit,remove[5];} source_wave[]={']
+    for row in wrows:
+        if row['seed']!=1:continue
+        lines.append(' {{%s},{%s},%d,{%s}},'%(','.join(map(str,mask(*WAVE[row['mode']]))),','.join(map(str,mask(*INNATE[row['mode']]))),
+            row['execute']['hit'],','.join(map(str,row['execute']['remove']))))
     lines+=['};','static const u8 source_magical_status[][5]={']
     lines+=[' {'+','.join(map(str,mask(*ids)))+'},'for ids in MODES]
     lines+=['};','static const struct {u16 seed,ab;u8 ma,az,tz,up,defense,mode,af,tf,forecast,hit,draws,add[5];} source_magical[]={']
@@ -141,7 +173,7 @@ def main():
         lines.append(' {%d,%d,%s,%d,%d,%d,{%s}},'%(p[-1],p[0],','.join(map(str,p[1:-1])),
             pre['chance']if pre['hit']else 0,exe['hit'],len(exe['draws']),','.join(map(str,exe['add']))))
     lines+=['};'];(out/'source.h').write_text('\n'.join(lines)+'\n')
-    (out/'source.json').write_text(json.dumps(dict(cases=rows,magical_cases=mrows,functions=o.function_hashes,
+    (out/'source.json').write_text(json.dumps(dict(cases=rows,magical_cases=mrows,wave_cases=wrows,functions=o.function_hashes,
         battle_sha256=s.core_audit.sha(d.bat),exe_sha256=s.core_audit.sha(d.exe),
         evade=dict(job=JOB,cev=cev,accessory=aev,shield=sev),
         scope='Original unmodified formula 0x50 with flags_4 0x12 records: physical evade stages '
@@ -149,6 +181,7 @@ def main():
     print('status strike oracle: %d profiles, hits %d, draws %s, miss types %s, evade %s'%(len(rows),
         sum(r['execute']['hit'] for r in rows),sorted({len(r['execute']['draws']) for r in rows}),
         sorted({r['execute']['miss'] for r in rows}),(cev,aev,sev)),flush=True)
+    print('Odd Soundwave oracle:',[(r['mode'],r['execute']['hit'],r['execute']['remove']) for r in wrows if r['seed']==1],flush=True)
     print('0x3D oracle: %d profiles, hits %d, draws %s, adds %s, previews %s'%(len(mrows),
         sum(r['execute']['hit'] for r in mrows),sorted({len(r['execute']['draws']) for r in mrows}),
         sorted({(r['input'][0],tuple(r['execute']['add'])) for r in mrows if r['execute']['hit']}),

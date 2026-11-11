@@ -37,6 +37,7 @@ MIGHTY_SWORD=(0xA0,0xA1,0xA2,0xA3)     # formula 0x2E (check_dark_sword.c)
 RUIN=(0xC4,0xC5,0xC6,0xC7)             # formulas 0x1A, 0x1B (check_ruin.c)
 STATUS_STRIKE=(0x111,0x11B,0x132)      # monster formula 0x50, evadeable (check_status_strike.c)
 MONSTER_STATUS=(0x120,0x130)           # monster formula 0x3D (check_status_strike.c)
+ODD_SOUNDWAVE=(0x11F,)                 # source 0x38 on the batch, core id 100 (check_status_strike.c)
 TRUTH=(0x10B,0x114,0x116,0x123,0x124,0x125,0x126,0x134)   # formula 0x4E (check_discovery.c)
 TALK=(117,118,119,120,121,122,124,125)
 HEALING=(1,2,3,4,5,6,60,72)
@@ -55,7 +56,7 @@ def catalogue_report():
         n=norm(a)
         if n[0]!=255 and(n[10]in range(8,17)or n[10]==18):assert n[4]&128,(a,n)
     actual=tuple(a for a in range(512)if norm(a)[4]&128)
-    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS+GIL+GEOMANCY+SECRET_FIST+LINE+DRAW_OUT+PERFORMANCE+ALLEGIANCE+FLOAT+CHOCOBO+HOLY_SWORD+MIGHTY_SWORD+DARK_SWORD+RUIN+STATUS_STRIKE+MONSTER_STATUS+TURN_PUNCH+TRUTH)),actual
+    assert actual==tuple(sorted(SPELLS+HEALING+BUFFS+PERCENT+CLEANSE+DECISIVE+CONTROL+BRAVE+PROTECT+GOLEM+PUNCH+TALK+SPIN+GUTS+GIL+GEOMANCY+SECRET_FIST+LINE+DRAW_OUT+PERFORMANCE+ALLEGIANCE+FLOAT+CHOCOBO+HOLY_SWORD+MIGHTY_SWORD+DARK_SWORD+RUIN+STATUS_STRIKE+MONSTER_STATUS+ODD_SOUNDWAVE+TURN_PUNCH+TRUTH)),actual
     assert tuple(norm(265)[:5])==(0,0,1,4,10) and norm(265)[10]==1
     for a,kind,formula in ((268,13,81),(269,3,76)):
         r,n=raw(a),norm(a);assert n[0]==kind and n[4]==161 and n[10]==r[8]==formula
@@ -89,6 +90,8 @@ def catalogue_report():
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==(0x7F if a==212 else r[11]) and n[10]==r[8]   # Mbarrier: adapted row
     for a in HOLY_SWORD:
         r,n=raw(a),norm(a);assert n[0]==0 and n[10]==0x2D and n[11]==0 and n[4]&(128|8|2)==128|8,(a,n)
+    for a in ODD_SOUNDWAVE:
+        r,n=raw(a),norm(a);assert n[0]==13 and n[1]==r[11] and n[10]==100 and r[8]==0x38 and n[4]==128|32|1,(a,n)
     for a in MONSTER_STATUS:
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==0x3D and n[4]&~1==128|32,(a,n)
     for a in STATUS_STRIKE:
