@@ -66,7 +66,36 @@ static void sword_production(void)
         CHECK(hits>0,1);
     }
 }
-static void sword_trials(void){profiles();sword_production();}
+// The record's one status (set type 0x20), read from the status table.
+static u8 sword_status_byte(AbId ab,u8 *bit)
+{
+    const u8 *row=cj_section(common,CJ_STATUS)+6*cj_range(common,ab)[11];u8 j;
+    for(j=0;j<5;j++)if(row[1+j]){*bit=row[1+j];return j;}
+    *bit=0;return 0;
+}
+// Holy Explosion: Earth Slash's cardinal line (CORE_LINE.md), caster excluded, physical
+// evasion, the status on a hit; a critical pushes a sole line victim; a fall adds its damage.
+static void explosion_production(void)
+{
+    u8 s,hits=0,pushes=0,byte,bit;u16 mask;
+    prepare_sword(0x9F,33);byte=sword_status_byte(0x9F,&bit);CHECK(bit!=0,1);
+    CHECK(abilities[0x9F].flags,AF_CAST|AF_AREA|AF_WEAPON|AF_EVADE);CHECK(abilities[0x9F].kind,AB_DAMAGE);
+    CHECK(can_use(U_RAMZA,0x9F),1);
+    mask=(u16)cast_targets(U_RAMZA,third,0x9F,0);
+    CHECK(!!(mask&((u16)1<<10)),1);CHECK(!!(mask&((u16)1<<U_RAMZA)),0);
+    CHECK(cast_order(U_RAMZA,first,0x9F,0),0);                     // as Earth Slash: not a line
+    for(s=1;s<250&&!(hits>=3&&pushes);s++){
+        Unit *t;u8 x,z;prepare_sword(0x9F,33);t=&st.unit[10];x=t->x;z=t->z;
+        memset(&t->statuses,0,sizeof t->statuses);unit_status_refresh(t);t->hp=t->max_hp=999;
+        rng32=seed_of(s);st.unit[U_RAMZA].mp=999;
+        CHECK(cast_order(U_RAMZA,third,0x9F,0),1);impact();
+        if(t->hp==999)continue;                                       // evaded
+        hits++;CHECK((core_status_current(&t->statuses,byte)&bit)!=0,1);
+        if(t->x!=x||t->z!=z)pushes++;
+    }
+    CHECK(hits>=3,1);CHECK(pushes>0,1);
+}
+static void sword_trials(void){profiles();sword_production();explosion_production();}
 #ifndef __m68k__
 int main(void){sw_init(61);sword_trials();printf("holy_sword %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else
