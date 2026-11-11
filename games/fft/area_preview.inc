@@ -4,7 +4,7 @@ static u8 area_preview(void)
     AreaUi *q=&W->area_ui;const u8 *r;u16 c;u8 i;
     if(st.mode!=M_AREA||!batch_forecast(&q->forecast))return 0;
     r=cj_range(common,q->forecast.ability);memset(q->panels,0,sizeof q->panels);
-    if(q->forecast.follow==MATH_BIND){
+    if(q->forecast.follow==MATH_BIND||(r[6]&32)){   // Math; direct targeting: the recipients' panels
         for(i=0;i<NUNIT;i++)if(q->forecast.mask&((u16)1<<i)){
             c=UNIT_CELL(&st.unit[i]);q->panels[c>>3]|=(u8)(1U<<(c&7));
         }

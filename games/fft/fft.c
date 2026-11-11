@@ -464,6 +464,7 @@ typedef struct {
     MimeState mime;                      // cold imitation queue; no separate allocation
     WeaponPanel weapon_panel;           // frozen occupants of one selected weapon panel
     u8 preview_target,preview_count;     // pure recipient/card output; no unit-state cache
+    u8 direct_from,direct_to,direct_hit;  // a direct-targeting cast's recipient, fetched before TARGETS runs
 #ifndef FFT_PACKED_PANELS
     s16 ai_panel_bonus[9][UNIT_CAPACITY];
     u16 ai_panel_left;u8 ai_panel_at,ai_reflect_hands;
@@ -1024,6 +1025,7 @@ u16 mod_entry(u8 op,u8 a)
     if(op==3||op==4){weapon_preview(st.formula.actor,st.formula.target,st.formula.ability);
         st.formula.target=W->preview_target;if(op==4)W->nature_pending|=16;return 0;}
     if(op==5)return strike_target();
+    if(op==6)return direct_target(st.formula.actor,st.formula.target);
     if(op==2){u8 who=st.formula.actor,t=st.formula.target,w=hand_weapon(&st.unit[who],0);
         if(w>=128)w=0;return cj_weapon(common,w)[1]&192?melee_target(who,t)!=255:
             (cj_weapon(common,w)[1]&16?arc_target(who,t)!=255:direct_target(who,t)!=255);}
@@ -2589,6 +2591,24 @@ void skill_range(u8 who,AbId ab)
 static u8 batch_commit(CastBatch *b);
 static u8 batch_status_commit(CastBatch *b);
 #include "performance_commit.inc"
+#ifdef FFT_MODULES
+// Direct-targeting casts (flags_4 0x20): the trajectory is the weapon planner's. Complete it
+// before TARGETS executes; an unprepared query there resolves to nobody.
+static void cast_direct_fetch(u8 a,u8 ref,AbId ab,u8 follow)
+{
+    const u8 *r=ab<512?cj_range(common,ab):0;u16 c;u8 i;
+    W->direct_from=255;
+    if(!r||!(r[6]&32)||a>=NUNIT||follow>1)return;
+    c=cast_target_cell(follow,ref);
+    for(i=0;i<NUNIT;i++)if(i!=a&&target_query(i,255)&&UNIT_CELL(&st.unit[i])==c){
+        u8 actor=st.formula.actor,target=st.formula.target;
+        st.formula.actor=a;st.formula.target=i;
+        W->direct_hit=(u8)mod_call(MOD_PLANNER,6,0);W->direct_from=a;W->direct_to=i;
+        st.formula.actor=actor;st.formula.target=target;
+        return;
+    }
+}
+#endif
 #ifndef FFT_PRODUCTION_CORE   // isolated packet API; gameplay uses owned prepare/commit
 u8 cast_batch(u8 op,CastBatch *b)
 {
@@ -2597,6 +2617,7 @@ u8 cast_batch(u8 op,CastBatch *b)
 #ifdef FFT_MODULES
     u8 status=op&&b->ability<512&&b->ability!=109&&b->ability!=116&&magic_status_formula(abilities[b->ability].formula);
         u8 id=op?(b->ability==109||b->ability==116?MOD_PERFORMANCE:status?MOD_STATUS:(b->ability<512&&performance_formula(abilities[b->ability].formula))?MOD_PERFORMANCE:MOD_SAVE):MOD_TARGETS;
+    if(!op)cast_direct_fetch(b->actor,b->ref,b->ability,b->follow);
     mod_call(id,255,0);mod_context(id)->cast_batch_out=b;
     result=(u8)mod_call(id,status?12:op?7:1,status?1:0);
 #else
@@ -2610,6 +2631,7 @@ u8 cast_batch(u8 op,CastBatch *b)
 u8 cast_forecast(CastBatch *b)
 {
 #ifdef FFT_MODULES
+    cast_direct_fetch(b->actor,b->ref,b->ability,b->follow);
     mod_call(MOD_TARGETS,255,0);mod_context(MOD_TARGETS)->cast_batch_out=b;
     return (u8)mod_call(MOD_TARGETS,3,0);
 #else
@@ -2632,6 +2654,7 @@ static u8 cast_dispatch(u8 result)
     }
     else if(result==CAST_AREA_DISPATCH){
 #ifdef FFT_MODULES
+        cast_direct_fetch(W->cast.actor,W->cast.ref,W->cast.ability,W->cast.follow);
         result=(u8)mod_call(MOD_TARGETS,2,0);
 #else
         result=batch_owned_prepare();
@@ -2662,7 +2685,7 @@ u8 cast_order(u8 a,u8 ref,AbId ab,u8 follow)
 #if defined(FFT_CHAPTER) && defined(FFT_MODULES)
 s16 cast_targets(u8 a,u8 ref,AbId ab,u8 follow)
 {
-    ModCtx *c;mod_call(MOD_TARGETS,255,0);c=mod_context(MOD_TARGETS);
+    ModCtx *c;cast_direct_fetch(a,ref,ab,follow);mod_call(MOD_TARGETS,255,0);c=mod_context(MOD_TARGETS);
     c->cast_actor=a;c->cast_ref=ref;c->cast_ability=ab;
     return (s16)mod_call(MOD_TARGETS,0,follow);
 }
@@ -2679,6 +2702,7 @@ static void area_control(u8 op)
 #endif
     if(result==AREA_QUERY){
 #ifdef FFT_MODULES
+        cast_direct_fetch(W->area_ui.forecast.actor,W->area_ui.forecast.ref,W->area_ui.forecast.ability,W->area_ui.forecast.follow);
         result=(u8)mod_call(MOD_TARGETS,4,0);
 #else
         result=area_preview();

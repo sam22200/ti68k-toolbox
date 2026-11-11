@@ -22,9 +22,9 @@ typedef char CastVictimSize[(sizeof(CastVictim)==4)?1:-1];
 static u8 cast_area_supported(const Ability *b,const u8 *r)
 {
     return r&&(magic_formula(b->formula)||b->formula==0x31)&&
-        (CAST_PERFORMANCE(b->formula)||speech_formula(b->formula)||((b->formula==0x1A||b->formula==0x55)&&(b->kind==AB_SPEED||b->kind==AB_BREAK))||b->kind==(magic_status_formula(b->formula)?(b->formula==18?AB_QUICK:b->formula==97?AB_BRAVE:b->formula==20?AB_GOLEM:b->kind==AB_CLEANSE?AB_CLEANSE:AB_STATUS):b->formula==12||b->formula==76||b->formula==0x23?AB_HEAL:b->formula==13||b->formula==0x35?AB_REVIVE:b->formula==0x34?AB_HP_MP_HEAL:b->formula==15||b->formula==0x1B||b->formula==0x21||b->formula==0x2F?AB_MP_DAMAGE:b->formula==14?AB_DEATH:AB_DAMAGE))&&
+        (CAST_PERFORMANCE(b->formula)||speech_formula(b->formula)||((b->formula==0x1A||b->formula==0x55)&&(b->kind==AB_SPEED||b->kind==AB_BREAK))||b->kind==(magic_status_formula(b->formula)?(b->formula==18?AB_QUICK:(u8)(b->formula-97)<=1?AB_BRAVE:b->formula==20?AB_GOLEM:b->kind==AB_CLEANSE?AB_CLEANSE:AB_STATUS):b->formula==12||b->formula==76||b->formula==0x23?AB_HEAL:b->formula==13||b->formula==0x35?AB_REVIVE:b->formula==0x34?AB_HP_MP_HEAL:b->formula==15||b->formula==0x1B||b->formula==0x21||b->formula==0x2F?AB_MP_DAMAGE:b->formula==14?AB_DEATH:AB_DAMAGE))&&
         (b->flags&(AF_CAST|AF_AREA))==(AF_CAST|AF_AREA)&&
         !(b->flags&~(AF_CAST|AF_AREA|AF_SELF|AF_EVADE|((b->formula|2)==0x2F?AF_WEAPON:0)))&&   // Holy/Dark Sword: a physical strike
-        batch_formula(r[8])==b->formula&&!(r[3]&32)&&!(r[4]&10)&&(!(r[4]&4)||b->formula==0x31||b->formula==0x20||b->formula==0x2D)&&(!(r[5]&4)||CAST_PERFORMANCE(b->formula))&&!(r[6]&32);
+        batch_formula(r[8])==b->formula&&!(r[3]&32)&&!(r[4]&10)&&(!(r[4]&4)||b->formula==0x31||b->formula==0x20||b->formula==0x2D||(r[6]&32))&&(!(r[5]&4)||CAST_PERFORMANCE(b->formula));
 }
 #endif

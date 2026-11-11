@@ -15,8 +15,8 @@ static u8 area_ai_supported(AbId ab)
     if((abilities[ab].formula|2)==0x2F)return p[4]==0x82||p[4]==0x42;   // Holy Sword: hostile HP; Dark Sword: MP
     if((u8)(abilities[ab].formula-0x1A)<=1||abilities[ab].formula==0x55)return 1;   // Ruins, Beaking: stat losses as the Dances, MP damage
     if(abilities[ab].formula==0x24)return p[4]==0x82;   // Geomancy: immediate HP, conditional status unscored
-    if(abilities[ab].formula==0x50)return p[4]==0x12&&!(p[5]&~2)&&p[6]==1&&p[7]==0x81;   // Secret Fist's status utility; monster strikes (AI byte 5: 2)
-    if(abilities[ab].formula==14||abilities[ab].formula==18||abilities[ab].formula==20||abilities[ab].formula==97)return 1;
+    if(abilities[ab].formula==0x50)return p[4]==0x12&&!(p[5]&~2)&&(p[6]==1||((raw[6]&32)&&(p[6]&~0x10)==0x41))&&(p[7]|1)==0x81;   // Secret Fist's status utility; monster strikes (AI byte 5: 2); direct targeting (AI byte 6: 0x40)
+    if(abilities[ab].formula==14||abilities[ab].formula==18||abilities[ab].formula==20||(u8)(abilities[ab].formula-97)<=1)return 1;
     if(magic_percent_formula(abilities[ab].formula))return (p[4]==0x82||p[4]==0x42)&&
         !(p[5]&~0x75)&&p[6]==2&&(p[7]&128)&&!(p[7]&~0xe0);
     // Frog toggles; status_ai_gain handles mutable removal and innate protection.

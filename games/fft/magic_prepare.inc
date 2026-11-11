@@ -32,7 +32,7 @@ static void magic_prepare(u8 a,u8 t,AbId ab,CastVictim *v)
             if(b->element&&v->effect!=AB_NULL)rand15(); // original conditional proc, empty status set
         }else
 #if MOD_PART(MOD_TARGETS)
-        if(b->formula==0x3D&&cj_section(common,CJ_STATUS)[6*b->y]==64){
+        if((b->formula==0x3D||b->formula==0x50)&&cj_section(common,CJ_STATUS)[6*b->y]==64){
             // Mind Blast: one status of a random-one set, drawn after the accuracy, in status order;
             // a blocked choice is a miss (source apply_status_to_action).
             const u8 *row=cj_section(common,CJ_STATUS)+6*b->y+1;u8 ids[8],n=0,k;
