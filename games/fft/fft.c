@@ -2278,7 +2278,8 @@ static u16 weapon_amount(u8 a,u8 t,u8 weapon,u8 crit,u16 r,u8 awake,u8 charge,u1
     u8 jump=charge==255;
     s16 xa,ya;
 #ifdef FFT_CHAPTER
-    xa=jump?ua->pa:weapon_plain_gun(weapon)?w->wp:
+    // Holy/Dark Sword (awake bit 2): raw PA whatever the sword (source store_pa_and_weapon_power).
+    xa=jump||(awake&4)?ua->pa:weapon_plain_gun(weapon)?w->wp:
         weapon_base_xa(weapon==255?0:cj_equipment_item(common,weapon)[0],ua,base_roll&32767);
 #else
     xa=w&&w->knife&&!jump?(ua->pa+ua->sp)>>1:ua->pa;
@@ -2376,7 +2377,7 @@ static u16 punch_strike(u8 a,u8 t,AbId ab,u16 r)
 // halved/doubled by the weapon's element; null/absorb are the category (skill_kind).
 static u16 sword_skill_amount(u8 a,u8 t,AbId ab,u8 crit,u16 roll)
 {
-    u8 w=hand_weapon(&st.unit[a],0),e=w==255?0:cj_weapon(common,w)[6];s16 n;
+    u8 w=hand_weapon(&st.unit[a],0),e=w==255||abilities[ab].formula==0x2F?0:cj_weapon(common,w)[6];s16 n;   // Dark Sword: no element stage
     n=(s16)weapon_amount(a,t,w,crit,roll,4,abilities[ab].y,(st.affinity[a][4]&e)?16384|32768:16384);
     n=magic_half_weak(t,e,n);
     return n>999?999:(u16)n;
@@ -2386,7 +2387,7 @@ u16 charge_query(u8 a,u8 t,AbId ab,u8 flags,u16 roll)
     if(jump_ability(ab))return jump_reaches(a,t,flags);
     u8 f=(u8)(abilities[ab].formula-0x25);  // 0x25/26 equipment, 0x28 Steal Exp, 0x2b/2c breaks, 0x31/32
     if(f<=13&&(0x30CFU>>f)&1)return punch_strike(a,t,ab,roll);
-    if(f==8)return sword_skill_amount(a,t,ab,(flags>>2)&1,roll);   // 0x2D Holy Sword
+    if(f==8||f==10)return sword_skill_amount(a,t,ab,(flags>>2)&1,roll);   // 0x2D Holy Sword, 0x2F Dark Sword
     return attack_weapon_damage(a,t,hand_weapon(&st.unit[a],flags&1),
         (flags>>2)&1,roll,(flags>>1)&1,abilities[ab].y);
 }

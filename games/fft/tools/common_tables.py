@@ -106,6 +106,15 @@ def holy_sword_record(d,r):
     return 0, r[10], r[0], 2*r[2] if r[3]&8 else 255, 128|8|2|(32 if r[1] else 0)|(0 if line else 1)
 
 
+def dark_sword_record(r):
+    """Dark Sword 0x2F (battle_formula_absorb_mp_pa_times_wp): physical evasion, PA x WP of the
+    equipped sword through Attack's physical stages and critical, no element stage, the amount
+    taken from the target's MP and given to the caster (the single-panel drain packets).
+    A sword is required (flags_4 0x08)."""
+    if tuple(r)!=(3,0,0,5,0x11,0x12,8,1,0x2F,0,0,0,0,0):return None
+    return 11, 0, r[0], 255, 128|32|8|2
+
+
 def healing_magic_record(r):
     """The six heals and two Raises share the owned radial pipeline (radius0 too)."""
     if (r[8] not in (12,13) or r[3]&~0x09 or r[4]&~0xe1 or
@@ -472,6 +481,9 @@ def battle_records(d):
         elif 0x9B <= a <= 0x9F and holy_sword_record(d, d.at(battle.ABILITY_RANGE + 14*a, 14)):
             kind, y, rng, vert, flags = holy_sword_record(d, d.at(battle.ABILITY_RANGE + 14*a, 14))
             formula = 0x2D                 # element 0: the weapon's, read at run time
+        elif a == 0xA4 and dark_sword_record(d.at(battle.ABILITY_RANGE + 14*a, 14)):
+            kind, y, rng, vert, flags = dark_sword_record(d.at(battle.ABILITY_RANGE + 14*a, 14))
+            formula = 0x2F
         elif a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]

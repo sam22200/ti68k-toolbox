@@ -38,10 +38,12 @@ static u8 batch_prepare(CastBatch *b,u8 ordered)
             next=t+1; // radial batches scan slots once; only lines need distance ranking
             bit=(u16)1<<t;todo&=(u16)~bit;
             magic_prepare(a,t,b->ability,&b->victim[t]);
-            // One linear victim reuses the existing frozen scalar knockback.
-            if((raw[8]==0x31||raw[8]==0x2D)&&(raw[4]&4)&&!(b->mask&(b->mask-1))&&st.crit&&b->victim[t].hit&&
-               (b->victim[t].effect&EFFECT_KIND_MASK)==AB_DAMAGE){
-                st.dmg=b->victim[t].amount;knockback(a,t);b->victim[t].amount=st.dmg;
+            // A sole victim reuses the existing frozen scalar knockback (source: target_count 1).
+            // Earth Slash: lines only; Holy/Dark Sword: any footprint. Dark Sword's MP amount
+            // takes no fall damage.
+            if((raw[8]==0x2D||raw[8]==0x2F||(raw[8]==0x31&&(raw[4]&4)))&&!(b->mask&(b->mask-1))&&st.crit&&b->victim[t].hit&&
+               (b->victim[t].effect&EFFECT_KIND_MASK)==(raw[8]==0x2F?AB_MP_DAMAGE:AB_DAMAGE)){
+                st.dmg=b->victim[t].amount;knockback(a,t);if(raw[8]!=0x2F)b->victim[t].amount=st.dmg;
             }
         }
     }
