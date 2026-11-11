@@ -68,7 +68,7 @@ FFT_FORMULA_FN u16 skill_amount(u8 a, u8 t, AbId ab, u16 r)
     const Unit *ua = &st.unit[a];
     u16 k;
 #ifdef FFT_CHAPTER
-    if(unit_monster(ua)&&ab==265)return attack_prediction(a,t);
+    if(unit_monster(ua)&&MONSTER_ATTACK(ab))return attack_prediction(a,t);
     if(jump_ability(ab))return magic_heal(a,t,ab,0);
     if(restore_ability(ab))return restore_quantity(t,ab,r);
     if(b->kind==AB_CLEANSE)return magic_heal(a,t,ab,0);

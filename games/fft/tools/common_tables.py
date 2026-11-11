@@ -153,8 +153,8 @@ def strike_record(r):
     skills; Spin Fist (0x31, radius 1 on the user, the user excluded) an immediate area cast."""
     if r[8]==0x31 and r[0]==0 and r[1]==1 and r[3]==3 and r[4]==0x11 and r[6]==3 and not r[7] and not r[11]:
         return 0,r[10],0,255,128|32|2|1
-    if r[8]not in(0x31,0x32)or r[1]or r[3]!=9 or r[4]&~0x11 or r[6]!=2 or r[7]or r[11]:return None
-    return 0,r[10],r[0],2*r[2],2
+    if r[8]not in(0x31,0x32)or r[1]or r[3]not in(1,9)or r[4]&~0x11 or r[6]!=2 or r[7]or r[11]:return None
+    return 0,r[10],r[0],2*r[2]if r[3]&8 else 255,2   # flags_1 0x08 off (Choco Ball): any height
 
 
 def draw_out_record(d,a,r):
@@ -254,6 +254,7 @@ def steal_gil_record(a,r):
     The Thief rolls physical SP'+X; the Mediator rolls Talk Skill's MA'+X."""
     expected={0x6c:bytes.fromhex('01 00 01 09 51 00 12 00 27 c8 00 00 00 00'),
               0x7b:bytes.fromhex('03 00 03 09 51 20 00 00 2a 5a 00 00 00 00')}
+    if a==0x133:a,r=0x6c,r[:5]+bytes((0,))+r[6:] if r[5]==0x10 else r   # Shine Lover: Gil Taking, monster byte
     if r!=expected.get(a):return None
     return 25,0,r[0],2*r[2],2 if a==0x6c else 128|32|1
 
@@ -365,6 +366,29 @@ def status_rows(d):
     return bytes(rows)
 
 
+def dash_like(d,a):
+    """Monster copies of Dash (0x93, formula0x37): only the vertical tolerance, the monster byte,
+    Y and two flags_4 bits may differ: evadeable (0x02) and Blade Grasp (0x10, read raw by the core)."""
+    if not 0x100<=a<0x170:return False
+    r=d.at(battle.ABILITY_RANGE+14*a,14);ref=d.at(battle.ABILITY_RANGE+14*0x93,14)
+    return (r[:2]==ref[:2] and 1<=r[2]<=3 and r[3:5]==ref[3:5] and r[5] in(0,0x10) and not r[6]&~0x12
+            and r[7:10]==ref[7:10] and r[11:]==ref[11:])
+
+
+def accumulate_like(d,a):
+    """Accumulate's (0x92) source record but for the monster byte and Y (Gather Power: PA+2)."""
+    r=d.at(battle.ABILITY_RANGE+14*a,14);ref=d.at(battle.ABILITY_RANGE+14*0x92,14)
+    return r[:5]==ref[:5] and r[5] in(0,0x10) and r[6:10]==ref[6:10] and r[11:]==ref[11:]
+
+
+def monster_attack_record(d,a):
+    """Monster basic physical attacks (Tackle, Bite, Scratch...): Choco Attack's (265) exact
+    source record, formula01 range1, only the vertical tolerance may differ."""
+    if not 0x100<=a<0x170 or a==265:return False
+    r=d.at(battle.ABILITY_RANGE+14*a,14);ref=d.at(battle.ABILITY_RANGE+14*265,14)
+    return r[:2]==ref[:2] and r[3:]==ref[3:] and 1<=r[2]<=3
+
+
 def battle_records(d):
     """Shared native execution records. Unverified families remain explicitly disabled.
 
@@ -390,7 +414,7 @@ def battle_records(d):
         # producers outside this source table interval remain independently gated.
         raw = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0<a<0x50 or a in HOLY_MAGIC else None
         # Punch Art (0x64..0x6b) and Talk Skill (0x74..0x7d) are read beyond the magic interval.
-        art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b else None
+        art = d.at(battle.ABILITY_RANGE + 14*a, 14) if 0x64<=a<=0x6b or a in(0xE1,0x10A) else None   # Grenade's Small Bomb, Choco Ball
         magic = offensive_magic_record(raw) if raw else None
         healing = healing_magic_record(raw) if raw else None
         if a == 0xD4: raw = raw[:11] + bytes((MBARRIER_ROW,)) + raw[12:]
@@ -409,20 +433,27 @@ def battle_records(d):
         # Guts (0x96..0x99) is read beyond the magic interval too.
         guts = guts_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x96<=a<=0x99 else None
         steal = steal_exp_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if a==0x73 else None
-        gil = steal_gil_record(a,d.at(battle.ABILITY_RANGE + 14*a,14)) if a in(0x6c,0x7b) else None
+        gil = steal_gil_record(a,d.at(battle.ABILITY_RANGE + 14*a,14)) if a in(0x6c,0x7b,0x133) else None
         geomancy = geomancy_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if 126<=a<=137 else None
         secret = secret_fist_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)) if a==0x68 else None
         stat_break = break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8e<=a<=0x91 else None
         gear_steal = steal_equip_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x6e<=a<=0x72 else None
         gear_break = equip_break_record(d.at(battle.ABILITY_RANGE + 14*a, 14)) if 0x8a<=a<=0x8d else None
-        if a in (265,268,269):
+        if a in (265,268,269) or monster_attack_record(d,a):
             r=d.at(battle.ABILITY_RANGE+14*a,14)
-            if a==265:kind,y,rng,vert,flags,formula=0,0,1,4,10,1
+            if a==265 or a!=268 and a!=269:kind,y,rng,vert,flags,formula=0,0,r[0],2*r[2],10,1
             elif a==268:kind,y,rng,vert,flags,formula=13,r[11],0,255,161,81
             else:kind,y,rng,vert,flags,formula=3,r[10],0,255,161,76
         elif a in adapted:
             kind, y, rng, vert, flags = adapted[a]
             formula = d.at(battle.ABILITY_RANGE + 14 * a, 14)[8]
+        elif dash_like(d, a):
+            r = d.at(battle.ABILITY_RANGE + 14*a, 14)   # Cat Kick, Tail Swing: rand(1..Y) x PA, knockback
+            kind, y, rng, vert, flags = 0, r[10], r[0], 2*r[2], 2 if r[6] & 2 else 0
+            formula = 0x37
+        elif a == 0x143 and accumulate_like(d, a):
+            kind, y, rng, vert, flags = 6, d.at(battle.ABILITY_RANGE + 14*a, 14)[10], 0, 0, 1   # Gather Power: PA+Y
+            formula = 0x36
         elif 0x170<=a<=0x175 or a==0x17d:
             form,z,status_set=d.at(battle.ITEM_ABILITY+3*(a-0x170),3)
             assert form in (0x48,0x49,0x4a,0x4b)

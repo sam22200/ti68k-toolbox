@@ -27,7 +27,7 @@ static u8 command_effect(u8 a,u8 t,AbId ab)
         if (W) W->win_k[0] = 0;                    // the item list shows the count
     }
 #ifdef FFT_CHAPTER
-    if(unit_monster(&st.unit[a])&&ab==265){attack_roll(a,t);st.abil=ab;return 1;}
+    if(unit_monster(&st.unit[a])&&MONSTER_ATTACK(ab)){attack_roll(a,t);st.abil=ab;return 1;}
     if(magic_formula(b->formula)){
         st.kx=st.unit[a].x;st.kz=st.unit[a].z; // saved original-caster origin for Reflect
         CastVictim v;magic_prepare(a,t,ab,&v);
