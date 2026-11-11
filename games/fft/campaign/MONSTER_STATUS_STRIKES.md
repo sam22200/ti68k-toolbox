@@ -65,14 +65,43 @@ reads the raw record) and flags_4 0x01: never evaded, where Spin Fist (0x03) is.
 `common_tables.strike_record` accepts it; `check_discovery.c` checks the same amount as Spin
 Fist, the raw vertical, and a forecast of 100 against the gear that lowers Spin Fist.
 
-## Numbers after Turn Punch and 0x3D
+## Odd Soundwave (source 0x38 on the batch, 2026-11-11)
 
-`make core-status-strike-check`: D0FD4866, 9,779 checks; `make core-discovery-check`:
-FEFE4CC1, 17,811 checks; both PC = sanitizers = 68000. Resident input 57,109 (headroom
-7,827), zone 8,698. Chapter I: 148 of 155. The 37 campaign replays are unchanged.
+The Squidlarkin's Odd Soundwave runs the status application alone (formula 0x38): its
+cancel set (Float, Reraise, Transparent, Regen, Protect, Shell, Haste, Faith, Reflect) on
+radius 2 around the caster, the caster included, area vertical 1. No evade, no accuracy, no
+draw; only present, non-innate statuses are removed, and nothing removed is a miss. The item
+cleanses already use 0x38 outside the magic pipeline, so the batch knows this record under
+the core id 100 (`FORMULA_AREA_CLEANSE`, `batch_formula` in `cast_rules.h`); the removal is
+the existing cleanse path (`core_cleanse_pack`).
+
+## Beaking (0x55, 2026-11-11)
+
+The Cocatoris's Beaking: magical evasion (flags_4 0x12: the accessory's and the shield's
+magical evade, one draw per stage), 0x3D's (MA + X)% without Faith, then PA - Y (2). In the
+core it is a status formula using the Ruins' stat loss (`stat_loss_formula`,
+`stat_loss_pa`, `RUINS.md`).
+
+## Goblin Punch (0x4F) and Self Destruct (0x52, 2026-11-11)
+
+Both deal the caster's missing HP (max HP - HP). Goblin Punch: formula 0x50's physical
+evade and (MA + X)% accuracy, a single target. Self Destruct (Bomb): radius 2 around the
+caster, never evaded, no draw; the others also get Oil at 100% (a blocked Oil does not stop
+the damage; a full-HP Bomb deals 0 and still oils), and the caster takes its own HP: it
+always dies. The area AI scores Goblin Punch as hostile HP; **Self Destruct is not offered
+to the AI yet** (its sacrifice needs a scoring rule of its own).
+
+## Numbers (2026-11-11)
+
+`make core-status-strike-check` runs two programs (the 68000 size limit): strikes and 0x3D
+D0FD4866, 9,779 checks; Odd Soundwave, Beaking, Goblin Punch, Self Destruct 88C99485, 3,237
+checks; `make core-discovery-check` FEFE4CC1, 17,811 checks; all PC = sanitizers = 68000.
+Resident input 57,285 (headroom 7,651), zone 8,698. Chapter I: 152 of 155. Secret Fist's
+and the Ruins' checks and the 37 campaign replays are unchanged.
 
 ## Next in the family
 
-Black Ink (0x11E: a line with flags_4 0x20, direct trajectory) and Look of Devil (0x12D: a
-random-one status set with flags_4 0x20) need the trajectory rule; Odd Soundwave (0x38)
-uses the same status application with a cancel set.
+Black Ink (0x11E: 0x50 on a line), Look of Devil (0x12D: 0x50 with a random-one set) and
+Look of Fright (0x12E: formula 0x62, Brave - Y with 0x3D's accuracy) all have flags_4 0x20
+(`DIRECT_TARGETING`: the line of fire must be clear), which the cast batch refuses today
+(`cast_area_supported`, `cast_targets`). They need that trajectory rule in the casts.

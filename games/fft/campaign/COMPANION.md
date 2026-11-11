@@ -76,5 +76,7 @@ direct 0x4E original-function oracle is not yet written. Chapter I: 129 of 155 e
    Earth Slash's line, Dark Sword 0x2F (a drain variant), Mighty Sword 0x2E (a strike plus
    an equipment break), the Ruins 0x1A/0x1B (`RUINS.md`): 142 of 155; Eye
    Gouge, Poison Nail, Beak (0x50 with evasion), Turn Punch, Mind Blast and Death Sentence
-   (0x3D) (`MONSTER_STATUS_STRIKES.md`): 148 of 155.
+   (0x3D), Odd Soundwave, Beaking, Goblin Punch, Self Destruct
+   (`MONSTER_STATUS_STRIKES.md`): 152 of 155. The companion image is still empty: every
+   Chapter I technique so far was a variant of a core family.
 4. Families already in the core for humans (0x50, 0x38, Turn Punch), the rest.

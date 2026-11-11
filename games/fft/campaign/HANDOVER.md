@@ -1,6 +1,6 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Current state (2026-11-11): Chapter I actions, 148 of 155 executable
+## Current state (2026-11-11): Chapter I actions, 152 of 155 executable
 
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
 [Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
@@ -57,18 +57,19 @@ banks: run through `make`. Check binaries must run inside a data folder
 Brave below 100 (a Brave of 100 hid the knight-sword bug). Known failure, unrelated:
 `manage-test` aborts.
 
-**Numbers now.** Resident TTPack input 57,109, headroom 7,827 bytes; zone 8,698; ABI 85.
+**Numbers now.** Resident TTPack input 57,285, headroom 7,651 bytes; zone 8,698; ABI 85.
 
-**Next (7 actions, all monsters).** Eye Gouge, Poison Nail, Beak, Turn Punch, Mind Blast
-and Death Sentence are done ([Monster status strikes](MONSTER_STATUS_STRIKES.md)). Left:
-Black Ink (0x50 on a line, flags_4 0x20: direct trajectory) and Look of Devil (0x50,
-random-one set, flags_4 0x20; the random draw exists now in `magic_prepare` for 0x3D), Odd
-Soundwave 0x38 (a cancel set), Goblin Punch 0x4F, Self Destruct 0x52, Look of Fright 0x62,
-Beaking 0x55. Test seeds: spread them (`(k*0x9E3779B1)|1`), small xorshift seeds give tiny
-first draws and always pick the first random choice. Also open: the AI choosing sword
-skills/Ruins is not yet seen in a battle; 0x4E area/line shapes; a direct 0x4E oracle;
-area criticals push only a sole victim (source `target_count` 1, faithful); Dark Sword's
-push adds no fall damage (adaptation).
+**Next (3 actions, all monsters, one missing rule).** Black Ink (0x11E: 0x50 on a line),
+Look of Devil (0x12D: 0x50, random-one set) and Look of Fright (0x12E: formula 0x62, Brave
+- Y with 0x3D's accuracy) share flags_4 0x20 (`DIRECT_TARGETING`: clear line of fire),
+refused today by `cast_area_supported` and `cast_targets` (`r[6]&32`). The formulas' parts
+all exist (0x50 evade/accuracy, the random-one draw in `magic_prepare`, Foxbird's Brave loss
+0x61); what is missing is the trajectory rule in casts (the core has `battle_line_clear`
+for bows). Everything else of [Monster status strikes](MONSTER_STATUS_STRIKES.md) is done.
+Open: Self Destruct is not offered to the AI (needs a sacrifice scoring rule); no battle
+replay shows the AI choosing the new techniques. Test seeds: spread them
+(`(k*0x9E3779B1)|1`), small xorshift seeds give tiny first draws and always pick the first
+random choice. The core id 100 is `FORMULA_AREA_CLEANSE` (source 0x38 on the batch).
 
 
 **Next steps (2026-11-10): [Chapter I readiness](CHAPTER1_READINESS.md)** — battle RAM margin: ragged depth, map envelope and the RAM message are done (~11.4 KB free natively, was ~1.2 KB); the hidden gray buffer and ring backups remain to reach 16 KB. Then the archive budget, a one-command native chapter run and a frozen core interface (resident headroom: 107 bytes).
