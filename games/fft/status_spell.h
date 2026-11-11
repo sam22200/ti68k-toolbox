@@ -6,7 +6,7 @@
 static u16 magic_status_value(u8 t,AbId ab,u8 choice)
 {
     const CoreStatus *s=&st.unit[t].statuses;
-    const u8 *r=cj_section(common,CJ_STATUS)+6*((abilities[ab].formula==0x24||abilities[ab].formula==0x2D||draw_out_formula(abilities[ab].formula))?cj_range(common,ab)[11]:abilities[ab].y),*rules=cj_status_rules(common),*p;
+    const u8 *r=cj_section(common,CJ_STATUS)+6*((abilities[ab].formula==0x24||abilities[ab].formula==0x2D||abilities[ab].formula==0x52||draw_out_formula(abilities[ab].formula))?cj_range(common,ab)[11]:abilities[ab].y),*rules=cj_status_rules(common),*p;
     u8 b,m,bit,k,j,current[5];
     if((ab==109||ab==116)&&(cj_allegiance_immune(common,st.unit[t].job,st.unit[t].eq)&(ab==109?2:1)))return 0;
     if(abilities[ab].kind==AB_CLEANSE)return core_cleanse_pack(s,r+1);

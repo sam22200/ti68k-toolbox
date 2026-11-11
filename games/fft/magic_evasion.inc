@@ -36,9 +36,9 @@ static u8 magic_hit(u8 a,u8 t,AbId ab,u8 execute)
     u8 returned=execute&2;execute&=1; // bit1: pure already-reflected forecast
     const Unit *u=&st.unit[t];const Ability *b=ab<NABIL?&abilities[ab]:RT_NULL;
     const u8 *raw=cj_range(common,ab>=512||ab==NO_ABIL?0:ab);
-    u8 ev[4],k,base=100,scale=1,id,tag,guard=0,physical=!b||b->formula==99||b->formula==0x37||b->formula==0x50||
+    u8 ev[4],k,base=100,scale=1,id,tag,guard=0,physical=!b||b->formula==99||b->formula==0x37||b->formula==0x50||b->formula==0x4F||
         (u8)(b->formula-0x25)<=7U||(u8)(b->formula-0x31)<=1U||(b->flags&AF_WEAPON),chance=100;
-    u8 accurate=b&&b->formula==0x50;   // monster status strikes: physical evasion, then the (MA+X)% roll
+    u8 accurate=b&&(b->formula==0x50||b->formula==0x4F);   // monster strikes: physical evasion, then the (MA+X)% roll
     u16 product;u8 factor[4];
     if(!b&&(!unit_can_act(&st.unit[a])||unit_petrified(u)||unit_airborne(u)))return 0;
     if(b&&!returned&&magic_reflects_from(a,t,ab))return 0;

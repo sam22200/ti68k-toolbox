@@ -364,6 +364,32 @@ def monster_status_magic_record(d,a,r):
     return 10,r[11],r[0],255,128|32|(0 if r[3]&1 else 1)
 
 
+def missing_hp_record(d,a,r):
+    """Damage = the caster's missing HP. Goblin Punch 0x4F: formula 0x50's physical evade
+    (flags_4 0x12) and (MA+X)% accuracy, a single target. Self Destruct 0x52: radius 2 around
+    the caster, never evaded, Oil at 100% on the others; the caster takes its own HP."""
+    if a==0x10F and tuple(r)==(1,0,1,9,0x11,0x10,0x12,0,0x4F,0x23,0,0,0,0):return 0,0,r[0],2*r[2],128|32|2
+    if (a==0x115 and tuple(r)==(0,2,3,2,0x10,0x10,1,0,0x52,0,0,0x65,0,0) and
+            d.at(battle.STATUS_SET+6*r[11],6)==bytes((0x80,0,0,0x80,0,0))):return 0,0,0,255,128|32|1
+    return None
+
+
+def beaking_record(r):
+    """Beaking (Cocatoris), formula 0x55: magical evasion (flags_4 0x12), (MA+X)% without
+    Faith, the target's PA loses Y; a single target at range 1."""
+    if tuple(r)!=(1,0,1,9,0x11,0x10,0x12,0,0x55,0x2d,2,0,0,0):return None
+    return 7,r[10],r[0],2*r[2],128|32|2
+
+
+def odd_soundwave_record(d,r):
+    """Odd Soundwave (Squidlarkin), formula 0x38 (the status application alone): its cancel set
+    on radius 2 around the caster, the caster included, area vertical 1; always applied, a miss
+    when nothing is removed. Core formula id 100 (cast_rules.h: FORMULA_AREA_CLEANSE)."""
+    if tuple(r)!=(0,2,1,2,0x10,0x10,1,0,0x38,0,0,0x37,0,0):return None
+    if d.at(battle.STATUS_SET+6*r[11],6)!=bytes((0x10,0,0,0x70,0x78,0x82)):return None
+    return 13,r[11],0,255,128|32|1
+
+
 def status_strike_record(d,r):
     """Monster status strikes, formula 0x50 (Eye Gouge, Poison Nail, Beak): Secret Fist's
     (MA+X)% physical-status accuracy after physical evasion (flags_4 0x12: evadeable, Blade
@@ -625,6 +651,12 @@ def battle_records(d):
             kind,y,rng,vert,flags=secret;formula=0x50   # status set in Y; X stays in the raw record
         elif monster_status:
             kind,y,rng,vert,flags=monster_status;formula=0x3D
+        elif a in (0x10F,0x115) and missing_hp_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14)):
+            kind,y,rng,vert,flags=missing_hp_record(d,a,d.at(battle.ABILITY_RANGE+14*a,14));formula=d.at(battle.ABILITY_RANGE+14*a,14)[8]
+        elif a==0x135 and beaking_record(d.at(battle.ABILITY_RANGE+14*a,14)):
+            kind,y,rng,vert,flags=beaking_record(d.at(battle.ABILITY_RANGE+14*a,14));formula=0x55
+        elif a==0x11F and odd_soundwave_record(d,d.at(battle.ABILITY_RANGE+14*a,14)):
+            kind,y,rng,vert,flags=odd_soundwave_record(d,d.at(battle.ABILITY_RANGE+14*a,14));formula=100
         elif guts:
             kind,y,rng,vert,flags,element=guts;formula=d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif talk:

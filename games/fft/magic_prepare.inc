@@ -59,6 +59,7 @@ static void magic_prepare(u8 a,u8 t,AbId ab,CastVictim *v)
         v->amount=amount;
         if(b->formula==0x24&&(u16)(muls16((s16)rand15(),100)>>15)<19&&magic_heal(a,t,ab,3))
             v->effect|=EFFECT_STATUS;
+        if(b->formula==0x52&&t!=a&&magic_heal(a,t,ab,3))v->effect|=EFFECT_STATUS;   // Self Destruct: Oil at 100%
         if(magic_status_formula(b->formula)&&!amount)v->hit=0;
     }else v->hit=0;
 #if MOD_PART(MOD_TARGETS)
