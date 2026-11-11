@@ -25,7 +25,7 @@ def main():
         log=run([*cmd,out/'mbcalls.89z']);(out/(label+'.log')).write_text(log);assert '_main returned'in log
         return log
     normal=execute('bindings',{});v=values(normal);assert v[-4]==1 and v[-2]==0 and v[-1]>100,v
-    zones=[s.strip()for s in normal.splitlines()if re.match(r'^(?:(?:61|62|63)\s+|max (?:61|62|63)\s+)',s)]
+    zones=[s.strip()for s in normal.splitlines()if re.match(r'^(?:(?:58|59|61|62|63)\s+|max (?:58|59|61|62|63)\s+)',s)]
     rejected={}
     with tempfile.TemporaryDirectory(prefix='fft-banks-bad-')as folder:
         temp=Path(folder)

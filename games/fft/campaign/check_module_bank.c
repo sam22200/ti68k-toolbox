@@ -25,20 +25,20 @@ static void check(u8 got,u8 expected)
 {
     checks++;digest=(digest<<1|digest>>31)^got;if(got!=expected)failures++;
 }
-static u8 valid(u16 asize,u16 bsize){return module_banks_valid(a,asize,b,bsize,1,3,4,0x1234,10);}
+static u8 valid(u16 asize,u16 bsize){return module_banks_valid(a,asize,b,bsize,1,3,4,0x1234,10,255);}
 static u8 valid_three(u16 csize)
-{return module_three_valid(a,34,b,54,c,csize,1,3,4,4,0x1234,10);}
+{return module_three_valid(a,34,b,54,c,csize,1,3,4,4,0x1234,10,255);}
 static void three_trials(void)
 {
     fresh();put(a,8,4);put(b,8,4);memcpy(c,a,34);put(c,4,3);
     check(valid_three(34),1);check(valid_three(40),1);
     check(valid_three(33),0);check(valid_three(41),0);
-    check(module_three_valid(a,34,b,54,0,34,1,3,4,4,0x1234,10),0);
+    check(module_three_valid(a,34,b,54,0,34,1,3,4,4,0x1234,10,255),0);
     c[12]^=1;check(valid_three(34),0);c[12]^=1;
     put(c,4,2);check(valid_three(34),0);put(c,4,3);
     put(c,8,3);check(valid_three(34),0);put(c,8,4);
     put(c,28,0);check(valid_three(34),0);put(c,28,0x1234);
-    check(module_three_valid(a,34,b,54,c,34,1,1,4,4,0x1234,10),0);
+    check(module_three_valid(a,34,b,54,c,34,1,1,4,4,0x1234,10,255),0);
 }
 static void trials(void)
 {
@@ -48,14 +48,14 @@ static void trials(void)
     for(i=35;i<40;i++)check(valid(i,54),0);
     for(i=55;i<60;i++)check(valid(34,i),0);
     check(valid(41,54),0);check(valid(34,61),0);
-    check(module_banks_valid(0,34,b,54,1,3,4,0x1234,10),0);
-    check(module_banks_valid(a,34,0,54,1,3,4,0x1234,10),0);
-    check(module_banks_valid(b,54,a,34,1,3,4,0x1234,10),0);
-    check(module_banks_valid(a,34,a,34,1,3,4,0x1234,10),0);
-    check(module_banks_valid(a,34,b,54,0,3,4,0x1234,8),0);
-    check(module_banks_valid(a,34,b,54,3,3,4,0x1234,8),0);
-    check(module_banks_valid(a,34,b,54,1,256,4,0x1234,10),0);
-    check(module_banks_valid(a,34,b,54,1,3,1,0x1234,10),0);
+    check(module_banks_valid(0,34,b,54,1,3,4,0x1234,10,255),0);
+    check(module_banks_valid(a,34,0,54,1,3,4,0x1234,10,255),0);
+    check(module_banks_valid(b,54,a,34,1,3,4,0x1234,10,255),0);
+    check(module_banks_valid(a,34,a,34,1,3,4,0x1234,10,255),0);
+    check(module_banks_valid(a,34,b,54,0,3,4,0x1234,8,255),0);
+    check(module_banks_valid(a,34,b,54,3,3,4,0x1234,8,255),0);
+    check(module_banks_valid(a,34,b,54,1,256,4,0x1234,10,255),0);
+    check(module_banks_valid(a,34,b,54,1,3,1,0x1234,10,255),0);
     for(i=0;i<20;i++){
         fresh();
         switch(i){

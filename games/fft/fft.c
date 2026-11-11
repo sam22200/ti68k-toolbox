@@ -942,6 +942,7 @@ u16 mod_entry(u8 op,u8 a)
     return batch_commit(&W->cast)&2;
 }
 #endif
+#include "companion.inc"
 #if !MOD_CORE && MOD_PART(MOD_NUMBERS)
 #define st_names CONTOUR_REF_st_names
 #include "forecast_text.inc"
@@ -3760,14 +3761,16 @@ static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
 static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context);
 static u8 area_paint(u8 who);
 
+static u16 special(u8 a,u8 t,AbId ab,u8 query);
 #include "module_defaults.inc"
-static u16 mod_call(u8 id, u8 op, u8 a)
+// Copies image id into dst (the zone, or the companion's block) and binds its context.
+static void mod_install(u8 id,u8 *dst)
 {
     const u8 *m = mod_images[id];
-    if (mod_id != id + 1) {
+    {
         u16 offset=RD16(m,4);
-        ModCtx *c=(ModCtx *)((u8 *)mod_zone+offset);
-        memcpy(mod_zone,m+10,offset);
+        ModCtx *c=(ModCtx *)(dst+offset);
+        memcpy(dst,m+10,offset);
         memcpy((u8 *)c+sizeof *c,m+12+offset,RD16(m,3)-offset-sizeof *c);
         memcpy(c,&mod_defaults,sizeof *c);
         c->map_w=map_w;
@@ -3791,6 +3794,31 @@ static u16 mod_call(u8 id, u8 op, u8 a)
         c->igfx=igfx;
         c->flow_bank=flow_bank;
         c->flow_ui=flow_ui;
+    }
+}
+// The companion (MOD_COMPANION): installed once in its own heap block (HW3Patch), then called
+// directly from the resident or any zone image, never swapped. Reinstalled when the bindings
+// it holds change (a new battle's Work or map); freed with the battle's buffers (release).
+static u16 *comp_block;
+static ModCtx *comp_context(void){return (ModCtx *)((u8 *)comp_block+RD16(mod_images[MOD_COMPANION],4));}
+static u16 special(u8 a,u8 t,AbId ab,u8 query)
+{
+    const u8 *m=mod_images[MOD_COMPANION];ModCtx *c;
+    if(!comp_block){
+        if(!m||!(comp_block=malloc(RD16(m,3))))return 0;
+        mod_install(MOD_COMPANION,(u8 *)comp_block);
+    }
+    c=comp_context();
+    if(c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){mod_install(MOD_COMPANION,(u8 *)comp_block);c=comp_context();}
+    c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;
+    return ((u16 (*)(u8,u8))((u8 *)comp_block+RD16(m,2)))(query,0);
+}
+static void companion_free(void){if(comp_block)free(comp_block);comp_block=RT_NULL;}
+static u16 mod_call(u8 id, u8 op, u8 a)
+{
+    const u8 *m = mod_images[id];
+    if (mod_id != id + 1) {
+        mod_install(id,(u8 *)mod_zone);
         mod_id = id + 1;
     }
     if(op==255)return 0;                // reserve255 for preload without execution
@@ -3818,7 +3846,7 @@ static u8 mod_ready(void)
     const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize),*c=rt_file("ffbo",&csize);
     mod_id=0;mod_images[MOD_RESOURCES]=RT_NULL; // (statics outlive a run: the RAM message's test)
     if(!mod_zone&&!(mod_zone=malloc(MOD_ZONE)))return 0;   // freed by final_release
-    if(!module_three_valid(a,asize,b,bsize,c,csize,MOD_BANK0_COUNT,MOD_BANK1_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE))return 0;
+    if(!module_three_valid(a,asize,b,bsize,c,csize,MOD_BANK0_COUNT,MOD_BANK1_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE,MOD_COMPANION))return 0;
     for(id=0;id<MOD_COUNT;id++){
         const u8 *bank=id<MOD_BANK0_COUNT?a:id<MOD_BANK1_END?b:c;
         u16 local=id<MOD_BANK0_COUNT?id:id<MOD_BANK1_END?id-MOD_BANK0_COUNT:id-MOD_BANK1_END;
@@ -4714,6 +4742,9 @@ release(void)
     if (vbuf) free(vbuf);
     sbuf = vbuf = RT_NULL;
     scene_l = scene_d = RT_NULL;
+#ifdef FFT_MODULES
+    companion_free();
+#endif
 }
 
 #ifdef FFT_CHAPTER
@@ -4752,7 +4783,7 @@ void game_init(void)
     sbuf=vbuf=RT_NULL;acache=RT_NULL; // reset before any allocation can fail
 #endif
 #ifdef FFT_MODULES
-    mod_zone=RT_NULL;
+    mod_zone=RT_NULL;comp_block=RT_NULL;
 #endif
 #ifndef FFT_MODULES
     battle_state=malloc(BATTLE_STORAGE_BYTES);

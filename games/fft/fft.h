@@ -142,7 +142,9 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_STATUS 23                      // bitmap commits and explicit status requests
 #define MOD_PLANNER 24                     // weapon geometry, recipients, previews and continuation
 #define MOD_AI_PREP 25                     // bounded victim/Math/collateral cache preparation
-#define MOD_COUNT 27
+#define MOD_COMPANION 27                   // non-canonical jobs', monsters' and bosses' rules: its own
+                                           // heap block, resident while loaded (HW3Patch), never the zone
+#define MOD_COUNT 28
 #define AI_BAD (-0x7FFF)
 #ifdef FFT_MODULE
 #define MOD_CORE 0
