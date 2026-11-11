@@ -46,9 +46,9 @@ def main():
                                     (6, battle.ITEM_ABILITY, 14 * 3),
                                     (7, common_tables.SPECIAL, 168),
                                     (8, common_tables.HUMAN, 0xB0 * 25),
-                                    (9, common_tables.MONSTER, 48 * 5),
-                                    (12, battle.STATUS_SET, 128 * 6)):
+                                    (9, common_tables.MONSTER, 48 * 5)):
         assert bank[offsets[section]:offsets[section] + count] == disc.at(address, count)
+    assert bank[offsets[12]:offsets[12] + 128 * 6] == common_tables.status_rows(disc)   # + Mbarrier's row
     assert bank[offsets[7]+168:offsets[7]+168+224] == disc.at(common_tables.ACTION_MENUS,224)
     assert bank[offsets[12]+128*6:offsets[12]+128*6+650] == common_tables.status_policy_bytes(disc)
     discovery=len(bank)-(96+2048+64+512)-128*8
