@@ -173,6 +173,17 @@ generic jobs only:
 - R/S/M used: Auto Potion, Counter, Weapon Guard, Equip Crossbow, Concentrate, Move+1,
   Jump+1 (all generic: covered by the 78 R/S/M consumers).
 
+**Monster copies done (2026-11-10): 122 of 155 executable, 33 missing.** Monster actions whose
+source record copies an already verified one are enabled (`common_tables.py`): 11 basic attacks
+(Tackle, Bite, Scratch... = Choco Attack, `MONSTER_ATTACK` replaces the id 265 hard-coded in
+six core sites), Small Bomb and Choco Ball (Punch Art strikes, formula 0x31), Cat Kick and
+Tail Swing (Dash's 0x37, evadeable), Shine Lover (Gil Taking), Gather Power (Accumulate, Y 2).
+A monster uses only its own set's learned abilities. Checked in `check_discovery.c` against
+the human action they copy (PC, sanitizers, 68000). Still needing family work with an oracle:
+Turn Punch (area vertical 1 where Spin Fist has 0), the formula 0x50 status family (Eye
+Gouge, Poison Nail, Black Ink, Look of Devil, Beak), Odd Soundwave (0x38), Holy Sword (0x2D:
+status on hit, area, line), then the ten new formulas (`HW3PATCH_USES.md` § 1).
+
 Caveat: the random-formation tier is read as "first pair of each route" (WLDCORE); some
 monsters listed (Dragon, Ahriman) may belong to later progress tiers. **The core cannot be
 frozen for Chapter I before monster actions and these special sets exist** (plus monster
