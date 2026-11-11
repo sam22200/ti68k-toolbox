@@ -13,6 +13,7 @@ def main():
     coverage=catalogue_report();(out/'coverage.json').write_text(json.dumps(coverage,indent=2)+'\n')
     result=trial("status_strike","check_status_strike.c",out,args.pc_only)
     result["part2"]=trial("status_strike","check_status_strike2.c",out/"part2",args.pc_only)
+    result["part3"]=trial("status_strike","check_status_strike3.c",out/"part3",args.pc_only)
     result.update(production_bank=coverage['bank_sha256'])
     (out/'results.json').write_text(json.dumps(result,indent=2)+'\n')
 
