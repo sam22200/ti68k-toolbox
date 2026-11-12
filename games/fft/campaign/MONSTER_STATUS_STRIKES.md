@@ -168,9 +168,17 @@ the plain Attack to Mighty Sword and to the Speed/Power/Mind Ruins (the equipmen
 and stat loss score below the damage), and gives Dark Sword and Magic Ruin no value (MP
 denial only counts against a caster).
 
+**Self Destruct** is offered to the area AI as hostile HP. No special rule: the caster is
+in its own radius, so it is one of the victims (it loses all its HP) and the planner's
+ordinary sum decides. At full HP (no damage), with one surviving enemy or with an ally in
+the blast it is not chosen; it is chosen when it kills the enemy or wounds three, and the
+execution kills the caster (1,705 checks with these cases, 95125A29). The source AI has no
+Self Destruct special case either (none found in `battle_ai_*`); its scores were not
+traced for this technique.
+
 ## Open
 
-Self Destruct is not offered to the AI (its sacrifice needs a scoring rule); Odd
+Self Destruct's AI rule is not compared with an original AI trace; Odd
 Soundwave's gain is checked on one case only; no full campaign battle replay holds these
 monsters yet; a direct-targeting cast aimed at an empty panel resolves to nobody
 (adaptation).

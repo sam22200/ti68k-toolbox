@@ -68,12 +68,14 @@ trajectory into TARGETS (it grew the zone by 1,100 bytes). Details and checks:
 
 **The AI uses them (2026-11-11).** `make core-ai-techniques-check` (`check_ai_techniques.c`):
 the real planner picks and the production order executes the monster techniques, the
-direct-targeting ones (clear line, ally or enemy on the line) and Holy Sword; 6EFBCA5E,
-1,424 checks, PC = sanitizers = 68000. Not preferred to Attack in that fixture: Mighty
+direct-targeting ones (clear line, ally or enemy on the line) and Holy Sword; 95125A29,
+1,705 checks, PC = sanitizers = 68000. Not preferred to Attack in that fixture: Mighty
 Sword, the Ruins; no value against a non-caster: Dark Sword, Magic Ruin.
 
-**Next.** Self Destruct is not offered to the AI (needs a sacrifice scoring rule); no full
-campaign battle replay holds these monsters yet. Then the rest of
+Self Destruct is offered too: the caster is one of its own victims, the ordinary sum
+decides (not compared with an original AI trace).
+
+**Next.** No full campaign battle replay holds these monsters yet. Then the rest of
 [Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
 one-command native chapter run. Other open: 0x4E area/line shapes and its direct oracle; a
 direct-targeting cast aimed at an empty panel resolves to nobody (the source can still hit
