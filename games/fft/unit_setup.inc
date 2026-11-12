@@ -34,6 +34,7 @@ static void fixed_units(void)
         u->zodiac=unit_zodiac[i];u->set=d->set;u->learned=DEF_LEARN(d);u->dc=3;
         for(k=0;k<5;k++){u->eq[k]=d->eq[k][0];u->raw[k]=RD32(igfx+CD(UNIT_RAW),(u16)(i*10+2*k));}
         unit_stats(u);
+        unit_status_seed(u,0); // fixed encounters need innate Float just like generated units
     }
     unit_reward_fields();monster_refresh();
 }
