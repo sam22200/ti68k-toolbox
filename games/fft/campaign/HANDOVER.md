@@ -75,12 +75,29 @@ Sword, the Ruins; no value against a non-caster: Dark Sword, Magic Ruin.
 Self Destruct is offered too: the caster is one of its own victims, the ordinary sum
 decides (not compared with an original AI trace).
 
+**Sweep of the core checks (2026-11-11).** The `core-*-check` targets are not in `make
+check`, and several had drifted during the lots above; all 105 non-source targets were run.
+One real regression: Odd Soundwave's core id 100 was Jump's (`JUMP_FORMULA`), so Lancer
+Jump went through the magic pipeline; the id is 101 now (`core-lancer-jump-check` caught
+it). The other failures were fixtures written for the earlier catalogue, repaired:
+synthetic records in the monster interval 0x100..0x16F need a monster caster
+(`fixture_monster.h`/`.py`: batch, area-forecast, area-ct, weather); cases built on a
+weapon skill carrying AREA without being an incantation (Stasis Sword before Holy Sword)
+are retired (area-ai, reactions, actions, incapacity, sleep); power-255 overflow profiles
+are skipped (bit 7 of the power marks formula 0x4E; retail powers stay below 128:
+area-forecast, elements, weather); targets (0x62 and direct targeting are owned shapes);
+percent (the catalogue validation is RESOURCES op 14). **Run the whole sweep after each
+lot**, not only the lot's own check: `for t in $(grep -o "^core-[a-z0-9-]*-check" Makefile)`.
+Before choosing a core pseudo-formula id, grep the existing ones (99 Throw, 100 Jump, 101
+area cleanse). Possible cleanup: the scalar path of a non-incantation AREA skill (the old
+cross splash) has no record left and may be dead code in the resident.
+
 **Next.** No full campaign battle replay holds these monsters yet. Then the rest of
 [Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
 one-command native chapter run. Other open: 0x4E area/line shapes and its direct oracle; a
 direct-targeting cast aimed at an empty panel resolves to nobody (the source can still hit
 a body on the way). Test seeds: spread them (`(k*0x9E3779B1)|1`), small xorshift seeds give
-tiny first draws and always pick the first random choice. The core id 100 is
+tiny first draws and always pick the first random choice. The core id 101 is
 `FORMULA_AREA_CLEANSE` (source 0x38 on the batch). A check fixture that goes through
 `cast_order` must respect the order's own range and height rules (a flat `W->hs` is not
 enough: `map_tiles[].stand`).

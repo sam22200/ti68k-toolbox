@@ -72,7 +72,9 @@ cancel set (Float, Reraise, Transparent, Regen, Protect, Shell, Haste, Faith, Re
 radius 2 around the caster, the caster included, area vertical 1. No evade, no accuracy, no
 draw; only present, non-innate statuses are removed, and nothing removed is a miss. The item
 cleanses already use 0x38 outside the magic pipeline, so the batch knows this record under
-the core id 100 (`FORMULA_AREA_CLEANSE`, `batch_formula` in `cast_rules.h`); the removal is
+the core id 101 (`FORMULA_AREA_CLEANSE`, `batch_formula` in `cast_rules.h`; it was 100 at
+first, which is Jump's core id: Lancer Jump went through the magic pipeline until the
+2026-11-11 fix); the removal is
 the existing cleanse path (`core_cleanse_pack`).
 
 ## Beaking (0x55, 2026-11-11)
@@ -94,7 +96,7 @@ to the AI yet** (its sacrifice needs a scoring rule of its own).
 ## Numbers (2026-11-11)
 
 `make core-status-strike-check` runs two programs (the 68000 size limit): strikes and 0x3D
-D0FD4866, 9,779 checks; Odd Soundwave, Beaking, Goblin Punch, Self Destruct 88C99485, 3,237
+D0FD4866, 9,779 checks; Odd Soundwave, Beaking, Goblin Punch, Self Destruct 80C99485, 3,237
 checks; `make core-discovery-check` FEFE4CC1, 17,811 checks; all PC = sanitizers = 68000.
 Resident input 57,285 (headroom 7,651), zone 8,698. Chapter I: 152 of 155. Secret Fist's
 and the Ruins' checks and the 37 campaign replays are unchanged.
@@ -140,11 +142,11 @@ loss); the trajectory on a flat row (clear line, a body on the line takes the te
 terrain leaves nobody, an empty aimed panel); production casts (Black Ink blinds, also the
 interposed body instead of the aimed unit; Look of Devil leaves each of its five statuses
 over the seeds; Look of Fright lowers Brave 70 -> 60). PC = sanitizers = 68000: 9807256F,
-8,887 checks; the two other programs are unchanged (D0FD4866, 88C99485).
+8,887 checks; the two other programs are unchanged (D0FD4866, 80C99485).
 
 ## Numbers (direct targeting, 2026-11-11)
 
-`make core-status-strike-check`: three programs, D0FD4866 (9,779), 88C99485 (3,237),
+`make core-status-strike-check`: three programs, D0FD4866 (9,779), 80C99485 (3,237),
 9807256F (8,887), all PC = sanitizers = 68000. Resident input 57,733: headroom 7,651 ->
 7,203 bytes; zone 8,698 (TARGETS 8,602). **Chapter I: 155 of 155 actions executable.** The
 other families' checks (discovery, Ruins, Holy/Dark/Mighty Sword, Secret Fist) and the 37
