@@ -58,8 +58,18 @@ static void monster_choices(void)
     technique_fixture(0x12E,3);plan(0,0);CHECK(st.ai_ab!=0x12E,1);
     technique_fixture(0x12E,3);st.unit[1].brave=15;plan(0,0);CHECK(st.ai_ab,0x12E);CHECK(at(2,1),1);
     execute();CHECK(W->cast.mask,2);
-    // Self Destruct is not offered yet.
-    technique_fixture(0x115,1);st.unit[0].hp=20;plan(0,0);CHECK(st.ai_ab!=0x115,1);
+    // Self Destruct: the caster is its own victim (it dies), so the technique is chosen only
+    // when the enemies' losses outweigh it.
+    technique_fixture(0x115,1);plan(0,0);CHECK(st.ai_ab!=0x115,1);                       // full HP: no damage
+    technique_fixture(0x115,1);st.unit[0].hp=20;plan(0,0);CHECK(st.ai_ab!=0x115,1);      // one enemy survives
+    technique_fixture(0x115,1);st.unit[0].hp=20;put_unit(2,1,4,0,TEAM_PLAYER);
+    plan(0,0);CHECK(st.ai_ab!=0x115,1);                                                  // an ally in the blast
+    technique_fixture(0x115,1);st.unit[0].hp=20;st.unit[1].hp=60;
+    plan(0,0);CHECK(st.ai_ab,0x115);CHECK(at(2,4),1);                                    // it kills the enemy
+    execute();CHECK(W->cast.mask,3);impact();CHECK(st.unit[0].hp,0);CHECK(st.unit[1].hp,0);
+    technique_fixture(0x115,1);st.unit[0].hp=20;put_unit(2,1,4,0,TEAM_ENEMY);put_unit(3,3,4,0,TEAM_ENEMY);
+    plan(0,0);CHECK(st.ai_ab,0x115);                                                     // three enemies wounded
+    execute();CHECK(W->cast.mask,15);impact();CHECK(st.unit[0].hp,0);CHECK(st.unit[1].hp,20);CHECK(st.unit[3].hp,20);
 }
 // Direct targeting from the planner: a clear line is used; an ally on the line makes the
 // technique useless (it would take it); an enemy on the line takes it at execution.
