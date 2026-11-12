@@ -21,7 +21,11 @@ static void source_results(void)
 {
     u16 n,amount;u8 kind,hit;u32 seed,hash;AbId ab;char text[40];
     for(n=0;n<sizeof source_elements/sizeof source_elements[0];n++){
-        const u16 *p=source_elements[n];ab=profile(p);seed=rng32;hash=state_hash();
+        const u16 *p=source_elements[n];
+        // The power-255 overflow profile is not representable: bit 7 of the power marks formula
+        // 0x4E (no Faith); retail powers stay below 128 (max 96).
+        if(p[1]==255)continue;
+        ab=profile(p);seed=rng32;hash=state_hash();
         kind=skill_kind(U_RAMZA,10,ab);CHECK(kind,p[16]==128?AB_DAMAGE:p[16]==64?AB_HEAL:AB_NULL);
         CHECK(state_hash()==hash,1);CHECK(rng32==seed,1);
         ZB(46);amount=skill_amount(U_RAMZA,10,ab,0);ZE(46);

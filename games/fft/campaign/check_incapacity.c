@@ -123,14 +123,8 @@ static void ordinary_effects(void)
     arena();keep_enemy();st.reaction[10]=REACTION_COUNTER;root(1);CHECK(st.action.pending!=0,1);
     stone(10);end_anim();CHECK(st.primary.running,0);CHECK(st.action.pending,0);
 }
-static void splash(void)
-{
-    AbId ab;u16 hp;
-    arena();keep_enemy();stone(12);
-    for(ab=0;ab<512;ab++)if(abilities[ab].kind==AB_DAMAGE&&(abilities[ab].flags&AF_AREA)&&!(abilities[ab].flags&AF_CAST))break;
-    CHECK(ab<512,1);hp=st.unit[12].hp;skill(U_RAMZA,10,ab);st.hit=1;st.dmg=1;st.push=0;impact();
-    CHECK(st.unit[10].hp,998);CHECK(st.unit[12].hp,hp);CHECK(unit_at_cell(third),13);
-}
+// The splash case (a petrified unit skipped by a weapon skill carrying AREA without being an
+// incantation, Stasis Sword before Holy Sword) has no record left.
 static void ai_targeting(void)
 {
     u8 i,petrify;
@@ -157,7 +151,7 @@ static void thirteen(void)
     for(i=0;i<NUNIT;i++)stone(i);CHECK(outcome(),END_DEFEAT);
     ZB(48);turn_start();ZE(48);CHECK(st.mode,M_END);CHECK(st.end,END_DEFEAT);CHECK(st.morph_mask,0);
 }
-static void incapacity_trials(void){outcomes();forecast_and_at();last_node();terminal_door();ordinary_effects();splash();ai_targeting();thirteen();}
+static void incapacity_trials(void){outcomes();forecast_and_at();last_node();terminal_door();ordinary_effects();ai_targeting();thirteen();}
 #ifndef __m68k__
 int main(void){sw_init(61);incapacity_trials();printf("incapacity %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
 #else

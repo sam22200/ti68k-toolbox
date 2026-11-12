@@ -151,7 +151,9 @@ static void forecasts(void)
 static void extra_effects(void)
 {
     u8 trial,i;AbId ab;
-    for(trial=0;trial<2;trial++){
+    // The AREA trial used a weapon skill carrying AREA without being an incantation (Stasis
+    // Sword before Holy Sword); no such record remains, so only the drain trial runs.
+    for(trial=0;trial<1;trial++){
         u8 flag=trial?AF_AREA:AF_DRAIN;
         reset();
         for(i=0;i<NUNIT;i++)st.unit[i].max_hp=st.unit[i].hp=999;
