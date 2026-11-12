@@ -2,13 +2,23 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
-### Resume here (validation completed 2026-11-12)
+### Resume here (Sweegy rules/save integration, 2026-11-12)
 
-**Git.** Completed lot: **`feat/fft-self-destruct-ai`**, based on `main` d2e585a,
+**Latest delivery.** [Sweegy monster battle](CHAPTER1_MONSTER_BATTLE.md): three
+complete production-update fights on PC/ASan/UBSan,13 actors on source MAP074
+terrain with ENTD180 monsters/guests and frozen generation inputs. Two victories
+and one defeat cover114 actions, including46 monster actions and Self Destruct.
+Initial fixed-unit Float and reward payment outside Gariland were real bugs,
+now fixed in PARTY8/SAVE4. One selected68000 boot/save run agrees with PC
+(45 checks/C024ACA4); no full native fights/sweep or live-emulator run.
+ABI86/zone8698/input57733/headroom7203 and layouts remain. Evidence:
+`x/chapter1-monster-battle/`. PC-first validation below supersedes per-lot sweeps.
+
+**Previous validated lot.** **`feat/fft-self-destruct-ai`**, based on `main` d2e585a,
 validated source head **fea4e51**. Its eight commits add Self Destruct to the area AI
 (75fe44b), fix Jump's formula-id collision (6a80b7d), repair drifted core checks
 (3f1b160, eb0a617, 59bc8c6) and document the work (1d4af4b, a63cf45, fea4e51).
-The validation continuation changes documentation only. The user's own uncommitted
+That sweep's continuation changed documentation only. The user's own uncommitted
 files, tenchu, `.gitignore`, `README.md`, `check_*.s`, are not ours: leave them.
 
 **Final sweep completed.** The detached sweep was still running when resumed; it was
@@ -35,13 +45,16 @@ lancer-jump 0D8F8FB5, actions 3BD1B082, elements, incapacity, sleep, percent, we
 checks); jump E23CBC36. An earlier pass of the other targets (before the id change 100 ->
 101) was green except those listed.
 
-**Not done, in order.** 1. No full campaign battle replay holds the Chapter I
-monsters yet (the AI check uses a synthetic 5 x 5 grid). 2. The AI's choices on these
+**Not done.** The first complete monster rules/save replay now passes, but its
+scenery, monster actor banks, event content and installed chapter route remain
+content work. Next core-readiness work: remeasure/recover the16KB battle RAM
+margin, confirm the final archive budget, automate the installed native chapter
+flow and freeze the core interface. The AI's choices on these
 techniques were not compared with original AI traces (Self Destruct's rule, Mighty Sword
 and the Ruins losing to Attack, Dark Sword and Magic Ruin worth nothing against a
-non-caster). 3. Possible dead code: the scalar path of a non-incantation AREA skill.
-4. Then `CHAPTER1_READINESS.md`: battle RAM margin, archive budget, one-command native
-chapter run.
+non-caster); exact PS1 AI and possible dead scalar AREA code are separate work.
+See `CHAPTER1_READINESS.md`; its11.4KB RAM measurement predates the companion
+reservation and subsequent program growth.
 
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
 [Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
@@ -55,7 +68,7 @@ own code (a flag, a parameter); the companion (`MOD_COMPANION` 27, preloaded blo
 (probe only). Emulator checks read RAM/logs (`ti-mem`, `tilog`, `fftmem.py`), not PNGs.
 French replies; commit with `ti-commit` (branch per task, explicit paths, merge when green).
 
-**Done this session (all merged on `main`):** HW3Patch check + heap module zone; monster
+**Previously merged on `main`:** HW3Patch check + heap module zone; monster
 actions copying verified records (`MONSTER_ATTACK`); companion mechanism + preload; formula
 0x4E (formula 0x08 without Faith); Holy Sword 0x2D incl. Holy Explosion's line; Dark Sword
 0x2F (MP drain); Mighty Sword 0x2E (strike + equipment break); Ruins 0x1A/0x1B. Bug fixed on
@@ -128,14 +141,16 @@ weapon skill carrying AREA without being an incantation (Stasis Sword before Hol
 are retired (area-ai, reactions, actions, incapacity, sleep); power-255 overflow profiles
 are skipped (bit 7 of the power marks formula 0x4E; retail powers stay below 128:
 area-forecast, elements, weather); targets (0x62 and direct targeting are owned shapes);
-percent (the catalogue validation is RESOURCES op 14). **Run the whole sweep after each
-lot**, not only the lot's own check: `for t in $(grep -o "^core-[a-z0-9-]*-check" Makefile)`.
+percent (the catalogue validation is RESOURCES op 14). **Validation policy updated by
+the user, 2026-11-12:** PC tests, sanitizer replays and complete gameplay/save flows
+first; selected TI checks only for changed native-sensitive paths. Do not repeat
+the whole native sweep after each lot; reuse this completed baseline.
 Before choosing a core pseudo-formula id, grep the existing ones (99 Throw, 100 Jump, 101
 area cleanse). Possible cleanup: the scalar path of a non-incantation AREA skill (the old
 cross splash) has no record left and may be dead code in the resident.
 
-**Next.** No full campaign battle replay holds these monsters yet. Then the rest of
-[Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
+**Next.** The complete Sweegy rules/save replay now passes (latest delivery above).
+Continue [Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
 one-command native chapter run. Other open: 0x4E area/line shapes and its direct oracle; a
 direct-targeting cast aimed at an empty panel resolves to nobody (the source can still hit
 a body on the way). Test seeds: spread them (`(k*0x9E3779B1)|1`), small xorshift seeds give
@@ -144,7 +159,7 @@ tiny first draws and always pick the first random choice. The core id 101 is
 `cast_order` must respect the order's own range and height rules (a flat `W->hs` is not
 enough: `map_tiles[].stand`).
 
-**Next steps (2026-11-10): [Chapter I readiness](CHAPTER1_READINESS.md)** — battle RAM margin: ragged depth, map envelope and the RAM message are done (~11.4 KB free natively, was ~1.2 KB); the hidden gray buffer and ring backups remain to reach 16 KB. Then the archive budget, a one-command native chapter run and a frozen core interface (resident headroom: 107 bytes).
+**Historical readiness plan (2026-11-10): [Chapter I readiness](CHAPTER1_READINESS.md)** — ragged depth, the map envelope and the RAM message were done (~11.4 KB free before the companion reservation); the hidden gray buffer and ring backups remain to reach 16 KB. Then the archive budget, a one-command native chapter run and a frozen core interface. Use the current headroom above.
 
 Current optimization checkpoint (2026-11-07): [Final pass](CORE_OPTIMIZATION.md).
 The shared actor cache tries its remembered entry, validating its current key

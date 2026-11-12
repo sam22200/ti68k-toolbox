@@ -1,5 +1,17 @@
 # Validation by affected dependency
 
+Current default (user decision 2026-11-12): run affected PC tests and sanitizer
+replays first, including complete combat and save flows. Native checks are
+selected for changed ABI/layouts, arithmetic/pointer paths, overlay calls,
+CPU budgets or hardware dependencies. Reuse unchanged native evidence; a new
+lot does not require the 103-target native sweep. That completed sweep is the
+2026-11-12 baseline in `x/core-sweep-20261112/`, not a per-edit checklist.
+
+`make chapter1-monster-battle-check` defaults to three complete Sweegy rules/save
+replays on PC plus sanitizers. `check_monster_battle.py --native` adds one
+selected PARTY/SAVE initialization/receipt carrier, not full native fights.
+Source inputs, bounds and evidence: [Monster battle](CHAPTER1_MONSTER_BATTLE.md).
+
 Current optimization checks (2026-11-07): [Final pass](CORE_OPTIMIZATION.md).
 `make test` includes58 actor-cache boundary checks and scene allocation/reentry
 checks. Cache PC/sanitizers/68000 agree; scene lifetime sanitizers, nine scene

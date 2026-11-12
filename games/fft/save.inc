@@ -169,7 +169,7 @@ static void save_campaign(void)
     if (w--) save.flags[w >> 3] |= (u8)(1 << (w & 7));
     if (CD(LOCATION)) save.loc = (u8)CD(LOCATION);      // the battle's place on the world map
     if (CD(PARTY) & 1 || st.party_in) save_party();
-    if(flow_bank&&CD(LOCATION)==7&&st.reward_ready&&!already)save_rewards();
+    if(flow_bank&&st.reward_ready&&!already&&(CD(PARTY)&1||st.party_in))save_rewards();
     rt_save(SAVE_NAME, &save, sizeof save);
 }
 

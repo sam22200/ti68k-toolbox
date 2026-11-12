@@ -1,5 +1,10 @@
 # Opening -> Academy -> Gariland
 
+Current monster integration (2026-11-12): [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md).
+Three complete PC/sanitizer fights exercise13 actors on the original terrain;
+fixed-unit innate Float and rewards outside Gariland are repaired. One selected
+68000 initialization/save check passes; no full TI sweep or emulator run.
+
 Current distribution (2026-11-07): [separate core and chapter packages](CORE_PACKAGES.md).
 `make packages` writes `x/packages/fft-core.89g` and `chapter-01.89g` with matching
 metadata, size reports and installation/removal lists. `make chapter-package`
