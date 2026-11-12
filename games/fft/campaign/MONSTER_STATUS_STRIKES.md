@@ -150,7 +150,27 @@ over the seeds; Look of Fright lowers Brave 70 -> 60). PC = sanitizers = 68000: 
 other families' checks (discovery, Ruins, Holy/Dark/Mighty Sword, Secret Fist) and the 37
 campaign replays are unchanged.
 
+## The AI on these techniques (`check_ai_techniques.c`, 2026-11-11)
+
+`make core-ai-techniques-check`: the actual planner (`ai_think`) on a flat 5 x 5 grid, then
+the AI's own aim step into the production order. Chosen and executed: Eye Gouge, Poison
+Nail, Beak, Death Sentence, Goblin Punch (a wounded caster), Beaking (against a weak
+Attack), Black Ink, Look of Devil, Mind Blast (a centre covering the enemy, not the
+caster), Odd Soundwave (an enemy with Protect and Haste: both stripped), Turn Punch (two
+adjacent enemies), Look of Fright (only when the Brave drop reaches Chicken: the area AI
+gives a Brave loss no other immediate value), the five Holy Sword skills (Split Punch and
+Crush Punch through the scalar strike, the others through the batch). Direct targeting: a
+clear line is used; an ally on the line leaves no action (it would take the technique); an
+enemy on the line takes it at execution. PC = sanitizers = 68000: 6EFBCA5E, 1,424 checks.
+
+Seen in the same fixture, not asserted: against one adjacent non-caster the planner prefers
+the plain Attack to Mighty Sword and to the Speed/Power/Mind Ruins (the equipment break
+and stat loss score below the damage), and gives Dark Sword and Magic Ruin no value (MP
+denial only counts against a caster).
+
 ## Open
 
-No battle replay shows the AI choosing these techniques; Self Destruct is not offered to
-the AI; a direct-targeting cast aimed at an empty panel resolves to nobody (adaptation).
+Self Destruct is not offered to the AI (its sacrifice needs a scoring rule); Odd
+Soundwave's gain is checked on one case only; no full campaign battle replay holds these
+monsters yet; a direct-targeting cast aimed at an empty panel resolves to nobody
+(adaptation).
