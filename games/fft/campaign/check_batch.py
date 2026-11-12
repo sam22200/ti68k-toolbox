@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compound formula08 preparation/payment/commit and response drain on PC/sanitizers/68000."""
 import argparse,json,re,tempfile
+from fixture_monster import monster_sets
 from pathlib import Path
 from check import HERE,ROOT,run
 from check_flow import data_links
@@ -31,6 +32,7 @@ def main():
         catalogue[norm+12*(0x110+i):norm+12*(0x111+i)]=catalogue[norm+12*0x112:norm+12*0x113]
     catalogue[raw+14*0x11e+5]|=4
     catalogue[norm+12*0x11f+4]|=16
+    monster_sets(catalogue)
     (fixture/'ffcj.bin').write_bytes(catalogue)
     with tempfile.TemporaryDirectory(prefix='fft-batch-')as folder:
         data=Path(folder);data_links(data)

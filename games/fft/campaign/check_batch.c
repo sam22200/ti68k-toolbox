@@ -1,6 +1,11 @@
 // Caller-owned compound preparation, once-only MP/HP and existing root drain.
 #define BATCH_CHECK
 #include "check_targets.c"
+#include "fixture_monster.h"
+static u8 fixture_cast_batch(u8 op,CastBatch *b){if(b)fixture_monster(b->actor,b->ability);return cast_batch(op,b);}
+static u8 fixture_cast_forecast(CastBatch *b){if(b)fixture_monster(b->actor,b->ability);return cast_forecast(b);}
+#define cast_batch fixture_cast_batch
+#define cast_forecast fixture_cast_forecast
 static CastBatch batch;
 static u32 batch_state_hash(void){return world_hash();}
 static void prepare_profile(const u16 *p)
@@ -70,7 +75,7 @@ static void rejected_and_empty(void)
 {
     u16 size,p[189];u32 seed,hash;const u8 *src=rt_file("fba00",&size);u8 i;
     read_profile(src,2,p);prepare_profile(p);batch.ability+=2;
-    st.unit[0].mp=6;hash=batch_state_hash();seed=rng32;
+    st.unit[0].mp=6;fixture_monster(0,batch.ability);hash=batch_state_hash();seed=rng32;   // the caster's set before the hash
     CHECK(cast_batch(CAST_BATCH_PREPARE,&batch),0);CHECK(batch_state_hash()==hash,1);CHECK(rng32==seed,1);
     CHECK(batch.phase,CAST_BATCH_EMPTY);CHECK(batch.mask,0);
     CHECK(cast_batch(2,&batch),0);CHECK(cast_batch(0,RT_NULL),0);CHECK(cast_batch(1,&batch),0);

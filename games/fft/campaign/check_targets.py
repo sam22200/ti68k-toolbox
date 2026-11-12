@@ -24,7 +24,7 @@ def main():
         r=bytearray(fire);r[1]=row['aoe'];r[2]=row['vert'];r[3]=row['f1'];r[4]=row['f2'];r[6]=row['f4']
         catalogue[raw+(0x100+i)*14:raw+(0x100+i)*14+14]=r
     # Jump has no generic area footprint; Steal Heart and performances now have owned shapes.
-    for i,(field,value)in enumerate(((8,0x62),(3,32),(4,2),(4,8),(6,32))):
+    for i,(field,value)in enumerate(((8,0x25),(3,32),(4,2),(4,8))):   # 0x62 and direct targeting (flags_4 0x20) are owned now
         r=bytearray(fire);r[field]=value;catalogue[raw+(0x150+i)*14:raw+(0x150+i)*14+14]=r
     (fixture/'ffcj.bin').write_bytes(catalogue)
     with tempfile.TemporaryDirectory(prefix='fft-targets-')as folder:

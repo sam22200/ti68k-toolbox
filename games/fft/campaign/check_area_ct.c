@@ -1,6 +1,7 @@
 // Owned ordinary area packets through real command/CT/impact/response dispatch.
 #define REACTION_SEQUENCE_CHECK
 #include "check_reactions.c"
+#include "fixture_monster.h"
 #define AREA_AB 0x110
 static u32 area_hash(void)
 {
@@ -22,6 +23,7 @@ static void area_prepare(void)
     }
     unit_place(&st.unit[8],third);st.unit[8].team=TEAM_ENEMY;
     st.weather=0;st.acted=st.moved=st.open_resolving=st.open_ct_phase=0;
+    fixture_monster(U_RAMZA,AREA_AB);
     CHECK(W->cast.phase,CAST_BATCH_EMPTY);CHECK(sizeof W->cast,60);
 }
 static void area_cure(u8 who,u8 sid)
@@ -137,6 +139,7 @@ static void area_clock(void)
 static void area_responses(void)
 {
     CastBatch copy;u8 k;area_prepare();
+    fixture_monster(10,AREA_AB);
     CHECK(cast_order(U_RAMZA,10,AREA_AB,1),2);CHECK(cast_order(10,U_RAMZA,AREA_AB,1),2);
     st.pending[U_RAMZA].ticks=st.pending[10].ticks=0;st.open_ct_phase=1;
     st.reaction[10]=REACTION_POTION;st.unit[10].brave=100;
