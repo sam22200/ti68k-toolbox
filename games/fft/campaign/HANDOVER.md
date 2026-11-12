@@ -2,6 +2,54 @@
 
 ## Current state (2026-11-11): Chapter I actions, 155 of 155 executable
 
+### Resume here (handover written 2026-11-11, work in progress)
+
+**Git.** `main` (d2e585a, pushed) holds everything up to the AI check on the Chapter I
+techniques. Branch **`feat/fft-self-destruct-ai`** (pushed, **not merged**) holds seven
+commits on top: Self Destruct offered to the area AI (75fe44b), the Jump fix (6a80b7d),
+the repaired core checks (3f1b160, eb0a617, 59bc8c6) and docs (1d4af4b, a63cf45). The
+working tree has no other change of this work (the user's own uncommitted files, tenchu,
+`.gitignore`, `README.md`, `check_*.s`, are not ours: leave them).
+
+**What blocks the merge.** A final sweep of the 103 non-source `core-*-check` targets was
+started on that branch, in a detached shell: one log per target and a `summary` file
+(`<target> rc <code>` lines, then `ALLDONE`) in the session scratchpad,
+`/tmp/claude-1001/-home-samuelcoz-workspace-ti/85d91ac6-2a6c-4ec6-827e-b1062444ec31/scratchpad/final/`.
+When this was written 22 of 103 had finished, all rc 0 (actions .. charge-hands, in
+alphabetical order). If the scratchpad is gone or the sweep was interrupted, rerun it
+(about 1.5 h, run it detached, a foreground `make` gets killed):
+
+```sh
+cd games/fft/campaign && export PATH=$PWD/../../../tools/bin:$PATH && mkdir -p /tmp/sweep
+for t in $(grep -o "^core-[a-z0-9-]*-check" Makefile | sort -u | grep -v "source\|packages\|profile"); do
+  timeout 1500 make $t > /tmp/sweep/$t.log 2>&1; echo "$t rc $?" >> /tmp/sweep/summary; done
+```
+
+Then, if every line is rc 0: `python check.py` (37 replays, unchanged so far),
+`tools/headroom.sh` (expect input 57,733, headroom 7,203, zone 8,698), and merge with the
+`ti-commit` rules (`git merge --no-ff feat/fft-self-destruct-ai`, push, delete the branch).
+A red target: read its log (`^line`, `failures`, `AssertionError`) and decide between a real
+regression and a fixture written for an earlier catalogue (the cases met are listed in
+"Sweep of the core checks" below). `make -k check` fails only on `manage-test` (known).
+
+**Verified on the branch before the final sweep** (each PC = sanitizers = 68000): every
+target that had failed, rerun green after its repair: area-ai B10402B5, batch 94558E80,
+area-forecast 4B89E4DD, area-ct 11D6FCB4, targets 9F81A9CC, reactions B3886956,
+lancer-jump 0D8F8FB5, actions 3BD1B082, elements, incapacity, sleep, percent, weather
+67702743; status-strike D0FD4866 / 80C99485 / 9807256F; ai-techniques 95125A29 (1,705
+checks); jump E23CBC36. An earlier pass of the other targets (before the id change 100 ->
+101) was green except those listed.
+
+**Not done, in order.** 1. Finish the sweep and merge (above). 2. The sentence "all 105
+non-source targets were run" below says 105: the count is 103, and it is only true once
+the sweep ends; correct it then. 3. No full campaign battle replay holds the Chapter I
+monsters yet (the AI check uses a synthetic 5 x 5 grid). 4. The AI's choices on these
+techniques were not compared with original AI traces (Self Destruct's rule, Mighty Sword
+and the Ruins losing to Attack, Dark Sword and Magic Ruin worth nothing against a
+non-caster). 5. Possible dead code: the scalar path of a non-incantation AREA skill.
+6. Then `CHAPTER1_READINESS.md`: battle RAM margin, archive budget, one-command native
+chapter run.
+
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
 [Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
 
