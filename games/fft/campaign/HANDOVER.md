@@ -66,9 +66,14 @@ before each TARGETS entry (`cast_direct_fetch`, as `hamedo_line`); do not copy t
 trajectory into TARGETS (it grew the zone by 1,100 bytes). Details and checks:
 [Monster status strikes](MONSTER_STATUS_STRIKES.md).
 
-**Next.** The AI and these techniques: no battle replay shows the AI choosing the new
-monster or sword techniques; Self Destruct is not offered to the AI (needs a sacrifice
-scoring rule); Odd Soundwave's cleanse gain is unverified. Then the rest of
+**The AI uses them (2026-11-11).** `make core-ai-techniques-check` (`check_ai_techniques.c`):
+the real planner picks and the production order executes the monster techniques, the
+direct-targeting ones (clear line, ally or enemy on the line) and Holy Sword; 6EFBCA5E,
+1,424 checks, PC = sanitizers = 68000. Not preferred to Attack in that fixture: Mighty
+Sword, the Ruins; no value against a non-caster: Dark Sword, Magic Ruin.
+
+**Next.** Self Destruct is not offered to the AI (needs a sacrifice scoring rule); no full
+campaign battle replay holds these monsters yet. Then the rest of
 [Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
 one-command native chapter run. Other open: 0x4E area/line shapes and its direct oracle; a
 direct-targeting cast aimed at an empty panel resolves to nobody (the source can still hit
