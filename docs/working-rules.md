@@ -13,6 +13,13 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **PC-first validation (user decision 2026-11-12):** develop and replay primarily
+  on the PC, including sanitizers and complete gameplay/save flows. Do not run
+  large TI sweeps after each lot. Use a small native check only for a changed
+  ABI/layout, arithmetic or pointer path, overlay boundary, CPU budget or
+  hardware-dependent behavior that needs it. Reuse unchanged native evidence.
+  This supersedes older per-lot whole-sweep instructions in FFT handovers.
+
 - **FFT final optimization pass (2026-11-07):** Read
   `games/fft/campaign/CORE_OPTIMIZATION.md`. Shared actor lookup first checks
   the remembered entry's current key; retain eviction validation and the

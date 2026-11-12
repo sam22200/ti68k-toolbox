@@ -1,5 +1,15 @@
 # Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-10)
 
+Current integration (2026-11-12): all155 audited Chapter I actions are executable.
+[Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md) now exercise the first
+complete monster fights on PC/sanitizers (13 actors, source terrain, frozen
+generation inputs); one selected68000 boot/save carrier covers the two cold
+fixes. This does not ship the remaining chapter artwork or event content.
+The RAM/archive measurements below are dated planning evidence: the11.4KB free
+RAM predates the companion's3074-byte reservation and later program growth.
+Current free RAM must be remeasured before claiming the16KB target. Program
+headroom is7203 bytes; it is not free battle RAM.
+
 Chapter I has about 20 battle maps and 20 scenes; the pilot ships 2 of each. Tackle these in
 order before producing Chapter I content. State of the 2026-11-08 session: saves as in FFT,
 scene skip, hidden DEBUG page, APPS selection, live AI-pause animation, `fftmem.py`/`tilog`
