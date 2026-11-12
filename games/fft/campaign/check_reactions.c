@@ -170,21 +170,9 @@ static void potions(void)
     arena();st.reaction[10]=REACTION_POTION;change(10,SID_SLEEP);root(0);
     CHECK(core_status_current(&st.unit[10].statuses,4)&0x10,0);CHECK(st.action.pending!=0,1);
 }
-static void shared_stock(void)
-{
-    u16 ab,hp;
-    arena();st.unit[10].team=TEAM_PLAYER;st.unit[10].hp=100;
-    unit_place(&st.unit[12],third);st.unit[12].hp=st.unit[12].max_hp=999;
-    st.unit[12].team=TEAM_PLAYER;st.unit[12].dc=3;st.unit[12].brave=100;
-    st.reaction[10]=st.reaction[12]=REACTION_POTION;st.bag[0]=1;st.bag[1]=st.bag[2]=0;
-    for(ab=0;ab<512;ab++)if((abilities[ab].flags&(AF_AREA|AF_CAST))==AF_AREA)break;
-    CHECK(ab<512,1);skill(U_RAMZA,10,ab);st.hit=1;st.push=0;st.dmg=4;impact();
-    CHECK(st.action.pending,((u16)1<<10)|((u16)1<<12));hp=st.unit[12].hp;
-    end_anim();CHECK(st.atk,10);CHECK(st.bag[0],0);impact();end_anim();
-    CHECK(st.primary.running,0);CHECK(st.action.pending,0);CHECK(st.unit[12].hp,hp);
-    CHECK(st.atk,U_RAMZA);CHECK(st.tgt,10);CHECK(st.dmg,4);CHECK(st.gain!=0,1);
-    end_anim();CHECK(st.action.phase,CTX_IDLE);
-}
+// The shared Potion stock of two reactors used a weapon skill carrying AREA without being an
+// incantation (Stasis Sword before Holy Sword); no such record remains. The batch form is in
+// check_batch.c (responses_and_late_protection).
 static void saved_reaction(void)
 {
     reset();party_load();CHECK(st.party_in,1);CHECK(st.reaction[U_RAMZA],REACTION_COUNTER);
@@ -239,7 +227,7 @@ static void terminals(void)
     CHECK(st.unit[U_RAMZA].hp,0);CHECK(st.end,END_NONE);end_anim();CHECK(st.end,END_DEFEAT);
     CHECK(st.action.phase,CTX_IDLE);CHECK(st.unit[U_RAMZA].jp,jp);CHECK(st.unit[10].gjp,0);
 }
-static void trials(void){saved_reaction();source();counter();potions();shared_stock();ranged_counter();terminals();}
+static void trials(void){saved_reaction();source();counter();potions();ranged_counter();terminals();}
 #if !defined(REACTION_FRAME_CHECK) && !defined(REACTION_SEQUENCE_CHECK)
 #ifndef __m68k__
 int main(void){sw_init(61);trials();printf("reactions %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}

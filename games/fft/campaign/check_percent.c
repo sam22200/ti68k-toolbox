@@ -129,9 +129,10 @@ static void presentation_and_boot(void)
     for(k=0;k<4;k++){
         u16 bytes=k==0?size:k==1?0:k==2?31:size-1;u8 valid;
 #ifdef FFT_MODULES
-        mod_call(MOD_SCREENS,255,0);mod_context(MOD_SCREENS)->w=RT_NULL;
-        mod_context(MOD_SCREENS)->common=k==3?RT_NULL:bank;mod_context(MOD_SCREENS)->desc_size=bytes;
-        valid=(u8)mod_call(MOD_SCREENS,12,0);mod_id=0;
+        // The catalogue validation lives in RESOURCES (op 14) since the RAM message took op 12.
+        mod_call(MOD_RESOURCES,255,0);mod_context(MOD_RESOURCES)->w=RT_NULL;
+        mod_context(MOD_RESOURCES)->common=k==3?RT_NULL:bank;mod_context(MOD_RESOURCES)->desc_size=bytes;
+        valid=(u8)mod_call(MOD_RESOURCES,14,0);mod_id=0;
 #else
         valid=cj_valid(k==3?RT_NULL:bank,bytes);
 #endif

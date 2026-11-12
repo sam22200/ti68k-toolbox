@@ -58,7 +58,9 @@ static void xa_rules(void)
         d=p[4]*p[1];CHECK(attack_damage(U_RAMZA,10,0,0),d>999?999:d);
         d=(p[4]+(p[4]>>1))*p[1];CHECK(attack_damage(U_RAMZA,10,1,0x4000),d>999?999:d);
         CHECK(skill_amount(U_RAMZA,10,random,0),p[4]);
-        CHECK(skill_amount(U_RAMZA,10,sword,0),p[4]*(1+abilities[sword].y));
+        // Holy Sword: the same XA times (the sword's WP + Y), i.e. the sword's Attack plus XA * Y.
+        a->eq[EQ_WEAPON]=33;d=attack_damage(U_RAMZA,10,0,0)+p[4]*abilities[sword].y;
+        CHECK(skill_amount(U_RAMZA,10,sword,0),d>999?999:d);a->eq[EQ_WEAPON]=255;
         // Charge adds its source power to XA before vulnerability/zodiac.
         if(p[1]>abilities[0x196].y){
             a->pa=p[1]-abilities[0x196].y;
@@ -126,13 +128,8 @@ static void integration(void)
     reset();t=&st.unit[10];change(10,SID_SLEEP,1);hp=t->hp;W->ai_k=0;steps=0;
     while(!ai_think()&&++steps<1024){}
     CHECK(steps<1024,1);CHECK(t->hp,hp);CHECK(t->status_ct[11],60);CHECK(core_status_current(&t->statuses,4)&0x10,0x10);
-    // The same wake hook handles every currently supported cross-splash victim.
-    // The cross splash is a weapon skill's; cast area magic has its own batch pipeline.
-    reset();for(ab=0;ab<512;ab++)if((abilities[ab].flags&(AF_AREA|AF_CAST))==AF_AREA)break;
-    CHECK(ab<512,1);t=&st.unit[10];t->hp=t->max_hp=999;
-    u=&st.unit[0];u->x=t->x+1;u->z=t->z;u->hp=u->max_hp=999;change(0,SID_SLEEP,1);
-    skill(U_RAMZA,10,ab);st.hit=1;st.push=0;st.dmg=1;st.act_t=ACT_HIT;attack_step();
-    CHECK(u->hp<999,1);CHECK(core_status_current(&u->statuses,4)&0x10,0);CHECK(u->status_ct[11],0);
+    // The cross-splash wake used a weapon skill carrying AREA without being an incantation
+    // (Stasis Sword before Holy Sword); no such record remains.
 }
 static void trials(void){xa_rules();wakes();integration();}
 #ifndef __m68k__

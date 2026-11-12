@@ -37,7 +37,7 @@ MIGHTY_SWORD=(0xA0,0xA1,0xA2,0xA3)     # formula 0x2E (check_dark_sword.c)
 RUIN=(0xC4,0xC5,0xC6,0xC7)             # formulas 0x1A, 0x1B (check_ruin.c)
 STATUS_STRIKE=(0x111,0x11B,0x132)      # monster formula 0x50, evadeable (check_status_strike.c)
 MONSTER_STATUS=(0x120,0x130)           # monster formula 0x3D (check_status_strike.c)
-ODD_SOUNDWAVE=(0x11F,)                 # source 0x38 on the batch, core id 100 (check_status_strike.c)
+ODD_SOUNDWAVE=(0x11F,)                 # source 0x38 on the batch, core id 101 (check_status_strike.c)
 DIRECT_STRIKE=(0x11E,0x12D)            # monster formula 0x50, direct targeting (check_status_strike3.c)
 FRIGHT=(0x12E,)                        # formula 0x62, direct targeting (check_status_strike3.c)
 BEAKING=(0x135,)                       # formula 0x55 (check_status_strike.c)
@@ -99,7 +99,7 @@ def catalogue_report():
     for a in BEAKING:
         r,n=raw(a),norm(a);assert n[0]==7 and n[1]==r[10]==2 and n[10]==0x55 and n[4]==128|32|2,(a,n)
     for a in ODD_SOUNDWAVE:
-        r,n=raw(a),norm(a);assert n[0]==13 and n[1]==r[11] and n[10]==100 and r[8]==0x38 and n[4]==128|32|1,(a,n)
+        r,n=raw(a),norm(a);assert n[0]==13 and n[1]==r[11] and n[10]==101 and r[8]==0x38 and n[4]==128|32|1,(a,n)
     for a in MONSTER_STATUS:
         r,n=raw(a),norm(a);assert n[0]==10 and n[1]==r[11] and n[10]==0x3D and n[4]&~1==128|32,(a,n)
     for a in DIRECT_STRIKE:

@@ -1,6 +1,47 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Current state (2026-11-11): Chapter I actions, 155 of 155 executable
+## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
+
+### Resume here (validation completed 2026-11-12)
+
+**Git.** Completed lot: **`feat/fft-self-destruct-ai`**, based on `main` d2e585a,
+validated source head **fea4e51**. Its eight commits add Self Destruct to the area AI
+(75fe44b), fix Jump's formula-id collision (6a80b7d), repair drifted core checks
+(3f1b160, eb0a617, 59bc8c6) and document the work (1d4af4b, a63cf45, fea4e51).
+The validation continuation changes documentation only. The user's own uncommitted
+files, tenchu, `.gitignore`, `README.md`, `check_*.s`, are not ours: leave them.
+
+**Final sweep completed.** The detached sweep was still running when resumed; it was
+left uninterrupted. All **103** `core-*-check` targets selected from the Makefile
+(excluding `source`, `packages`, `profile`) finished with rc 0. The shell then ran
+`check.py`: all **37 PC/68000 campaign replays** pass, with the exact same result rows
+(pixels, state hashes and recorded saves) as the preceding run. `tools/headroom.sh`
+reports **input 57,733, headroom 7,203, zone 8,698**, matching the expected build.
+
+**Evidence.** `x/core-sweep-20261112/verification.json` records the tested commit,
+all 103 target names, return codes and log hashes. The directory contains copied
+per-target logs, the completed `summary` (`ALLDONE`), `replays.log`, `replays.json`
+and `headroom.log`; it no longer depends on the old session's `/tmp` scratchpad.
+All 18 tracked unrelated modifications/explicit `check_*.s` files retain their
+initial bytes and modification times. The live emulator was untouched.
+No sweep rerun is pending for this lot. `make -k check`'s known `manage-test` failure
+is separate and was not rerun in this continuation.
+
+**Verified on the branch before the final sweep** (each PC = sanitizers = 68000): every
+target that had failed, rerun green after its repair: area-ai B10402B5, batch 94558E80,
+area-forecast 4B89E4DD, area-ct 11D6FCB4, targets 9F81A9CC, reactions B3886956,
+lancer-jump 0D8F8FB5, actions 3BD1B082, elements, incapacity, sleep, percent, weather
+67702743; status-strike D0FD4866 / 80C99485 / 9807256F; ai-techniques 95125A29 (1,705
+checks); jump E23CBC36. An earlier pass of the other targets (before the id change 100 ->
+101) was green except those listed.
+
+**Not done, in order.** 1. No full campaign battle replay holds the Chapter I
+monsters yet (the AI check uses a synthetic 5 x 5 grid). 2. The AI's choices on these
+techniques were not compared with original AI traces (Self Destruct's rule, Mighty Sword
+and the Ruins losing to Attack, Dark Sword and Magic Ruin worth nothing against a
+non-caster). 3. Possible dead code: the scalar path of a non-incantation AREA skill.
+4. Then `CHAPTER1_READINESS.md`: battle RAM margin, archive budget, one-command native
+chapter run.
 
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
 [Holy/Mighty/Dark Sword](HOLY_SWORD.md), [Ruins](RUINS.md), [HW3Patch uses](HW3PATCH_USES.md).
@@ -68,17 +109,37 @@ trajectory into TARGETS (it grew the zone by 1,100 bytes). Details and checks:
 
 **The AI uses them (2026-11-11).** `make core-ai-techniques-check` (`check_ai_techniques.c`):
 the real planner picks and the production order executes the monster techniques, the
-direct-targeting ones (clear line, ally or enemy on the line) and Holy Sword; 6EFBCA5E,
-1,424 checks, PC = sanitizers = 68000. Not preferred to Attack in that fixture: Mighty
+direct-targeting ones (clear line, ally or enemy on the line) and Holy Sword; 95125A29,
+1,705 checks, PC = sanitizers = 68000. Not preferred to Attack in that fixture: Mighty
 Sword, the Ruins; no value against a non-caster: Dark Sword, Magic Ruin.
 
-**Next.** Self Destruct is not offered to the AI (needs a sacrifice scoring rule); no full
-campaign battle replay holds these monsters yet. Then the rest of
+Self Destruct is offered too: the caster is one of its own victims, the ordinary sum
+decides (not compared with an original AI trace).
+
+**Sweep of the core checks (completed 2026-11-12).** The `core-*-check` targets are not in
+`make check`, and several had drifted during the lots above; all 103 selected non-source
+targets now pass (evidence above).
+One real regression: Odd Soundwave's core id 100 was Jump's (`JUMP_FORMULA`), so Lancer
+Jump went through the magic pipeline; the id is 101 now (`core-lancer-jump-check` caught
+it). The other failures were fixtures written for the earlier catalogue, repaired:
+synthetic records in the monster interval 0x100..0x16F need a monster caster
+(`fixture_monster.h`/`.py`: batch, area-forecast, area-ct, weather); cases built on a
+weapon skill carrying AREA without being an incantation (Stasis Sword before Holy Sword)
+are retired (area-ai, reactions, actions, incapacity, sleep); power-255 overflow profiles
+are skipped (bit 7 of the power marks formula 0x4E; retail powers stay below 128:
+area-forecast, elements, weather); targets (0x62 and direct targeting are owned shapes);
+percent (the catalogue validation is RESOURCES op 14). **Run the whole sweep after each
+lot**, not only the lot's own check: `for t in $(grep -o "^core-[a-z0-9-]*-check" Makefile)`.
+Before choosing a core pseudo-formula id, grep the existing ones (99 Throw, 100 Jump, 101
+area cleanse). Possible cleanup: the scalar path of a non-incantation AREA skill (the old
+cross splash) has no record left and may be dead code in the resident.
+
+**Next.** No full campaign battle replay holds these monsters yet. Then the rest of
 [Chapter I readiness](CHAPTER1_READINESS.md): battle RAM margin, archive budget, a
 one-command native chapter run. Other open: 0x4E area/line shapes and its direct oracle; a
 direct-targeting cast aimed at an empty panel resolves to nobody (the source can still hit
 a body on the way). Test seeds: spread them (`(k*0x9E3779B1)|1`), small xorshift seeds give
-tiny first draws and always pick the first random choice. The core id 100 is
+tiny first draws and always pick the first random choice. The core id 101 is
 `FORMULA_AREA_CLEANSE` (source 0x38 on the batch). A check fixture that goes through
 `cast_order` must respect the order's own range and height rules (a flat `W->hs` is not
 enough: `map_tiles[].stand`).

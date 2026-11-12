@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Owned area packet through commands, real CT, impact and response drain."""
 import argparse,json,re,tempfile
+from fixture_monster import monster_sets
 from pathlib import Path
 from check import HERE,ROOT,run
 from check_flow import data_links
@@ -25,6 +26,7 @@ def main():
         catalogue[raw+14*(0x110+i):raw+14*(0x111+i)]=r
         value=bytearray(12);value[:8]=bytes((0,14,4,255,128|32|1|(16 if i==3 else 0),255,100,0));value[10]=8;value[11]=128
         catalogue[norm+12*(0x110+i):norm+12*(0x111+i)]=value
+    monster_sets(catalogue)
     (fixture/'ffcj.bin').write_bytes(catalogue)
     with tempfile.TemporaryDirectory(prefix='fft-area-ct-')as folder:
         data=Path(folder);data_links(data)

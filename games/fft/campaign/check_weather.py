@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Targeted magical evasion, source RNG order and target validity, PC/sanitizers and actual 68000 modules."""
 import argparse,json,re,tempfile
+from fixture_monster import monster_sets
 from pathlib import Path
 from check import HERE,ROOT,run
 from check_flow import data_links
@@ -30,6 +31,7 @@ def main():
             r=bytearray(holy);r[7]=element;r[10]=power
             catalogue[raw+ab*14:raw+ab*14+14]=r
     catalogue[norm+0x10*12:norm+0x10*12+12]=struct.pack('>8BH2B',0,14,4,3,130,255,100,0,50,8,128)
+    monster_sets(catalogue)
     (fixture/'ffcj.bin').write_bytes(catalogue)
     with tempfile.TemporaryDirectory(prefix='fft-magic-')as folder:
         data=Path(folder);data_links(data)

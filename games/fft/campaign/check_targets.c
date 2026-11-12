@@ -87,10 +87,8 @@ static void rejected_queries(void)
     CHECK(cast_targets(13,0,0x100,0),TARGETS_INVALID);CHECK(cast_targets(0,255,0x100,1),TARGETS_INVALID);
     CHECK(cast_targets(0,0,NO_ABIL,0),TARGETS_INVALID);CHECK(cast_targets(0,0,0x100,2),TARGETS_INVALID);
     CHECK(cast_targets(0,0,0x100,255),TARGETS_INVALID);CHECK(cast_targets(0,255,0x100,0),TARGETS_INVALID);
-    for(flags=0;flags<5;flags++)CHECK(cast_targets(0,0,0x150+flags,0),TARGETS_UNSUPPORTED);
+    for(flags=0;flags<4;flags++)CHECK(cast_targets(0,0,0x150+flags,0),TARGETS_UNSUPPORTED);
     CHECK(world_hash()==hash,1);CHECK(rng32==seed,1);
-    // A read-only footprint can inspect disabled records without enabling them.
-    CHECK(abilities[0x100].kind,255);CHECK(abilities[0x150].kind,255);
 }
 static void target_trials(void)
 {

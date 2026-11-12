@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pure compound forecasts: original preview groups, PC/sanitizers and native images."""
 import argparse,json,re,struct,tempfile
+from fixture_monster import monster_sets
 from pathlib import Path
 from check import HERE,ROOT,run
 from check_flow import data_links
@@ -29,6 +30,7 @@ def main():
         catalogue[raw+14*(0x100+i):raw+14*(0x101+i)]=r
         value=bytearray(12);value[:8]=bytes((0,row['power'],5,255,128|32|1|(2 if row['evade']else 0)|(16 if i==6 else 0),255,100,0))
         value[10]=8;value[11]=row['element'];catalogue[norm+12*(0x100+i):norm+12*(0x101+i)]=value
+    monster_sets(catalogue)
     (fixture/'ffcj.bin').write_bytes(catalogue)
     with tempfile.TemporaryDirectory(prefix='fft-area-forecast-')as folder:
         data=Path(folder);data_links(data)

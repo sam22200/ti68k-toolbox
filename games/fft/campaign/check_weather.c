@@ -2,6 +2,7 @@
 #define INCANTATION_CHECK
 #include "check_casting.c"
 static const u8 elements[9]={128,64,32,8,192,224,2,0,136};
+#include "fixture_monster.h"
 static AbId carrier(const u16 *p)
 {
     u8 k;for(k=0;k<9;k++)if(elements[k]==p[2])break;
@@ -30,7 +31,10 @@ static void source_profiles(void)
     CHECK(source!=RT_NULL,1);if(!source)return;count=RD16(source,2);CHECK(count,254);
     for(n=0;n<count;n++){
         for(i=0;i<25;i++)p[i]=RD16(source+6+50*n,i);
-        weather_prepare(p);ab=carrier(p);CHECK(st.weather,p[15]);seed=rng32;hash=state_hash();
+        // The power-255 overflow profiles are not representable: bit 7 of the power marks
+        // formula 0x4E (no Faith); retail powers stay below 128 (max 96).
+        if(p[1]>127)continue;
+        weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));ab=carrier(p);CHECK(st.weather,p[15]);seed=rng32;hash=state_hash();
         kind=skill_kind(U_RAMZA,10,ab);CHECK(kind,p[17]&128?AB_DAMAGE:p[17]&64?AB_HEAL:AB_NULL);
         ZB(55);CHECK(magic_amount(U_RAMZA,10,(p[2]<<8)|p[1]),p[24]);ZE(55);
         CHECK(state_hash()==hash,1);
@@ -57,7 +61,7 @@ static void source_profiles(void)
 static void weather_boundary(void)
 {
     u16 p[15]={5,14,128,3,0,0,0,0,0,0,0,0,1,70,70};u8 i,flags;
-    weather_prepare(p);
+    weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));
     for(i=0;i<5;i++)for(flags=0;flags<4;flags++){
         CHECK(battle_weather(i,flags),1);CHECK(st.weather,core_weather(i,flags));
     }
@@ -72,18 +76,18 @@ static void weather_boundary(void)
 static void oil_latch_and_packet(void)
 {
     u16 p[15]={5,14,128,0,0,1,0,0,0,0,0,0,1,70,70};AbId ab=carrier(p);char text[40];
-    weather_prepare(p);st.open_resolving=1;skill(U_RAMZA,10,ab);CHECK(st.effect_kind&EFFECT_OIL,EFFECT_OIL);
+    weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));st.open_resolving=1;skill(U_RAMZA,10,ab);CHECK(st.effect_kind&EFFECT_OIL,EFFECT_OIL);
     // A query on another target must not overwrite the prepared removal/category.
     forecast_text(U_RAMZA,U_RAMZA,ab,text);CHECK(st.effect_kind&EFFECT_OIL,EFFECT_OIL);
     CHECK(battle_weather(4,0),1);impact();CHECK(st.unit[10].statuses.inflicted[2]&128,0);CHECK(st.unit[10].hp,66);
     // Native packet transport through a real Auto-Potion root response.
-    weather_prepare(p);st.reaction[10]=REACTION_POTION;st.open_resolving=1;skill(U_RAMZA,10,ab);impact();end_anim();
+    weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));st.reaction[10]=REACTION_POTION;st.open_resolving=1;skill(U_RAMZA,10,ab);impact();end_anim();
     CHECK(st.primary.running,1);CHECK(st.primary.effect_kind&EFFECT_OIL,EFFECT_OIL);CHECK(st.effect_kind&EFFECT_OIL,0);
     impact();end_anim();CHECK(st.effect_kind&EFFECT_OIL,EFFECT_OIL);CHECK(act_kind(),AB_DAMAGE);
     // Added after preparation: not a source removal packet. Protected at impact: retain it.
-    p[5]=0;weather_prepare(p);st.open_resolving=1;skill(U_RAMZA,10,ab);st.unit[10].statuses.inflicted[2]|=128;
+    p[5]=0;weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));st.open_resolving=1;skill(U_RAMZA,10,ab);st.unit[10].statuses.inflicted[2]|=128;
     impact();CHECK(st.unit[10].statuses.inflicted[2]&128,128);
-    p[5]=1;weather_prepare(p);st.open_resolving=1;skill(U_RAMZA,10,ab);st.unit[10].statuses.innate[2]|=128;
+    p[5]=1;weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));st.open_resolving=1;skill(U_RAMZA,10,ab);st.unit[10].statuses.innate[2]|=128;
     impact();CHECK(st.unit[10].statuses.inflicted[2]&128,128);
 }
 static void live_weather_and_ai(void)
@@ -109,7 +113,7 @@ static void live_weather_and_ai(void)
 }
 static void menu_sizing(void)
 {
-    u16 p[15]={5,14,128,0,0,0,0,0,0,0,0,0,1,70,70};weather_prepare(p);
+    u16 p[15]={5,14,128,0,0,0,0,0,0,0,0,0,1,70,70};weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));
     W->win_k[0]=M_MENU;W->win_k[1]=0;W->win_k[2]=U_RAMZA;W->win_n=0;
 #ifdef FFT_MODULES
     mod_call(MOD_ACTION,255,0);
@@ -125,7 +129,7 @@ static void forecast_caches(void)
     u16 p[15]={5,14,128,3,0,0,0,0,0,0,0,0,1,70,70},j;u8 i;const u8 *q;
     for(i=0;i<4;i++){
         p[2]=i==2?8:128;p[3]=i==1?0:3;p[6]=i==2;p[7]=i==3;
-        weather_prepare(p);
+        weather_prepare(p);fixture_monster(U_RAMZA,carrier(p));
 #ifdef FFT_MODULES
         mod_call(MOD_RESULTS,255,0);
 #endif

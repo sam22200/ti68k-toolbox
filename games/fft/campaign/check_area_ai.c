@@ -150,20 +150,8 @@ static void empty_execution(void)
     CHECK(W->cast.phase,CAST_BATCH_READY);CHECK(W->cast.follow,0);CHECK(W->cast.mask,6);
     impact();CHECK(st.unit[1].hp,30);CHECK(st.unit[2].hp,30);
 }
-static void legacy_area_flag(void)
-{
-    // Enabled weapon skills can carry AREA without being an incantation.
-    fixture(0,0);W->ai_list[0]=0x9b;W->ai_nab=1;W->ai_a=0;W->ai_self=0;W->ai_k=3;
-#ifdef FFT_MODULES
-    mod_call(MOD_AI,1,0);
-#else
-    ai_ability(0,0x9b,0);
-#endif
-    CHECK(W->ai_k,3);
-    st.ai_ab=0x9b;st.ai_tgt=UNIT_CELL(&st.unit[1]);cursor_place(st.ai_tgt);
-    st.ai=AI_AIM;st.ai_t=AI_PREVIEW+AI_NAME;W->hud_ok=1;
-    ai_step();CHECK(st.mode,M_ACT);CHECK(st.acted,1);CHECK(st.unit[0].mp,100);
-}
+// Stasis Sword (0x9b) was once a weapon skill carrying AREA without being an incantation;
+// it is a Holy Sword area cast now: planner and execution in check_ai_techniques.c.
 static void rejected_execution(void)
 {
     fixture(0,0);plan(0,0);st.unit[0].mp=6;cursor_place(st.ai_tgt);
@@ -185,7 +173,7 @@ static void stress(void)
 static void area_trials(void)
 {
     source_scores();f=malloc(sizeof *f);CHECK(f!=RT_NULL,1);if(!f)return;
-    centres();empty_execution();legacy_area_flag();rejected_execution();stress();CHECK(chapter_load(1),1);reset();free(f);
+    centres();empty_execution();rejected_execution();stress();CHECK(chapter_load(1),1);reset();free(f);
     CHECK(sizeof(AreaAi)<=256,1);
 }
 #ifndef AREA_UI_CHECK

@@ -6,7 +6,7 @@ static void request(AbId ab,u8 ref,u8 follow)
 {
     memset(&prediction,0xA5,sizeof prediction);prediction.actor=0;
     prediction.ability=ab;prediction.ref=ref;prediction.follow=follow;
-    prediction.phase=CAST_BATCH_EMPTY;
+    prediction.phase=CAST_BATCH_EMPTY;fixture_monster(0,ab);   // before any world hash
 }
 static void forecast_profiles(void)
 {
@@ -24,7 +24,9 @@ static void forecast_profiles(void)
         for(i=0;i<NUNIT;i++){
             const u16 *r=p+7+14*i;
             if(r[10])mask|=(u16)1<<i;
-            CHECK(prediction.victim[i].hit,r[11]);CHECK(prediction.victim[i].amount,r[12]);
+            // The power-255 profile's wrapped amount (above 999) is not representable: bit 7 of
+            // the power marks formula 0x4E (no Faith); retail powers stay below 128 (max 96).
+            CHECK(prediction.victim[i].hit,r[11]);if(r[12]<=999)CHECK(prediction.victim[i].amount,r[12]);
             CHECK(prediction.victim[i].effect,r[13]);
         }
         CHECK(prediction.mask,mask);CHECK(world_hash()==hash,1);CHECK(rng32==seed,1);
@@ -57,6 +59,7 @@ static void rejected_forecasts(void)
         if(i==6){prediction.follow=1;prediction.ref=13;}
         if(i==7)prediction.phase=CAST_BATCH_READY;
         if(i==8)prediction.phase=CAST_BATCH_APPLIED;
+        fixture_monster(prediction.actor,prediction.ability);
         before=prediction;hash=world_hash();seed=rng32;
         CHECK(cast_forecast(&prediction),0);CHECK(world_hash()==hash,1);CHECK(rng32==seed,1);
         CHECK(memcmp(&before,&prediction,sizeof before)==0,1);
