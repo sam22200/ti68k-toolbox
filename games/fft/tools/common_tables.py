@@ -384,7 +384,7 @@ def beaking_record(r):
 def odd_soundwave_record(d,r):
     """Odd Soundwave (Squidlarkin), formula 0x38 (the status application alone): its cancel set
     on radius 2 around the caster, the caster included, area vertical 1; always applied, a miss
-    when nothing is removed. Core formula id 100 (cast_rules.h: FORMULA_AREA_CLEANSE)."""
+    when nothing is removed. Core formula id 101 (cast_rules.h: FORMULA_AREA_CLEANSE)."""
     if tuple(r)!=(0,2,1,2,0x10,0x10,1,0,0x38,0,0,0x37,0,0):return None
     if d.at(battle.STATUS_SET+6*r[11],6)!=bytes((0x10,0,0,0x70,0x78,0x82)):return None
     return 13,r[11],0,255,128|32|1
@@ -672,7 +672,7 @@ def battle_records(d):
         elif a==0x135 and beaking_record(d.at(battle.ABILITY_RANGE+14*a,14)):
             kind,y,rng,vert,flags=beaking_record(d.at(battle.ABILITY_RANGE+14*a,14));formula=0x55
         elif a==0x11F and odd_soundwave_record(d,d.at(battle.ABILITY_RANGE+14*a,14)):
-            kind,y,rng,vert,flags=odd_soundwave_record(d,d.at(battle.ABILITY_RANGE+14*a,14));formula=100
+            kind,y,rng,vert,flags=odd_soundwave_record(d,d.at(battle.ABILITY_RANGE+14*a,14));formula=101
         elif guts:
             kind,y,rng,vert,flags,element=guts;formula=d.at(battle.ABILITY_RANGE + 14*a, 14)[8]
         elif talk:
