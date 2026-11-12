@@ -1,36 +1,31 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Current state (2026-11-11): Chapter I actions, 155 of 155 executable
+## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
-### Resume here (handover written 2026-11-11, work in progress)
+### Resume here (validation completed 2026-11-12)
 
-**Git.** `main` (d2e585a, pushed) holds everything up to the AI check on the Chapter I
-techniques. Branch **`feat/fft-self-destruct-ai`** (pushed, **not merged**) holds seven
-commits on top: Self Destruct offered to the area AI (75fe44b), the Jump fix (6a80b7d),
-the repaired core checks (3f1b160, eb0a617, 59bc8c6) and docs (1d4af4b, a63cf45). The
-working tree has no other change of this work (the user's own uncommitted files, tenchu,
-`.gitignore`, `README.md`, `check_*.s`, are not ours: leave them).
+**Git.** Completed lot: **`feat/fft-self-destruct-ai`**, based on `main` d2e585a,
+validated source head **fea4e51**. Its eight commits add Self Destruct to the area AI
+(75fe44b), fix Jump's formula-id collision (6a80b7d), repair drifted core checks
+(3f1b160, eb0a617, 59bc8c6) and document the work (1d4af4b, a63cf45, fea4e51).
+The validation continuation changes documentation only. The user's own uncommitted
+files, tenchu, `.gitignore`, `README.md`, `check_*.s`, are not ours: leave them.
 
-**What blocks the merge.** A final sweep of the 103 non-source `core-*-check` targets was
-started on that branch, in a detached shell: one log per target and a `summary` file
-(`<target> rc <code>` lines, then `ALLDONE`) in the session scratchpad,
-`/tmp/claude-1001/-home-samuelcoz-workspace-ti/85d91ac6-2a6c-4ec6-827e-b1062444ec31/scratchpad/final/`.
-When this was written 22 of 103 had finished, all rc 0 (actions .. charge-hands, in
-alphabetical order). If the scratchpad is gone or the sweep was interrupted, rerun it
-(about 1.5 h, run it detached, a foreground `make` gets killed):
+**Final sweep completed.** The detached sweep was still running when resumed; it was
+left uninterrupted. All **103** `core-*-check` targets selected from the Makefile
+(excluding `source`, `packages`, `profile`) finished with rc 0. The shell then ran
+`check.py`: all **37 PC/68000 campaign replays** pass, with the exact same result rows
+(pixels, state hashes and recorded saves) as the preceding run. `tools/headroom.sh`
+reports **input 57,733, headroom 7,203, zone 8,698**, matching the expected build.
 
-```sh
-cd games/fft/campaign && export PATH=$PWD/../../../tools/bin:$PATH && mkdir -p /tmp/sweep
-for t in $(grep -o "^core-[a-z0-9-]*-check" Makefile | sort -u | grep -v "source\|packages\|profile"); do
-  timeout 1500 make $t > /tmp/sweep/$t.log 2>&1; echo "$t rc $?" >> /tmp/sweep/summary; done
-```
-
-Then, if every line is rc 0: `python check.py` (37 replays, unchanged so far),
-`tools/headroom.sh` (expect input 57,733, headroom 7,203, zone 8,698), and merge with the
-`ti-commit` rules (`git merge --no-ff feat/fft-self-destruct-ai`, push, delete the branch).
-A red target: read its log (`^line`, `failures`, `AssertionError`) and decide between a real
-regression and a fixture written for an earlier catalogue (the cases met are listed in
-"Sweep of the core checks" below). `make -k check` fails only on `manage-test` (known).
+**Evidence.** `x/core-sweep-20261112/verification.json` records the tested commit,
+all 103 target names, return codes and log hashes. The directory contains copied
+per-target logs, the completed `summary` (`ALLDONE`), `replays.log`, `replays.json`
+and `headroom.log`; it no longer depends on the old session's `/tmp` scratchpad.
+All 18 tracked unrelated modifications/explicit `check_*.s` files retain their
+initial bytes and modification times. The live emulator was untouched.
+No sweep rerun is pending for this lot. `make -k check`'s known `manage-test` failure
+is separate and was not rerun in this continuation.
 
 **Verified on the branch before the final sweep** (each PC = sanitizers = 68000): every
 target that had failed, rerun green after its repair: area-ai B10402B5, batch 94558E80,
@@ -40,14 +35,12 @@ lancer-jump 0D8F8FB5, actions 3BD1B082, elements, incapacity, sleep, percent, we
 checks); jump E23CBC36. An earlier pass of the other targets (before the id change 100 ->
 101) was green except those listed.
 
-**Not done, in order.** 1. Finish the sweep and merge (above). 2. The sentence "all 105
-non-source targets were run" below says 105: the count is 103, and it is only true once
-the sweep ends; correct it then. 3. No full campaign battle replay holds the Chapter I
-monsters yet (the AI check uses a synthetic 5 x 5 grid). 4. The AI's choices on these
+**Not done, in order.** 1. No full campaign battle replay holds the Chapter I
+monsters yet (the AI check uses a synthetic 5 x 5 grid). 2. The AI's choices on these
 techniques were not compared with original AI traces (Self Destruct's rule, Mighty Sword
 and the Ruins losing to Attack, Dark Sword and Magic Ruin worth nothing against a
-non-caster). 5. Possible dead code: the scalar path of a non-incantation AREA skill.
-6. Then `CHAPTER1_READINESS.md`: battle RAM margin, archive budget, one-command native
+non-caster). 3. Possible dead code: the scalar path of a non-incantation AREA skill.
+4. Then `CHAPTER1_READINESS.md`: battle RAM margin, archive budget, one-command native
 chapter run.
 
 Read first: [Chapter I readiness](CHAPTER1_READINESS.md), [Companion](COMPANION.md),
@@ -123,8 +116,9 @@ Sword, the Ruins; no value against a non-caster: Dark Sword, Magic Ruin.
 Self Destruct is offered too: the caster is one of its own victims, the ordinary sum
 decides (not compared with an original AI trace).
 
-**Sweep of the core checks (2026-11-11).** The `core-*-check` targets are not in `make
-check`, and several had drifted during the lots above; all 105 non-source targets were run.
+**Sweep of the core checks (completed 2026-11-12).** The `core-*-check` targets are not in
+`make check`, and several had drifted during the lots above; all 103 selected non-source
+targets now pass (evidence above).
 One real regression: Odd Soundwave's core id 100 was Jump's (`JUMP_FORMULA`), so Lancer
 Jump went through the magic pipeline; the id is 101 now (`core-lancer-jump-check` caught
 it). The other failures were fixtures written for the earlier catalogue, repaired:
