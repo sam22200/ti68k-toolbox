@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepared objective policy and original-source predicates on PC only."""
+"""Objective policy and original-source predicates on PC only."""
 import argparse
 import hashlib
 import json
@@ -30,7 +30,7 @@ def main():
         run(['cc', '-std=gnu99', '-O1', '-g', *flags, '-o', binary, HERE/'test_objective_rules.c'], out/f'{name}-build.log')
         logs.append(run([binary], out/f'{name}.log'))
     assert logs[0] == logs[1]
-    report = dict(result=logs[0].strip(), sanitizers_equal=True, native=False, integrated=False,
+    report = dict(result=logs[0].strip(), sanitizers_equal=True, native=False, scope="policy/oracle; runtime checked by check_objective_runtime.py",
                   oracle_sha256=hashlib.sha256((out/'oracle/results.json').read_bytes()).hexdigest(),
                   sources={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                            for p in (HERE.parent/'objective_rules.h', HERE/'test_objective_rules.c')})
