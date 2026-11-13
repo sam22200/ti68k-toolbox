@@ -2,9 +2,33 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
-### Resume here (bounded grayscale RAM, 2026-11-12)
+### Resume here (archive reach colours, 2026-11-12)
 
-**Latest delivery.** [Battle RAM follow-up](CORE_RAM_MARGIN.md): the fixed hidden
+**Latest delivery.** [Archive reach colours](CORE_REACH_ARCHIVE.md) removes the
+row-backup pool, unused native half buffer and wide sort scratch. Work29282
+(-8182), true production input57275/headroom7661 (-456 input), ABI87/ModCtx352/
+zone8698. Net simultaneous production RAM saving8638 bytes. R4 keeps raw shared
+colour planes in the archive and compressed depth; install matching new groups.
+Private production core405033 + chapter291731 bytes, not a full Chapter I pack.
+
+PC/reference/sanitizers agree on384 per-phase reach hashes, the complete Sweegy
+fight/save, packages and rendering. Selected68000 checks cover the changed layout,
+256-node sort, bindings and frame budgets; ordinary peaks335008/355298. The user
+approved the two-pixel dense-range correction caused by the former128-row overflow.
+One private **installed supervisor** Titanium run works and returns0; free14058/
+max13042 with diagnostics. Estimated production free15171 is still below16KiB;
+peak/contiguous/reentry certification remains open. Exit free delta-140 is logged.
+Evidence: `x/archive-reach-colours/verification.json`. No103-target sweep repeated;
+historical artifacts, unrelated files and the user's emulator were preserved.
+
+**Next:** recover the remaining measured RAM deficit, verify production installed
+peak/contiguous RAM, then finish chapter archive assembly, one-command native
+chapter route and interface freeze. Do not repeat the old sweep per lot or reopen
+generic combat families. The previous ring-backup proposal is now delivered.
+
+### Previous delivery (bounded grayscale RAM, 2026-11-12)
+
+**Previous delivery.** [Battle RAM follow-up](CORE_RAM_MARGIN.md): the fixed hidden
 render target now holds100 rows instead of128, with clipping and guarded PC/
 sanitizer/native comparisons preserving visible output. Production saves1692
 bytes net; true TTPack input57731/headroom7205, ABI86/zone8698/Work37464 remain.

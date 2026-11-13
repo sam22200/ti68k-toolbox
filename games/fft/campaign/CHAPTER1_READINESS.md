@@ -7,10 +7,13 @@ generation inputs); one selected68000 boot/save carrier covers the two cold
 fixes. This does not ship the remaining chapter artwork or event content.
 The RAM/archive measurements below are dated planning evidence: the11.4KB free
 RAM predates the companion's3074-byte reservation and later program growth.
-[Current RAM follow-up](CORE_RAM_MARGIN.md) saves1692 production bytes net.
-A private instrumented Titanium control has9606 bytes free; the16KiB target and
-installed-flow peak certification remain open. True TTPack input57731 leaves7205
-bytes; executable headroom is separate from free battle RAM.
+[Current archive-colour follow-up](CORE_REACH_ARCHIVE.md) saves8638 production
+bytes after the1692-byte grayscale lot. Work29282, ABI87; true TTPack input57275
+leaves7661 bytes. The real installed supervisor diagnostic has14058 bytes free
+(largest13042); production free15171 is only an estimate and still below16KiB.
+Installed-flow peak/contiguous certification remains open. Current pilot groups
+are696764 transport bytes; a conservative full-chapter archive estimate remains
+below its planning allowance, but full content has not been assembled.
 
 Chapter I has about 20 battle maps and 20 scenes; the pilot ships 2 of each. Tackle these in
 order before producing Chapter I content. State of the 2026-11-08 session: saves as in FFT,
@@ -20,10 +23,10 @@ debug aids and logs" and "Native test loop").
 
 ## 1. Battle RAM margin (first, mandatory)
 
-**Current status:** the100-row hidden target is delivered; see
-[measurements and limits](CORE_RAM_MARGIN.md). Continue RAM recovery and installed-flow
-measurement before claiming16KiB. Ring backups remain next, and their estimated
-2.5KB gain alone is insufficient.
+**Current status:** the100-row hidden target and archive-based reach restoration
+are delivered; see [current measurements and limits](CORE_REACH_ARCHIVE.md).
+Continue the remaining RAM recovery and production installed-flow measurement
+before claiming16KiB. The old ring-backup estimate below is historical.
 
 **Historical status 2026-11-10 (before companion/program growth): ~11.4 KB free.** Measured natively (Titanium AMS 3.10, Orbonne, `ti-mem heap`): 187,554
 bytes free when the supervisor calls `fftbat`, the battle reserves 176,158:
