@@ -1,5 +1,9 @@
 # Opening -> Academy -> Gariland
 
+Current RAM follow-up (2026-11-12): [bounded grayscale target](CORE_RAM_MARGIN.md).
+Net production saving1692 bytes, identical visible output, true TTPack input57731/
+headroom7205. Private instrumented Titanium free9606;16KiB readiness remains open.
+
 Current monster integration (2026-11-12): [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md).
 Three complete PC/sanitizer fights exercise13 actors on the original terrain;
 fixed-unit innate Float and rewards outside Gariland are repaired. One selected

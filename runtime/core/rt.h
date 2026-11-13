@@ -32,6 +32,14 @@ typedef int32_t s32;
 #define RT_PH 128
 #define RT_PBYTES 30
 #define RT_PSIZE (RT_PBYTES * RT_PH)   // 3840 bytes per plane
+// Opt-in drawing bound for fixed-address copy presentation; physical LCD geometry stays intact.
+#ifndef RT_DRAW_ROWS
+#define RT_DRAW_ROWS RT_PH
+#endif
+#if RT_DRAW_ROWS < RT_H || RT_DRAW_ROWS > RT_PH
+#error RT_DRAW_ROWS must cover the LCD and fit a physical plane
+#endif
+#define RT_DRAW_BYTES (RT_PBYTES * RT_DRAW_ROWS)
 
 // Frame rate: the game loop runs once every RT_FRAME_TICKS ticks of the 256 Hz clock
 // (8 = 32 fps). A game may define it before including rt.h, both platforms honour it.

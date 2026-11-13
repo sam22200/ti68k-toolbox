@@ -7,6 +7,11 @@ CPU budgets or hardware dependencies. Reuse unchanged native evidence; a new
 lot does not require the 103-target native sweep. That completed sweep is the
 2026-11-12 baseline in `x/core-sweep-20261112/`, not a per-edit checklist.
 
+`make battle-ram-check` compares guarded100-row targets with the128-row reference
+on PC/ASan/UBSan. `check_battle_planes.py --native` adds only primitive/Gariland
+backend checks. Scope, one hardware session and remaining16KiB gate:
+[Battle RAM](CORE_RAM_MARGIN.md).
+
 `make chapter1-monster-battle-check` defaults to three complete Sweegy rules/save
 replays on PC plus sanitizers. `check_monster_battle.py --native` adds one
 selected PARTY/SAVE initialization/receipt carrier, not full native fights.

@@ -19,6 +19,15 @@ runtime/
                               made by make from tools/rom/TI89Titanium_OS.89u; not in git)
 ```
 
+With fixed-address color copy presentation (`RT_GRAY_COPY_PRESENT`),
+`RT_DRAW_ROWS=100` opts into two3000-byte hidden planes. Clear/fill, sprite and
+text clipping honor that bound; stride and physical LCD geometry remain unchanged.
+Games must also bound their direct plane accesses, clears and copies. Other builds
+keep128 rows and GrayDBuf. FFT
+[covers the compact path](../games/fft/campaign/CORE_RAM_MARGIN.md) with guarded
+PC/sanitizer/native tests and a private Titanium run. `RT_TILOG` optionally logs
+ready-state free/contiguous heap after scenario initialization.
+
 ## The game side
 
 ```c

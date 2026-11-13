@@ -4626,7 +4626,7 @@ static void draw_turn(void)
     pvx = scene_x(st.rot, cu, cv) - st.camx;
     pvy = scene_y(cu, cv) + HH - st.camy;
 #ifdef FFT_TURN_LOWPOLY_NATIVE
-    memset(rt_light,0,RT_PSIZE); memset(rt_dark,0,RT_PSIZE);
+    memset(rt_light,0,RT_H*RT_PBYTES); memset(rt_dark,0,RT_H*RT_PBYTES);
     D.l=rt_light; D.d=rt_dark; D.stride=RT_PBYTES;
 #else
     memset(half, 0, sizeof half);
@@ -6030,11 +6030,11 @@ static void screen_scene(void)
         }
 #ifndef __m68k__
         {                                      // the tests: the copy is the view's
-            static u8 t[2][RT_PSIZE];
-            memcpy(t[0], rt_light, RT_PSIZE); memcpy(t[1], rt_dark, RT_PSIZE);
+            static u8 t[2][RT_DRAW_BYTES];
+            memcpy(t[0], rt_light, RT_DRAW_BYTES); memcpy(t[1], rt_dark, RT_DRAW_BYTES);
             copy_view();
             bg_used++;
-            if (memcmp(t[0], rt_light, RT_PSIZE) || memcmp(t[1], rt_dark, RT_PSIZE)) bg_bad++;
+            if (memcmp(t[0], rt_light, RT_DRAW_BYTES) || memcmp(t[1], rt_dark, RT_DRAW_BYTES)) bg_bad++;
         }
 #endif
         return;
@@ -6825,7 +6825,7 @@ static void draw_end(void)
             text_into((u16 *)l, (u16 *)d, 92, 78, s, C_BLACK);
         } else text_into((u16 *)l, (u16 *)d, 8, 90, help_lines[1], C_BLACK);
     }
-    memcpy(rt_light, l, RT_PSIZE); memcpy(rt_dark, d, RT_PSIZE);
+    memcpy(rt_light, l, RT_H*RT_PBYTES); memcpy(rt_dark, d, RT_H*RT_PBYTES);
 }
 #if !MOD_CORE
 #include "reaction_live.h"

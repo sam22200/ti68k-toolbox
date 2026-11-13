@@ -56,15 +56,27 @@ static u32 read_keys(void)
 
 void draw_clear(void)
 {
+#if RT_DRAW_ROWS < RT_PH
+    memset(rt_light,0,RT_DRAW_BYTES);
+#ifndef RT_MONO
+    memset(rt_dark,0,RT_DRAW_BYTES);
+#endif
+#else
 #ifdef RT_MONO
     FastClearScreen_R(rt_light);
 #else
     GrayClearScreen2B_R(rt_light, rt_dark);
 #endif
+#endif
 }
 
 void rt_fill(u16 x1, u16 y1, u16 x2, u16 y2, u8 color)
 {
+#if RT_DRAW_ROWS < RT_PH
+    if(y1>=RT_DRAW_ROWS || y1>y2 || x1>x2 || x1>=RT_PW)return;
+    if(y2>=RT_DRAW_ROWS)y2=RT_DRAW_ROWS-1;
+    if(x2>=RT_PW)x2=RT_PW-1;
+#endif
 #ifdef RT_MONO
     FastFillRect_R(rt_light, x1, y1, x2, y2, color & 2 ? A_NORMAL : A_REVERSE);
 #else
@@ -74,6 +86,20 @@ void rt_fill(u16 x1, u16 y1, u16 x2, u16 y2, u8 color)
 
 void draw_sprite(s16 x, s16 y, const RtSprite *s)
 {
+#if RT_DRAW_ROWS < RT_PH
+    RtSprite clipped;
+    if(!s->h || y>=RT_DRAW_ROWS || y<=-(s16)s->h)return;
+    clipped=*s;
+    if(y<0){
+        u16 skip=(u16)-y*(s->w>>3);
+        if(s->light)clipped.light=(const u8 *)s->light+skip;
+        if(s->dark)clipped.dark=(const u8 *)s->dark+skip;
+        if(s->mask)clipped.mask=(const u8 *)s->mask+skip;
+        clipped.h=(u8)(s->h+y);y=0;
+    }
+    if(y+clipped.h>RT_DRAW_ROWS)clipped.h=(u8)(RT_DRAW_ROWS-y);
+    s=&clipped;
+#endif
     void *l = rt_light;
 #ifdef RT_MONO
     if (s->mask) switch (s->w) {
@@ -235,7 +261,12 @@ static void text_plane(u8 *plane, s16 x, s16 y, const u8 *s, u8 f)
 {
     u16 rows = f == F_SMALL ? 5 : 8;
     u8 *row;
+#if RT_DRAW_ROWS < RT_PH
+    if((u16)y>=RT_DRAW_ROWS)return;
+    if(y+rows>RT_DRAW_ROWS)rows=RT_DRAW_ROWS-y;
+#else
     if ((u16)y > RT_PH - 1 - rows) return;
+#endif
     row = plane + y * RT_PBYTES;
     for (; *s; s++) {
         const u8 *g;
@@ -329,7 +360,14 @@ void _main(void)
 #ifdef RT_MONO
     scr = malloc(RT_PSIZE);
 #else
+#if RT_DRAW_ROWS < RT_PH
+#if !defined(RT_GRAY_COPY_PRESENT)
+#error Compact planes require RT_GRAY_COPY_PRESENT
+#endif
+    dbuf = malloc(2 * RT_DRAW_BYTES);
+#else
     dbuf = malloc(GRAYDBUFFER_SIZE);
+#endif
 #endif
     InitArgPtr(ap);
     if (GetArgType(ap) == POSINT_TAG) scenario = GetIntArg(ap);
@@ -342,13 +380,20 @@ void _main(void)
     SetIntVec(AUTO_INT_1, DUMMY_HANDLER);          // before GrayOn (KB rule)
     if (!GrayOn()) goto out;
     GraySetInt1Handler(tick_handler);
+#if RT_DRAW_ROWS < RT_PH
+    rt_dark=dbuf;rt_light=(u8 *)dbuf+RT_DRAW_BYTES;
+#else
     GrayDBufInit(dbuf);
     rt_light = GrayDBufGetHiddenPlane(LIGHT_PLANE);
     rt_dark = GrayDBufGetHiddenPlane(DARK_PLANE);
 #endif
+#endif
 
     game_init();
     game_scenario(scenario);
+#ifdef RT_TILOG
+    tilog("runtime ready rows %u free %lu max %lu",(u16)RT_DRAW_ROWS,HeapAvail(),HeapMax());
+#endif
 #ifdef RT_BENCH
     {                                              // RT_BENCH updates (no keys), then RT_BENCH
         u16 k, t0;                                 // renders of the final state, no frame wait
@@ -373,13 +418,20 @@ void _main(void)
 #ifdef RT_GRAY_COPY_PRESENT
         // Opt-in native review control: fixed source addresses for TiEmu grayscale inference.
         GrayWaitNSwitches(1);
+#if RT_DRAW_ROWS < RT_PH
+        memcpy(GrayGetPlane(LIGHT_PLANE),rt_light,RT_DRAW_BYTES);
+        memcpy(GrayGetPlane(DARK_PLANE),rt_dark,RT_DRAW_BYTES);
+#else
         FastCopyScreen_R(rt_light,GrayGetPlane(LIGHT_PLANE));
         FastCopyScreen_R(rt_dark,GrayGetPlane(DARK_PLANE));
+#endif
 #else
         GrayDBufToggleSync();                      // swap at a plane switch: no tearing
 #endif
+#if RT_DRAW_ROWS == RT_PH
         rt_light = GrayDBufGetHiddenPlane(LIGHT_PLANE);
         rt_dark = GrayDBufGetHiddenPlane(DARK_PLANE);
+#endif
 #endif
         {
             u16 len = RT_FRAME_LEN(rt_frame);
