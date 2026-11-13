@@ -147,6 +147,8 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare FCD5 encounter source maps')
     if spec.get('ko_actor_format')!='FKO1':
         raise ValueError('Core specification must declare FKO1 optional monster Dead art')
+    if spec.get('objective_format')!='FGO1':
+        raise ValueError('Core specification must declare FGO1 named encounter objectives')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -171,6 +173,11 @@ def chapter_package(source, spec, core_spec, key):
     if spec['schema'] != 'FFT_CHAPTER_SPEC_1':
         raise ValueError('Unsupported chapter specification')
     variables = select(source, spec['variables'])
+    if 'ffgo' in spec['variables']:
+        import objective_bank
+        if core_spec.get('objective_format')!='FGO1':
+            raise ValueError('Named objectives require an FGO1-capable core')
+        objective_bank.validate(resources.resolve(source,'ffgo'), {r['prefix'] for r in spec['routes']})
     if 'ffko' in spec['variables']:
         import monster_ko_bank
         if core_spec.get('ko_actor_format')!='FKO1':

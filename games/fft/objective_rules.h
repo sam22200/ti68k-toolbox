@@ -1,4 +1,4 @@
-// Prepared portable policy; not wired into battle_outcome before banner review.
+// Settled HP-script objectives, separate from generic source importance flags.
 #ifndef FFT_OBJECTIVE_RULES_H
 #define FFT_OBJECTIVE_RULES_H
 // Identities are encounter slots, including0. One named enemy, optional allies.
@@ -15,7 +15,7 @@ static u8 core_objective_result(u16 target,u16 protect,u16 ko,u16 removed,
                                u8 mandatory_loss,u8 ordinary)
 {
     u16 lost=(u16)(ko|removed);
-    if(mandatory_loss||(protect&lost))return END_DEFEAT;
+    if(mandatory_loss||ordinary==END_DEFEAT||(protect&lost))return END_DEFEAT;
     if(target){
         if(target&lost)return END_VICTORY;
         return ordinary==END_DEFEAT?END_DEFEAT:END_NONE;

@@ -3,6 +3,7 @@
   "view_format": "R4",
   "encounter_format": "FCD5",
   "ko_actor_format": "FKO1",
+  "objective_format": "FGO1",
   "envelope": {"units": 13, "tiles": 256, "axis": 18, "layers": 2, "scene_rows": 202},
   "variables": [
     "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",

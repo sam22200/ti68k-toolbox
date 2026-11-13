@@ -49,10 +49,18 @@ static void bn_draw(void)
     u8 line;
     for (line = 0; line < (st.banner == BN_START ? 2 : 1); line++) {
         u8 k = bn_line(st.banner, line), r;
-        const u8 *g = bank + RD16(bank, k), *l = g + 4;
+        const u8 *g;u8 width=bn_width[k];
+#ifdef FFT_CHAPTER
+        if(st.banner==BN_START&&W->goal){
+            if(!W->goal[10+line])continue;
+            g=W->goal+RD16(W->goal,3+line);width=W->goal[10+line];
+        }else
+#endif
+        g=bank+RD16(bank,k);
+        const u8 *l = g + 4;
         u16 size = (u16)(g[2] * g[3]);
         const u8 *d = l + size, *m = d + size;
-        s16 c = (s16)(st.banner_t - W->bn_t0[line]) * BN_SPEED + ((RT_W - bn_width[k]) >> 1);
+        s16 c = (s16)(st.banner_t - W->bn_t0[line]) * BN_SPEED + ((RT_W - width) >> 1);
         u8 full;
         u16 tail = 0;
         if (st.banner_t <= W->bn_t0[line] || st.banner_t >= W->bn_end - DK_N) continue;

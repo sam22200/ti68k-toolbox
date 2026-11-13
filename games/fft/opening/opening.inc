@@ -100,6 +100,7 @@ static void opening_start(u16 n)
 #else
     opening_setup((u8)chapter_route((u8)(chapter_now-1)));
 #endif
+    if(!objective_bind())return;
     actor_reset();
     cam_target(&st.camx,&st.camy);
     if(n==5){st.open_stage=OPEN_DONE;return;} // AMS chapter-loader injection door: over at once
