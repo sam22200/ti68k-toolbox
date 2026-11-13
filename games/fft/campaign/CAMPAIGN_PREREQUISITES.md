@@ -1,6 +1,8 @@
 # User campaign prerequisites (2026-11-13)
 
 These requests precede the installed-route automation in CHAPTER1_ARCHIVE_PLAN.md.
+The2026-11-13 extension also puts [breeding, Bar/rumors/Propositions and the
+complete poaching economy](CAMPAIGN_SIDE_SYSTEMS.md) before campaign extraction.
 Delivered: [scene controls/permanent stats](SCENE_SAVE_FIXES.md) and
 [four traps/level-down persistence](TRAPS.md). Evidence: `x/campaign-prerequisites/`
 and `x/tile-traps/`. Historical groups/saves stay intact.
@@ -23,6 +25,9 @@ Use PC/sanitizers first; only selected changed-layout/native checks at the end.
 | Imposed guests | Fixed TEAM_GUEST encounter slots survive party loading and run AI (including current pilot/monster fixtures). They are not treated as ordinary deployed/recruited party slots. | Encounter-specific guests and their cross-fight story progression/content; distinguish guest metadata from permanent roster persistence. |
 | Objective types | Current `battle_outcome` is ordinary elimination plus mandatory Ramza permanent-loss/allied incapacitation defeat. | Targeted enemy and protected actor objectives, validated encounter metadata, banners/target emphasis and save/terminal integration. |
 | Story choices | Scene steps only play titles, stories, cards, narration and overlays; no choice/effect opcode exists. | Recruitment/refusal and conditional story effects through the common menu, exactly-once saves/flags. User's final phrase about other effects awaits clarification. |
+| Monster breeding | Recruited monsters can be saved as type3. No persistent world date, egg generation/hatch lifecycle or egg roster state exists. | Fixed offspring, source family/variant/timer rules, shared travel clock,16-slot/full-roster handling, save migration and reviewed egg UI. |
+| Bar / rumors / Propositions | World-map menu placeholders are not Bar functionality. No town/story-filtered rumors, dispatched workers or saved job/return state. | Chapter I rumors/detail text and conditional effects; reusable fee/duration/away-worker/JP-gil/collection settlement, gated to Chapter II onward. |
+| Poaching / Fur Shop | Support471 has a one-shot kill/loot consumer, but directly credits the blue party's inventory. No separate Fur Shop stock or purchase flow. | Source eligibility/stock/access/price rules, atomic purchases, breeding/allied-monster interactions and migration from direct receipt. Preserve the Chapter III shop unlock; machinery is a pre-extraction requirement. |
 
 ## Delivered scene correction (approved2026-11-13)
 
@@ -74,6 +79,7 @@ persistent-departure certification.
 
 ## Resume
 
-Continue with source-correct monster KO assets, objectives/guest content
-and choices. Keep every remaining item explicit; do not describe the chapter/core
+Continue with target/protect objectives, guest/chain/choice content and the
+new world/party side systems. Full standing/action monster art remains content
+work. Keep every remaining item explicit; do not describe the chapter/core
 as ready merely because generic combat coverage and archive planning pass.

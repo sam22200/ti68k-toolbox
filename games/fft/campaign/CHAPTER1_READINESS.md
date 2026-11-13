@@ -1,13 +1,17 @@
 # Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-12)
 
 Latest steering (2026-11-13): finish the [user prerequisites](CAMPAIGN_PREREQUISITES.md)
-before route automation. [Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
+before route automation and campaign extraction. The user also requires
+[monster breeding, Bars/rumors/Propositions and the full poaching/Fur Shop loop](CAMPAIGN_SIDE_SYSTEMS.md).
+Their reusable rules/save hooks are pre-extraction work, with original chapter
+unlocks preserved (rumors in I, Propositions from II, Fur Shops from III).
+[Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
 and [four traps/level-down persistence](TRAPS.md) are delivered and approved.
 Approved [monster KO support](MONSTER_KO.md) renders six source families through
 optional chapter art and the unchanged48-entry cache. ABI89/Work29310/Save3204/
 FCD5, input61211/headroom3725; matching pilot groups total704425 transport bytes.
-Standing/action monster art, other palettes, targeted/protected objectives and
-authored guest/chain/choice content remain. Resident RAM grows3590 bytes versus
+Standing/action monster art, other palettes, targeted/protected objectives,
+authored guest/chain/choice content and the side systems above remain. Resident RAM grows3590 bytes versus
 the trap lot despite unchanged heap requests. RAM figures below are previous
 measurements, not a new16KiB pass; difficult recovery remains deferred.
 
@@ -38,6 +42,17 @@ order before producing Chapter I content. State of the 2026-11-08 session: saves
 scene skip, hidden DEBUG page, APPS selection, live AI-pause animation, `fftmem.py`/`tilog`
 instrumentation and the `fftcore` TiEmu state ([CORE_PACKAGES.md](CORE_PACKAGES.md), "Saves,
 debug aids and logs" and "Native test loop").
+
+## Before campaign extraction: world/party side systems
+
+Required by the user2026-11-13; [initial GameFAQs overview and native audit](CAMPAIGN_SIDE_SYSTEMS.md).
+Breeding needs a saved calendar/egg lifecycle, fixed offspring and full-roster
+handling. Bars need town/story-filtered rumors and later dispatch/return jobs.
+Poaching currently gives an item directly to the party: source-correct Fur Shop
+stock/access/purchases and save migration remain. These are explicit gates,
+not implicit completion under generic R/S/M coverage. Preserve later chapter
+unlocking while testing reusable machinery with PC injection doors. Implement
+objectives first, then progress through the complete prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)
 
