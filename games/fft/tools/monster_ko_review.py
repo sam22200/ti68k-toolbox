@@ -137,7 +137,7 @@ class Original:
         return frame, wait
 
 
-def preview(canvas, spr, grey):
+def preview(canvas, spr, grey, with_masks=False):
     """Same 0.6 scale/anchor in both columns; 32x40 study envelope, no crop.
 
     This envelope deliberately does not claim compatibility with the current
@@ -178,7 +178,12 @@ def preview(canvas, spr, grey):
         for c in range(3):
             channel = count(rgb[canvas, c]*opaque)/body.clip(1)
             pixels[:, :, c][mask] = channel[mask].round().astype(np.uint8)
-    return Image.fromarray(pixels)
+    image = Image.fromarray(pixels)
+    if with_masks:
+        if not grey:
+            raise ValueError('only four-grey previews have native masks')
+        return image, mask | ring, mask
+    return image
 
 
 def main():

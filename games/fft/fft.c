@@ -34,6 +34,9 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 #include "base.inc"
 #ifdef FFT_CHAPTER
 #include "identity_pool.h"
+#if MOD_CORE
+#include "monster_ko.h"
+#endif
 #endif
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
@@ -139,6 +142,7 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 #ifdef FFT_CHAPTER
 #if MOD_CORE
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
+static const u8 *ko_gfx;                // optional chapter-owned fixed Dead poses, raw archive rows
 static const u8 *flow_bank,*flow_ui;      // optional source-backed sequencing/results; reused ffmg icons
 static const u8 *opening_story,*pgfx;
 static void map_start(u8 after);
@@ -4294,6 +4298,12 @@ static u8 morph_first(void)
 
 #ifdef FFT_ACTOR_BANK
 static const u8 *unit_frame(u8 rot, u8 i);
+#ifdef FFT_CHAPTER
+static u8 monster_ko_active(u8 i);
+#define ACTOR_SHOW(k) do{if(visible[k]&&(!ko_gfx||!monster_ko_active(k)))unit_frame(st.rot,k);}while(0)
+#else
+#define ACTOR_SHOW(k) do{if(visible[k])unit_frame(st.rot,k);}while(0)
+#endif
 #include "actors.inc"
 
 // Walking/action poses have priority; rotate the remaining decode opportunities
@@ -4301,18 +4311,19 @@ static const u8 *unit_frame(u8 rot, u8 i);
 static void actor_animate(const u8 *visible)
 {
     u8 i,k;
-    if(st.mode==M_WALK && visible[st.sel])unit_frame(st.rot,st.sel);
+    if(st.mode==M_WALK)ACTOR_SHOW(st.sel);
     if(st.mode==M_ACT) {
-        if(visible[st.atk])unit_frame(st.rot,st.atk);
-        if(visible[st.tgt])unit_frame(st.rot,st.tgt);
+        ACTOR_SHOW(st.atk);
+        ACTOR_SHOW(st.tgt);
     }
     for(i=0;i<NUNIT && W->actor_budget;i++) {
         k=W->actor_next;
         if(++W->actor_next==NUNIT)W->actor_next=0;
-        if(visible[k])unit_frame(st.rot,k);
+        ACTOR_SHOW(k);
     }
     W->actor_budget=0;
 }
+#undef ACTOR_SHOW
 #endif
 
 static const u8 *object_frame(u8 i)
@@ -4333,7 +4344,7 @@ static const u8 *object_frame(u8 i)
 #endif
 }
 
-static const u8 *morph_frame(const u8 *old, const u8 *obj)
+static u16 morph_bits(u8 r)
 {
     #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define dissolve CONTOUR_REF_dissolve
@@ -4344,12 +4355,17 @@ static const u16 dissolve[5][4] = {
         { 0xFFFF, 0x5555, 0xFFFF, 0x5555 }, { 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF }
     };
 #endif
-    u8 r, plane, t = st.morph_t, phase = t < 8 ? 0 : t < 24 ? (u8)((t - 8) >> 2) : 4;
+    u8 t=st.morph_t,phase=t<8?0:t<24?(u8)((t-8)>>2):4;
+    return dissolve[phase][r&3];
+}
+static const u8 *morph_frame(const u8 *old, const u8 *obj)
+{
+    u8 r, plane, t = st.morph_t;
     u8 *out = (u8 *)W->morph_g;
     for (plane = 0; plane < 4; plane++, old += 2 * UNIT_SH, obj += 2 * UNIT_SH, out += 2 * UNIT_SH)
         for (r = 0; r < UNIT_SH; r++) {
             u16 a = RD16(old, r), b = RD16(obj, r);
-            WR16(out, r, a ^ ((a ^ b) & dissolve[phase][r & 3]));
+            WR16(out, r, a ^ ((a ^ b) & morph_bits(r)));
         }
     out = (u8 *)W->morph_g;
     if (t >= 4 && t < 24)
@@ -4402,6 +4418,10 @@ static const u8 *unit_frame(u8 rot, u8 i)
 
 #define DC_Y 18                         // a death counter's top above the feet
 
+#ifdef FFT_CHAPTER
+#include "monster_ko.inc"
+#endif
+
 // A covered body's interior is white, preserving its white/black contour: letting a busy
 // roof texture show through made the hollow silhouette look like ordinary sprite detail.
 // Covered shadows stay transparent. c RT_NULL draws the ordinary unoccluded sprite.
@@ -4450,14 +4470,18 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 #ifdef FFT_CHAPTER
     if(unit_airborne(&st.unit[i]))return;
 #endif
-    if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
-        draw_unit_water(sx, sy, rot, i, c); return;
-    }
     RtSprite s;
     u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
     u8 r, h0 = UNIT_SH, h1 = 0, flash = unit_flash(i);
-    const u8 *g = unit_frame(rot, i);
+    const u8 *g;
     s.w = 16;
+#ifdef FFT_CHAPTER
+    if(ko_gfx&&draw_monster_ko(sx,sy,rot,i,c?c->depth:255)){sy-=UNIT_FOOT;goto markers;}
+#endif
+    if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
+        draw_unit_water(sx, sy, rot, i, c); return;
+    }
+    g = unit_frame(rot, i);
     if (c) {
         const u16 *cm = c->cm;
         for (r = c->r0; r <= c->r1; r++)
@@ -4907,7 +4931,7 @@ void game_init(void)
     if(battle_state)free(battle_state);
 #endif
     battle_state=RT_NULL;rt_state=RT_NULL;rt_state_size=0;
-    chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;
+    chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;ko_gfx=RT_NULL;
     flow_bank=flow_ui=RT_NULL;
 #ifdef __m68k__
     navbuf=RT_NULL;nav_capacity=0;
@@ -5007,7 +5031,7 @@ static u8 chapter_load(u8 c)
 {
     u16 i;
     const u8 *surface;
-    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;
+    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;ko_gfx=RT_NULL;
     if (!sbuf || !cgfx) return 0;
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
@@ -5023,6 +5047,13 @@ static u8 chapter_load(u8 c)
     {char letter=chapter_route(c);i=letter?chapter_files(letter):0;}
 #endif
     if(!i){igfx=RT_NULL;return 0;}
+    {u16 size;ko_gfx=resource_file("ffko",&size);
+     if(ko_gfx&&!monster_ko_valid(ko_gfx,size)){ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}
+#ifdef FFT_ACTOR_BANK
+    if(ko_gfx){u16 k;u32 total=0;
+        for(k=0;k<ACTOR_BANKS&&abank[k];k++)total+=RD16(abank[k],0);
+        if(total>=32768U-256){ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}
+#endif
     surface=cdesc+i;
 #ifndef FFT_MODULES
     story_after = 0;
@@ -7040,7 +7071,7 @@ void game_render(void)
         FRAME_END(); return;
     }
     for (i = 0, n = 0; i < NUNIT; i++) {           // units back to front, those on screen and
-        s16 bx, by;                                // the frame's cost without the optional work
+        s16 bx, by;u8 span=16;                     // the frame's cost without the optional work
         u16 fk=unit_feet_key(i,st.rot);
         if (st.unit[i].x >= MAP_W || st.unit[i].z >= MAP_H) {
             f[i].x = f[i].y = 0; f[i].depth = 0;   // removed unit / test injection: no map access
@@ -7055,12 +7086,15 @@ void game_render(void)
         }
         for (j = i; j > 0 && f[ord[j - 1]].depth > f[i].depth; j--) ord[j] = ord[j - 1];
         ord[j] = i;
-        bx = f[i].x - st.camx - 8; by = f[i].y - st.camy - UNIT_FOOT;
+#ifdef FFT_CHAPTER
+        if(ko_gfx&&!st.unit[i].hp)span=32;
+#endif
+        bx = f[i].x - st.camx - (span>>1); by = f[i].y - st.camy - UNIT_FOOT;
         vis[i] = st.unit[i].x < MAP_W &&
 #ifdef FFT_CHAPTER
             !unit_airborne(&st.unit[i]) &&
 #endif
-            bx > -16 && bx < RT_W && by > -UNIT_SH && by - FOE_H < RT_H;
+            bx > -(s16)span && bx < RT_W && by > -UNIT_SH && by - FOE_H < RT_H;
 #ifdef FFT_CHAPTER
         if(flow_bank&&st.scene_hide&(1U<<i))vis[i]=0;
 #endif
@@ -7097,7 +7131,11 @@ void game_render(void)
         u8 k = ord[i];
         Cover *c = &W->cover[k];
         if (!vis[k]) continue;                     // off screen
-        if (c->x != f[k].x || c->y != f[k].y || c->depth != f[k].depth || c->rot != st.rot) {
+        if (c->x != f[k].x || c->y != f[k].y || c->depth != f[k].depth || c->rot != st.rot
+#ifdef FFT_CHAPTER
+            ||((c->r0&128)&&(!ko_gfx||!monster_ko_active(k)))
+#endif
+        ) {
             c->x = f[k].x; c->y = f[k].y; c->depth = f[k].depth; c->rot = st.rot;
             cover(c->cm, f[k].x, f[k].y, f[k].depth);
             c->wet = unit_in_water(k);
