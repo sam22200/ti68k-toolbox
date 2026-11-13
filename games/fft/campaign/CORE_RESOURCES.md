@@ -4,6 +4,12 @@
 coverage and FSV4 are unchanged. Apply these rules to every arena, dialogue,
 introduction, interlude and menu, including different encounters in one chapter.
 
+R4 update (2026-11-12): [archive reach colours](CORE_REACH_ARCHIVE.md) stores
+one raw colour payload per pooled physical view, with compressed depth. It does
+not add a resource family or retain a duplicate compressed colour bank. FRF1
+aliases and the mandatory exact sharing audit still apply; core spec/manifest
+keys require matching R4 core/chapter builds.
+
 ## Ownership rules for future content
 
 1. Classify a resource by reuse, not by its first consumer. Rules/catalogues,

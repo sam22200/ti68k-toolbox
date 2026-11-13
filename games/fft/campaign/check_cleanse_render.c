@@ -20,8 +20,8 @@ static void seed_planes(u8 salt)
 }
 static void relocation_trials(void)
 {
-    u8 rot,face,j;u8 *saved=(u8*)W->bk;u32 before,after;Feet f;char text[28];void *l,*d;
-    CHECK(sizeof W->bk>=2*RT_PSIZE,1);
+    u8 rot,face,j;u8 *saved=malloc(2*RT_PSIZE);u32 before,after;Feet f;char text[28];void *l,*d;
+    CHECK(saved!=RT_NULL,1);if(!saved)return;
     for(rot=0;rot<4;rot++)for(face=0;face<4;face++)for(j=0;j<2;j++){
         st.rot=rot;st.act=U_RAMZA;st.unit[U_RAMZA].face=face;
         f=unit_feet(rot,U_RAMZA);st.camx=f.x-80;st.camy=f.y-50;dst_screen(0,0);
@@ -41,6 +41,7 @@ static void relocation_trials(void)
         make_forecast(U_RAMZA,10,cleanses[j]);CHECK(rt_light==l&&rt_dark==d,1);
         CHECK(memcmp(saved,W->forecast,sizeof W->forecast),0);
     }
+    free(saved);
 }
 #ifndef __m68k__
 int main(void){sw_init(61);relocation_trials();printf("cleanse_render %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}

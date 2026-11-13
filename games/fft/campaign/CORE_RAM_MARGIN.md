@@ -1,5 +1,10 @@
 # Battle RAM: bounded grayscale target (2026-11-12)
 
+Historical first RAM lot. The subsequent [archive-colour delivery](CORE_REACH_ARCHIVE.md)
+saves another8638 production bytes (Work29282, input57275, ABI87). Its real
+installed supervisor diagnostic leaves14058 bytes free; the16KiB gate remains
+open. The direct-caller measurements below retain their original context.
+
 The first RAM follow-up is delivered; the16KiB readiness gate remains open.
 The old11.4KB free figure predates the companion and program growth. Do not
 reuse it as the current installed battle margin.

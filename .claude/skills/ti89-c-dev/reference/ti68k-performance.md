@@ -1073,3 +1073,16 @@ archive size must be reported separately. Tests of packed buffers must use their
 accessors and row spans rather than assume contiguous planes. These are PC/
 sanitizer/ti-cycles results, not new emulator observations. Reproduction and
 regression rules: `games/fft/campaign/CORE_OPTIMIZATION.md`.
+
+### Raw archived colours versus decode scratch (FFT, 2026-11-12)
+
+A selected16160-byte view transfer takes97244 datasheet68000 cycles as a raw
+archive copy versus914868 through verified ZX0, with identical output. This
+headless microbenchmark excludes depth, loading and presentation; it is not a
+whole-frame speedup. Raw colours also remove RAM row backups. Combined with
+unused native half-buffer removal and byte sort scratch, Work saves8182 bytes;
+resident input saves456, at roughly80KB more pilot archive data. Measured
+13-actor ordinary rotation/equipment peaks335008/355298 remain below360k;
+cold rotation4962432 is separate. Installed startup/exit works in a private
+Titanium emulator, but the remaining16KiB free-RAM gate stays open. Details,
+configuration guards and approved range-overflow pixels: campaign/CORE_REACH_ARCHIVE.md.

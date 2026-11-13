@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Full256-node battle adapters with13 actors, PC/sanitizers/actual68000."""
-import json,re,tempfile
+import argparse,json,re,tempfile
 from pathlib import Path
 from check_flow import HERE,ROOT,data_links
 from check import run
@@ -8,7 +8,9 @@ from check_core_boundaries import descriptor13
 
 
 def main():
-    out=HERE/'x/core-256';out.mkdir(parents=True,exist_ok=True)
+    ap=argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--out',type=Path,default=HERE/'x/core-256')
+    out=ap.parse_args().out.resolve();out.mkdir(parents=True,exist_ok=True)
     source=HERE/'check_full_grid.c';common=[source,ROOT/'runtime/core/rt_core.c']
     host=common+[ROOT/'runtime/platform-sw/rt_sw.c']
     run(['cc','-std=gnu99','-O1','-g','-w','-o',out/'full',*host])

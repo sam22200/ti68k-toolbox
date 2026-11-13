@@ -175,8 +175,21 @@ static u16 vplane;                      // bytes of one plane of the unpacked ra
 #endif
 #if defined(FFT_CHAPTER) && defined(FFT_VIEW_SPLIT)
 #define FFT_SHARED_ROTATION_WORK
+#ifndef FFT_LEGACY_REACH_BACKUPS       // explicitly selected historical PC reference only
+#define FFT_ARCHIVE_COLOURS
 #endif
-#define BK_N 128                        // FFT_VIEW_SPLIT: rows kept (a reach touches up to 126)
+#endif
+#ifdef FFT_REFERENCE_BK_ROWS
+#if !defined(FFT_LEGACY_REACH_BACKUPS) || defined(__m68k__)
+#error Expanded row pool is a historical PC oracle only
+#endif
+#define BK_N FFT_REFERENCE_BK_ROWS
+#else
+#define BK_N 128                        // historical row-pool limit
+#endif
+#if !defined(FFT_ARCHIVE_COLOURS) || !defined(FFT_TURN_LOWPOLY_NATIVE) || defined(FFT_CONFIG) || defined(FFT_FIXED) || defined(FFT_TEXTURE_PREVIEW) || defined(FFT_TURN_TEXTURE) || defined(FFT_EXPLORATION)
+#define FFT_HALF_BUFFER
+#endif
 // Work memory, allocated with the scene (globals and statics are stored in the program file
 // on the TI: -mno-bss, and the TI-89 refuses programs above 24 KB)
 #define TW (RT_W / 2)                   // the rotation frames: half resolution
@@ -228,7 +241,9 @@ typedef struct {
 #else
     s16 span_l[TH + 8], span_r[TH + 8];
 #endif
+#ifdef FFT_HALF_BUFFER
     u8 half[2][TW / 8 * TH];
+#endif
 #endif
     u8 from[MAP_NMAX];
 #ifndef FFT_TABLES_ARCHIVED
@@ -439,23 +454,37 @@ typedef struct {
 #ifdef FFT_VIEW_SPLIT
     // The view's colours of the scene rows the reach rings were drawn on, kept before a ring
     // changes them (the colours are no longer kept whole: VIEW_BYTES)
+    #ifndef FFT_ARCHIVE_COLOURS
     u8 bk_of[SC_HMAX];                     // a row's slot (0xFF: the row is still the view's)
     u8 bk_row[BK_N], bk_n, bk_over;     // each slot's row; slots used; rings past the backup
+    #else
+    u8 bk_n,bk_over;                   // diagnostic cold-reload control; no row capacity limit
+    #endif
 #ifdef FFT_SHARED_ROTATION_WORK
-    // Rotation replaces the view before reach backups can be used again.
+    // Native rotation scratch; the historical control aliases its row pool here.
+    #ifndef FFT_ARCHIVE_COLOURS
     union {
     u8 bk[BK_N][2][SC_BYTES] __attribute__((aligned(2)));
+    #endif
         struct {
 #ifdef FFT_TURN_LOWPOLY_NATIVE
     s16 span_l[RT_H + 8], span_r[RT_H + 8];
 #else
     s16 span_l[TH + 8], span_r[TH + 8];
 #endif
+#ifdef FFT_HALF_BUFFER
     u8 half[2][TW / 8 * TH];
-    u16 count[256];
-    s16 key[MAP_NMAX], gx[MAP_WMAX + 1][MAP_HMAX + 1], gy[MAP_WMAX + 1][MAP_HMAX + 1];
+#endif
+#ifdef FFT_ARCHIVE_COLOURS
+    u8 count[256],key[MAP_NMAX];      // sort buckets/positions modulo256; all keys are clamped
+#else
+    u16 count[256];s16 key[MAP_NMAX];
+#endif
+    s16 gx[MAP_WMAX + 1][MAP_HMAX + 1], gy[MAP_WMAX + 1][MAP_HMAX + 1];
         };
+    #ifndef FFT_ARCHIVE_COLOURS
     };
+    #endif
 #else
     u8 bk[BK_N][2][SC_BYTES] __attribute__((aligned(2)));
 #endif
@@ -612,10 +641,16 @@ static u8 bg_usable(void);
 #endif
 #define order (W->order)
 #define key (W->key)
-// Stable counting sort. A single bucket may contain all256 nodes.
+// Stable counting sort. At <=256 nodes, byte starts/increments wrap only at
+// the end (or for a sole256-node bucket whose start is correctly zero).
 static void tile_order(void)
 {
-    u16 i,total=0,*cnt=W->count;
+    u16 i,total=0;
+#ifdef FFT_ARCHIVE_COLOURS
+    u8 *cnt=W->count;
+#else
+    u16 *cnt=W->count;
+#endif
     memset(cnt,0,sizeof W->count);
     for(i=0;i<MAP_N;i++)cnt[key[i]]++;
     for(i=0;i<256;i++){u16 n=cnt[i];cnt[i]=total;total+=n;}
@@ -1560,8 +1595,12 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
         a = m >> sh; m3[0] = (u16)(a >> 16); m3[1] = (u16)a; m3[2] = (u16)(m << (16 - sh));
         a = l >> sh; l3[0] = (u16)(a >> 16); l3[1] = (u16)a; l3[2] = (u16)(l << (16 - sh));
 #ifdef FFT_VIEW_SPLIT
+    #ifdef FFT_ARCHIVE_COLOURS
+        const u8 *ol=views[scene_rot]+8,*od=ol+SC_PLANE;
+    #else
         const u8 *ol = scene_l, *od = scene_d;      // past the backup: the row as it is
         if (W->bk_of[yy] != 0xFF) { ol = W->bk[W->bk_of[yy]][0] - yy * SC_BYTES; od = W->bk[W->bk_of[yy]][1] - yy * SC_BYTES; }
+    #endif
 #else
         const u8 *ol = vbuf, *od = vbuf + SC_PLANE;
 #endif
@@ -1578,8 +1617,15 @@ static void __attribute__((noinline)) ring_into_scene(const Marker *mk)
                 g2 = (u16)(RD16(t + 2 * DEPTH_STRIDE, 0) + dd) & 0x8080; g2 = (u16)((g2 << 1) - (g2 >> 7));
                 c = (u16)(((g1 & RD16(t + DEPTH_STRIDE, 0)) | (g2 & RD16(t + 3 * DEPTH_STRIDE, 0))) & mw & hp);
             }
-            WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(ol + oo, 0) & c)));
-            WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (l3[k] & mw & ~c) | (RD16(od + oo, 0) & c)));
+            {u16 original_l=RD16(ol+oo,0),original_d=RD16(od+oo,0);
+#if defined(FFT_ARCHIVE_COLOURS) && defined(FFT_EDGE_WIDTH_REVIEW)
+             if((st.scenery&1)&&RD16(views[scene_rot],2)){
+                 u16 bits=RD16(od+SC_PLANE+oo,0),ink=(u16)~original_d&bits;
+                 original_l=(original_l&~bits)|ink;original_d=(original_d&~bits)|ink;
+             }
+#endif
+             WR16(q, 0, (u16)((RD16(q, 0) & ~mw) | (l3[k] & mw & ~c) | (original_l & c)));
+             WR16(q + SC_PLANE, 0, (u16)((RD16(q + SC_PLANE, 0) & ~mw) | (l3[k] & mw & ~c) | (original_d & c)));}
         }
     }
 }
@@ -1617,11 +1663,15 @@ static void depth_rows(void)
 #ifdef FFT_VIEW_SPLIT
 static void bk_reset(void)
 {
-    memset(W->bk_of, 0xFF, sizeof W->bk_of); W->bk_n = 0; W->bk_over = 0;
+#ifndef FFT_ARCHIVE_COLOURS
+    memset(W->bk_of, 0xFF, sizeof W->bk_of);
+#endif
+    W->bk_n = 0; W->bk_over = 0;
 }
 
 // Keep the view's colours of scene row y before a ring changes it; 0: the backup is full of
 // rows still changed (rings drawn now or rows still to put back)
+#ifndef FFT_ARCHIVE_COLOURS
 static u8 bk_save(s16 y)
 {
     u8 s;
@@ -1641,22 +1691,34 @@ static u8 bk_save(s16 y)
     return 1;
 }
 #endif
+#endif
 
 #ifdef FFT_VIEW_SPLIT
-// V3 adds a compressed1-bit width mask between colours and depth. The row
-// backups are obsolete after a complete colour reload, so reuse them as scratch.
+// R4 colors and optional width mask are read in place; only depth is unpacked.
+// The explicit historical control uses R2/R3 and its obsolete row-pool scratch.
+#ifndef FFT_ARCHIVE_COLOURS
 typedef char EdgeMaskFitsBackups[sizeof(W->bk) >= SC_BYTES*SC_HMAX ? 1 : -1];
+#endif
 static const u8 *unpack_colours(u8 rot)
 {
-    const u8 *p=views[rot]+8,*mask;          // R2/R3 (extract.view_bank)
-    u16 extra=RD16(views[rot],2);           // the width mask's stream (R3), 0 (R2)
+    const u8 *p=views[rot]+8,*mask;
+    u16 extra=RD16(views[rot],2);           // optional mask bytes (ZX0 only in the control)
     mask=p+RD16(views[rot],1);
+#ifdef FFT_ARCHIVE_COLOURS
+    memcpy(scene_l,p,2*SC_PLANE);
+#else
     zx0_unpack(p,scene_l);
+#endif
 #ifdef FFT_EDGE_WIDTH_REVIEW
     if(extra && (st.scenery&1)) {
-        PlaneWord *m=(PlaneWord *)W->bk,*l=(PlaneWord *)scene_l,*d=(PlaneWord *)scene_d;
+        const PlaneWord *m;
+        PlaneWord *l=(PlaneWord *)scene_l,*d=(PlaneWord *)scene_d;
         u16 n=(u16)SC_PLANE>>2;
-        zx0_unpack(mask,(u8 *)W->bk);
+#ifdef FFT_ARCHIVE_COLOURS
+        m=(const PlaneWord *)mask;
+#else
+        zx0_unpack(mask,(u8 *)W->bk);m=(const PlaneWord *)W->bk;
+#endif
         while(n--) {
             PlaneWord bits=*m++,ink=~*d&bits;
             *l=(*l&~bits)|ink;l++;
@@ -1848,7 +1910,20 @@ static u8 bg_usable(void)
 // scene rows [y, y + n) put back from the view (u32 copies: ~0.6k a row)
 static void scene_rows(s16 y, s16 n)
 {
-#ifdef FFT_VIEW_SPLIT                           // from the backup (rows never changed are kept)
+#ifdef FFT_ARCHIVE_COLOURS
+    const u8 *p=views[scene_rot]+8+(u16)(y*SC_BYTES),*q=p+SC_PLANE;
+    u16 bytes=(u16)(n*SC_BYTES);
+    memcpy(scene_l+y*SC_BYTES,p,bytes);memcpy(scene_d+y*SC_BYTES,q,bytes);
+#ifdef FFT_EDGE_WIDTH_REVIEW
+    if((st.scenery&1)&&RD16(views[scene_rot],2)){
+        const u8 *m=q+SC_PLANE;u8 *l=scene_l+y*SC_BYTES,*d=scene_d+y*SC_BYTES;
+        u16 count=bytes>>1;
+        while(count--){u16 bits=RD16(m,0),ink=(u16)~RD16(d,0)&bits;
+            WR16(l,0,(RD16(l,0)&~bits)|ink);WR16(d,0,(RD16(d,0)&~bits)|ink);
+            m+=2;l+=2;d+=2;}
+    }
+#endif
+#elif defined(FFT_VIEW_SPLIT)                    // historical row backup control
     for (; n > 0; n--, y++) {
         u8 s = W->bk_of[y];
         if (s == 0xFF) continue;
@@ -1999,7 +2074,7 @@ rings:
         W->left -= RING_K * mk.rows / 12;
         if (mk.y < W->ring_y0) W->ring_y0 = mk.y < 0 ? 0 : mk.y;     // (first: the backup never
         if (mk.y + mk.rows > W->ring_y1) W->ring_y1 = mk.y + mk.rows > SC_H ? SC_H : mk.y + mk.rows;
-#ifdef FFT_VIEW_SPLIT                              // reuses a row of this ring)
+#if defined(FFT_VIEW_SPLIT) && !defined(FFT_ARCHIVE_COLOURS)
         { s16 y; for (y = W->ring_y0 > mk.y ? W->ring_y0 : mk.y; y < mk.y + mk.rows && y < SC_H; y++) if (!bk_save(y)) W->bk_over = 1; }
 #endif
         ring_into_scene(&mk);

@@ -24,10 +24,10 @@ ti cycles: $(TI_FILES) $(MODULES)
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../fft.c ../fft.h opening.inc $(wildcard data/*.h)
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../unit_card.h ../unit_card.inc ../portrait32.inc ../choice_menu.h ../choice_menu.inc
 $(MODULES): ../unit_card.h ../choice_menu.h ../campaign/save.h ../campaign/save_slots.h
-$(MODULES): ../core_limits.h ../chapter.h
+$(MODULES): ../view_format.h ../core_limits.h ../chapter.h
 $(MODULES): ../tactical_grid.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../tactical_grid.h ../tactical_search.inc
-$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../core_limits.h ../chapter.h ../chapters.h ../module.h
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../view_format.h ../core_limits.h ../chapter.h ../chapters.h ../module.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../campaign/save.h ../campaign/save_slots.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test $(MODULES): ../campaign/save_types.h
 check: test pc cycles $(MODULES)
@@ -54,11 +54,13 @@ review: pc
 # The battle program and the campaign bundle are ../campaign's (make packed, make bundle).
 .PHONY: banks
 banks:                         # the shared contour tail first: ffov0 must match ffcu's
+	$(PY) ../tools/view_split.py opening
 	$(PY) ../tools/contour_assets.py --attach data/ffov0.bin
 	$(MAKE) $(TI_FILES)
 
 .PHONY: contour-assets
 contour-assets:
+	$(PY) ../tools/view_split.py opening
 	$(PY) ../tools/contour_assets.py --attach data/ffov0.bin
 pc test cycles ti packed regression-check visual-check: | contour-assets data/ffcj.bin data/ffod.bin
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: ../config.inc ../contour.h ../contour_art.inc

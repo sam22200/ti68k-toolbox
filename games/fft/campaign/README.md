@@ -1,6 +1,13 @@
 # Opening -> Academy -> Gariland
 
-Current RAM follow-up (2026-11-12): [bounded grayscale target](CORE_RAM_MARGIN.md).
+Current archive reach follow-up (2026-11-12): [R4 colours and RAM](CORE_REACH_ARCHIVE.md).
+Work29282/ABI87, true production input57275/headroom7661; net8638 bytes saved
+since the grayscale lot. PC/sanitizers and selected native checks pass. The user
+approved the two-pixel old range-overflow correction. Installed diagnostic free
+14058 bytes still leaves the16KiB gate open. Private pilot groups total696764
+transport bytes; full Chapter I content/peak certification remain separate.
+
+Previous RAM follow-up (2026-11-12): [bounded grayscale target](CORE_RAM_MARGIN.md).
 Net production saving1692 bytes, identical visible output, true TTPack input57731/
 headroom7205. Private instrumented Titanium free9606;16KiB readiness remains open.
 

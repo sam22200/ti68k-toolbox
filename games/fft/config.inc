@@ -95,7 +95,7 @@ static u8 config_update(void)
             && st.mode != M_ACT && st.mode != M_WALK && st.mode != M_END) {
             st.config = 1; st.config_row = 0;
 #if defined(FFT_CHAPTER) && defined(FFT_EDGE_WIDTH_REVIEW)
-            st.scenery=(st.scenery&1)|(views[0]&&views[0][1]=='3' ? 2 : 0);
+            st.scenery=(st.scenery&1)|(views[0]&&RD16(views[0],2) ? 2 : 0);
 #endif
             return 1;
         }

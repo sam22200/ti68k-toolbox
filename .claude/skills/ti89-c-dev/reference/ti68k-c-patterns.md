@@ -1142,3 +1142,21 @@ indexes. Current FCP2 uses46 unique portraits for61 reviewed uses and510 names;
 all bytes agree with the original records. Native validators must reject odd
 word-directory offsets before any native word read. No expansion heap is needed.
 Details and measured limits: `games/fft/campaign/CORE_FACTORIZATION.md`.
+
+### Immutable archive colours instead of row backups (FFT, 2026-11-12)
+
+**Verified in Titanium TiEmu:** the installed supervisor can launch, render,
+rotate and quit a battle whose R4 view keeps colour planes raw in the archive,
+with only depth decompressed. Restore dirty rows from the current scene's
+archive view; do not rely on a fixed row pool that dense ranges can exhaust.
+Remove scratch aliases only after checking every active configuration: FFT's
+native low-poly path needs full-resolution spans/vertices but no half buffer.
+Work falls37464 ->29282, while archive banks grow roughly80KB in the pilot.
+The installed diagnostic still has only14058 free bytes; this does not pass
+its16KiB gate. See campaign/CORE_REACH_ARCHIVE.md for build/context limits.
+
+**PC/68000 checked, not an additional hardware timing claim:** a stable forward
+counting sort of at most256 nodes can use byte bucket starts and clamped byte
+keys. A sole256-node histogram bucket wraps to0 with the correct start0;
+placements still visit all256 slots. Otherwise every histogram fits. Test this
+edge explicitly, and never reuse the mutated final buckets as population counts.

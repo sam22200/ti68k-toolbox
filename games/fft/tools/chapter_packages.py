@@ -141,6 +141,8 @@ def select(source, names):
 def core_package(source, spec):
     if spec['schema'] != 'FFT_CORE_SPEC_1':
         raise ValueError('Unsupported core specification')
+    if spec.get('view_format')!='R4':
+        raise ValueError('Core specification must declare R4 archive colours')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -165,6 +167,11 @@ def chapter_package(source, spec, core_spec, key):
     if spec['schema'] != 'FFT_CHAPTER_SPEC_1':
         raise ValueError('Unsupported chapter specification')
     variables = select(source, spec['variables'])
+    for v in variables:
+        if re.fullmatch(r'ff[a-z0-9]v[0-3]',v.name):
+            raw=resources.resolve(source,v.name)
+            if raw[:2]!=b'R4':
+                raise ValueError(f'{v.name}: R4 archive colours required; rebuild chapter views')
     if set(spec['variables']) & set(core_spec['variables']):
         raise ValueError('Chapter duplicates shared core variables')
     if any(v.kind != 0x1c or v.name.endswith('core') for v in variables):

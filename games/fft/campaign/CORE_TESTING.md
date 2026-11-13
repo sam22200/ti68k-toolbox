@@ -7,6 +7,14 @@ CPU budgets or hardware dependencies. Reuse unchanged native evidence; a new
 lot does not require the 103-target native sweep. That completed sweep is the
 2026-11-12 baseline in `x/core-sweep-20261112/`, not a per-edit checklist.
 
+`make archive-reach-check` defaults to PC/full-row reference/ASan/UBSan,
+comparing per-phase full-scene and LCD hashes; `check_archive_reach.py --native`
+adds one selected68000 carrier. It also checks R4 header bounds and byte sorting
+at256 nodes. Complete ordinary Sweegy/save, normalized packages, affected render
+checks, ABI rejection and13-actor native budgets pass. The two-pixel correction
+from the old128-row overflow was explicitly reviewed and approved. Scope and
+installed supervisor RAM limits: [Archive reach colours](CORE_REACH_ARCHIVE.md).
+
 `make battle-ram-check` compares guarded100-row targets with the128-row reference
 on PC/ASan/UBSan. `check_battle_planes.py --native` adds only primitive/Gariland
 backend checks. Scope, one hardware session and remaining16KiB gate:

@@ -105,17 +105,19 @@ def decode_views(out,repeats):
                                (HERE/'campaign/data','ffgv',202)):
         for rot in range(4):
             path=folder/f'{prefix}{rot}.bin';bank=path.read_bytes()
-            if bank[:2]!=b'R2':raise ValueError(f'{path}: expected selected R2 bank')
+            if bank[:2] not in (b'R2',b'R3',b'R4'):raise ValueError(f'{path}: expected ragged view')
             tail_bytes=0
             if bank[-10:-6]in (b'FC01',b'FC02'):
                 original=int.from_bytes(bank[-6:-4],'big')
                 tail_bytes=len(bank)-original;bank=bank[:original]
             n=int.from_bytes(bank[2:4],'big')
+            mask=int.from_bytes(bank[4:6],'big')
             for label,packed,expected in (('colours',bank[8:8+n],2*40*rows),
-                                           ('depth_masks',bank[8+n:],int.from_bytes(bank[6:8],'big'))):
-                raw=unpack(packed)
+                                           ('depth_masks',bank[8+n+mask:],int.from_bytes(bank[6:8],'big'))):
+                copy=bank[:2]==b'R4' and label=='colours'
+                raw=packed if copy else unpack(packed)
                 if len(raw)!=expected:raise ValueError(f'{path}/{label}: decoded span mismatch')
-                (out/'audpack.bin').write_bytes(struct.pack('>H',len(raw))+packed)
+                (out/'audpack.bin').write_bytes(struct.pack('>H',len(raw)|(32768 if copy else 0))+packed)
                 run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','audpack.bin','audpack'],out)
                 timings=[]
                 for repeat in range(repeats):
@@ -125,15 +127,16 @@ def decode_views(out,repeats):
                     vals=[int(v,16)for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',log)]
                     if vals[:2]!=[len(raw),checksum(raw)] or '_main returned' not in log:
                         raise ValueError(f'{path}: native decode differs')
-                    zone=next(line for line in log.splitlines()if re.match(r'^4\s+Audit ZX0 decode',line))
+                    zone=next(line for line in log.splitlines()if re.match(r'^4\s+Audit view transfer',line))
                     timings.append(int(zone.split()[-1]))
                 results.append(dict(bank=path.stem,stream=label,raw_bytes=len(raw),
-                                    compressed_bytes=len(packed),
+                                    stored_bytes=len(packed),compressed_bytes=0 if copy else len(packed),
+                                    method='raw copy'if copy else 'ZX0',
                                     bank_contour_tail_bytes=tail_bytes,
                                     raw_sha256=core_audit.sha(raw),native_checksum=checksum(raw),
                                     cycles=timings,cpu_ms_12mhz=max(timings)/12000))
     return dict(streams=results,repeats=repeats,
-                caveat='Verified ZX0 decoder only, datasheet CPU; ragged depth rows remain XOR encoded. '
+                caveat='Archive copy/verified ZX0 decoder only, datasheet CPU; ragged depth rows remain XOR encoded. '
                        'Contour tail is excluded from compressed stream lengths. '
                        'Not complete loading/rotation/LCD latency; no secondary recompression applied.')
 

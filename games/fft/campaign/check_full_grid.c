@@ -115,7 +115,13 @@ static void cells(u8 floors)
     CHECK(W->ring_i>=MAP_N,1);CHECK(reach_edges(255,0)!=0,1);
     if(floors){CHECK(node_at(0,0,0)!=255,1);CHECK(node_at(7,15,1),128);}
     for(i=0;i<256;i++)key[i]=17;
-    ZB(6);tile_order();ZE(6);CHECK(W->count[17],256);for(i=0;i<256;i++)CHECK(order[i],i);
+    ZB(6);tile_order();ZE(6);
+#ifdef FFT_ARCHIVE_COLOURS
+    CHECK(W->count[17],0); // the final position256 wraps; all256 output IDs remain distinct
+#else
+    CHECK(W->count[17],256);
+#endif
+    for(i=0;i<256;i++)CHECK(order[i],i);
     if(!floors) {
         // Two nodes project onto the same point: ID255 must return256 in the +1 API.
         f->tiles[238].stand=4;memset(st.reach,255,256);st.reach[255]=1;

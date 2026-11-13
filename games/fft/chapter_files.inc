@@ -3,6 +3,7 @@
 // where these names are the image's context (module.h) and the resident adopts them after
 // the call. Returns the surface section's descriptor offset, 0: a missing or invalid bank.
 #include "campaign/pack_format.h"
+#include "view_format.h"
 static const u8 *chapter_contours(const u8 *p,u16 size)
 {
     const u8 *f;u16 off;
@@ -30,8 +31,14 @@ static u16 chapter_files(char letter)
     name[0] = name[1] = 'f'; name[2] = letter; name[3] = 'v'; name[5] = 0;
     for (i = 0; i < 4; i++) {                  // read in place (archived on the TI): fetched
         name[4] = (char)('0' + i);             // again each load, the archive may have moved
-        views[i] = resource_file(name, i == 0 ? &view_size : RT_NULL);
-        if (!views[i] || views[i][0] != 'R' || RD16(views[i], 3) > FFT_CORE_DEPTH_MAX) return 0;
+        u16 size;const u8 *v=resource_file(name,&size);
+        views[i]=v;if(!i)view_size=size;
+        if(!v||size<9||v[0]!='R'||RD16(v,3)>FFT_CORE_DEPTH_MAX)return 0;
+#ifndef FFT_LEGACY_REACH_BACKUPS
+        if(!core_view_rows(v,size,SC_HMAX))return 0;
+#else
+        if(v[1]!='2'&&v[1]!='3')return 0;
+#endif
     }
     /* Production stores these identical engine tables once in ffcu. Old
        extraction fixtures retain the same validated tail in their first view. */
@@ -47,6 +54,9 @@ static u16 chapter_files(char letter)
     if(!i)return 0;
     encounter_units = (u8)CD(UNIT_COUNT);
     map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u16)map_w * map_h; sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
+#ifndef FFT_LEGACY_REACH_BACKUPS
+    {u16 rot;for(rot=0;rot<4;rot++)if(RD16(views[rot],1)!=2U*SC_BYTES*(u16)sc_h)return 0;}
+#endif
     unit_defs = (const UnitDef *)(cdesc + CD(UNIT_DEFS));
     map_tiles = (const Tile *)(igfx + UI_TILES);
     return i;
