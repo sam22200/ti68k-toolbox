@@ -1,8 +1,11 @@
 # Source-specific monster KO poses (2026-11-13)
 
-Source study and a visual proposal are ready. **Not integrated or approved.**
-The shipping pilot still contains human actor banks; Sweegy's rules/save replay
-does not certify monster artwork. No core build, ABI, cache, save or package changed.
+The user approved the proposal: "parfait le visouelle et continue". The core
+renders the six source-specific Dead families through optional chapter-owned
+FKO1 art. The human pilot contains no unused monster bank. Full standing/action
+art, other species/palettes and authored monster encounters remain content work.
+ABI89, Work29310, State2224, FSV5/Save3204, seven blocks98444 and48 cache entries
+remain. All28 executable overlays are byte-identical to the trap release.
 
 ## Observed in FFT
 
@@ -37,39 +40,99 @@ crash composition or justify silently dropping opaque parts. The parser accepts
 offset0 as a valid frame even at a nonzero index, and rejects absent/truncated
 records. Retail SPR extent sizes are sector-rounded, unlike ISO file sizes.
 
-## Target implementation / pending decision
+## Approved implementation
 
 The comparison shows source colours and a proposed four-grey conversion at the
 same0.6 scale and anchor, front/back beside each other. It uses no human face,
 skin or eye correction. The proposed silhouette receives the required white
 outline. Source-derived images and reports stay under `x/monster-ko/`.
 
-The preview uses a **32x40 study envelope**, not the current16x26/208-byte
-runtime frame. In particular, the standing Behemoth cannot be cropped to the
-human width without losing its body. Approval of the poses is not approval of
-a changed runtime cache or a new memory/CPU claim. After review, fit the actual
-chapter actor path without enlarging every cached human frame, retaining
-occlusion, shared physical storage and mirror reuse. Search/reuse existing
-chapter artwork first; the current shared banks are pilot humans and objects,
-with no suitable Behemoth/Bomb/Chocobo body to reuse.
+The32x40 preview is cropped in **empty rows only**, keeping scale/feet anchor
+and all silhouette pixels. The samples fit8..20 rows. Each physical record has
+32 columns and four raw planes: light, dark, inverted mask and inner body.
+Eleven physical poses cover six front/back pairs and their mirrors in2876
+archive bytes. Equal records, complete mirrors and job aliases share IDs.
+The current human/object banks had no suitable monster body to reuse.
+
+Computing wide cover every frame initially exceeded the CPU budget. Each fixed
+KO now prepares two shaded16x26/208-byte halves in the **existing cache**.
+At most26 entries serve13 KO units, within its unchanged48-entry capacity.
+Cover.cm holds two remembered indexes/height while r0's high bit marks KO mode.
+Both current cache keys must match after eviction; job/pose, feet, depth,
+camera and immersion invalidate the result. Normal cover is rebuilt on revival.
+Fixed KO poses skip animated decoding; preparation misses retain the optional
+work charge. No Work growth, allocation or new assembly is introduced.
+
+Keys0xff00 upward are reserved for shaded halves. Packaging/cold loading reject
+physical actor counts at or above32512 with FKO1, preventing mirror-key clashes.
+Native mirroring uses the existing verified ExtGraph routine. Ordinary cover,
+white interior/outline, immersion, clipping, markers and the KO-to-crystal/chest
+dissolve remain. One active dissolve uses bounded stack scratch; waiting actors
+keep cached KO poses. Low-poly turns retain their unoccluded actor presentation.
+Perspective experiments remain outside campaign packages.
 
 Do not replace these small KO poses with scaled human corpses. Keep their
 original size relationship and the battle's existing KO counter/target feedback.
 Other palettes/species, animation transitions, scene actors and complete
 chapter monster banks remain content work; six source samples are not a census.
+Standing Behemoth art still needs its full width in that future content path;
+it has not been cropped to the human16-column frame.
+
+## Format and packages
+
+FKO1: magic4, pair/frame counts2+2,160 job pair indexes2 each (65535 absent),
+four keys per pair2 each (front/back/mirrored front/back), frame_count+1
+offsets2 each, then even-aligned records. Key bit15 is mirror. A record has
+height1, anchor_x1 (=16), anchor_y1, reserved1 (=0), then four height*4-byte
+planes. Height1..26, anchor_y0..28 and height-anchor_y<=12 bound40-row dissolve
+scratch. Validators reject bad IDs/offsets/extents/flags and coloured/inner
+bits outside the opaque mask.
+
+Optional `ffko` is active-chapter art, validated cold and borrowed in place.
+Every arena reuses it. `ko_actor_format: FKO1` binds core support into the
+matching package key; old core reuse is rejected even though ABI89 remains.
+Only fftbat/ffbcore change; all other programs/overlays/pilot data are reused.
+
+Private normalized pilot: core412690 + chapter291735 =704425 transport bytes,
+key `0a6f05fdec1f5dd1e3eaf1c97f717351`, under `x/monster-ko/release/`.
+`release-with-ko/` adds the bank once (chapter294653); it is an inspection
+fixture, not authored monster encounters. Never distribute source.89g.
+Actual input61211/headroom3725 grows **3590 program-RAM bytes** versus traps.
+Heap/cache capacities do not grow, but old free-RAM estimates are not current.
+The16KiB/installed peak gate remains open; difficult RAM recovery stays deferred.
 
 ## Reproduce
 
 ```sh
-rtk proxy tools/pyenv/bin/python -m unittest discover -s games/fft/tools -p test_monster_ko_review.py -v
+rtk proxy tools/pyenv/bin/python -m unittest discover -s games/fft/tools -p 'test_monster_ko_*.py' -v
 rtk proxy tools/pyenv/bin/python games/fft/tools/monster_ko_review.py
+rtk proxy make -C games/fft/campaign campaign-monster-ko-check
+# Optional selected68000 renderer carrier, not a whole native sweep:
+rtk proxy tools/pyenv/bin/python games/fft/campaign/check_monster_ko.py --native
 ```
 
-The four focused tests cover asymmetric part order/flips, transparent off-canvas
-parts versus forbidden opaque clipping, SHP bounds and strict SEQ rejection.
-`x/monster-ko/results.json` records the source-file/function hashes and pose
-bounds; `source-and-four-greys.png` is marked for a gallery decision. No shipping
-bank is written. No TI test is needed for this host-only study.
+Seven Python tests cover source bounds/composition and pool/mirror/job aliases,
+format/package rejection. PC/ASan/UBSan and one actual68000 renderer carrier
+pass131 checks/59645262 and32 equal screens;24 poses/mirrors match the already
+approved image pixel-for-pixel. Eviction of either half is checked. Normalized
+packages pass42 host+819 C/94924924 on PC/sanitizers. PC battle/aftermath/save
+flows pass; their stale FSV4 test input failed identically at baseline7bf703c
+and is now FSV5. Migration itself remains in the existing save/trap suites.
+
+Selected13-actor native ordinary-frame peaks, with cold preparation separate:
+
+| Case | Checksum | Peak cycles |
+|---|---|---:|
+| Human rotation replay, optional KO bank installed | ECF7 |344308|
+| Human equipment last actor | AA26 |357644|
+|13 fixed monster KO poses |6753|318768|
+| One dissolve plus12 waiting KO actors |41CF|262086|
+| First KO then revival among13 actors |0EF6|296802|
+
+First scene/cache preparations remain slower (about1.6..5.0M cycles in these
+fixtures), not ordinary frame-rate claims. Evidence and controls are under
+`x/monster-ko/`; final renderer runs are `verified-integration/`,
+`verified-capacity/` and `morph-transition/`. No TiEmu or103-suite sweep ran.
 
 ## Independent next work
 

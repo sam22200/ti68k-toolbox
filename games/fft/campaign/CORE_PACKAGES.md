@@ -1,6 +1,13 @@
 # Shared core and replaceable chapter packages
 
-Latest (2026-11-13): [traps and current-raw saves](TRAPS.md), matching ABI89
+Latest (2026-11-13): [monster KO support](MONSTER_KO.md) declares optional
+chapter-owned `ffko`/FKO1, validated by packaging and the cold loader. The core
+spec's `ko_actor_format` binds support into the matching key; old core reuse
+is rejected. ABI89/FSV5 and all28 overlays remain. Pilot transport412690+291735,
+key0a6f05fdec1f5dd1e3eaf1c97f717351. The human pilot has no unused monster bank;
+the private with-KO inspection chapter is294653 bytes.
+
+Previous (2026-11-13): [traps and current-raw saves](TRAPS.md), matching ABI89
 core/chapters, FCD5 source-map identity and FSV5/Save3204. Old core reuse is
 rejected through the declared encounter format and package key. Pilot transport
 bytes410040+291735; this is not full Chapter I or Flash/RAM peak certification.

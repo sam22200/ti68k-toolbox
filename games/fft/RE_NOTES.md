@@ -8,10 +8,11 @@ first-frame/wait pairs across four SEQ families. Behemoth/Bomb use MON.SHP
 silhouettes are present in the original sheet. Chocobo Dead37/38 leaves feathers.
 This is a bounded source-composition study, not a full death-transition replay.
 
-**TARGET IMPLEMENTATION:** retain species-specific KO size and all SHP parts,
-with white outlines and no human face corrections. A six-sheet four-grey
-proposal awaits approval; the32x40 study envelope is not integrated into the
-16x26 runtime cache. Details and reproduction: [campaign/MONSTER_KO.md](campaign/MONSTER_KO.md).
+**TARGET IMPLEMENTATION:** approved six-sheet KO art is integrated through
+optional chapter FKO1 records, preserving size/parts/white outlines without
+human face corrections. Shaded32-column poses reuse two existing cache entries;
+standing/action art remains separate content work. Details and reproduction:
+[campaign/MONSTER_KO.md](campaign/MONSTER_KO.md).
 
 ## Throw family (2026-11-02)
 

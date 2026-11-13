@@ -1,5 +1,12 @@
 # Validation by affected dependency
 
+Monster KO: `make campaign-monster-ko-check` uses PC/sanitizers and approved
+pixels. `check_monster_ko.py --native` opts into one actual68000 renderer carrier.
+`check_capacity_render.py --case` selects `monster-ko`, `monster-ko-morph` or
+`monster-ko-transition` with `--ko-bank PATH` for dense, one-dissolve or first-KO/
+revival budget fixtures; its defaults retain the original four cases.
+Scope/evidence: [MONSTER_KO.md](MONSTER_KO.md). No emulator is involved.
+
 Current default (user decision 2026-11-12): run affected PC tests and sanitizer
 replays first, including complete combat and save flows. Native checks are
 selected for changed ABI/layouts, arithmetic/pointer paths, overlay calls,
