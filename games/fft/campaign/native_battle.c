@@ -4,6 +4,9 @@
 #define MIN_AMS 200
 #define RETURN_VALUE
 #define RT_GRAY_COPY_PRESENT           // reviewed fixed plane addresses avoid TiEmu frame reversal
+#ifndef RT_DRAW_ROWS
+#define RT_DRAW_ROWS 100               // fixed buffers need only the visible LCD rows
+#endif
 #include <tigcclib.h>
 #undef _main
 #define _main battle_runtime_main

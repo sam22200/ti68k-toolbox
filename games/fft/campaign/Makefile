@@ -15,6 +15,9 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: battle-ram-check
+battle-ram-check:
+	$(PY) check_battle_planes.py
 .PHONY: chapter1-monster-battle-check
 chapter1-monster-battle-check: data/ffcj.bin data/ffgd.bin data/ffgi.bin data/ffflow.bin
 	$(PY) check_monster_battle.py
