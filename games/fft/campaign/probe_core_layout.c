@@ -1,4 +1,5 @@
 // Actual compiler layouts, not host-ABI estimates. No game/hardware init.
+#define RT_DRAW_ROWS 100               // production native_battle.c's fixed-address planes
 #ifdef __m68k__
 #define USE_TI89
 #define MIN_AMS 200
@@ -15,6 +16,7 @@
 #endif
 #include "battle.c"
 #include "save.h"
+#include "data/modules.h"
 
 static unsigned long sizes[] = {
     UNIT_CAPACITY, sizeof(Unit), sizeof(State), sizeof(Work), sizeof(Cover), sizeof(Feet),
@@ -27,7 +29,8 @@ static unsigned long sizes[] = {
     sizeof(Cover) + sizeof(Feet) + 2 + 2 + 3,
     2UL * RT_PSIZE,
     BATTLE_STORAGE_BYTES,
-    NAV_BYTES(1), NAV_BYTES(MAP_NMAX), NAV_SINGLE_BYTES(1)
+    NAV_BYTES(1), NAV_BYTES(MAP_NMAX), NAV_SINGLE_BYTES(1),
+    NAV_ENVELOPE, MOD_ZONE, FFT_CORE_COMPANION_MAX, 2UL*RT_DRAW_BYTES
 };
 #ifdef __m68k__
 void _main(void)

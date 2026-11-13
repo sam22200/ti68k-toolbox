@@ -18,7 +18,8 @@ FIELDS = ('unit_capacity unit_bytes state_bytes work_bytes cover_bytes feet_byte
           'save_unit_bytes save_bytes map_capacity scene_rows depth_buffer_bytes '
           'scene_and_work_block_bytes actor_cache_bytes state_bytes_per_extra_unit '
           'work_bytes_per_extra_unit management_cache_bytes battle_state_allocation_bytes '
-          'nav_bytes_per_node nav_max_bytes nav_single_bytes_per_node').split()
+          'nav_bytes_per_node nav_max_bytes nav_single_bytes_per_node '
+          'nav_envelope_bytes module_zone_bytes companion_bytes hidden_render_bytes').split()
 
 
 def run(args, cwd=ROOT):
@@ -53,26 +54,31 @@ def native_layout(out):
         # may be treated as free embedded storage or an already released Work cache.
         layout['battle_heap_block_bytes']=[layout[key]for key in
             ('battle_state_allocation_bytes','depth_buffer_bytes','scene_and_work_block_bytes','actor_cache_bytes')]
-        # Topology is a fifth allocation, retained at the largest visited size.
+        # The production bootstrap reserves the map envelope once, independent of
+        # the dense-map NAV_* helpers. Executable zone and companion are separate
+        # live heap blocks; neither is embedded in the resident anymore.
         descriptor_nodes={}
         for name,path in (('orbonne',HERE/'opening/data/ffod.bin'),
                           ('gariland',HERE/'campaign/data/ffgd.bin')):
             words=struct.unpack('>52H',path.read_bytes()[:104])
             descriptor_nodes[name]=words[9]*words[10]
-        base_blocks=layout['battle_heap_block_bytes']
+        base_blocks=layout['battle_heap_block_bytes']+[layout[key]for key in
+            ('nav_envelope_bytes','module_zone_bytes','companion_bytes')]
         layout['battle_heap_by_map']={}
         for name,nodes in {**descriptor_nodes,'maximum':layout['map_capacity']}.items():
-            blocks=base_blocks+[nodes*layout['nav_bytes_per_node' if name=='maximum' else 'nav_single_bytes_per_node']]
+            blocks=list(base_blocks)
             layout['battle_heap_by_map'][name]=dict(nodes=nodes,blocks=blocks,requested_bytes=sum(blocks))
         layout['battle_heap_block_bytes']=layout['battle_heap_by_map']['gariland']['blocks']
         layout['battle_heap_requested_bytes']=sum(layout['battle_heap_block_bytes'])
         layout['maximum_battle_heap_requested_bytes']=layout['battle_heap_by_map']['maximum']['requested_bytes']
-        layout['nav_growth_transient_bytes']=layout['nav_max_bytes']+max(descriptor_nodes.values())*layout['nav_single_bytes_per_node']
+        layout['nav_growth_transient_bytes']=0
     return dict(**layouts,
                 caveat='sizeof and allocation formulas only; not measured heap high-water, '
                        'stack, fragmentation, allocator overhead, full program residency or '
-                       'combined supervisor/module/grayscale residency. Battle State plus deferred-save '
-                       'tail are included; all five blocks must be simultaneously available. Topology growth allocates before freeing the old cache; the transient includes both.')
+                       'combined supervisor/program/grayscale residency. Battle State plus deferred-save '
+                       'tail, fixed navigation envelope, module zone and companion are included; '
+                       'all seven game blocks must be simultaneously available. hidden_render_bytes '
+                       'is a separate runtime request; GrayOn also allocates its visible planes.')
 
 
 def unpack(packed):
