@@ -6,6 +6,15 @@
 // of the battle (faded or cut), else to the battle, or after it to the end (OPEN_DONE).
 // The includer provides opening_battle (the battle starting) and opening_after (the
 // chapter's own state put back after it).
+#if !MOD_CORE
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+#define hand_gfx CONTOUR_REF_hand_gfx
+#endif
+#define CHOICE_TEXT(x,y,s,c,l) ui_text(x,y,s,c,l)
+#define CHOICE_WIDTH(s) ui_width(s)
+#include "choice_menu.inc"
+#endif
+#include "scene_skip.h"
 enum { MS_AFTER = 1, MS_FADE = 2, MS_PLACED = 4, MS_CAMERA = 8 };
 static const u8 *map_script_data(void)
 {
@@ -35,7 +44,7 @@ static const u8 *map_first(u8 after)            // the first sequence before / a
 static void map_stage(u8 stage)
 {
     const u8 *s = map_seq(stage);
-    st.open_stage = stage; st.open_clock = 0; st.open_seen = 0;
+    st.open_stage = stage; st.open_clock = 0; st.open_seen = 0; st.quit = 0;
     memset(W->actor_key, 255, sizeof W->actor_key);
     W->dialog_key = 0xFFFF; W->bg_ok = W->hold = W->frz = 0;
     if (!s) { if (stage == OPEN_PLAY) st.open_stage=OPEN_BEGIN; return; }
@@ -71,8 +80,9 @@ static void map_start_step(u8 after)                 // the first sequence befor
 
 static void map_skip(void)                      // to the battle, or after it to the end
 {
-    const u8 *s = map_seq(st.open_stage);
-    map_transition(s && s[2] & MS_AFTER ? OPEN_DONE : OPEN_PLAY);
+    u8 stage=st.open_fade&&st.open_fade<9?st.open_next:st.open_stage;
+    const u8 *s = map_seq(stage);
+    map_transition(stage==OPEN_DONE||(s && s[2]&MS_AFTER)?OPEN_DONE:OPEN_PLAY);
 }
 
 static void map_advance(void)
@@ -101,11 +111,14 @@ static u8 map_step(void)
         }
         st.open_handoff = 1; return 0;
     }
-    st.tick++; if (st.open_clock < 250) st.open_clock++;
-    if (!st.open_stage && !st.open_fade) {      // the victory: what follows it, else the end
-        s = map_first(MS_AFTER);
-        if (s) map_enter(s); else map_transition(OPEN_DONE);
+    if(!st.open_stage&&!st.open_fade){ // settle entry before accepting ESC, including fade-out
+        st.quit=0;s=map_first(MS_AFTER);
+        if(s)map_enter(s);else map_transition(OPEN_DONE);
     }
+    // The ordinary quit selector is idle during map dialogue. Reuse its byte
+    // for the scene prompt, without adding battle/save/overlay state.
+    {u8 skip=scene_skip_input(&st.quit);if(skip){W->frz_n++;if(skip==2)map_skip();return 1;}}
+    st.tick++; if (st.open_clock < 250) st.open_clock++;
     if (st.open_fade) {
         if (++st.open_fade == 9) { map_stage(st.open_next); st.open_fade = 9; }
         else if (st.open_fade >= 17) st.open_fade = 0;
@@ -199,4 +212,5 @@ static void map_render(void)
             for (w = 0; w < 10; w++) { RMW16(l + 2 * w, bits, bits); RMW16(d + 2 * w, bits, bits); }
         }
     }
+    if(st.quit)scene_skip_draw(st.quit,W->frz_n);
 }

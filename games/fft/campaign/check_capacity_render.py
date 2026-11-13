@@ -13,7 +13,9 @@ from check_core_boundaries import descriptor13
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,default=HERE/'x/core-capacity/render')
-    out=ap.parse_args().out.resolve();out.mkdir(parents=True,exist_ok=True)
+    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last'),
+                    help='select affected cases; default is the original four-case certification')
+    args=ap.parse_args();out=args.out.resolve();out.mkdir(parents=True,exist_ok=True)
     common=[HERE/'check_capacity_render.c',ROOT/'runtime/core/rt_core.c']
     run(['cc','-std=gnu99','-O1','-w','-o',out/'render',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'renderc',*common,
@@ -29,6 +31,7 @@ def main():
         rotations=out/'rotate.keys';rotations.write_text('12 F5\n13\n50 F1\n51\n')
         for label,scenario,frames,keys in (('board',0,90,empty),('rotations',0,100,rotations),
                                          ('status-last',1,100,empty),('equipment-last',2,100,empty)):
+            if args.case and label not in args.case:continue
             pc=run([out/'render',scenario,frames,keys,out/(label+'-pc.png')],data)
             command=[ROOT/'tools/bin/ti-cycles','--arg',scenario,'--frames',frames,'--max',3000,
                      '--keys',keys,'--png',out/(label+'-native.png')]
