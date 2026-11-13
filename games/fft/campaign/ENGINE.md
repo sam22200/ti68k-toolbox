@@ -1,5 +1,12 @@
 # One engine for every chapter
 
+Latest encounter/persistence formats (2026-11-13): [four traps](TRAPS.md).
+FCD5/header106 adds SOURCE_MAP at word52, independent of world-map location.
+FSV5/3204 appends a two-byte current-raw-stat roster bitmap, migrating older
+saves without changing their existing offsets. ABI89/ModCtx352/Work29310,
+28 images, one8698-byte zone; PARTY16/ORDER8 balance the three existing shards.
+Resource pooling, actor cache and allocation envelopes remain as documented.
+
 Current shared resources (2026-11-07): [Resource policy and formats](CORE_RESOURCES.md).
 Arena/scene/intro consumers share physical data by chapter; universal engine
 artwork is stored once in core ffcu. FRF1 references and FSC2/FSP1 scene pools

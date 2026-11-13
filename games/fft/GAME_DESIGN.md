@@ -214,3 +214,5 @@ level-down, chained battles with save proposals, imposed guests, objective types
 and story choices need explicit audited status rather than a generic core-ready
 claim. The shared scene confirmation layout was approved2026-11-13; scene/save delivery
 and remaining prerequisites are tracked in the linked audit.
+The trap message layout was approved2026-11-13; all four traps and persistent
+Degenerator stats are delivered in [campaign/TRAPS.md](campaign/TRAPS.md).

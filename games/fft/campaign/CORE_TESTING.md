@@ -16,6 +16,16 @@ banks. `check_scene_skip.py --data-dir DIR` selects just three standalone
 prompt/resume/skip replays. `check_capacity_render.py --case ...` can now select
 individual native frame cases. [Evidence and bounds](SCENE_SAVE_FIXES.md).
 
+Traps: `make campaign-traps-check` runs a small original-MIPS fixture,
+PC/sanitizer trap/save tests and current-raw management checks. It does not
+compile overlays or touch TiEmu. `check_traps.py --native-numbers` opts into one
+independent arithmetic/bitmap carrier. `--only raw-management` extends the
+prerequisites runner with the affected FSV5 management test. Scope and evidence:
+[Trap delivery](TRAPS.md). `check_traps_native.py --data-dir DIR` opts into one
+83-check actual-overlay/save carrier on normalized data, with four equal screens.
+632 PC/sanitizer checks, the complete reused Sweegy trace/save, bindings, two
+frame-budget cases and final package checks pass; no whole sweep or TiEmu.
+
 `make chapter1-archive-budget PACKAGE_OUTPUT=...` is host-only planning: real
 group hashes/current core key plus dated estimates. It never builds or runs TI.
 Allowances/depth overflow and duplicate maps are checked; full chapter/Flash

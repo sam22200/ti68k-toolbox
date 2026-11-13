@@ -1,11 +1,19 @@
 # Opening -> Academy -> Gariland
 
-Current scene/save delivery (2026-11-13): [safe scene skipping and permanent stats](SCENE_SAVE_FIXES.md).
+Latest delivery (2026-11-13): [four traps and persistent level-down](TRAPS.md).
+Approved box; FCD5 source-map metadata, FSV5/Save3204 and matching ABI89 groups.
+Work29310, zone8698, input57621/headroom7315; pilot groups total701775 transport
+bytes. PC/sanitizers and selected native checks pass, including the complete
+unchanged Sweegy trace/save semantics and13-actor frame budgets. Monster KO
+poses, objectives and authored guest/chain/choice content remain ahead of route
+automation. Install matching groups; old88 measurements below are historical.
+
+Previous scene/save delivery (2026-11-13): [safe scene skipping and permanent stats](SCENE_SAVE_FIXES.md).
 ESC confirms Skip scene? in both scene implementations; the common box is
 user-approved. Brave/Faith keep one quarter of net battle changes. ABI88,
 Work29308, input57275/headroom7661, zone8698; matching private pilot groups total
 697815 transport bytes. [Other requested prerequisites](CAMPAIGN_PREREQUISITES.md)
-remain ahead of installed-route automation, starting with the four traps.
+remain ahead of installed-route automation.
 
 Current planning checkpoint (2026-11-12): [Chapter I archive budget](CHAPTER1_ARCHIVE_PLAN.md).
 Host-only projection1869336 bytes against2163895 allowance,294559 planning

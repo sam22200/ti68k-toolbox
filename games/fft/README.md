@@ -3,6 +3,8 @@
 Active campaign controls: [scene/save fixes](campaign/SCENE_SAVE_FIXES.md).
 ESC during a scenario scene confirms skipping (No first), without abandoning
 the campaign. Battle God mode: MODE/CATALOG, then ALPHA, then ENTER/2nd.
+[Four traps and persistent Degenerator stats](campaign/TRAPS.md) are delivered
+with per-encounter source-map metadata and compatible FSV5 saves.
 Other requested campaign prerequisites remain in [the audit](campaign/CAMPAIGN_PREREQUISITES.md).
 
 [Shared scenery/cache experiment](scenery/README.md): one material-piece bank for

@@ -2,10 +2,11 @@
 
 Latest steering (2026-11-13): finish the [user prerequisites](CAMPAIGN_PREREQUISITES.md)
 before route automation. [Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
-are delivered and visually approved. ABI88/Work29308, input57275/headroom7661;
-matching private pilot groups total697815 transport bytes. Four traps, monster
-KO art, targeted/protected objectives and authored guest/chain/choice content
-remain. The RAM figures below are previous measurements, not a new16KiB pass.
+and [four traps/level-down persistence](TRAPS.md) are delivered and approved.
+ABI89/Work29310/Save3204/FCD5, input57621/headroom7315; matching private pilot
+groups total701775 transport bytes. Monster KO art, targeted/protected objectives
+and authored guest/chain/choice content remain. RAM figures below are previous
+measurements, not a new16KiB pass; difficult recovery remains deferred.
 
 Current integration (2026-11-12): all155 audited Chapter I actions are executable.
 [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md) now exercise the first

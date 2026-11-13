@@ -1,8 +1,9 @@
-# User campaign prerequisites (2026-11-12)
+# User campaign prerequisites (2026-11-13)
 
 These requests precede the installed-route automation in CHAPTER1_ARCHIVE_PLAN.md.
-First delivery: [scene controls and permanent stats](SCENE_SAVE_FIXES.md), based on919ede6. Evidence:
-`x/campaign-prerequisites/`. Unrelated work and historical groups/saves stay intact.
+Delivered: [scene controls/permanent stats](SCENE_SAVE_FIXES.md) and
+[four traps/level-down persistence](TRAPS.md). Evidence: `x/campaign-prerequisites/`
+and `x/tile-traps/`. Historical groups/saves stay intact.
 Use PC/sanitizers first; only selected changed-layout/native checks at the end.
 
 ## Current audit and delivery queue
@@ -11,12 +12,12 @@ Use PC/sanitizers first; only selected changed-layout/native checks at the end.
 |---|---|---|
 | Scene skip/quit | Shared Skip scene? confirmation delivered for map and standalone scenes; default No, paused scene, explicit Yes skips without exiting to title. User approved the box on2026-11-13. | Preserve the tested handoffs when adding choice scenes. |
 | God mode | MODE or CATALOG, then ALPHA opens DEBUG; God mode toggles with ENTER/2nd. | Document the keys clearly; no new feature needed. |
-| Four trap tiles | Move-Find records already contain trap flags, but native settlement only handles discovery, not traps. | Degenerator, Deathtrap (Death Sentence), Sleeping Gas and Steel Needle; original lookup/precedence, committed-move settlement, persistence and bounded presentation. |
+| Four trap tiles | [Delivered](TRAPS.md): all four effects, first-record lookup, pickup/benefit/discovery ordering, per-encounter source-map identity, reaction/RNG boundaries and FSV5 persistence. Approved box; matching native overlays, frames and package checks pass. | Author future encounters with their source-map ID and source locations; mounts remain out of scope. |
 | Monster KO sprites | Shipping actor banks cover the pilot humans. Sweegy's rules/save fixture is not shipped monster art; Behemoth KO art is not yet integrated. | Inspect the original complete pose/composition, including small or multipart KO poses, before adapting. Never replace every monster KO with a scaled human pose. |
 | EXP/JP/level | Saved for deployed party slots by `party_update`; undeployed records survive compaction. | Retain regression coverage while adding level-down/trap behavior. |
 | Items/stolen/found/loot | Live inventory, steals/chests/discovery and battle rewards have save paths. Existing save/flow suites cover receipt and caps. | Retain these paths; test new trap/discovery precedence rather than invent pilot loot. |
 | Brave/Faith | Saves now keep one quarter of the net battle change, truncating toward zero; initial values and idempotent settlement are checked PC/sanitizers/68000. | Original warning/departure UI remains separate and is not claimed implemented. |
-| Degenerator persistence | Not implemented because traps are absent. Raw-stat changes previously were not copied back to an existing roster slot either; the working save fix now preserves them. | Source level-down/growth semantics and an actual post-trap save/load test. |
+| Degenerator persistence | Current raw stats and source level-down/growth persist across levels/jobs. FSV5 adds a two-byte roster bitmap; PC/sanitizers and actual native overlay/save checks pass. | Does not reconstruct historical PS1 growth for legacy native records. |
 | Permanent death | KO counts3..0 survive; crystal/chest/gone removes party slots at victory. Undeployed members and other records survive compaction. | Keep regression tests; scripted objective losses remain distinct. |
 | Consecutive battles/save proposal | `pack_story.h` already calls successive steps directly; `FP_SAVE_PROMPT` calls the shared Save screen between completed steps. No map is required between steps. | A real authored chain/integration test; this is backend support, not completion of every retail chain. |
 | Imposed guests | Fixed TEAM_GUEST encounter slots survive party loading and run AI (including current pilot/monster fixtures). They are not treated as ordinary deployed/recruited party slots. | Encounter-specific guests and their cross-fight story progression/content; distinguish guest metadata from permanent roster persistence. |
@@ -62,9 +63,9 @@ second settlement cannot apply the same change twice. Initial party creation and
 recruitment use the same captured baseline. Raw24-bit stat bytes are also copied
 back for existing slots, preserving future level-down changes.
 
-The serialized FSV4/3202 and Unit112/State2224 remain. The final overlay ABI is
-88 because Work changes; matching rebuilt groups contain28 images, ModCtx352,
-Work29308 and zone8698. Previous ABI87 data is rejected before executing.
+The preceding scene/save lot used FSV4/3202, ABI88, ModCtx352, Work29308 and
+zone8698, rejecting87. [Traps](TRAPS.md) now supersede it with ABI89/FSV5;
+Unit112/State2224 and zone8698 remain.
 PC and ASan/UBSan save tests pass signed changes-70,-8,-7,-4,-3,0,3,4,7,8,30,
 repeat settlement, raw-stat round trip, initial party creation and the existing
 KO/inventory/undeployed cases. A selected real68000 carrier passes198 checks,
@@ -73,6 +74,6 @@ persistent-departure certification.
 
 ## Resume
 
-Continue with traps, source-correct monster KO assets, objectives/guest content
+Continue with source-correct monster KO assets, objectives/guest content
 and choices. Keep every remaining item explicit; do not describe the chapter/core
 as ready merely because generic combat coverage and archive planning pass.
