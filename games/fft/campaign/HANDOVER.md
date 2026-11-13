@@ -2,6 +2,21 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Active work: target/protect objective review (2026-11-13)
+
+[OBJECTIVES.md](OBJECTIVES.md):25 bounded original-MIPS HP/importance cases
+and18 PC/sanitizer policy boundaries pass. `objective_rules.h` is prepared
+but unused by fft.c; shipping behavior remains ordinary elimination. The
+four-view `x/objectives/review/objective-before-after.png` is marked for a
+gallery Decision; the first small labels were rejected. The user requested
+large title-style direct names; the revised cap12 goals are ready and their
+visual verdict is pending. The temporary PC engine copy
+and banner packet are review controls, not production art/runtime changes.
+After approval, bind validated identities/metadata, settled action/Reraise/
+outcome ordering, banner names/pulses and exactly-once save/aftermath. Keep
+the existing pipeline's scopes; no native sweep or TiEmu ran for this prep.
+The breeding/Bar/poaching extension below remains a pre-extraction requirement.
+
 ### Scope extension before campaign extraction (2026-11-13)
 
 The user added monster breeding, Bar/rumors and poaching to the readiness gate.
