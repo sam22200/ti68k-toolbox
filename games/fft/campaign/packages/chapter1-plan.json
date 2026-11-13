@@ -1,0 +1,178 @@
+{
+  "schema": "FFT_CHAPTER1_ARCHIVE_PLAN_1",
+  "evidence_date": "2026-11-10",
+  "source": "CHAPTER1_READINESS.md section 2, historical R2 estimates; cached map census for cropped depth/width",
+  "cached_census_sha256": "86b185702308fef0cf7b84c1480072229e5dbb2de2614cfb8ddd0e813169a4f6",
+  "baseline_view_format": "R2",
+  "target_view_format": "R4",
+  "production_width_mask": false,
+  "battles": 20,
+  "scenes": 20,
+  "scenery_calibration_percent": 112,
+  "maps": [
+    {
+      "map": 56,
+      "name": "Orbonne",
+      "legacy_four_views_bytes": 31024,
+      "cropped_depth_bytes": [
+        9336,
+        10552,
+        11592,
+        11160
+      ],
+      "width_px": 288.0
+    },
+    {
+      "map": 22,
+      "name": "Gariland",
+      "legacy_four_views_bytes": 35328,
+      "cropped_depth_bytes": [
+        16808,
+        17416,
+        18288,
+        17032
+      ],
+      "width_px": 300.0
+    },
+    {
+      "map": 85,
+      "name": "Mandalia Plains",
+      "legacy_four_views_bytes": 37384,
+      "cropped_depth_bytes": [
+        15612,
+        15268,
+        15340,
+        15620
+      ],
+      "width_px": 312.0
+    },
+    {
+      "map": 74,
+      "name": "Sweegy Woods",
+      "legacy_four_views_bytes": 36170,
+      "cropped_depth_bytes": [
+        16960,
+        18608,
+        17432,
+        19304
+      ],
+      "width_px": 276.0
+    },
+    {
+      "map": 31,
+      "name": "Dorter",
+      "legacy_four_views_bytes": 23774,
+      "cropped_depth_bytes": [
+        14944,
+        17896,
+        17664,
+        15264
+      ],
+      "width_px": 240.0
+    },
+    {
+      "map": 34,
+      "name": "Sand Rat",
+      "legacy_four_views_bytes": 24955,
+      "cropped_depth_bytes": [
+        12508,
+        13308,
+        13460,
+        12396
+      ],
+      "width_px": 252.0
+    },
+    {
+      "map": 76,
+      "name": "Zeklaus Desert",
+      "legacy_four_views_bytes": 40105,
+      "cropped_depth_bytes": [
+        16768,
+        17040,
+        16848,
+        16880
+      ],
+      "width_px": 336.0
+    },
+    {
+      "map": 91,
+      "name": "Thieves Fort",
+      "legacy_four_views_bytes": 27748,
+      "cropped_depth_bytes": [
+        14376,
+        15672,
+        14136,
+        13176
+      ],
+      "width_px": 264.0
+    },
+    {
+      "map": 77,
+      "name": "Lenalia Plateau",
+      "legacy_four_views_bytes": 24336,
+      "cropped_depth_bytes": [
+        12448,
+        14464,
+        15608,
+        14112
+      ],
+      "width_px": 264.0
+    },
+    {
+      "map": 72,
+      "name": "Fovoham Plains",
+      "legacy_four_views_bytes": 20087,
+      "cropped_depth_bytes": [
+        15088,
+        14952,
+        18968,
+        19176
+      ],
+      "width_px": 276.0
+    },
+    {
+      "map": 73,
+      "name": "Windmill interior",
+      "legacy_four_views_bytes": 24864,
+      "cropped_depth_bytes": [
+        14696,
+        13944,
+        13576,
+        14648
+      ],
+      "width_px": 204.0
+    },
+    {
+      "map": 103,
+      "name": "Windmill Shed",
+      "legacy_four_views_bytes": 22727,
+      "cropped_depth_bytes": [
+        12272,
+        10824,
+        12048,
+        13408
+      ],
+      "width_px": 216.0
+    },
+    {
+      "map": 49,
+      "name": "Fort Zeakden",
+      "legacy_four_views_bytes": 27405,
+      "cropped_depth_bytes": [
+        14608,
+        15872,
+        12656,
+        13312
+      ],
+      "width_px": 264.0
+    }
+  ],
+  "other_upper_estimates": {
+    "arena_banks": 105000,
+    "extra_encounters": 35000,
+    "actor_banks": 250000,
+    "scenes": 100000,
+    "flow_dialogue_results": 100000,
+    "world_map": 18000
+  }
+}
