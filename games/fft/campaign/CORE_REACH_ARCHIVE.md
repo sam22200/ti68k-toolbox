@@ -124,8 +124,9 @@ with largest block65520 restored. Seven game blocks are released; the remaining
 140-byte AMS/runtime change is recorded, not silently normalized. No repeated
 entry/leak or worst-flow peak certification is claimed by this one run.
 
-Next: recover the remaining measured RAM deficit, then verify the production
-installed flow's peak/contiguous margin. Full chapter archive assembly, the
-one-command native chapter route and interface freeze also remain open. Preserve
-the actor/cache/scene allocation gains and PC-first workflow; do not reopen a
-generic combat-family queue or add new ASM for this checkpoint.
+Follow-up user decision (2026-11-12): a bounded audit selected no simple extra
+roughly2KiB saving; defer further difficult RAM refactoring and proceed.
+[Archive planning](CHAPTER1_ARCHIVE_PLAN.md) now provides a reproducible host-only
+projection. The16KiB target and production installed peak/contiguous/reentry
+certification remain open. Next is the installed chapter route, PC-first.
+Preserve actor/cache/scene allocation gains; do not reopen a generic combat queue.

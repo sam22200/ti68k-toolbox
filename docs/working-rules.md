@@ -20,6 +20,11 @@ Both apply to every agent working in this repository.
   hardware-dependent behavior that needs it. Reuse unchanged native evidence.
   This supersedes older per-lot whole-sweep instructions in FFT handovers.
 
+- **FFT RAM follow-up (user decision 2026-11-12):** after a bounded search,
+  defer difficult recovery of the remaining roughly2KiB and proceed with chapter
+  readiness work. Keep the measured deficit explicit; do not report16KiB passed
+  or shrink measured caches/fixed capacities merely to meet the target.
+
 - **FFT final optimization pass (2026-11-07):** Read
   `games/fft/campaign/CORE_OPTIMIZATION.md`. Shared actor lookup first checks
   the remembered entry's current key; retain eviction validation and the

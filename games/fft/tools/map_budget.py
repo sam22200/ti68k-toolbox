@@ -133,7 +133,7 @@ def ragged(disc, files, m, nx, nz, b):
 
 
 def archive(disc, files, m):
-    """Estimated archive bytes of the map's four R2 views (extract.views() default four greys,
+    """Estimated archive bytes of the map's four current R4 views (extract.views() default four greys,
     rows cropped to the first SC_HMAX content rows, extract.pack_view): ZX0 is slow, about 10 s
     a map."""
     mesh, nx, nz, maxh = load(disc, files, m)

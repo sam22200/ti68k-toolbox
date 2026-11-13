@@ -15,6 +15,9 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: chapter1-archive-budget
+chapter1-archive-budget:
+	$(PY) ../tools/chapter1_budget.py --packages $(PACKAGE_OUTPUT)/packages.json
 .PHONY: archive-reach-check
 archive-reach-check: | contour-assets
 	$(PY) ../tools/view_split.py opening
