@@ -5,7 +5,7 @@ take from generated headers, as one small archived variable read at load.
 usage: chapter_desc.py opening|campaign ...
 Reads <chapter>/data/{battle,interface,map}.h and the actor offsets (opening/data/units.h,
 campaign/data/actors.h); writes <chapter>/data/<ffod|ffgd>.bin and the shared layout
-chapter.h (CD_* word indices, identical for every chapter). Layout: "FCD4", then u16
+chapter.h (CD_* word indices, identical for every chapter). Layout: "FCD5", then u16
 fields (FIELDS), then the small tables (u8 rows; zodiac_days u16), each at a field's
 byte offset from the start of the descriptor (0: the chapter has none).
 """
@@ -62,11 +62,12 @@ START = {'opening': 1, 'campaign': 0}           # 1: a story start (opening.inc)
 # RSM_POS, EQUIP_CHANGE_POS: the learned bits of the reactions and supports a unit draws.
 PARTY = {'opening': 0, 'campaign': 1}
 LOCATION = {'opening': 19, 'campaign': 7}       # its world map location: FFT id + 1 (Orbonne, Gariland)
+SOURCE_MAP = {'opening': 56, 'campaign': 22}   # original terrain/Move-Find identity, independent of world location
 WON = {'opening': 1, 'campaign': 2}
 SAVE_IDS = ('DEFEND_ID', 'EQUIP_CHANGE_ID', 'EQUIP_CHANGE_POS')
 FIELDS = [f for f, _ in NUMBERS] + [f for f, _ in IGFX] + [f for f, _, _ in TABLES] + \
     ['WATER', 'MAP_SCRIPT', 'RAMZA', 'UNIT_K', 'GFX_PORTRAIT', 'GFX_CHEMIST', 'START',
-     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS) + ['DRAW_BASIC', 'UNIT_COUNT', 'UNIT_REWARDS']
+     'PARTY', 'WON', 'LOCATION'] + list(SAVE_IDS) + ['DRAW_BASIC', 'UNIT_COUNT', 'UNIT_REWARDS', 'SOURCE_MAP']
 NAMES = {'opening': 'ffod', 'campaign': 'ffgd'}
 
 
@@ -161,7 +162,7 @@ def build(chapter):
     limit=int(re.search(r'^#define FFT_CORE_UNIT_MAX (\d+)',(HERE/'core_limits.h').read_text(),re.M)[1])
     if not 1<=unit_count<=limit:
         raise ValueError(f'{chapter}: {unit_count} actors exceed the accepted1..{limit} envelope')
-    head = b'FCD4' + bytes(2 * len(FIELDS))
+    head = b'FCD5' + bytes(2 * len(FIELDS))
     body = bytearray(head)
     fields = {}
     fields['UNIT_COUNT']=unit_count
@@ -206,6 +207,7 @@ def build(chapter):
     fields['RAMZA'], fields['UNIT_K'] = RAMZA[chapter], UNIT_K[chapter]
     fields['START'] = START[chapter]
     fields['PARTY'], fields['WON'], fields['LOCATION'] = PARTY[chapter], WON[chapter], LOCATION[chapter]
+    fields['SOURCE_MAP'] = SOURCE_MAP[chapter]
     for f in SAVE_IDS:
         fields[f] = values.get(f, 0)
     convert_units(chapter, folder, offsets, values, fields, body)
@@ -233,7 +235,7 @@ def build(chapter):
     struct.pack_into('>%dH' % len(FIELDS), body, 4, *(fields[f] for f in FIELDS))
     import surface_data
     disc,files=surface_data.extract.disc_files(str(HERE.parents[1]/'roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'))
-    raw,geometry,_=surface_data.terrain(disc,files,56 if chapter=='opening'else 22)
+    raw,geometry,_=surface_data.terrain(disc,files,SOURCE_MAP[chapter])
     body=surface_data.attach_descriptor(body,surface_data.encode(raw,geometry['width'],geometry['height'],with_terrain=True))
     (folder / (NAMES[chapter] + '.bin')).write_bytes(bytes(body))
     print(NAMES[chapter], len(body), 'bytes')
@@ -338,9 +340,37 @@ def dump_water():
     subprocess.run([exe], cwd=HERE / 'campaign/data', check=True)
 
 
+def upgrade_descriptor(raw, source_map):
+    """Lossless metadata-only FCD4 migration, without extracting unchanged art/data.
+
+    The caller must supply the encounter's source map (255 explicitly means no
+    Move-Find data); a world-map location cannot identify repeated encounters.
+    Offsets into igfx remain unchanged. Descriptor-owned spans move by two bytes.
+    """
+    if type(source_map) is not int or not (0<=source_map<=127 or source_map==255):
+        raise ValueError('source_map: expected0..127 or255')
+    if raw[:4]==b'FCD5':
+        if len(raw)<106:raise ValueError('Truncated FCD5 descriptor')
+        out=bytearray(raw);struct.pack_into('>H',out,104,source_map);return bytes(out)
+    if raw[:4]!=b'FCD4' or len(raw)<112 or raw[-8:-4]!=b'SGE1':
+        raise ValueError('Expected a complete FCD4 descriptor with geometry')
+    if len(raw)>65510:raise ValueError('Descriptor exceeds one resource variable after migration')
+    out=bytearray(b'FCD5'+raw[4:104]+struct.pack('>H',source_map)+raw[104:])
+    owned=[f for f,_,_ in TABLES]+['UNIT_DEFS','UNIT_REWARDS','WATER','MAP_SCRIPT','GFX_PORTRAIT','GFX_CHEMIST']
+    for name in owned:
+        at=4+2*FIELDS.index(name);value=struct.unpack_from('>H',out,at)[0]
+        if value:
+            if not 104<=value<len(raw)-8:raise ValueError(f'{name}: invalid descriptor offset')
+            struct.pack_into('>H',out,at,value+2)
+    off,size=struct.unpack_from('>HH',raw,len(raw)-4)
+    if off<104 or off+size!=len(raw)-8:raise ValueError('Invalid geometry footer')
+    struct.pack_into('>H',out,len(out)-4,off+2)
+    return bytes(out)
+
+
 def header():
     lines = ['// Generated by tools/chapter_desc.py: a chapter descriptor\'s layout (campaign/ENGINE.md).',
-             '#define CD_MAGIC 0x46434434UL   // "FCD4"',
+             '#define CD_MAGIC 0x46434435UL   // "FCD5"',
              '#define CD_HEADER_BYTES %dU' % (4+2*len(FIELDS))]
     lines += ['#define CD_%s %d' % (f, 2 + i) for i, f in enumerate(FIELDS)]   # u16 word index
     path = HERE / 'chapter.h'

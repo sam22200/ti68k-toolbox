@@ -141,6 +141,7 @@ u8 can_equip(const SaveUnit *u, u8 slot, u8 id)
 
 typedef struct { u16 hp, mp; u8 sp, pa, ma, move, jump; } Stats;
 #include "../movement_rules.h"
+#include "../raw_stats.h"
 Stats stats(const SaveUnit *u)             // fft.c unit_stats, from the save's records
 {
     const u8 *j = job_rec(record(u, career(u)));
@@ -148,12 +149,11 @@ Stats stats(const SaveUnit *u)             // fft.c unit_stats, from the save's 
     if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
     Stats s;
     u16 v16[5];
-    u8 i, k;
+    u8 i,k,current=0;
+    for(k=0;k<save.n;k++)if(u==&save.unit[k]){current=save_raw_current(&save,k);break;}
     for (i = 0; i < 5; i++) {
         u32 v = (u32)u->raw[i][0] << 16 | (u16)u->raw[i][1] << 8 | u->raw[i][2];
-        u8 g = j[J_GROWTH + i] ? j[J_GROWTH + i] : 1;
-        for (k = 2; k <= u->level; k++) v += v / (u16)(g + k - 1);
-        if (v > 0xFFFFFFUL) v = 0xFFFFFFUL;
+        if(!current)v=core_raw_grown(v,j[J_GROWTH+i],u->level);
         v = v * j[J_MULT + i] / 100 >> 14;
         v16[i] = v ? (u16)v : 1;
     }

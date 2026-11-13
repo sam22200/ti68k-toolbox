@@ -2,7 +2,8 @@
 #define FFT_SAVE_TYPES_H
 // Serialized save layout only; no file calls before module context bindings.
 #include "../../../runtime/core/rt.h"
-#define SAVE_MAGIC "FSV4"
+#define SAVE_MAGIC "FSV5"
+#define SAVE_V4_BYTES 3202U
 #define SAVE_V3_BYTES 3138U
 #define SAVE_DISCOVERY_BYTES 64U
 #define SAVE_FLAGS 4                    // byte offset of the story flags (fftstory reads them)
@@ -36,6 +37,13 @@ typedef struct {
     u8 deploy_n, deploy_battle[2];
     u8 deploy[5][4];                   // roster slot, world x/z, native facing
     u8 discovered[SAVE_DISCOVERY_BYTES]; //128 source maps, four once-only item locations each
+    u8 raw_current[2];                  // party-slot bitmap: current raw stats instead of level-one seeds
 } Save;
-
+static u8 save_raw_current(const Save *s,u8 slot)
+{return slot<PARTY_MAX&&(s->raw_current[slot>>3]&((u8)1<<(slot&7)))!=0;}
+static void save_raw_set(Save *s,u8 slot,u8 current)
+{
+    u8 bit=(u8)1<<(slot&7);if(slot>=PARTY_MAX)return;
+    if(current)s->raw_current[slot>>3]|=bit;else s->raw_current[slot>>3]&=(u8)~bit;
+}
 #endif

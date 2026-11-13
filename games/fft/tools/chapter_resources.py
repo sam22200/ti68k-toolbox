@@ -98,13 +98,13 @@ def audit(variables,source):
 def lean_encounter(source, prefix):
     """Only fields actually consumed from igfx survive in the shipping bank.
 
-    The FCD4 descriptor already owns converted UnitDefs and water positions.
+    The FCD5 descriptor already owns converted UnitDefs and water positions.
     Legacy abilities/skill sets are consumed offline by chapter_desc.py only.
     """
     dn,inn='ff'+prefix+'d','ff'+prefix+'i'
     desc=bytearray(resolve(source,dn));old=resolve(source,inn)
     # Small metadata-only packaging fixtures have no surface/terrain payload.
-    if len(desc)<112 or desc[:4]!=b'FCD4' or desc[-8:-4]!=b'SGE1':return
+    if len(desc)<114 or desc[:4]!=b'FCD5' or desc[-8:-4]!=b'SGE1':return
     import chapter_desc
     fields={f:4+2*i for i,f in enumerate(chapter_desc.FIELDS)}
     def get(f):return word(desc,fields[f])

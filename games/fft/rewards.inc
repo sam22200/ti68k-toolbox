@@ -15,6 +15,11 @@ static void exp_gain(Unit *u,u8 e)
         if (u->level < 99) {
             u16 hp = u->hp, mp = u->mp;
             u->level++; u->exp = 0; st.lvup = 1;
+            if(u->raw[0]&RAW_CURRENT){
+                u8 k;const Job *j=&jobs[u->job];
+                for(k=0;k<5;k++){rand15();u->raw[k]=core_raw_level(u->raw[k]&RAW_MAX,j->growth[k],u->level,0);}
+                u->raw[0]|=RAW_CURRENT;
+            }
             unit_stats(u);
             u->hp = hp < u->max_hp ? hp : u->max_hp;
             u->mp = mp < u->max_mp ? mp : u->max_mp;

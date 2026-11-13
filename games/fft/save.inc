@@ -71,14 +71,15 @@ static u8 permanent_stat(u8 base,u8 current)
     return current>=base?(u8)(base+((u16)(current-base)>>2)):
                          (u8)(base-((u16)(base-current)>>2));
 }
-static void save_permanent_stats(SaveUnit *s,Unit *u,u8 who)
+static void save_permanent_stats(SaveUnit *s,Unit *u,u8 who,u8 slot)
 {
     u8 k;
     s->brave=permanent_stat(W->permanent_base[who][0],u->brave);
     s->faith=permanent_stat(W->permanent_base[who][1],u->faith);
-    // A second settlement cannot reapply the same change. No new save fields.
+    // A second settlement cannot reapply the same Brave/Faith change.
     W->permanent_base[who][0]=u->brave=s->brave;
     W->permanent_base[who][1]=u->faith=s->faith;
+    save_raw_set(&save,slot,(u->raw[0]&RAW_CURRENT)!=0);
     for(k=0;k<5;k++){
         s->raw[k][0]=(u8)(u->raw[k]>>16);s->raw[k][1]=(u8)(u->raw[k]>>8);s->raw[k][2]=(u8)u->raw[k];
     }
@@ -105,18 +106,19 @@ static void party_update(void)
         c = (u8)(s->job - 0x4A);
         if (c >= CAREER_N) c = 0;
         s->level = u->level; s->exp = u->exp;
-        save_permanent_stats(s,u,i);
+        save_permanent_stats(s,u,i,u->slot);
         for(k=0;k<EQ_N;k++)s->eq[k]=u->eq[k]==255?0:u->eq[k];
         be16(s->jp[c], u->jp); be16(s->tjp[c], u->tjp);
     }
     for (k = 0; k < save.n; k++) {
         if(lost[k]){lost[k]=255;continue;}
         lost[k]=n;
+        save_raw_set(&save,n,save_raw_current(&save,k));
         if (n != k) memcpy(&save.unit[n], &save.unit[k], sizeof save.unit[0]);
         n++;
     }
     for(i=0;i<NUNIT;i++)if(st.unit[i].slot<save.n)st.unit[i].slot=lost[st.unit[i].slot];
-    for (k = n; k < save.n; k++) memset(&save.unit[k], 0, sizeof save.unit[0]);
+    for (k = n; k < save.n; k++){memset(&save.unit[k],0,sizeof save.unit[0]);save_raw_set(&save,k,0);}
     save.n = n;
 }
 
@@ -126,7 +128,7 @@ static void save_party(void)
     const u8 *rsm = cdesc + CD(RSM_POS);
     u8 i, k;
     if (st.party_in) party_update();
-    else {save.n=0;memset(save.unit,0,sizeof save.unit);}
+    else {save.n=0;memset(save.unit,0,sizeof save.unit);memset(save.raw_current,0,sizeof save.raw_current);}
     for (i = 0; i < NUNIT; i++, u++) {
         SaveUnit *s;
         u8 c;
@@ -138,7 +140,7 @@ static void save_party(void)
         c = (u8)(s->job - 0x4A);           // its career row (another job: the Squire's)
         if (c >= CAREER_N) c = 0;
         s->gfx = u->gfx; s->type = unit_monster(u)?3:(u8)(i == U_RAMZA ? 2 : u->female); s->name = u->name;
-        s->level = u->level; s->exp = u->exp; save_permanent_stats(s,u,i);
+        s->level = u->level; s->exp = u->exp; save_permanent_stats(s,u,i,(u8)(save.n-1));
         s->zodiac = u->zodiac;
         be16(s->reaction,st.reaction[i]);
         for (k = 0; k < EQ_N; k++) s->eq[k] = u->eq[k] == 0xFF ? 0 : u->eq[k];
@@ -246,6 +248,7 @@ static void party_load(void)
         W->permanent_base[i][0]=u->brave;W->permanent_base[i][1]=u->faith;
         u->zodiac = s->zodiac;
         for (k = 0; k < 5; k++) u->raw[k] = (u32)s->raw[k][0] << 16 | (u16)s->raw[k][1] << 8 | s->raw[k][2];
+        if(save_raw_current(&save,n))u->raw[0]|=RAW_CURRENT;
         for (k = 0; k < EQ_N; k++) u->eq[k] = s->eq[k] ? s->eq[k] : 0xFF;
         {u16 id=(u16)(s->movement[0]<<8|s->movement[1]);
          st.movement[i]=(u16)(id-486)<24U?(u8)(id-485):0;}

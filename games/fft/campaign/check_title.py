@@ -95,9 +95,9 @@ def main():
                     saved=save_dump.decode(after['ffsave']);assert saved['party']==[] and saved['money']==2000
                     assert after.get('ffslot')==initial.get('ffslot'),(name,'no slot chosen')
                 elif expected==3:
-                    written=after['ffsave'+str(after['ffslot'][4])]   # the session, as FSV4
-                    copy={k:v for k,v in save_dump.decode(written).items() if k!='discovered'}   # FSV4-only field
-                    assert written[:4]==b'FSV4' and copy==save_dump.decode(bytes(base)),(name,'complete campaign snapshot')
+                    written=after['ffsave'+str(after['ffslot'][4])]   # the migrated session
+                    copy={k:v for k,v in save_dump.decode(written).items() if k!='discovered'}
+                    assert written[:4]==b'FSV5' and copy==save_dump.decode(bytes(base)),(name,'complete campaign snapshot')
                 else:
                     slot=after['ffslot'][4];saved=save_dump.decode(after['ffsave'])
                     assert saved['party'][0]['level']==(22 if slot==3 else 8),(name,'session from the slot')

@@ -74,7 +74,8 @@ def main():
             if f not in mutable:check(get(before,f)==get(after,f))
         tiles=get(before,'MAP_W')*get(before,'MAP_H')*12
         check(a[get(before,'TILES'):get(before,'TILES')+tiles]==b[:tiles])
-        check(before[104:]==after[104:]) # units, water, collision columns: byte-identical
+        head=4+2*len(chapter_desc.FIELDS)
+        check(before[head:]==after[head:]) # units, water, collision columns: byte-identical
         check(get(after,'ABILITIES')==get(after,'SKILL_SETS')==0)
         count=get(before,'UNIT_COUNT')
         if get(before,'UNIT_RAW'):

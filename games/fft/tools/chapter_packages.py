@@ -143,6 +143,8 @@ def core_package(source, spec):
         raise ValueError('Unsupported core specification')
     if spec.get('view_format')!='R4':
         raise ValueError('Core specification must declare R4 archive colours')
+    if spec.get('encounter_format')!='FCD5':
+        raise ValueError('Core specification must declare FCD5 encounter source maps')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -201,9 +203,11 @@ def chapter_package(source, spec, core_spec, key):
             if 'ff'+prefix+suffix not in spec['variables']:
                 raise ValueError(f'Route {band}: missing ff{prefix}{suffix}')
         desc = resources.resolve(source,'ff'+prefix+'d',set(spec['variables'])|set(core_spec['variables']))
-        if len(desc) < 104 or desc[:4] != b'FCD4':
+        if len(desc) < 106 or desc[:4] != b'FCD5':
             raise ValueError('Unsupported encounter descriptor')
-        words = struct.unpack_from('>52H', desc)
+        words = struct.unpack_from('>53H', desc)
+        if words[52]>127 and words[52]!=255:
+            raise ValueError('Encounter source_map: expected0..127 or255')
         if words[42] and 'ff'+prefix+'st' not in spec['variables']:
             raise ValueError('Scripted encounter requires its story bank')
         e = core_spec['envelope']

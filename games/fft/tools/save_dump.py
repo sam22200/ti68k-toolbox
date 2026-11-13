@@ -24,7 +24,7 @@ def payload(path):
 
 def decode(b):
     base=HEAD+PARTY_MAX*UNIT
-    assert (len(b)==base and b[:4]==b'FSV2') or (len(b)==base+28 and b[:4]==b'FSV3') or (len(b)==base+92 and b[:4]==b'FSV4'), 'not a campaign save'
+    assert (len(b)==base and b[:4]==b'FSV2') or (len(b)==base+28 and b[:4]==b'FSV3') or (len(b)==base+92 and b[:4]==b'FSV4') or (len(b)==base+94 and b[:4]==b'FSV5'), 'not a campaign save'
     flags = [k for k in range(FLAG_N) if b[4 + (k >> 3)] >> (k & 7) & 1]
     n, loc = b[4 + FLAG_N // 8], b[5 + FLAG_N // 8]
     inv = {i: c for i, c in enumerate(b[4 + FLAG_N // 8 + 2:HEAD]) if c}
@@ -44,11 +44,14 @@ def decode(b):
                           support=struct.unpack_from('>H', u, 32)[0], movement=struct.unpack_from('>H', u, 34)[0],
                           careers=careers))
     result=dict(flags=flags, location=loc - 1 if loc else None, inventory=inv, party=units)
-    if b[:4]in(b'FSV3',b'FSV4'):
+    if b[:4]in(b'FSV3',b'FSV4',b'FSV5'):
         t=b[base:];result.update(money=int.from_bytes(t[:4],'big'),flow=t[4],
             deployment_battle=int.from_bytes(t[6:8],'big'),
             deployment=[dict(slot=t[8+4*i],x=t[9+4*i],z=t[10+4*i],face=t[11+4*i]) for i in range(t[5])])
-    if b[:4]==b'FSV4':result['discovered']=list(b[base+28:])
+    if b[:4]in(b'FSV4',b'FSV5'):result['discovered']=list(b[base+28:base+92])
+    if b[:4]==b'FSV5':
+        for i,u in enumerate(units):
+            if b[base+92+(i>>3)]&(1<<(i&7)):u['raw_current']=True
     return result
 
 

@@ -48,7 +48,6 @@ static u8 movement_benefit(u8 who)
         W->nature_pending|=1;
 #endif
     }
-    if(discovery_move(who))return 1;
     if(!u->hp||core_reaction_blocked(&u->statuses,0,0,0,0))return 0;
     cj_movement(common,u->job,st.movement[who],flags);
     if(flags[0]&1){kind=1;n=(u->max_hp+9)/10U;u->hp=action_hp(AB_HEAL,u->hp,u->max_hp,n);}
@@ -63,4 +62,21 @@ static u8 movement_benefit(u8 who)
     if(!kind)return 0;
     st.abil=492+kind;st.dmg=n;st.pick=254;st.pick_t=1;st.mode=M_PICK;
     return 1;
+}
+#if MOD_CORE
+#include "reaction_live.h"
+#include "traps.inc"
+#endif
+static u8 movement_post(u8 who)
+{
+    u8 map=(u8)CD(SOURCE_MAP);
+    if(!W->move_post){W->move_post=1;W->move_owner=who;W->trap_message=0;}
+    if(W->move_post==1){W->move_post=2;if(movement_benefit(who))return 1;}
+    W->move_post=0;
+    if(discovery_find(who,map))return 1; // an unfound item suppresses this visit's trap
+#if MOD_CORE
+    return trap_apply(who,map);
+#else
+    W->move_post=3;return 0; // resident calls NATURE only after EQUIPMENT returns
+#endif
 }
