@@ -1,5 +1,10 @@
 # Final Fantasy Tactics: Magic City Gariland (tech demo)
 
+Active campaign controls: [scene/save fixes](campaign/SCENE_SAVE_FIXES.md).
+ESC during a scenario scene confirms skipping (No first), without abandoning
+the campaign. Battle God mode: MODE/CATALOG, then ALPHA, then ENTER/2nd.
+Other requested campaign prerequisites remain in [the audit](campaign/CAMPAIGN_PREREQUISITES.md).
+
 [Shared scenery/cache experiment](scenery/README.md): one material-piece bank for
 Gariland/Orbonne, exact-source controls and native one/four-orientation benchmarks.
 Four full caches exceed the complete game's RAM budget; production remains unchanged.

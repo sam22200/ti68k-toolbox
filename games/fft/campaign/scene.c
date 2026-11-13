@@ -59,7 +59,7 @@ typedef struct {
     u16 status[2][RT_H * RT_PBYTES / 2];   // the dialogue's own planes, copied box by box
 } Work;
 static Work *W;
-static u8 skip_ask,skip_row;            // ESC's "Skip scene?" prompt: open, 0 No / 1 Yes
+static u8 skip_ask;            // shared prompt: 0 closed, 1 No / 2 Yes
 static u8 *vbuf;                        // the picture: colour, colour, depth/mask x 2
 static const u8 *set, *amap, *cgfx, *pgfx;   // pgfx: the speakers' portraits (ffcp)
 static const u8 *scene_assets,*scene_steps;
@@ -77,6 +77,22 @@ static const u8 walk_seq[16] = { 2, 1, 1, 0, 0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 3, 3 
 
 #include "../actors.inc"
 #include "../text.inc"
+#include "../contour.h"
+#include "../archive_art.h"
+static const u8 *contour_gfx;
+#include "../contour_art.inc"
+#define HAND_H 14
+#ifdef __m68k__
+#define hand_gfx CONTOUR_REF_hand_gfx
+#else
+static u32 scene_hand[3][HAND_H]; // software sprites use aligned host-order words
+#define hand_gfx scene_hand
+#endif
+static u8 scene_text_width(const char *s){u8 n=0;while(*s)n+=UI_SHARED(ADV)[(u8)*s++-32];return n;}
+#define CHOICE_TEXT(x,y,s,c,l) ui_text(x,y,s,c,l)
+#define CHOICE_WIDTH(s) scene_text_width(s)
+#include "../choice_menu.inc"
+#include "../scene_skip.h"
 static void opening_actor(u8 gfx,u8 slot,s16 x,s16 y,u8 face,u16 logical);
 #define BEATS_PICTURE
 #include "../beats.inc"
@@ -151,7 +167,16 @@ void game_init(void)
 #endif
     W = RT_NULL; vbuf = RT_NULL; acache = RT_NULL;   // statics survive between runs
     picture_bytes = 0;
-    cgfx = rt_file("ffcu", RT_NULL);
+    cgfx = rt_file("ffcu", &identity_size);
+    contour_gfx=archive_art_tail(cgfx,identity_size);
+    if(!contour_gfx){ // historical extraction controls; shipping shares this tail in ffcu
+        const u8 *view=resource_file("ffov0",&identity_size);
+        contour_gfx=archive_art_tail(view,identity_size);
+    }
+#ifndef __m68k__
+    if(contour_gfx){u8 plane,row;for(plane=0;plane<3;plane++)for(row=0;row<HAND_H;row++)
+        scene_hand[plane][row]=RD32((const u8 *)CONTOUR_REF_hand_gfx[plane],(u16)row*2);}
+#endif
     scene_flow=rt_file("ffflow",RT_NULL);if(!qvalid(scene_flow))scene_flow=RT_NULL;
     pgfx = rt_file("ffcp", &identity_size);
     if(!identity_valid(pgfx,identity_size))pgfx=RT_NULL;
@@ -169,11 +194,11 @@ void game_scenario(u16 n)
 {
     char name[6] = "ffs0";
     u16 size,asset_size,i,required=0;
-    memset(&st, 0, sizeof st); skip_ask = skip_row = 0;
+    memset(&st, 0, sizeof st); skip_ask = 0;
     scene_set_id=(u8)n;
     name[3] = (char)('0' + n);
     set = resource_file(name, &size);asset_size=size;
-    if (!W || !set || size<12 || !pgfx || !cgfx || !abank[0] || !abank[1] ||
+    if (!W || !set || size<12 || !pgfx || !cgfx || !contour_gfx || !abank[0] || !abank[1] ||
         RD16(set,0)!=0x4653||(RD16(set,1)!=0x4331&&RD16(set,1)!=0x4332)) { set = RT_NULL; return; }
     scene_assets=set;scene_steps=set+12;
     if(RD16(set,1)==0x4332){
@@ -219,19 +244,10 @@ u8 game_update(void)
         return 0;
     }
     if (!set) return !input_pressed(K_ESC);
-    if (skip_ask) {
-        if (input_pressed(K_UP | K_DOWN)) skip_row ^= 1;
-        if (input_pressed(K_B | K_ESC)) skip_ask = 0;
-        else if (input_pressed(K_A | K_ENTER)) {
-            skip_ask = 0;
-            if (skip_row) {                  // done, flow written
-                tilog("scene skipped at step %u", st.step);
-                st.step = RD16(set, 5); step_start(); return 0;
-            }
-        }
+    {u8 skip=scene_skip_input(&skip_ask);if(skip){
+        if(skip==2){tilog("scene skipped at step %u",st.step);st.step=RD16(set,5);step_start();return 0;}
         return 1;
-    }
-    if (input_pressed(K_ESC)) { skip_ask = 1; skip_row = 0; return 1; }
+    }}
     W->actor_budget = 1; W->actor_misses = 0; W->ac_now++;
     st.tick++; if (st.open_clock < 250) st.open_clock++;
     if (st.open_fade) {                 // out over 8 frames, the next step in over 8 more
@@ -364,12 +380,6 @@ void game_render(void)
             ZB(22); opening_dialog_draw(); ZE(22);
         }
     }
-    if (skip_ask) {                     // centred, white on black, the hand on its row
-        draw_rect(44, 34, 72, 32, C_WHITE); draw_rect(45, 35, 70, 30, C_BLACK);
-        ui_text(52, 38, "Skip scene?", C_WHITE, 114);   // (limit: the box's right edge)
-        ui_text(62, 48, "No", C_WHITE, 114); ui_text(62, 56, "Yes", C_WHITE, 114);
-        ui_text(54, 48 + 8 * skip_row, ">", C_WHITE, 114);
-    }
     if (st.open_fade) {
         u8 level = st.open_fade < 9 ? st.open_fade : 17 - st.open_fade;
         u8 phase = (level + 1) >> 1, r; u16 pat = phase >= 4 ? 0xFFFF : phase == 3 ? 0xEEEE : phase == 2 ? 0xAAAA : 0x8888;
@@ -379,4 +389,5 @@ void game_render(void)
             for (w = 0; w < 10; w++) { RMW16(l + 2 * w, bits, bits); RMW16(d + 2 * w, bits, bits); }
         }
     }
+    if(skip_ask)scene_skip_draw(skip_ask,rt_frame);
 }

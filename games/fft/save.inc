@@ -64,12 +64,32 @@ static void save_rewards(void)
     memset(save.deploy_battle,0,sizeof save.deploy_battle);
 }
 
+// Source post-battle rule: keep one quarter of the net change, truncating
+// signed changes toward zero. The original also resets the live value to it.
+static u8 permanent_stat(u8 base,u8 current)
+{
+    return current>=base?(u8)(base+((u16)(current-base)>>2)):
+                         (u8)(base-((u16)(base-current)>>2));
+}
+static void save_permanent_stats(SaveUnit *s,Unit *u,u8 who)
+{
+    u8 k;
+    s->brave=permanent_stat(W->permanent_base[who][0],u->brave);
+    s->faith=permanent_stat(W->permanent_base[who][1],u->faith);
+    // A second settlement cannot reapply the same change. No new save fields.
+    W->permanent_base[who][0]=u->brave=s->brave;
+    W->permanent_base[who][1]=u->faith=s->faith;
+    for(k=0;k<5;k++){
+        s->raw[k][0]=(u8)(u->raw[k]>>16);s->raw[k][1]=(u8)(u->raw[k]>>8);s->raw[k][2]=(u8)u->raw[k];
+    }
+}
+
 // the party the battle took from the save (party_load): the records keep every job's JP and
 // abilities; the battle changes a unit's level, EXP and its job's JP; the units lost (a crystal
 // or a chest) leave the party
 static void party_update(void)
 {
-    const Unit *u = st.unit;
+    Unit *u = st.unit;
     u8 i, k, n = 0, lost[PARTY_MAX];
     memset(lost, 0, sizeof lost);
     for (i = 0; i < NUNIT; i++, u++) {
@@ -85,6 +105,7 @@ static void party_update(void)
         c = (u8)(s->job - 0x4A);
         if (c >= CAREER_N) c = 0;
         s->level = u->level; s->exp = u->exp;
+        save_permanent_stats(s,u,i);
         for(k=0;k<EQ_N;k++)s->eq[k]=u->eq[k]==255?0:u->eq[k];
         be16(s->jp[c], u->jp); be16(s->tjp[c], u->tjp);
     }
@@ -117,12 +138,9 @@ static void save_party(void)
         c = (u8)(s->job - 0x4A);           // its career row (another job: the Squire's)
         if (c >= CAREER_N) c = 0;
         s->gfx = u->gfx; s->type = unit_monster(u)?3:(u8)(i == U_RAMZA ? 2 : u->female); s->name = u->name;
-        s->level = u->level; s->exp = u->exp; s->brave = u->brave; s->faith = u->faith;
+        s->level = u->level; s->exp = u->exp; save_permanent_stats(s,u,i);
         s->zodiac = u->zodiac;
         be16(s->reaction,st.reaction[i]);
-        for (k = 0; k < 5; k++) {
-            s->raw[k][0] = (u8)(u->raw[k] >> 16); s->raw[k][1] = (u8)(u->raw[k] >> 8); s->raw[k][2] = (u8)u->raw[k];
-        }
         for (k = 0; k < EQ_N; k++) s->eq[k] = u->eq[k] == 0xFF ? 0 : u->eq[k];
         be16(s->jp[c], u->jp); be16(s->tjp[c], u->tjp);
         for (k = 0; k < SET_N; k++) if (u->learned & (1U << k)) learn(s->learned[c], k);
@@ -225,6 +243,7 @@ static void party_load(void)
         u->job = s->job; u->female = s->type == 1; u->name = s->name;
         u->gfx = s->gfx != 0xFF ? s->gfx : unit_monster(u)?255:u->female ? UG_SQUIRE_F : UG_SQUIRE_M;
         u->level = u->lv0 = s->level; u->exp = s->exp; u->brave = s->brave; u->faith = s->faith;
+        W->permanent_base[i][0]=u->brave;W->permanent_base[i][1]=u->faith;
         u->zodiac = s->zodiac;
         for (k = 0; k < 5; k++) u->raw[k] = (u32)s->raw[k][0] << 16 | (u16)s->raw[k][1] << 8 | s->raw[k][2];
         for (k = 0; k < EQ_N; k++) u->eq[k] = s->eq[k] ? s->eq[k] : 0xFF;

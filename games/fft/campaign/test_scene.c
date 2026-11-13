@@ -30,10 +30,10 @@ int main(void)
     for(i=0;i<20&&sw_step(0);i++){}
     assert(chapter_completed());   // SHIFT skips the chapel
     // ESC asks "Skip scene?": No (default) or SHIFT/ESC resumes, Yes ends it as played through.
-    sw_init(0);assert(sw_step(K_ESC)&&skip_ask&&!skip_row);assert(sw_step(0));
+    sw_init(0);assert(sw_step(K_ESC)&&skip_ask==1);assert(sw_step(0));
     press(K_ENTER);assert(!skip_ask&&!chapter_completed());
     assert(sw_step(K_ESC)&&skip_ask);assert(sw_step(0));assert(sw_step(K_ESC)&&!skip_ask);assert(sw_step(0));
-    assert(sw_step(K_ESC));assert(sw_step(0));assert(sw_step(K_DOWN)&&skip_row);assert(sw_step(0));
+    assert(sw_step(K_ESC));assert(sw_step(0));assert(sw_step(K_DOWN)&&skip_ask==2);assert(sw_step(0));
     assert(!sw_step(K_ENTER)&&chapter_completed());
     // ffs1: narration, dark chapter/location titles, then all Academy dialogue.
     assert(!chdir("../../campaign/data"));

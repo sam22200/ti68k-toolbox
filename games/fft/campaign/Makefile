@@ -15,6 +15,12 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: campaign-prerequisites-native-check
+campaign-prerequisites-native-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y
+	$(PY) check_campaign_native.py
+.PHONY: campaign-prerequisites-check
+campaign-prerequisites-check:
+	$(PY) check_campaign_prerequisites.py
 .PHONY: chapter1-archive-budget
 chapter1-archive-budget:
 	$(PY) ../tools/chapter1_budget.py --packages $(PACKAGE_OUTPUT)/packages.json
@@ -197,7 +203,7 @@ fftgar_pc fftintro_pc fftbatflow_pc: ../action_effect.h ../action_resolve.inc
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_rules.h ../common.h
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_policy.h ../status_unit.h ../status_policy.inc ../status_lifetime.h ../status_control.h ../status_runtime.inc ../turn_order.inc ../setup_glyphs.inc
 fftdep_pc fftmap_pc ffttitle_pc fftscn_pc fftmng_pc: ../common.h
-fftgar_pc fftintro_pc fftbatflow_pc fftscn_pc: ../core_limits.h ../view_format.h
+fftgar_pc fftintro_pc fftbatflow_pc fftscn_pc: ../core_limits.h ../view_format.h ../archive_art.h ../scene_skip.h
 fftgar_pc fftintro_pc fftbatflow_pc: ../chapter.h ../chapters.h ../module.h
 fftintro_pc: ../opening/opening.c ../fft.c ../fft.h ../opening/opening.inc pc_entry.c
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ ../opening/opening.c $(RT_CORE) $(RT_SW) pc_entry.c $(SDL_LIBS)

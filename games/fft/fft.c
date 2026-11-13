@@ -505,6 +505,8 @@ typedef struct {
     u8 ab_j,ab_self,ab_walk;           // resumable scalar origin/target cursor
 #endif
     MoveConfig move_config;            // survives an overlay replacement between graph slices
+    // Cold persistence belongs last: preserve measured renderer/cache field offsets.
+    u8 permanent_base[UNIT_CAPACITY][2]; // initial Brave/Faith, retained through battle effects
 #else
     u8 ab_j,ab_self,ab_walk;
 #endif

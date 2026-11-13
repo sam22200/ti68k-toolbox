@@ -4,15 +4,7 @@
 // the call. Returns the surface section's descriptor offset, 0: a missing or invalid bank.
 #include "campaign/pack_format.h"
 #include "view_format.h"
-static const u8 *chapter_contours(const u8 *p,u16 size)
-{
-    const u8 *f;u16 off;
-    size=resource_size(p,size);
-    if(!p||(size&1)||size<CONTOUR_BYTES+10)return RT_NULL;
-    f=p+size-10;off=RD16(f,3);
-    return RD32(f,0)==0x46433032UL&&!(off&1)&&
-        off+CONTOUR_BYTES==size-10&&RD16(f,4)==CONTOUR_BYTES?p+off:RT_NULL;
-}
+#include "archive_art.h"
 static char chapter_route(u8 encounter)
 {
     u16 size;const u8 *pack=rt_file("ffpack",&size);
@@ -43,8 +35,8 @@ static u16 chapter_files(char letter)
     /* Production stores these identical engine tables once in ffcu. Old
        extraction fixtures retain the same validated tail in their first view. */
     {u16 size;const u8 *shared=rt_file("ffcu",&size);
-     contour_gfx=chapter_contours(shared,size);}
-    if(!contour_gfx)contour_gfx=chapter_contours(views[0],view_size);
+     contour_gfx=archive_art_tail(shared,size);}
+    if(!contour_gfx)contour_gfx=archive_art_tail(views[0],view_size);
     name[4] = 0;
     name[3] = 'a'; ugfx = resource_file(name, RT_NULL);
     name[3] = 'd'; cdesc = resource_file(name, &desc_size);
