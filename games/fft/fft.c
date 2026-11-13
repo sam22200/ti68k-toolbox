@@ -513,6 +513,7 @@ typedef struct {
     // Cold persistence belongs last: preserve measured renderer/cache field offsets.
     u8 permanent_base[UNIT_CAPACITY][2]; // initial Brave/Faith, retained through battle effects
     u8 move_post,move_owner,trap_message; // committed movement's resumable cold settlement
+    const u8 *goal;                     // cold FGO1 route entry, borrowed from archive
 #else
     u8 ab_j,ab_self,ab_walk;
 #endif
@@ -4239,7 +4240,11 @@ static u8 hit_flash(u8 i)
 static u8 unit_flash(u8 i)
 {
     u8 t = (u8)(st.banner_t & 15);
-    if (st.banner == BN_START && st.unit[i].team == TEAM_ENEMY && st.unit[i].hp)
+    if (st.banner == BN_START && st.unit[i].hp && (
+#ifdef FFT_CHAPTER
+        W->goal ? ((RD16(W->goal,1)|RD16(W->goal,2))&((u16)1<<i)) :
+#endif
+         st.unit[i].team == TEAM_ENEMY))
         return t < 2 || (t >= 10 && t < 12) ? 1 : t < 10 ? 2 : 0;
     return st.mode == M_ACT ? hit_flash(i) : 0;
 }
@@ -5245,6 +5250,19 @@ static u8 aim(AbId ab)
 #endif
 
 #ifdef FFT_CHAPTER
+#ifndef FFT_MODULES
+#include "objective_load.inc"
+#endif
+static u8 objective_bind(void)
+{
+#ifdef FFT_MODULES
+    u8 ok=(u8)mod_call(MOD_RESOURCES,15,(u8)(chapter_now-1));
+#else
+    u8 ok=objective_load((u8)(chapter_now-1));
+#endif
+    if(!ok){W=RT_NULL;igfx=RT_NULL;return 0;}
+    return 1;
+}
 static u8 scenario_prepare(u8 n);
 #endif
 void game_scenario(u16 n)
@@ -5304,6 +5322,7 @@ void game_scenario(u16 n)
     for (bag_i = 0; bag_i < NBAG; bag_i++) st.bag[BAG_SLOT(bag_i)] = bag_init[bag_i];
 #endif
 #ifdef FFT_CHAPTER
+    if(!objective_bind())return;
     if(manual){cam_target(&st.camx,&st.camy);map_start(0);return;}
 #endif
 #ifndef FFT_CHAPTER
@@ -7330,6 +7349,7 @@ u16 mod_entry(u8 op,u8 a)
 #include "chapter_files.inc"
 #undef ugfx
 #include "bootstrap_files.inc"
+#include "objective_load.inc"
 // The battle could not start (op 12; held: 1 State, 2 the view/scene/cache blocks, 4 the map
 // envelope, 8 the companion's block; M.desc_size: AMS's free RAM / 16, read by the resident): "Not enough RAM" when that
 // free RAM and the blocks held are less than the battle allocates (BATTLE_RAM_BYTES), so a user
@@ -7361,6 +7381,7 @@ u16 mod_entry(u8 op,u8 a)
     if(op==12)return ram_message(a);
     if(op==13)return bootstrap_files();         // cold start: allocations, shared banks
     if(op==14)return cj_valid(common,M.desc_size);
+    if(op==15)return objective_load(a);
     if(op==11)return (u8)chapter_route(a);
     if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
     return 0;

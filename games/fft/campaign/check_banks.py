@@ -7,7 +7,7 @@ from check import HERE,ROOT,run
 def values(log):return [int(v,16)for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',log)]
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--out',type=Path,default=HERE/'x/core-banks/check')
-    ap.add_argument('--previous-bank-dir',type=Path,help='also reject a real previous two-shard export')
+    ap.add_argument('--previous-bank-dir',type=Path,help='also reject a real previous export')
     args=ap.parse_args()
     out=args.out.resolve();out.mkdir(parents=True,exist_ok=True)
     run(['cc','-std=gnu99','-O1','-g','-fsanitize=address,undefined','-o',out/'parser',HERE/'check_module_bank.c'])
@@ -55,7 +55,8 @@ def main():
         if args.previous_bank_dir:
             cases.append(('previous-export',{
                 name:bank('previous-export-'+name,name,(args.previous_bank_dir/(name+'.bin')).read_bytes())
-                for name in('ffbm','ffbn')}))
+                     if(args.previous_bank_dir/(name+'.bin')).exists()else None
+                for name in('ffbm','ffbn','ffbo')}))
         for label,override in cases:
             log=execute(label,override);assert values(log)[-4:]==[0,17,0,0],(label,values(log))
             rejected[label]=dict(accepted=False,bindings_or_module_calls=0)

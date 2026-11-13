@@ -1,5 +1,13 @@
 # Shared campaign resources and shipping deduplication
 
+FGO1 update (2026-11-13): [named objectives](OBJECTIVES.md) use optional active-
+chapter `ffgo`, one route directory with exact shared title/name spans across
+all encounters. Two equal routes add only16 directory bytes. Core result/default
+strips remain once in ffcu; new whole named words are encounter content, never
+copies of the UI bank. Direct archive reads add one cold Work pointer, no new
+allocation/cache or frame-time lookup. Packaging validates declared routes and
+requires the matching FGO1 core specification/key (ABI90); FCD5 remains.
+
 FKO1 update (2026-11-13): [monster Dead art](MONSTER_KO.md) is optional active-
 chapter `ffko`, shared by all encounters. Its direct job/pair/frame indexes pool
 equal records, job aliases and mirrors. The reviewed bank is2876 bytes/11

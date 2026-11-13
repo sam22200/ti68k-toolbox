@@ -1,5 +1,12 @@
 # Validation by affected dependency
 
+Named objectives: `make campaign-objectives-check` runs original-MIPS policy,
+bank validation and actual PC/sanitizer action/save/pixel tests. The optional
+`check_objective_runtime.py --native --data-dir DIR` adds only actual ORDER/
+PARTY/SAVE/archive handoffs and one combined-title render/budget carrier.
+Approved LCD pixels remain exact; isolated save regressions cover receipt
+idempotence. Scope, metadata and remaining authored content: [Objectives](OBJECTIVES.md).
+
 Monster KO: `make campaign-monster-ko-check` uses PC/sanitizers and approved
 pixels. `check_monster_ko.py --native` opts into one actual68000 renderer carrier.
 `check_capacity_render.py --case` selects `monster-ko`, `monster-ko-morph` or

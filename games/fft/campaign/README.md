@@ -1,11 +1,21 @@
 # Opening -> Academy -> Gariland
 
+Latest delivery (2026-11-13): [large named objectives](OBJECTIVES.md), approved.
+Elimination/target/protect/combined rules, fixed slot/name binding and pooled
+chapter FGO1 strips use the production renderer. Repeated result saves retain
+new bag loot and consume collected receipts once. ABI90/Work29314, FSV5/FCD5
+unchanged; PC/sanitizers and selected native action/binding/budget checks pass.
+Input61317/headroom3619, matching pilot705830 transport bytes. Current frame/
+RAM measurements and private groups: HANDOVER.md / `x/objectives/`.
+Authored guests, chains with Save, choices and the breeding/Bar/Fur Shop queue
+remain before campaign extraction. The16KiB RAM/installed-peak gate remains open.
+
 Latest delivery (2026-11-13): [approved source-specific monster KO](MONSTER_KO.md).
 Optional shared chapter art preserves the small poses and fallen bodies using
 the existing cache. PC/sanitizers, selected68000 pictures/budgets and matching
 packages pass. ABI89/FSV5 remain; input61211/headroom3725, pilot groups704425
 bytes. Standing/action monster art, other palettes and authored encounters
-remain. Target/protect objectives are next;16KiB RAM/installed peak is open.
+remain. Target/protect objectives are delivered (see above);16KiB RAM/installed peak is open.
 
 Previous delivery (2026-11-13): [four traps and persistent level-down](TRAPS.md).
 Approved box; FCD5 source-map metadata, FSV5/Save3204 and matching ABI89 groups.

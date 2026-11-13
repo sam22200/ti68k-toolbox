@@ -2,6 +2,52 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Latest delivery: large named objectives (2026-11-13)
+
+[OBJECTIVES.md](OBJECTIVES.md): the user approved the large Lato names
+("ouais valide"). Ordinary elimination, named target, protected ally and both
+are integrated. FGO1 `ffgo` is one optional chapter-wide pooled bank; explicit
+slot masks, source roles and final unit names bind after saved party/fixed guests.
+RESOURCES26/op15 returns before any turn/outcome image. No frame-time file or
+font work; direct archive strips reuse the approved renderer. Do not author
+randomly named targets without fixing their identity. One target/protected ally
+is the bounded title format; more complex scripted objectives remain content.
+
+Protected loss/ordinary allied defeat/mandatory Ramza loss take priority over
+simultaneous target victory. HP0 or permanent removal satisfies the target;
+Petrify/hidden/off-camera alone does not. Existing settled action/response/Mime
+boundaries remain. Later CT Reraise is not immunity to a settled HP0 script.
+Successful result saves now sync the live bag and consume found/stolen queues,
+fixing repeat-save loss of awarded bag items and duplicate collected receipts.
+
+PC/ASan/UBSan:19 policy boundaries,25 original-MIPS conditions/outcomes,
+61 actual action/save checks0B3C2C52, five bank tests, four exact approved
+screens7371/2368/4980/168F. Native checks are selected ABI/layout/archive/
+ORDER-PARTY-SAVE/budget carriers, not a whole combat sweep; no TiEmu touched.
+The normalized ordinary pilot retains81/AE9CFD31 and14/2CD70391. Save-only
+regressions pass PC/sanitizers, including found/stolen repeated settlement.
+
+ABI90/ModCtx352/signatureF4D0; Work29314 (+4) keeps hot fields at their old
+offsets by placing the archive pointer at the cold tail. Unit112/State2224/
+Save3204/FSV5/FCD5 remain.28 overlays, zone8698; shards63030/64272/61052.
+Caches and seven allocations remain (requested game blocks98448). Resident input61317/headroom3619 (+106 program-RAM bytes vs KO); matching
+pilot core414095 + chapter291735 =705830 transport bytes,
+key09eefbf25ef805acf4e6af9fb71c29a7. Combined-title frame342048 cycles/168F;
+13-actor equipment peak355076 cycles/AA26, both below360k.
+356 bindings and real ABI89 export rejection pass. The16KiB/installed-peak gate remains open; difficult
+recovery is deferred. Do not use the pre-KO15171 estimate as current free RAM.
+
+Evidence: `x/objectives/verification.json`, `final-check/`, `bindings/`,
+`capacity/`, `package-check/`, `save-regression/`, `pilot-flow/`, `release/`.
+`production-review/` reproduces approved pixels through the actual engine.
+The human pilot has no unused `ffgo`; chapter-specific objective metadata and
+aftermath are future authored content. Approval is recorded; its marker cleared.
+
+**Next:** authored guest/chain-with-Save integration, then story choices and the
+remaining [prerequisites](CAMPAIGN_PREREQUISITES.md). Breeding, Bars/rumors/
+Propositions and the Fur Shop remain pre-extraction requirements. Do not jump
+to installed-route automation or claim full monster chapter artwork.
+
 ### Scope extension before campaign extraction (2026-11-13)
 
 The user added monster breeding, Bar/rumors and poaching to the readiness gate.

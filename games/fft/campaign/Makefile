@@ -15,6 +15,11 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: campaign-objectives-check
+campaign-objectives-check:
+	$(PY) check_objectives.py
+	$(PY) -m unittest discover -s ../tools -p 'test_objective_bank.py'
+	$(PY) check_objective_runtime.py
 .PHONY: campaign-monster-ko-check
 campaign-monster-ko-check:
 	$(PY) -m unittest discover -s ../tools -p 'test_monster_ko_*.py'
