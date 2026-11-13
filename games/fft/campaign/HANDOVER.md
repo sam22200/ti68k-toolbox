@@ -2,6 +2,20 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Current work: monster KO source study (2026-11-13)
+
+[Monster KO study](MONSTER_KO.md) confirms that the tiny Behemoth tail, Bomb
+flame and Chocobo feathers are original Dead artwork. Six sheets/four families,
+16 executed original-MIPS frame/wait pairs and four parser/compositor tests
+pass on PC. Preview `x/monster-ko/source-and-four-greys.png` is pinned in the
+gallery; a visual verdict is pending. Do not integrate/benchmark the proposed
+four-grey artwork before approval. Its32x40 study envelope is not the current
+16x26/208-byte actor cache. No shipping data/core/ABI/package or TI change.
+Source tool: `tools/monster_ko_review.py`; evidence: `x/monster-ko/results.json`.
+Target/protect objective audit can proceed independently; implementation,
+authored guest/chain-with-Save/choices, monster chapter art and16KiB RAM remain
+open. Do not mistake this source study for shipping monster-art completion.
+
 ### Latest delivery: four traps (2026-11-13)
 
 The user approved the trap box. [Four traps and persistent level-down](TRAPS.md)
