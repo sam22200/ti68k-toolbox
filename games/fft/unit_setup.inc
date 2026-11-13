@@ -11,6 +11,7 @@ static void clear_spare_units(void)
         Unit *u=&st.unit[i];memset(u,0,sizeof *u);
         memset(st.affinity[i],0,5);
         u->x=u->z=u->gfx=u->slot=255;u->dc=DC_GONE;
+        W->permanent_base[i][0]=W->permanent_base[i][1]=0;
     }
 }
 static void unit_reward_fields(void)
@@ -31,6 +32,7 @@ static void fixed_units(void)
         u->x=d->x;u->z=d->z;u->gfx=d->gfx;u->job=d->job;u->team=d->team;u->face=d->face;
         u->cell=(u8)(d->z*MAP_W+d->x);
         u->level=u->lv0=d->level;u->brave=d->brave;u->faith=d->faith;u->female=d->type==1;
+        W->permanent_base[i][0]=u->brave;W->permanent_base[i][1]=u->faith;
         u->zodiac=unit_zodiac[i];u->set=d->set;u->learned=DEF_LEARN(d);u->dc=3;
         for(k=0;k<5;k++){u->eq[k]=d->eq[k][0];u->raw[k]=RD32(igfx+CD(UNIT_RAW),(u16)(i*10+2*k));}
         unit_stats(u);
@@ -61,6 +63,9 @@ void battle_units(void)
         u->job = d->job; u->level = d->level; u->ct = 0; u->dc = 3; u->female = d->type == 1;
         u->brave = d->brave ? d->brave : (u8)(45 + ((30UL * rand15()) >> 15));
         u->faith = d->faith ? d->faith : (u8)(45 + ((30UL * rand15()) >> 15));
+#ifdef FFT_CHAPTER
+        W->permanent_base[i][0]=u->brave;W->permanent_base[i][1]=u->faith;
+#endif
         if (!day) day = (u16)(1 + ((365UL * rand15()) >> 15));
         for (k = 0; k < 12 && day >= ZODIAC_DAY(k); k++) ;
         u->zodiac = (u8)((k + 9) % 12);

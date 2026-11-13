@@ -98,6 +98,34 @@ static void check_gil_roundtrip(void)
     remove("ffsave.sav");
 }
 
+static void check_permanent_stats(void)
+{
+    static const s8 changes[]={-70,-8,-7,-4,-3,0,3,4,7,8,30};
+    static const u8 expected[]={53,68,69,69,70,70,70,71,71,72,77};
+    u8 i,j;Save a,b;Unit *u;
+    for(i=0;i<sizeof changes;i++){
+        remove("ffsave.sav");sw_init(61);save_campaign();party_load();
+        u=&st.unit[U_RAMZA];u->brave=70;u->faith=30;
+        W->permanent_base[U_RAMZA][0]=70;W->permanent_base[U_RAMZA][1]=30;
+        u->brave=(u8)(70+changes[i]);u->faith=(u8)(30-changes[i]/2);
+        u->raw[0]-=123; // future raw-stat changes must survive an existing-party save
+        save_campaign();assert(rt_load(SAVE_NAME,&a,sizeof a));
+        assert(a.unit[u->slot].brave==expected[i]);
+        assert(a.unit[u->slot].faith==30+(-changes[i]/2)/4);
+        assert(a.unit[u->slot].raw[0][0]==(u8)(u->raw[0]>>16));
+        assert(a.unit[u->slot].raw[0][1]==(u8)(u->raw[0]>>8));
+        assert(a.unit[u->slot].raw[0][2]==(u8)u->raw[0]);
+        save_campaign();assert(rt_load(SAVE_NAME,&b,sizeof b));
+        assert(!memcmp(&a.unit,&b.unit,sizeof a.unit));
+        party_load();assert(u->brave==expected[i]&&u->faith==a.unit[u->slot].faith);
+    }
+    // First creation and a subsequently undeployed member use their own bases.
+    remove("ffsave.sav");sw_init(61);u=&st.unit[U_RAMZA];
+    j=W->permanent_base[U_RAMZA][0];u->brave=(u8)(j+4);
+    save_campaign();assert(rt_load(SAVE_NAME,&a,sizeof a)&&a.unit[0].brave==j+1);
+    remove("ffsave.sav");
+}
+
 int main(void)
 {
     u8 i,before,id;Save s;
@@ -105,6 +133,7 @@ int main(void)
     check_ko_party();
     check_hp_roundtrip();
     check_gil_roundtrip();
+    check_permanent_stats();
     remove("ffsave.sav");
     sw_init(61);assert(sw_step(0));
     st.unit[1].hp=0;st.unit[1].dc=DC_CHEST;
