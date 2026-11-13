@@ -201,3 +201,16 @@ native latency or presentation defect.
   General setup may use the requested frozen pause (campaign/CORE_AI_PACING.md);
   its measured one-second quantum is accepted. Do not add another full pause
   after planning or infer total plan latency from that peak alone.
+
+## Campaign prerequisites requested2026-11-12
+
+Before installed-route automation, resolve the user's list in
+[campaign/CAMPAIGN_PREREQUISITES.md](campaign/CAMPAIGN_PREREQUISITES.md).
+ESC during a scenario scene must offer a safe confirmation; it must not silently
+quit to the title. A skip passes to the normal next stage. Any actual quit path
+needs No/Yes confirmation too. Keep the common choice renderer and both confirm
+keys. Four traps, monster-specific KO poses, persistent results/Brave/Faith/
+level-down, chained battles with save proposals, imposed guests, objective types
+and story choices need explicit audited status rather than a generic core-ready
+claim. The shared scene confirmation layout was approved2026-11-13; scene/save delivery
+and remaining prerequisites are tracked in the linked audit.

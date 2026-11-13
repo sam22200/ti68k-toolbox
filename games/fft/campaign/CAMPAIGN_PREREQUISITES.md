@@ -1,0 +1,78 @@
+# User campaign prerequisites (2026-11-12)
+
+These requests precede the installed-route automation in CHAPTER1_ARCHIVE_PLAN.md.
+First delivery: [scene controls and permanent stats](SCENE_SAVE_FIXES.md), based on919ede6. Evidence:
+`x/campaign-prerequisites/`. Unrelated work and historical groups/saves stay intact.
+Use PC/sanitizers first; only selected changed-layout/native checks at the end.
+
+## Current audit and delivery queue
+
+| Request | Actual code state | Remaining work |
+|---|---|---|
+| Scene skip/quit | Shared Skip scene? confirmation delivered for map and standalone scenes; default No, paused scene, explicit Yes skips without exiting to title. User approved the box on2026-11-13. | Preserve the tested handoffs when adding choice scenes. |
+| God mode | MODE or CATALOG, then ALPHA opens DEBUG; God mode toggles with ENTER/2nd. | Document the keys clearly; no new feature needed. |
+| Four trap tiles | Move-Find records already contain trap flags, but native settlement only handles discovery, not traps. | Degenerator, Deathtrap (Death Sentence), Sleeping Gas and Steel Needle; original lookup/precedence, committed-move settlement, persistence and bounded presentation. |
+| Monster KO sprites | Shipping actor banks cover the pilot humans. Sweegy's rules/save fixture is not shipped monster art; Behemoth KO art is not yet integrated. | Inspect the original complete pose/composition, including small or multipart KO poses, before adapting. Never replace every monster KO with a scaled human pose. |
+| EXP/JP/level | Saved for deployed party slots by `party_update`; undeployed records survive compaction. | Retain regression coverage while adding level-down/trap behavior. |
+| Items/stolen/found/loot | Live inventory, steals/chests/discovery and battle rewards have save paths. Existing save/flow suites cover receipt and caps. | Retain these paths; test new trap/discovery precedence rather than invent pilot loot. |
+| Brave/Faith | Saves now keep one quarter of the net battle change, truncating toward zero; initial values and idempotent settlement are checked PC/sanitizers/68000. | Original warning/departure UI remains separate and is not claimed implemented. |
+| Degenerator persistence | Not implemented because traps are absent. Raw-stat changes previously were not copied back to an existing roster slot either; the working save fix now preserves them. | Source level-down/growth semantics and an actual post-trap save/load test. |
+| Permanent death | KO counts3..0 survive; crystal/chest/gone removes party slots at victory. Undeployed members and other records survive compaction. | Keep regression tests; scripted objective losses remain distinct. |
+| Consecutive battles/save proposal | `pack_story.h` already calls successive steps directly; `FP_SAVE_PROMPT` calls the shared Save screen between completed steps. No map is required between steps. | A real authored chain/integration test; this is backend support, not completion of every retail chain. |
+| Imposed guests | Fixed TEAM_GUEST encounter slots survive party loading and run AI (including current pilot/monster fixtures). They are not treated as ordinary deployed/recruited party slots. | Encounter-specific guests and their cross-fight story progression/content; distinguish guest metadata from permanent roster persistence. |
+| Objective types | Current `battle_outcome` is ordinary elimination plus mandatory Ramza permanent-loss/allied incapacitation defeat. | Targeted enemy and protected actor objectives, validated encounter metadata, banners/target emphasis and save/terminal integration. |
+| Story choices | Scene steps only play titles, stories, cards, narration and overlays; no choice/effect opcode exists. | Recruitment/refusal and conditional story effects through the common menu, exactly-once saves/flags. User's final phrase about other effects awaits clarification. |
+
+## Delivered scene correction (approved2026-11-13)
+
+ESC opens Skip scene? with No selected. No, ESC or SHIFT resumes without changing
+story progress. Yes via ENTER/2nd skips to the appropriate battle/aftermath handoff;
+it never means quit-to-title. The prompt pauses scene timers/fades. Pending fade
+stages determine whether the skip is before or after a battle. An old cancelled
+battle-quit selector cannot open an aftermath prompt by itself.
+
+The common `choice_menu.inc` supplies frame/rows/animated glove. Art remains one
+shared archive tail; a small allocation-free tail validator is reused by map and
+standalone scenes. Historical extraction controls borrow the same first-view
+artwork when ffcu has no tail. No duplicate hand bank is introduced.
+
+Review: `scene-escape-before-after.png`; user verdict: "ok pour le visuel,
+continue". Approval is recorded in the private evidence directory.
+
+PC/ASan/UBSan map-control tests pass: held opening ESC, default No, cancel,
+UP/DOWN, ENTER/2nd, frozen timers, skip into a running battle and skip aftermath
+into normal reward pages. Standalone scene unit tests also pass PC/sanitizers. The software backend
+receives aligned host-order glove words decoded once from the same archive art;
+TI keeps direct archive pointers. Selected real68000 scene/save checks and three
+standalone prompt/resume/skip replays pass against final shipping data.
+
+## Delivered permanent-stat correction
+
+Original rule source:
+`sources/fft_decomp/src/event/require_apply_permanent_brave_faith_changes_and_collect_warnings.c`.
+It applies base + trunc((current-base)/4), then resets the current value to that
+permanent result. Native signed constant-division sequences are represented by
+unsigned magnitude shifts with explicit sign. No division in a hot loop is added.
+
+`Work.permanent_base[UNIT_CAPACITY][2]` records initial values at fixed/random
+unit creation and saved-party load. This adds26 bytes at the cold tail of Work,
+outside UI/AI scratch, preserving existing renderer/cache field offsets.
+Save settlement resets the baseline/current values to the saved result, so a
+second settlement cannot apply the same change twice. Initial party creation and
+recruitment use the same captured baseline. Raw24-bit stat bytes are also copied
+back for existing slots, preserving future level-down changes.
+
+The serialized FSV4/3202 and Unit112/State2224 remain. The final overlay ABI is
+88 because Work changes; matching rebuilt groups contain28 images, ModCtx352,
+Work29308 and zone8698. Previous ABI87 data is rejected before executing.
+PC and ASan/UBSan save tests pass signed changes-70,-8,-7,-4,-3,0,3,4,7,8,30,
+repeat settlement, raw-stat round trip, initial party creation and the existing
+KO/inventory/undeployed cases. A selected real68000 carrier passes198 checks,
+including virtual-VAT save/reload. This is not retail-MIPS replay or
+persistent-departure certification.
+
+## Resume
+
+Continue with traps, source-correct monster KO assets, objectives/guest content
+and choices. Keep every remaining item explicit; do not describe the chapter/core
+as ready merely because generic combat coverage and archive planning pass.

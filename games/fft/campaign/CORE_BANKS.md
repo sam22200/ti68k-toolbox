@@ -1,5 +1,14 @@
 # Split executable archive banks
 
+Current guard update (2026-11-13): raw module shards may hold65000 bytes,
+matching the existing actor/catalogue bank guard. This is still below the65512
+raw-resource envelope, with the AMS trailer/size word fitting16 bits. Exact
+65000 and over-limit directory-inclusive boundaries are tested. The former
+64000 production guard below is historical; runtime formats/ranges/lookup and
+zone budgets are unchanged. Current three shards64522/61648/57504 fit.
+See [scene/save delivery](SCENE_SAVE_FIXES.md); the generic64000 planning alert
+in core_budget remains an earlier capacity warning, not the serialization limit.
+
 Current follow-up: [CORE_AREA_CT.md](CORE_AREA_CT.md) adds the durable area owner
 and command/CT/impact routing. Numbers below are the historical archive checkpoint.
 

@@ -2,7 +2,29 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
-### Resume here (archive planning; RAM refactoring deferred, 2026-11-12)
+### Resume here (scene/save delivery, 2026-11-13)
+
+The user put [this prerequisite list](CAMPAIGN_PREREQUISITES.md) ahead of the
+installed-route automation: scene ESC/confirmation, debug keys, four traps,
+monster-specific KO poses, persistent battle results/Brave/Faith/level-down,
+chains with Save proposals, imposed guests, objectives and story choices.
+[Scene/save fixes](SCENE_SAVE_FIXES.md) deliver the shared safe ESC confirmation
+and permanent Brave/Faith/raw-stat persistence. The user approved the box on
+2026-11-13. PC/sanitizers, selected real68000 scene/save/binding/layout checks,
+two render-budget cases and the final normalized package/save checks pass.
+ABI88/ModCtx352/Work29308/zone8698; matching groups rebuilt, previous87 rejected.
+True input57275/headroom7661; core406084 + chapter291731 transport bytes.
+No hardware session or whole-suite TI sweep. Source audit, remaining work and
+private evidence: CAMPAIGN_PREREQUISITES.md / `x/campaign-prerequisites/`.
+The user's last story-choice sentence was truncated; an async clarification is
+pending. Do not lose the rest of this request or jump straight to automation.
+
+**Next:** implement all four trap types with committed-move/discovery ordering
+and persistent level-down, then source-specific monster KO poses, encounter
+objectives/guests, consecutive battle/save integration and story choices. The
+16KiB goal remains unpassed and difficult RAM recovery remains deferred.
+
+### Previous checkpoint (archive planning; RAM refactoring deferred, 2026-11-12)
 
 **User steering:** look for an easy roughly2KiB RAM saving; if complicated,
 proceed to the next step. A bounded source audit found no selected low-risk

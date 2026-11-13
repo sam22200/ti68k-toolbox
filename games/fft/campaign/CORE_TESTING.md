@@ -7,6 +7,15 @@ CPU budgets or hardware dependencies. Reuse unchanged native evidence; a new
 lot does not require the 103-target native sweep. That completed sweep is the
 2026-11-12 baseline in `x/core-sweep-20261112/`, not a per-edit checklist.
 
+`make campaign-prerequisites-check` is PC/ASan/UBSan only, in private data trees:
+map-scene controls, standalone scenes and persistent stats/KO/inventory. Its
+`--only map|scene|save` option selects an affected subset. The opt-in
+`campaign-prerequisites-native-check` runs one198-check actual-overlay scene/save
+carrier; `check_campaign_native.py --data-dir DIR` accepts normalized shipping
+banks. `check_scene_skip.py --data-dir DIR` selects just three standalone
+prompt/resume/skip replays. `check_capacity_render.py --case ...` can now select
+individual native frame cases. [Evidence and bounds](SCENE_SAVE_FIXES.md).
+
 `make chapter1-archive-budget PACKAGE_OUTPUT=...` is host-only planning: real
 group hashes/current core key plus dated estimates. It never builds or runs TI.
 Allowances/depth overflow and duplicate maps are checked; full chapter/Flash

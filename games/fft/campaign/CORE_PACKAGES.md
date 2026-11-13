@@ -172,8 +172,11 @@ Game starts a fresh session without choosing a slot; Continue copies a slot into
 `ffslot` only remembers the last slot. A lost or quit battle returns to the title and the
 slots are as last saved.
 
-**Skips and debug.** In a scene, ESC asks "Skip scene?" (No/Yes; Yes ends it exactly as played
-through). In battle, Settings (MODE/CATALOG) then [alpha] opens the hidden DEBUG page: God
+**Skips and debug (fixed2026-11-13).** In standalone and battle-map scenes,
+ESC asks "Skip scene?" with No selected. No, ESC or SHIFT resumes; Yes via
+ENTER/2nd passes to the normal battle/aftermath handoff, without returning to
+the title. Scene timers/fades pause during the shared confirmation.
+See [scene/save delivery](SCENE_SAVE_FIXES.md). In battle, Settings (MODE/CATALOG) then [alpha] opens the hidden DEBUG page: God
 mode (allied blows kill, damage on allies misses; single blows and area batches, not the
 deferred weapon panel/line victims), Fast AI (AI turns as with [2nd] held, no 1.5 s hold) and
 "Skip this fight?" (No/Yes: every enemy at 0 HP, the ordinary victory, rewards, aftermath and

@@ -1,5 +1,12 @@
 # Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-12)
 
+Latest steering (2026-11-13): finish the [user prerequisites](CAMPAIGN_PREREQUISITES.md)
+before route automation. [Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
+are delivered and visually approved. ABI88/Work29308, input57275/headroom7661;
+matching private pilot groups total697815 transport bytes. Four traps, monster
+KO art, targeted/protected objectives and authored guest/chain/choice content
+remain. The RAM figures below are previous measurements, not a new16KiB pass.
+
 Current integration (2026-11-12): all155 audited Chapter I actions are executable.
 [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md) now exercise the first
 complete monster fights on PC/sanitizers (13 actors, source terrain, frozen

@@ -1,11 +1,19 @@
 # Opening -> Academy -> Gariland
 
+Current scene/save delivery (2026-11-13): [safe scene skipping and permanent stats](SCENE_SAVE_FIXES.md).
+ESC confirms Skip scene? in both scene implementations; the common box is
+user-approved. Brave/Faith keep one quarter of net battle changes. ABI88,
+Work29308, input57275/headroom7661, zone8698; matching private pilot groups total
+697815 transport bytes. [Other requested prerequisites](CAMPAIGN_PREREQUISITES.md)
+remain ahead of installed-route automation, starting with the four traps.
+
 Current planning checkpoint (2026-11-12): [Chapter I archive budget](CHAPTER1_ARCHIVE_PLAN.md).
 Host-only projection1869336 bytes against2163895 allowance,294559 planning
 margin. Full content is not assembled. Per the user, difficult RAM recovery is
-deferred;16KiB remains unverified. Next is the installed chapter route, PC-first.
+deferred;16KiB remains unverified. The user campaign prerequisites now precede
+the installed chapter route, with PC-first validation.
 
-Current archive reach follow-up (2026-11-12): [R4 colours and RAM](CORE_REACH_ARCHIVE.md).
+Previous archive reach follow-up (2026-11-12): [R4 colours and RAM](CORE_REACH_ARCHIVE.md).
 Work29282/ABI87, true production input57275/headroom7661; net8638 bytes saved
 since the grayscale lot. PC/sanitizers and selected native checks pass. The user
 approved the two-pixel old range-overflow correction. Installed diagnostic free
@@ -21,7 +29,7 @@ Three complete PC/sanitizer fights exercise13 actors on the original terrain;
 fixed-unit innate Float and rewards outside Gariland are repaired. One selected
 68000 initialization/save check passes; no full TI sweep or emulator run.
 
-Current distribution (2026-11-07): [separate core and chapter packages](CORE_PACKAGES.md).
+Historical distribution checkpoint (2026-11-07): [separate core and chapter packages](CORE_PACKAGES.md).
 `make packages` writes `x/packages/fft-core.89g` and `chapter-01.89g` with matching
 metadata, size reports and installation/removal lists. `make chapter-package`
 assembles content against that core without compiling it. The current chapter
@@ -1176,8 +1184,10 @@ Retail art, text, binary data and captures remain generated/ignored.
 On the calculator, send that group and run **`fftstory()`**. ENTER/2nd advances
 dialogue; SHIFT skips the current Orbonne section; CATALOG inverts its dialogue
 window. During battle, CATALOG selects **Move: full tiles / Move: contour**
-(default full); ENTER toggles and ESC/CATALOG closes settings. Ordinary Gariland controls apply after the Academy. ESC cancels a chapter
-without automatically starting the next. `fftbat(n)` alone plays one chapter (100 + an
+(default full); ENTER toggles and ESC/CATALOG closes settings. Ordinary Gariland controls apply after the Academy. In scenario scenes,
+ESC asks Skip scene? with No selected; No/ESC resumes, Yes skips to the normal
+battle/aftermath handoff. It does not quit to the title. In combat, MODE/CATALOG
+then ALPHA opens DEBUG; ENTER/2nd toggles God mode. `fftbat(n)` alone plays one chapter (100 + an
 Orbonne door: `fftbat(100)` its gate; 200 + a Gariland door: `fftbat(200)` its battle) and
 returns to HOME; use `fftstory()` for the automatic continuation.
 
