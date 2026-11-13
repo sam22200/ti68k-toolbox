@@ -14,7 +14,7 @@ u16 rt_ticks(void) { return (u16)(((u32)rt_frame * RT_FRAME_TICKS2) >> 1); }   /
 static void put(u8 *p, s16 x, s16 y, u8 on)
 {
     u8 *b, m;
-    if ((u16)x >= RT_PW || (u16)y >= RT_PH) return;
+    if ((u16)x >= RT_PW || (u16)y >= RT_DRAW_ROWS) return;
     b = p + y * RT_PBYTES + (x >> 3);
     m = 0x80 >> (x & 7);
     if (on) *b |= m; else *b &= ~m;
@@ -41,7 +41,7 @@ static void blit(u8 *p, s16 x, s16 y, u8 w, u8 h, const void *data, const void *
         for (c = 0; c < w; c++) {
             s16 px = x + c, py = y + r;
             u32 bit = 0x80000000UL >> c;
-            if ((u16)px >= RT_PW || (u16)py >= RT_PH) continue;
+            if ((u16)px >= RT_PW || (u16)py >= RT_DRAW_ROWS) continue;
             put(p, px, py, (d & bit) || ((m & bit) && get(p, px, py)));
         }
     }
@@ -49,9 +49,9 @@ static void blit(u8 *p, s16 x, s16 y, u8 w, u8 h, const void *data, const void *
 
 void draw_clear(void)                  // like every draw_*: into rt_light / rt_dark (the TI's)
 {
-    memset(rt_light, 0, RT_PSIZE);
+    memset(rt_light, 0, RT_DRAW_BYTES);
 #ifndef RT_MONO
-    memset(rt_dark, 0, RT_PSIZE);
+    memset(rt_dark, 0, RT_DRAW_BYTES);
 #endif
 }
 
