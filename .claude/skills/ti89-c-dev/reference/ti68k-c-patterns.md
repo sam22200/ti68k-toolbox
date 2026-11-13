@@ -8,6 +8,24 @@ old sources in `sources/` (TICT tutorials, TI-Chess, TICT-Explorer, small games;
 `sources/README.md`) and tests run in TiEmu (marked **verified**). Game algorithms (AI, 3D,
 pathfinding, networking, data encoding) are in `ti68k-game-techniques.md`.
 
+### Bounded fixed-address grayscale targets (verified, Titanium AMS3.10, 2026-11-12)
+
+Copy-present games can hold100 hidden rows per plane while GrayOn retains its
+full physical planes. Keep the30-byte stride, clip sprites at both vertical
+ends (advance their source at the top), preserve partially visible font rows,
+and bound every clear/copy/direct access. Do not call GrayDBufInit or retrieve
+its hidden pointers for these shorter allocations. Copy only3000 bytes per
+plane after the plane-switch wait; the ordinary GrayDBuf path is unchanged.
+FFT's runtime opt-in `RT_DRAW_ROWS=100` saves1688 allocated bytes; guarded PC/
+sanitizer/68000 output agrees and one isolated Titanium run checks grayscale,
+keyboard rotation and heap cleanup. Full-plane PC diagnostic reads also need
+the bounded size. Scope and remaining RAM gate: `games/fft/campaign/CORE_RAM_MARGIN.md`.
+
+**TTPack size reporting (packed-header checked):** its input includes the
+two-byte variable length word. A raw `.89z` varsize57729 produces packed input
+57731, not57729. Compare the little-endian unpacked-length field in the packed
+bank when checking executable headroom. `games/fft/tools/headroom.sh` includes it.
+
 ## 1. Program skeleton and global directives
 
 **Serialize GCC4TI builds sharing sources (observed on the host):** the driver

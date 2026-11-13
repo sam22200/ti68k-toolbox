@@ -1,4 +1,4 @@
-# Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-10)
+# Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-12)
 
 Current integration (2026-11-12): all155 audited Chapter I actions are executable.
 [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md) now exercise the first
@@ -7,8 +7,10 @@ generation inputs); one selected68000 boot/save carrier covers the two cold
 fixes. This does not ship the remaining chapter artwork or event content.
 The RAM/archive measurements below are dated planning evidence: the11.4KB free
 RAM predates the companion's3074-byte reservation and later program growth.
-Current free RAM must be remeasured before claiming the16KB target. Program
-headroom is7203 bytes; it is not free battle RAM.
+[Current RAM follow-up](CORE_RAM_MARGIN.md) saves1692 production bytes net.
+A private instrumented Titanium control has9606 bytes free; the16KiB target and
+installed-flow peak certification remain open. True TTPack input57731 leaves7205
+bytes; executable headroom is separate from free battle RAM.
 
 Chapter I has about 20 battle maps and 20 scenes; the pilot ships 2 of each. Tackle these in
 order before producing Chapter I content. State of the 2026-11-08 session: saves as in FFT,
@@ -18,8 +20,12 @@ debug aids and logs" and "Native test loop").
 
 ## 1. Battle RAM margin (first, mandatory)
 
-**Status 2026-11-10: ~11.4 KB free on every map (was ~1.2 KB); 2 and 3 below remain to reach
-the 16 KB target.** Measured natively (Titanium AMS 3.10, Orbonne, `ti-mem heap`): 187,554
+**Current status:** the100-row hidden target is delivered; see
+[measurements and limits](CORE_RAM_MARGIN.md). Continue RAM recovery and installed-flow
+measurement before claiming16KiB. Ring backups remain next, and their estimated
+2.5KB gain alone is insufficient.
+
+**Historical status 2026-11-10 (before companion/program growth): ~11.4 KB free.** Measured natively (Titanium AMS 3.10, Orbonne, `ti-mem heap`): 187,554
 bytes free when the supervisor calls `fftbat`, the battle reserves 176,158:
 
 | Block | Bytes | Notes |
@@ -54,8 +60,8 @@ headroom, area-impact and package checks pass):
    allocated after the program and grayscale planes, 94,842 bytes);
    "Missing data" otherwise. Free = AMS's free RAM + what the battle already holds.
 
-**Remaining to reach 16 KB (~4.6 KB):**
-1. **100-row hidden gray buffer (−1,688).** Copy-present mode never flips it, but every draw
+**Historical proposals (the old4.6KB deficit is obsolete):**
+1. **100-row hidden gray buffer (−1,688), delivered2026-11-12.** The following was the original plan; the current implementation and checks are in CORE_RAM_MARGIN.md. Copy-present mode never flips it, but every draw
    path of `fftbat` must stay within 100 rows first: `rt_ti.c` sprite clipping allows rows
    up to 127 (`RT_PH`), `fft.c` clears `RT_PSIZE`, and the copy to the visible planes is
    `FastCopyScreen_R` (3,840 bytes: a 3,000-byte C copy costs about the same).

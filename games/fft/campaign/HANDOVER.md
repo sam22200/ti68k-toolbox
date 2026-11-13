@@ -2,7 +2,26 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
-### Resume here (Sweegy rules/save integration, 2026-11-12)
+### Resume here (bounded grayscale RAM, 2026-11-12)
+
+**Latest delivery.** [Battle RAM follow-up](CORE_RAM_MARGIN.md): the fixed hidden
+render target now holds100 rows instead of128, with clipping and guarded PC/
+sanitizer/native comparisons preserving visible output. Production saves1692
+bytes net; true TTPack input57731/headroom7205, ABI86/zone8698/Work37464 remain.
+The headroom helper now includes TTPack's two-byte length word; the preceding
+57733/7203 report was payload-only (true packed57735/7201).
+One private Titanium session verifies grayscale, keyboard rotation, heap blocks
+and return cleanup. Instrumented free heap is9606 bytes, **not** the16KiB target
+or an installed supervisor-flow peak certification. Only TURN1/RESULTS7 images
+change versus Sweegy, with unchanged lengths/header; historical groups/states
+are untouched. Evidence: `x/battle-ram-margin/`. No combat sweep was repeated.
+
+**Next:** continue RAM recovery (ring backups, their scratch aliases and further
+measured savings), then installed-flow peak/contiguous RAM, archive budget,
+one-command native chapter run and interface freeze. The100-row proposal below
+is now delivered; old11.4KB and4.6KB-deficit figures are historical.
+
+### Previous delivery (Sweegy rules/save integration, 2026-11-12)
 
 **Latest delivery.** [Sweegy monster battle](CHAPTER1_MONSTER_BATTLE.md): three
 complete production-update fights on PC/ASan/UBSan,13 actors on source MAP074
@@ -111,7 +130,7 @@ banks: run through `make`. Check binaries must run inside a data folder
 Brave below 100 (a Brave of 100 hid the knight-sword bug). Known failure, unrelated:
 `manage-test` aborts.
 
-**Numbers now.** Resident TTPack input 57,733, headroom 7,203 bytes; zone 8,698; ABI 86.
+**Numbers now.** True resident TTPack input57,731, headroom7205 bytes; zone8698; ABI86. See the two-byte reporting correction above.
 
 **Chapter I actions are complete (155 of 155, 2026-11-11).** The last three (Black Ink,
 Look of Devil, Look of Fright; flags_4 0x20 `DIRECT_TARGETING`) resolve one panel through
