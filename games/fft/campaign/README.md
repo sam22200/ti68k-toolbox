@@ -1,6 +1,13 @@
 # Opening -> Academy -> Gariland
 
-Latest delivery (2026-11-13): [four traps and persistent level-down](TRAPS.md).
+Latest delivery (2026-11-13): [approved source-specific monster KO](MONSTER_KO.md).
+Optional shared chapter art preserves the small poses and fallen bodies using
+the existing cache. PC/sanitizers, selected68000 pictures/budgets and matching
+packages pass. ABI89/FSV5 remain; input61211/headroom3725, pilot groups704425
+bytes. Standing/action monster art, other palettes and authored encounters
+remain. Target/protect objectives are next;16KiB RAM/installed peak is open.
+
+Previous delivery (2026-11-13): [four traps and persistent level-down](TRAPS.md).
 Approved box; FCD5 source-map metadata, FSV5/Save3204 and matching ABI89 groups.
 Work29310, zone8698, input57621/headroom7315; pilot groups total701775 transport
 bytes. PC/sanitizers and selected native checks pass, including the complete

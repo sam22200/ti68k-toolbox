@@ -1,5 +1,11 @@
 # Shared campaign resources and shipping deduplication
 
+FKO1 update (2026-11-13): [monster Dead art](MONSTER_KO.md) is optional active-
+chapter `ffko`, shared by all encounters. Its direct job/pair/frame indexes pool
+equal records, job aliases and mirrors. The reviewed bank is2876 bytes/11
+physical poses. Packaging validates this family, bounds reserved cache keys
+and retains the whole-bank duplicate audit; no core/pilot copy is added.
+
 FCD5 update (2026-11-13): [traps/source-map identity](TRAPS.md). The descriptor
 adds one word; shipping normalization retains the existing exact sharing pass
 and all live encounter payloads. FCD4/ABI80 measurements below are historical.

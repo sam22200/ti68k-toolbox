@@ -13,9 +13,11 @@ from check_core_boundaries import descriptor13
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,default=HERE/'x/core-capacity/render')
-    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last'),
+    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition'),
                     help='select affected cases; default is the original four-case certification')
+    ap.add_argument('--ko-bank',type=Path,help='private FKO1 bank for the monster-ko case')
     args=ap.parse_args();out=args.out.resolve();out.mkdir(parents=True,exist_ok=True)
+    if args.case and any(c.startswith('monster-ko')for c in args.case)and not args.ko_bank:ap.error('monster-ko needs --ko-bank')
     common=[HERE/'check_capacity_render.c',ROOT/'runtime/core/rt_core.c']
     run(['cc','-std=gnu99','-O1','-w','-o',out/'render',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'renderc',*common,
@@ -27,11 +29,18 @@ def main():
         (data/'ffgd.bin').write_bytes(descriptor13())
         run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','ffgd.bin','ffgd'],data)
         files['ffgd']=data/'ffgd.89y'
+        if args.ko_bank:
+            (data/'ffko.bin').write_bytes(args.ko_bank.read_bytes())
+            run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','ffko.bin','ffko'],data)
+            files['ffko']=data/'ffko.89y'
         empty=out/'none.keys';empty.write_text('0\n')
         rotations=out/'rotate.keys';rotations.write_text('12 F5\n13\n50 F1\n51\n')
         for label,scenario,frames,keys in (('board',0,90,empty),('rotations',0,100,rotations),
-                                         ('status-last',1,100,empty),('equipment-last',2,100,empty)):
+                                         ('status-last',1,100,empty),('equipment-last',2,100,empty),
+                                         ('monster-ko',3,60,empty),('monster-ko-morph',4,60,empty),
+                                         ('monster-ko-transition',5,60,empty)):
             if args.case and label not in args.case:continue
+            if label.startswith('monster-ko')and not args.case:continue
             pc=run([out/'render',scenario,frames,keys,out/(label+'-pc.png')],data)
             command=[ROOT/'tools/bin/ti-cycles','--arg',scenario,'--frames',frames,'--max',3000,
                      '--keys',keys,'--png',out/(label+'-native.png')]
@@ -47,7 +56,7 @@ def main():
             ordinary=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if not mode>>31]
             cold=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if mode>>31]
             assert max(ordinary)<360000,(label,max(ordinary),frame_costs[1::2].index(max(ordinary)))
-            if scenario:assert(values[-1]>>16)&255==12
+            if scenario in (1,2):assert(values[-1]>>16)&255==12
             results.append(dict(case=label,checksum=match[1],identity=match[2],actors=13,
                                 ordinary_average_cycles=sum(ordinary)//len(ordinary),
                                 ordinary_peak_cycles=max(ordinary),cold_or_turn_peak_cycles=max(cold,default=0)))

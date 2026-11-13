@@ -1,5 +1,19 @@
 # Final Fantasy Tactics (PS1): study notes
 
+## Monster Dead poses (2026-11-13)
+
+**OBSERVED IN FFT:** `tools/monster_ko_review.py` executes16 original-MIPS
+first-frame/wait pairs across four SEQ families. Behemoth/Bomb use MON.SHP
+26/28 for fixed Dead (animation0x1a), versus human23/24; the tiny tail/flame
+silhouettes are present in the original sheet. Chocobo Dead37/38 leaves feathers.
+This is a bounded source-composition study, not a full death-transition replay.
+
+**TARGET IMPLEMENTATION:** approved six-sheet KO art is integrated through
+optional chapter FKO1 records, preserving size/parts/white outlines without
+human face corrections. Shaded32-column poses reuse two existing cache entries;
+standing/action art remains separate content work. Details and reproduction:
+[campaign/MONSTER_KO.md](campaign/MONSTER_KO.md).
+
 ## Throw family (2026-11-02)
 
 **OBSERVED IN FFT:** source formula0x63 uses current Speed times the selected

@@ -1,5 +1,11 @@
 # Battle RAM: bounded grayscale target (2026-11-12)
 
+2026-11-13 follow-up: [monster KO support](MONSTER_KO.md) keeps Work29310,
+Save3204, seven blocks98444 and48 actor-cache entries unchanged. Resident
+input61211 grows3590 program-RAM bytes versus traps. Do not reuse15171 as
+current estimated free RAM. No new installed peak/contiguous/reentry measurement
+or16KiB pass is claimed; difficult recovery remains deferred by the user.
+
 Historical first RAM lot. The subsequent [archive-colour delivery](CORE_REACH_ARCHIVE.md)
 saves another8638 production bytes (Work29282, input57275, ABI87). Its real
 installed supervisor diagnostic leaves14058 bytes free; the16KiB gate remains

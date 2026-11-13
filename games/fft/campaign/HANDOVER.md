@@ -2,6 +2,33 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Latest delivery: approved monster KO rendering (2026-11-13)
+
+[Monster KO rendering](MONSTER_KO.md) preserves the approved tail/flame/feathers
+and fallen bodies. Optional chapter FKO1 stores11 physical poses in2876 bytes.
+Shaded halves reuse two existing cache entries per KO; validate both remembered
+keys and pose/job/feet/depth/camera/immersion. Restore normal cover on revival.
+No heap/cache/layout growth. ABI89/Work29310/Save3204/seven blocks98444/zone8698
+and all28 overlays remain. Input61211/headroom3725 adds3590 program-RAM bytes;
+16KiB/installed peak stays open and older free-RAM estimates predate this growth.
+Difficult recovery remains deferred. Matching pilot core412690 + chapter291735,
+key0a6f05fdec1f5dd1e3eaf1c97f717351. No unused monster bank is shipped in the
+human pilot; `release-with-ko/` is private inspection content. Full standing/
+action monster art, other palettes and authored encounters remain.
+
+PC/sanitizers and one actual68000 carrier pass131 checks/59645262,32 equal
+screens and24 exact approved pictures. Five selected13-actor cases pass360k
+(KO318768, dissolve262086, transition296802; human344308/357644). Seven host
+tests, package42+819/94924924 and normalized PC save/aftermath flows pass.
+Their old FSV4/FSV5 test-input mismatch reproduces at baseline7bf703c and is
+fixed in the fixture. No hardware run or broad native sweep. Evidence:
+`x/monster-ko/verification.json`, `verified-integration/`, `verified-capacity/`,
+`morph-transition/`, `release/`. Approval is recorded and its marker cleared.
+
+**Next:** targeted/protected encounter objectives, then authored guest/chain-
+with-Save/choice content. Keep CAMPAIGN_PREREQUISITES.md complete; do not jump
+to installed-route automation or claim full monster chapter artwork.
+
 ### Latest delivery: four traps (2026-11-13)
 
 The user approved the trap box. [Four traps and persistent level-down](TRAPS.md)

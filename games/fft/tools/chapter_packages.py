@@ -145,6 +145,8 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare R4 archive colours')
     if spec.get('encounter_format')!='FCD5':
         raise ValueError('Core specification must declare FCD5 encounter source maps')
+    if spec.get('ko_actor_format')!='FKO1':
+        raise ValueError('Core specification must declare FKO1 optional monster Dead art')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -169,6 +171,15 @@ def chapter_package(source, spec, core_spec, key):
     if spec['schema'] != 'FFT_CHAPTER_SPEC_1':
         raise ValueError('Unsupported chapter specification')
     variables = select(source, spec['variables'])
+    if 'ffko' in spec['variables']:
+        import monster_ko_bank
+        if core_spec.get('ko_actor_format')!='FKO1':
+            raise ValueError('Monster Dead art requires an FKO1-capable core')
+        monster_ko_bank.validate(resources.resolve(source,'ffko'))
+        total=sum(struct.unpack_from('>H',resources.resolve(source,n))[0]
+                  for n in ('ffca','ffcb','ffcc','ffcd','ffce','ffcf') if n in spec['variables'])
+        if total>=32768-256:
+            raise ValueError('Actor frames collide with reserved monster KO cache keys')
     for v in variables:
         if re.fullmatch(r'ff[a-z0-9]v[0-3]',v.name):
             raw=resources.resolve(source,v.name)

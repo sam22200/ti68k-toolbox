@@ -3,9 +3,12 @@
 Latest steering (2026-11-13): finish the [user prerequisites](CAMPAIGN_PREREQUISITES.md)
 before route automation. [Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
 and [four traps/level-down persistence](TRAPS.md) are delivered and approved.
-ABI89/Work29310/Save3204/FCD5, input57621/headroom7315; matching private pilot
-groups total701775 transport bytes. Monster KO art, targeted/protected objectives
-and authored guest/chain/choice content remain. RAM figures below are previous
+Approved [monster KO support](MONSTER_KO.md) renders six source families through
+optional chapter art and the unchanged48-entry cache. ABI89/Work29310/Save3204/
+FCD5, input61211/headroom3725; matching pilot groups total704425 transport bytes.
+Standing/action monster art, other palettes, targeted/protected objectives and
+authored guest/chain/choice content remain. Resident RAM grows3590 bytes versus
+the trap lot despite unchanged heap requests. RAM figures below are previous
 measurements, not a new16KiB pass; difficult recovery remains deferred.
 
 Current integration (2026-11-12): all155 audited Chapter I actions are executable.

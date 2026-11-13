@@ -1,5 +1,10 @@
 # Split executable archive banks
 
+Monster KO follow-up (2026-11-13): [resident rendering](MONSTER_KO.md) leaves
+all28 images byte-identical to the trap lot, including all three raw shards,
+ABI89/ModCtx352/signatureF3CB and zone8698. FKO1 is chapter artwork, not another
+executable image; matching package keys still change with fftbat/ffbcore.
+
 Latest (2026-11-13): [traps/FSV5](TRAPS.md), ABI89/ModCtx352/zone8698.
 PARTY16/ORDER8 balance the three contiguous ranges; raw shards62758/64232/60004
 fit65000. All28 bindings and actual88 rejection pass. No new zone/allocation.

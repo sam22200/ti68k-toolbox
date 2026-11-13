@@ -41,7 +41,7 @@ def main():
     ap.add_argument('--data-dir',type=Path,help='validate actual installed pack data in isolation')
     args=ap.parse_args();OUT=args.out.resolve();save_name='ffsave'   # the session; a --slot is seeded and must stay untouched
     if args.data_dir:args.data_dir=args.data_dir.resolve()
-    OUT.mkdir(parents=True,exist_ok=True);initial=b'FSV4'+fixture()[4:]+bytes(64);write_changed(OUT/'initial.sav',initial)
+    OUT.mkdir(parents=True,exist_ok=True);initial=b'FSV5'+fixture()[4:]+bytes(66);write_changed(OUT/'initial.sav',initial)
     run(['cc','-std=gnu99','-O1','-g','-w','-o',OUT/'battle',HERE/'check_flow_battle.c',
          ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c'])
     with tempfile.TemporaryDirectory(prefix='fft-flow-') as name:
