@@ -2,6 +2,20 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Scope extension before campaign extraction (2026-11-13)
+
+The user added monster breeding, Bar/rumors and poaching to the readiness gate.
+[Initial GameFAQs overview and code audit](CAMPAIGN_SIDE_SYSTEMS.md) separates
+original unlocks (I rumors, II Propositions, III Fur Shops) from reusable core
+machinery required before extraction. Direct GameFAQs fetches are blocked;
+the survey uses indexed excerpts and labelled local source reads, not a new
+retail oracle. World date/eggs/away workers/Bar state and Fur Shop transactions
+are missing; current support471 directly gives party inventory, not shop stock.
+Do not mark these complete under generic combat coverage or drop them because
+their shops/jobs unlock later. CHAPTER1_READINESS and CAMPAIGN_PREREQUISITES
+carry the full queue. Continue target/protect objectives first. No runtime,
+ABI/save/package/art or TI change belongs to this documentation addition.
+
 ### Latest delivery: approved monster KO rendering (2026-11-13)
 
 [Monster KO rendering](MONSTER_KO.md) preserves the approved tail/flame/feathers
