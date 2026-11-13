@@ -1,5 +1,11 @@
 # One engine for every chapter
 
+Named-objective update (2026-11-13): [OBJECTIVES.md](OBJECTIVES.md) describes
+optional chapter-wide FGO1. RESOURCES26/op15 validates/binds explicit slot/name
+goals after PARTY setup and returns before ORDER8 checks outcomes. Direct
+archive title strips reuse the approved Lato renderer; ABI90/F4D0/Work29314,
+FCD5/FSV5 and zone8698 remain. Current packages/evidence: HANDOVER.md.
+
 Latest encounter/persistence formats (2026-11-13): [four traps](TRAPS.md).
 FCD5/header106 adds SOURCE_MAP at word52, independent of world-map location.
 FSV5/3204 appends a two-byte current-raw-stat roster bitmap, migrating older

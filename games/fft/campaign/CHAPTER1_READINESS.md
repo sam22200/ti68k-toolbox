@@ -8,12 +8,14 @@ unlocks preserved (rumors in I, Propositions from II, Fur Shops from III).
 [Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
 and [four traps/level-down persistence](TRAPS.md) are delivered and approved.
 Approved [monster KO support](MONSTER_KO.md) renders six source families through
-optional chapter art and the unchanged48-entry cache. ABI89/Work29310/Save3204/
-FCD5, input61211/headroom3725; matching pilot groups total704425 transport bytes.
-Standing/action monster art, other palettes, targeted/protected objectives,
-authored guest/chain/choice content and the side systems above remain. Resident RAM grows3590 bytes versus
-the trap lot despite unchanged heap requests. RAM figures below are previous
-measurements, not a new16KiB pass; difficult recovery remains deferred.
+optional chapter art and the unchanged48-entry cache. [Large named objectives](OBJECTIVES.md)
+are now approved and integrated: target/protect/combined, with explicit binding
+and repeated-receipt save fixes. ABI90/Work29314/Save3204/FCD5; true input61317/
+headroom3619, matching pilot groups705830 transport bytes. Objectives add4
+requested heap bytes and106 resident program bytes versus the KO lot.
+Standing/action monster art, other palettes, authored guest/chain/choice content
+and the side systems above remain. RAM figures below are dated evidence, not a
+new16KiB pass; difficult recovery remains deferred.
 
 Current integration (2026-11-12): all155 audited Chapter I actions are executable.
 [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md) now exercise the first
@@ -51,8 +53,8 @@ handling. Bars need town/story-filtered rumors and later dispatch/return jobs.
 Poaching currently gives an item directly to the party: source-correct Fur Shop
 stock/access/purchases and save migration remain. These are explicit gates,
 not implicit completion under generic R/S/M coverage. Preserve later chapter
-unlocking while testing reusable machinery with PC injection doors. Implement
-objectives first, then progress through the complete prerequisite queue.
+unlocking while testing reusable machinery with PC injection doors. Named objectives are delivered; continue authored guest/chain/choice integration
+and the complete prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)
 

@@ -1,10 +1,10 @@
-# Encounter objectives: prepared rules and PC visual review
+# Named-target and protection objectives
 
-2026-11-13. **Not integrated.** The shipping engine still uses ordinary
-elimination and its mandatory Ramza permanent-loss contract. The prepared
-policy, bounded source study and four-view art comparison await the user's
-visual verdict before descriptor/runtime/banner integration. ABI89/FCD5/FSV5,
-production groups, saves and the user's emulator remain unchanged.
+2026-11-13. **Approved and integrated.** User verdict: "ouais valide" for the
+large Lato names. The core supports ordinary elimination, one named target,
+one protected ally, or both. The pilot retains ordinary elimination; its
+historical groups/saves and the live emulator are preserved. This is reusable
+engine support, not an extraction of later authored encounters.
 
 ## Observed in original instructions
 
@@ -27,84 +27,102 @@ units do decide the generic outcome. Simultaneous important blue/red loss
 returns defeat first. Do not implement scripted protection by counting all
 allies, or treat a guest flag as an objective on its own.
 
-## Prepared target policy
+## Runtime contract
 
-`objective_rules.h` is an allocation-free helper, currently unused by fft.c.
-It accepts validated encounter-slot masks, including slot0: one optional named
-target and any explicitly protected allies. Overlapping/out-of-range masks,
-zero/excess capacities and multiple target bits are rejected.
+`objective_rules.h` is used by ORDER8's `battle_outcome`. Encounter-slot masks
+remain fixed after initial binding, including slot0. At the existing settled
+outcome boundaries, mandatory Ramza permanent loss, ordinary allied defeat and
+protected HP0/permanent loss win priority over a simultaneous target win.
+A target at0 HP or permanently removed wins while unrelated enemies can live.
+A living target cannot be satisfied by incapacitating other foes. Protection
+alone still requires ordinary enemy elimination. Petrify alone is not the named
+HP predicate. Hidden, airborne or off-camera units are not permanent removals;
+current allegiance never changes the authored identities.
 
-At an existing **settled** outcome boundary:
+Outcome checks retain the existing root/response/reward/Mime settlement order.
+A temporary KO reversed before that boundary does not end the battle. Reraise
+is consumed on the KO actor's later CT pick in this engine: it is not immunity
+to an already settled HP0 script condition. This is an explicit native policy,
+not a claim that all retail event scripts use the same trigger/priority.
 
-1. Preserve mandatory loss and give protected KO/permanent loss priority.
-2. A named target reaching0 HP or explicit permanent removal wins, regardless
-   of unrelated living enemies. If it still lives, ordinary victory cannot
-   accidentally satisfy that objective; ordinary defeat still applies.
-3. With no named target, ordinary elimination remains the win condition. A
-   protection-only battle therefore also requires defeating the enemies.
+## Metadata, titles and storage
 
-This is an explicit native policy for the requested goal types, not a claim
-that every retail scene uses this exact event priority. Hidden, airborne,
-off-camera and not-yet-spawned are not synonyms for permanent removal. Bind
-identities after party/fixed-guest setup; never select objectives at runtime
-by enemy order. The review's first enemy/guest selections are visual fixtures,
-not authored encounter metadata.
+Optional active-chapter `ffgo` is one **FGO1** bank shared across every encounter
+route. No descriptor or save migration: FCD5/FSV5 remain. RESOURCES26/op15 binds
+it after party/fixed-guest setup, before turn/outcome processing. It validates
+spans, alignment, masks/counts, role and the actual target/protected names;
+invalid or mismatched data refuses entry. Missing routes keep ordinary goals.
+Do not bind a random generic enemy by runtime ordering. The Keane/Delita demo
+uses explicit fixture identities at fixed seed61, not authored mission data.
+Future targets with random names need fixed authored identities first.
 
-Eighteen PC/sanitizer boundaries cover legacy outcomes, named target slot0,
-highest supported protected slot, invalid masks, a living named target with
-all other foes incapacitated, permanent removal and simultaneous win/loss.
-Actual action queues, Reraise, encounter binding, scripted aftermath, defeat
-without rewards and exactly-once victory/save settlement remain integration
-work after the visual verdict. No TI check is warranted for unused policy.
+FGO1 is magic4, raw size2, route count2, then16-byte entries:
+`route1,reserved1,target2,protect2,strip0_offset2,strip1_offset2,width0_1,width1_1,
+ target_name_offset2,protect_name_offset2`. Offsets are positive/even relative
+to the entry. The final payload interns equal title strips and NUL-terminated
+uppercase identity strings across the whole chapter. Strip records reuse the
+existing `x,top,rows,stride + light/dark/mask` format. No glyph work, file lookup,
+decompression or whole-bank copy occurs during banner frames. One borrowed
+pointer is kept at Work's cold tail; cache capacities and allocations remain.
 
-## Proposed presentation and reuse
+`tools/objective_bank.py objectives.json ffgo.bin` accepts, for example:
 
-`tools/objective_review.py` produces
-`x/objectives/review/objective-before-after.png`: current elimination, named
-target, protected ally and combined objectives, all at the same scale/view.
-It reuses the map/actors, Lato title font/rasterizer and reviewed victory/defeat
-strip bytes. The user rejected the first small-name labels and requested the
-actual names directly in large text: `DEFEAT KEANE!` and `PROTECT DELITA!`.
-The revised goals use cap12, the same as the existing Battle Start title;
-fitting allows11/10 for longer lines, never the old small label font. Custom
-goals replace the redundant Battle Start heading. Protection-only also shows
-`DEFEAT ALL FOES!`; combined objectives keep both named goals. Only relevant
-actors pulse. These are objective titles, not spoken dialogue; actual named
-dialogue must continue to have portraits.
+```json
+[{"route":"g","target":{"slot":1,"name":"Keane"},
+  "protect":{"slot":0,"name":"Delita"}}]
+```
 
-The tool compiles a temporary engine copy with a single focus-highlight
-condition changed and supplies only temporary banner bytes. No production
-source, shared bank, format, allocation or timing policy is modified. The
-single fully revealed frame is a visual proposal, not tested banner timing or
-measured TI performance. Do not integrate, optimize or benchmark the new art
-until approved. Mark the comparison with ti-view's Decision badge; clear only
-that marker after a verdict. Other pending gallery decisions remain intact.
+Add `ffgo` to the chapter specification. Packaging validates it, checks declared
+routes and requires an FGO1-capable core. Core/chapter keys and ABI must match.
+The default human pilot ships no unused objective bank. Different objectives,
+names, positions and story aftermath remain encounter content.
 
-## Next integration, after approval
+The generator uses the exact approved Lato Black sampler: cap12, fitting11/10
+only when necessary; names that cannot fit are rejected for an explicit large
+layout. `DEFEAT KEANE!`/`PROTECT DELITA!` replace the redundant Battle Start
+heading. Protection-only adds `DEFEAT ALL FOES!`. Relevant actors pulse. Reveal
+length comes from each real strip width, followed by the complete hold time.
+Victory/defeat strips and ordinary banner bytes remain once in core.
 
-- Add validated encounter metadata and compatible package/version guards.
-  Keep the default pilot elimination behavior and existing slots/party saves.
-- Call the policy only at coherent outcome boundaries, after relevant action/
-  reaction/automatic-revival handling; do not end on a temporary intermediate KO.
-- Bind target/protect names and pulse masks from that same metadata. Share
-  universal goal strips in core and retain encounter identity/content by ID;
-  never duplicate whole UI or portrait banks per arena.
-- Preserve banner fit/reveal/hold time, save/reward idempotence and the360k
-  ordinary frame budget. Keep stack, archive, executable-size and RAM growth
-  explicit; the16KiB gate is already open and difficult recovery deferred.
-- Use focused PC/sanitizer event/save flows first. Only changed native layout,
-  ABI/overlay, arithmetic and rendering/budget paths need selected68000 checks;
-  no whole sweep or TiEmu session per edit.
+## Save receipt correction
+
+Repeated result settlement exposed an existing bug: the live bag still held
+pre-reward counts, so a second save could remove awarded Potions/Phoenix Downs.
+Found/stolen queues could also be replayed. After a successful save request,
+settlement now synchronizes the live bag and consumes those queues. Story flags
+still gate one-time gil/trophies. Failed writes do not consume the found/stolen queues.
+Tests check unchanged defeat saves and byte-identical repeated victory saves.
+
+## Validation and remaining scope
+
+Nineteen policy boundaries and25 original-MIPS conditions/outcomes pass.
+PC/ASan/UBSan real action/save tests pass61 checks/0B3C2C52, including temporary
+revival before settlement, simultaneous post-impact loss, surviving unrelated
+enemies, allegiance/visibility/Petrify, bad identity/spans and repeated receipts.
+Four runtime screens exactly match approved pixels:7371/2368/4980/168F.
+The pooled two-route bank adds only16 directory bytes:2206 ->2222.
+
+Actual68000 checks cover the changed archive/ORDER/PARTY/SAVE boundary, native
+pointer/layout/binding contract and banner rasterization/budget. PC uses the
+full `game_update` exit; the native receipt carrier retains Work deliberately
+for the repeated-save assertion. No broad combat sweep or TiEmu session.
+Final measured layouts, frame costs, package key and evidence are recorded in
+HANDOVER.md and `x/objectives/verification.json`. The16KiB RAM/installed-peak
+gate remains open; difficult recovery is still deferred.
 
 ```sh
 rtk proxy make -C games/fft/campaign campaign-objectives-check
+rtk proxy tools/pyenv/bin/python games/fft/campaign/check_objective_runtime.py \
+  --native --data-dir games/fft/campaign/x/objectives/shipping-data \
+  --out games/fft/campaign/x/objectives/shipping-check
 rtk proxy tools/pyenv/bin/python games/fft/tools/objective_review.py
 ```
 
-The rejected small-label comparison is retained under
-`x/objectives/review-small-labels/`; only the revised comparison is marked for
-Decision. The large-title version still needs its visual verdict.
+The original approved comparison stays under `x/objectives/review/`; rejected
+small labels stay under `review-small-labels/`. New production comparisons go
+to `production-review/`; its four LCD images are checked against the approved
+ones. Approval is recorded and only its Decision marker was cleared.
 
-The separate [breeding/Bar/Fur Shop readiness extension](CAMPAIGN_SIDE_SYSTEMS.md)
-remains required before campaign extraction, alongside the rest of
-CAMPAIGN_PREREQUISITES.md. Do not lose that queue while completing objectives.
+Next: authored guest/chain-with-Save integration, story choices, then the full
+remaining prerequisite queue. [Breeding, Bars/rumors/Propositions and the Fur
+Shop](CAMPAIGN_SIDE_SYSTEMS.md) remain required before campaign extraction.

@@ -1,5 +1,10 @@
 # Shared core and replaceable chapter packages
 
+FGO1 update (2026-11-13): [named objectives](OBJECTIVES.md) add optional shared
+chapter `ffgo` and an `objective_format: FGO1` core declaration. ABI90/F4D0,
+Work29314 and new matching keys are required; FCD5/FSV5 and the chapter-only
+build flow remain. The ordinary pilot ships no unused objective data.
+
 Latest (2026-11-13): [monster KO support](MONSTER_KO.md) declares optional
 chapter-owned `ffko`/FKO1, validated by packaging and the cold loader. The core
 spec's `ko_actor_format` binds support into the matching key; old core reuse
