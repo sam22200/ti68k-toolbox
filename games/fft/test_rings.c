@@ -43,11 +43,12 @@ static void verify(void)
     // Split views keep depth in vbuf. Reconstruct pristine colours from the
     // archive instead of accidentally treating those depth bytes as pixels.
     {
-        const u8 *p=views[st.rot];u8 head=p[1]=='3'?6:4;
-        zx0_unpack(p+head,reference);
-        if(head==6&&(st.scenery&1)) {
+        const u8 *p=views[st.rot];u8 raw=p[1]=='4';
+        if(raw)memcpy(reference,p+8,2*SC_PLANE);else zx0_unpack(p+8,reference);
+        if(RD16(p,2)&&(st.scenery&1)) {
             u8 *mask=malloc(SC_PLANE);u16 j;
-            assert(mask);zx0_unpack(p+head+RD16(p,1),mask);
+            assert(mask);if(raw)memcpy(mask,p+8+RD16(p,1),SC_PLANE);
+            else zx0_unpack(p+8+RD16(p,1),mask);
             for(j=0;j<SC_PLANE;j++) {
                 u8 dark=reference[SC_PLANE+j],m=mask[j];
                 reference[j]=(reference[j]&~m)|(~dark&m);
@@ -136,7 +137,7 @@ int main(void)
 #endif
     reference=malloc(2*SC_PLANE);assert(reference);
 #ifdef FFT_VIEW_SPLIT
-    for(width=0;width<(views[0][1]=='3'?2:1);width++) {
+    for(width=0;width<(RD16(views[0],2)?2:1);width++) {
         st.scenery=width;scene_rot=vbuf_rot=255;
 #endif
 #ifdef FFT_REACH_CONTOUR

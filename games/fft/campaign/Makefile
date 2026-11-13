@@ -15,6 +15,10 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: archive-reach-check
+archive-reach-check: | contour-assets
+	$(PY) ../tools/view_split.py opening
+	$(PY) check_archive_reach.py
 .PHONY: battle-ram-check
 battle-ram-check:
 	$(PY) check_battle_planes.py
@@ -190,7 +194,7 @@ fftgar_pc fftintro_pc fftbatflow_pc: ../action_effect.h ../action_resolve.inc
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_rules.h ../common.h
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_policy.h ../status_unit.h ../status_policy.inc ../status_lifetime.h ../status_control.h ../status_runtime.inc ../turn_order.inc ../setup_glyphs.inc
 fftdep_pc fftmap_pc ffttitle_pc fftscn_pc fftmng_pc: ../common.h
-fftgar_pc fftintro_pc fftbatflow_pc fftscn_pc: ../core_limits.h
+fftgar_pc fftintro_pc fftbatflow_pc fftscn_pc: ../core_limits.h ../view_format.h
 fftgar_pc fftintro_pc fftbatflow_pc: ../chapter.h ../chapters.h ../module.h
 fftintro_pc: ../opening/opening.c ../fft.c ../fft.h ../opening/opening.inc pc_entry.c
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ ../opening/opening.c $(RT_CORE) $(RT_SW) pc_entry.c $(SDL_LIBS)
@@ -235,6 +239,7 @@ packages-routing-check: packages
 
 .PHONY: contour-assets
 contour-assets:
+	$(PY) ../tools/view_split.py campaign
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
 pc test cycles ti packed regression-check visual-check: | contour-assets
 fftgar_pc: ../config.inc ../contour.h ../contour_art.inc
@@ -247,7 +252,7 @@ fftintro_pc fftgar_pc fftgar_status_test: | contour-assets
 
 # The selected style is an actual bank prerequisite, so .89y wrappers cannot
 # silently retain older colours after a phony preparation target runs.
-data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin &: ../tools/campaign_scenery.py $(wildcard ../x/isometric-style/variant-*.raw)
+data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin &: ../tools/campaign_scenery.py ../tools/extract.py $(wildcard ../x/isometric-style/variant-*.raw)
 	$(PY) ../tools/campaign_scenery.py
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
 	touch data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin

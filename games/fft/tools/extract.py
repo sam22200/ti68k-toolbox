@@ -289,18 +289,43 @@ def unragged_depth(stream, rows):
 
 
 def view_bank(tag, colours, stroke, depth):
-    """A chapter view (ffov*, ffgv*): b'R2' (or b'R3' with a width mask), u16 lengths of the
-    colour and mask ZX0 streams (0: none), u16 RAM bytes of the unpacked depth stream (checked
-    against the core's FFT_CORE_DEPTH_MAX), then the three ZX0 streams (fft.c unpack_view())."""
-    return (tag + len(colours).to_bytes(2, 'big') + len(stroke).to_bytes(2, 'big')
+    """R4: raw immutable colours/mask, compressed ragged depth. Legacy callers
+    supply R2/R3 ZX0 colour streams; normalize them before serialization."""
+    if tag in (b'R2', b'R3'):
+        colours = unzx0(colours)
+        stroke = unzx0(stroke) if stroke else b''
+    assert len(colours) % 80 == 0 and (not stroke or 2*len(stroke) == len(colours))
+    return (b'R4' + len(colours).to_bytes(2, 'big') + len(stroke).to_bytes(2, 'big')
             + len(depth).to_bytes(2, 'big') + colours + stroke + zx0pack.pack(depth))
 
 
 def pack_view(raw):
-    """R2 view: the two colour planes (decoded straight into the scene buffer) and the
+    """R4 view: the two colour planes (copied straight into the scene buffer) and the
     ragged depth stream."""
     plane = len(raw) // 6
-    return view_bank(b'R2', zx0pack.pack(raw[:2 * plane]), b'', ragged_depth(raw))
+    return view_bank(b'R4', raw[:2 * plane], b'', ragged_depth(raw))
+
+
+def archive_view(bank):
+    """Convert a legacy bank losslessly, retaining depth stream and contour bytes.
+    Already normalized input is byte-identical; no disc or artwork regeneration."""
+    tail=b''
+    if bank[-10:-6] in (b'FC01',b'FC02'):
+        original,offset,count=struct.unpack('>3H',bank[-6:])
+        tail=bank[offset:offset+count];bank=bank[:original]
+    if bank[:2] == b'R4':
+        out=bank
+    else:
+        assert bank[:2] in (b'R2',b'R3'), 'not a ragged view'
+        a,b=struct.unpack_from('>2H',bank,2)
+        colours=unzx0(bank[8:8+a]);mask=unzx0(bank[8+a:8+a+b]) if b else b''
+        assert len(colours)%80==0 and (not mask or 2*len(mask)==len(colours))
+        out=b'R4'+struct.pack('>2H',len(colours),len(mask))+bank[6:8]+colours+mask+bank[8+a+b:]
+    if tail:
+        n=len(out);off=(n+1)&~1
+        out+=bytes(off-n)+tail+b'FC02'+struct.pack('>3H',n,off,len(tail))
+    assert len(out)<=65512, 'view plus AMS trailer exceeds a variable'
+    return out
 
 
 def unzx0(stream):
@@ -314,15 +339,15 @@ def unzx0(stream):
 
 
 def read_view(bank):
-    """A chapter view bank (R2/R3, a contour tail ignored) -> (tag, colour stream, mask stream,
-    the 4 depth/mask planes as full rows)."""
+    """A chapter view bank -> (tag, colours, mask, four full depth/mask planes).
+    Colours/mask are raw for R4 and ZX0 streams for legacy R2/R3. Ignore the contour tail."""
     if bank[-10:-6] in (b'FC01', b'FC02'):
         bank = bank[:int.from_bytes(bank[-6:-4], 'big')]
-    assert bank[:2] in (b'R2', b'R3'), 'not a ragged chapter view'
+    assert bank[:2] in (b'R2', b'R3', b'R4'), 'not a ragged chapter view'
     a, b, n = (int.from_bytes(bank[i:i + 2], 'big') for i in (2, 4, 6))
     depth = unzx0(bank[8 + a + b:])
     assert len(depth) == n, 'depth size field'
-    rows = len(unzx0(bank[8:8 + a])) // 80
+    rows = (a if bank[:2]==b'R4' else len(unzx0(bank[8:8 + a]))) // 80
     return bank[:2], bank[8:8 + a], bank[8 + a:8 + a + b], unragged_depth(depth, rows)
 
 

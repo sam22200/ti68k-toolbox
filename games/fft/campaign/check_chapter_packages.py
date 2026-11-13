@@ -33,6 +33,9 @@ def synthetic(core, chapter):
     source = {}
     for name in core['variables']+chapter['variables']:
         raw = name.encode()*4
+        if re.fullmatch(r'ff[a-z0-9]v[0-3]',name):
+            import extract
+            raw=extract.view_bank(b'R4',(name.encode()*16)[:80],b'',bytes(4))
         if name in ('ffgd', 'ffod'):
             words = [0]*52
             words[9], words[10], words[13], words[50] = 10, 10, 100, 11
