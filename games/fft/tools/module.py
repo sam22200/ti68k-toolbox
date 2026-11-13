@@ -28,6 +28,9 @@ import zlib
 ROOT = Path(__file__).resolve().parents[3]
 T = ROOT / 'tools'
 ENV = {'TIGCC': str(T / 'gcc4ti-bin'), 'PATH': '%s:/usr/bin:/bin' % (T / 'gcc4ti-bin/bin')}
+# Raw dat payload guard, matching the existing actor/catalogue bank guard.
+# Six trailer bytes and the AMS length word still fit the 16-bit variable.
+BANK_BUDGET = 65000
 CFLAGS = ['-Os', '-Wall', '-W', '-mpcrel', '-mregparm=5', '-fomit-frame-pointer', '-fwhole-program',
           '-I%s' % (T / 'extgraph/lib')]
 
@@ -112,12 +115,12 @@ def pair_banks(mods):
     token=zlib.crc32(b''.join(mods))
     banks=[]
     for first,part in ((0,mods[:split]),(split,mods[split:])):
-        if size(part)>64000:raise ValueError("module shard exceeds64000-byte production budget")
+        if size(part)>BANK_BUDGET:raise ValueError("module shard exceeds65000-byte production budget")
         bank=bytearray(b'FMB3')+struct.pack('>3HI',first,len(part),len(mods),token)+bytes(2*len(part))
         for i,m in enumerate(part):
             struct.pack_into('>H',bank,14+2*i,len(bank));bank+=m
-        if len(bank)>64000:
-            raise ValueError('module shard exceeds64000-byte production budget')
+        if len(bank)>BANK_BUDGET:
+            raise ValueError('module shard exceeds65000-byte production budget')
         banks.append(bytes(bank))
     return split,banks
 
@@ -129,7 +132,7 @@ def triple_banks(mods):
     token=zlib.crc32(b''.join(mods));banks=[]
     for first,end in ((0,x),(x,y),(y,n)):
         part=mods[first:end]
-        if size(part)>64000:raise ValueError("module shard exceeds64000 bytes")
+        if size(part)>BANK_BUDGET:raise ValueError("module shard exceeds65000 bytes")
         bank=bytearray(b'FMB3')+struct.pack('>3HI',first,len(part),n,token)+bytes(2*len(part))
         for i,m in enumerate(part):struct.pack_into('>H',bank,14+2*i,len(bank));bank+=m
         banks.append(bytes(bank))

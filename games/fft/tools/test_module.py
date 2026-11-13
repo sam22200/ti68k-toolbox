@@ -35,7 +35,14 @@ class SplitBanks(unittest.TestCase):
             got.extend(bank[a:b]for a,b in zip(offsets,offsets[1:]))
         self.assertEqual(got,mods)
         self.assertEqual(module.triple_banks(mods),(splits,banks))
-        with self.assertRaises(ValueError):module.triple_banks([image(64000)]*3)
+        with self.assertRaises(ValueError):module.triple_banks([image(module.BANK_BUDGET-22)]*3)
+
+    def test_raw_dat_guard_includes_directory(self):
+        _,banks=module.triple_banks([image(module.BANK_BUDGET-24)]*3)
+        self.assertEqual([len(b)for b in banks],[module.BANK_BUDGET]*3)
+        self.assertLessEqual(module.BANK_BUDGET+6+2,65535)
+        with self.assertRaises(ValueError):
+            module.triple_banks([image(module.BANK_BUDGET-22)]*3)
 
     def test_token_changes_when_code_changes(self):
         _,a=module.pair_banks([image(8),image(10)])
@@ -72,7 +79,7 @@ worker:
         self.assertEqual(module.arithmetic_mask(asm+'\nnext:\n bsr __divsi3\n'),5)
 
     def test_invalid_capacity(self):
-        for mods in ([],[image(8)],[image(8)]*256,[image(63980)]*2):
+        for mods in ([],[image(8)],[image(8)]*256,[image(module.BANK_BUDGET-20)]*2):
             with self.assertRaises(ValueError):module.pair_banks(mods)
 
 if __name__=='__main__':unittest.main()
