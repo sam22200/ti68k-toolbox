@@ -190,7 +190,13 @@ static void save_campaign(void)
     if (CD(LOCATION)) save.loc = (u8)CD(LOCATION);      // the battle's place on the world map
     if (CD(PARTY) & 1 || st.party_in) save_party();
     if(flow_bank&&st.reward_ready&&!already&&(CD(PARTY)&1||st.party_in))save_rewards();
-    rt_save(SAVE_NAME, &save, sizeof save);
+    if(rt_save(SAVE_NAME, &save, sizeof save)){
+        u8 k;
+        // Commit the live receipt too: a repeated exit must neither add finds/
+        // steals twice nor overwrite newly awarded bag items with pre-result counts.
+        for(k=0;k<BAG_MAX;k++)st.bag[k]=save.inv[0xF0+k];
+        st.nfound=st.nstolen=0;
+    }
 }
 
 #endif
