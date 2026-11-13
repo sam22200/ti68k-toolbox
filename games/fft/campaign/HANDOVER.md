@@ -2,7 +2,29 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
-### Resume here (archive reach colours, 2026-11-12)
+### Resume here (archive planning; RAM refactoring deferred, 2026-11-12)
+
+**User steering:** look for an easy roughly2KiB RAM saving; if complicated,
+proceed to the next step. A bounded source audit found no selected low-risk
+saving without touching active buffers, measured caches or the reserved3072-byte
+companion envelope. Further RAM refactoring is deferred. The16KiB goal is **not
+passed**: installed diagnostic14058/max13042, production estimate15171.
+
+**Latest delivery:** [Chapter I archive plan](CHAPTER1_ARCHIVE_PLAN.md).
+A host-only command binds actual package groups/manifests to the current R4
+core and combines dated13-map estimates with all raw-colour bytes (no deduction
+of the replaced compressed colours). Projected chapter1869336 versus allowance
+2163895 leaves294559 planning bytes. All13 cached cropped-depth sets fit;
+Zeklaus still needs its width crop. This is an estimate, not assembled content
+or actual Flash certification. No new TI checks, engine/layout/ABI changes,
+asset extraction or census. `x/chapter1-archive-plan/verification.json`.
+
+**Next:** automate the installed chapter route with PC-first preparation and
+one targeted emulator milestone for AMS/link behavior, then interface review.
+Full content assembly, Flash and RAM peak/contiguous/reentry certification remain
+open. Do not resume extensive RAM work or the native sweep merely to reach16KiB.
+
+### Previous delivery (archive reach colours, 2026-11-12)
 
 **Latest delivery.** [Archive reach colours](CORE_REACH_ARCHIVE.md) removes the
 row-backup pool, unused native half buffer and wide sort scratch. Work29282
@@ -21,7 +43,7 @@ peak/contiguous/reentry certification remains open. Exit free delta-140 is logge
 Evidence: `x/archive-reach-colours/verification.json`. No103-target sweep repeated;
 historical artifacts, unrelated files and the user's emulator were preserved.
 
-**Next:** recover the remaining measured RAM deficit, verify production installed
+**Original next step (superseded by the user steering above):** recover the remaining measured RAM deficit, verify production installed
 peak/contiguous RAM, then finish chapter archive assembly, one-command native
 chapter route and interface freeze. Do not repeat the old sweep per lot or reopen
 generic combat families. The previous ring-backup proposal is now delivered.

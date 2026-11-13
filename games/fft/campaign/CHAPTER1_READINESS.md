@@ -15,18 +15,26 @@ Installed-flow peak/contiguous certification remains open. Current pilot groups
 are696764 transport bytes; a conservative full-chapter archive estimate remains
 below its planning allowance, but full content has not been assembled.
 
+User steering (2026-11-12): defer difficult RAM recovery and continue. A bounded
+source audit selected no simple extra2KiB saving; keep the current buffer/cache
+and companion capacities. [Archive projection](CHAPTER1_ARCHIVE_PLAN.md) now has
+a host-only reproducible check:1869336 projected chapter bytes versus2163895
+allowance,294559 planning margin. Full assembly remains open. Next is preparing
+the installed chapter route, not another RAM refactor or TI sweep.
+
 Chapter I has about 20 battle maps and 20 scenes; the pilot ships 2 of each. Tackle these in
 order before producing Chapter I content. State of the 2026-11-08 session: saves as in FFT,
 scene skip, hidden DEBUG page, APPS selection, live AI-pause animation, `fftmem.py`/`tilog`
 instrumentation and the `fftcore` TiEmu state ([CORE_PACKAGES.md](CORE_PACKAGES.md), "Saves,
 debug aids and logs" and "Native test loop").
 
-## 1. Battle RAM margin (first, mandatory)
+## 1. Battle RAM margin (target; further refactoring deferred)
 
 **Current status:** the100-row hidden target and archive-based reach restoration
 are delivered; see [current measurements and limits](CORE_REACH_ARCHIVE.md).
-Continue the remaining RAM recovery and production installed-flow measurement
-before claiming16KiB. The old ring-backup estimate below is historical.
+Per the user decision above, proceed without further difficult RAM refactoring.
+Production installed-flow measurement is still required before claiming16KiB.
+The old ring-backup estimate below is historical.
 
 **Historical status 2026-11-10 (before companion/program growth): ~11.4 KB free.** Measured natively (Titanium AMS 3.10, Orbonne, `ti-mem heap`): 187,554
 bytes free when the supervisor calls `fftbat`, the battle reserves 176,158:
@@ -106,8 +114,13 @@ sizing `vbuf` per chapter (RAM would vary per map; the envelope keeps one number
 
 ## 2. Archive budget for 20 maps
 
-**Status 2026-11-10: Chapter I fits in one pack (~1.0 MB of ~2.17 MB); the core now reads up
-to six actor banks (~390 KB).**
+**Current planning status:** [R4 projection](CHAPTER1_ARCHIVE_PLAN.md) is1869336
+bytes against2163895 available, with294559 margin; real full content/Flash
+validation is unfinished. `make chapter1-archive-budget PACKAGE_OUTPUT=...`
+checks current package provenance without compiling or running TI.
+
+**Historical estimate 2026-11-10:** the following R2 numbers predate raw R4
+colours. The core reads up to six actor banks (~390KB).
 
 Budget: 2,700,000 planning bytes − 131,072 reserve − core 396,473 = **2,172,455 bytes** for
 the installed chapter (one chapter at a time, INSTALL.md). Pilot pack: 211,686 bytes.

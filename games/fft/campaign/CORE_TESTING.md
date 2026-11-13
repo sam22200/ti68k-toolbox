@@ -7,6 +7,11 @@ CPU budgets or hardware dependencies. Reuse unchanged native evidence; a new
 lot does not require the 103-target native sweep. That completed sweep is the
 2026-11-12 baseline in `x/core-sweep-20261112/`, not a per-edit checklist.
 
+`make chapter1-archive-budget PACKAGE_OUTPUT=...` is host-only planning: real
+group hashes/current core key plus dated estimates. It never builds or runs TI.
+Allowances/depth overflow and duplicate maps are checked; full chapter/Flash
+certification remains separate. See [Archive plan](CHAPTER1_ARCHIVE_PLAN.md).
+
 `make archive-reach-check` defaults to PC/full-row reference/ASan/UBSan,
 comparing per-phase full-scene and LCD hashes; `check_archive_reach.py --native`
 adds one selected68000 carrier. It also checks R4 header bounds and byte sorting

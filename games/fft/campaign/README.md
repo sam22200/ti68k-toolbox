@@ -1,5 +1,10 @@
 # Opening -> Academy -> Gariland
 
+Current planning checkpoint (2026-11-12): [Chapter I archive budget](CHAPTER1_ARCHIVE_PLAN.md).
+Host-only projection1869336 bytes against2163895 allowance,294559 planning
+margin. Full content is not assembled. Per the user, difficult RAM recovery is
+deferred;16KiB remains unverified. Next is the installed chapter route, PC-first.
+
 Current archive reach follow-up (2026-11-12): [R4 colours and RAM](CORE_REACH_ARCHIVE.md).
 Work29282/ABI87, true production input57275/headroom7661; net8638 bytes saved
 since the grayscale lot. PC/sanitizers and selected native checks pass. The user
