@@ -30,7 +30,7 @@ def sha(data):
 
 
 def build_fixture(out, party_level, enemy_level):
-    """Private FCD4/FGS2 carrier; never replace the installed pilot banks."""
+    """Private FCD5/FGS2 carrier; never replace the installed pilot banks."""
     disc = battle.Disc(str(core_audit.DEFAULT_DISC))
     disk, files = extract.disc_files(str(core_audit.DEFAULT_DISC))
     terrain, meta, provenance = surface_data.terrain(disk, files, 74)
@@ -67,6 +67,7 @@ def build_fixture(out, party_level, enemy_level):
     put('TILES', append(interface, tiles))
     put('MAP_W', width)
     put('MAP_H', height)
+    put('SOURCE_MAP',74)
     put('SC_TOP', 0)
     put('START', 0)
     put('MAP_SCRIPT', 0)

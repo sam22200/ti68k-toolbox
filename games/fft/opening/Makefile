@@ -26,6 +26,7 @@ $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen
 $(MODULES): ../unit_card.h ../choice_menu.h ../campaign/save.h ../campaign/save_slots.h
 $(MODULES): ../scene_skip.h ../archive_art.h ../view_format.h ../core_limits.h ../chapter.h
 $(MODULES): ../tactical_grid.h
+$(MODULES) $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../raw_stats.h ../trap_rules.h ../traps.inc
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../tactical_grid.h ../tactical_search.inc
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../scene_skip.h ../archive_art.h ../view_format.h ../core_limits.h ../chapter.h ../chapters.h ../module.h
 $(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z fftopen_regression_test fftopen_visual_test: ../campaign/save.h ../campaign/save_slots.h

@@ -23,10 +23,11 @@ def run(argv, cwd, log):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=HERE/'x/campaign-prerequisites/tests')
-    parser.add_argument('--only', choices=['map', 'save', 'scene'])
+    parser.add_argument('--only', choices=['map', 'save', 'scene', 'raw-management'])
     args = parser.parse_args()
     out = args.out.resolve();out.mkdir(parents=True, exist_ok=True)
     cases = [('map', 'check_scene_controls.c'), ('save', 'test_save.c'), ('scene', 'test_scene.c')]
+    if args.only=='raw-management':cases=[('raw-management','test_raw_management.c')]
     results = []
     for name, source in cases:
         if args.only and name != args.only:

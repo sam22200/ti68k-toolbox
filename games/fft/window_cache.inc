@@ -1,4 +1,4 @@
-// Unchanged cached menu compositor; RESULTS owns the native entry.
+// Cached menu compositor; RESULTS owns the native entry.
 // Cached one part per frame: raised title / framed box, then each line. Hand sits outside.
 static u8 win_lines(u8 m)
 {
@@ -32,6 +32,9 @@ next_part:
         u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_AUTO || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
         const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
             : m == M_AUTO ? "Auto-battle" : m == M_SKILLS ? SKILL_NAME(u->set) : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
+#ifdef FFT_CHAPTER
+        if(m==M_PICK&&W->trap_message)title="Trap";
+#endif
         W->win_w = w; W->win_h = h; W->win_m = (u8)(win_lines(m) + 1);
         // Keep the existing strided cache and incremental one-row-per-part schedule.
         for(r=0;r<WIN_ROWS;r++)for(i=0;i<w;i++) {

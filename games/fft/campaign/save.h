@@ -20,6 +20,8 @@ static u8 save_load_from(const char *name,Save *s)
     memset(s,0,sizeof *s);
     if(rt_load(name,s,sizeof *s)&&!memcmp(s->magic,SAVE_MAGIC,4))return s->n<=PARTY_MAX;
     memset(s,0,sizeof *s);
+    if(rt_load(name,s,SAVE_V4_BYTES)&&!memcmp(s->magic,"FSV4",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
+    memset(s,0,sizeof *s);
     if(rt_load(name,s,SAVE_V3_BYTES)&&!memcmp(s->magic,"FSV3",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
     memset(s,0,sizeof *s);
     if(rt_load(name,s,SAVE_V2_BYTES)&&!memcmp(s->magic,"FSV2",4)&&s->n<=PARTY_MAX) {

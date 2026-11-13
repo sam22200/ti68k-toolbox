@@ -56,7 +56,10 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
         n = put_s(s, 0, st.abil == NO_ABIL ? "Attack" : st.abil == ABIL_DEFEND ? window_defend : ABIL_NAME(st.abil));
     } else if (m == M_PICK) {                      // a crystal or a chest picked up
         #ifdef FFT_CHAPTER
-        if(st.pick==254&&(u16)(st.abil-493)<4U){n=put_s(s,0,st.abil==493?"HP+":st.abil==494?"MP+":st.abil==495?"EXP+":"JP+");n=put_n(s,n,st.dmg);}
+        if(W->trap_message){
+            const char *label=W->trap_message==1?"Degenerator":W->trap_message==2?"Deathtrap":W->trap_message==3?"Sleeping gas":"Steel needle";
+            n=put_s(s,0,label);
+        }else if(st.pick==254&&(u16)(st.abil-493)<4U){n=put_s(s,0,st.abil==493?"HP+":st.abil==494?"MP+":st.abil==495?"EXP+":"JP+");n=put_n(s,n,st.dmg);}
         else
 #endif
         if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");

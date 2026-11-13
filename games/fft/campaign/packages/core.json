@@ -1,6 +1,7 @@
 {
   "schema": "FFT_CORE_SPEC_1",
   "view_format": "R4",
+  "encounter_format": "FCD5",
   "envelope": {"units": 13, "tiles": 256, "axis": 18, "layers": 2, "scene_rows": 202},
   "variables": [
     "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",

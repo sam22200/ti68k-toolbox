@@ -1,5 +1,9 @@
 # Shared campaign resources and shipping deduplication
 
+FCD5 update (2026-11-13): [traps/source-map identity](TRAPS.md). The descriptor
+adds one word; shipping normalization retains the existing exact sharing pass
+and all live encounter payloads. FCD4/ABI80 measurements below are historical.
+
 2026-11-07. This extends [core/chapter packaging](CORE_PACKAGES.md). Combat
 coverage and FSV4 are unchanged. Apply these rules to every arena, dialogue,
 introduction, interlude and menu, including different encounters in one chapter.

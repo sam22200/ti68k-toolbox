@@ -37,6 +37,7 @@ def main():
                      '--keys',keys,'--png',out/(label+'-native.png')]
             for p in files.values():command+=['--file',p]
             native=run([*command,out/'renderc.89z'])
+            (out/(label+'.log')).write_text(native) # retain failure evidence before any gate
             match=re.search(r'capacity checksum (\w+) identity (\w+)',pc);assert match,pc
             assert re.search(r'checksum (\w+)',native)[1].lower()==match[1].lower()
             values=[int(v,16)for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',native)]
@@ -45,9 +46,8 @@ def main():
             frame_costs=values[:-2]
             ordinary=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if not mode>>31]
             cold=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if mode>>31]
-            assert max(ordinary)<360000,(label,max(ordinary))
+            assert max(ordinary)<360000,(label,max(ordinary),frame_costs[1::2].index(max(ordinary)))
             if scenario:assert(values[-1]>>16)&255==12
-            (out/(label+'.log')).write_text(native)
             results.append(dict(case=label,checksum=match[1],identity=match[2],actors=13,
                                 ordinary_average_cycles=sum(ordinary)//len(ordinary),
                                 ordinary_peak_cycles=max(ordinary),cold_or_turn_peak_cycles=max(cold,default=0)))

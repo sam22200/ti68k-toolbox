@@ -21,6 +21,15 @@ campaign-prerequisites-native-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y
 .PHONY: campaign-prerequisites-check
 campaign-prerequisites-check:
 	$(PY) check_campaign_prerequisites.py
+.PHONY: campaign-traps-check
+campaign-traps-check:
+	$(PY) ../tools/trap_oracle.py
+	$(PY) check_traps.py
+	$(PY) check_campaign_prerequisites.py --only raw-management --out x/tile-traps/raw-management
+.PHONY: campaign-traps-native-check
+TRAP_DATA_DIR ?= x/tile-traps/shipping-data
+campaign-traps-native-check:
+	$(PY) check_traps_native.py --data-dir $(TRAP_DATA_DIR)
 .PHONY: chapter1-archive-budget
 chapter1-archive-budget:
 	$(PY) ../tools/chapter1_budget.py --packages $(PACKAGE_OUTPUT)/packages.json
@@ -203,6 +212,7 @@ fftgar_pc fftintro_pc fftbatflow_pc: ../action_effect.h ../action_resolve.inc
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_rules.h ../common.h
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_policy.h ../status_unit.h ../status_policy.inc ../status_lifetime.h ../status_control.h ../status_runtime.inc ../turn_order.inc ../setup_glyphs.inc
 fftdep_pc fftmap_pc ffttitle_pc fftscn_pc fftmng_pc: ../common.h
+fftdep_pc fftmng_pc fftgar_pc fftintro_pc fftbatflow_pc: ../raw_stats.h ../trap_rules.h
 fftgar_pc fftintro_pc fftbatflow_pc fftscn_pc: ../core_limits.h ../view_format.h ../archive_art.h ../scene_skip.h
 fftgar_pc fftintro_pc fftbatflow_pc: ../chapter.h ../chapters.h ../module.h
 fftintro_pc: ../opening/opening.c ../fft.c ../fft.h ../opening/opening.inc pc_entry.c

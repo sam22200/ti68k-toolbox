@@ -18,6 +18,7 @@
 #include "weapon_panel.h"
 #include "movement_rules.h"
 #include "ct_recip.h"
+#include "raw_stats.h"
 #include <stdlib.h>
 #include <string.h>
 #ifdef FFT_REACH_CONTOUR
@@ -507,6 +508,7 @@ typedef struct {
     MoveConfig move_config;            // survives an overlay replacement between graph slices
     // Cold persistence belongs last: preserve measured renderer/cache field offsets.
     u8 permanent_base[UNIT_CAPACITY][2]; // initial Brave/Faith, retained through battle effects
+    u8 move_post,move_owner,trap_message; // committed movement's resumable cold settlement
 #else
     u8 ab_j,ab_self,ab_walk;
 #endif
@@ -575,7 +577,11 @@ static ModCtx *mod_context(u8 id);
 #if defined(FFT_CHAPTER) && MOD_CORE
 #ifdef FFT_MODULES
 static void equipment_control(u8 op){mod_call(MOD_EQUIPMENT,op,st.act);}
-static void movement_settle(u8 who){mod_call(MOD_EQUIPMENT,4,who);}
+static void movement_settle(u8 who)
+{
+    mod_call(MOD_EQUIPMENT,4,who);
+    if(W->move_post==3){W->move_post=0;mod_call(MOD_NATURE,4,who);}
+}
 #else
 static void equipment_control(u8 op);
 static void movement_settle(u8 who);
@@ -2874,7 +2880,7 @@ void rewards(u8 a,u8 t,u8 kill)
 #include "equipment_runtime.inc"
 #include "combat_response.inc"
 #include "nature_runtime.inc"
-static void movement_settle(u8 who){movement_benefit(who);}
+static void movement_settle(u8 who){movement_post(who);}
 #endif
 #endif
 
@@ -5214,7 +5220,7 @@ void game_scenario(u16 n)
 {
     u8 bag_i;
 #ifdef FFT_CHAPTER
-    if(W)memset(&W->mime,0,sizeof W->mime);
+    if(W){memset(&W->mime,0,sizeof W->mime);W->move_post=W->move_owner=W->trap_message=0;}
     u8 manual;
     u8 c = (u8)(n < 100 ? FFT_DEFAULT_CHAPTER : n / 100 - 1);   // the chapter, then its door
     n %= 100;
@@ -5828,17 +5834,32 @@ static u8 update(u8 fast)
                 u8 i;                              // or a crystal or a chest there picked up
                 st.mode = M_MENU; st.moved = 1; st.menu = st.acted ? MN_WAIT : MN_ACT;
 #ifdef FFT_CHAPTER
-                movement_settle(st.sel);
+                W->move_post=1;W->move_owner=st.sel;W->trap_message=0;
 #endif
                 for (i = 0; i < NUNIT; i++)
                     if (UNIT_CELL(&st.unit[i])==CURSOR_CELL && DC_OBJ(st.unit[i].dc)&&st.unit[i].dc!=DC_GONE) pick_up(st.sel, i);
+#ifdef FFT_CHAPTER
+                if(st.mode!=M_PICK)movement_settle(st.sel);
+#endif
                 if (st.ai && st.mode == M_MENU) ai_next();
             }
         }
     } else if (st.mode == M_ACT) {
         attack_step();
     } else if (st.mode == M_PICK) {                // the message, then the menu (no undo)
-        if (++st.pick_t >= PICK_FRAMES) { st.mode = M_MENU; if (st.ai) ai_next(); }
+        if (++st.pick_t >= PICK_FRAMES) {
+            st.mode=M_MENU;
+#ifdef FFT_CHAPTER
+            if(W->move_post)movement_settle(W->move_owner);
+            if(st.mode==M_MENU){
+                W->trap_message=0;
+                if(!st.unit[st.act].hp||(st.unit[st.act].status_flags&STATUS_CT_FROZEN)){
+                    turn_end(st.moved,st.acted);return 1;
+                }
+            }
+#endif
+            if(st.ai&&st.mode==M_MENU)ai_next();
+        }
     } else if (st.mode == M_END) {                 // the results: the battle again, or quit
 #ifdef FFT_CHAPTER                                 // (a chapter: back to the campaign)
         if(flow_bank&&st.end==END_VICTORY&&st.reward_ready) {
@@ -6279,7 +6300,12 @@ static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context)
     d.name=unit_name(i);
     d.hp=u->hp;d.max_hp=u->max_hp;d.mp=u->mp;d.max_mp=u->max_mp;
     d.level=u->level;d.exp=u->exp;d.brave=u->brave;d.faith=u->faith;
-    unit_card_draw(&d,layout,0,part,context,opacity);
+    if(part==UC_STATUS_HEADER){
+        unit_card_draw(&d,layout,0,UC_PORTRAIT,context,opacity);
+        unit_card_draw(&d,layout,0,UC_NAME,context,opacity);
+        unit_card_draw(&d,layout,0,UC_JOB,context,opacity);
+        unit_card_draw(&d,layout,0,UC_LEVEL,context,opacity);
+    }else unit_card_draw(&d,layout,0,part,context,opacity);
     if(part==UC_PORTRAIT&&opacity) {
         const u8 *p=d.portrait+232;u8 r;
         for(r=0;r<29;r++) {
@@ -6725,10 +6751,7 @@ static void draw_status(void)
         if (!k) {
             memset(W->status, 0, sizeof W->status);
             draw_rect(0, 0, RT_W, 32, C_LGRAY); draw_rect(0, 32, RT_W, 1, C_DGRAY);
-            unit_card_battle(st.sel,UC_STATUS,UC_PORTRAIT,2);
-            unit_card_battle(st.sel,UC_STATUS,UC_NAME,2);
-            unit_card_battle(st.sel,UC_STATUS,UC_JOB,2);
-            unit_card_battle(st.sel,UC_STATUS,UC_LEVEL,2);
+            unit_card_battle(st.sel,UC_STATUS,UC_STATUS_HEADER,2);
             ui_text(24, 25, st.page ? "EQUIP / SKILLS" : "STATUS", C_DGRAY, 92);
             ui_text(4, 95, st.status_info ? "[ESC] back" : st.page ? "[2nd] details" : "< > page", C_DGRAY, 81);
             if (!st.status_info) ui_text(94, 95, "[ESC] return", C_DGRAY, 159);
@@ -7221,7 +7244,7 @@ static void equipment_control(u8 op){equipment_local_control(op);}
 u16 mod_entry(u8 op,u8 a)
 {
     if(!op){equipment_rebuild_pending();return 0;}
-    if(op==4)return movement_benefit(a);
+    if(op==4)return movement_post(a);
     if(op==5)return equipment_commit(a,W->ai_tt);
     if(op==6){combat_response_launch();return 0;}
     if(op==7){reaction_self_launch(6);return 0;}
@@ -7245,6 +7268,7 @@ u16 mod_entry(u8 op,u8 a)
 #include "nature_runtime.inc"
 #include "discovery_move.inc"
 #include "reaction_live.h"
+#include "traps.inc"
 #include "mime_runtime.inc"
 u16 mod_entry(u8 op,u8 a)
 {
@@ -7253,6 +7277,7 @@ u16 mod_entry(u8 op,u8 a)
  if(op==0){nature_hit_commit();W->nature_pending&=(u16)~3;return 0;}
  if(op==1){monster_refresh();return 0;}
  if(op==3)return discovery_find(a,(u8)st.formula.roll);
+ if(op==4)return trap_apply(a,(u8)CD(SOURCE_MAP));
  if(op==6)return (u16)math_targets(st.formula.actor,(u8)st.formula.roll);
  if(op==5){AreaAi *q=&W->area_ai;memset(q,0,sizeof *q);q->next=1;
   for(i=0;i<16;i++)q->math_mask[i]=math_filters(st.act,i)?(u16)math_targets(st.act,i):0;

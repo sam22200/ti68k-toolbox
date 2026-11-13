@@ -1,5 +1,10 @@
 # Shared core and replaceable chapter packages
 
+Latest (2026-11-13): [traps and current-raw saves](TRAPS.md), matching ABI89
+core/chapters, FCD5 source-map identity and FSV5/Save3204. Old core reuse is
+rejected through the declared encounter format and package key. Pilot transport
+bytes410040+291735; this is not full Chapter I or Flash/RAM peak certification.
+
 2026-11-07. This is the active distribution checkpoint after
 [combat closure](CORE_FINAL_COMBAT.md) and [factorization](CORE_FACTORIZATION.md).
 The combat inventory stays complete: 201 actions and 78 R/S/M consumers.
@@ -110,7 +115,7 @@ failed ("Missing data or memory") after title → scene. A normal start (`fftsto
 to the title when a step returns 0 (Game Over, quit battle), as in FFT; Continue resumes before
 that step. Direct doors (`fftstory(2)`, `fftstory(99)`) still stop at HOME.
 
-FSV4, all three slots, original source IDs, party/inventory/progression and
+FSV5 (FSV2/3/4 migration), all three slots, original source IDs, party/inventory/progression and
 legacy migration stay unchanged. Step predicates read persisted story flags;
 the existing Academy/deployment `flow` byte retains its pilot-specific meaning.
 This does not introduce a new campaign scripting VM or generic mid-scene save.

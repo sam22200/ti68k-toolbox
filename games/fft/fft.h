@@ -123,7 +123,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_FORMULA 5                          // formula evaluation, also compiled into the AI
 #define MOD_AI_SETUP 6                        // candidate preparation/facing, separate from evaluation
 #define MOD_RESULTS 7                         // result pages, separate to bound the resident overlay zone
-#define MOD_PARTY 8                           // encounter/party initialization, no save writes
+#define MOD_PARTY 16                          // encounter/party initialization, no save writes
 #define MOD_ACTION 9                           // primary commit and bounded secondary execution
 #define MOD_COMMAND 10                         // command preparation returns before AI continuation
 #define MOD_RESPONSE 11                        // cold response packet/stock preparation
@@ -131,7 +131,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_AREA_AI 13                        // cached area candidates, separate from scalar AI
 #define MOD_AREA_UI 14                        // approved manual area inspection/confirmation
 #define MOD_NUMBERS 15                       // shared scalar/area numbers and cold glyph preparation
-#define MOD_ORDER 16                         // cold AT forecast, including finite tempo segments
+#define MOD_ORDER 8                          // cold AT forecast; ABI89 balances the archive ranges
 #define MOD_PERFORMANCE 17                  // recurring performance commands and mixed effects
 #define MOD_MOVEMENT 18                     // cold movement geometry and special destination maps
 #define MOD_EQUIPMENT 19                    // cold inventory, derived-stat rebuild and move rewards

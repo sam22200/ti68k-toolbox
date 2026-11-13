@@ -2,6 +2,30 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Latest delivery: four traps (2026-11-13)
+
+The user approved the trap box. [Four traps and persistent level-down](TRAPS.md)
+deliver all four effects, accepted-move/pickup/discovery ordering, KO/Sleep and
+source reaction/RNG boundaries. FCD5 identifies the source map per encounter;
+FSV5 preserves current raw stats across Degenerator, job changes, levels and saves.
+ABI89/ModCtx352/signatureF3CB, Work29310/Save3204; PARTY16/ORDER8 balance the
+three existing shards62758/64232/60004. Zone8698, seven blocks98444, actual
+input57621/headroom7315. Matching core410040 + pilot chapter291735 bytes.
+
+PC/sanitizers pass632 mechanic checks and the unchanged complete Sweegy trace/
+save semantics. Selected real68000 checks pass83 overlay/save assertions with
+four equal trap screens,356 bindings, actual88 rejection and the final13-actor
+frame cases (peaks337162/357620, ECF7/AA26). Header snapshot reuse fixed the
+initial416-cycle equipment-entry overrun. Numeric/layout evidence is reused
+where unchanged. No whole sweep, content census, art regeneration or TiEmu.
+Private evidence/groups: `x/tile-traps/verification.json` / `release/`.
+
+**Next:** source-specific monster KO poses, then targeted/protected objectives,
+authored guest/chain-with-Save integration and story choices. Keep the complete
+queue in CAMPAIGN_PREREQUISITES.md; do not jump to installed-route automation.
+Brave/Faith warnings/departures and the16KiB RAM/installed-peak gate remain open;
+difficult RAM recovery remains deferred. Old88 groups are historical, never mix.
+
 ### Resume here (scene/save delivery, 2026-11-13)
 
 The user put [this prerequisite list](CAMPAIGN_PREREQUISITES.md) ahead of the
@@ -19,8 +43,7 @@ private evidence: CAMPAIGN_PREREQUISITES.md / `x/campaign-prerequisites/`.
 The user's last story-choice sentence was truncated; an async clarification is
 pending. Do not lose the rest of this request or jump straight to automation.
 
-**Next:** implement all four trap types with committed-move/discovery ordering
-and persistent level-down, then source-specific monster KO poses, encounter
+**Original next (traps delivered above):** source-specific monster KO poses, encounter
 objectives/guests, consecutive battle/save integration and story choices. The
 16KiB goal remains unpassed and difficult RAM recovery remains deferred.
 

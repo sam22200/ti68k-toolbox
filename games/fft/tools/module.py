@@ -8,8 +8,8 @@ an FMB3 pair: magic, first ID/count/total (u16), shared export token (u32), loca
 u16 offsets; each FMD2 stores entry/logical size/context offset then the image,
 with only the signature retained from the zero-filled context (restored on load).
 The token identifies a matching export, not a runtime integrity checksum.
-A contiguous balanced partition is deterministic; stable module IDs do not move.
-Both shards are read in place; the core retains one execution zone (MOD_ZONE).
+A contiguous balanced partition is deterministic; IDs are fixed within an ABI.
+Shards are read in place; the core retains one execution zone (MOD_ZONE).
 
 GCC4TI -mpcrel emits separate sections. The established one_section adapter below
 collects them into one .text; relocations/undefined symbols are rejected. No new
@@ -132,7 +132,10 @@ def triple_banks(mods):
     token=zlib.crc32(b''.join(mods));banks=[]
     for first,end in ((0,x),(x,y),(y,n)):
         part=mods[first:end]
-        if size(part)>BANK_BUDGET:raise ValueError("module shard exceeds65000 bytes")
+        if size(part)>BANK_BUDGET:
+            raise ValueError("module shard exceeds65000 bytes; banks %s; logical images %s" %
+                             ([size(mods[:x]),size(mods[x:y]),size(mods[y:])],
+                              [struct.unpack_from('>H',m,6)[0] for m in mods]))
         bank=bytearray(b'FMB3')+struct.pack('>3HI',first,len(part),n,token)+bytes(2*len(part))
         for i,m in enumerate(part):struct.pack_into('>H',bank,14+2*i,len(bank));bank+=m
         banks.append(bytes(bank))

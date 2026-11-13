@@ -37,10 +37,11 @@ def synthetic(core, chapter):
             import extract
             raw=extract.view_bank(b'R4',(name.encode()*16)[:80],b'',bytes(4))
         if name in ('ffgd', 'ffod'):
-            words = [0]*52
+            words = [0]*53
             words[9], words[10], words[13], words[50] = 10, 10, 100, 11
             if name=='ffod':words[42]=1
-            raw = b'FCD4'+struct.pack('>50H', *words[2:])
+            words[52]=56 if name=='ffod' else 22
+            raw = b'FCD5'+struct.pack('>51H', *words[2:])
         code = name.startswith('fft') and not name.endswith('core') and name != 'fftitle'
         source[name] = packages.Variable(name, 0x21 if code else 0x1c,
                                         0 if name == 'fftstory' else 3,

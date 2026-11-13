@@ -1,17 +1,16 @@
 #ifdef FFT_CHAPTER
 #include "movement_rules.h"
 #endif
+#include "raw_stats.h"
 // Same stat implementation in portable code and its native callers' images.
 void unit_stats(Unit *u)
 {
     const Job *j = &jobs[u->job];
     u16 s[5];
-    u8 i, k;
+    u8 i;
     for (i = 0; i < 5; i++) {
-        u32 v = u->raw[i];
-        u8 g = j->growth[i] ? j->growth[i] : 1;
-        for (k = 2; k <= u->level; k++) v += v / (u16)(g + k - 1);
-        if (v > 0xFFFFFFUL) v = 0xFFFFFFUL;
+        u32 v=u->raw[i]&RAW_MAX;
+        if(!(u->raw[0]&RAW_CURRENT))v=core_raw_grown(v,j->growth[i],u->level);
         v = v * j->mult[i] / 100 >> 14;
         s[i] = v ? (u16)v : 1;
     }

@@ -1,11 +1,15 @@
 # Split executable archive banks
 
+Latest (2026-11-13): [traps/FSV5](TRAPS.md), ABI89/ModCtx352/zone8698.
+PARTY16/ORDER8 balance the three contiguous ranges; raw shards62758/64232/60004
+fit65000. All28 bindings and actual88 rejection pass. No new zone/allocation.
+
 Current guard update (2026-11-13): raw module shards may hold65000 bytes,
 matching the existing actor/catalogue bank guard. This is still below the65512
 raw-resource envelope, with the AMS trailer/size word fitting16 bits. Exact
 65000 and over-limit directory-inclusive boundaries are tested. The former
 64000 production guard below is historical; runtime formats/ranges/lookup and
-zone budgets are unchanged. Current three shards64522/61648/57504 fit.
+zone budgets are unchanged. The scene/save shards64522/61648/57504 fit.
 See [scene/save delivery](SCENE_SAVE_FIXES.md); the generic64000 planning alert
 in core_budget remains an earlier capacity warning, not the serialization limit.
 

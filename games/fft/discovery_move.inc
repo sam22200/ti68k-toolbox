@@ -1,12 +1,20 @@
 #include "nature_rules.h"
+#include "trap_rules.h"
+static const u8 *move_find_row(u8 who,u8 map,u8 *entry)
+{
+ const Unit *u=&st.unit[who];const u8 *row;u8 i;
+ if(map>=128||!u->hp||!unit_on_field(u))return RT_NULL;
+ row=NATURE_DATA+96+((u16)map<<4);
+ for(i=0;i<4;i++,row+=4)if((row[0]>>4)==u->x&&(row[0]&15)==u->z&&
+     (row[1]>>7)==node_layer(UNIT_CELL(u))){*entry=i;return row;}
+ return RT_NULL;
+}
 static u8 discovery_find(u8 who,u8 map)
 {
  Unit *u=&st.unit[who];const u8 *row;u8 f[3],i,bit,item;
- if(map>=128||!u->hp||!unit_on_field(u))return 0;
  cj_movement(common,u->job,st.movement[who],f);if(!(f[2]&1))return 0;
- row=NATURE_DATA+96+((u16)map<<4);
- for(i=0;i<4;i++,row+=4){
-  if((row[1]&32)||!(row[2]|row[3])||(row[0]>>4)!=u->x||(row[0]&15)!=u->z||(row[1]>>7)!=node_layer(UNIT_CELL(u)))continue;
+ row=move_find_row(who,map,&i);
+ if(row&&!(row[1]&32)){
   bit=128>>(((map&1)<<2)+i);if(battle_save.discovered[map>>1]&bit)return 0;
   item=row[((u16)(muls16((s16)rand15(),100)>>15)<100-u->brave)?2:3];
   battle_save.discovered[map>>1]|=bit;
@@ -27,5 +35,5 @@ static u8 discovery_find(u8 who,u8 map)
 }
 static u8 discovery_move(u8 who)
 {
- u16 loc=CD(LOCATION);return loc<64?discovery_find(who,NATURE_DATA[96+2048+loc]):0;
+ return discovery_find(who,(u8)CD(SOURCE_MAP));
 }
