@@ -1,5 +1,27 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Latest: wide monster combat body review prepared (2026-11-14)
+
+Read [MONSTER_COMBAT_REVIEW.md](MONSTER_COMBAT_REVIEW.md). Private PC-only
+previews now cover16 selected families/48 real jobs: standing, walk, ordinary
+level attack, hurt, Dead, plus hover/flight for the three flying sheets.44
+retail-MIPS timelines/278 displayed records replay identically;16 compressed
+attack pages match the original decompressor. Attacks must use that separate
+page, selected by the SHP attack-start field, rather than idle-page fragments.
+All16 approved standing planes remain exact. No new palette choice. Current
+study shows1002 body renderings, outlined union35x36 before script offsets;
+the64x64 preview canvas is not a shipping/cache format. Four malformed/complete
+decoder boundaries pass. No TI build/native sweep/TiEmu or production change.
+
+**Pending visual approval:** `x/monster-combat-review/animations-1.gif` and
+`animations-2.gif` are pinned in the gallery; static poses/flight are alongside.
+Do not integrate/optimize/benchmark the new pictures before the verdict. The
+GIFs sample body timelines only: script offsets are recorded, not projected;
+no source battle timing/effect/impact fidelity is claimed. Then build the wide
+battle renderer/cache/cover/water/flash/facing path, preserving48 cache entries
+and13 actors, before enabling deployment and actual full breeding flows.
+Current shipping remains the Formation release below; type3 vetoes remain.
+
 ## Latest: actual monster Formation/Status integrated (2026-11-14)
 
 Read [MONSTER_FORMATION.md](MONSTER_FORMATION.md). Actual management/deployment
