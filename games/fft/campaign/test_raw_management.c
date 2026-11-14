@@ -11,11 +11,14 @@ int main(void)
     u=&save.unit[0];u->type=2;u->job=1;u->level=10;
     for(k=0;k<5;k++){u->raw[k][0]=(u8)(raw>>16);u->raw[k][1]=(u8)(raw>>8);u->raw[k][2]=(u8)raw;}
     seed=stats(u);save_raw_set(&save,0,1);current=stats(u);
+    save.guest_id[3][1]=4;save.guest[3]=*u;save.guest[3].exp=73;
+    save.guest[3].jp[2][1]=99;save_raw_set(&save,19,1);
     assert(seed.hp>current.hp&&current.hp==(raw*job_rec(RAMZA_JOB)[J_MULT]/100>>14));
     change_job(u,3);assert(save_raw_current(&save,0)&&u->job==0x4d);
     assert(stats(u).hp==(raw*job_rec(3)[J_MULT]/100>>14));
     assert(rt_save(SAVE_NAME,&save,sizeof save)&&save_load(&back));
     assert(!memcmp(&save,&back,sizeof save)&&save_raw_current(&back,0));
+    assert(save_guest_id(&back,3)==4&&back.guest[3].exp==73&&back.guest[3].jp[2][1]==99&&save_raw_current(&back,19));
     puts("Current raw stats: management, job changes and save keep the same raw values");
     return 0;
 }
