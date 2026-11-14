@@ -12,6 +12,7 @@ static u8 save_progress_read(const u8 *p,u16 size,FpProgress *state)
     if(old)need=SAVE_V2_BYTES;
     else if(!memcmp(p,"FSV3",4))need=SAVE_V3_BYTES;
     else if(!memcmp(p,"FSV4",4))need=SAVE_V4_BYTES;
+    else if(!memcmp(p,"FSV5",4))need=SAVE_V5_BYTES;
     else if(!memcmp(p,SAVE_MAGIC,4))need=sizeof(Save);
     else return 0;
     if(size<need||p[36]>PARTY_MAX)return 0;

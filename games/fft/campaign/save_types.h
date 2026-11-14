@@ -2,13 +2,15 @@
 #define FFT_SAVE_TYPES_H
 // Serialized save layout only; no file calls before module context bindings.
 #include "../../../runtime/core/rt.h"
-#define SAVE_MAGIC "FSV5"
+#define SAVE_MAGIC "FSV6"
+#define SAVE_V5_BYTES 3204U
 #define SAVE_V4_BYTES 3202U
 #define SAVE_V3_BYTES 3138U
 #define SAVE_DISCOVERY_BYTES 64U
 #define SAVE_FLAGS 4                    // byte offset of the story flags (fftstory reads them)
 #define FLAG_N 256                      // story flags: bit k of flags[k >> 3]
 #define PARTY_MAX 16                    // FFT's roster
+#define GUEST_MAX 4                     // separate source formation slots16..19
 #define SAVE_V2_BYTES 3110U
 #define SAVE_FLOW_OFFSET 3114U
 #define CAREER_N 20                     // FFT's generic jobs, Squire 0x4A .. Mime 0x5D: a unit's
@@ -38,12 +40,19 @@ typedef struct {
     u8 deploy[5][4];                   // roster slot, world x/z, native facing
     u8 discovered[SAVE_DISCOVERY_BYTES]; //128 source maps, four once-only item locations each
     u8 raw_current[2];                  // party-slot bitmap: current raw stats instead of level-one seeds
+    u8 guest_id[GUEST_MAX][2];          // stable authored source identities; zero is an empty slot
+    u8 guest_raw, guest_reserved;       // current-raw bitmap; reserved must be zero
+    SaveUnit guest[GUEST_MAX];
 } Save;
 static u8 save_raw_current(const Save *s,u8 slot)
-{return slot<PARTY_MAX&&(s->raw_current[slot>>3]&((u8)1<<(slot&7)))!=0;}
+{return slot<PARTY_MAX?(s->raw_current[slot>>3]&((u8)1<<(slot&7)))!=0:
+    slot<PARTY_MAX+GUEST_MAX&&(s->guest_raw&((u8)1<<(slot-PARTY_MAX)))!=0;}
 static void save_raw_set(Save *s,u8 slot,u8 current)
 {
-    u8 bit=(u8)1<<(slot&7);if(slot>=PARTY_MAX)return;
-    if(current)s->raw_current[slot>>3]|=bit;else s->raw_current[slot>>3]&=(u8)~bit;
+    u8 bit,*p;
+    if(slot>=PARTY_MAX+GUEST_MAX)return;
+    if(slot<PARTY_MAX){p=&s->raw_current[slot>>3];bit=(u8)1<<(slot&7);}
+    else{p=&s->guest_raw;bit=(u8)1<<(slot-PARTY_MAX);}
+    if(current)*p|=bit;else *p&=(u8)~bit;
 }
 #endif

@@ -8,7 +8,7 @@ int main(void)
     Save old,back;u8 i,cells[8],n=0;u8 reserve[2][sizeof(SaveUnit)];
     if(access("ffflow.bin",R_OK))assert(!chdir("data"));
     remove("ffsave.sav");sw_init(0);
-    assert(sizeof(SaveUnit)==176&&sizeof(Save)==SAVE_V3_BYTES+SAVE_DISCOVERY_BYTES);
+    assert(sizeof(SaveUnit)==176&&sizeof(Save)==SAVE_V5_BYTES+10+GUEST_MAX*sizeof(SaveUnit));
     assert(save.n==7&&qlong(save.money)==2000&&dp.n==1&&deploy_where(0)==8);
     assert(sw_step(K_F1)&&dp.unit==6);assert(sw_step(0));
     assert(sw_step(K_F5)&&dp.unit==0);assert(sw_step(0));
