@@ -26,6 +26,8 @@ retry flows pass. Existing guest chains and scene choices still pass. Native
 checks are selected byte/layout, SAVE/compaction and render/RNG carriers.
 Grown-monster formation sprites and deployment selectors remain next: current
 selectors reject all type3 monsters, so the combat breeding loop is still open.
+The [48-variant formation proposal](MONSTER_FORMATION_REVIEW.md) now has actual
+PC/sanitizer page previews; its visual verdict is pending and shipping is unchanged.
 Bar/Fur Shop follows. ABI92/ModCtx356/Work29340/Save3992/FCD5, zone8702;
 battle input61491/headroom3445 and seven game-block requests99266. Shared Save
 reader uses1612 of the existing3072 companion reserve. Cache/capacities remain.

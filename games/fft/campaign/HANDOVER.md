@@ -1,5 +1,24 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Pending: standing-monster formation review (2026-11-14)
+
+Read [MONSTER_FORMATION_REVIEW.md](MONSTER_FORMATION_REVIEW.md). Branch
+`feat/fft-monster-formation-review` prepares48 source job/palette thumbnails,
+portraits and monster names in actual PC Formation/Status/deployment pages.
+The full silhouettes fit32x26; Behemoth shrinks uniformly, without cutting its
+body to the human16-column format. Proposed monster Status hides human Job Lv
+and Total JP. Decision pictures: `x/monster-formation-review/review.png` and
+`atlas.png`. **User verdict is pending.** No production source/bank, save,
+ABI, selector, cache, shipping package or CPU/RAM claim changes. Eleven private
+page scenarios match PC/sanitizers and preserve Save/session bytes; no TI run.
+
+After approval, continue real formation/Status/deployment binding and the battle
+loader's type3 gate together with compatible wider standing/action/palette/KO
+art. Current shipping rejects all adult monsters as well as eggs; a placement
+picture bypassing that selector is not proof of playability. Keep the approved
+egg release and its capacities/budgets below. Do not optimize or integrate this
+new picture before the verdict, or start Bar/content extraction prematurely.
+
 ## Latest: approved persistent calendar and eggs (2026-11-14)
 
 Read [BREEDING.md](BREEDING.md). The user approved both pictures ("tres bien et
