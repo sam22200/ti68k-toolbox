@@ -15,6 +15,11 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: campaign-breeding-check
+campaign-breeding-check:
+	$(PY) -m unittest discover -s ../tools -p test_breeding_rules.py
+	$(PY) check_breeding.py
+
 .PHONY: story-choices-check
 story-choices-check:
 	$(PY) -m unittest discover -s ../tools -p 'test_story_*.py'
