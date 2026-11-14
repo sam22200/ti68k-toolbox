@@ -1,5 +1,12 @@
 # Opening -> Academy -> Gariland
 
+Latest backend step (2026-11-14): [calendar and monster breeding](BREEDING.md).
+Daily egg/offspring/fixed-generation rules pass269 PC/sanitizer/68000 checks,
+five bank suites and ten original-MIPS daily-policy/hatch cases. Not integrated
+into FSV6/worldmap/management/deployment yet: saved state, actual travel hooks
+and reviewed egg presentation are next. Shipping groups/battle budgets remain
+those of story choices below. Bar/Fur Shop and16KiB certification stay open.
+
 
 Latest delivery (2026-11-13): [persistent story choices/branches](STORY_CHOICES.md).
 Approved compact combat-style menu with protruding glove, mandatory questions,

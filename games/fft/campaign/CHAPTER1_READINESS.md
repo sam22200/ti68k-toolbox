@@ -20,7 +20,11 @@ with the approved compact menu, guest/flag effects, skip barriers and real
 Save/Continue/replay tests. Native pending-save visibility and atomic PC session
 replacement are checked. Current pilot groups711813 transport bytes change only
 the scene program and matching metadata; no fictional recruitment is shipped.
-The reusable calendar/monster breeding machinery is next, followed by Bar/Fur Shop.
+The [calendar/breeding backend](BREEDING.md) now passes269 PC/sanitizer/68000
+boundaries, five bank suites and ten original-MIPS policy/hatch cases. Its
+proposed69-byte state is not appended to Save yet; actual route/calendar/save,
+egg deployment exclusions, roster producers and reviewed egg UI remain next.
+Bar/Fur Shop follows. Backend completion does not close the breeding gate.
 ABI91/Work29340/Save3918/FCD5, zone8842; battle input61381/headroom3555
 and seven game-block requests99332 remain unchanged from the guest delivery.
 Cache/capacities remain. One selected13-actor frame replay stays
@@ -64,8 +68,9 @@ handling. Bars need town/story-filtered rumors and later dispatch/return jobs.
 Poaching currently gives an item directly to the party: source-correct Fur Shop
 stock/access/purchases and save migration remain. These are explicit gates,
 not implicit completion under generic R/S/M coverage. Preserve later chapter
-unlocking while testing reusable machinery with PC injection doors. Named objectives and Save checkpoints are delivered; continue story choice/effect integration
-and the complete prerequisite queue.
+unlocking while testing reusable machinery with PC injection doors. Named
+objectives, Save checkpoints and story choices are delivered; calendar/egg save
+and travel integration is now the active step in the prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)
 

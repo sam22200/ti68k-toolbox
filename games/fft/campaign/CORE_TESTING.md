@@ -1,5 +1,12 @@
 # Validation by affected dependency
 
+Calendar/breeding backend (2026-11-14): `make campaign-breeding-check` runs five
+FWB1 validation suites,269 C boundaries on PC/ASan/UBSan and ten bounded
+original-MIPS daily-policy/hatch cases. `check_breeding.py --native` opts into
+one byte-layout/pointer/arithmetic carrier; no overlay/art/package rebuild or
+TiEmu. [Scope and pending integration](BREEDING.md): FSV6/worldmap/management/
+deployment are unchanged; this is not real Save/Continue/travel certification.
+
 
 Story choices (2026-11-13): `make story-choices-check` covers five host suites,
 81 effect boundaries and251 real scene/input/atomic-file checks on PC/ASan/UBSan,
