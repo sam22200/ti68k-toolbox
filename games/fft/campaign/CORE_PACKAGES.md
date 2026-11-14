@@ -1,5 +1,13 @@
 # Shared core and replaceable chapter packages
 
+FMA1 update (2026-11-14): shared core ffma13082 supplies approved monster
+Formation/Status. `formation_art_format: FMA1` is required and validated by
+packaging. Only ffmgcore/ffpccore and manifests change; all program stubs,
+battle/shards and chapter content except ffpack remain exact. ABI92/FSV7 and
+battle allocations are unchanged. Matching groups441437+291789=733226, key
+37f0ec2538ccb78ed0b0f20ef00cdedd: `x/monster-formation/release/`. Adult battle
+deployment/art remains next; this is not a16KiB installed-RAM pass.
+
 FSV7 update (2026-11-14): [calendar/eggs](BREEDING.md) require matching ABI92/
 ModCtx356/FA04 programs and images. Core spec declares FSV7/FWB1/FEG2 and owns
 universal ffwb285/ffeg640 once. All six packed children and supervisor are

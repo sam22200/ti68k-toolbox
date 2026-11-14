@@ -1,8 +1,10 @@
 # Standing monsters: one appearance per family (2026-11-14)
 
-Branch `feat/fft-monster-formation-review` prepares a PC-only picture proposal
-for the next [breeding gate](BREEDING.md). It is not integrated. The current
-FSV7/ABI92 release under `x/eggs/release/` remains the shipping baseline.
+The selected picture is approved. [Actual Formation/Status](MONSTER_FORMATION.md)
+now matches it through shared FMA1 shipping art; compatible combat poses and
+real monster deployment remain next. The original review branch
+`feat/fft-monster-formation-review` is merged. Historical FMR1 pictures/proofs
+below remain intact; current groups live under `x/monster-formation/release/`.
 
 **User decision:** use only the most readable appearance of each family; the
 three monster types are distinguished by their job names. Palette choice was
@@ -62,10 +64,10 @@ The job/sheet/shape/SEQ inputs and source pages have SHA256 records in the
 private results. Monster names use the same SMALL.OUT text list as the human
 name reader, at the source monster class0x0300/text0x4300, entries768..1022.
 
-`review_monster_formation.py` generates explicit source copies under the private
-output directory. Anchored hooks fail if their production source no longer
-matches. Only those copies gain the proposed names, portraits,32-column actors
-and monster Status fields. The source files and shipping banks are not edited.
+The original `review_monster_formation.py` generated explicit private source
+copies with anchored hooks. That prototype path is retired: the wrapper now
+captures actual production pages through `check_monster_formation.py`. No
+parallel prototype renderer is retained. The old captures and proof stay intact.
 Private FMR1 uses a48-byte job-to-frame directory,255 names and16 physical
 body/portrait pairs:14696 bytes, replacing35768 in the former FMR0 review.
 This is a private carrier, not a new installed format or shipping-size claim.
@@ -75,21 +77,21 @@ Any eventual ownership and storage design follows [CORE_RESOURCES.md](CORE_RESOU
 
 ```sh
 rtk proxy tools/pyenv/bin/python games/fft/campaign/review_monster_formation.py
-rtk proxy tools/pyenv/bin/python games/fft/campaign/review_monster_formation.py --sanitize
+rtk proxy tools/pyenv/bin/python games/fft/campaign/check_monster_formation.py --native
 ```
 
-Eleven actual-page scenarios match on PC and ASan/UBSan, with the entire Save
+The initial review's eleven scenarios matched on PC and ASan/UBSan, with the entire Save
 unchanged after each rendered frame and the temporary session file unchanged.
 All48 job references share the correct family record, and the actual Chocobo/
 Black Chocobo cards retain distinct job names despite sharing their picture.
 Shape composition rejects missing/truncated parts and out-of-sheet opaque
 pixels; fitted masks retain space for their whole outline. This does not
 certify native cycles, arithmetic, pointers, layout or installed memory.
-No TI build, native sweep, TiEmu, CPU benchmark or package rebuild ran.
+That initial review ran no TI build or package rebuild. Current production
+checks/packages and the two selected native frames are in MONSTER_FORMATION.md.
 
-**Next:** bind the selected art
-to management/Status/deployment with real asset availability, egg exclusion and
-durable placement. The battle loader currently rejects every type3 unit too.
+**Next:** complete battle art and durable placement. Management/Status and the
+deployment drawing are integrated; the battle loader still rejects type3 units.
 It needs matching standing/action art, correct palette/job identity, wider-body
 cache/cover handling and KO support before allowing an adult into combat. Do
 not remove only the menu veto or substitute human art. FKO1's six palette-zero

@@ -1,5 +1,17 @@
 # Validation by affected dependency
 
+Monster Formation/Status (2026-11-14): `make campaign-monster-formation-check`
+runs PC/sanitizers on ten approved pictures, two actual input flows and FMA1
+rejection boundaries. `check_monster_formation.py --native` opts into only two
+archive/word-order/render frames21E4/86E9. Reuse those unchanged draw/read checks
+after input-only changes; do not rerun battle/layout/CPU suites when the actual
+program and28 images are byte-identical. Human edit pages skip adults; Status
+can browse them and skips eggs. Existing egg dismissal/retry passes with FMA1
+installed. Package delivery passes42 host/867 C checks. The old management
+fixture's3-vs5 roster mismatch reproduces at baseline; keep it and its assertion
+intact, and use the current actual human-equipment input flow for this lot.
+Scope and remaining combat gate: [MONSTER_FORMATION.md](MONSTER_FORMATION.md).
+
 Calendar/egg integration (2026-11-14): `make campaign-eggs-check` is PC/sanitizers
 first:90 migration/metadata boundaries and actual map/management/title Save/
 Continue/hatch/full16/two-leg/held-input/dismiss/retry flows. `check_eggs.py

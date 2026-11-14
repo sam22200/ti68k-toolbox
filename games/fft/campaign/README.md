@@ -1,6 +1,15 @@
 # Opening -> Academy -> Gariland
 
-Latest delivery (2026-11-14): approved [calendar and persistent eggs](BREEDING.md).
+Latest delivery (2026-11-14): [actual adult Formation/Status](MONSTER_FORMATION.md).
+Universal FMA1/ffma13082 holds16 selected body/portrait pairs and255 names for48
+distinct jobs. Actual pages match the approval on PC/sanitizers and two selected
+native frames. Input tests cover adults/eggs, full16 browsing and human-page
+guards; existing egg controls and package checks pass. Only ffmgcore/ffpccore,
+ffma and manifests change; battle/ABI92/FSV7/Work/cache remain. Matching groups
+733226 bytes under `x/monster-formation/release/`. Wide battle art/animations
+and real monster deployment remain next; Bar/Fur Shop and16KiB remain open.
+
+Earlier delivery (2026-11-14): approved [calendar and persistent eggs](BREEDING.md).
 FSV7 migrates FSV2..6, retaining guest/prefix offsets; route-leg days, fixed
 offspring, hatch, compact dismissal and actual Save/Continue pass PC/sanitizers
 and selected native checks. World/map/egg pictures match the user approval.

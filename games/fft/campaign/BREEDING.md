@@ -6,12 +6,15 @@ integrated. Save/Continue and real map/management/title child flows pass on PC
 and sanitizers. Selected native migration, actual SAVE/compaction, archive
 sprite pointers and world RNG checks pass; no emulator or battle-family sweep.
 
-**Still open:** current deployment/party selectors reject all type3 monsters,
-and formation lacks grown-monster sprites. This delivery does not close the
+**Now integrated:** [adult Formation/Status](MONSTER_FORMATION.md), with16
+approved shared appearances and48 distinct jobs/names, real input and archive
+checks. **Still open:** deployment/party selectors reject all type3 monsters
+pending compatible wide battle poses/animations and cover/cache integration.
+This delivery does not close the
 playable monster/breeding prerequisite. Finish that selection/art path before
 Bar/Fur Shop and campaign extraction. The pilot adds no fictional monsters or
-eggs. Matching release groups: `x/eggs/release/`, core427121 + chapter291789 =
-718910 transport bytes, key `656593affdef2a427bec0030cb75fefd`.
+eggs. Matching release groups: `x/monster-formation/release/`, core441437 +
+chapter291789 =733226 transport bytes, key `37f0ec2538ccb78ed0b0f20ef00cdedd`.
 
 ## Source and portable rules
 

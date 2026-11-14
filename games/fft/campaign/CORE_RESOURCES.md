@@ -1,5 +1,14 @@
 # Shared campaign resources and shipping deduplication
 
+FMA1 update (2026-11-14): [actual monster Formation/Status](MONSTER_FORMATION.md)
+uses universal core `ffma`,13082 raw bytes:16 chosen body/portrait pairs and255
+pooled source names. Forty-eight job IDs alias the16 physical records. The bank
+is validated by packaging and cold C binding, with native DAT trailers handled.
+Management/deployment borrow it in place, with no allocation/cache growth.
+Retained picture records are exact copies of the approved selected appearances;
+future consumers must reference these compatible records instead of duplicating
+them per encounter. Battle sprites and real monster placement remain next.
+
 Human appearance decision (2026-11-14): the user extends the single-palette
 rule to humans to limit campaign size. Select one high-contrast four-grey
 palette per distinct human character/job sprite model; do not rip or ship
@@ -15,8 +24,8 @@ visual per ordinary monster family, with job names distinguishing the three
 types. `tools/monster_appearance.py` selects16 source appearances for48 actual
 jobs. Share body/portrait references; do not duplicate three palette versions
 or change gameplay job IDs, stats, abilities, breeding or saved identities.
-This policy currently drives private formation previews, not shipping battle
-art. Source shapes and source palettes remain available as offline controls.
+This policy now drives shipping Formation/Status; battle art remains next.
+Source shapes and source palettes remain available as offline controls.
 
 Calendar/egg update (2026-11-14): universal core ffwb/FWB1 is285 rule bytes;
 ffeg/FEG2 pools eight reviewed color/crack references into four physical16x26
