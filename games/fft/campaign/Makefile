@@ -15,6 +15,12 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: story-choices-check
+story-choices-check:
+	$(PY) -m unittest discover -s ../tools -p 'test_story_*.py'
+	$(PY) check_story_choices.py
+	$(PY) check_story_scene.py
+
 .PHONY: campaign-guests-check
 campaign-guests-check:
 	$(PY) -m unittest discover -s ../tools -p test_guest_bank.py
