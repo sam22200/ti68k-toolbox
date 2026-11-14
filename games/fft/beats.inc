@@ -238,5 +238,8 @@ static void opening_dialog_draw(void)
     opening_copy_rect(x,y,w,h);
     if(*name)opening_copy_rect(x,y-11,(u8)nw,11);
     if(W->dialog_face!=0xFF)opening_face_draw(W->dialog_face,x-DLG_FACE_W-2);
-    if(st.open_reveal>=W->dialog_total && (st.tick&16))draw_rect(x+w-5,96,3,2,st.open_white?C_BLACK:C_WHITE);
+#ifndef OPENING_DECISION
+#define OPENING_DECISION 0
+#endif
+    if(!OPENING_DECISION&&st.open_reveal>=W->dialog_total && (st.tick&16))draw_rect(x+w-5,96,3,2,st.open_white?C_BLACK:C_WHITE);
 }

@@ -163,6 +163,18 @@ def scene_parts(source, name, shared_serif):
     if head==20:
         pool=raw[12:20].rstrip(b'\0').decode('ascii');assets=resolve(source,pool)
     rows=[struct.unpack_from('>BB3H',raw,head+8*i) for i in range(count)]
+    for i,(kind,arg,a,b,c) in enumerate(rows):
+        if kind not in (6,7):continue
+        if not i<b<=count or not i<c<=count:raise ValueError(f'{name}: scene branches must move forward')
+        if kind==7:
+            if not 1<=a<=256 or arg>1:raise ValueError(f'{name}: invalid flag branch')
+        else:
+            import story_choice
+            if not i or rows[i-1][0]!=2 or a>=len(assets):raise ValueError(f'{name}: choice needs a preceding question story')
+            story_choice.validate(assets[a:])
+            story_choice.validate_prompt(assets,rows[i-1][4],rows[i-1][3])
+            guard=word(assets,a+8)
+            if (guard and not i<arg<=count)or(not guard and arg):raise ValueError(f'{name}: invalid guarded-choice destination')
     # FSP1 records carry sizes so a chapter can be rebuilt from already pooled
     # banks without guessing where a ZX0 stream ends or including another blob.
     sizes={}
@@ -174,6 +186,8 @@ def scene_parts(source, name, shared_serif):
         if kind==1 and not shared_serif:starts.add(a)
         elif kind in (2,4,5):starts.update((a,c))
         elif kind==3:starts.add(a)
+        elif kind==6:starts.add(a)
+        elif kind==7:pass
         elif kind!=1:raise ValueError(f'{name}: unsupported scene operation')
     def picture(at):
         end=at+sizes[at] if at in sizes else min((x for x in starts if x>at),default=len(assets))
@@ -184,6 +198,8 @@ def scene_parts(source, name, shared_serif):
         if kind==1:values=[0 if shared_serif else assets[a:a+756],b,c]
         elif kind in (2,4):values=[picture(a),b,assets[c:beat_end(assets,c)]]
         elif kind==5:values=[picture(a),b,assets[c:c+1+2*assets[c]]]
+        elif kind==6:values=[assets[a:a+word(assets,a+4)],b,c]
+        elif kind==7:values=[a,b,c]
         else:
             end=a+1
             for _ in range(assets[a]):end=assets.index(0,end+3)+1

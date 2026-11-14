@@ -12,6 +12,13 @@ taken from opening/data/ffost.bin (tools/opening_assets.py). Layout, big-endian:
            from there; each beat as in ffost: event, actors, hold, pan, actors, speaker, text)
     CARD   a = lines (u8 count; per line x, y, colour, text NUL)
   a step's arg bit 0 on a CARD: it fades in (the end of the previous program's fade out).
+    CHOICE a = FCX1 record; b/c = next step for its first/second answer.
+           Previous step is STORY; its final visible beat is the fitted question.
+           arg is the forward destination when the record's condition is false
+           (0 for an unconditional choice). Resolved choices follow the saved answer.
+    BRANCH a = flag1..256; arg = expected0/1; b/c = next step on mismatch/match.
+All branch destinations move forward; step count denotes the end. Records,
+questions and pictures use the usual shared scene pool at the shipping boundary.
 The pose table's name is empty when no step draws actors.
 Offsets count from the start of the variable.
 """
@@ -20,7 +27,7 @@ import re
 import struct
 
 HERE = Path(__file__).resolve().parents[1]
-TITLE, STORY, CARD, NARRATE, OVERLAY = 1, 2, 3, 4, 5
+TITLE, STORY, CARD, NARRATE, OVERLAY, CHOICE, BRANCH = 1, 2, 3, 4, 5, 6, 7
 
 
 def beats(story):
