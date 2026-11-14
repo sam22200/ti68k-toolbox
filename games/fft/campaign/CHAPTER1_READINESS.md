@@ -32,7 +32,8 @@ type3 until compatible wide combat poses/animations and cover/cache are bound;
 the combat breeding loop remains open. A private
 [wide body animation review](MONSTER_COMBAT_REVIEW.md) now covers all16 selected
 families, including their separate compressed attack pages and three flyers.
-Visual approval and battle integration remain; no deployment gate was removed.
+The user approved those animations on2026-11-14. Battle integration and the real
+deployment/Save/Continue/battle/results loop remain; no deployment gate was removed.
 Matching groups733226 bytes live in
 `x/monster-formation/release/`. The user extended the single-palette policy to
 humans: [one readable palette per distinct model](CORE_RESOURCES.md), with

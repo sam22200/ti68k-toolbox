@@ -1,10 +1,12 @@
 # Opening -> Academy -> Gariland
 
 Current private step: [wide monster body animation review](MONSTER_COMBAT_REVIEW.md)
-is ready for visual approval.16 chosen families share44 original-MIPS timelines;
+was approved by the user on2026-11-14.16 chosen families share44 original-MIPS timelines;
 compressed attack pages are checked against the retail decoder and approved
 standing planes remain exact. PC-only previews, no shipping/runtime changes.
-The real monster deployment veto stays until wide battle rendering is integrated.
+Claude's next step is wide battle rendering/cache/cover/water/flash/facing,
+then actual deployment/Save/Continue/battle/results. The real monster deployment
+veto stays until that rendering is integrated; no repeat visual vote is needed.
 
 Latest delivery (2026-11-14): [actual adult Formation/Status](MONSTER_FORMATION.md).
 Universal FMA1/ffma13082 holds16 selected body/portrait pairs and255 names for48

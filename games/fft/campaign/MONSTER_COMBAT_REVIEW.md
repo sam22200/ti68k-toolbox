@@ -1,6 +1,9 @@
 # Monster combat body review (2026-11-14)
 
-**Private visual proposal, not integrated combat.** Formation/Status remains the
+**User-approved body animations, not yet integrated combat.** The user accepted
+both GIF previews on2026-11-14 and requested a handoff to Claude. The visual gate
+is closed for these poses; do not ask again about their palettes, scale or
+silhouettes. Formation/Status remains the
 approved [FMA1 delivery](MONSTER_FORMATION.md). Real deployment and party loading
 still reject type3. This step prepares complete standing, walking, ordinary
 level unarmed attack, hurt and Dead body poses for16 selected family appearances;
@@ -43,7 +46,11 @@ rtk proxy tools/pyenv/bin/python games/fft/tools/monster_combat_review.py
 
 Outputs live only in ignored `x/monster-combat-review/`: `poses-1.png`,
 `poses-2.png`, `flight.png`, `animations-1.gif`, `animations-2.gif` and
-`results.json`. The two GIFs are the pending gallery decisions. They show
+`results.json`. The two GIFs are approved and their gallery decision markers
+have been cleared. `approval.json` records the user verdict and exact image
+hashes. The capture-time pending fields in `results.json`/`verification.json`
+are historical; those proofs remain untouched and this approval supersedes
+their old status. The GIFs show
 original front/back facings plus explicit mirrors, with the selected family
 palette, a white outline and the exact approved uniform scale. All16 original
 standing planes remain identical to the accepted FMR1 bank, including when
@@ -64,7 +71,7 @@ their bytes and dates; `preserved.json`/`verification.json` record the audit.
 The current ABI92/FSV7 release remains `x/monster-formation/release/`,733226
 transport bytes. Installed16KiB certification remains open.
 
-## Target implementation after visual approval
+## Next implementation with approved pictures
 
 Bind complete wide animated bodies into the actual battle renderer: standing,
 action/KO selection, facing, cover/depth, water crop, damage flash and cache
@@ -81,4 +88,5 @@ Only after compatible art/rendering is available may the deployment/party veto
 be removed. Then run actual deploy/Save/Continue/battle/results flows on PC and
 sanitizers, plus selected native render/cache/CPU checks for those new paths.
 Bar/rumors/Propositions and Fur Shop remain after playable breeding and before
-campaign extraction. Pending approval is a visual gate, not a new palette vote.
+campaign extraction. The approved preview closes the body-picture gate; the
+actual battle renderer, deployment and full breeding loop remain to implement.

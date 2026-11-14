@@ -1,6 +1,61 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Latest: wide monster combat body review prepared (2026-11-14)
+## Latest handoff to Claude: monster animations approved (2026-11-14)
+
+**The user has approved both monster animation previews.** Their latest message
+accepts the visuals and asks to continue with Claude. This closes the visual
+gate for the16 selected-family standing/walk/ordinary attack/hurt/Dead poses
+and the three flyers' hover/flight shown in `animations-1.gif` and
+`animations-2.gif`. Keep the selected palettes and approved family scales;
+do not ask for this approval again. Both gallery decision markers are cleared.
+`x/monster-combat-review/approval.json` records the verdict and exact approved
+image hashes. The older `results.json`/`verification.json` still say pending
+because they are preserved capture-time evidence; this approval supersedes
+that historical status, without rewriting those proofs or image dates.
+
+**Next work for Claude is implementation, not another visual study:**
+
+1. Read [MONSTER_COMBAT_REVIEW.md](MONSTER_COMBAT_REVIEW.md),
+   [MONSTER_FORMATION.md](MONSTER_FORMATION.md), [CORE_RESOURCES.md](CORE_RESOURCES.md)
+   and [CORE_OPTIMIZATION.md](CORE_OPTIMIZATION.md). Bind the approved wide
+   standing/action/KO bodies into the actual battle renderer. Reuse compatible
+   FMA1/ffma standing, portrait and name records across all encounters.
+2. Start with `fft.c` (`unit_frame`, `actor_animate`, `draw_unit_covered` and
+   the cover invalidation in the main render loop), `actors.inc`,
+   `monster_ko.inc`/`.h`, and the two new source-study helpers under `tools/`.
+   Handle facing, terrain cover/depth, water, flash, animation-frame cache keys
+   and remembered-entry eviction validation together. The existing KO renderer
+   uses two16-column halves in the shared cache; it is not an animated wide-body
+   implementation. Body bounds reach35x36 before script offsets, so do not
+   silently clip to32x26 or shrink each action independently. Record/project
+   SEQ offsets consistently; the previews do not certify that projection or
+   actual battle hit timing. Additional status/ability poses are still outside
+   the approved basic-body set.
+3. Preserve16 normal party slots, four separate guests,13 active actors,
+   48 actor cache entries and the3072-byte companion reserve. Do not feed
+   monster gfx255 into the human lookup. Actual type3 placement and PARTY
+   selectors remain blocked in `campaign/deployment.inc` and `save.inc`;
+   lift those vetoes only once compatible art/rendering is available, retaining
+   egg exclusions and source48-job identities. Then finish actual deployment,
+   Save/Continue, battle/results and return-to-map breeding flows.
+4. Develop/test primarily on PC with sanitizers. Reuse the completed source
+   study and unchanged native evidence. Run only selected native checks for
+   new archive/layout/arithmetic/render/cache/CPU paths; no broad TI sweep or
+   TiEmu for this documentation handoff. Keep the360k ordinary-frame budget.
+
+No battle renderer, deployment gate, save, bank or shipping group changed in
+the review/approval step. Source commits: `8b3ba2b` (oracle/shared converter),
+`aa3d878` (previews), `b81786f` (evidence docs), followed by this approval note.
+All offline checks below already pass; do not rerun them merely to reproduce
+the count. Current release is still the Formation release below. Installed
+16KiB/peak RAM certification remains open; the user deferred difficult recovery
+of the extra roughly2KiB. Bar/rumors/Propositions and Fur Shop follow playable
+breeding, before Chapter I extraction. Human palette-only swaps stay excluded.
+Preserve unrelated Tenchu/root work, the four untracked campaign `.s` files,
+historical proofs/saves and their bytes/dates. The LAN gallery remains available
+at `http://192.168.1.176:8000/`; leave it running.
+
+## Completed source study: wide monster combat bodies (2026-11-14)
 
 Read [MONSTER_COMBAT_REVIEW.md](MONSTER_COMBAT_REVIEW.md). Private PC-only
 previews now cover16 selected families/48 real jobs: standing, walk, ordinary
@@ -13,9 +68,8 @@ study shows1002 body renderings, outlined union35x36 before script offsets;
 the64x64 preview canvas is not a shipping/cache format. Four malformed/complete
 decoder boundaries pass. No TI build/native sweep/TiEmu or production change.
 
-**Pending visual approval:** `x/monster-combat-review/animations-1.gif` and
-`animations-2.gif` are pinned in the gallery; static poses/flight are alongside.
-Do not integrate/optimize/benchmark the new pictures before the verdict. The
+**Visually approved by the user:** `x/monster-combat-review/animations-1.gif`
+and `animations-2.gif`; static poses/flight are alongside. The
 GIFs sample body timelines only: script offsets are recorded, not projected;
 no source battle timing/effect/impact fidelity is claimed. Then build the wide
 battle renderer/cache/cover/water/flash/facing path, preserving48 cache entries
