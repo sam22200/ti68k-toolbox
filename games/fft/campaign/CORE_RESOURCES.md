@@ -1,5 +1,13 @@
 # Shared campaign resources and shipping deduplication
 
+Monster appearance decision (2026-11-14): the user requests one high-contrast
+visual per ordinary monster family, with job names distinguishing the three
+types. `tools/monster_appearance.py` selects16 source appearances for48 actual
+jobs. Share body/portrait references; do not duplicate three palette versions
+or change gameplay job IDs, stats, abilities, breeding or saved identities.
+This policy currently drives private formation previews, not shipping battle
+art. Source shapes and source palettes remain available as offline controls.
+
 Calendar/egg update (2026-11-14): universal core ffwb/FWB1 is285 rule bytes;
 ffeg/FEG2 pools eight reviewed color/crack references into four physical16x26
 sprites (640 bytes instead of1256). Management/deployment borrow the archive

@@ -13,6 +13,13 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT monster readability (user decision2026-11-14):** one chosen appearance
+  per ordinary monster family, selecting the best four-grey contrast. The three
+  types remain distinguishable by their actual job names; retain their distinct
+  IDs, stats, skills, offspring and saves. Reuse the selected body/portrait via
+  references, with no three-palette shipping copies. Palette choice is delegated
+  to the agent; shared choices live in `games/fft/tools/monster_appearance.py`.
+
 - **PC-first validation (user decision 2026-11-12):** develop and replay primarily
   on the PC, including sanitizers and complete gameplay/save flows. Do not run
   large TI sweeps after each lot. Use a small native check only for a changed

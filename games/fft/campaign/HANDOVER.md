@@ -1,23 +1,28 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Pending: standing-monster formation review (2026-11-14)
+## Selected: one monster appearance per family (2026-11-14)
 
 Read [MONSTER_FORMATION_REVIEW.md](MONSTER_FORMATION_REVIEW.md). Branch
-`feat/fft-monster-formation-review` prepares48 source job/palette thumbnails,
-portraits and monster names in actual PC Formation/Status/deployment pages.
+`feat/fft-monster-formation-review` now prepares16 selected family appearances
+for48 real jobs in actual PC Formation/Status/deployment pages. The user asked
+for one appearance with the best contrast, distinguishing types by job names,
+and delegated the choice. This settles palette selection; do not ask again.
+`tools/monster_appearance.py` is the shared selection policy. Actual jobs, names,
+stats, skills, breeding and save IDs remain distinct. Private FMR1 references
+16 body/portrait pairs through48 aliases,14696 bytes instead of35768.
 The full silhouettes fit32x26; Behemoth shrinks uniformly, without cutting its
 body to the human16-column format. Proposed monster Status hides human Job Lv
-and Total JP. Decision pictures: `x/monster-formation-review/review.png` and
-`atlas.png`. **User verdict is pending.** No production source/bank, save,
+and Total JP. Current pictures: `x/monster-family-review/review.png` and
+`atlas.png`; old captures/proofs remain untouched. No production source/bank, save,
 ABI, selector, cache, shipping package or CPU/RAM claim changes. Eleven private
 page scenarios match PC/sanitizers and preserve Save/session bytes; no TI run.
 
-After approval, continue real formation/Status/deployment binding and the battle
+Continue real formation/Status/deployment binding and the battle
 loader's type3 gate together with compatible wider standing/action/palette/KO
 art. Current shipping rejects all adult monsters as well as eggs; a placement
 picture bypassing that selector is not proof of playability. Keep the approved
-egg release and its capacities/budgets below. Do not optimize or integrate this
-new picture before the verdict, or start Bar/content extraction prematurely.
+egg release and its capacities/budgets below. Share the selected family visuals
+without rewriting real job IDs. Do not start Bar/content extraction prematurely.
 
 ## Latest: approved persistent calendar and eggs (2026-11-14)
 
