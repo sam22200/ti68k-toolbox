@@ -13,6 +13,20 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT human palette variants (user decision2026-11-14):** apply the same
+  storage rule to humans: choose one readable four-grey palette per distinct
+  character/job sprite model, and do not rip or ship its palette-only color
+  swaps. Share sprite/portrait records across those variants. Keep genuinely
+  different male/female models, named characters, costumes and story forms;
+  a color swap does not change gameplay identity, job, team, stats or dialogue.
+
+- **FFT monster readability (user decision2026-11-14):** one chosen appearance
+  per ordinary monster family, selecting the best four-grey contrast. The three
+  types remain distinguishable by their actual job names; retain their distinct
+  IDs, stats, skills, offspring and saves. Reuse the selected body/portrait via
+  references, with no three-palette shipping copies. Palette choice is delegated
+  to the agent; shared choices live in `games/fft/tools/monster_appearance.py`.
+
 - **PC-first validation (user decision 2026-11-12):** develop and replay primarily
   on the PC, including sanitizers and complete gameplay/save flows. Do not run
   large TI sweeps after each lot. Use a small native check only for a changed

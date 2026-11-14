@@ -1,5 +1,23 @@
 # Shared campaign resources and shipping deduplication
 
+Human appearance decision (2026-11-14): the user extends the single-palette
+rule to humans to limit campaign size. Select one high-contrast four-grey
+palette per distinct human character/job sprite model; do not rip or ship
+all of its palette-only color swaps. Reuse the selected sprite/portrait via
+IDs across encounters and teams. Preserve genuinely different male/female
+models, named characters, costumes and story forms, plus every unit's actual
+identity, job, team, stats and dialogue. Known speakers still need their own
+appropriate portraits. This is an extraction/ownership rule, not a claim that
+existing installed banks were rebuilt or that storage savings were measured.
+
+Monster appearance decision (2026-11-14): the user requests one high-contrast
+visual per ordinary monster family, with job names distinguishing the three
+types. `tools/monster_appearance.py` selects16 source appearances for48 actual
+jobs. Share body/portrait references; do not duplicate three palette versions
+or change gameplay job IDs, stats, abilities, breeding or saved identities.
+This policy currently drives private formation previews, not shipping battle
+art. Source shapes and source palettes remain available as offline controls.
+
 Calendar/egg update (2026-11-14): universal core ffwb/FWB1 is285 rule bytes;
 ffeg/FEG2 pools eight reviewed color/crack references into four physical16x26
 sprites (640 bytes instead of1256). Management/deployment borrow the archive
@@ -70,7 +88,8 @@ keys require matching R4 core/chapter builds.
    decompression or expanded whole-chapter RAM pool is allowed by this policy.
 4. Deduplicate exact bytes offline. Preserve order, spelling, actor placement,
    source handedness, timing and reviewed pixels. Speaker portraits remain
-   mandatory. Do not merge merely similar artwork or discard depth/masks.
+   mandatory. Apply the explicit single-palette decisions above; otherwise do
+   not merge merely similar artwork. Preserve depth/masks in every case.
 5. Measure **core + one installed chapter**, including indexes/reference code;
    moving bytes between groups is not a saving. Check actual TTPack input,
    the static execution zone, heap and affected native frame costs. Performance

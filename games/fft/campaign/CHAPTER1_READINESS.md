@@ -26,11 +26,17 @@ retry flows pass. Existing guest chains and scene choices still pass. Native
 checks are selected byte/layout, SAVE/compaction and render/RNG carriers.
 Grown-monster formation sprites and deployment selectors remain next: current
 selectors reject all type3 monsters, so the combat breeding loop is still open.
+The [formation proposal](MONSTER_FORMATION_REVIEW.md) now follows the user's
+one-appearance-per-family decision:16 shared visuals,48 distinct jobs/names.
+Actual PC/sanitizer page previews pass; shipping integration remains next.
+The user approved those visuals and extended the single-palette policy to
+humans: [one readable palette per distinct model](CORE_RESOURCES.md), with
+palette-only swaps excluded from campaign ripping/shipping.
 Bar/Fur Shop follows. ABI92/ModCtx356/Work29340/Save3992/FCD5, zone8702;
 battle input61491/headroom3445 and seven game-block requests99266. Shared Save
 reader uses1612 of the existing3072 companion reserve. Cache/capacities remain.
 One selected13-actor frame replay staysAA26/355148 cycles.
-Standing/action monster art, other palettes, authored retail
+Standing/action monster art, authored retail
 chains/choices and the side systems above remain. RAM figures below are dated
 evidence, not a new16KiB pass; difficult recovery remains deferred.
 
