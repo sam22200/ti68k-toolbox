@@ -24,6 +24,7 @@ static void egg_actor(s16 x,s16 y,u8 slot)
 static void formation_actor(s16 x,s16 y,u8 slot)
 {
     if(save_egg(&save,slot))egg_actor(x,y,slot);
+    else if(unit(slot)->type==3)monster_actor(x,y,unit(slot));
     else actor(x,y,picture(unit(slot),career(unit(slot))));
 }
 static void egg_card(u8 slot)

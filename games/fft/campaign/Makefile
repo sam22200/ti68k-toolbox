@@ -13,7 +13,7 @@ PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
-BANKS += ffwb ffeg
+BANKS += ffwb ffeg ffma
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
@@ -24,6 +24,10 @@ campaign-breeding-check:
 .PHONY: campaign-eggs-check
 campaign-eggs-check:
 	$(PY) check_eggs.py
+
+.PHONY: campaign-monster-formation-check
+campaign-monster-formation-check:
+	$(PY) check_monster_formation.py
 
 .PHONY: story-choices-check
 story-choices-check:
@@ -333,6 +337,8 @@ data/ffwb.bin: ../tools/breeding_rules.py
 	$(PY) ../tools/breeding_rules.py "$(DISC)" $@
 data/ffeg.bin: ../tools/egg_art.py
 	$(PY) ../tools/egg_art.py "$(DISC)" $@ --pooled
+data/ffma.bin: ../tools/monster_formation_bank.py ../tools/monster_appearance.py x/monster-family-review/ffmr.bin
+	$(PY) ../tools/monster_formation_bank.py x/monster-family-review/ffmr.bin $@
 
 FLOW_STATE := x/mandalia/gariland-deployment.state
 $(FLOW_STATE):

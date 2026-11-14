@@ -6,8 +6,11 @@ the campaign. Battle God mode: MODE/CATALOG, then ALPHA, then ENTER/2nd.
 [Four traps and persistent Degenerator stats](campaign/TRAPS.md) are delivered
 with per-encounter source-map metadata and compatible FSV5 saves.
 [Approved monster KO support](campaign/MONSTER_KO.md) preserves six source
-families through optional chapter art and the existing cache; full standing/
-action monster art and other palettes remain chapter content work.
+families through optional chapter art and the existing cache. [Actual monster
+Formation/Status](campaign/MONSTER_FORMATION.md) now shares16 selected appearances
+across48 jobs; compatible battle poses/animations and deployment remain next.
+Humans and monsters use one readable palette per distinct model/family rather
+than shipping color swaps.
 Other requested campaign prerequisites remain in [the audit](campaign/CAMPAIGN_PREREQUISITES.md).
 
 [Shared scenery/cache experiment](scenery/README.md): one material-piece bank for

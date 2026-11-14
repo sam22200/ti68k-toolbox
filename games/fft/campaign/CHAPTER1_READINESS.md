@@ -24,12 +24,13 @@ fixed offspring, hatch and safe compact dismissal.90 migration boundaries and
 actual PC/sanitizer map/management/title Save/Continue/held-input/full16/two-leg/
 retry flows pass. Existing guest chains and scene choices still pass. Native
 checks are selected byte/layout, SAVE/compaction and render/RNG carriers.
-Grown-monster formation sprites and deployment selectors remain next: current
-selectors reject all type3 monsters, so the combat breeding loop is still open.
-The [formation proposal](MONSTER_FORMATION_REVIEW.md) now follows the user's
-one-appearance-per-family decision:16 shared visuals,48 distinct jobs/names.
-Actual PC/sanitizer page previews pass; shipping integration remains next.
-The user approved those visuals and extended the single-palette policy to
+Actual [monster Formation/Status](MONSTER_FORMATION.md) is now integrated:
+FMA1/ffma13082,16 shared body/portrait records,255 names and48 distinct jobs.
+Ten accepted pictures, two real input flows, two native archive/render frames
+and package checks pass. Current battle/deployment selectors still reject
+type3 until compatible wide combat poses/animations and cover/cache are bound;
+the combat breeding loop remains open. Matching groups733226 bytes live in
+`x/monster-formation/release/`. The user extended the single-palette policy to
 humans: [one readable palette per distinct model](CORE_RESOURCES.md), with
 palette-only swaps excluded from campaign ripping/shipping.
 Bar/Fur Shop follows. ABI92/ModCtx356/Work29340/Save3992/FCD5, zone8702;

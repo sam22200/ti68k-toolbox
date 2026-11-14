@@ -1,5 +1,34 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Latest: actual monster Formation/Status integrated (2026-11-14)
+
+Read [MONSTER_FORMATION.md](MONSTER_FORMATION.md). Actual management/deployment
+now borrow universal FMA1/ffma13082:16 approved body/portrait records,48 job
+aliases,255 source monster names. Ten pictures retain accepted checksums on
+PC/sanitizers; selected native Formation21E4/Status86E9 agree. Two real PC input
+flows cover adult Status, full16 browsing, egg exclusions and human equipment
+navigation. F1/F5 skips monsters on human edit pages, avoiding a bypass of their
+menu lock. Existing egg dismissal/retry and42 host/867 C package checks pass.
+No new allocation/cache, native sweep or TiEmu. The obsolete test_manage fixture
+failure (expected3 units, existing FSV4 has5) reproduces at baseline; it and the
+fixture remain intact. New actual-input coverage replaces reliance on it here.
+
+Only packed ffmgcore/ffpccore, new ffma and manifests change. Stubs, battle,
+28 images and all chapter payloads except ffpack remain exact. ABI92/356/FA04,
+Save3992/Work29340/zone8702/companion3072 remain; no installed16KiB claim.
+Matching groups: `x/monster-formation/release/`,441437+291789=733226 transport
+bytes, key37f0ec2538ccb78ed0b0f20ef00cdedd. Protected19 and both accepted review
+sets retain their bytes/dates; proof under `x/monster-formation/verification.json`.
+
+**Next:** compatible wide standing/action/KO battle art and its cover/cache/
+water/flash/facing integration, then real monster deployment/Save/Continue/
+battle/results. Current placement and party selectors still reject all type3;
+do not remove those vetoes before art is available. Actor cache remains48 and
+ordinary actor slots16 columns; never pass monster gfx255 to the human lookup.
+Use the16 selected family appearances, preserving48 gameplay jobs. The static
+deployment picture is injected, not a playable-battle certificate. Do not start
+Bar/Fur Shop or extraction yet; human palette-only swaps stay excluded.
+
 ## Approved: selected monster visuals and human palette rule (2026-11-14)
 
 The user approved the selected16 monster appearances ("oui tres bien") and

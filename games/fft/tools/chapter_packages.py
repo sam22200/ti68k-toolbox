@@ -158,6 +158,10 @@ def core_package(source, spec):
     if (spec.get('world_save_format'),spec.get('breeding_format'),spec.get('egg_art_format'))!=('FSV7','FWB1','FEG2'):
         raise ValueError('Core specification must declare FSV7 world state, FWB1 breeding and FEG2 eggs')
     variables = select(source, spec['variables'])
+    if spec.get('formation_art_format')!='FMA1' or 'ffma' not in source or 'ffma' not in spec['variables']:
+        raise ValueError('Core specification must declare shared FMA1 formation art')
+    import monster_formation_bank
+    monster_formation_bank.validate(source['ffma'].raw)
     envelope = spec['envelope']
     expected = {}
     for key, name in [('units', 'FFT_CORE_UNIT_MAX'), ('tiles', 'FFT_CORE_TILE_MAX'),
