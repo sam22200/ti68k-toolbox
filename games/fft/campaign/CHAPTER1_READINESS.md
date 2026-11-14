@@ -13,22 +13,24 @@ are approved and integrated: target/protect/combined, explicit binding and
 repeated-receipt fixes. [Consecutive Save checkpoints](CHAINS.md) and
 [persistent story guests](GUESTS.md) now pass real PC/sanitizer child-process
 flows, including Save, decline and defeat/Continue at full16-party capacity.
-FSV6 retains four separate guests, migrates FSV2..5, and offers remove/recruit
+FSV7 retains four separate guests, migrates FSV2..6, and offers remove/recruit
 hooks. The pilot persists Gariland's Delita through an authored stable key;
 Orbonne's fixed prologue actors stay encounter-local. [Story choices and conditional branches](STORY_CHOICES.md) are now integrated
 with the approved compact menu, guest/flag effects, skip barriers and real
 Save/Continue/replay tests. Native pending-save visibility and atomic PC session
-replacement are checked. Current pilot groups711813 transport bytes change only
-the scene program and matching metadata; no fictional recruitment is shipped.
-The [calendar/breeding backend](BREEDING.md) now passes269 PC/sanitizer/68000
-boundaries, five bank suites and ten original-MIPS policy/hatch cases. Its
-proposed69-byte state is not appended to Save yet; actual route/calendar/save,
-egg deployment exclusions, roster producers and reviewed egg UI remain next.
-Bar/Fur Shop follows. Backend completion does not close the breeding gate.
-ABI91/Work29340/Save3918/FCD5, zone8842; battle input61381/headroom3555
-and seven game-block requests99332 remain unchanged from the guest delivery.
-Cache/capacities remain. One selected13-actor frame replay stays
-AA26/355080 cycles. Standing/action monster art, other palettes, authored retail
+replacement are checked. Current pilot groups718910 transport bytes include
+approved [persistent calendar and eggs](BREEDING.md): route-leg days, saved RNG,
+fixed offspring, hatch and safe compact dismissal.90 migration boundaries and
+actual PC/sanitizer map/management/title Save/Continue/held-input/full16/two-leg/
+retry flows pass. Existing guest chains and scene choices still pass. Native
+checks are selected byte/layout, SAVE/compaction and render/RNG carriers.
+Grown-monster formation sprites and deployment selectors remain next: current
+selectors reject all type3 monsters, so the combat breeding loop is still open.
+Bar/Fur Shop follows. ABI92/ModCtx356/Work29340/Save3992/FCD5, zone8702;
+battle input61491/headroom3445 and seven game-block requests99266. Shared Save
+reader uses1612 of the existing3072 companion reserve. Cache/capacities remain.
+One selected13-actor frame replay staysAA26/355148 cycles.
+Standing/action monster art, other palettes, authored retail
 chains/choices and the side systems above remain. RAM figures below are dated
 evidence, not a new16KiB pass; difficult recovery remains deferred.
 
@@ -63,14 +65,15 @@ debug aids and logs" and "Native test loop").
 ## Before campaign extraction: world/party side systems
 
 Required by the user2026-11-13; [initial GameFAQs overview and native audit](CAMPAIGN_SIDE_SYSTEMS.md).
-Breeding needs a saved calendar/egg lifecycle, fixed offspring and full-roster
-handling. Bars need town/story-filtered rumors and later dispatch/return jobs.
+Calendar/egg lifecycle, fixed offspring and full-roster handling are delivered;
+grown-monster formation/deployment/art is still required. Bars need town/story-
+filtered rumors and later dispatch/return jobs.
 Poaching currently gives an item directly to the party: source-correct Fur Shop
 stock/access/purchases and save migration remain. These are explicit gates,
 not implicit completion under generic R/S/M coverage. Preserve later chapter
 unlocking while testing reusable machinery with PC injection doors. Named
-objectives, Save checkpoints and story choices are delivered; calendar/egg save
-and travel integration is now the active step in the prerequisite queue.
+objectives, Save checkpoints and story choices are delivered; grown-monster
+formation/deployment is now the active step in the prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)
 

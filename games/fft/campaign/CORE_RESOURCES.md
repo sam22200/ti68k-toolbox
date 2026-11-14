@@ -1,5 +1,12 @@
 # Shared campaign resources and shipping deduplication
 
+Calendar/egg update (2026-11-14): universal core ffwb/FWB1 is285 rule bytes;
+ffeg/FEG2 pools eight reviewed color/crack references into four physical16x26
+sprites (640 bytes instead of1256). Management/deployment borrow the archive
+pointer, never a per-chapter copy or new frame cache. Existing glyphs, glove,
+human actors and portraits remain shared. New core spec keys bind these families
+and FSV7 to the matching ABI92 release. All chapter content remains exact.
+
 FCX1 scene update (2026-11-13): choice records and their preceding question
 beats join the existing chapter-wide FSP1 pool; equal records across two different
 scene sets share one physical span. Choice/flag-branch scalar destinations stay

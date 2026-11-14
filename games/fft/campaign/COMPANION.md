@@ -1,5 +1,14 @@
 # Companion image: specials shared by every chapter
 
+2026-11-14 update, ABI92/ModCtx356: companion op254 owns the shared real campaign
+Save reader/migration/validation. Zone SAVE/PARTY call resident `load_save`,
+which refreshes companion bindings, passes `save_out` through its transient
+union and calls the pinned image. It never replaces the caller's executing
+zone. Normal `special` calls still reset their own union arguments. The reader
+is included locally on PC and in separate front ends. Companion grows390->1612
+inside the already reserved3072 bytes; zone8842->8702, with no new heap block.
+Native actual SAVE/guest/egg compaction passes114/B00EEFA2. See BREEDING.md.
+
 2026-11-10, ABI 85. User decision: the techniques of non-canonical jobs (Holy Sword, Dark
 Sword, Wiegraf's and Zalbag's sets...), of monsters and of bosses recur across the four
 chapters, so they belong to the core, in one **companion** image, not in chapter packs.

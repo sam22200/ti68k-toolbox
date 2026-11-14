@@ -1,25 +1,46 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
-## Pending: egg/calendar visual review (2026-11-14)
+## Latest: approved persistent calendar and eggs (2026-11-14)
 
-Read [EGG_REVIEW.md](EGG_REVIEW.md). Branch `feat/fft-egg-review` prepares PC-only
-source egg/grid/card, compact Dismiss and default-No confirmation, plus a small
-world-map date panel. Gallery decisions: `x/egg-review/review.png`, `calendar.png`.
-User verdict is pending. Do not integrate/optimize/benchmark the new picture
-before that verdict; no production Save/worldmap/manage/ABI/package edits yet.
-PC/sanitizer picture hashes: DAB9/9C07/AA1B/E3DF, map DDB3/EAAA. Only private
-fixtures were written. Native backend269/69509ED8 evidence is reused, no TI run.
+Read [BREEDING.md](BREEDING.md). The user approved both pictures ("tres bien et
+cintune"); decision markers are cleared. Actual management/date output remains
+9C07/AA1B/E3DF/EAAA on PC/sanitizers/68000. Source egg art is pooled in universal
+core FEG2 (640 bytes/four physical frames/eight logical variants), FWB1 rules285.
+No cache/allocation growth for pictures; no fictional pilot monsters or eggs.
 
-Independent read-only original Gariland deployment fixture has calendar Jan1,
-era0 (event9, DATE_ADVANCE0), with preserved state SHA/mtime; this supplies a
-documented pilot migration baseline, not legacy elapsed travel or full retail
-chronology. EGG_REVIEW lists every migration/roster/route caller to bind next.
-Current deploy/party selectors reject all type3 monsters, not just eggs; grown
-monster deployment/source art must remain explicit in completion claims.
-Once the user approves the actual pictures, continue full durable save/route/
-roster/egg-control integration, actual PC Save/Continue/child flows, then only
-changed ABI/native boundaries. Capacities, existing releases and16KiB deficit
-remain. Do not start Bar/content extraction before this breeding integration.
+FSV7 Save3992 (+74) appends calendar69/RNG4/pad1 after the unchanged FSV6 prefix
+and guest tail. FSV2..6 migrate to observed Jan1/era0; old elapsed travel is
+unknown. One day per completed route leg, no idle/menu/reentry time or RNG.
+Offspring are fixed at laying. Approved card/menu, default-No dismissal and
+fighter exclusions are integrated. All normal/guest append/rebuild/recruit/
+remove/permanent-death compaction paths carry metadata/raw bits. PC atomic
+session writes preserve the prior file on failure; native Save pointers live
+through deferred flush as before. World PRNG is the saved native xorshift family,
+an adaptation of retail's clock reseed rather than a claim of exact PS1 RNG.
+
+PC/sanitizers:271 backend/C0193379,90 migration/2B7ED894, actual map/management/
+title Save/Continue/hatch/full16/two-leg/held-input/dismiss/retry flows. Three
+real forced-guest battle chains (Save/decline/defeat/Continue) still pass, as do
+251 story-scene checks and42 host/855 C package checks. Selected native:90
+migration,114 actual SAVE/guest/egg compaction B00EEFA2, four reviewed pictures
+and day/birth state380A142A; one13-actor equipment replay AA26/355148 cycles.
+No whole TI sweep or TiEmu. New DAT validators account for native six-byte tags.
+
+ABI92/ModCtx356/signatureFA04, Unit112/State2224/Work29340;28 images, splits9/18,
+shards62994/63034/64650. Shared reader runs in pre-reserved companion op254
+(1612 of3072); resident load_save callback never replaces the executing zone.
+Zone8702 (was8842), seven game-block requests99266 (was99332); installed16KiB/
+peak remains open. Battle input61491/headroom3445. Core427121+chapter291789=
+718910 transport bytes, key 656593affdef2a427bec0030cb75fefd; matching groups
+under `x/eggs/release/`. All old chapter payloads except ffpack remain exact.
+
+**Next:** grown-monster formation sprites/status/deployment selection. Current
+selectors reject all type3 monsters, so hatching/persistence does not yet make
+the full combat breeding loop playable. Reuse/pool chapter art and source job
+identities, preserve reviewed UI, and show a new picture if needed. Then Bar/
+rumors/Propositions and full Fur Shop remain pre-extraction gates. Keep16 party,
+13 actors,48 cache and3072 companion; no hard extra2KiB recovery or battle-family
+queue. Protected19 byte/mtime checks and current proof: `x/eggs/verification.json`.
 
 ## Latest: calendar and breeding backend (2026-11-14)
 

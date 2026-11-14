@@ -1,5 +1,14 @@
 # Shared core and replaceable chapter packages
 
+FSV7 update (2026-11-14): [calendar/eggs](BREEDING.md) require matching ABI92/
+ModCtx356/FA04 programs and images. Core spec declares FSV7/FWB1/FEG2 and owns
+universal ffwb285/ffeg640 once. All six packed children and supervisor are
+rebuilt for Save3992; all28 images share the new signature. Zone8702, companion
+1612 inside its unchanged3072 reserve, battle input61491/headroom3445. Current
+transport427121+291789=718910, key 656593affdef2a427bec0030cb75fefd; use matching
+`x/eggs/release/` groups. Chapter content is byte-identical except ffpack's key.
+Save slots remain user-owned; FSV2..6 migrate on read.16KiB/installed peak stays open.
+
 FCX1 scene update (2026-11-13): [story choices](STORY_CHOICES.md) require
 `story_choice_format: FCX1` and matching core/chapter keys. Only `ffscore` and
 manifests change; existing battle code/28 images and all chapter data remain
