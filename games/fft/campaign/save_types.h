@@ -2,7 +2,8 @@
 #define FFT_SAVE_TYPES_H
 // Serialized save layout only; no file calls before module context bindings.
 #include "../../../runtime/core/rt.h"
-#define SAVE_MAGIC "FSV6"
+#define SAVE_MAGIC "FSV7"
+#define SAVE_V6_BYTES 3918U
 #define SAVE_V5_BYTES 3204U
 #define SAVE_V4_BYTES 3202U
 #define SAVE_V3_BYTES 3138U
@@ -11,6 +12,7 @@
 #define FLAG_N 256                      // story flags: bit k of flags[k >> 3]
 #define PARTY_MAX 16                    // FFT's roster
 #define GUEST_MAX 4                     // separate source formation slots16..19
+#include "world_types.h"
 #define SAVE_V2_BYTES 3110U
 #define SAVE_FLOW_OFFSET 3114U
 #define CAREER_N 20                     // FFT's generic jobs, Squire 0x4A .. Mime 0x5D: a unit's
@@ -43,7 +45,11 @@ typedef struct {
     u8 guest_id[GUEST_MAX][2];          // stable authored source identities; zero is an empty slot
     u8 guest_raw, guest_reserved;       // current-raw bitmap; reserved must be zero
     SaveUnit guest[GUEST_MAX];
+    WorldParty world;                   // append-only FSV7; old guest/prefix offsets stay
+    u8 world_rng[4],world_pad;           // BE nonzero xorshift32 state; even total size
 } Save;
+static u8 save_egg(const Save *s,u8 slot)
+{return slot<WB_SLOTS&&s->world.egg[slot]!=0;}
 static u8 save_raw_current(const Save *s,u8 slot)
 {return slot<PARTY_MAX?(s->raw_current[slot>>3]&((u8)1<<(slot&7)))!=0:
     slot<PARTY_MAX+GUEST_MAX&&(s->guest_raw&((u8)1<<(slot-PARTY_MAX)))!=0;}

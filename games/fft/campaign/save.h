@@ -12,32 +12,46 @@
 #include "save_types.h"
 #ifndef SAVE_OFFSETS_ONLY
 #include <string.h>
-#include "guest_roster.h"
+#include "save_world.h"
 #define SAVE_NAME SAVE_SESSION_NAME
+#ifdef FFT_MODULE
+#if !MOD_PART(MOD_COMPANION)
+#define FFT_SAVE_FORWARD
+#endif
+#endif
+#ifdef FFT_SAVE_FORWARD
+// A zone image cannot replace itself to load a save. The resident forwards to
+// the pinned companion, sharing one real reader without another heap block.
+static u8 save_load(Save *s){return M.load_save(s);}
+#undef FFT_SAVE_FORWARD
+#else
 // FSV2 had no funds or deployment. Preserve its entire party/flags/inventory;
 // initialize the newly introduced balance to the source's starting2000gil.
 static u8 save_load_from(const char *name,Save *s)
 {
     memset(s,0,sizeof *s);
     if(rt_load(name,s,sizeof *s)&&!memcmp(s->magic,SAVE_MAGIC,4)){
-        if(save_guests_valid(s))return 1;
+        if(save_world_valid(s))return 1;
         memset(s,0,sizeof *s);return 0;
     }
     memset(s,0,sizeof *s);
-    if(rt_load(name,s,SAVE_V5_BYTES)&&!memcmp(s->magic,"FSV5",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
+    if(rt_load(name,s,SAVE_V6_BYTES)&&!memcmp(s->magic,"FSV6",4)&&save_guests_valid(s)){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}
     memset(s,0,sizeof *s);
-    if(rt_load(name,s,SAVE_V4_BYTES)&&!memcmp(s->magic,"FSV4",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
+    if(rt_load(name,s,SAVE_V5_BYTES)&&!memcmp(s->magic,"FSV5",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}
     memset(s,0,sizeof *s);
-    if(rt_load(name,s,SAVE_V3_BYTES)&&!memcmp(s->magic,"FSV3",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
+    if(rt_load(name,s,SAVE_V4_BYTES)&&!memcmp(s->magic,"FSV4",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}
+    memset(s,0,sizeof *s);
+    if(rt_load(name,s,SAVE_V3_BYTES)&&!memcmp(s->magic,"FSV3",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}
     memset(s,0,sizeof *s);
     if(rt_load(name,s,SAVE_V2_BYTES)&&!memcmp(s->magic,"FSV2",4)&&s->n<=PARTY_MAX) {
-        memcpy(s->magic,SAVE_MAGIC,4);s->money[2]=7;s->money[3]=208;
+        memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);s->money[2]=7;s->money[3]=208;
         if(s->flags[0]&2)s->flow=4;
         return 1;
     }
     memset(s,0,sizeof *s);return 0;
 }
 static u8 save_load(Save *s){return save_load_from(SAVE_NAME,s);}
+#endif
 #else
 #define SAVE_NAME SAVE_SESSION_NAME
 #endif

@@ -15,5 +15,10 @@ static u16 __attribute__((unused)) companion_query(u8 a,u8 t,AbId ab,u8 query)
 static u16 __attribute__((unused)) special(u8 a,u8 t,AbId ab,u8 query){return companion_query(a,t,ab,query);}
 #endif
 #if !MOD_CORE && MOD_PART(MOD_COMPANION)
-u16 mod_entry(u8 op,u8 a){(void)a;return companion_query(M.cast_actor,M.cast_ref,M.cast_ability,op);}
+#include "campaign/save.h"
+u16 mod_entry(u8 op,u8 a)
+{
+    (void)a;if(op==254)return save_load(M.save_out);
+    return companion_query(M.cast_actor,M.cast_ref,M.cast_ability,op);
+}
 #endif

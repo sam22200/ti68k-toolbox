@@ -49,7 +49,7 @@ static void flush(void)
 }
 static void seed(u8 n)
 {
-    u8 i;memset(&baseline,0,sizeof baseline);memcpy(baseline.magic,SAVE_MAGIC,4);
+    u8 i;save_init(&baseline);
     baseline.n=n;baseline.loc=7;baseline.flow=4;
     for(i=0;i<n;i++){baseline.unit[i].job=0x4a;baseline.unit[i].gfx=2;baseline.unit[i].level=10;baseline.unit[i].name=i;}
     baseline.unit[0].job=1;baseline.unit[0].gfx=0;baseline.unit[0].type=2;

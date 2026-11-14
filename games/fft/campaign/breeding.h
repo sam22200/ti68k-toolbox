@@ -2,19 +2,12 @@
 #define FFT_BREEDING_H
 #include <string.h>
 #include "guest_roster.h"
-// Cold portable backend, not yet appended to FSV6 or called by worldmap.
+// Cold portable backend; Save retains its byte-only WorldParty payload.
 // Include ../base.inc first for the existing verified muls16 primitive.
 // Each egg uses an ordinary SaveUnit, generated once at laying. The saved
 // level-one seeds use the existing raw-current convention; no growth loop
 // or second Job table is needed while travelling.
-#define WB_SLOTS (PARTY_MAX+GUEST_MAX)
 #define WB_RULE_BYTES 285U
-typedef struct {
-    u8 month,day,era,reserved;          // source var67 increments on March21, cap99
-    u8 egg[WB_SLOTS];                 // initial days in high nibble, remaining in low
-    u8 birthday[WB_SLOTS][2];          // BE day1..365 after hatch;0 unknown/not born
-    u8 egg_color[(WB_SLOTS+3)/4];      // source color0..3 retained through hatch/reload
-} WorldParty;
 enum { WB_INVALID,WB_DAY,WB_LAID,WB_FULL };
 typedef u16 (*WorldDraw)(void *);       // caller supplies original-style15-bit draws
 static u16 wb_word(const u8 *p){return (u16)((u16)p[0]<<8|p[1]);}
@@ -25,18 +18,13 @@ static u8 wb_birth_sign(const u8 *p,u16 birthday)
     for(i=0;i<12;i++)if(birthday>=wb_word(p+261+2*i))sign++;
     return sign>=12?(u8)(sign-12):sign;
 }
-static u8 world_egg_color(const WorldParty *w,u8 slot)
-{return slot<WB_SLOTS?(w->egg_color[slot>>2]>>((slot&3)*2))&3:0;}
-static void wb_color_set(WorldParty *w,u8 slot,u8 color)
-{
-    u8 shift=(slot&3)*2,mask=(u8)(3U<<shift);
-    w->egg_color[slot>>2]=(w->egg_color[slot>>2]&(u8)~mask)|((color&3)<<shift);
-}
 // Cold validation at bank binding, never once per map animation frame.
 static u8 world_rules_valid(const u8 *p,u16 size)
 {
-    static const u8 months[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    const u8 *months=world_month_days;
     u8 i;u16 previous=0;
+    // Native rt_file includes the typed AMS DAT trailer; host files are raw.
+    if(p&&size>=6&&!memcmp(p+size-6,"\0dat\0\xf8",6))size-=6;
     if(!p||size!=WB_RULE_BYTES||memcmp(p,"FWB1",4)||wb_word(p+4)!=size||p[6]!=94||p[7]!=48||
        memcmp(p+8,months,12))return 0;
     for(i=0;i<13;i++){
@@ -153,15 +141,5 @@ static u8 world_party_day(WorldParty *w,Save *s,const u8 *rules,WorldDraw draw,v
     child->level=levels[wb_draw(draw,ctx)%nl];save_raw_set(s,i,0);
     w->egg[i]=(u8)(days*17);w->birthday[i][0]=w->birthday[i][1]=0;wb_color_set(w,i,color);s->n++;
     return WB_LAID;
-}
-// Roster producers must move side metadata together with a SaveUnit. Kept
-// separate from FSV6 operations until every recruit/remove/compact path binds it.
-static void world_party_clear_slot(WorldParty *w,u8 slot)
-{if(slot<WB_SLOTS){w->egg[slot]=0;w->birthday[slot][0]=w->birthday[slot][1]=0;wb_color_set(w,slot,0);}}
-static void world_party_move_slot(WorldParty *w,u8 to,u8 from)
-{
-    if(to>=WB_SLOTS||from>=WB_SLOTS||to==from)return;
-    w->egg[to]=w->egg[from];memcpy(w->birthday[to],w->birthday[from],2);
-    wb_color_set(w,to,world_egg_color(w,from));world_party_clear_slot(w,from);
 }
 #endif

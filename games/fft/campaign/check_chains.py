@@ -59,7 +59,8 @@ def chain_fixture(source, guests=False):
         spec['variables'].append('ffgu')
         source['ffgu'] = packages.Variable('ffgu', 0x1c, 3, guest_bank.build([dict(route=p, slot=0, id=4) for p in ('g', 'h')])+packages.resources.TRAILER)
     source = {name: source[name] for name in core['variables']+spec['variables']}
-    initial = bytearray(b'FSV6'+fixture()[4:]+bytes(3918-len(fixture())))
+    initial = bytearray(b'FSV7'+fixture()[4:]+bytes(3918-len(fixture()))+
+                        bytes((1,1,0,0))+bytes(65)+bytes((0x25,0x45,0xf4,0x91,0)))
     initial[4] = 3; initial[36] = 16; initial[3114] = 4; initial[3115:3138] = bytes(23)
     for slot in range(7, 16):
         initial[294+176*slot:294+176*(slot+1)] = initial[470:646]
@@ -136,7 +137,7 @@ def main():
         values = [int(v, 16) for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)', log)]
         assert values[-3:] == [int(expected[1], 16), 0, int(expected[2])], values
     summary = dict(cases=results, native_progress=args.native_progress, private_chain_not_retail_content=True,
-                   core_key=report['core_key'], abi=91, save_bytes=3918, persistent_guests=args.guests,
+                   core_key=report['core_key'], abi=92, save_bytes=3992, persistent_guests=args.guests,
                    initial_sha256=hashlib.sha256(initial).hexdigest(),
                    preserved=json.loads((HERE/'x/objectives/verification.json').read_text())['protected'])
     (out/'verification.json').write_text(json.dumps(summary, indent=2)+'\n')

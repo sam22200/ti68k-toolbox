@@ -13,7 +13,7 @@
 #include "x/breeding/fixture.h"
 static Save save,before;
 static WorldParty world,prior;
-static u8 scratch[WB_RULE_BYTES+1];
+static u8 scratch[WB_RULE_BYTES+6];
 static u16 checks,failures,draw_count,draw_at;
 static u32 digest=23;
 static const u16 *draws;
@@ -50,7 +50,7 @@ static void unchanged(void)
 static void trials(void)
 {
     u8 i;u16 k;
-    CHECK(sizeof(Save),3918);CHECK(sizeof(WorldParty),69);
+    CHECK(sizeof(Save),3992);CHECK(sizeof(WorldParty),69);
     CHECK(world_rules_valid(rules,sizeof rules),1);
     memcpy(scratch+1,rules,sizeof rules);CHECK(world_rules_valid(scratch+1,sizeof rules),1);
     for(i=0;i<7;i++){
@@ -59,6 +59,9 @@ static void trials(void)
         CHECK(world_rules_valid(scratch,sizeof rules),0);
     }
     CHECK(world_rules_valid(rules,sizeof rules-1),0);
+    memcpy(scratch,rules,sizeof rules);memcpy(scratch+sizeof rules,"\0dat\0\xf8",6);
+    CHECK(world_rules_valid(scratch,sizeof scratch),1);scratch[sizeof scratch-1]=0;
+    CHECK(world_rules_valid(scratch,sizeof scratch),0);
     memcpy(scratch,rules,sizeof rules);scratch[262]++;
     CHECK(world_rules_valid(scratch,sizeof rules),0);
     seed(1);before=save;

@@ -30,6 +30,7 @@ static void deploy_init(void)
     const u8 *boot=qpart(flowbank,Q_ROSTER);u8 i;
     memset(&dp,0,sizeof dp);memset(dp.placed,255,sizeof dp.placed);
     if(!save.n) {
+        if(!save_world_valid(&save))save_init(&save);
         save.n=boot[0];memcpy(save.money,boot+1,4);memcpy(save.inv,boot+5,256);
         memcpy(save.unit,boot+261,(u16)save.n*sizeof(SaveUnit));
         memcpy(save.magic,SAVE_MAGIC,4);
@@ -58,7 +59,7 @@ static void deploy_init(void)
 static u8 deploy_place(void)
 {
     u8 cell=(u8)(dp.row*5+dp.col),old=deploy_where(dp.unit);
-    if(save.unit[dp.unit].type==3){dp.note=6;return 0;}
+    if(save_egg(&save,dp.unit)||save.unit[dp.unit].type==3){dp.note=6;return 0;}
     if(!deploy_cell(cell)[0]){dp.note=1;return 0;}
     if(dp.placed[cell]!=255&&dp.placed[cell]!=dp.unit){dp.note=2;return 0;}
     if(old==255&&dp.n==deploy_rules()[2]){dp.note=3;return 0;}

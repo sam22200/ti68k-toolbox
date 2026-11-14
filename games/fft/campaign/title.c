@@ -129,8 +129,7 @@ static u8 title_accept(void)
         if(s->kind!=SLOT_VALID){title.notice=s->kind==SLOT_DAMAGED?2:1;return 1;}
         if(!save_load_from(save_slot_name(title.slot),title_draft)){title.notice=2;return 1;}
     } else {
-        memset(title_draft,0,sizeof *title_draft);memcpy(title_draft->magic,SAVE_MAGIC,4);
-        title_draft->money[2]=7;title_draft->money[3]=208;
+        save_init(title_draft);
     }
     title.wrote=1;
     if(!rt_save(title_target(),title_draft,sizeof *title_draft)){title.notice=3;title.wrote=0;return 1;}

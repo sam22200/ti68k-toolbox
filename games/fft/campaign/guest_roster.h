@@ -26,6 +26,7 @@ static void save_guest_clear(Save *s,u8 i)
     if(i>=GUEST_MAX)return;
     memset(s->guest_id[i],0,2);memset(&s->guest[i],0,sizeof s->guest[i]);
     save_raw_set(s,(u8)(PARTY_MAX+i),0);
+    world_party_clear_slot(&s->world,(u8)(PARTY_MAX+i));
 }
 // A full normal roster must not discard the guest or any of its equipment.
 // Story code commits the returned in-memory Save with its flags in one write.
@@ -35,6 +36,7 @@ static u8 save_guest_recruit(Save *s,u16 id)
     if(i==255||n>=PARTY_MAX)return 255;
     memcpy(&s->unit[n],&s->guest[i],sizeof s->unit[0]);
     save_raw_set(s,n,save_raw_current(s,(u8)(PARTY_MAX+i)));s->n++;
+    world_party_move_slot(&s->world,n,(u8)(PARTY_MAX+i));
     save_guest_clear(s,i);return n;
 }
 static u8 save_guest_remove(Save *s,u16 id)

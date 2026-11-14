@@ -3894,6 +3894,7 @@ static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context);
 static u8 area_paint(u8 who);
 
 static u16 special(u8 a,u8 t,AbId ab,u8 query);
+static u8 module_save_load(Save *out);
 #include "module_defaults.inc"
 // Copies image id into dst (the zone, or the companion's block) and binds its context.
 static void mod_install(u8 id,u8 *dst)
@@ -3953,6 +3954,15 @@ static u16 special(u8 a,u8 t,AbId ab,u8 query)
     return ((u16 (*)(u8,u8))((u8 *)comp_block+RD16(m,2)))(query,0);
 }
 static void companion_free(void){if(comp_block)free(comp_block);comp_block=RT_NULL;}
+static u8 module_save_load(Save *out)
+{
+    const u8 *m=mod_images[MOD_COMPANION];ModCtx *c;
+    if(!comp_block||!out)return 0;
+    c=comp_context();
+    if(c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){mod_install(MOD_COMPANION,(u8 *)comp_block);c=comp_context();}
+    c->save_out=out;
+    return (u8)((u16 (*)(u8,u8))((u8 *)comp_block+RD16(m,2)))(254,0);
+}
 static u16 mod_call(u8 id, u8 op, u8 a)
 {
     const u8 *m = mod_images[id];
