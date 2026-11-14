@@ -1,5 +1,15 @@
 # Validation by affected dependency
 
+
+Story choices (2026-11-13): `make story-choices-check` covers five host suites,
+81 effect boundaries and251 real scene/input/atomic-file checks on PC/ASan/UBSan,
+including separate actual title Save/Continue children and cold resolved replay.
+Explicit `check_story_scene.py --native` checks116 shared cases/0DC86CDC, pooled
+record pointers, native pending Save/reentry and the complete339426-cycle frame.
+Actual planes remain identical to the approved F19D/4580 compact menu. Shared
+BEATS3 code is byte-identical; reuse all other battle/native/art evidence.
+See STORY_CHOICES.md; no all-family TI sweep or emulator per lot.
+
 Persistent guests (2026-11-13): [GUESTS.md](GUESTS.md) and `campaign-guests-check`
 cover FSV2..6 migration, four guest slots alongside16 players, stable identities,
 shared stats, full-capacity rejection, remove/recruit hooks and99-owned guest

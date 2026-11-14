@@ -3,7 +3,8 @@
 2026-11-13. Imposed guests now retain progression between encounters and through
 Save/Continue. FSV6 has four separate guest records, preserving all16 ordinary
 party slots. The pilot binds Gariland's Delita; Orbonne's fixed prologue actors
-remain encounter-local. Story choice presentation/effect opcodes are next.
+remain encounter-local. [Story choice presentation/effect opcodes](STORY_CHOICES.md) are now delivered
+in the subsequent lot; its measurements supersede the scene/core sizes below.
 
 ## Identity and ownership
 

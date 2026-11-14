@@ -1,6 +1,42 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
 
+## Latest: story choices and conditional scenes (2026-11-13)
+
+Read [STORY_CHOICES.md](STORY_CHOICES.md). The user approved the compact design
+("tres bien le design maintenat"): smaller box, no excess top padding, glove
+protrudes left like combat. Current production output matches F19D/4580 exactly.
+FSC kinds6/7 implement choice/flag branches with forward destinations and pooled
+FCX1 records. The prior STORY's fitted final question retains its portrait.
+Held confirmation is disarmed; cursor/errors update immediately. Skip walks
+forward but stops at unresolved eligible choices, without selecting an answer.
+
+Effects preflight atomically: flags, guest recruit/remove, full-party rejection,
+exactly-once markers. Native dirty scene_save stays visible between decisions,
+reentry and scene_progress; the deferred pointer remains durable. PC writes a
+temporary session and replaces it only after successful write/close/rename.
+All three failure phases are injected, preserve the baseline and retry cleanly.
+No second Save allocation, format/layout change or battle ABI change.
+
+Backend81/FAD68EE4 remains PC/sanitizer/68000. Actual pooled scene251/1322A29E
+passes PC/sanitizers, including actual title Save/Continue children and cold
+scene replay. The shared native subset116/0DC86CDC checks pointer lifetime and
+input/render/session paths; complete fixture frame peak339426 cycles. Five
+host suites and legacy scene regressions pass. No broad native sweep or TiEmu.
+
+Only `ffscore` changes in the core (plus manifest); BEATS3's native body is proven
+identical and all battle/other child/content payloads are reused. Scene input
+26283 (was21949), ABI91/F8B5, Work29340/Save3918/zone8842 and battle input61381/
+headroom3555 stay. Core420024 + chapter291789 =711813 transport bytes, key
+668a8d4b8281e62a6087d23389480f73; use `x/story-choices/release/`. No fictional QA
+choice is shipped in the pilot. The16KiB installed RAM/peak gate remains open.
+
+**Next:** breeding's reusable world calendar/egg/offspring/full-roster machinery,
+then Bar/rumors/Propositions and full Fur Shop stock/purchases. Keep their chapter
+unlocks and source rules, departure warnings, future event-specific handlers,
+character templates/transitions and real campaign content explicit. Do not start
+campaign ripping or a new combat-family sweep merely because choices now work.
+
 ## Latest: persistent story guests (2026-11-13)
 
 Read [GUESTS.md](GUESTS.md). Four FSV6 guest slots preserve16 normal party slots.

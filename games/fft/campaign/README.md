@@ -1,5 +1,14 @@
 # Opening -> Academy -> Gariland
 
+
+Latest delivery (2026-11-13): [persistent story choices/branches](STORY_CHOICES.md).
+Approved compact combat-style menu with protruding glove, mandatory questions,
+conditional flags and guest recruitment/removal; Save/Continue cannot replay
+accepted effects. Actual PC/sanitizer flows, failure-safe session writes and one
+small native scene carrier pass; no battle sweep. ABI91/FSV6 and battle budgets
+stay. Matching pilot groups711813 transport bytes; only scene code/metadata
+change. Breeding, Bar/Fur Shop and16KiB installed RAM certification remain open.
+
 Latest delivery (2026-11-13): [persistent story guests](GUESTS.md). Four separate
 FSV6 slots retain guest progression without consuming the16-player roster; old
 saves migrate. The pilot persists Delita through one generated FGP1 directory.

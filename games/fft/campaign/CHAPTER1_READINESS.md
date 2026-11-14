@@ -15,11 +15,15 @@ repeated-receipt fixes. [Consecutive Save checkpoints](CHAINS.md) and
 flows, including Save, decline and defeat/Continue at full16-party capacity.
 FSV6 retains four separate guests, migrates FSV2..5, and offers remove/recruit
 hooks. The pilot persists Gariland's Delita through an authored stable key;
-Orbonne's fixed prologue actors stay encounter-local. Story choice/effect UI
-and conditional/recruitment flags are next.
-ABI91/Work29340/Save3918/FCD5, zone8842; true input61381/headroom3555,
-matching pilot groups708776 transport bytes. Seven game-block requests grow884
-bytes to99332; cache/capacities remain. One selected13-actor frame replay stays
+Orbonne's fixed prologue actors stay encounter-local. [Story choices and conditional branches](STORY_CHOICES.md) are now integrated
+with the approved compact menu, guest/flag effects, skip barriers and real
+Save/Continue/replay tests. Native pending-save visibility and atomic PC session
+replacement are checked. Current pilot groups711813 transport bytes change only
+the scene program and matching metadata; no fictional recruitment is shipped.
+The reusable calendar/monster breeding machinery is next, followed by Bar/Fur Shop.
+ABI91/Work29340/Save3918/FCD5, zone8842; battle input61381/headroom3555
+and seven game-block requests99332 remain unchanged from the guest delivery.
+Cache/capacities remain. One selected13-actor frame replay stays
 AA26/355080 cycles. Standing/action monster art, other palettes, authored retail
 chains/choices and the side systems above remain. RAM figures below are dated
 evidence, not a new16KiB pass; difficult recovery remains deferred.
