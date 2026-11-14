@@ -168,7 +168,9 @@ void game_render(void)
         if(col<0||col>=5)continue;
         c=(u8)col;cell=(u8)(r*5+c);
         if(dp.placed[cell]!=255&&!(dp.placed[cell]==dp.unit&&(rt_frame&8))) {
-            const SaveUnit *u=unit(dp.placed[cell]);actor(92+((s16)r-c)*9,63-diagonal*4,picture(u,career(u)));
+            const SaveUnit *u=unit(dp.placed[cell]);
+            if(u->type==3)monster_actor(92+((s16)r-c)*9,63-diagonal*4,u);
+            else actor(92+((s16)r-c)*9,63-diagonal*4,picture(u,career(u)));
         }
     }
     // The raised arrow clears the footer; keep its separator continuous.

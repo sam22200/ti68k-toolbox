@@ -19,6 +19,7 @@
 #include "../identity_pool.h"
 #include <stdlib.h>
 #include <string.h>
+#include "../monster_formation.h"
 #ifndef __m68k__
 #include "story_choice_file.h"
 #endif
@@ -43,7 +44,7 @@ typedef struct {
 enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED, NOTE_SAVE };
 Mg mg;
 Save save;
-static const u8 *bank, *common,*identity,*egg_bank;
+static const u8 *bank, *common,*identity,*egg_bank,*monster_bank;
 static u8 *cache;
 static u8 dirty;
 
@@ -301,6 +302,21 @@ static void actor_white(s16 x,s16 y,u8 k)
     }
     draw_sprite(x,y,&sp);
 }
+static void monster_actor(s16 x,s16 y,const SaveUnit *u)
+{
+    const u8 *p=monster_formation_frame(monster_bank,u->job);
+    if(!p)return;
+#ifdef __m68k__
+    RtSprite sp={32,26,p,p+104,p+208};
+#else
+    u32 rows[3][26];u8 a,b;RtSprite sp={32,26,rows[0],rows[1],rows[2]};
+    for(a=0;a<3;a++)for(b=0;b<26;b++){
+        const u8 *q=p+(u16)a*104+(u16)b*4;
+        rows[a][b]=(u32)q[0]<<24|(u32)q[1]<<16|(u16)q[2]<<8|q[3];
+    }
+#endif
+    draw_sprite(x-8,y,&sp);
+}
 #include "../portrait32.inc"
 static void icon(s16 x, s16 y, u8 id)
 {
@@ -315,11 +331,11 @@ static void hand(s16 x, s16 y)
 
 static const char *unit_name(const SaveUnit *u)
 {
-    if(u->type==3)return (const char *)(cj_section(common,CJ_JOB_NAMES)+14U*u->job);
+    if(u->type==3){const char *name=monster_formation_name(monster_bank,u->name);return name?name:(const char *)(cj_section(common,CJ_JOB_NAMES)+14U*u->job);}
     if (u->type == 2) return "Ramza";
     return identity_name(identity,(u16)u->name+(u->type==1?255:0));
 }
-static const char *job_name(const SaveUnit *u, u8 c) { return u->type==3?unit_name(u):str(b16(job_rec(record(u, c)))); }
+static const char *job_name(const SaveUnit *u, u8 c) { return u->type==3?(const char *)(cj_section(common,CJ_JOB_NAMES)+14U*u->job):str(b16(job_rec(record(u, c)))); }
 
 static void floor_diamond(s16 x,s16 y)
 {
@@ -343,7 +359,8 @@ static void floor_diamond(s16 x,s16 y)
 #include "../unit_card.inc"
 static void management_card(UnitCard *d,const SaveUnit *u,const Stats *s)
 {
-    d->portrait=u->type==3?RT_NULL:identity_portrait(identity,section(6)[picture(u,career(u))]);
+    const u8 *p=u->type==3?monster_formation_frame(monster_bank,u->job):RT_NULL;
+    d->portrait=u->type==3?(p?p+312:RT_NULL):identity_portrait(identity,section(6)[picture(u,career(u))]);
     d->name=unit_name(u);d->job=job_name(u,career(u));
     d->hp=d->max_hp=s->hp;d->mp=d->max_mp=s->mp;
     d->level=u->level;d->exp=u->exp;d->brave=u->brave;d->faith=u->faith;
@@ -362,7 +379,7 @@ static void unit_header(void)
     Stats s = stats(u);
     UnitCard d;u8 part;management_card(&d,u,&s);
     for(part=0;part<=UC_JOB;part++)unit_card_draw(&d,UC_MANAGEMENT,0,part,0,0);
-    actor(140,15,picture(u,career(u)));
+    if(u->type==3)monster_actor(132,15,u);else actor(140,15,picture(u,career(u)));
     draw_rect(2, 46, 156, 1, C_LGRAY);
 }
 
@@ -451,12 +468,12 @@ static void status_page(void)
     u8 v[8], i;
     v[0] = s.move; v[1] = s.jump; v[2] = s.sp; v[3] = s.pa; v[4] = s.ma; v[5] = u->brave; v[6] = u->faith;
     v[7] = job_level(u, c);
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < (u->type==3?7:8); i++) {
         s16 x = i < 4 ? 6 : 85, y = 50 + (i & 3) * 7;
         black(x, y, names[i]); right(x + 66, y, v[i]);
     }
     black(6, 80, "EXP"); number(26, 80, u->exp);
-    black(85, 80, "Total JP"); right(151, 80, tjp(u, c));
+    if(u->type!=3){black(85, 80, "Total JP"); right(151, 80, tjp(u, c));}
     foot("F1/F5:unit SHIFT:back");
 }
 
@@ -648,6 +665,7 @@ void game_init(void)
     if (!cj_valid(common, size)) bank = RT_NULL;
     save_load(&save);
     egg_bank=rt_file("ffeg",&size);if(!egg_art_valid(egg_bank,size))bank=RT_NULL;
+    monster_bank=rt_file("ffma",&size);if(!monster_formation_valid(monster_bank,size))monster_bank=RT_NULL;
     if (save.n > PARTY_MAX) save.n = 0;
     cache = (u8 *)malloc(2 * RT_PSIZE);
     dirty = 1;
@@ -660,6 +678,7 @@ void game_scenario(u16 n)                // test doors: a screen of the first un
     mg.screen = n < sizeof doors ? doors[n] : S_FORM;
     mg.unit = mg.row = mg.top = 0;
     if(save_egg(&save,0))mg.screen=S_FORM;
+    else if(unit(0)->type==3&&mg.screen!=S_FORM&&mg.screen!=S_MENU)mg.screen=S_STATUS;
     if (mg.screen == S_JOBS) open_jobs();
     dirty = 1;
 }
@@ -734,8 +753,9 @@ u8 game_update(void)
     }
     if ((key & (K_F1 | K_F5)) && mg.screen != S_FORM && mg.screen != S_MENU && mg.screen != S_PICK) {
         u8 tries=save.n;
-        do{mg.unit=(u8)((mg.unit+(key&K_F1?save.n-1:1))%save.n);}while(save_egg(&save,mg.unit)&&--tries);
-        if(save_egg(&save,mg.unit)){roster_position(S_FORM);return 1;}
+        do{mg.unit=(u8)((mg.unit+(key&K_F1?save.n-1:1))%save.n);}
+        while((save_egg(&save,mg.unit)||(unit(mg.unit)->type==3&&mg.screen!=S_STATUS))&&--tries);
+        if(save_egg(&save,mg.unit)||(unit(mg.unit)->type==3&&mg.screen!=S_STATUS)){roster_position(S_FORM);return 1;}
         if (mg.screen == S_JOBS) open_jobs();
         else if (mg.screen == S_LEARN) mg.row = mg.top = 0;
         return 1;

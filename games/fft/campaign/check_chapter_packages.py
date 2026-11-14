@@ -33,6 +33,10 @@ def synthetic(core, chapter):
     source = {}
     for name in core['variables']+chapter['variables']:
         raw = name.encode()*4
+        if name=='ffma':
+            import monster_formation_bank as mfa
+            body=bytes(208)+b'\xff'*104;face=bytes(232)+b'\xff'*116
+            raw=mfa.pack([body+face]*16,[f'Monster{i}'.encode()for i in range(255)])
         if re.fullmatch(r'ff[a-z0-9]v[0-3]',name):
             import extract
             raw=extract.view_bank(b'R4',(name.encode()*16)[:80],b'',bytes(4))
