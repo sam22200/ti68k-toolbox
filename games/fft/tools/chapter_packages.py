@@ -153,6 +153,8 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare relocation-safe save checkpoints')
     if spec.get('guest_format') != 'FGP1':
         raise ValueError('Core specification must declare persistent FGP1 guests')
+    if spec.get('story_choice_format') != 'FCX1':
+        raise ValueError('Core specification must declare FCX1 scene choices')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -177,6 +179,11 @@ def chapter_package(source, spec, core_spec, key):
     if spec['schema'] != 'FFT_CHAPTER_SPEC_1':
         raise ValueError('Unsupported chapter specification')
     variables = select(source, spec['variables'])
+    for v in variables:
+        if re.fullmatch('ffs[0-9]',v.name):
+            parsed=resources.scene_parts(source,v.name,True)
+            if parsed and any(kind in (6,7) for kind,_,_ in parsed[1]) and core_spec.get('story_choice_format')!='FCX1':
+                raise ValueError('Scene decisions require an FCX1-capable core')
     if 'ffgu' in spec['variables']:
         import guest_bank
         if core_spec.get('guest_format') != 'FGP1':

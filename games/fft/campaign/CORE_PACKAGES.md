@@ -1,5 +1,14 @@
 # Shared core and replaceable chapter packages
 
+FCX1 scene update (2026-11-13): [story choices](STORY_CHOICES.md) require
+`story_choice_format: FCX1` and matching core/chapter keys. Only `ffscore` and
+manifests change; existing battle code/28 images and all chapter data remain
+byte-identical. Current core420024 + chapter291789 =711813 transport bytes,
+key668a8d4b8281e62a6087d23389480f73. Scene input26283; ABI91/FSV6 and battle
+input61381/headroom3555/zone8842 remain. Choices update the session, with explicit
+slots still owned by the title's Save/Continue. Old core reuse is rejected.
+
+
 FSV6/FGP1 update (2026-11-13): [persistent guests](GUESTS.md) require matching
 ABI91/F8B5 core/chapter groups. `persistent_guests` generates one chapter-owned
 `ffgu` during the mandatory shipping pass; repeat builds/core reuse retain it.

@@ -1,5 +1,14 @@
 # Shared campaign resources and shipping deduplication
 
+FCX1 scene update (2026-11-13): choice records and their preceding question
+beats join the existing chapter-wide FSP1 pool; equal records across two different
+scene sets share one physical span. Choice/flag-branch scalar destinations stay
+in8-byte FSC rows; they are not resource offsets. The shipping parser validates
+records, final question bounds and forward targets, and requires the FCX1-capable
+core/key. No new font, portrait, image bank or whole-chapter RAM pool is introduced.
+The production pilot adds no fictional recruitment data; see STORY_CHOICES.md.
+
+
 FGP1 update (2026-11-13): [persistent guests](GUESTS.md) use one chapter-wide
 `ffgu` directory of stable identity/encounter-slot references. The shipping pass
 generates it from `persistent_guests`, checks an explicitly supplied bank against
