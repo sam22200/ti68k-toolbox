@@ -514,6 +514,7 @@ typedef struct {
     u8 permanent_base[UNIT_CAPACITY][2]; // initial Brave/Faith, retained through battle effects
     u8 move_post,move_owner,trap_message; // committed movement's resumable cold settlement
     const u8 *goal;                     // cold FGO1 route entry, borrowed from archive
+    u16 guest_key[FFT_CORE_UNIT_MAX];    // stable IDs; encounter slots are transient
 #else
     u8 ab_j,ab_self,ab_walk;
 #endif
@@ -561,7 +562,7 @@ static u8 nav_reserve(u16 count,u8 upper)
 static void grid_tables(void)
 {
     // Cold map/rebinding setup. Refresh context even if PARTY was last resident.
-    mod_id=0;mod_call(MOD_PARTY,8,0);
+    mod_id=0;mod_call(MOD_RESOURCES,19,0);
 }
 #else
 #include "grid_tables.inc"
@@ -768,12 +769,10 @@ void unit_stats(Unit *u){u8 i;for(i=0;i<NUNIT;i++)if(u==&st.unit[i])W->rebuild|=
 #if MOD_PART(MOD_PARTY)
 #include "unit_setup.inc"
 #include "banner_setup.inc"
-#if !MOD_CORE
+#endif
+#if !MOD_CORE && MOD_PART(MOD_RESOURCES)
 #include "grid_tables.inc"
-#endif
-#if !MOD_CORE
 #include "setup_glyphs.inc"
-#endif
 #endif
 #ifdef FFT_CHAPTER
 static u16 magic_status_value(u8 t,AbId ab,u8 choice);
@@ -1273,6 +1272,7 @@ static void map_render(void);
 static void save_campaign(void);
 static void prepare_rewards(void);
 static void party_load(void);
+static void guests_restore(void);
 static void funds_load(void);
 #endif
 
@@ -3126,8 +3126,8 @@ static u8 tile_h(const Tile *t)         // FFT's tile height: its lowest corner
     if (t->c[3] < h) h = t->c[3];
     return h;
 }
-#if defined(FFT_CHAPTER) && MOD_PART(MOD_PARTY)
-// A chapter's cold grid tables after its topology reservation (PARTY10 on the TI).
+#if defined(FFT_CHAPTER) && MOD_PART(MOD_RESOURCES)
+// A chapter's cold grid tables after its topology reservation (RESOURCES20 on the TI).
 #if MOD_CORE
 static void setup_glyphs(void);
 #endif
@@ -4029,7 +4029,7 @@ static void map_start(u8 after)
     if(st.open_stage==OPEN_BEGIN)opening_battle(0);
 }
 static void save_campaign(void) { mod_call(MOD_SAVE, 0, 0); }
-static void prepare_rewards(void) { mod_call(MOD_SAVE, 3, 0); }
+static void prepare_rewards(void) { mod_call(MOD_RESOURCES,17,0); }
 static void party_load(void) { mod_call(MOD_PARTY, 1, 0);if(W->nature_units)mod_call(MOD_NATURE,1,0); }
 static void funds_load(void) { mod_call(MOD_PARTY, 11, 0); }
 #ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
@@ -4624,7 +4624,7 @@ static void draw_weapon(s16 sx, s16 sy, u8 i, u8 depth)
 #endif
 
 #ifdef FFT_MODULES
-static void setup_glyphs(void){mod_call(MOD_PARTY,5,0);}
+static void setup_glyphs(void){mod_call(MOD_RESOURCES,18,0);}
 #else
 #include "setup_glyphs.inc"
 #endif
@@ -5079,8 +5079,8 @@ static u8 chapter_load(u8 c)
     W->surface=surface+SURFACE_HEADER;
     W->surface_flags=surface[3]=='2'?SURFACE_TERRAIN:0;
 #ifdef FFT_MODULES
-    mod_id=0;mod_call(MOD_PARTY,255,0);mod_context(MOD_PARTY)->chapter_story_after=&story_after;
-    mod_call(MOD_PARTY,10,0);         // rebinds to this chapter's Work/map first
+    mod_id=0;mod_call(MOD_RESOURCES,255,0);mod_context(MOD_RESOURCES)->chapter_story_after=&story_after;
+    mod_call(MOD_RESOURCES,20,0);         // rebinds to this chapter's Work/map first
 #else
     chapter_grid();
 #endif
@@ -5252,13 +5252,18 @@ static u8 aim(AbId ab)
 #ifdef FFT_CHAPTER
 #ifndef FFT_MODULES
 #include "objective_load.inc"
+#include "guest_load.inc"
 #endif
 static u8 objective_bind(void)
 {
 #ifdef FFT_MODULES
-    u8 ok=(u8)mod_call(MOD_RESOURCES,15,(u8)(chapter_now-1));
+    u8 ok=(u8)mod_call(MOD_RESOURCES,16,(u8)(chapter_now-1));
+    if(ok&2)mod_call(MOD_PARTY,15,0);
+    if(ok)ok=(u8)mod_call(MOD_RESOURCES,15,(u8)(chapter_now-1));
 #else
-    u8 ok=objective_load((u8)(chapter_now-1));
+    u8 ok=guest_load((u8)(chapter_now-1));
+    if(ok&2)guests_restore();
+    if(ok)ok=objective_load((u8)(chapter_now-1));
 #endif
     if(!ok){W=RT_NULL;igfx=RT_NULL;return 0;}
     return 1;
@@ -7350,6 +7355,8 @@ u16 mod_entry(u8 op,u8 a)
 #undef ugfx
 #include "bootstrap_files.inc"
 #include "objective_load.inc"
+#include "guest_load.inc"
+#include "reward_prepare.inc"
 // The battle could not start (op 12; held: 1 State, 2 the view/scene/cache blocks, 4 the map
 // envelope, 8 the companion's block; M.desc_size: AMS's free RAM / 16, read by the resident): "Not enough RAM" when that
 // free RAM and the blocks held are less than the battle allocates (BATTLE_RAM_BYTES), so a user
@@ -7381,6 +7388,11 @@ u16 mod_entry(u8 op,u8 a)
     if(op==12)return ram_message(a);
     if(op==13)return bootstrap_files();         // cold start: allocations, shared banks
     if(op==14)return cj_valid(common,M.desc_size);
+    if(op==17){prepare_rewards();return 0;}
+    if(op==18){setup_glyphs();return 0;}
+    if(op==19){grid_tables();return 0;}
+    if(op==20){chapter_grid();return 0;}
+    if(op==16)return guest_load(a);
     if(op==15)return objective_load(a);
     if(op==11)return (u8)chapter_route(a);
     if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}

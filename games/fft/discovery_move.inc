@@ -1,5 +1,6 @@
 #include "nature_rules.h"
 #include "trap_rules.h"
+#include "campaign/guest_roster.h"
 static const u8 *move_find_row(u8 who,u8 map,u8 *entry)
 {
  const Unit *u=&st.unit[who];const u8 *row;u8 i;
@@ -19,10 +20,16 @@ static u8 discovery_find(u8 who,u8 map)
   item=row[((u16)(muls16((s16)rand15(),100)>>15)<100-u->brave)?2:3];
   battle_save.discovered[map>>1]|=bit;
   if(item&&item!=255&&unit_home_team(u)!=TEAM_ENEMY){
-   u16 count=battle_save.inv[item];u8 j,k;
-   for(j=0;j<battle_save.n;j++)for(k=0;k<5;k++)if(battle_save.unit[j].eq[k]==item)count++;
+   u16 count=save_owned_count(&battle_save,item);u8 j,k;
    for(j=0;j<NUNIT;j++)if(st.unit[j].slot<battle_save.n){
     for(k=0;k<5;k++){if(battle_save.unit[st.unit[j].slot].eq[k]==item)count--;if(st.unit[j].eq[k]==item)count++;}
+   }
+   for(j=0;j<NUNIT;j++)if(W->guest_key[j]){
+    u8 g=save_guest_find(&battle_save,W->guest_key[j]);
+    for(k=0;k<5;k++){
+     if(g<GUEST_MAX&&battle_save.guest[g].eq[k]==item)count--;
+     if(st.unit[j].eq[k]==item)count++;
+    }
    }
    if(count<99)battle_save.inv[item]++;
    else{u32 money=qlong(battle_save.money)+(cj_word(NATURE_DATA+96+2048+64+((u16)item<<1))>>2);qput(battle_save.money,money>99999999UL?99999999UL:money);}

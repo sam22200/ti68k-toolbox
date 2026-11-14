@@ -151,6 +151,8 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare FGO1 named encounter objectives')
     if spec.get('checkpoint_version') != 1:
         raise ValueError('Core specification must declare relocation-safe save checkpoints')
+    if spec.get('guest_format') != 'FGP1':
+        raise ValueError('Core specification must declare persistent FGP1 guests')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -175,6 +177,18 @@ def chapter_package(source, spec, core_spec, key):
     if spec['schema'] != 'FFT_CHAPTER_SPEC_1':
         raise ValueError('Unsupported chapter specification')
     variables = select(source, spec['variables'])
+    if 'ffgu' in spec['variables']:
+        import guest_bank
+        if core_spec.get('guest_format') != 'FGP1':
+            raise ValueError('Persistent guests require an FGP1-capable core')
+        bindings = guest_bank.validate(resources.resolve(source, 'ffgu'), {r['prefix'] for r in spec['routes']})
+        for route, (slots, identities) in bindings.items():
+            desc = resources.resolve(source, 'ff'+route+'d')
+            if len(desc) < 106 or desc[:4] != b'FCD5':
+                raise ValueError('Unsupported guest encounter descriptor')
+            defs, count = struct.unpack_from('>H', desc, 34)[0], struct.unpack_from('>H', desc, 100)[0]
+            if defs < 106 or defs+28*count > len(desc) or any(slot >= count or desc[defs+28*slot+11] != 2 for slot in slots):
+                raise ValueError('Persistent guest must bind an imposed TEAM_GUEST actor')
     if 'ffgo' in spec['variables']:
         import objective_bank
         if core_spec.get('objective_format')!='FGO1':

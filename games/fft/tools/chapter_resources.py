@@ -247,6 +247,14 @@ def encounter_names(spec):
 def prepare_chapter(source,spec,core_names):
     """Never pool across separately installed chapters or create alias chains."""
     source=dict(source);names=set(spec['variables']);allowed=names|set(core_names)
+    if 'persistent_guests' in spec:
+        import guest_bank
+        raw=guest_bank.build(spec['persistent_guests'])
+        if 'ffgu' in source and resolve(source,'ffgu')!=raw:
+            raise ValueError('ffgu differs from authored persistent guest bindings')
+        template=source['ff'+spec['routes'][0]['prefix']+'d']
+        source['ffgu']=changed(replace(template,name='ffgu'),raw)
+        names.add('ffgu');allowed.add('ffgu')
     # Recover semantic payloads before repacking an already optimized chapter.
     for n in sorted(names):
         if n in source and source[n].raw[:4]==b'FRF1':source[n]=changed(source[n],resolve(source,n,allowed))

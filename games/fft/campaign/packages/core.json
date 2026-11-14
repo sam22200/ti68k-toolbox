@@ -5,6 +5,7 @@
   "ko_actor_format": "FKO1",
   "objective_format": "FGO1",
   "checkpoint_version": 1,
+  "guest_format": "FGP1",
   "envelope": {"units": 13, "tiles": 256, "axis": 18, "layers": 2, "scene_rows": 202},
   "variables": [
     "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",

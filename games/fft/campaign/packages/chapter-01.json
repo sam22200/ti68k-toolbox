@@ -9,6 +9,7 @@
   "next": 2,
   "world_map": true,
   "routes": [{"band": 1, "prefix": "o"}, {"band": 2, "prefix": "g"}],
+  "persistent_guests": [{"route":"g", "slot":0, "id":4}],
   "steps": [
     {"program": "scene", "argument": 0, "skip_flag": 1},
     {"program": "battle", "argument": 100, "skip_flag": 1},
