@@ -1,5 +1,12 @@
 # Validation by affected dependency
 
+Consecutive checkpoints: `make campaign-chains-check CHAIN_INPUT=...` runs three
+real child-process PC/ASan/UBSan flows with byte-identical session/slot snapshots,
+full16-party forced-guest AI and manifest invalidation after every child. The
+optional `check_chains.py --native-progress` adds one38-boundary progress/relocation
+carrier; unchanged battle/native frame evidence is reused. [Scope and guest
+persistence gap](CHAINS.md).
+
 Named objectives: `make campaign-objectives-check` runs original-MIPS policy,
 bank validation and actual PC/sanitizer action/save/pixel tests. The optional
 `check_objective_runtime.py --native --data-dir DIR` adds only actual ORDER/

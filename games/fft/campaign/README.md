@@ -1,5 +1,12 @@
 # Opening -> Academy -> Gariland
 
+Latest delivery (2026-11-13): [consecutive Save checkpoints](CHAINS.md). Real PC/
+sanitizer child programs verify Save, decline and defeat/Continue; fixed
+manifest relocation and FSV4 resume. Only the supervisor grows74 bytes;
+ABI90/FSV5, battle code/images/allocations and reviewed UI remain. Matching
+pilot705904 transport bytes; no native sweep or TiEmu. Persistent story-guest
+records remain missing and precede story choices/campaign extraction.
+
 Latest delivery (2026-11-13): [large named objectives](OBJECTIVES.md), approved.
 Elimination/target/protect/combined rules, fixed slot/name binding and pooled
 chapter FGO1 strips use the production renderer. Repeated result saves retain
