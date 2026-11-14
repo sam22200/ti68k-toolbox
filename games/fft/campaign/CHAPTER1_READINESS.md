@@ -29,7 +29,12 @@ FMA1/ffma13082,16 shared body/portrait records,255 names and48 distinct jobs.
 Ten accepted pictures, two real input flows, two native archive/render frames
 and package checks pass. Current battle/deployment selectors still reject
 type3 until compatible wide combat poses/animations and cover/cache are bound;
-the combat breeding loop remains open. Matching groups733226 bytes live in
+the combat breeding loop remains open. A private
+[wide body animation review](MONSTER_COMBAT_REVIEW.md) now covers all16 selected
+families, including their separate compressed attack pages and three flyers.
+The user approved those animations on2026-11-14. Battle integration and the real
+deployment/Save/Continue/battle/results loop remain; no deployment gate was removed.
+Matching groups733226 bytes live in
 `x/monster-formation/release/`. The user extended the single-palette policy to
 humans: [one readable palette per distinct model](CORE_RESOURCES.md), with
 palette-only swaps excluded from campaign ripping/shipping.
