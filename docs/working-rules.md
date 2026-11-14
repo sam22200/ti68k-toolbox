@@ -13,6 +13,13 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT human palette variants (user decision2026-11-14):** apply the same
+  storage rule to humans: choose one readable four-grey palette per distinct
+  character/job sprite model, and do not rip or ship its palette-only color
+  swaps. Share sprite/portrait records across those variants. Keep genuinely
+  different male/female models, named characters, costumes and story forms;
+  a color swap does not change gameplay identity, job, team, stats or dialogue.
+
 - **FFT monster readability (user decision2026-11-14):** one chosen appearance
   per ordinary monster family, selecting the best four-grey contrast. The three
   types remain distinguishable by their actual job names; retain their distinct

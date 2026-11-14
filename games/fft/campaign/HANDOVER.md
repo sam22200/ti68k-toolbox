@@ -1,5 +1,17 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Approved: selected monster visuals and human palette rule (2026-11-14)
+
+The user approved the selected16 monster appearances ("oui tres bien") and
+extended the no-color-swap rule to humans. Read [CORE_RESOURCES.md](CORE_RESOURCES.md)
+and `docs/working-rules.md`: choose one readable palette per distinct human
+character/job sprite model, and share it across palette-only variants rather
+than ripping them all. Keep genuinely different male/female designs, named
+characters, costumes and story forms. Actual jobs, teams, stats, identities and
+dialogue remain distinct; identified speakers retain their portraits. This
+records future extraction policy, not a shipping rebuild or measured saving.
+Continue the actual monster formation/deployment integration described below.
+
 ## Selected: one monster appearance per family (2026-11-14)
 
 Read [MONSTER_FORMATION_REVIEW.md](MONSTER_FORMATION_REVIEW.md). Branch

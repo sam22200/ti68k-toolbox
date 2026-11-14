@@ -11,6 +11,11 @@ ask for another palette selection. `tools/monster_appearance.py` records the16
 chosen source jobs for reuse by later builders. Real job IDs, names, stats,
 abilities, offspring and saved identities remain48 distinct entries.
 
+The user then approved the selected picture ("oui tres bien") and extended the
+same no-color-swap policy to human art. See [CORE_RESOURCES.md](CORE_RESOURCES.md):
+one chosen palette per distinct model, retaining real design/identity differences.
+No further palette-selection approval is pending.
+
 ## Review pictures
 
 Current files are under `games/fft/campaign/x/monster-family-review/`; the old
