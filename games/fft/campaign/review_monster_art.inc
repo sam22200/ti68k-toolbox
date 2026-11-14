@@ -2,9 +2,9 @@
 static const u8 *review_art;
 static u8 review_enabled;
 static const u8 *review_record(u8 job)
-{return review_art+8+255U*16U+(u16)(job-94)*660U;}
+{return review_art+8+48+255U*16U+(u16)review_art[8+job-94]*660U;}
 static const char *review_name(u8 id)
-{return (const char *)(review_art+8+(u16)id*16U);}
+{return (const char *)(review_art+8+48+(u16)id*16U);}
 static void review_actor(s16 x,s16 y,const SaveUnit *u)
 {
     const u8 *p=review_record(u->job);u32 rows[3][26];u8 a,b;

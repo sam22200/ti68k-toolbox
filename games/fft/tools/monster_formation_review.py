@@ -16,6 +16,7 @@ import battle
 import extract
 import interface
 import management_data
+from monster_appearance import REPRESENTATIVE_JOBS, appearance_job
 import monster_ko_review as source
 from review_files import save_image, write_changed
 
@@ -23,7 +24,7 @@ from review_files import save_image, write_changed
 def thumbnail(canvas, spr, palette):
     yy, xx = np.mgrid[:128, :128]
     opaque = canvas != 0
-    # One family scale for all three palettes; preserve the source feet origin.
+    # Preserve the source feet origin; the selected family palette shares this fit.
     for scale in range(600, 199, -1):
         x = np.floor((xx+.5-64)*scale/1000).astype(int)+16
         y = np.floor((yy+.5-96)*scale/1000).astype(int)+21
@@ -69,14 +70,15 @@ def build(cue, out):
     # Source name class0x0300 / text0x4300; same existing SMALL.OUT list as humans.
     nicknames = [interface.decode(raw).encode('ascii') for raw in entries[768:1023]]
     assert len(nicknames) == 255 and all(len(n) < 16 for n in nicknames)
-    bank = bytearray(b'FMR0'+struct.pack('>HH', 48, 255))
+    bank = bytearray(b'FMR1'+struct.pack('>HH', 16, 255))
+    bank += bytes((job-94)//3 for job in range(94, 142))
     bank += b''.join(n.ljust(16, b'\0') for n in nicknames)
     sheet_cache, rows, hashes = {}, [], {'EVENT/SMALL.OUT': hashlib.sha256(small).hexdigest()}
-    atlas = Image.new('RGB', (1008, 16*118+48), 'white')
+    atlas = Image.new('RGB', (1008, 8*150+48), 'white')
     draw = ImageDraw.Draw(atlas)
-    draw.text((8, 6), 'FORMATION PROPOSAL: source RGB / four greys / portrait; 3x nearest', fill='black')
-    draw.text((8, 24), 'Complete bodies; same family scale across palettes. Review only, no combat art.', fill='black')
-    for job in range(94, 142):
+    draw.text((8, 6), 'ONE APPEARANCE PER FAMILY: source RGB / four greys / portrait; 3x nearest', fill='black')
+    draw.text((8, 24), '48 real jobs retain their names and rules; 16 shared bodies and portraits.', fill='black')
+    for family, job in enumerate(REPRESENTATIVE_JOBS):
         record = bd.at(battle.JOBS+48*job, 48)
         sheet, palette = record[45:47]
         if sheet not in sheet_cache:
@@ -95,8 +97,10 @@ def build(cue, out):
         portrait_spr[8*32:9*32] = spr[(8+palette)*32:(9+palette)*32]
         face = management_data.portrait(portrait_spr)
         bank += interface.planes(gray, 32)+interface.planes(face, 32)
-        x, y = ((job-94) % 3)*336, ((job-94)//3)*118+48
-        draw.text((x+6, y+2), f'{job} {names[job]}  {scale/1000:.3f}', fill='black')
+        x, y = (family % 2)*504, (family//2)*150+48
+        draw.text((x+6, y+2), f'Shared appearance: {names[job]}  {scale/1000:.3f}', fill='black')
+        for variant in range(3):
+            draw.text((x+316, y+32+16*variant), names[94+3*family+variant], fill='black')
         def image(pixels):
             values = np.full(pixels.shape, 170, np.uint8)
             mask = pixels >= 0
@@ -107,10 +111,20 @@ def build(cue, out):
         atlas.paste(image(face).resize((96, 87), Image.Resampling.NEAREST), (x+206, y+22))
         rows.append(dict(job=job, name=names[job], sheet=sheet, palette=palette,
                          frame=frame, wait=wait, scale_milli=scale))
-    assert len(bank) == 8+255*16+48*(312+348)
+    assert len(bank) == 8+48+255*16+16*(312+348)
+    aliases = []
+    for job in range(94, 142):
+        original = bd.at(battle.JOBS+48*job, 48)
+        selected = bd.at(battle.JOBS+48*appearance_job(job), 48)
+        if original[45] != selected[45]:
+            raise ValueError('selected appearance belongs to another source family')
+        aliases.append(dict(job=job, name=names[job], source_palette=original[46],
+                            appearance_job=appearance_job(job), appearance_palette=selected[46],
+                            frame_id=(job-94)//3))
     write_changed(out/'ffmr.bin', bytes(bank))
     save_image(atlas, out/'atlas.png')
-    return dict(rows=rows, source_sha256=hashes, bank_sha256=hashlib.sha256(bank).hexdigest(),
+    return dict(rows=rows, aliases=aliases, physical_appearances=16, logical_jobs=48,
+                source_sha256=hashes, bank_sha256=hashlib.sha256(bank).hexdigest(),
                 source_scope='Retail job/sheet/SHP/direct SEQ records and original monster names; static first idle only',
-                proposal='Uniform fit at most0.6; 32x26 thumbnail, 32x29 portrait; no human eye/skin edits',
+                proposal='One selected palette per family; uniform fit at most0.6, 32x26 thumbnail, 32x29 portrait',
                 shipping=False, optimized=False)

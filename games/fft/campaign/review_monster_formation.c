@@ -11,7 +11,8 @@ void game_scenario(u16 n)
 {
     u8 i;u16 size;
     source_scenario(0);assert(bank&&common&&cache&&save.n==7);
-    review_art=rt_file("ffmr",&size);assert(review_art&&size==35768&&!memcmp(review_art,"FMR0",4));
+    review_art=rt_file("ffmr",&size);assert(review_art&&size==14696&&!memcmp(review_art,"FMR1",4));
+    for(i=0;i<48;i++)assert(review_art[8+i]==i/3&&review_record((u8)(94+i))==review_record((u8)(94+(i/3)*3)));
     review_enabled=n!=0&&n<100;n%=100;save.n=10;
     for(i=1;i<8;i++){
         SaveUnit base=save.unit[1];save.unit[i]=base;
@@ -22,6 +23,8 @@ void game_scenario(u16 n)
         world_party_clear_slot(&save.world,i);
     }
     save.world.egg[7]=0x32;
+    assert(save.unit[1].job==94&&save.unit[2].job==95);
+    assert(strcmp(job_name(&save.unit[1],0),job_name(&save.unit[2],0)));
     save.unit[8]=save.unit[0];save.unit[9]=save.unit[0];
 #ifdef MONSTER_DEPLOY_REVIEW
     // Visual fixture only: placement bypasses the still-closed production gate.

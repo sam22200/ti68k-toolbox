@@ -2,8 +2,9 @@
 """Render private proposed monster art through actual PC management/deployment.
 
 Generate explicit review-only copies with anchored hooks; never edit production
-pages or activate deployment rules before the user's visual verdict. No native
-build, optimization, benchmark or shipping package belongs to this review.
+pages or activate deployment rules. No native build, CPU benchmark or shipping
+package belongs to this review. Palette selection follows the user's delegated
+one-appearance-per-family decision.
 """
 import argparse
 import hashlib
@@ -76,7 +77,7 @@ def collage(out):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--sanitize',action='store_true');args=ap.parse_args()
-    out=HERE/'x/monster-formation-review';out.mkdir(parents=True,exist_ok=True)
+    out=HERE/'x/monster-family-review';out.mkdir(parents=True,exist_ok=True)
     info=art.build(core_audit.DEFAULT_DISC,out);info['production_source_sha256']=prepare(out)
     flags=['-fsanitize=address,undefined','-fno-sanitize=shift','-fno-pie','-no-pie']if args.sanitize else []
     snapshots={}
