@@ -1,5 +1,26 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Pending: egg/calendar visual review (2026-11-14)
+
+Read [EGG_REVIEW.md](EGG_REVIEW.md). Branch `feat/fft-egg-review` prepares PC-only
+source egg/grid/card, compact Dismiss and default-No confirmation, plus a small
+world-map date panel. Gallery decisions: `x/egg-review/review.png`, `calendar.png`.
+User verdict is pending. Do not integrate/optimize/benchmark the new picture
+before that verdict; no production Save/worldmap/manage/ABI/package edits yet.
+PC/sanitizer picture hashes: DAB9/9C07/AA1B/E3DF, map DDB3/EAAA. Only private
+fixtures were written. Native backend269/69509ED8 evidence is reused, no TI run.
+
+Independent read-only original Gariland deployment fixture has calendar Jan1,
+era0 (event9, DATE_ADVANCE0), with preserved state SHA/mtime; this supplies a
+documented pilot migration baseline, not legacy elapsed travel or full retail
+chronology. EGG_REVIEW lists every migration/roster/route caller to bind next.
+Current deploy/party selectors reject all type3 monsters, not just eggs; grown
+monster deployment/source art must remain explicit in completion claims.
+Once the user approves the actual pictures, continue full durable save/route/
+roster/egg-control integration, actual PC Save/Continue/child flows, then only
+changed ABI/native boundaries. Capacities, existing releases and16KiB deficit
+remain. Do not start Bar/content extraction before this breeding integration.
+
 ## Latest: calendar and breeding backend (2026-11-14)
 
 Read [BREEDING.md](BREEDING.md). Portable daily calendar/egg/offspring/generation

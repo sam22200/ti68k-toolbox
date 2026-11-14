@@ -5,6 +5,10 @@ into the shipping world map, FSV6, deployment, management or packages yet. The
 Chapter I breeding prerequisite remains open. Current installed programs and
 reviewed pictures are unchanged; use the story-choice release, not this fixture.
 
+[Egg/calendar prototypes and save/travel integration preparation](EGG_REVIEW.md)
+are available; the new picture awaits user approval. The observed original
+Gariland deployment fixture supplies a Jan1/era0 pilot baseline.
+
 ## Source and portable rules
 
 The target is USA PS1. Local decomp source leads are
