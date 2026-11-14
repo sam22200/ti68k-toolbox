@@ -77,7 +77,7 @@ percentages; neither should replace original conditions/tables.
 
 | System | Native state | Original routines identified for the bounded follow-up |
 |---|---|---|
-| Calendar/breeding | World-map route animation exists, but Save has no world date, egg state or hatch timers. Saved recruited monsters use type3; that alone is not breeding. | `world_unit_update_monster_breeding`, `main_party_create_monster_egg`, formation hatch progress/total helpers. |
+| Calendar/breeding | [Portable backend](BREEDING.md) checked on PC/sanitizers/one68000 carrier, plus ten original-MIPS policy/hatch fixtures. FSV6/worldmap/deployment/management integration and reviewed egg UI remain; current shipping Save has no date/eggs. | `world_unit_update_monster_breeding`, `main_party_create_monster_egg`, formation hatch progress/total helpers; travel day is at completed location-to-location leg arrival. |
 | Bar/rumors | No Bar/rumor route in worldmap.c. The generic menu's unavailable entries are not working Bars. Save has no rumor-specific state. | `wldcore_list_open_rumors`, `wldcore_bar_push_rumor_detail_level`, rumor input/close handlers and their script variables. |
 | Propositions | No worker dispatch, away-unit state, active job timers or return settlement in the native save/UI. | `wldcore_list_open_available_propositions`, dispatch candidate/confirmation handlers, proposition states, `main_job_add_proposition_jp`. |
 | Poaching | `nature_runtime.inc::nature_hit_commit` removes the victim and rolls source loot. Its explicit policy gives blue-party loot directly to capped inventory. There is no independent Fur Shop stock or purchase UI. | `battle_action_add_poached_item_to_fur_shop_inventory`, `world_shop_adjust_poached_item_quantity`, shop eligibility/price/transaction handlers. |
@@ -93,7 +93,8 @@ inventory limits. Its exact rare/common selector is already covered by the
 earlier discovery oracle; preserve it rather than rounded guide percentages.
 
 These are source leads, not complete retail flow certification. In particular,
-identify where travel advances the date, which rumor interactions write story
+travel advances the date at completed route-leg arrival (source read, see
+BREEDING.md). Still identify which rumor interactions write story
 state, and how purchase access/prices depend on chapter and equipped support.
 
 ## Required work before campaign extraction
@@ -101,7 +102,7 @@ state, and how purchase access/prices depend on chapter and equipped support.
 1. **Shared world clock and durable state.** Advance time by original travel
    rules once, not by animation frames, repeated ENTER, cancelled travel or
    reentry. Define compact persistent dates/egg/job/rumor/poach state with
-   migration from FSV5. Keep current saves, permanent raw stats, discovery,
+   migration from current FSV6 and older formats. Keep current saves, permanent raw stats, discovery,
    roster compaction and unused party records intact. Measure RAM costs; the
    existing16KiB gate is unpassed and cache capacities must not be reduced.
 2. **Breeding and eggs.** Source-check generation/hatching order, offspring

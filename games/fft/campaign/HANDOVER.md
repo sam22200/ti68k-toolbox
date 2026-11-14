@@ -1,5 +1,35 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Latest: calendar and breeding backend (2026-11-14)
+
+Read [BREEDING.md](BREEDING.md). Portable daily calendar/egg/offspring/generation
+rules now pass269 PC/ASan/UBSan boundaries,69509ED8; five FWB1 rejection suites
+and ten original-MIPS daily-policy/hatch fixtures pass. One small68000 carrier
+agrees on layout/pointers/arithmetic. No battle sweep, packaging or TiEmu.
+
+FWB1 is285 universal rule bytes, extracted only under ignored `x/breeding/`;
+growth/skillsets remain shared. Proposed WorldParty69 bytes hold calendar,
+20 packed timers, birthdays and colors. It is **not appended to Save yet**.
+Children are generated once at laying into ordinary16-slot SaveUnits, using
+existing seed/raw-current storage. Source order, full-roster draws, guest
+parents/donors, hatch exclusion and slot-metadata helpers are checked. This is
+backend evidence, not real Save/Continue/travel/deployment integration; current
+shipping FSV6/ABI91/Work29340/Save3918/zone8842 and story-choice groups remain.
+
+**Next:** integrate durable calendar/egg migration and actual route-leg arrivals,
+with all roster compaction/recruitment producers and egg exclusions; prepare
+the real roster/egg/status preview for visual approval before retaining the
+new picture. Use actual PC Save/Continue, repeated input/cancel/reentry flows,
+then only the changed save/layout/native paths. Source travel adds one day at
+each completed location-to-location leg, not each interpolation point or route
+cost; script time jumps use a different original routine. Resolve a documented
+chapter/event start date for legacy saves and a durable clock/RNG policy.
+Current code does not yet recognize eggs outside the backend: do not enable
+the generator in worldmap alone. See BREEDING.md for the integration contract.
+Then Bar/rumors/Propositions and full Fur Shop remain pre-extraction gates.
+The16KiB installed RAM/peak gate remains open; keep capacities and defer hard
+RAM recovery. Protected19 bytes/mtime remain; evidence `x/breeding/verification.json`.
+
 
 ## Latest: story choices and conditional scenes (2026-11-13)
 
