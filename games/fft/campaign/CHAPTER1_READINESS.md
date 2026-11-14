@@ -9,18 +9,20 @@ unlocks preserved (rumors in I, Propositions from II, Fur Shops from III).
 and [four traps/level-down persistence](TRAPS.md) are delivered and approved.
 Approved [monster KO support](MONSTER_KO.md) renders six source families through
 optional chapter art and the unchanged48-entry cache. [Large named objectives](OBJECTIVES.md)
-are now approved and integrated: target/protect/combined, with explicit binding
-and repeated-receipt save fixes. ABI90/Work29314/Save3204/FCD5; true input61317/
-headroom3619, matching pilot groups705830 transport bytes. Objectives add4
-requested heap bytes and106 resident program bytes versus the KO lot.
-[Consecutive Save checkpoints](CHAINS.md) now pass full PC/sanitizer child-process
-flows, including a protected imposed guest at full16-party capacity. The
-supervisor's relocation and FSV4-resume bugs are fixed; real pilot groups total
-705904 bytes. Guest progression still needs separate persistent records (source
-slots16..19); FSV5 currently recreates fixed guests each encounter.
-Standing/action monster art, other palettes, persistent guests, authored chain/choice content
-and the side systems above remain. RAM figures below are dated evidence, not a
-new16KiB pass; difficult recovery remains deferred.
+are approved and integrated: target/protect/combined, explicit binding and
+repeated-receipt fixes. [Consecutive Save checkpoints](CHAINS.md) and
+[persistent story guests](GUESTS.md) now pass real PC/sanitizer child-process
+flows, including Save, decline and defeat/Continue at full16-party capacity.
+FSV6 retains four separate guests, migrates FSV2..5, and offers remove/recruit
+hooks. The pilot persists Gariland's Delita through an authored stable key;
+Orbonne's fixed prologue actors stay encounter-local. Story choice/effect UI
+and conditional/recruitment flags are next.
+ABI91/Work29340/Save3918/FCD5, zone8842; true input61381/headroom3555,
+matching pilot groups708776 transport bytes. Seven game-block requests grow884
+bytes to99332; cache/capacities remain. One selected13-actor frame replay stays
+AA26/355080 cycles. Standing/action monster art, other palettes, authored retail
+chains/choices and the side systems above remain. RAM figures below are dated
+evidence, not a new16KiB pass; difficult recovery remains deferred.
 
 Current integration (2026-11-12): all155 audited Chapter I actions are executable.
 [Sweegy combat/save replays](CHAPTER1_MONSTER_BATTLE.md) now exercise the first
@@ -58,7 +60,7 @@ handling. Bars need town/story-filtered rumors and later dispatch/return jobs.
 Poaching currently gives an item directly to the party: source-correct Fur Shop
 stock/access/purchases and save migration remain. These are explicit gates,
 not implicit completion under generic R/S/M coverage. Preserve later chapter
-unlocking while testing reusable machinery with PC injection doors. Named objectives and Save checkpoints are delivered; continue persistent guest/choice integration
+unlocking while testing reusable machinery with PC injection doors. Named objectives and Save checkpoints are delivered; continue story choice/effect integration
 and the complete prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)

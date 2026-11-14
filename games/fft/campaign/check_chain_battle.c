@@ -23,7 +23,12 @@ int main(int argc,char **argv)
     CHECK(save_load(&entry));snapshot(ordinal,"before",&entry);
     CHECK(entry.n==16&&st.party_in&&NUNIT==11&&CD(PARTY)==3);
     CHECK(st.unit[0].team==TEAM_GUEST&&!strcmp(unit_name(0),"Delita"));
-    CHECK(st.unit[0].level==unit_defs[0].level&&st.unit[0].hp>0);
+    CHECK(st.unit[0].level==(save_guest_find(&entry,4)<GUEST_MAX?entry.guest[save_guest_find(&entry,4)].level:unit_defs[0].level)&&st.unit[0].hp>0);
+    if(W->guest_key[0]&&save_guest_find(&entry,4)<GUEST_MAX){
+        const SaveUnit *g=&entry.guest[save_guest_find(&entry,4)];
+        CHECK(st.unit[0].jp==qword(g->jp[0])&&st.unit[0].exp==g->exp);
+        CHECK(st.unit[0].slot>=16&&st.unit[0].slot<20);
+    }
     CHECK(!unit_party_member(&st.unit[0])&&unit_home_team(&st.unit[0])!=TEAM_ENEMY);
     CHECK(RD16(W->goal,1)==0&&RD16(W->goal,2)==1);
     for(i=6;i<NUNIT;i++)CHECK(st.unit[i].slot<5); // forced guest consumed no deployed slot
@@ -48,6 +53,16 @@ int main(int argc,char **argv)
     else{
         CHECK(st.open_handoff&&st.reward_ready&&st.reward_page==3);
         CHECK(exit.n==16);CHECK(actions>0&&guest_actions>0);
+        if(W->guest_key[0]){
+            u8 g=save_guest_find(&exit,4);CHECK(g<GUEST_MAX);
+            if(g<GUEST_MAX){CHECK(exit.guest[g].exp==st.unit[0].exp&&exit.guest[g].level==st.unit[0].level);
+                CHECK(qword(exit.guest[g].jp[0])==st.unit[0].jp);
+                if(save_guest_find(&entry,4)<GUEST_MAX){
+                    const SaveUnit *old=&entry.guest[save_guest_find(&entry,4)];
+                    CHECK(exit.guest[g].level>old->level||exit.guest[g].exp>old->exp);
+                    CHECK(qword(exit.guest[g].tjp[0])>qword(old->tjp[0]));
+                }}
+        }
         CHECK(qlong(exit.money)==qlong(entry.money)+st.reward_base+st.reward_bonus);
         CHECK(exit.flags[(CD(WON)-1)>>3]&(1U<<((CD(WON)-1)&7)));
         for(i=5;i<16;i++)CHECK(!memcmp(&entry.unit[i],&exit.unit[i],sizeof(SaveUnit)));

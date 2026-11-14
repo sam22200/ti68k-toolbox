@@ -22,7 +22,7 @@ Use PC/sanitizers first; only selected changed-layout/native checks at the end.
 | Degenerator persistence | Current raw stats and source level-down/growth persist across levels/jobs. FSV5 adds a two-byte roster bitmap; PC/sanitizers and actual native overlay/save checks pass. | Does not reconstruct historical PS1 growth for legacy native records. |
 | Permanent death | KO counts3..0 survive; crystal/chest/gone removes party slots at victory. Undeployed members and other records survive compaction. | Keep regression tests; scripted objective losses remain distinct. |
 | Consecutive battles/save proposal | [Delivered and integration-tested](CHAINS.md): direct steps, intermediate Save or decline, cold-child receipts, defeat/Continue at the correct fight. Fixed relocation of step metadata and FSV4 resume; completion predicates must match descriptor WON. PC/sanitizer save bytes agree; one small native reader/relocation carrier passes. | Author actual retail chain content; the two-arena QA fixture is not a shipping campaign sequence. |
-| Imposed guests | Fixed TEAM_GUEST slots survive full16-party loading and use AI; the consecutive-battle test verifies no ordinary party slot is consumed or guest silently recruited. | **Persistent guest records are missing from FSV5.** Source guest slots16..19 retain progression separately; implement keyed guest EXP/JP/equipment/membership save/load/remove/recruit hooks and migration before extraction. Fixed guests are currently recreated per encounter. |
+| Imposed guests | [Delivered backend](GUESTS.md): four separate FSV6 guest slots, stable chapter-wide keys, shared progression/stat readers/writers, absent reserves, full-capacity rejection and remove/recruit hooks. The pilot persists Delita; full16-party Save/Continue chains and selected native checks pass. Guest equipment joins99-owned counts. | Story choice/effect callers must commit recruitment/removal with their flags. Author stable identities, scripted job transitions and encounter-local exceptions in actual campaign content. |
 | Objective types | [Approved and integrated](OBJECTIVES.md): elimination, one named target, one protected ally or both. Explicit FGO1 slot/name binding, settled loss priority, large Lato names and relevant pulses. PC/sanitizers and selected native action/save/render checks pass. | Author encounter-specific fixed identities and aftermath. More complex event-triggered goals remain content; the pilot keeps elimination. |
 | Story choices | Scene steps only play titles, stories, cards, narration and overlays; no choice/effect opcode exists. | Recruitment/refusal and conditional story effects through the common menu, exactly-once saves/flags. User's final phrase about other effects awaits clarification. |
 | Monster breeding | Recruited monsters can be saved as type3. No persistent world date, egg generation/hatch lifecycle or egg roster state exists. | Fixed offspring, source family/variant/timer rules, shared travel clock,16-slot/full-roster handling, save migration and reviewed egg UI. |
@@ -79,7 +79,7 @@ persistent-departure certification.
 
 ## Resume
 
-Continue with persistent story guests, choices, authored chain content and the
+Continue with story choices/effects using the guest hooks, authored chain content and the
 new world/party side systems. Full standing/action monster art remains content
 work. Keep every remaining item explicit; do not describe the chapter/core
 as ready merely because generic combat coverage and archive planning pass.

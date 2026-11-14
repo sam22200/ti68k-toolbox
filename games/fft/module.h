@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 90U
+#define MOD_ABI 91U
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -21,7 +21,7 @@ typedef struct {
     u16 sig;                            // MOD_SIG, from the module's own build
     union {                             // transient input, never gameplay/save state
         struct {u16 cast_ability;u8 cast_actor,cast_ref;};
-        u8 *chapter_story_after;         // PARTY10 cold script flags
+        u8 *chapter_story_after;         // RESOURCES20 cold script flags
         const CoreBoot *boot;          // RESOURCES13: cold pointer bindings, no gameplay state
         Unit *stats_unit;                // resident -> PARTY9 only
         char *window_out;               // resident -> RESULTS1 only

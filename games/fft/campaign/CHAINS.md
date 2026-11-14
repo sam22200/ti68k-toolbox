@@ -1,5 +1,12 @@
 # Consecutive battles and intermediate Save checkpoints
 
+
+Later guest update (2026-11-13): [GUESTS.md](GUESTS.md) supersedes this delivery's
+FSV5 lengths and missing-guest section. FSV6 now has four persistent guest slots;
+`check_chains.py --guests` checks natural guest progression and identical Save/
+Continue snapshots alongside16 ordinary party slots. The authored retail chain
+content remains future work. The original checkpoint measurements below are dated.
+
 2026-11-13. The supervisor's existing direct battle sequence is now checked
 through real, separate PC battle and title processes. Save, decline and
 defeat/Continue resume the right encounter without a world-map detour. The
@@ -93,7 +100,7 @@ Evidence and normalized fixture packages: `x/chains/verification.json`, logs,
 the real pilot `release/`. The displayed Save screen capture is under `review/`.
 Historical groups, saves and unrelated user files retain bytes and timestamps.
 
-## Guest progression is still missing
+## Historical guest gap (now delivered above)
 
 **Source-code read, not a new retail execution:** `unit.h` defines16 ordinary
 party slots plus guest slots16..19 (`PARTY_ROSTER_SLOT_COUNT=20`).

@@ -42,7 +42,10 @@ def synthetic(core, chapter):
             if name=='ffod':words[42]=1
             words[44] = 1 if name=='ffod' else 2
             words[52]=56 if name=='ffod' else 22
+            words[17]=106
             raw = b'FCD5'+struct.pack('>51H', *words[2:])
+            units=bytearray(28*11);units[11]=2
+            raw+=units
         code = name.startswith('fft') and not name.endswith('core') and name != 'fftitle'
         source[name] = packages.Variable(name, 0x21 if code else 0x1c,
                                         0 if name == 'fftstory' else 3,
@@ -80,9 +83,10 @@ def main():
     variables = shared+packs[0][1]
     # The running supervisor's own image differs from its file: never a checked dependency.
     verify(b'fftstory' not in next(v for v in shared if v.name == 'ffcore').payload)
-    verify(len({v.name for v in variables}) == len(source)+2)
+    generated={'ffgu'} if 'persistent_guests' in chapter else set()
+    verify(len({v.name for v in variables}) == len(set(source)|generated)+2)
     verify(not set(v.name for v in shared)&set(v.name for v in packs[0][1]))
-    verify(set(source) == set(v.name for v in variables)-{'ffcore', 'ffpack'})
+    verify(set(source)|generated == set(v.name for v in variables)-{'ffcore', 'ffpack'})
     roundtrip = out/'roundtrip.89g';roundtrip.write_bytes(packages.group_bytes(variables))
     verify(packages.read_group(roundtrip) == {v.name:v for v in variables})
     before = roundtrip.read_bytes()

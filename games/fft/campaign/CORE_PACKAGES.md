@@ -1,5 +1,15 @@
 # Shared core and replaceable chapter packages
 
+FSV6/FGP1 update (2026-11-13): [persistent guests](GUESTS.md) require matching
+ABI91/F8B5 core/chapter groups. `persistent_guests` generates one chapter-owned
+`ffgu` during the mandatory shipping pass; repeat builds/core reuse retain it.
+The pilot binds Delita4 in Gariland, leaving prologue actors encounter-local.
+FSV2..5 migrate to3918-byte saves with four empty guest slots. Save slots remain
+outside installation groups and change only through explicit Save. Current
+transport416987+291789=708776 bytes; input61381/headroom3555, zone8842,
+Work29340. Older measurements/formats below are historical.
+
+
 Checkpoint update (2026-11-13): [CHAINS.md](CHAINS.md). Core declarations require
 `checkpoint_version:1` for safe intermediate Save and FSV2/3/4/5 progress reads.
 Battle step skip_flag must match descriptor WON; Save prompts need that durable
@@ -133,7 +143,7 @@ failed ("Missing data or memory") after title → scene. A normal start (`fftsto
 to the title when a step returns 0 (Game Over, quit battle), as in FFT; Continue resumes before
 that step. Direct doors (`fftstory(2)`, `fftstory(99)`) still stop at HOME.
 
-FSV5 (FSV2/3/4 migration), all three slots, original source IDs, party/inventory/progression and
+FSV6 (FSV2..5 migration), all three slots, original source IDs, party/inventory/progression and
 legacy migration stay unchanged. Step predicates read persisted story flags;
 the existing Academy/deployment `flow` byte retains its pilot-specific meaning.
 This does not introduce a new campaign scripting VM or generic mid-scene save.

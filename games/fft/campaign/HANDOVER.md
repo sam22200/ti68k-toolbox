@@ -1,5 +1,44 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+
+## Latest: persistent story guests (2026-11-13)
+
+Read [GUESTS.md](GUESTS.md). Four FSV6 guest slots preserve16 normal party slots.
+Shared serialization/restoration retains EXP/JP/levels, equipment, quarter Brave/
+Faith and current raw stats. Stable FGP1 keys survive encounter-slot changes;
+absent guests remain in reserve. Overflow rejects entry; remove/recruit hooks
+are atomic in-memory operations, with full-party recruitment leaving both rosters
+untouched. Guest equipment counts toward99-owned stock. The shipping pass now
+builds one12-byte `ffgu` from the pilot's `persistent_guests` declaration (Delita4
+in Gariland); fixed Orbonne prologue actors remain encounter-local.
+
+PC/ASan/UBSan and actual68000 guest SAVE/restore pass104 checks/11AC3656.
+Three real PC/sanitizer child-process chains pass Save, decline and defeat/
+Continue with byte-identical snapshots; Delita naturally grows15/EXP91/TJP210
+at the checkpoint ->16/EXP0/TJP302. The full16-player roster stays full.
+Package checks42 host/831 C pass. Selected native scene/save198/5501566B and
+13-actor equipment AA26/355080 cycles pass; no native sweep/TiEmu. Historical
+manage-test's three-vs-five-unit fixture mismatch remains known; focused raw-
+management guest-tail/job/save checks and title/deployment/world/scene pass.
+
+ABI91/ModCtx352/F8B5, Work29340, Save3918/FSV6,28 images, zone8842;
+Unit112/State2224 remain. Native seven game-block requests99332 (+884), actual
+battle input61381/headroom3555. Cold result/grid/glyph setup is RESOURCES17..20;
+guest bind16 returns before PARTY15 restores. Shared rules/cache capacities stay.
+Pilot core416987 + chapter291789 =708776 transport bytes, key
+165279dae1c252e57b85cbc33e976fcb. Use matching `x/guests/release/` groups;
+old chapter art/encounters remain exact. Protected19 byte/timestamp checks pass.
+The16KiB installed free-RAM/peak gate is still open; difficult recovery is deferred.
+
+**Next:** story choice/effect opcodes and recruitment/refusal/conditional flags,
+using the guest lifecycle hooks and a durable atomic Save. Show any new choice
+presentation for visual approval before integrating it. Then breeding, Bar/
+rumors/Propositions and full Fur Shop machinery remain pre-extraction gates.
+Authored retail chains, character transitions and remaining monster artwork
+are content work; no campaign ripping or generic combat-family queue yet.
+
+The earlier deliveries below retain their dated formats/budgets.
+
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
 ### Latest delivery: consecutive battle checkpoints (2026-11-13)

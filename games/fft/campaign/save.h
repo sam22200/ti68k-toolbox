@@ -12,13 +12,19 @@
 #include "save_types.h"
 #ifndef SAVE_OFFSETS_ONLY
 #include <string.h>
+#include "guest_roster.h"
 #define SAVE_NAME SAVE_SESSION_NAME
 // FSV2 had no funds or deployment. Preserve its entire party/flags/inventory;
 // initialize the newly introduced balance to the source's starting2000gil.
 static u8 save_load_from(const char *name,Save *s)
 {
     memset(s,0,sizeof *s);
-    if(rt_load(name,s,sizeof *s)&&!memcmp(s->magic,SAVE_MAGIC,4))return s->n<=PARTY_MAX;
+    if(rt_load(name,s,sizeof *s)&&!memcmp(s->magic,SAVE_MAGIC,4)){
+        if(save_guests_valid(s))return 1;
+        memset(s,0,sizeof *s);return 0;
+    }
+    memset(s,0,sizeof *s);
+    if(rt_load(name,s,SAVE_V5_BYTES)&&!memcmp(s->magic,"FSV5",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
     memset(s,0,sizeof *s);
     if(rt_load(name,s,SAVE_V4_BYTES)&&!memcmp(s->magic,"FSV4",4)&&s->n<=PARTY_MAX){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
     memset(s,0,sizeof *s);

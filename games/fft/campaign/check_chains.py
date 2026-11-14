@@ -17,6 +17,7 @@ import tempfile
 from check_flow import HERE, ROOT, fixture
 import chapter_packages as packages
 import objective_bank
+import guest_bank
 
 
 def run(command, log, cwd=ROOT, allowed=(0,)):
@@ -29,9 +30,10 @@ def run(command, log, cwd=ROOT, allowed=(0,)):
     return p.stdout
 
 
-def chain_fixture(source):
+def chain_fixture(source, guests=False):
     core = json.loads((HERE/'packages/core.json').read_text())
     spec = deepcopy(json.loads((HERE/'packages/chapter-01.json').read_text()))
+    spec.pop('persistent_guests', None)
     spec.update(title='Private QA: two borrowed arenas, forced guest and checkpoint',
                 world_map=False, requires_flag=0, completion_flag=9, next=65535,
                 routes=[dict(band=2, prefix='g'), dict(band=3, prefix='h')],
@@ -53,8 +55,11 @@ def chain_fixture(source):
         source[old.name] = packages.Variable(old.name, old.kind, old.attr, bytes(desc)+packages.resources.TRAILER)
     goals = objective_bank.build([dict(route=p, protect=dict(slot=0, name='Delita')) for p in ('g', 'h')])
     source['ffgo'] = packages.Variable('ffgo', 0x1c, 3, goals+packages.resources.TRAILER)
+    if guests:
+        spec['variables'].append('ffgu')
+        source['ffgu'] = packages.Variable('ffgu', 0x1c, 3, guest_bank.build([dict(route=p, slot=0, id=4) for p in ('g', 'h')])+packages.resources.TRAILER)
     source = {name: source[name] for name in core['variables']+spec['variables']}
-    initial = bytearray(b'FSV5'+fixture()[4:]+bytes(66))
+    initial = bytearray(b'FSV6'+fixture()[4:]+bytes(3918-len(fixture())))
     initial[4] = 3; initial[36] = 16; initial[3114] = 4; initial[3115:3138] = bytes(23)
     for slot in range(7, 16):
         initial[294+176*slot:294+176*(slot+1)] = initial[470:646]
@@ -98,8 +103,9 @@ def main():
     ap.add_argument('--input', type=Path, required=True, help='current core/chapter source.89g built once beforehand')
     ap.add_argument('--out', type=Path, default=HERE/'x/chains')
     ap.add_argument('--native-progress', action='store_true')
+    ap.add_argument('--guests', action='store_true', help='retain Delita by stable identity across both fights')
     args = ap.parse_args(); out = args.out.resolve(); out.mkdir(parents=True, exist_ok=True)
-    source, core, spec, initial = chain_fixture(packages.read_group(args.input.resolve()))
+    source, core, spec, initial = chain_fixture(packages.read_group(args.input.resolve()), args.guests)
     report, shared, content = packages.build(source, core, [spec], out/'fixture-package')
     variables = shared+content[0][1]
     # Authoring failures must be rejected before distributing an unusable checkpoint.
@@ -108,6 +114,13 @@ def main():
         try: packages.chapter_package(source, bad, core, bytes.fromhex(report['core_key']))
         except ValueError: pass
         else: raise AssertionError(('bad checkpoint accepted', change))
+    if args.guests:
+        for raw in (b'FGP1', guest_bank.build([dict(route='g', slot=1, id=4)])):
+            bad_source = dict(source)
+            bad_source['ffgu'] = packages.Variable('ffgu', 0x1c, 3, raw+packages.resources.TRAILER)
+            try: packages.chapter_package(bad_source, spec, core, bytes.fromhex(report['core_key']))
+            except ValueError: pass
+            else: raise AssertionError('invalid guest binding accepted')
     binaries = {}; common = [ROOT/'runtime/core/rt_core.c', ROOT/'runtime/platform-sw/rt_sw.c']
     for mode, flags in [('pc', []), ('san', ['-fsanitize=address,undefined', '-fno-sanitize=shift', '-fno-pie', '-no-pie'])]:
         for name, filename, runtime in [('battle', 'check_chain_battle.c', True), ('title', 'check_chain_title.c', True),
@@ -123,7 +136,7 @@ def main():
         values = [int(v, 16) for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)', log)]
         assert values[-3:] == [int(expected[1], 16), 0, int(expected[2])], values
     summary = dict(cases=results, native_progress=args.native_progress, private_chain_not_retail_content=True,
-                   core_key=report['core_key'], abi_unchanged=90, save_bytes_unchanged=3204,
+                   core_key=report['core_key'], abi=91, save_bytes=3918, persistent_guests=args.guests,
                    initial_sha256=hashlib.sha256(initial).hexdigest(),
                    preserved=json.loads((HERE/'x/objectives/verification.json').read_text())['protected'])
     (out/'verification.json').write_text(json.dumps(summary, indent=2)+'\n')

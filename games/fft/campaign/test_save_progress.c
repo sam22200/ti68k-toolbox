@@ -56,9 +56,9 @@ static void relocation(void)
 }
 static void trials(void)
 {
-    static const u16 sizes[]={SAVE_V2_BYTES,SAVE_V3_BYTES,SAVE_V4_BYTES,sizeof(Save)};
+    static const u16 sizes[]={SAVE_V2_BYTES,SAVE_V3_BYTES,SAVE_V4_BYTES,SAVE_V5_BYTES,sizeof(Save)};
     u8 version,i;FpProgress p;
-    for(version=0;version<4;version++){
+    for(version=0;version<5;version++){
         u16 n=sizes[version];memset(bytes,0,sizeof bytes);
         memcpy(bytes,"FSV2",4);bytes[3]+=version;bytes[36]=16;
         bytes[4]=0x82;bytes[5]=1;bytes[35]=0x80;bytes[SAVE_FLOW_OFFSET]=4;

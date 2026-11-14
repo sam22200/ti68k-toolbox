@@ -1,5 +1,13 @@
 # Shared campaign resources and shipping deduplication
 
+FGP1 update (2026-11-13): [persistent guests](GUESTS.md) use one chapter-wide
+`ffgu` directory of stable identity/encounter-slot references. The shipping pass
+generates it from `persistent_guests`, checks an explicitly supplied bank against
+the declaration, and includes it in the existing ownership/duplicate audit.
+The pilot adds12 raw bytes for Delita, sharing all existing portraits/sprites.
+No per-encounter actor copy or frame-time lookup; ABI91 matching keys are required.
+
+
 FGO1 update (2026-11-13): [named objectives](OBJECTIVES.md) use optional active-
 chapter `ffgo`, one route directory with exact shared title/name spans across
 all encounters. Two equal routes add only16 directory bytes. Core result/default
