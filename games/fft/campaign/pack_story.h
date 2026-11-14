@@ -41,9 +41,9 @@ title:
         if(k>=fp_word(p+32))break;
         step=p+fp_word(p+38)+k*FP_STEP_BYTES;
         if(fp_needed(step,state.flags,state.flow)){
-            unsigned char op=step[0];unsigned short argument=fp_word(step+2);
+            unsigned char op=step[0],flags=step[1];unsigned short argument=fp_word(step+2);
             if(!call(op,argument)){if(!arg)goto title;return FP_OK;}
-            if(step[1]&FP_SAVE_PROMPT)call(FP_TITLE,3);   /* SHIFT/ESC declines */
+            if(flags&FP_SAVE_PROMPT)call(FP_TITLE,3);   /* SHIFT/ESC declines */
             progress(&state);
         }
     }

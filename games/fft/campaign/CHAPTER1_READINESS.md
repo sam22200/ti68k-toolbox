@@ -13,7 +13,12 @@ are now approved and integrated: target/protect/combined, with explicit binding
 and repeated-receipt save fixes. ABI90/Work29314/Save3204/FCD5; true input61317/
 headroom3619, matching pilot groups705830 transport bytes. Objectives add4
 requested heap bytes and106 resident program bytes versus the KO lot.
-Standing/action monster art, other palettes, authored guest/chain/choice content
+[Consecutive Save checkpoints](CHAINS.md) now pass full PC/sanitizer child-process
+flows, including a protected imposed guest at full16-party capacity. The
+supervisor's relocation and FSV4-resume bugs are fixed; real pilot groups total
+705904 bytes. Guest progression still needs separate persistent records (source
+slots16..19); FSV5 currently recreates fixed guests each encounter.
+Standing/action monster art, other palettes, persistent guests, authored chain/choice content
 and the side systems above remain. RAM figures below are dated evidence, not a
 new16KiB pass; difficult recovery remains deferred.
 
@@ -53,7 +58,7 @@ handling. Bars need town/story-filtered rumors and later dispatch/return jobs.
 Poaching currently gives an item directly to the party: source-correct Fur Shop
 stock/access/purchases and save migration remain. These are explicit gates,
 not implicit completion under generic R/S/M coverage. Preserve later chapter
-unlocking while testing reusable machinery with PC injection doors. Named objectives are delivered; continue authored guest/chain/choice integration
+unlocking while testing reusable machinery with PC injection doors. Named objectives and Save checkpoints are delivered; continue persistent guest/choice integration
 and the complete prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)

@@ -7,6 +7,7 @@
 #define SAVE_OFFSETS_ONLY
 #include "save.h"
 #include "pack_story.h"
+#include "save_progress.h"
 static short chapter(const char *command)
 {
     HANDLE h;short result;
@@ -28,11 +29,7 @@ static const unsigned char *package_file(const char *name,unsigned short *size)
 static void progress_read(FpProgress *state)
 {
     unsigned short n;const unsigned char *p=package_file(SAVE_NAME,&n);
-    memset(state,0,sizeof *state);
-    if(!p||n<SAVE_V2_BYTES+6||
-       (memcmp(p,SAVE_MAGIC,4)&&memcmp(p,"FSV3",4)&&memcmp(p,"FSV2",4)))return;
-    memcpy(state->flags,p+SAVE_FLAGS,32);
-    if(n>=SAVE_V3_BYTES+6&&memcmp(p,"FSV2",4))state->flow=p[SAVE_FLOW_OFFSET];
+    save_progress_read(p,p?n:0,state);
 }
 static void progress_reset(void)
 {

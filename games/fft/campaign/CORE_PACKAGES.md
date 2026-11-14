@@ -1,5 +1,11 @@
 # Shared core and replaceable chapter packages
 
+Checkpoint update (2026-11-13): [CHAINS.md](CHAINS.md). Core declarations require
+`checkpoint_version:1` for safe intermediate Save and FSV2/3/4/5 progress reads.
+Battle step skip_flag must match descriptor WON; Save prompts need that durable
+flag. Matching core/chapter keys reject the preceding supervisor. FKP1/FSV5/
+ABI90 remain; only fftstory grows74 bytes (pilot414169+291735 transport bytes).
+
 FGO1 update (2026-11-13): [named objectives](OBJECTIVES.md) add optional shared
 chapter `ffgo` and an `objective_format: FGO1` core declaration. ABI90/F4D0,
 Work29314 and new matching keys are required; FCD5/FSV5 and the chapter-only

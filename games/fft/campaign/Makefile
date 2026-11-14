@@ -15,6 +15,10 @@ DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA)
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
+.PHONY: campaign-chains-check
+CHAIN_INPUT ?= $(PACKAGE_OUTPUT)/source.89g
+campaign-chains-check:
+	$(PY) check_chains.py --input $(CHAIN_INPUT)
 .PHONY: campaign-objectives-check
 campaign-objectives-check:
 	$(PY) check_objectives.py

@@ -2,6 +2,42 @@
 
 ## Current state (2026-11-12): Chapter I actions, 155 of 155 executable
 
+### Latest delivery: consecutive battle checkpoints (2026-11-13)
+
+[CHAINS.md](CHAINS.md): real separate PC battle/title children now exercise
+Save/decline and defeat/Continue without a map detour. Fixes: snapshot step flags
+before a child relocates the manifest; accept FSV4 in supervisor progress, with
+shared per-version length/roster checks. Packaging aligns battle skip_flag/WON
+and requires a persisted flag for battle Save proposals. `checkpoint_version:1`
+requires the corrected matching core; FKP1/FSV5/ABI90 remain.
+
+Three PC/ASan/UBSan flows pass: six full8553-update wins (26 actions/3 guest
+actions each) plus one deliberate protected-guest loss. All session/slot/child
+snapshots match byte-for-byte. Full16-party capacity, forced guest AI, player
+XP/JP/level carry, reward receipts and eleven undeployed records pass. Each
+child invalidates every borrowed manifest pointer; the old supervisor fails
+that relocation control. One small native carrier passes38 boundaries/FFFFFB80;
+42 host/819 C package checks pass. No native full fights, ABI/render sweep,
+overlay rebuild or TiEmu. The fixture borrows one arena twice; it is not retail
+campaign extraction or an authored shipping chain.
+
+Only fftstory changes (+74 bytes); all battle/28 image/menu/scene/content bytes
+are unchanged. Real pilot core414169 + chapter291735 =705904 transport bytes,
+key89b137c4932f78229aec9a87f0965a26. Battle input61317/headroom3619, ABI90/F4D0,
+Work29314, Save3204 and zone8698 remain; 16KiB/installed peak is still open.
+Private proof/groups: `x/chains/verification.json`, `release/`, `fixture-package/`,
+`binary-reuse.json`; capture `review/save-between-battles.png`. Protected files
+retain bytes/mtime. Use PC-first `make campaign-chains-check CHAIN_INPUT=...`.
+
+**Next:** persistent story guests, then choices/world-party side systems. Source
+read confirms ordinary slots0..15 plus separate guest slots16..19. FSV5 has no
+persistent guest records: fixed guests work in battle but their EXP/JP/equipment/
+identity progression is recreated each encounter. This is a core gap, not only
+future content. Design keyed guest persistence/migration without reducing the
+normal16-slot roster or copying art. The imposed-guest row is not fully done.
+Do not jump to campaign ripping or route automation; preserve breeding, Bars/
+rumors/Propositions, Fur Shop and Brave/Faith departure UI in the queue.
+
 ### Latest delivery: large named objectives (2026-11-13)
 
 [OBJECTIVES.md](OBJECTIVES.md): the user approved the large Lato names
