@@ -39,7 +39,7 @@ def unit_decode(u):
 
 def decode(b):
     base=HEAD+PARTY_MAX*UNIT
-    assert (len(b)==base and b[:4]==b'FSV2') or (len(b)==base+28 and b[:4]==b'FSV3') or (len(b)==base+92 and b[:4]==b'FSV4') or (len(b)==base+94 and b[:4]==b'FSV5') or (len(b)==3918 and b[:4]==b'FSV6'), 'not a campaign save'
+    assert (len(b)==base and b[:4]==b'FSV2') or (len(b)==base+28 and b[:4]==b'FSV3') or (len(b)==base+92 and b[:4]==b'FSV4') or (len(b)==base+94 and b[:4]==b'FSV5') or (len(b)==3918 and b[:4]==b'FSV6') or (len(b)==3992 and b[:4]==b'FSV7'), 'not a campaign save'
     flags = [k for k in range(FLAG_N) if b[4 + (k >> 3)] >> (k & 7) & 1]
     n, loc = b[4 + FLAG_N // 8], b[5 + FLAG_N // 8]
     inv = {i: c for i, c in enumerate(b[4 + FLAG_N // 8 + 2:HEAD]) if c}
@@ -48,15 +48,15 @@ def decode(b):
         u = b[HEAD + k * UNIT:HEAD + (k + 1) * UNIT]
         units.append(unit_decode(u))
     result=dict(flags=flags, location=loc - 1 if loc else None, inventory=inv, party=units)
-    if b[:4]in(b'FSV3',b'FSV4',b'FSV5',b'FSV6'):
+    if b[:4]in(b'FSV3',b'FSV4',b'FSV5',b'FSV6',b'FSV7'):
         t=b[base:];result.update(money=int.from_bytes(t[:4],'big'),flow=t[4],
             deployment_battle=int.from_bytes(t[6:8],'big'),
             deployment=[dict(slot=t[8+4*i],x=t[9+4*i],z=t[10+4*i],face=t[11+4*i]) for i in range(t[5])])
-    if b[:4]in(b'FSV4',b'FSV5',b'FSV6'):result['discovered']=list(b[base+28:base+92])
-    if b[:4]in(b'FSV5',b'FSV6'):
+    if b[:4]in(b'FSV4',b'FSV5',b'FSV6',b'FSV7'):result['discovered']=list(b[base+28:base+92])
+    if b[:4]in(b'FSV5',b'FSV6',b'FSV7'):
         for i,u in enumerate(units):
             if b[base+92+(i>>3)]&(1<<(i&7)):u['raw_current']=True
-    if b[:4]==b'FSV6':
+    if b[:4]in(b'FSV6',b'FSV7'):
         result['guests']=[]
         for i in range(4):
             identity=int.from_bytes(b[3204+2*i:3206+2*i], 'big')
@@ -64,6 +64,13 @@ def decode(b):
             u=unit_decode(b[3214+UNIT*i:3214+UNIT*(i+1)])
             u.update(id=identity, raw_current=bool(b[3212]&(1<<i)))
             result['guests'].append(u)
+    if b[:4]==b'FSV7':
+        result['calendar']=dict(month=b[3918],day=b[3919],era=b[3920])
+        result['world_rng']=int.from_bytes(b[3987:3991],'big')
+        for i,u in enumerate(units):
+            egg=b[3922+i]
+            u.update(egg=bool(egg),hatch_remaining=egg&15,hatch_total=egg>>4,
+                     birthday=int.from_bytes(b[3942+2*i:3944+2*i],'big'),egg_color=(b[3982+(i>>2)]>>((i&3)*2))&3)
     return result
 
 

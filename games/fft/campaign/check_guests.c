@@ -58,7 +58,7 @@ static u8 bind(void)
 static void trials(void)
 {
     Save a,b;Unit *u;u8 i,g;u16 oldjp;u8 raw_bank[28];
-    CHECK(sizeof(SaveUnit),176);CHECK(sizeof(Save),3918);
+    CHECK(sizeof(SaveUnit),176);CHECK(sizeof(Save),3992);
     CHECK(W!=RT_NULL,1);if(!W)return;
     CHECK(W->guest_key[0],4);CHECK(st.unit[0].team,TEAM_GUEST);CHECK(st.unit[0].slot,16);
     CHECK(save_load(&a),1);CHECK(a.n,16);CHECK(save_guest_find(&a,4),255);
@@ -118,6 +118,19 @@ static void trials(void)
     CHECK(memcmp(&a.unit[15],&b.guest[3],sizeof(SaveUnit)),0);
     CHECK(save_guest_remove(&a,12),1);CHECK(save_guest_remove(&a,12),0);CHECK(a.n,16);
     CHECK(save_guests_valid(&a),1);a.guest_id[1][1]=9;CHECK(save_guests_valid(&a),0);
+    // Actual SAVE compaction must carry undeployed eggs around a permanent
+    // loss, on both the host and the executing native SAVE overlay.
+    save_init(&b);b.n=4;
+    for(i=0;i<4;i++){b.unit[i]=a.unit[0];b.unit[i].level=12;}
+    b.unit[1].type=b.unit[3].type=3;b.unit[1].job=94;b.unit[3].job=96;
+    b.world.egg[1]=0x32;b.world.egg[3]=0x54;wb_color_set(&b.world,1,2);wb_color_set(&b.world,3,3);
+    save_raw_set(&b,3,1);persist(&b);
+    for(i=0;i<NUNIT;i++)st.unit[i].slot=255;
+    st.unit[U_RAMZA].slot=0;st.unit[U_RAMZA].team=TEAM_PLAYER;st.unit[U_RAMZA].dc=DC_CRYSTAL;
+    st.party_in=1;save_campaign();flush();CHECK(save_load(&b),1);CHECK(b.n,3);
+    CHECK(b.world.egg[0],0x32);CHECK(b.world.egg[2],0x54);CHECK(b.world.egg[3],0);
+    CHECK(world_egg_color(&b.world,0),2);CHECK(world_egg_color(&b.world,2),3);CHECK(save_raw_current(&b,2),1);
+    CHECK(save_world_valid(&b),1);
     b.guest_reserved=1;persist(&b);CHECK(save_load(&a),0);CHECK(a.n,0);
     // Parser boundaries are shared with shipping validation.
     memset(raw_bank,0,sizeof raw_bank);memcpy(raw_bank,"FGP1",4);raw_bank[5]=12;raw_bank[7]=1;

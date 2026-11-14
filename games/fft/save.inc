@@ -15,7 +15,7 @@
 #if MOD_PART(MOD_PARTY)
 static void funds_load(void)
 {
-    if(!save_load(&save)){memset(&save,0,sizeof save);qput(save.money,2000);}
+    if(!save_load(&save))save_init(&save);
 }
 #endif
 
@@ -101,14 +101,15 @@ static void party_update(void)
         save_unit_progress(s,u,i,u->slot);
     }
     for (k = 0; k < save.n; k++) {
-        if(lost[k]){lost[k]=255;continue;}
+        if(lost[k]){world_party_clear_slot(&save.world,k);lost[k]=255;continue;}
         lost[k]=n;
         save_raw_set(&save,n,save_raw_current(&save,k));
+        world_party_move_slot(&save.world,n,k);
         if (n != k) memcpy(&save.unit[n], &save.unit[k], sizeof save.unit[0]);
         n++;
     }
     for(i=0;i<NUNIT;i++)if(st.unit[i].slot<save.n)st.unit[i].slot=lost[st.unit[i].slot];
-    for (k = n; k < save.n; k++){memset(&save.unit[k],0,sizeof save.unit[0]);save_raw_set(&save,k,0);}
+    for (k = n; k < save.n; k++){memset(&save.unit[k],0,sizeof save.unit[0]);save_raw_set(&save,k,0);world_party_clear_slot(&save.world,k);}
     save.n = n;
 }
 
@@ -116,6 +117,7 @@ static void save_new_unit(SaveUnit *s,Unit *u,u8 i,u8 slot)
 {
     const u8 *rsm=cdesc+CD(RSM_POS);u8 c,k;
     memset(s,0,sizeof *s);
+    world_party_clear_slot(&save.world,slot);
     s->job = u->job;
     c = (u8)(s->job - 0x4A);           // its career row (another job: the Squire's)
     if (c >= CAREER_N) c = 0;
@@ -159,13 +161,15 @@ static void save_party(void)
     Unit *u = st.unit;
     u8 i, k;
     if (st.party_in) party_update();
-    else {save.n=0;memset(save.unit,0,sizeof save.unit);memset(save.raw_current,0,sizeof save.raw_current);}
+    else {save.n=0;memset(save.unit,0,sizeof save.unit);memset(save.raw_current,0,sizeof save.raw_current);
+          for(k=0;k<PARTY_MAX;k++)world_party_clear_slot(&save.world,k);}
     for (i = 0; i < NUNIT; i++, u++) {
         SaveUnit *s;
         if(!unit_party_member(u)||DC_OBJ(u->dc)||save.n==PARTY_MAX)continue;
         if(st.party_in&&(u->slot!=255||!(u->allegiance&ALLEGIANCE_INVITED)))continue;
         if(st.party_in)u->slot=save.n;
         s = &save.unit[save.n++];
+        world_party_clear_slot(&save.world,(u8)(save.n-1));
         save_new_unit(s,u,i,(u8)(save.n-1));
     }
     for (k = 0; k < BAG_MAX; k++) save.inv[0xF0 + k] = st.bag[k];
@@ -190,8 +194,7 @@ static void save_campaign(void)
     u32 funds=qlong(save.money);       // save_load refreshes roster/flags, not the live balance
     memcpy(inventory,save.inv,256);memcpy(inventory+256,save.discovered,SAVE_DISCOVERY_BYTES);
     if (!save_load(&save)) {
-        memset(&save, 0, sizeof save);
-        memcpy(save.magic, SAVE_MAGIC, 4);
+        save_init(&save);
     }
     qput(save.money,funds);memcpy(save.inv,inventory,256);memcpy(save.discovered,inventory+256,SAVE_DISCOVERY_BYTES);
     already=w?(u8)(save.flags[(w-1)>>3]>>((w-1)&7)&1):0;

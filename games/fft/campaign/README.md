@@ -1,6 +1,15 @@
 # Opening -> Academy -> Gariland
 
-Latest backend step (2026-11-14): [calendar and monster breeding](BREEDING.md).
+Latest delivery (2026-11-14): approved [calendar and persistent eggs](BREEDING.md).
+FSV7 migrates FSV2..6, retaining guest/prefix offsets; route-leg days, fixed
+offspring, hatch, compact dismissal and actual Save/Continue pass PC/sanitizers
+and selected native checks. World/map/egg pictures match the user approval.
+ABI92/ModCtx356/FA04, Save3992/Work29340, zone8702, companion1612 of3072;
+battle input61491/headroom3445, seven blocks99266. Matching groups718910 bytes
+in `x/eggs/release/`. Grown-monster art/deployment is next: selectors still
+reject all type3. Breeding completion, Bar/Fur Shop and16KiB certification stay open.
+
+Earlier backend step (2026-11-14): [calendar and monster breeding](BREEDING.md).
 Daily egg/offspring/fixed-generation rules pass269 PC/sanitizer/68000 checks,
 five bank suites and ten original-MIPS daily-policy/hatch cases. Not integrated
 into FSV6/worldmap/management/deployment yet: saved state, actual travel hooks

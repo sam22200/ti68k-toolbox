@@ -13,12 +13,17 @@ PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS += ffwb ffeg
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
 campaign-breeding-check:
 	$(PY) -m unittest discover -s ../tools -p test_breeding_rules.py
 	$(PY) check_breeding.py
+
+.PHONY: campaign-eggs-check
+campaign-eggs-check:
+	$(PY) check_eggs.py
 
 .PHONY: story-choices-check
 story-choices-check:
@@ -191,11 +196,11 @@ dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
 	./fftscn_dialogue_test
 .PHONY: map-test
-map-test: data/ffwm.bin data/ffmg.bin
+map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin
 	$(CC) $(PC_CFLAGS) -o fftmap_test test_worldmap.c $(RT_CORE) $(RT_SW)
 	./fftmap_test
 .PHONY: manage-test
-manage-test: data/ffmg.bin data/ffcj.bin
+manage-test: data/ffmg.bin data/ffcj.bin data/ffeg.bin
 	$(CC) $(PC_CFLAGS) -o fftmng_test test_manage.c $(RT_CORE) $(RT_SW)
 	./fftmng_test
 fftmng_pc: manage.c pc_entry.c ../common.h
@@ -323,6 +328,11 @@ data/ffcj.bin ../opening/data/ffcj.bin &: ../tools/common_tables.py ../tools/bat
 
 data/ffwm.bin: ../tools/world_assets.py ../tools/management_data.py ../tools/units.py ../tools/interface.py
 	$(PY) ../tools/world_assets.py "$(DISC)" $@
+
+data/ffwb.bin: ../tools/breeding_rules.py
+	$(PY) ../tools/breeding_rules.py "$(DISC)" $@
+data/ffeg.bin: ../tools/egg_art.py
+	$(PY) ../tools/egg_art.py "$(DISC)" $@ --pooled
 
 FLOW_STATE := x/mandalia/gariland-deployment.state
 $(FLOW_STATE):

@@ -48,16 +48,20 @@ def fixture(source):
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--native',action='store_true')
     ap.add_argument('--data-dir',type=Path,default=HERE/'x/guests/shipping')
-    args=ap.parse_args();source_dir=args.data_dir.resolve();out=HERE/'x/story-choices/scene';out.mkdir(exist_ok=True)
+    ap.add_argument('--out',type=Path,default=HERE/'x/story-choices/scene')
+    args=ap.parse_args();source_dir=args.data_dir.resolve();out=args.out.resolve();out.mkdir(parents=True,exist_ok=True)
     source={}
     for group in ('fft-core.89g','chapter-01.89g'):source.update(packages.read_group(HERE/'x/guests/release'/group))
     banks=fixture(source)
     hashes=[approved_hash(HERE/'x/story-choices/review'/f'{name}.png')for name in ('choice','full')]
-    (HERE/'x/story-choices/scene_fixture.h').write_text('#define APPROVED_CHOICE_PLANES 0x%08XUL\n#define APPROVED_FULL_PLANES 0x%08XUL\n'%tuple(hashes))
+    header=HERE/'x/story-choices/scene_fixture.h';text='#define APPROVED_CHOICE_PLANES 0x%08XUL\n#define APPROVED_FULL_PLANES 0x%08XUL\n'%tuple(hashes)
+    if not header.exists()or header.read_text()!=text:header.write_text(text)
     common=[ROOT/'runtime/core/rt_core.c'];logs=[];snapshots=[];portable=None
     for mode,flags in [('pc',[]),('san',['-fsanitize=address,undefined','-fno-sanitize=shift','-fno-pie','-no-pie'])]:
         exe=out/mode
         (out/f'{mode}-build.log').write_text(run(['cc','-std=gnu99','-O1','-g','-w',*flags,'-o',exe,HERE/'check_story_scene.c',*common,ROOT/'runtime/platform-sw/rt_sw.c']))
+        title=out/f'title-{mode}'
+        (out/f'title-{mode}-build.log').write_text(run(['cc','-std=gnu99','-O1','-g','-w',*flags,'-o',title,HERE/'check_chain_title.c',*common,ROOT/'runtime/platform-sw/rt_sw.c']))
         with tempfile.TemporaryDirectory(prefix='fft-story-scene-')as name:
             data=Path(name);data_links(data,source_dir)
             for var,content in banks.items():
@@ -65,8 +69,7 @@ def main():
             log=run(['env','ASAN_OPTIONS=detect_leaks=0','UBSAN_OPTIONS=halt_on_error=1',exe],data)
             (out/f'{mode}.log').write_text(log);logs.append(log)
             initial=(data/'ffsave.sav').read_bytes()
-            # Reuse the source-unchanged real title child from the guest delivery.
-            title=HERE/f'x/guests/chains/title-{mode}'
+            # Save schema changes require a matching actual title child.
             for action,expected in [('save',3),('continue',2)]:
                 if action=='continue':(data/'ffsave.sav').write_bytes(bytes(len(initial)))
                 p=subprocess.run(['env','ASAN_OPTIONS=detect_leaks=0',str(title),action],cwd=data,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)

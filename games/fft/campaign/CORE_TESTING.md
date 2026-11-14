@@ -1,5 +1,16 @@
 # Validation by affected dependency
 
+Calendar/egg integration (2026-11-14): `make campaign-eggs-check` is PC/sanitizers
+first:90 migration/metadata boundaries and actual map/management/title Save/
+Continue/hatch/full16/two-leg/held-input/dismiss/retry flows. `check_eggs.py
+--native-save` opts into90 byte/layout checks; `check_egg_native.py` selects
+five actual archive/render/RNG cases (four approved pictures, state380A142A).
+Actual native SAVE/companion/guest/egg compaction114/B00EEFA2 and one13-actor
+equipment replay AA26/355148 close the new ABI92 paths. PC regressions include
+271 backend cases,251 scene cases, three complete forced-guest battle chains
+and42 host/855 C package checks. Native DAT trailers are checked explicitly.
+No all-family native sweep or TiEmu; [scope and remaining grown-monster path](BREEDING.md).
+
 Calendar/breeding backend (2026-11-14): `make campaign-breeding-check` runs five
 FWB1 validation suites,269 C boundaries on PC/ASan/UBSan and ten bounded
 original-MIPS daily-policy/hatch cases. `check_breeding.py --native` opts into

@@ -7,10 +7,13 @@
   "checkpoint_version": 1,
   "guest_format": "FGP1",
   "story_choice_format": "FCX1",
+  "world_save_format": "FSV7",
+  "breeding_format": "FWB1",
+  "egg_art_format": "FEG2",
   "envelope": {"units": 13, "tiles": 256, "axis": 18, "layers": 2, "scene_rows": 202},
   "variables": [
     "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",
     "fftdep", "ffpccore", "fftbat", "ffbcore", "fftscn", "ffscore",
-    "ffbm", "ffbn", "ffbo", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw"
+    "ffbm", "ffbn", "ffbo", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw", "ffwb", "ffeg"
   ]
 }

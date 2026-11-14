@@ -1,9 +1,17 @@
 # World calendar and breeding backend (2026-11-14)
 
-The reusable **backend** is implemented and checked. It is **not integrated**
-into the shipping world map, FSV6, deployment, management or packages yet. The
-Chapter I breeding prerequisite remains open. Current installed programs and
-reviewed pictures are unchanged; use the story-choice release, not this fixture.
+The user approved both [egg and calendar pictures](EGG_REVIEW.md). The calendar,
+fixed offspring, hatch, egg card/menu/dismissal and durable FSV7 state are now
+integrated. Save/Continue and real map/management/title child flows pass on PC
+and sanitizers. Selected native migration, actual SAVE/compaction, archive
+sprite pointers and world RNG checks pass; no emulator or battle-family sweep.
+
+**Still open:** current deployment/party selectors reject all type3 monsters,
+and formation lacks grown-monster sprites. This delivery does not close the
+playable monster/breeding prerequisite. Finish that selection/art path before
+Bar/Fur Shop and campaign extraction. The pilot adds no fictional monsters or
+eggs. Matching release groups: `x/eggs/release/`, core427121 + chapter291789 =
+718910 transport bytes, key `656593affdef2a427bec0030cb75fefd`.
 
 ## Source and portable rules
 
@@ -54,39 +62,50 @@ without a reroll. The backend uses existing verified `muls16`; no new ASM.
 
 ## State and integration contract
 
-`WorldParty` is a **proposed69-byte, byte-only payload**, not a new current Save
-field:4 calendar/header bytes,20 packed initial/remaining egg timers,40 birthday
+`WorldParty` is a **69-byte, byte-only FSV7 payload** after the3918-byte FSV6
+prefix:4 calendar/header bytes,20 packed initial/remaining egg timers,40 birthday
 bytes and5 packed color bytes. Unknown birthdays are0; hatch birthdays are
 BE1..365. Eggs count against the ordinary roster's16 slots. All20 formation
 positions have metadata so guest reordering/recruitment can move it explicitly.
-The move/clear helpers preserve timers, birthdays and colors. All actual
-roster producers still need to bind them before enabling this feature.
+The move/clear helpers preserve timers, birthdays and colors through guest
+recruit/remove, normal append/rebuild, egg dismissal and permanent-death battle
+compaction. Four BE RNG bytes and one zero pad make Save3992 (+74). FSV2..6
+migrate without changing old party/guest offsets or recovering unknown travel.
 
 Rules must pass cold `world_rules_valid` before any daily call. State validation
 rejects invalid dates/levels, duplicate/invalid guest keys, absent-slot metadata,
 zero/underflowed egg timers and non-monster eggs before date/RNG/party mutation.
-An egg is presently represented by side metadata alongside a type3 SaveUnit:
-**do not feed it to the current deployment/management code**, which does not
-know that metadata yet. The backend allocates no heap or second Save; its two
-bounded daily lists use40 stack bytes.69 proposed saved bytes is not a native
-installed-RAM, stack-peak or full-frame performance certificate.
+An egg uses side metadata alongside a type3 SaveUnit. Formation shows the
+approved card rather than fighter stats; ENTER cannot open fighter Status,
+fighter browsing skips eggs, and its compact menu only offers dismissal with
+default No. Both metadata and raw bits compact atomically after Yes; the PC
+session writer preserves the prior file on failure and supports retry. The
+backend allocates no heap or second Save; its two daily lists use40 stack bytes.
 
-The caller supplies15-bit random draws. Retail reseeds from play-time fields;
-portable clock/RNG binding and persistence are still an integration decision.
-No callback, frame counter, entry or idle render may silently advance a day.
-Keep the old FSV6 prefix/guest tail intact during migration; old saves cannot
-reconstruct an elapsed date they never recorded. Resolve a documented start
-date from the source chapter/event, rather than inventing elapsed travel.
+The world caller supplies15-bit draws from an independent saved xorshift32
+stream, the battle engine's existing family. This is a portable adaptation,
+not retail's play-time reseed or an exact PS1 PRNG sequence. Migration/new-game
+uses the observed Gariland fixture's Jan1/era0 baseline, seed2545F491. Idle,
+hover, held confirmation, menu cancel and child reentry consume no day/draw.
+Every completed route leg advances once, before the final arrival handoff;
+location, roster, date and RNG are committed in the same session Save.
 
 ## Checks and next step
 
 `make campaign-breeding-check` is PC-first: five FWB1 rejection suites plus
-269 C boundaries, ASan/UBSan, digest **69509ED8**. Eight complete child records
+271 current C boundaries/ASan/UBSan, digest **C0193379**. The prior269-check
+native rule baseline is reused; new native cases cover the changed bindings.
+Eight complete child records
 match an independent source-read model; tests cover rarity edges, full16 slots,
 guests, minimum timers, fixed offspring through a cold byte round-trip and
 hatch, name collision, March21/date/sign rollover, invalid-state atomicity and
-slot metadata moves. The round-trip is **not** an actual title Save/Continue
-or migration test. These remain required after save integration.
+slot metadata moves. `make campaign-eggs-check` adds90 migration/metadata
+boundaries (**2B7ED894**) and actual PC/sanitizer title Save/Continue, map/
+management child reentry, hatch without reroll, full16-party rejection, a two-
+leg original-route/reverse fixture, held input, dismissal/default No and failed-
+write retry. Integrated egg/menu/confirmation/date pixels remain9C07/AA1B/
+E3DF/EAAA. Three real consecutive-fight Save/decline/defeat/Continue flows and
+the251-check story-choice regression still pass with current title children.
 
 Ten bounded PC/Unicorn2.1.4 cases execute the hash-verified original MIPS daily
 routine and hatch-zodiac routine. Original parent/rarity/offspring/hatch/full-
@@ -95,17 +114,24 @@ and leveling are explicit fixture hooks; full original generation and gameplay
 travel/UI are not certified by this oracle. Complete generation currently has
 the independent source-read model evidence described above.
 
-`check_breeding.py --native` opts into one small68000 carrier for the same
-byte layouts, pointers and arithmetic. No battle overlays, all-family sweep,
-art rebuild or TiEmu. Evidence under ignored `x/breeding/`: extracted bank/input
-hashes, oracle hashes, source hashes, logs and final verification manifest.
+`check_eggs.py --native-save` covers the90 layout/metadata boundaries;
+`check_egg_native.py` selects five actual68000 render/archive/RNG cases. The
+native day/birth Save hash is380A142A, identical to PC. `check_guests.py --native`
+adds actual pinned-reader/SAVE/guest/egg compaction (114/B00EEFA2). A single
+13-actor equipment replay retainsAA26, peak355148<360000 cycles. Native DAT
+readers accept the six typed trailer bytes as well as raw host banks. Final
+package checks42 host/855 C pass PC/sanitizers. Evidence: `x/eggs/`.
 
-**Next:** bind the world calendar/eggs to a versioned durable save and actual
-route completion, with ordinary-roster compaction/recruitment hooks and eggs
-excluded from deployment/equipment/job changes. Prepare an actual compact
-roster/egg/status preview for user approval before integration of its new
-picture. Then test real PC Save/Continue/reentry/cancel journeys and do only
-the affected save/ABI/native checks once stabilized. Pool FWB1 once as universal
-core data, factoring any already-owned generation bytes during shipping.
-Bar/rumors/Propositions and the full Fur Shop stock/purchase loop remain next.
-The installed16KiB/peak gate remains unpassed; difficult RAM recovery is deferred.
+ABI92/ModCtx356/signatureFA04, Unit112/State2224/Work29340. Shared cold Save
+reading moves into the pre-reserved companion (1612 of3072 bytes), reached
+through a resident callback/companion op254 without replacing the executing
+zone image. All28 images are exported together; zone8702 (was8842), shards
+62994/63034/64650, splits9/18. Game-block requests99266 (was99332); this is not
+installed free-RAM or stack/fragmentation certification. Battle TTPack input
+61491/64936 leaves3445. Existing48-frame cache,13 actors and16 ordinary party
+slots remain. Universal core FWB1 is285 bytes; pooled FEG2 is640 with four
+physical sprites behind eight logical frames (all reviewed pixels exact).
+
+**Next:** grown-monster formation/deployment/art support, then Bar/rumors/
+Propositions and full Fur Shop. Full Chapter I event content/time jumps remain
+separate. The installed16KiB/peak gate is unpassed; hard RAM recovery is deferred.
