@@ -21,22 +21,24 @@ import monster_ko_review as source
 from review_files import save_image, write_changed
 
 
-def thumbnail(canvas, spr, palette):
+def thumbnail(canvas, spr, palette, *, scale_milli=None, width=32, height=26,
+              feet=(16, 21)):
     yy, xx = np.mgrid[:128, :128]
     opaque = canvas != 0
     # Preserve the source feet origin; the selected family palette shares this fit.
-    for scale in range(600, 199, -1):
-        x = np.floor((xx+.5-64)*scale/1000).astype(int)+16
-        y = np.floor((yy+.5-96)*scale/1000).astype(int)+21
-        if np.all(~opaque | ((x >= 1) & (x < 31) & (y >= 1) & (y < 25))):
+    scales = range(600, 199, -1) if scale_milli is None else (scale_milli,)
+    for scale in scales:
+        x = np.floor((xx+.5-64)*scale/1000).astype(int)+feet[0]
+        y = np.floor((yy+.5-96)*scale/1000).astype(int)+feet[1]
+        if np.all(~opaque | ((x >= 1) & (x < width-1) & (y >= 1) & (y < height-1))):
             break
     else:
         raise ValueError('complete source silhouette does not fit formation')
-    valid = (x >= 0) & (x < 32) & (y >= 0) & (y < 26)
-    cell = (y*32+x)[valid]
+    valid = (x >= 0) & (x < width) & (y >= 0) & (y < height)
+    cell = (y*width+x)[valid]
 
     def count(values):
-        return np.bincount(cell, weights=values[valid], minlength=832).reshape(26, 32)
+        return np.bincount(cell, weights=values[valid], minlength=width*height).reshape(height, width)
 
     pal = np.frombuffer(spr, '<u2', 16, palette*32).astype(int)
     rgb = np.stack((pal & 31, (pal >> 5) & 31, (pal >> 10) & 31), 1)*255/31
@@ -46,13 +48,13 @@ def thumbnail(canvas, spr, palette):
     total, body = count(np.ones_like(opaque)), count(opaque)
     mask = (body*2 >= total) & (total > 0)
     hist = np.stack([count(opaque & (canvas != 1) & (tones[canvas] == g)) for g in range(4)], 2)
-    gray = np.full((26, 32), -1, dtype=int)
+    gray = np.full((height, width), -1, dtype=int)
     gray[mask] = np.where(hist.sum(2) > 0, hist.argmax(2), 3)[mask]
     cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
     edge = mask & ~ndimage.binary_erosion(mask, structure=cross)
     ring = ndimage.binary_dilation(mask, structure=cross) & ~mask
     gray[edge], gray[ring] = 3, 0
-    color = np.full((26, 32, 3), 170, np.uint8)
+    color = np.full((height, width, 3), 170, np.uint8)
     for c in range(3):
         channel = count(rgb[canvas, c]*opaque)/body.clip(1)
         color[:, :, c][mask] = channel[mask].round().astype(np.uint8)
