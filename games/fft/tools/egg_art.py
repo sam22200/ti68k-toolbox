@@ -64,10 +64,24 @@ def build(cue):
     return body, proof
 
 
+def pool(bank):
+    """Lossless shipping FEG2:8 logical IDs reference unique156-byte sprites."""
+    assert bank[:8]==b'FEG1'+bytes((8,16,26,0)) and len(bank)==1256
+    unique=[];ids=[]
+    for i in range(8):
+        frame=bank[8+156*i:8+156*(i+1)]
+        if frame not in unique:unique.append(frame)
+        ids.append(unique.index(frame))
+    return b'FEG2'+bytes((len(unique),16,26,0))+bytes(ids)+b''.join(unique)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('cue'); ap.add_argument('out', type=Path)
+    ap.add_argument('--pooled',action='store_true')
     args = ap.parse_args(); bank, proof = build(args.cue)
+    if args.pooled:
+        bank=pool(bank);proof.update(review_only=False,format='FEG2',bytes=len(bank),physical_frames=bank[4])
     args.out.parent.mkdir(parents=True, exist_ok=True); args.out.write_bytes(bank)
     args.out.with_suffix('.json').write_text(json.dumps(proof, indent=2)+'\n')
     print(json.dumps(proof, indent=2))

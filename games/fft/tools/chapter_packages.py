@@ -155,6 +155,8 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare persistent FGP1 guests')
     if spec.get('story_choice_format') != 'FCX1':
         raise ValueError('Core specification must declare FCX1 scene choices')
+    if (spec.get('world_save_format'),spec.get('breeding_format'),spec.get('egg_art_format'))!=('FSV7','FWB1','FEG2'):
+        raise ValueError('Core specification must declare FSV7 world state, FWB1 breeding and FEG2 eggs')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}

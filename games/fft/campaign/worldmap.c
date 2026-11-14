@@ -16,6 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../base.inc"
+#include "breeding.h"
+#ifndef __m68k__
+#include "story_choice_file.h"
+#endif
 
 enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED };
 typedef struct {
@@ -30,7 +34,7 @@ typedef struct {
 } Wm;
 Wm wm;
 Save save;
-static const u8 *bank, *mgb;
+static const u8 *bank, *mgb,*breed_rules;
 static RtTilemap map;
 static u8 *wmcache,*idle_sprites;
 static u8 strip_tag[16];
@@ -132,6 +136,17 @@ static void arrive(void)
     save.loc = (u8)(wm.at + 1); wm.changed = 1;
 }
 
+// Same bounded xorshift family as battle rand15, with an independent durable
+// world stream. Idle frames, menu input and child reentry consume no draws.
+static u16 world_draw(void *context)
+{
+    u8 *p=((Save *)context)->world_rng;
+    u32 n=(u32)b16(p)<<16|b16(p+2);
+    n^=n<<13;n^=n>>17;n^=n<<5;
+    p[0]=(u8)(n>>24);p[1]=(u8)(n>>16);p[2]=(u8)(n>>8);p[3]=(u8)n;
+    return (u16)(n>>17);
+}
+
 static void travel_step(void)            // a pixel a frame along the route's points
 {
     const u8 *p = point(wm.leg, (u8)(wm.step + 1));
@@ -140,6 +155,12 @@ static void travel_step(void)            // a pixel a frame along the route's po
     wm.y += ty > wm.y ? 1 : ty < wm.y ? -1 : 0;
     if (wm.x != tx || wm.y != ty) return;
     if (++wm.step + 1 < route(wm.path[wm.leg] & 0x7F)[3]) return;
+    {
+        u8 result=world_party_day(&save.world,&save,breed_rules,world_draw,&save);
+        const u8 *rt=route(wm.path[wm.leg]&0x7f);
+        if(result==WB_INVALID){wm.moving=0;wm.x=loc_x(wm.at);wm.y=loc_y(wm.at);wm.note=NOTE_UNAVAILABLE;return;}
+        wm.at=wm.path[wm.leg]&0x80?rt[0]:rt[1];save.loc=(u8)(wm.at+1);wm.changed=1;
+    }
     wm.step = 0;
     if (++wm.leg == wm.legs) arrive();
 }
@@ -174,6 +195,8 @@ void game_init(void)
     mgb = rt_file("ffmg", &size);
     if (mgb && memcmp(mgb, "FMG3", 4)) mgb = RT_NULL;
     save_load(&save);
+    breed_rules=rt_file("ffwb",&size);
+    if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
         map.w = bank[14]; map.h = bank[15];
         stride=b16(part(0));strip_bytes=stride<<4;
@@ -204,7 +227,14 @@ static u8 leave(u16 result)
 {
     tilog("map leave %u at loc %u%s", result, save.loc, wm.changed ? " (session saved)" : "");
     wm.result = result;
-    if (wm.changed) rt_save(SAVE_NAME, &save, sizeof save);
+    if (wm.changed) {
+#ifdef __m68k__
+        u8 ok=rt_save(SAVE_NAME,&save,sizeof save);
+#else
+        u8 ok=story_choice_store_file(&save);
+#endif
+        if(!ok){wm.note=NOTE_UNAVAILABLE;return 1;}
+    }
     release_map();
     return 0;
 }
@@ -463,6 +493,14 @@ void game_render(void)
     }
     draw_rect(0, 91, 160, 9, C_WHITE); draw_rect(0, 90, 160, 1, C_BLACK);
     black(3, 93, wm.sel==255?"Move cursor":loc_name(wm.sel));
+    {
+        static const char months[12][4]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+        char date[7];u8 day=save.world.day;
+        memcpy(date,months[save.world.month-1],3);date[3]=' ';
+        if(day>=10){date[4]=(char)('0'+day/10);date[5]=(char)('0'+day%10);date[6]=0;}
+        else{date[4]=(char)('0'+day);date[5]=0;}
+        panel(4,3,42,11);black(8,6,date);
+    }
     if(wm.menu) {
         static const char *const rows[]={"Move","Formation","Brave Story","Tutorial","Data","Option"};
         static const ChoiceLayout menu={88,43,72,57,3,CHOICE_TAB_PLAIN,3,1,25,6,10,7,158,-20,7};

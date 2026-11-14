@@ -19,6 +19,9 @@
 #include "../identity_pool.h"
 #include <stdlib.h>
 #include <string.h>
+#ifndef __m68k__
+#include "story_choice_file.h"
+#endif
 #ifdef RT_CYCLES
 #include "../../../tools/m68kbench/bench.h"
 #endif
@@ -37,10 +40,10 @@ typedef struct {
     u8 slide,job_anim,old_picture;
     s16 floor_from_x,floor_from_y;
 } Mg;
-enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED };
+enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED, NOTE_SAVE };
 Mg mg;
 Save save;
-static const u8 *bank, *common,*identity;
+static const u8 *bank, *common,*identity,*egg_bank;
 static u8 *cache;
 static u8 dirty;
 
@@ -331,6 +334,8 @@ static void floor_diamond(s16 x,s16 y)
     }
 }
 
+#include "egg_draw.inc"
+
 #include "../unit_card.h"
 #define CARD_TEXT(x,y,s,c,l,context) text(x,y,s,c,l)
 #define CARD_WIDTH(s) card_width(s)
@@ -370,14 +375,15 @@ static void formation(void)
 {
     u8 i, first = (u8)(mg.top * 5);
     const SaveUnit *u = unit(mg.unit);
-    Stats s=stats(u);
+    Stats s;if(!save_egg(&save,mg.unit))s=stats(u);
     for (i = 0; i < 10 && first + i < save.n; i++) {
         s16 x = 8 + (i % 5) * 32, y = 7 + (i / 5) * 27;
-        const SaveUnit *v = unit((u8)(first + i));
-        actor(x,y,picture(v,career(v)));
+        formation_actor(x,y,(u8)(first+i));
     }
-    draw_rect(0,62,160,1,C_BLACK);formation_details(u,&s,65);
+    draw_rect(0,62,160,1,C_BLACK);
     if(save.n>10){black(154,8,mg.top?"^":"");black(154,54,first+10<save.n?"v":"");}
+    if(save_egg(&save,mg.unit)){egg_card(mg.unit);return;}
+    formation_details(u,&s,65);
     if(mg.screen==S_FORM)black(37,95,"ENTER:status ALPHA:menu");
 }
 
@@ -391,8 +397,7 @@ static void formation_cursor(void)
     // The diamond goes underneath feet; reusing the cheap actor sprites avoids
     // rebuilding stats/text/the entire cached page on each interpolation step.
     for(i=0;i<10&&first+i<save.n;i++) {
-        const SaveUnit *v=unit((u8)(first+i));
-        actor(8+(i%5)*32,7+(i/5)*27,picture(v,career(v)));
+        formation_actor(8+(i%5)*32,7+(i/5)*27,(u8)(first+i));
     }
 }
 
@@ -530,7 +535,7 @@ static void pick_row(u8 i, s16 y)
 
 static void note_panel(void)
 {
-    static const char *const notes[] = { "", "Not enough JP", "" };
+    static const char *const notes[] = { "", "Not enough JP", "", "Save failed" };
     if (!mg.note) return;
     panel(5, 60, 150, 24);
     if (mg.note == NOTE_LOCKED) {
@@ -551,6 +556,7 @@ static void confirm_panel(void)
     const SaveUnit *u = unit(mg.unit);
     static const ChoiceLayout menu={65,53,94,27,3,CHOICE_TAB,3,1,0,6,10,8,157,-15,7};
     if (!mg.confirm) return;
+    if(save_egg(&save,mg.unit)){egg_menu(mg.confirm);return;}
     choice_frame(&menu,mg.screen==S_JOBS?job_name(u,mg.row):"Learn ability?");
     choice_row(&menu,0,mg.screen==S_JOBS?"Change Job":"Learn",C_BLACK);
     choice_row(&menu,1,"Return",C_BLACK);
@@ -560,7 +566,8 @@ static void confirm_panel(void)
 static void command_menu(void)
 {
     static const ChoiceLayout menu={56,15,101,50,0,CHOICE_PANEL,9,4,0,25,14,8,159,1,10};
-    u8 i;choice_frame(&menu,"Menu");
+    u8 i;if(save_egg(&save,mg.unit)){if(!mg.confirm)egg_menu(0);return;}
+    choice_frame(&menu,"Menu");
     for(i=0;i<4;i++)choice_row(&menu,i,menu_rows[i],C_BLACK);
     choice_cursor_animated(&menu,mg.row,rt_frame);
 }
@@ -585,7 +592,7 @@ static void page(void)
         formation();
         if (mg.screen == S_MENU) {
             formation_cursor();
-            foot("ENTER:open SHIFT:back");
+            if(!save_egg(&save,mg.unit))foot("ENTER:open SHIFT:back");
         }
         note_panel();
         return;
@@ -640,6 +647,7 @@ void game_init(void)
     common = rt_file("ffcj", &size);
     if (!cj_valid(common, size)) bank = RT_NULL;
     save_load(&save);
+    egg_bank=rt_file("ffeg",&size);if(!egg_art_valid(egg_bank,size))bank=RT_NULL;
     if (save.n > PARTY_MAX) save.n = 0;
     cache = (u8 *)malloc(2 * RT_PSIZE);
     dirty = 1;
@@ -651,16 +659,25 @@ void game_scenario(u16 n)                // test doors: a screen of the first un
     static const u8 doors[] = { S_FORM, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_MENU };
     mg.screen = n < sizeof doors ? doors[n] : S_FORM;
     mg.unit = mg.row = mg.top = 0;
+    if(save_egg(&save,0))mg.screen=S_FORM;
     if (mg.screen == S_JOBS) open_jobs();
     dirty = 1;
 }
 
 #include "../../../lib/tilog.h"
-static void leave(void)
+static u8 leave(void)
 {
     tilog("manage leave%s", mg.changed ? " (session saved)" : "");
-    if (mg.changed) rt_save(SAVE_NAME, &save, sizeof save);
+    if (mg.changed) {
+#ifdef __m68k__
+        u8 ok=rt_save(SAVE_NAME,&save,sizeof save);
+#else
+        u8 ok=story_choice_store_file(&save);
+#endif
+        if(!ok){mg.note=NOTE_SAVE;dirty=1;return 1;}
+    }
     if (cache) { free(cache); cache = RT_NULL; }
+    return 0;
 }
 
 static u8 list_move(u32 key, u8 n)              // up / down in a scrolling list
@@ -689,10 +706,21 @@ u8 game_update(void)
     if(mg.spin){mg.spin+=mg.spin>0?-1:1;dirty=1;return 1;}
     if (!key) return 1;
     dirty = 1;
-    if (!bank || !save.n) { if (key & K_ESC) { leave(); return 0; } return 1; }
+    if (!bank || !save.n) { if (key & K_ESC)return leave();return 1; }
     u = unit(mg.unit);
     if (mg.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) mg.note = 0; return 1; }
     if (mg.confirm) {
+        if(save_egg(&save,mg.unit)){
+            if(key&(K_B|K_ESC))mg.confirm=0;
+            else if(key&(K_ENTER|K_A)){
+                u8 accept=mg.confirm==2;mg.confirm=0;
+                if(accept&&save_dismiss_egg(&save,mg.unit)){
+                    mg.changed=1;if(mg.unit>=save.n)mg.unit=save.n?(u8)(save.n-1):0;
+                    mg.row=mg.slide=0;roster_position(S_FORM);
+                }
+            }else mg.confirm=choice_move(mg.confirm-1,2,key)+1;
+            return 1;
+        }
         if (key & (K_B | K_ESC)) mg.confirm = 0;
         else if (key & (K_ENTER | K_A)) {
             u8 accept=mg.confirm==1;
@@ -705,14 +733,16 @@ u8 game_update(void)
         return 1;
     }
     if ((key & (K_F1 | K_F5)) && mg.screen != S_FORM && mg.screen != S_MENU && mg.screen != S_PICK) {
-        mg.unit = (u8)((mg.unit + (key & K_F1 ? save.n - 1 : 1)) % save.n);
+        u8 tries=save.n;
+        do{mg.unit=(u8)((mg.unit+(key&K_F1?save.n-1:1))%save.n);}while(save_egg(&save,mg.unit)&&--tries);
+        if(save_egg(&save,mg.unit)){roster_position(S_FORM);return 1;}
         if (mg.screen == S_JOBS) open_jobs();
         else if (mg.screen == S_LEARN) mg.row = mg.top = 0;
         return 1;
     }
     switch (mg.screen) {
     case S_FORM:
-        if (key & K_ESC) { leave(); return 0; }
+        if (key&K_ESC||(save_egg(&save,mg.unit)&&(key&K_B)))return leave();
         at = mg.unit;
         if (key & K_LEFT) at = at ? (u8)(at - 1) : (u8)(save.n - 1);
         if (key & K_RIGHT) at = (u8)(at + 1 == save.n ? 0 : at + 1);
@@ -726,11 +756,15 @@ u8 game_update(void)
         mg.unit = at;
         if (at / 5 < mg.top) mg.top = at / 5;
         if (at / 5 > mg.top + 1) mg.top = at / 5 - 1;
-        if (key & (K_ENTER | K_A)) mg.screen = S_STATUS;
+        if ((key & (K_ENTER | K_A))&&!save_egg(&save,mg.unit)) mg.screen = S_STATUS;
         if (key & (K_C | K_D)) { mg.screen = S_MENU; mg.row = 0;mg.slide=0; }
         return 1;
     case S_MENU:
         if (key & (K_B | K_ESC)) { roster_position(S_FORM); return 1; }
+        if(save_egg(&save,mg.unit)){
+            if(key&(K_ENTER|K_A))mg.confirm=1;
+            return 1;
+        }
         mg.row=choice_move(mg.row,4,key);
         if (key & (K_ENTER | K_A)) {
             static const u8 dest[] = { S_EQUIP, S_SET, S_LEARN, S_JOBS };
