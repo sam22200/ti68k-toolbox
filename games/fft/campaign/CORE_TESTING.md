@@ -1,5 +1,17 @@
 # Validation by affected dependency
 
+Persistent guests (2026-11-13): [GUESTS.md](GUESTS.md) and `campaign-guests-check`
+cover FSV2..6 migration, four guest slots alongside16 players, stable identities,
+shared stats, full-capacity rejection, remove/recruit hooks and99-owned guest
+gear. `check_chains.py --guests` runs real PC/sanitizer battle/title/supervisor
+children and compares every save snapshot. Selected native guest SAVE/restore
+(104/11AC3656), scene/save(198/5501566B), layout and one13-actor equipment replay
+(AA26/355080 cycles) close the changed ABI91/FSV6/overlay paths; reuse unchanged
+combat/art evidence. Historical manage-test still depends on its obsolete
+three-unit proof; the focused raw-management test preserves a guest tail through
+job changes and saves. No all-family native sweep or TiEmu per lot.
+
+
 Consecutive checkpoints: `make campaign-chains-check CHAIN_INPUT=...` runs three
 real child-process PC/ASan/UBSan flows with byte-identical session/slot snapshots,
 full16-party forced-guest AI and manifest invalidation after every child. The

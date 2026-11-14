@@ -1,6 +1,15 @@
 # Opening -> Academy -> Gariland
 
-Latest delivery (2026-11-13): [consecutive Save checkpoints](CHAINS.md). Real PC/
+Latest delivery (2026-11-13): [persistent story guests](GUESTS.md). Four separate
+FSV6 slots retain guest progression without consuming the16-player roster; old
+saves migrate. The pilot persists Delita through one generated FGP1 directory.
+PC/sanitizer Save/decline/defeat/Continue chains and selected native save/frame
+checks pass. ABI91/F8B5, Work29340/Save3918/zone8842, input61381/headroom3555;
+matching pilot groups708776 transport bytes. Story choices/effects are next;
+breeding/Bar/Fur Shop and the16KiB installed-RAM gate remain open.
+
+
+Previous delivery (2026-11-13): [consecutive Save checkpoints](CHAINS.md). Real PC/
 sanitizer child programs verify Save, decline and defeat/Continue; fixed
 manifest relocation and FSV4 resume. Only the supervisor grows74 bytes;
 ABI90/FSV5, battle code/images/allocations and reviewed UI remain. Matching
