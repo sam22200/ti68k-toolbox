@@ -40,6 +40,7 @@ def synthetic(core, chapter):
             words = [0]*53
             words[9], words[10], words[13], words[50] = 10, 10, 100, 11
             if name=='ffod':words[42]=1
+            words[44] = 1 if name=='ffod' else 2
             words[52]=56 if name=='ffod' else 22
             raw = b'FCD5'+struct.pack('>51H', *words[2:])
         code = name.startswith('fft') and not name.endswith('core') and name != 'fftitle'

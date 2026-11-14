@@ -149,6 +149,8 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare FKO1 optional monster Dead art')
     if spec.get('objective_format')!='FGO1':
         raise ValueError('Core specification must declare FGO1 named encounter objectives')
+    if spec.get('checkpoint_version') != 1:
+        raise ValueError('Core specification must declare relocation-safe save checkpoints')
     variables = select(source, spec['variables'])
     envelope = spec['envelope']
     expected = {}
@@ -206,6 +208,7 @@ def chapter_package(source, spec, core_spec, key):
     pack_id = number(spec['id'], 0, 65534, 'id')
     routes = bytearray()
     bands, prefixes = set(), set()
+    route_won = {}
     if not 1 <= len(spec['routes']) <= 254 or len(spec['steps']) > 255:
         raise ValueError('Invalid route/step count')
     for route in spec['routes']:
@@ -224,6 +227,7 @@ def chapter_package(source, spec, core_spec, key):
         if len(desc) < 106 or desc[:4] != b'FCD5':
             raise ValueError('Unsupported encounter descriptor')
         words = struct.unpack_from('>53H', desc)
+        route_won[band] = words[44]
         if words[52]>127 and words[52]!=255:
             raise ValueError('Encounter source_map: expected0..127 or255')
         if words[42] and 'ff'+prefix+'st' not in spec['variables']:
@@ -246,8 +250,16 @@ def chapter_package(source, spec, core_spec, key):
         prompt = step.get('save_prompt', False)
         if type(prompt) is not bool:
             raise ValueError('save_prompt: expected true/false')
+        if prompt and core_spec.get('checkpoint_version') != 1:
+            raise ValueError('Save prompts require the corrected checkpoint core')
+        skip_flag = number(step.get('skip_flag', 0), 0, 256, 'skip flag')
+        if op == 2:
+            if prompt and not skip_flag:
+                raise ValueError('Battle save_prompt requires a persisted skip_flag')
+            if skip_flag and skip_flag != route_won[arg//100]:
+                raise ValueError('Battle skip_flag must match its descriptor WON flag')
         steps += struct.pack('>BBHHBB', op, int(prompt), arg,
-                             number(step.get('skip_flag', 0), 0, 256, 'skip flag'),
+                             skip_flag,
                              number(step.get('skip_flow', 0), 0, 255, 'skip flow'), 0)
     d = dependencies(variables)
     allowed=set(spec['variables'])|set(core_spec['variables'])
