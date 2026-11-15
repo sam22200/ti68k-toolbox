@@ -53,6 +53,9 @@ campaign-objectives-check:
 campaign-monster-ko-check:
 	$(PY) -m unittest discover -s ../tools -p 'test_monster_ko_*.py'
 	$(PY) check_monster_ko.py
+.PHONY: campaign-monster-body-check
+campaign-monster-body-check:
+	$(PY) check_monster_body.py
 .PHONY: campaign-prerequisites-native-check
 campaign-prerequisites-native-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y
 	$(PY) check_campaign_native.py
