@@ -36,6 +36,7 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 #include "identity_pool.h"
 #if MOD_CORE
 #include "monster_ko.h"
+#include "monster_body.h"
 #endif
 #endif
 
@@ -143,6 +144,7 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 #if MOD_CORE
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
 static const u8 *ko_gfx;                // optional chapter-owned fixed Dead poses, raw archive rows
+static const u8 *body_gfx;              // optional wide monster bodies (monster_body.h)
 static const u8 *flow_bank,*flow_ui;      // optional source-backed sequencing/results; reused ffmg icons
 static const u8 *opening_story,*pgfx;
 static void map_start(u8 after);
@@ -4315,7 +4317,8 @@ static u8 morph_first(void)
 static const u8 *unit_frame(u8 rot, u8 i);
 #ifdef FFT_CHAPTER
 static u8 monster_ko_active(u8 i);
-#define ACTOR_SHOW(k) do{if(visible[k]&&(!ko_gfx||!monster_ko_active(k)))unit_frame(st.rot,k);}while(0)
+static u8 monster_body_active(u8 i);
+#define ACTOR_SHOW(k) do{if(visible[k]&&(!ko_gfx||!monster_ko_active(k))&&!monster_body_active(k))unit_frame(st.rot,k);}while(0)
 #else
 #define ACTOR_SHOW(k) do{if(visible[k])unit_frame(st.rot,k);}while(0)
 #endif
@@ -4401,6 +4404,7 @@ static const u8 *unit_frame(u8 rot, u8 i)
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
     if (DC_OBJ(un->dc)) {
         if (st.morph_mask & (u16)(1U << i)) {
+            if (un->gfx == 255) return object_frame(i);   // a monster: no human Dead frame
 #ifdef FFT_ACTOR_BANK
             const u8 *ko = actor_frame((u16)(un->gfx * 44 + P_KO + (dir & 1) + (dir & 2 ? 22 : 0)), i);
 #else
@@ -4435,6 +4439,7 @@ static const u8 *unit_frame(u8 rot, u8 i)
 
 #ifdef FFT_CHAPTER
 #include "monster_ko.inc"
+#include "monster_body.inc"
 #endif
 
 // A covered body's interior is white, preserving its white/black contour: letting a busy
@@ -4492,6 +4497,9 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     s.w = 16;
 #ifdef FFT_CHAPTER
     if(ko_gfx&&draw_monster_ko(sx,sy,rot,i,c?c->depth:255)){sy-=UNIT_FOOT;goto markers;}
+    if((r=draw_monster_body(sx,sy,rot,i,c))!=0){   // markers above a body taller than a human
+        if(r>=UNIT_FOOT)sy-=r-UNIT_FOOT+1;
+        sy-=UNIT_FOOT;goto markers;}
 #endif
     if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
         draw_unit_water(sx, sy, rot, i, c); return;
@@ -4946,7 +4954,7 @@ void game_init(void)
     if(battle_state)free(battle_state);
 #endif
     battle_state=RT_NULL;rt_state=RT_NULL;rt_state_size=0;
-    chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;ko_gfx=RT_NULL;
+    chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;ko_gfx=RT_NULL;body_gfx=RT_NULL;
     flow_bank=flow_ui=RT_NULL;
 #ifdef __m68k__
     navbuf=RT_NULL;nav_capacity=0;
@@ -5046,7 +5054,7 @@ static u8 chapter_load(u8 c)
 {
     u16 i;
     const u8 *surface;
-    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;ko_gfx=RT_NULL;
+    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;ko_gfx=RT_NULL;body_gfx=RT_NULL;
     if (!sbuf || !cgfx) return 0;
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
@@ -5063,7 +5071,9 @@ static u8 chapter_load(u8 c)
 #endif
     if(!i){igfx=RT_NULL;return 0;}
     {u16 size;ko_gfx=resource_file("ffko",&size);
-     if(ko_gfx&&!monster_ko_valid(ko_gfx,size)){ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}
+     if(ko_gfx&&!monster_ko_valid(ko_gfx,size)){ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}
+     body_gfx=resource_file("ffmb",&size);
+     if(body_gfx&&!monster_body_valid(body_gfx,size)){body_gfx=RT_NULL;ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}
 #ifdef FFT_ACTOR_BANK
     if(ko_gfx){u16 k;u32 total=0;
         for(k=0;k<ACTOR_BANKS&&abank[k];k++)total+=RD16(abank[k],0);
