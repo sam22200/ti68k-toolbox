@@ -1,5 +1,13 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Wide monster body engine (2026-11-15)
+
+The battle renderer now draws FMB1 wide bodies (`ffmb`): see
+[MONSTER_BODY.md](MONSTER_BODY.md). Tested with synthetic creatures only on PC,
+sanitizers and the 68000. The bank content is packed from local PNG poses by
+`tools/monster_body_bank.py`, one command. Still open: CPU of a full 13-actor
+frame, the type-3 deployment/party veto and the real flows below.
+
 ## Latest handoff to Claude: monster animations approved (2026-11-14)
 
 **The user has approved both monster animation previews.** Their latest message
