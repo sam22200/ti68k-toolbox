@@ -311,6 +311,34 @@ tools/bin/ti-table sqrt > sqrt.h              # isqrt(0..255)
   160×100 37k; `GrayClearScreen2B_R` 3.3k (TiEmu; `movem`, ~17k real); 6 characters of text
   through AMS `DrawStr` + `PortSet` on two planes 92k (F_4x6) / 75k (F_6x8), with the in-place
   font and one `long` OR per row 9.7k / 11.4k (**~8× faster**).
+- **A 32-wide masked grey sprite costs 28 % less than the two 16-wide halves it replaces**
+  (**verified**, `runtime/tests/rbench.c` cases 8/9/10 under `ti-cycles`, datasheet counts, so
+  the shifts TiEmu undercounts are included). Thirteen masked grey sprites of 28 rows at an odd
+  x: 16 wide 98,936 cycles (7,610 each), 32 wide 142,214 (10,940 each), and the same area as
+  two 16-wide calls 197,230 (15,172 per pair). So one `GrayClipSprite32_MASK_R` saves 4,232
+  cycles over two `GrayClipSprite16_MASK_R`, not half of them: most of the cost is the per-row
+  shift into the destination, which a wider sprite still pays. Calibration: ten masked grey
+  16x16 cost 47,094 (4,709 each), matching the ~4.6k measured in TiEmu above.
+  **Use a wider sprite when the art allows it, but do not expect it to halve anything.**
+- **Keeping a sprite shifted and blitting it on word boundaries is 3x faster than ExtGraph's
+  clipped call** (**verified**, same harness, cases 10 to 13, thirteen 32x28 masked grey sprites
+  at an odd x). A 32-wide sprite shifted to an arbitrary x spans three words; hold those rows in
+  a scratch buffer and write them yourself:
+
+  | per body | cycles | each |
+  |:--|---:|---:|
+  | two `GrayClipSprite16_MASK_R` (today's two strips) | 197,456 | 15,189 |
+  | three words, `(dest & mask) \| data` per word per plane | 114,272 | 8,790 |
+  | the first two words as one `long`, the third a word | 89,342 | 6,872 |
+  | the same, writing the solid middle `long` without reading it | 65,948 | 5,073 |
+
+  The long form is the honest general number (**2.2x**); the solid form applies only to rows
+  whose middle long is fully opaque, which a body's silhouette gives for most of its rows
+  (**3x**). The 68000 allows a `long` access at any even address, so a word-aligned destination
+  is enough. This is the pre-shift idea of §13 without its 16x memory: re-shift only when
+  `x & 15`, the picture or the flags change, which for a walking actor on a still camera is
+  rare. The cost is the scratch buffer, 28 rows x 3 planes x 6 bytes = 504 bytes per actor, and
+  doing your own clipping, which the ExtGraph call did for you.
 - **Per-call overhead dominates small `draw_rect`s: draw repeated shapes as sprites** (**verified**,
   `games/flappy/`, Titanium TiEmu): a Flappy frame with 4 pipes drawn as 6-colour stripes (28
   `draw_rect` per pipe) plus the game-over panel cost 431k cycles; with each pipe half as one
