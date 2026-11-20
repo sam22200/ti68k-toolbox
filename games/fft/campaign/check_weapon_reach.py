@@ -24,7 +24,7 @@ def main():
   if not args.pc_only:
    run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-DFFT_CHECK_NATIVE_ORDINAL','-o',out/program,*src,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
    cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',20000]
-   for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():cmd+=['--file',HERE/'data'/(bank+'.89y')]
+   for bank in 'ffbm ffbn ffbo ffbp ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():cmd+=['--file',HERE/'data'/(bank+'.89y')]
    fixture=HERE/'x/core-weapon-reach/oracle'
    run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','fwreach.bin','fwreach'],fixture)
    cmd+=['--file',fixture/'fwreach.89y']

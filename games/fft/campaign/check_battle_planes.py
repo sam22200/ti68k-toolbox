@@ -42,7 +42,7 @@ def main():
              '--companion',27])
         assert (native/'modules.h').read_bytes()==(HERE/'data/modules.h').read_bytes()
         files={p.stem:p for folder in (HERE.parent/'opening/data',HERE/'data')for p in folder.glob('*.89y')}
-        for bank in ('ffbm','ffbn','ffbo'):
+        for bank in ('ffbm','ffbn','ffbo','ffbp'):
             run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',bank+'.bin',bank],native)
             files[bank]=native/(bank+'.89y')
         log=run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-DRT_DRAW_ROWS=100',

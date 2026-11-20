@@ -30,7 +30,7 @@ EXTRA=('affinity boundaries capacity-render casting cell compact context deferre
        'haste-slow incantation jump jump-actors jump-cost long-jump magic magic-evasion profile profile-deep '
         'span-search status-rules step step-cache weather').split()
 # Shared generated data that more than one suite would otherwise rebuild concurrently.
-SHARED=['data/ffbm.89y','data/ffbn.89y','data/ffbo.89y','data/ffcj.89y','data/ffgd.89y','data/fftitle.89y']
+SHARED=['data/ffbm.89y','data/ffbn.89y','data/ffbo.89y','data/ffbp.89y','data/ffcj.89y','data/ffgd.89y','data/fftitle.89y']
 EXCLUDE=[ROOT/'tools/pyenv',ROOT/'tools/gcc4ti-bin',CACHE]
 BIG=8<<20   # larger files (the disc image) are keyed by size and mtime
 LINE=re.compile(r'^(\d+)\s+(.*)$')

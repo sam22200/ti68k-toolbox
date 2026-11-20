@@ -37,6 +37,13 @@ def synthetic(core, chapter):
             import monster_formation_bank as mfa
             body=bytes(208)+b'\xff'*104;face=bytes(232)+b'\xff'*116
             raw=mfa.pack([body+face]*16,[f'Monster{i}'.encode()for i in range(255)])
+        if name in ('ffmb','ffmc','ffmd'):
+            import monster_body_bank as mbb
+            h,wb=8,2                                  # one family, one blank picture a pose
+            picture=bytes((h,wb,h-1,8))+bytes(4*h*wb)
+            job=94+3*('ffmb','ffmc','ffmd').index(name)
+            raw=mbb.pack([{'jobs':[job],
+                           'anims':{a:([picture],[8])for a in range(mbb.ANIMS)}}])[0]
         if re.fullmatch(r'ff[a-z0-9]v[0-3]',name):
             import extract
             raw=extract.view_bank(b'R4',(name.encode()*16)[:80],b'',bytes(4))
