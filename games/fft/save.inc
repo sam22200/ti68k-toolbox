@@ -221,7 +221,7 @@ static void save_campaign(void)
 // source positions, including unavailable actions; the bag comes from the inventory.
 static u8 party_next(u8 n, u8 ramza)          // the save's next unit (from n) that is / is not Ramza
 {
-    while (n < save.n && ((save.unit[n].type == 2) != ramza || save.unit[n].type==3)) n++;
+    while (n < save.n && (save.unit[n].type == 2) != ramza) n++;
     return n;
 }
 
@@ -270,7 +270,7 @@ static void party_load(void)
         u16 mask=0;u8 valid=1,has_ramza=0;
         for(i=0;i<save.deploy_n;i++) {
             const u8 *p=save.deploy[i];u8 j,legal=0;
-            if(p[0]>=save.n||save.unit[p[0]].type==3||(mask&(1U<<p[0]))){valid=0;break;}
+            if(p[0]>=save.n||(mask&(1U<<p[0]))){valid=0;break;}
             mask|=(u16)(1U<<p[0]);
             for(j=0;j<25;j++){const u8 *c=qpart(flow_bank,Q_DEPLOY)+4+3*j;if(c[0]&&c[1]==p[1]&&c[2]==p[2])legal=1;}
             for(j=0;j<i;j++)if(save.deploy[j][1]==p[1]&&save.deploy[j][2]==p[2])legal=0;

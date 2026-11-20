@@ -162,6 +162,18 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare shared FMA1 formation art')
     import monster_formation_bank
     monster_formation_bank.validate(source['ffma'].raw)
+    # The wide monster bodies are the same bytes for every chapter -- the player may breed
+    # any family and deploy it anywhere -- so they belong to the core, not to a chapter.
+    if spec.get('body_art_format')!='FMB1':
+        raise ValueError('Core specification must declare FMB1 wide monster bodies')
+    import monster_body_bank
+    banks=[n for n in ('ffmb','ffmc','ffmd')if n in spec['variables']]
+    if not banks or banks[0]!='ffmb':
+        raise ValueError('Core specification must carry ffmb, then ffmc and ffmd in order')
+    for name in banks:
+        if name not in source:
+            raise ValueError(f'Core specification declares {name}, which is not in the input')
+        monster_body_bank.validate(source[name].raw)
     envelope = spec['envelope']
     expected = {}
     for key, name in [('units', 'FFT_CORE_UNIT_MAX'), ('tiles', 'FFT_CORE_TILE_MAX'),

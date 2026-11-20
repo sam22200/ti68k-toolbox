@@ -125,6 +125,27 @@ def pair_banks(mods):
     return split,banks
 
 
+def quad_banks(mods):
+    """Four contiguous shards: the companion's own image grew past what three hold."""
+    def size(part):return 14+sum(len(m)+2 for m in part)
+    n=len(mods)
+    cuts=min(((x,y,z)for x in range(1,n-2)for y in range(x+1,n-1)for z in range(y+1,n)),
+             key=lambda c:max(size(mods[:c[0]]),size(mods[c[0]:c[1]]),
+                              size(mods[c[1]:c[2]]),size(mods[c[2]:])))
+    x,y,z=cuts
+    token=zlib.crc32(b''.join(mods));banks=[]
+    for first,end in ((0,x),(x,y),(y,z),(z,n)):
+        part=mods[first:end]
+        if size(part)>BANK_BUDGET:
+            raise ValueError("module shard exceeds65000 bytes; banks %s; logical images %s" %
+                             ([size(mods[:x]),size(mods[x:y]),size(mods[y:z]),size(mods[z:])],
+                              [struct.unpack_from('>H',m,6)[0] for m in mods]))
+        bank=bytearray(b'FMB3')+struct.pack('>3HI',first,len(part),n,token)+bytes(2*len(part))
+        for i,m in enumerate(part):struct.pack_into('>H',bank,14+2*i,len(bank));bank+=m
+        banks.append(bytes(bank))
+    return cuts,banks
+
+
 def triple_banks(mods):
     def size(part):return 14+sum(len(m)+2 for m in part)
     n=len(mods)
@@ -150,11 +171,18 @@ def main():
     ap.add_argument('out',type=Path);ap.add_argument('source');ap.add_argument('count',type=int)
     ap.add_argument('--second',type=Path,help='active FMB3 pair; omit only for historical FMB2 controls')
     ap.add_argument('--third',type=Path,help='third matching FMB3 archive shard')
+    ap.add_argument('--fourth',type=Path,help='fourth matching FMB3 archive shard')
     ap.add_argument('--companion',type=int,help='image id kept out of the zone (its own heap block)')
     args=ap.parse_args();out,source,count=args.out,args.source,args.count
     with tempfile.TemporaryDirectory() as d:
         mods = [module(source, k, Path(d)) for k in range(count)]
-    if args.third:
+    if args.fourth:
+        if not args.third:ap.error('--fourth requires --third')
+        splits,banks=quad_banks(mods)
+        for path,bank in zip((out,args.second,args.third,args.fourth),banks):write_changed(path,bank)
+        extra=('#define MOD_BANK0_COUNT %d\n#define MOD_BANK1_END %d\n'
+               '#define MOD_BANK2_END %d\n')%splits
+    elif args.third:
         if not args.second:ap.error('--third requires --second')
         splits,banks=triple_banks(mods)
         for path,bank in zip((out,args.second,args.third),banks):write_changed(path,bank)

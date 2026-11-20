@@ -51,7 +51,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='fft-objective-run-') as name:
             data = Path(name); data_links(data, data_source)
             (data/'ffgo.bin').unlink(missing_ok=True); (data/'ffgo.bin').write_bytes(banks[2])
-            (data/'ffsave.sav').write_bytes(b'FSV5'+fixture()[4:]+bytes(66))
+            (data/'ffsave.sav').write_bytes(fixture())
             p = subprocess.run(['env', 'ASAN_OPTIONS=detect_leaks=0', 'UBSAN_OPTIONS=halt_on_error=1', str(binary)], cwd=data,
                                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             (out/f'{label}.log').write_text(p.stdout)
@@ -67,7 +67,7 @@ def main():
              HERE/'check_objective_runtime.c', ROOT/'runtime/core/rt_core.c', ROOT/'lib/unpack68k.s', ROOT/'tools/extgraph/lib/tilemap.a']))
         with tempfile.TemporaryDirectory(prefix='fft-objective-native-') as name:
             data = Path(name)
-            (data/'ffgo.bin').write_bytes(banks[2]); (data/'ffsave.sav').write_bytes(b'FSV5'+fixture()[4:]+bytes(66))
+            (data/'ffgo.bin').write_bytes(banks[2]); (data/'ffsave.sav').write_bytes(fixture())
             for ext, kind, bankname in [('bin', 'dat', 'ffgo'), ('sav', 'sav', 'ffsave')]:
                 run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth', '-89', kind, f'{bankname}.{ext}', bankname], data)
             command = [ROOT/'tools/bin/ti-cycles', '--frames', 0, '--arg', 261, '--max', 10000]

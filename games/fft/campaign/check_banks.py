@@ -56,7 +56,7 @@ def main():
             cases.append(('previous-export',{
                 name:bank('previous-export-'+name,name,(args.previous_bank_dir/(name+'.bin')).read_bytes())
                      if(args.previous_bank_dir/(name+'.bin')).exists()else None
-                for name in('ffbm','ffbn','ffbo')}))
+                for name in('ffbm','ffbn','ffbo','ffbp')}))
         for label,override in cases:
             log=execute(label,override);assert values(log)[-4:]==[0,17,0,0],(label,values(log))
             rejected[label]=dict(accepted=False,bindings_or_module_calls=0)

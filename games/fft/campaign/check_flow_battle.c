@@ -104,8 +104,9 @@ static void trials(void)
 {
     u8 i;u16 selected=0;Save input;
     CHECK(flow_bank&&flow_ui&&W);if(!flow_bank||!W)return;
-    // The fixture is generated FSV5. Runtime save migration is exercised in the
-    // save suite/module, not duplicated in this size-bounded flow harness.
+    // The fixture is generated in the current format, read here without migration.
+    // Older-format loads are exercised in the save suite/module, not duplicated in
+    // this size-bounded flow harness.
     CHECK(rt_load(SAVE_NAME,&input,sizeof input)&&!memcmp(input.magic,SAVE_MAGIC,4)&&input.n==7);
 #ifdef FLOW_FIRST_FRAME_ONLY
     game_scenario(261);

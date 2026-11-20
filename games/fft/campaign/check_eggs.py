@@ -20,7 +20,7 @@ def main():
     cue=ROOT/'roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'
     rules,_=breeding_rules.build(cue);art,_=egg_art.build(cue);art=egg_art.pool(art)
     (out/'ffwb.bin').write_bytes(rules);(out/'ffeg.bin').write_bytes(art)
-    initial=bytearray(b'FSV6'+fixture()[4:]+bytes(3918-len(fixture())))
+    initial=bytearray(fixture()[:3918])   # the shared prefix; this check writes its own world tail
     initial[4]|=2;initial[36]=8;initial[37]=7
     parent=bytearray(initial[470:646]);parent[0:5]=bytes((95,255,3,250,42));initial[294+7*176:294+8*176]=parent
     # FSV7 tail is explicit fixture input; real FSV2..6 migration is checked

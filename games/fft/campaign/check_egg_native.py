@@ -10,7 +10,7 @@ from check_flow import HERE,ROOT,data_links,fixture,run
 def main():
     out=HERE/'x/eggs/native-render';out.mkdir(parents=True,exist_ok=True)
     source=HERE/'x/eggs/shipping';rows=[]
-    initial=bytearray(b'FSV6'+fixture()[4:]+bytes(3918-len(fixture())))
+    initial=bytearray(fixture()[:3918])   # the shared prefix; this check writes its own world tail
     initial[4]|=2;initial[36]=8;initial[37]=7
     parent=bytearray(initial[470:646]);parent[0:5]=bytes((95,255,3,250,42));initial[294+7*176:294+8*176]=parent
     initial=b'FSV7'+bytes(initial[4:])+bytes((1,1,0,0))+bytes(65)+bytes((0,0,0,1,0))

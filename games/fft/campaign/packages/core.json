@@ -11,10 +11,11 @@
   "breeding_format": "FWB1",
   "egg_art_format": "FEG2",
   "formation_art_format": "FMA1",
+  "body_art_format": "FMB1",
   "envelope": {"units": 13, "tiles": 256, "axis": 18, "layers": 2, "scene_rows": 202},
   "variables": [
     "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",
     "fftdep", "ffpccore", "fftbat", "ffbcore", "fftscn", "ffscore",
-    "ffbm", "ffbn", "ffbo", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw", "ffwb", "ffeg", "ffma"
+    "ffbm", "ffbn", "ffbo", "ffbp", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw", "ffwb", "ffeg", "ffma", "ffmb", "ffmc", "ffmd"
   ]
 }

@@ -37,6 +37,9 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 #if MOD_CORE
 #include "monster_ko.h"
 #endif
+#if MOD_CORE || MOD_PART(MOD_COMPANION)
+#include "monster_body.h"               // the companion draws the wide bodies
+#endif
 #endif
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
@@ -143,6 +146,7 @@ static const u8 *igfx;                  // portraits, names, marker and text (ff
 #if MOD_CORE
 static const u8 *cdesc;                 // the chapter's descriptor (ffod, ffgd: chapter.h)
 static const u8 *ko_gfx;                // optional chapter-owned fixed Dead poses, raw archive rows
+static const u8 *body_gfx[MB_BANKS];    // optional wide monster bodies (monster_body.h)
 static const u8 *flow_bank,*flow_ui;      // optional source-backed sequencing/results; reused ffmg icons
 static const u8 *opening_story,*pgfx;
 static void map_start(u8 after);
@@ -213,10 +217,39 @@ static u16 vplane;                      // bytes of one plane of the unpacked ra
 #ifdef FFT_CHAPTER
 #include "mime_state.h"
 #endif
+// Part of Work's layout, so a module and the core must agree on them whether or not
+// monster_body.h is compiled in: the covered box rows a unit remembers, and the widest
+// box row it keeps (64 columns plus the shift byte).
+#define MB_CACHE_ROWS 32
+#define MB_CACHE_BYTES 8
+#ifdef FFT_CHAPTER
+#include "body_blit.h"
+// A body already shifted to its sub-word x is blitted on word boundaries instead of
+// shifted again every frame: 7,299 cycles against 15,189 for a 32x28 body
+// (ti68k-performance.md section 7). Eight slots, not one per unit: the whole roster
+// would cost 8,034 bytes of Work against the 15,958 still free under the AMS block
+// ceiling. A slot belongs to the first unit that claims it and keeps it, so those eight
+// hit every frame; thirteen units sharing eight slots under any eviction would evict
+// each one before its next use and hit nothing, and indexing the slots by unit number
+// instead measured 58,000 cycles a frame worse. The rest take the ExtGraph path.
+#define MB_SHIFT_ROWS 34                // every picture of every family fits (tallest 33)
+#define MB_SHIFT_N 8
+typedef struct {
+    const u8 *g;                        // the picture these rows were composed from
+    s16 x, y;                           // and where: the scenery in front follows from it
+    u8 d, rot, flags, owner;            // depth, view, mirror/flash/wet, the unit + 1
+    BodyRow row[MB_SHIFT_ROWS];
+} BodyShift;
+#endif
 typedef struct {                        // a unit's cover mask, and its covered rows r0..r1
     s16 x, y;                           // among 2 .. UNIT_SH - 3 (r0 > r1: none)
     u8 depth, rot, r0, r1, wet;
     u16 cm[COVER_H];
+#ifdef FFT_CHAPTER                      // what stands in front of a wide monster body's family
+    s16 bx, by;                         // box, remembered per place: the box holds every pose,
+    u8 bd, brot, b0, b1, bvalid;        // so a new picture reads nothing (monster_body.inc).
+    u8 bc[MB_CACHE_ROWS][MB_CACHE_BYTES];   // rows b0..b1 of the box, when they fit
+#endif
 } Cover;
 typedef struct { s16 x, y; u8 depth; } Feet;   // a unit's feet (unit_feet)
 typedef struct { u8 *l, *d; s16 stride, ox, oy, x0, x1, y0, y1; } Dst;   // a drawing target
@@ -231,6 +264,9 @@ typedef struct {
     u8 dialog_white, dialog_part, dialog_face;
 #endif
     Cover cover[UNIT_CAPACITY];         // per unit, for its feet, its depth and the view
+#ifdef FFT_CHAPTER
+    BodyShift bshift[MB_SHIFT_N];       // the shifted bodies kept between frames
+#endif
     u32 wcover[WEAPON_SH];              // the blade's cover, kept while its anchor stands
     s16 wx, wy;
     u8 wrot, wdepth;
@@ -3099,6 +3135,9 @@ action_finished:
 
 #endif
 #ifdef FFT_CHAPTER
+#ifdef FFT_CHAPTER
+static u8 draw_monster_body(s16 sx,s16 sy,u8 rot,u8 i,const Cover *c);  // monster_body.inc
+#endif
 #include "companion.inc"               // after the resident: its PC build reuses magic_stages.h
 #endif
 // ---------------------------------------------------------------- the AI
@@ -3895,6 +3934,10 @@ static u8 area_paint(u8 who);
 
 static u16 special(u8 a,u8 t,AbId ab,u8 query);
 static u8 module_save_load(Save *out);
+#ifdef FFT_CHAPTER
+static u8 unit_flash(u8 i);             // bound into the context below, defined with the
+static u8 unit_pose(u8 i);              // rest of the drawing
+#endif
 #include "module_defaults.inc"
 // Copies image id into dst (the zone, or the companion's block) and binds its context.
 static void mod_install(u8 id,u8 *dst)
@@ -3953,7 +3996,33 @@ static u16 special(u8 a,u8 t,AbId ab,u8 query)
     c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;
     return ((u16 (*)(u8,u8))((u8 *)comp_block+RD16(m,2)))(query,0);
 }
-static void companion_free(void){if(comp_block)free(comp_block);comp_block=RT_NULL;}
+#ifdef FFT_CHAPTER
+// The wide monster bodies: the renderer and its shifted-body slots live in the companion
+// image, which keeps them out of the resident. Its block is never swapped, so this costs
+// one indirect call per body, not a zone install. Thirteen bodies a frame make the
+// address arithmetic worth keeping: reading mod_images and the image header on every one
+// of them cost about 600 cycles a body.
+static ModCtx *comp_ctx;
+static u16 (*comp_entry)(u8,u8);
+static u8 companion_body(s16 sx,s16 sy,u8 rot,u8 i,const Cover *c)
+{
+    ModCtx *x=comp_ctx;
+    if(!comp_block)return 0;
+    if(!x||x->w!=W||x->map_tiles!=map_tiles||x->unit_count!=encounter_units){
+        mod_install(MOD_COMPANION,(u8 *)comp_block);
+        comp_ctx=x=comp_context();
+        comp_entry=(u16 (*)(u8,u8))((u8 *)comp_block+RD16(mod_images[MOD_COMPANION],2));
+    }
+    x->body_x=sx;x->body_y=sy;x->body_cover=c;x->body_rot=rot;
+#ifdef FFT_VIEW_SPLIT
+    // The scene buffer moves without the map or the roster moving, so the depth the
+    // bodies read is refreshed per call, not only when the image is reinstalled.
+    x->ctx_vbuf=vbuf;x->ctx_vplane=vplane;
+#endif
+    return (u8)comp_entry(253,i);
+}
+#endif
+static void companion_free(void){if(comp_block)free(comp_block);comp_block=RT_NULL;comp_ctx=RT_NULL;}
 static u8 module_save_load(Save *out)
 {
     const u8 *m=mod_images[MOD_COMPANION];ModCtx *c;
@@ -3991,14 +4060,17 @@ static u16 mod_call(u8 id, u8 op, u8 a)
 // the bank found, each module of this build and within the zone
 static u8 mod_ready(void)
 {
-    u16 asize=0,bsize=0,csize=0,id;
-    const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize),*c=rt_file("ffbo",&csize);
+    u16 asize=0,bsize=0,csize=0,dsize=0,id;
+    const u8 *a=rt_file("ffbm",&asize),*b=rt_file("ffbn",&bsize),
+             *c=rt_file("ffbo",&csize),*d=rt_file("ffbp",&dsize);
     mod_id=0;mod_images[MOD_RESOURCES]=RT_NULL; // (statics outlive a run: the RAM message's test)
     if(!mod_zone&&!(mod_zone=malloc(MOD_ZONE)))return 0;   // freed by final_release
-    if(!module_three_valid(a,asize,b,bsize,c,csize,MOD_BANK0_COUNT,MOD_BANK1_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE,MOD_COMPANION))return 0;
+    if(!module_four_valid(a,asize,b,bsize,c,csize,d,dsize,MOD_BANK0_COUNT,MOD_BANK1_END,
+                          MOD_BANK2_END,MOD_COUNT,sizeof(ModCtx),MOD_SIG,MOD_ZONE,MOD_COMPANION))return 0;
     for(id=0;id<MOD_COUNT;id++){
-        const u8 *bank=id<MOD_BANK0_COUNT?a:id<MOD_BANK1_END?b:c;
-        u16 local=id<MOD_BANK0_COUNT?id:id<MOD_BANK1_END?id-MOD_BANK0_COUNT:id-MOD_BANK1_END;
+        const u8 *bank=id<MOD_BANK0_COUNT?a:id<MOD_BANK1_END?b:id<MOD_BANK2_END?c:d;
+        u16 local=id<MOD_BANK0_COUNT?id:id<MOD_BANK1_END?id-MOD_BANK0_COUNT:
+                  id<MOD_BANK2_END?id-MOD_BANK1_END:id-MOD_BANK2_END;
         mod_images[id]=bank+RD16(bank,7+local);
     }
     return 1;
@@ -4315,30 +4387,39 @@ static u8 morph_first(void)
 static const u8 *unit_frame(u8 rot, u8 i);
 #ifdef FFT_CHAPTER
 static u8 monster_ko_active(u8 i);
-#define ACTOR_SHOW(k) do{if(visible[k]&&(!ko_gfx||!monster_ko_active(k)))unit_frame(st.rot,k);}while(0)
-#else
-#define ACTOR_SHOW(k) do{if(visible[k])unit_frame(st.rot,k);}while(0)
+static u8 monster_body_active(u8 i);
 #endif
 #include "actors.inc"
+// One copy for its four callers: the expanded test cost more than the call on a
+// path that decodes a frame. A monster never reaches the human 16-column lookup:
+// its own banks draw it, and if a chapter ships without its family it is left
+// undrawn rather than given a human frame.
+static void actor_show(const u8 *visible,u8 k)
+{
+#ifdef FFT_CHAPTER
+    if(visible[k]&&(DC_OBJ(st.unit[k].dc)||!unit_monster(&st.unit[k])))unit_frame(st.rot,k);
+#else
+    if(visible[k])unit_frame(st.rot,k);
+#endif
+}
 
 // Walking/action poses have priority; rotate the remaining decode opportunities
 // among visible actors so the frontmost unit cannot starve the other animations.
 static void actor_animate(const u8 *visible)
 {
     u8 i,k;
-    if(st.mode==M_WALK)ACTOR_SHOW(st.sel);
+    if(st.mode==M_WALK)actor_show(visible,st.sel);
     if(st.mode==M_ACT) {
-        ACTOR_SHOW(st.atk);
-        ACTOR_SHOW(st.tgt);
+        actor_show(visible,st.atk);
+        actor_show(visible,st.tgt);
     }
     for(i=0;i<NUNIT && W->actor_budget;i++) {
         k=W->actor_next;
         if(++W->actor_next==NUNIT)W->actor_next=0;
-        ACTOR_SHOW(k);
+        actor_show(visible,k);
     }
     W->actor_budget=0;
 }
-#undef ACTOR_SHOW
 #endif
 
 static const u8 *object_frame(u8 i)
@@ -4401,6 +4482,7 @@ static const u8 *unit_frame(u8 rot, u8 i)
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
     if (DC_OBJ(un->dc)) {
         if (st.morph_mask & (u16)(1U << i)) {
+            if (un->gfx == 255) return object_frame(i);   // a monster: no human Dead frame
 #ifdef FFT_ACTOR_BANK
             const u8 *ko = actor_frame((u16)(un->gfx * 44 + P_KO + (dir & 1) + (dir & 2 ? 22 : 0)), i);
 #else
@@ -4435,6 +4517,20 @@ static const u8 *unit_frame(u8 rot, u8 i)
 
 #ifdef FFT_CHAPTER
 #include "monster_ko.inc"
+#endif
+#endif
+#if (MOD_CORE || MOD_PART(MOD_COMPANION)) && defined(FFT_CHAPTER)
+#include "monster_body.inc"
+#endif
+#if MOD_CORE
+#ifdef FFT_CHAPTER
+// The resident reaches the renderer through the companion image; a zone image that draws
+// units keeps its own copy, as it did before.
+#ifdef FFT_MODULES
+#define MONSTER_BODY_DRAW(sx,sy,rot,i,c) companion_body((sx),(sy),(rot),(i),(c))
+#else
+#define MONSTER_BODY_DRAW(sx,sy,rot,i,c) draw_monster_body((sx),(sy),(rot),(i),(c))
+#endif
 #endif
 
 // A covered body's interior is white, preserving its white/black contour: letting a busy
@@ -4492,6 +4588,11 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     s.w = 16;
 #ifdef FFT_CHAPTER
     if(ko_gfx&&draw_monster_ko(sx,sy,rot,i,c?c->depth:255)){sy-=UNIT_FOOT;goto markers;}
+    if((r=MONSTER_BODY_DRAW(sx,sy,rot,i,c))!=0){  // markers above a body taller than a human
+        if(r>=UNIT_FOOT)sy-=r-UNIT_FOOT+1;
+        sy-=UNIT_FOOT;goto markers;}
+    // No bank of this chapter draws this monster: its markers only, never a human frame.
+    if(unit_monster(&st.unit[i])&&!DC_OBJ(st.unit[i].dc)){sy-=UNIT_FOOT;goto markers;}
 #endif
     if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
         draw_unit_water(sx, sy, rot, i, c); return;
@@ -4946,7 +5047,7 @@ void game_init(void)
     if(battle_state)free(battle_state);
 #endif
     battle_state=RT_NULL;rt_state=RT_NULL;rt_state_size=0;
-    chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;ko_gfx=RT_NULL;
+    chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;ko_gfx=RT_NULL;memset(body_gfx,0,sizeof body_gfx);
     flow_bank=flow_ui=RT_NULL;
 #ifdef __m68k__
     navbuf=RT_NULL;nav_capacity=0;
@@ -5046,7 +5147,7 @@ static u8 chapter_load(u8 c)
 {
     u16 i;
     const u8 *surface;
-    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;ko_gfx=RT_NULL;
+    W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;ko_gfx=RT_NULL;memset(body_gfx,0,sizeof body_gfx);
     if (!sbuf || !cgfx) return 0;
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
@@ -5063,7 +5164,14 @@ static u8 chapter_load(u8 c)
 #endif
     if(!i){igfx=RT_NULL;return 0;}
     {u16 size;ko_gfx=resource_file("ffko",&size);
-     if(ko_gfx&&!monster_ko_valid(ko_gfx,size)){ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}
+     if(ko_gfx&&!monster_ko_valid(ko_gfx,size)){ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}
+     {char name[5];u8 b;                  // ffmb, then ffmc: a chapter past one variable
+      name[0]=name[1]='f';name[2]='m';name[4]=0;
+      for(b=0;b<MB_BANKS;b++){
+          name[3]=(char)('b'+b);
+          body_gfx[b]=resource_file(name,&size);
+          if(body_gfx[b]&&!monster_body_valid(body_gfx[b],size)){
+              memset(body_gfx,0,sizeof body_gfx);ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}}}
 #ifdef FFT_ACTOR_BANK
     if(ko_gfx){u16 k;u32 total=0;
         for(k=0;k<ACTOR_BANKS&&abank[k];k++)total+=RD16(abank[k],0);

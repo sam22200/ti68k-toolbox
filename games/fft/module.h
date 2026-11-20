@@ -32,6 +32,7 @@ typedef struct {
         struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; RESOURCES14: catalogue size in desc_size;
                                         // RESOURCES12: AMS's free RAM / 16 in desc_size
         const u8 *chapter_ugfx;          // SAVE6 -> resident: the chapter's unit frames
+        struct {s16 body_x,body_y;const Cover *body_cover;u8 body_rot;}; // COMPANION253
     };
     u8 map_w, map_h;
     u16 map_n;                         // the chapter's sizes, as they are at load (fft.h)
@@ -104,6 +105,12 @@ typedef struct {
     void (*draw_sprite)(s16 x, s16 y, const RtSprite *s);
     u32 *rt_keys, *rt_prev;
     u8 *scene_rot, *vbuf_rot;
+    const u8 *const *ctx_body_gfx;      // the wide monster body banks (COMPANION253)
+    u8 *ctx_vbuf;                       // the depth they read,
+    u16 ctx_vplane;
+    u8 (*ctx_unit_flash)(u8 i);         // the three unit questions the bodies ask
+    u8 (*ctx_unit_in_water)(u8 i);
+    u8 (*ctx_unit_pose)(u8 i);
     const u8 *cgfx;
 #ifdef FFT_CHAPTER
     u8 (*ranged_reach)(u8 a, u8 o, u8 c); // a255: fill manual mask for actor o/origin c
@@ -207,6 +214,12 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define rt_prev (*M.rt_prev)
 #define scene_rot (*M.scene_rot)
 #define vbuf_rot (*M.vbuf_rot)
+#define body_gfx (M.ctx_body_gfx)
+#define unit_flash M.ctx_unit_flash
+#define unit_in_water M.ctx_unit_in_water
+#define unit_pose M.ctx_unit_pose
+#define vbuf (M.ctx_vbuf)
+#define vplane (M.ctx_vplane)
 #define cgfx (M.cgfx)
 #define rt_load M.rt_load
 #define rt_save M.rt_save

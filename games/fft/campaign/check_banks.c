@@ -40,6 +40,10 @@ static void expected_context(void)
         c->state = &st; c->w = W; c->abilities = abilities; c->map_tiles = map_tiles;
         c->contour_gfx = contour_gfx; c->cdesc = cdesc;
         c->views=views;c->highlight_seq=&hl_seq;
+#ifdef FFT_CHAPTER
+        c->ctx_body_gfx=body_gfx;          // vbuf/vplane: only the companion, per call
+        c->ctx_unit_flash=unit_flash;c->ctx_unit_in_water=unit_in_water;c->ctx_unit_pose=unit_pose;
+#endif
         c->rand15 = rand15; c->known = known; c->spread_start = spread_start; c->spread_go = spread_go;
         c->bfs = bfs;
         c->charge_query=charge_query;c->skill_cost=skill_cost;
@@ -72,6 +76,7 @@ static void expected_context(void)
         c->ranged_reach = ranged_reach; c->rt_load = rt_load; c->rt_save = rt_save; c->rt_file = rt_file;
         c->jobs = jobs; c->unit_defs = unit_defs; c->common = common; c->charge_ticks = charge_ticks;
         c->igfx = igfx; c->flow_bank=flow_bank;c->flow_ui=flow_ui;c->rt_seed = &rt_seed;
+        c->load_save = module_save_load;
         c->divsi3 = __divsi3; c->mulsi3 = __mulsi3;
         c->udivsi3=__udivsi3;
 }
@@ -80,13 +85,14 @@ static void bindings(void)
     u8 id,pass;u32 seed=rng32;u16 size;const u8 *bank;
     u8 actual_w=map_w,actual_h=map_h,actual_units=encounter_units;
     u16 actual_n=map_n;s16 actual_sc_h=sc_h,actual_sc_top=sc_top;
-    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,352);
+    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,384);
     for(pass=0;pass<2;pass++){
         if(pass){map_w=1;map_h=1;map_n=1;encounter_units=13;sc_h=200;sc_top=1;}
         expected_context();
         for(id=0;id<MOD_COMPANION;id++){   // zone images; the companion has its own block
             ModCtx *c;ZB(61);mod_call(id,255,0);ZE(61);c=mod_context(id);
-            CHECK(mod_id,id+1);CHECK(memcmp(c,&expected,sizeof expected)==0,1);
+            CHECK(mod_id,id+1);
+            CHECK(memcmp(c,&expected,sizeof expected)==0,1);
             CHECK(rng32==seed,1);
             c->cast_ability=0x123;c->cast_actor=12;c->cast_ref=255;
             ZB(62);mod_call(id,255,0);ZE(62);CHECK(c->cast_ability,0x123);
@@ -97,7 +103,8 @@ static void bindings(void)
     CHECK(mod_images[0]==bank+RD16(bank,7),1);
     bank=rt_file("ffbn",&size);CHECK(mod_images[MOD_BANK0_COUNT]==bank+RD16(bank,7),1);
     bank=rt_file("ffbo",&size);CHECK(mod_images[MOD_BANK1_END]==bank+RD16(bank,7),1);
-    CHECK(mod_images[MOD_COUNT-1]==bank+RD16(bank,7+MOD_COUNT-1-MOD_BANK1_END),1);
+    bank=rt_file("ffbp",&size);CHECK(mod_images[MOD_BANK2_END]==bank+RD16(bank,7),1);
+    CHECK(mod_images[MOD_COUNT-1]==bank+RD16(bank,7+MOD_COUNT-1-MOD_BANK2_END),1);
     // The1x1 context above is not a playable map. Restore real dimensions before
     // an injection door, which now checks on-field team survival correctly.
     map_w=actual_w;map_h=actual_h;map_n=actual_n;encounter_units=actual_units;

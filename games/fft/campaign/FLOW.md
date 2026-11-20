@@ -150,8 +150,11 @@ KO staging, production victory/fade/result confirmation and saved bytes.
 Separate native/PC runs also verify no duplicate payout and saturated-stock
 quarter-price credit. These are controlled fixtures, not a full manual campaign.
 
-`python3 check_flow_menus.py` passes10 native/PC input/pixel/state/save replays:
-five deployment, three Academy and two Gariland-title cases. `make pc` builds
+`python3 check_flow_menus.py` passes20 native/PC input/pixel/state/save replays:
+fifteen deployment, three Academy and two Gariland-title cases. The scene cases
+read their contour art from a package-shaped `ffcu`
+(`check.shared_contour_banks`); loose `data/` keeps that tail in `ffgv0`, where
+`scene.c` does not look, and every set was refused. `make pc` builds
 the supervisor entries. The bounded battle fixtures pass ASan/UBSan with legacy
 fixed-point shifts and leak accounting excluded.
 

@@ -26,7 +26,7 @@ def main():
         run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'areahit',*source,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
         for bank in ('ffgd','ffcj'):run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',bank+'.bin',bank],data)
         cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
-        for bank in 'ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
+        for bank in 'ffbm ffbn ffbo ffbp ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
             cmd+=['--file',(data if bank in ('ffgd','ffcj')else HERE/'data')/(bank+'.89y')]
         native=run([*cmd,out/'areahit.89z']);(out/'native.log').write_text(native)
     values=[int(v,16)for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',native)]

@@ -23,22 +23,29 @@
 #undef game_update
 static u8 ko_board;
 static u8 ko_original_job;
-u8 game_update(void){if(ko_board){
+u8 game_update(void){
+#ifdef CAP_KO
+    if(ko_board){
     FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=0;W->ac_now++;
     if(ko_board==2)st.morph_t=(u8)((rt_frame%5)*8);
     if(ko_board==3&&rt_frame==15){st.unit[0].job=133;st.unit[0].hp=0;st.unit[0].dc=3;}
     if(ko_board==3&&rt_frame==35){st.unit[0].job=ko_original_job;st.unit[0].hp=st.unit[0].max_hp;}
-    return 1;}return capacity_source_update();}
+    return 1;}
+#endif
+    return capacity_source_update();}
 void game_scenario(u16 scenario)
 {
     ko_board=0;
     capacity_source_scenario(61);
     if(!W)return;
+#ifdef CAP_STATUS
     if(scenario==1||scenario==2) {
         st.sel=(u8)(NUNIT-1);st.mode=M_STATUS;st.page=(u8)(scenario-1);
         W->status_i=0;W->status_page=255;
     }
-    if(scenario>=3){
+#endif
+#ifdef CAP_KO
+    if(scenario>=3&&scenario<=5){
         static const u8 jobs_ko[6]={133,100,97,109,106,94};u8 i;
         ko_board=1;st.mode=M_MENU;st.ai=AI_OFF;st.open_stage=st.open_fade=st.banner=0;
         st.morph_mask=0;st.end=0;st.act=st.sel=U_RAMZA;
@@ -52,6 +59,25 @@ void game_scenario(u16 scenario)
             for(i=0;i<NUNIT;i++)st.unit[i].dc=DC_CRYSTAL;}
         if(scenario==5)ko_board=3;
     }
+#endif
+    // 6..: the board of scenario0 with scenario-5 of the13 actors wearing a wide body,
+    // their jobs taken from the bank itself, so any bank exercises all its families.
+    // 100*f+5+n: the same board with every body in the f-th family instead, so one
+    // family's cost is measured on the same cells as any other.
+#ifdef CAP_BODY
+    if(scenario>=1000){                          // all thirteen in one job: its own cost
+        u8 i;
+        for(i=0;i<NUNIT;i++){st.unit[i].job=(u8)(scenario-1000);st.unit[i].gfx=255;}
+    } else if(scenario>=6){
+        u8 i,j=MB_JOB0,tries,n=(u8)(scenario-5);
+        if(n>NUNIT)n=NUNIT;
+        for(i=(u8)(NUNIT-n);i<NUNIT;i++){        // one job per family the banks draw
+            for(tries=0;tries<MB_JOBS&&!monster_body_of(j);tries=(u8)(tries+3))
+                if((j=(u8)(j+3))>=MB_JOB0+MB_JOBS)j=MB_JOB0;
+            if(tries>=MB_JOBS)return;
+            st.unit[i].job=j;st.unit[i].gfx=255;
+            if((j=(u8)(j+3))>=MB_JOB0+MB_JOBS)j=MB_JOB0;}}
+#endif
 }
 static u32 identity(void)
 {

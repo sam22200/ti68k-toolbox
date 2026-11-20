@@ -40,7 +40,7 @@ def main():
         changed.append(variable.name)
     # The supervisor stays in RAM, while packed entries and their data archive.
     variable=source['fftstory'];source['fftstory']=packages.Variable(variable.name,variable.kind,0,variable.payload)
-    for name in ('ffbm','ffbn','ffbo','ffwb','ffeg'):
+    for name in ('ffbm','ffbn','ffbo','ffbp','ffwb','ffeg'):
         path=(HERE/'data'/(name+'.bin')) if name.startswith('ffb') else out/(name+'.bin')
         source[name]=packages.Variable(name,0x1c,3,path.read_bytes()+packages.resources.TRAILER);changed.append(name)
     release=out/'release';release.mkdir(exist_ok=True)

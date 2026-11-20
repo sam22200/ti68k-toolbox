@@ -1,5 +1,739 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## The type-3 veto is lifted: a grown monster deploys and fights (2026-11-15)
+
+A player's grown monster is now an ordinary party member. The four gates are
+gone -- `party_next` and the saved-deployment validator in `save.inc`, and the
+placement restore and `deploy_place` in `campaign/deployment.inc` -- and the
+egg exclusion stays exactly where it was (`deploy_place` still refuses one,
+note 6, now worded "An egg cannot fight").
+
+Two guards replace the blanket veto, so a monster can never fall back to the
+human 16-column lookup: `ACTOR_SHOW` passes only objects and humans to
+`unit_frame`, and `draw_unit_covered` leaves a monster no bank can draw with
+its markers alone instead of a human frame. In practice it never happens,
+because the chapter now ships **all sixteen appearances** rather than the ten
+its own encounters place: the player may breed any family. They are 135,566
+bytes over three banks (`MB_BANKS` is 3, `ffmb`/`ffmc`/`ffmd`), and monsters
+cost 149,573 bytes installed in all. Those banks are identical for every
+chapter, so they belong in the core package; moving them there is the
+packaging step and is not done.
+
+Proofs. `campaign-monster-formation-check` passes with 87 checks: an adult
+monster placed on a legal free cell is accepted with no note, an egg is still
+refused. `check_monster_body.py` adds seven PC-only party checks (kept out of
+the shared digest so both CPUs still agree): `party_next` now returns the
+monster slot, `saved_unit_load` builds it with gfx 255, and
+`monster_body_of`/`monster_body_active` hand it to its bank. The 35 shared
+checks and 19 screens stay 97E50FE8 on PC, ASan/UBSan and the 68000; the four
+13-actor board checks keep 0546/ECF7/A87E/AA26; eggs, save, status and scene
+tests pass.
+
+## The shared save fixture, repaired (2026-11-15)
+
+`check_flow.py`'s `fixture()` emitted an FSV3 save of 3,138 bytes while `Save`
+is FSV7 of 3,992, so every consumer patched the difference back on by hand and
+`check_flow_battle`'s raw `rt_load` failed at its first assertion. The
+generator now emits the current format outright -- the FSV3 body, then the 66
+discovery/raw-current bytes, an all-zero guest block, day one of year one with
+no egg, and `save_world_init`'s seed -- and its callers take it as it comes
+instead of relabelling it:
+
+- `check_flow.py` writes `fixture()` as `initial`;
+- `check_monster_battle.py`, `check_guests.py`, `check_chains.py` and
+  `check_objective_runtime.py` drop their `b'FSV4'/b'FSV5'/b'FSV7'` prefixes;
+- `check_eggs.py` and `check_egg_native.py` take `fixture()[:3918]`, the shared
+  prefix, and keep writing their own world tail with its deterministic seed.
+
+Four checks that were failing before any of this work now pass:
+`check_flow.py` (81 + 14 checks), `chapter1-monster-battle-check` (382 + 425 +
+330 checks over three seeds), `deploy-test` and `manage-test`. `deploy-test`
+only needed its size assertion moved off the FSV6 sum to `sizeof(Save)==3992`,
+as `test_world_save.c` and `check_guests.c` already state it. `manage-test`
+needed `x/check/ffsave_won.sav` regenerated -- the one on disk was an FSV4
+party of five from an older run -- after which the Chemist recruit the test
+reads sits at slot 3, not 1; every other expectation (Ramza level 2 as a
+Squire, 51 HP, the Chemist's 169 JP) still holds untouched.
+
+`check_title.py` was failing too and is fixed here: it asserted the slot Save
+writes still starts `FSV5`, and compared a snapshot stripped of `discovered`
+against a fixture that did not have the field. Both sides are now stripped and
+the magic is FSV7. 22 PC/68000 cases pass.
+
+Also green after the change: `check_eggs.py` (90), `check_strikes.py` (251),
+`check_guests.py`, `check_objective_runtime.py`, `check_equipment_save.py`,
+`check_affinity.py` (1,883), `check_hands.py` (197), `make test`,
+`campaign-monster-formation-check` (87) and `check_monster_body.py`
+(97E50FE8, 35 + 7).
+
+### The two PC/68000 divergences were the harness, not the code
+
+`check_flow_menus.py`'s `flowdep` and `check.py --menus-only`'s `manage` ran a
+PC build that saw more files than the 68000 build. Both are fixed and both now
+pass.
+
+**Missing banks on the 68000 side.** `management_init` nulls `bank` when
+`ffeg` fails `egg_art_valid`, and `worldmap`'s `game_init` nulls its own when
+`ffwb` fails `world_rules_valid`. The PC gets both through `data_links`, which
+symlinks every `*.bin`; the TI runs were handed an explicit bank list that left
+them out, so `game_update` took its `if(!flowbank||!bank||!save.n)` exit on
+every frame -- 40 frames of input changed nothing, and `update` cost a constant
+292 cycles. Instrumenting the 68000 build printed `flowbank` set, `bank` null,
+`save.n` 7, magic `FSV7`: the save was never the problem. Adding `ffeg` and
+`ffma` to the `manage`/`flowdep` lists and `ffwb` to `worldmap`'s turned
+`checksum 1538 state da5d23d3` into the PC's own `EDD0 / 20A22386`.
+
+**The opening's historical view controls leaking in.** `scene.c` falls back to
+`resource_file("ffov0")` for its contour art when `ffcu` has no tail. `ffov0`
+is an *opening* bank that the campaign package does not ship, but
+`data_links`'s default links `opening/data` as well, so the PC drew contours
+the 68000 could not have. With those four `ffov*` files removed the PC gives
+`0328 / 0x1100` -- exactly the 68000's numbers. `check_flow_menus.py` now links
+this chapter's data only, which is the set the TI run is given anyway.
+
+`check_flow_menus.py --deployment-only` passes **15** PC/68000 input, pixel,
+state and save replays, and `check.py --menus-only` passes **23**.
+
+### The campaign's scene replays are vacuous: loose `data/` is not package-shaped
+
+Removing the `ffov*` leak exposed the rest of it. `check_flow_menus.py`'s
+`flowcin` cases now agree pixel for pixel and state for state on both CPUs --
+at `checksum 0328`, which is the screen that reads **"Missing scene set"**. The
+state never moves: 0x1100 at frame 30, at 1,600 and at 12,000, and no save is
+written, so the `flow==1` assertion fails.
+
+`scene.c`'s `game_scenario` rejects the set when `!contour_gfx`. It looks for
+the engine tables in `ffcu`'s tail, then falls back to `ffov0` -- the
+*opening's* first view. `chapter_files.inc` (the battle path) falls back to its
+own `views[0]` instead, which is why battles were unaffected. In the loose
+`data/` directories the tail sits in `ffgv0.bin` / `ffov0.bin`
+(`contour_assets.py --attach data/ffgv0.bin`); `tools/chapter_resources.py`
+`shared_contours()` hoists it into `ffcu` **only when a package is built**. So
+loose campaign data has no contour tail anywhere `scene.c` looks, and the
+opening's own data happens to work through the `ffov0` fallback.
+
+Verified: rebuild `ffcu.bin` with `contour_tail`/`shared_contours`'s own layout
+(base, pad to even, the tail from `ffgv0`, `FC02` + the three offsets) and the
+Academy scene runs -- `checksum CC9A state 15A0` at frame 30, ending at frame
+**534** with `flow == 1`, which is exactly what the `academy()` callback wants.
+
+This also meant `check.py`'s own `scene` cases (`narration`, `chapter`,
+`academy-complete`) had been passing vacuously on both CPUs: they compared two
+"Missing scene set" screens.
+
+**Fixed in the harness, not in shipping code.** `check.py` gained
+`shared_contour_banks(dest)`: a folder of symlinks to this chapter's banks with
+one real file, an `ffcu` rebuilt exactly as `shared_contours()` builds it
+(base, pad to even, the tail from `ffgv0`, `FC02` and the three offsets), plus
+its `.89y`. `check.program` takes a `bank_dir`, so the 68000 run is handed the
+same bytes. Only the scene replays use it; the battle replays keep loose
+`data/`, where `chapter_files.inc` still falls back to `ffgv0`. `scene.c` is
+untouched -- its `ffov0` fallback is the opening's own and stays out of the
+campaign's path now that nothing links the opening's data in.
+
+**Deliberate reference change.** The three `scene` cases move off the vacuous
+`0328`: `narration` CC9A, `chapter` 64AE, `academy-complete` runs to its end at
+frame **534**. The pictures were reviewed: the narration caption over the
+chapel, then the Academy bridge with its actors. `check_flow_menus.py` now
+passes **20** replays (it recorded ten in `FLOW.md`), `flowcin`/`complete` and
+`flowtit`/`complete` included, each writing the same save on both CPUs.
+
+## A player's monster, through the real chain (2026-11-15)
+
+With the fixture repaired the chain is provable, and it is proved end to end on
+one roster byte: the same party and the same key scripts as the ordinary runs,
+with slot 6 turned into an adult Chocobo (job 94, `gfx` 255, `type` 3, nothing
+equipped, no secondary set, no learned abilities).
+
+**The deployment program, both CPUs.** `check_flow_menus.py` gains a `flowmon`
+run of the real `deploy.c`: the monster is listed with its job name, HP/MP and
+Brave/Faith, the same keys pick it, place it and open "Start battle?", and the
+committed save holds the same deployment `[0,2,3,4,6]` with slot 6 still
+job 94 / `type` 3 / `gfx` 255. PC and 68000 agree on every pixel, every state
+and the bytes written: `save 3352f278f22c`. `check_flow_menus.py
+--deployment-only` now passes **18** replays, the full run **23**.
+
+**The battle and the results, PC.** `check_flow.py` gains a third pass over the
+same Gariland fixture with that roster: `flow 9B48BC6C failures 0 checks 81` --
+every assertion the human roster satisfies holds with the monster fielded, and
+the settled save keeps 4,500 gil, seven units and the monster's record at slot
+6. The board was reviewed against the ordinary one: identical scenery and
+allies, the Chocobo's wide body in place of the human at its deployed cell.
+Captures under `x/qa/flow/monster/`.
+
+The 68000 side of that battle is not duplicated here: `check_monster_body.py`
+already renders thirteen actors with bodies on both CPUs, and the deployment
+run above covers the 68000 path into the save.
+
+### The instrumented 68000 fixture went 38 bytes over, and is back under
+
+`check_flow.py --native` could not build `flowgar`
+(`-DFLOW_GARILAND_RESULTS_ONLY`): *Program size of 65552 bytes exceeds maximum
+by 38*. It built before this branch, so the body engine's additions caused it.
+`ACTOR_SHOW` was a macro expanded at four call sites; it is now one
+`actor_show(visible,k)` function. The fixture links at **65,505** bytes, 47
+saved. Measured: the 13-body peak is the same cycle for cycle whether the
+function is inlined or not, the four board checksums stay
+0546/ECF7/A87E/AA26, `check_monster_body.py` stays 97E50FE8, and
+`check_flow.py --native` passes again. Sharing one body-bank reset loop was
+tried first and cost 22 bytes more than the three inlined `memset`s, so it was
+dropped.
+
+### The remaining peak, measured properly
+
+`check_capacity_render.py --case monster-body --bodies 13 --body-chapter`
+still trips its own 360k gate. With the real chapter banks: average
+**312,119**, peak **415,718** at frame 5, and **7** of 89 ordinary frames over
+budget -- frames 1, 2, 3, 4, 5, 6 and 8 (382,200 / 376,272 / 375,444 / 374,402
+/ 415,718 / 386,496 / 393,510). From frame 10 it settles around 305,000, which
+is *below* the same scenario without bodies (the plain `board` case averages
+232,272 but peaks at 349,680 and swings between 246k and 350k).
+
+**It is not the box probe, and it is not picture decoding.** `monster_body.inc`
+decodes nothing -- it reads the bank in place -- and a temporary counter on the
+cold `c->bvalid` path (reverted; it is four lines under an `#ifdef` if it is
+wanted again) measured **6 probes and 170 probed rows over the whole 90-frame
+run** with thirteen bodies, against 0 for the plain board. The probe only runs
+where `depth!=255`, so most bodies never pay it. That hypothesis is dead.
+
+**The cost is per family, not per frame.** Sweeping the body count with the
+real chapter banks, where the harness takes one job per family from the bank
+itself:
+
+| bodies | ordinary average | ordinary peak |
+|---:|---:|---:|
+| 1 | 232,272 | 349,680 |
+| 4 | 261,322 | 377,962 |
+| 8 | 319,062 | **443,888** |
+| 13 | 312,119 | 415,718 |
+
+One body costs exactly what the plain board costs, to the cycle. Eight bodies
+peak **higher** than thirteen, so the cost is not monotonic in the count: the
+harness picks a different job per family for each count, and some families are
+far more expensive than others. The marginal cost is roughly 10-12k cycles of
+average per body. The next measurement is therefore per family -- box width
+and height against the frame cost, one family at a time -- not another guess at
+the shared path.
+
+### Measured per family: the cost is the picture's width in strips
+
+`check_capacity_render.py` gained `--body-family F`: scenario `100*F+5+n`
+dresses **every** body in the F-th family the banks draw, so each family is
+measured on the same thirteen cells. The default (0) keeps the mixed scenario
+and the four certified checksums 0546/ECF7/A87E/AA26; mixed thirteen stays
+312,103 / 415,704.
+
+Thirteen bodies, one family at a time, with the real chapter banks. `wb` is the
+picture width in bytes, so 2 is one 16-column strip and 4 is two:
+
+| fam | job | bank | box | picture widths | average | peak |
+|---:|---:|:--|:--|:--|---:|---:|
+| 10 | 121 | ffmc/1 | 25x32 | all `wb` 2 | **248,346** | **355,408** |
+| 2 | 97 | ffmb/1 | 30x48 | mostly 2 | 268,743 | 370,820 |
+| 8 | 115 | ffmb/7 | 31x48 | mixed | 280,675 | 393,204 |
+| 9 | 118 | ffmc/0 | 34x48 | mixed | 306,625 | 413,608 |
+| 5 | 106 | ffmb/4 | 29x48 | mixed | 316,637 | 447,870 |
+| 7 | 112 | ffmb/6 | 29x48 | mostly 4 | 328,156 | 439,590 |
+| 1,3,4,6 | 94,100,103,109 | ffmb | 24-29x48 | mostly 4 | 340-349k | 444-465k |
+| 14,15,11 | 133,136,124 | ffmc | 27-30x48 | 4 | 372-376k | 482-485k |
+| 16 | 139 | ffmd/0 | 33x48 | all 4 | 410,555 | 512,366 |
+| 12 | 127 | ffmc/3 | 33x48 | all 4, 23-33 rows | 414,059 | 523,506 |
+| 13 | 130 | ffmc/4 | 33x48 | all 4, 25-31 rows | **458,284** | **574,268** |
+
+**The box is not the driver.** Family 10 has the *largest* box of all
+(34x48 belongs to family 9; 10's is 25x32) and is the cheapest; the families
+with identical 48-column boxes span 248k to 458k. The box is only the probe
+window, and the probe almost never runs (6 times in 90 frames).
+
+**The strips are.** Every cheap family draws 16-column pictures, every
+expensive one draws 32-column pictures. `monster_body.inc` ends with
+`sp.w=16` and one `draw_sprite(x+16*c0,...)` per strip, so a 32-column body
+costs two full ExtGraph calls per frame instead of one. Thirteen bodies of a
+one-strip family already fit the 360k budget (355,408); thirteen of a two-strip
+family are 60% over.
+
+### The 32-wide blit was measured before building it, and it is not enough
+
+`runtime/tests/rbench.c` gained three cases (8, 9, 10) and was run under
+`ti-cycles`, whose datasheet counts include the shifts TiEmu undercounts.
+Thirteen masked grey sprites of 28 rows at an odd x:
+
+| | cycles | per sprite |
+|:--|---:|---:|
+| 16 wide | 98,936 | 7,610 |
+| 32 wide | 142,214 | 10,940 |
+| two 16-wide (the same area) | 197,230 | 15,172 per pair |
+
+So one `GrayClipSprite32_MASK_R` saves **4,232 cycles**, 28 %, over the two
+16-wide calls a two-strip body makes today -- 55,016 cycles a frame for
+thirteen of them. Applied to the worst family that is 574,268 down to about
+519,000 and 458,284 down to about 403,000: **still over the 360k budget.** The
+cost is dominated by the per-row shift into the destination, which a wider
+sprite still pays. Calibration: ten masked grey 16x16 cost 47,094 here against
+the ~4.6k each recorded from TiEmu, so the harness agrees with the knowledge
+base. The numbers are now in `ti68k-performance.md` §7.
+
+That measurement also sizes the problem exactly: the blits *are* the cost. With
+thirteen two-strip bodies they are 197,230 of a 458,284 average, while the
+board they replace draws thirteen humans for roughly 85,000.
+
+### The shifted-body blit, measured: 3x, and it reaches the budget
+
+Rather than guess again, cases 11 to 13 of `rbench.c` blit thirteen 32x28
+bodies that are already shifted into aligned 48-bit rows, under `ti-cycles`:
+
+| per body | cycles | each | against today |
+|:--|---:|---:|---:|
+| two `GrayClipSprite16_MASK_R` (today) | 197,456 | 15,189 | -- |
+| three words, `(dest & mask) \| data` | 114,272 | 8,790 | 1.7x |
+| first two words as one `long`, third a word | 89,342 | 6,872 | 2.2x |
+| the same, solid middle `long` written unread | 65,948 | 5,073 | **3.0x** |
+
+My 3,400-cycle guess was wrong by 2x; the real general figure is the `long`
+form at 6,872, and the solid form applies to the rows whose middle long is
+fully opaque, which a body's silhouette gives for most of them.
+
+Applied to thirteen bodies of the worst family (13, job 130, average 458,284
+and peak 574,268): the `long` form saves 108,121 a frame and the mixed
+solid/long form about 131,500, taking the **average to roughly 327,000 --
+under the 360k budget** -- and the peak to roughly 443,000, which is still the
+opening ramp and still over.
+
+**What this costs to build.** A scratch buffer of 28 rows x 3 planes x 6 bytes
+= 504 bytes per actor, 6,552 for thirteen, against the 15,958 bytes still free
+under the AMS block ceiling -- so it grows `Work`, which means `MOD_SIG`
+changes and `data/ffbm.89y ffbn.89y ffbo.89y` must be rebuilt and their build
+output read (the trap recorded above). It re-shifts only when `x & 15`, the
+picture or the flags change, the same invalidate-on-key idea as `c->bvalid`.
+And it takes over the clipping that `draw_sprite` was doing. The 68000 allows a
+`long` at any even address, so a word-aligned destination is enough. The
+32-wide pack-format change is then unnecessary: the scratch rows are built by
+us either way.
+
+That is a milestone, not a patch, so its first half is landed on its own here:
+the blit exists and is proved, and nothing in the renderer uses it yet.
+
+### `games/fft/body_blit.h`: the blit, measured and proved against `draw_sprite`
+
+`BodyRow` holds one body row already shifted into the three words it lands on
+(light, dark, mask, `mask` bit 1 keeping the destination exactly as `RtSprite`
+does). `body_row_shift()` builds one from a 32-column body's two strips and
+`s = x & 15`, in 32-bit arithmetic only; a 16-column body passes an entirely
+transparent right strip. `body_rows_blit()` writes `h` of them, clipping whole
+words -- the plane is an exact number of them -- and the rows outside the
+drawing area.
+
+**It is bit-exact.** `check_monster_body.c` gained a PC-only block that, for
+every height 1..12, every sub-word `x` from -20 to 250 in steps of 7 and four
+`y` including off the top and bottom, draws the same art with two
+`draw_sprite` calls and with `body_rows_blit`, over a non-empty screen, and
+compares both whole planes: **4,680 comparisons, all equal**. The shared digest
+stays 97E50FE8 with its 35 checks and the 68000 carrier still reports the same
+checks and screens.
+
+**It is 2.1x.** Measured under `ti-cycles` with the real header, thirteen
+bodies of 28 rows:
+
+| | cycles | each |
+|:--|---:|---:|
+| two `GrayClipSprite16_MASK_R` (today) | 197,456 | 15,189 |
+| the word loop, first version | 181,374 | 13,952 |
+| three words unrolled as a `long` and a word | 103,058 | 7,927 |
+| the same, row clipping hoisted and pointers walked | **94,894** | **7,299** |
+
+The first version was barely better than ExtGraph: the inner loop over the
+three words was not unrolled, which cost almost everything the shift saved.
+The unrolled form is an `#ifdef __m68k__` fast path for a body with nothing
+clipped sideways, which is the ordinary case; the portable word loop stays as
+the general path and is what the PC runs, so the equality test above covers the
+code the PC executes. The 68000 fast path is covered once the renderer uses it,
+by the nineteen screens.
+
+Two traps found while writing it, both now in the header's comments: the plane
+is **big-endian**, so a PC build that reads it through `u16 *` draws different
+pixels from the same bytes (`BB_RD`/`BB_WR` say so explicitly and compile to a
+plain word access on the 68000); and the 68000 allows a `long` at any even
+address, so a word-aligned destination is enough.
+
+### Wired, on the user's call: eight slots, not one per unit
+
+`Work` gained `BodyShift bshift[8]` (5,008 bytes against the 15,958 free under
+the AMS block ceiling; one slot per unit would have been 8,034). A slot belongs
+to the first unit that claims it and is never released, so those eight hit
+every frame: thirteen bodies cycling through eight slots under any eviction
+policy would evict each one before its next use and hit nothing.
+
+**The first key was wrong.** It was the picture and `x & 15`, on the assumption
+that most bodies have nothing in front of them -- drawn from the box probe
+running only 6 times in 90 frames. That inference was false: the probe is
+itself cached, so few probes do not mean few covered bodies. With the key
+guarded by `depth == 255` the path never ran, and the measurements came back
+unchanged to the cycle. The key is now everything a composed row depends on --
+the picture, `x`, `y`, depth, the view rotation, mirror/flash/wet and the
+height -- so a covered body caches as well as a bare one, and a frame that
+finds the unit unmoved reads neither the scenery nor the picture.
+
+The strip loop fills the slot instead of a second copy of the composition: `l`,
+`d` and `m` became `[2][MB_ROWS]`, each strip keeps its composed rows, and the
+tail shifts the pairs once and blits. Eligibility is at most two strips, at
+most 34 rows and fully on screen sideways, so `body_rows_blit` never declines;
+mirrored bodies cache too, because the composed arrays are indexed by the
+visual strip either way.
+
+**Measured**, thirteen bodies, real chapter banks:
+
+| all thirteen in | average before | after | peak before | after |
+|:--|---:|---:|---:|---:|
+| job 130 (the worst) | 458,284 | **352,229** | 574,268 | 500,072 |
+| job 139 | 410,555 | **278,327** | 512,366 | 418,930 |
+| job 127 | 414,059 | **335,843** | 523,506 | 483,736 |
+| the mixed set | 312,103 | **282,423** | 415,704 | 421,742 |
+| job 121 (one strip) | 248,346 | 271,852 | 355,408 | 381,420 |
+| job 97 (one strip) | 268,743 | 281,336 | 371,624 | 397,646 |
+
+**Every average is now inside the 360k budget**, the worst family by 23 %.
+
+**A better variant exists and does not fit.** Caching only two-strip bodies and
+keeping the 68000 shortcut that hands an unchanged strip to `draw_sprite`
+straight from the archive measured better everywhere -- job 130 at 335,942 /
+478,940, the mixed set at 267,412, and the one-strip families left exactly as
+they were -- but `check_native.c -DCHECK_GAR`, the eleven-case Gariland
+regression fixture, came out **136 bytes over** the 64 KB variable limit with
+both paths compiled in. Dropping the shortcut and caching every body instead
+costs those cycles and buys the space. The one-strip families lose 13,000 to
+23,000 cycles of average by it; they were, and remain, well inside the budget.
+
+**The peaks are not fixed.** They are the opening ramp, where every body is new
+and every slot is being filled, and a fill costs about what the old path cost.
+A budget of three fills a frame was tried and made the peaks *worse* (job 130:
+478,940 without it, 520,860 with): spreading the fills only adds frames in
+which ten bodies still draw the slow way. It was removed.
+
+**Everything still draws the same pixels.** `check_monster_body.py` keeps
+97E50FE8 with its 35 checks, 4,687 PC checks and the same nineteen screens on
+the 68000; the four certified board checksums stay 0546/ECF7/A87E/AA26;
+`check_flow.py` passes 81 + 14 + 81; `campaign-monster-formation-check` passes
+87.
+
+Two harness consequences, both recorded because they will recur:
+
+- **`MOD_SIG` holds `sizeof(Work)`**, and this change moved it three times. Each
+  time the 68000 came back with `identity 0x00ff0000` -- no units, no `W` --
+  while the PC was perfectly happy, because the PC does not use the modules.
+  `make data/ffbm.89y data/ffbn.89y data/ffbo.89y` after every `Work` change,
+  and read what it prints.
+- **`check_capacity_render.c` no longer fits one 68000 variable** with the whole
+  battle in it. Its scenarios are now three compile groups -- `CAP_STATUS` (the
+  certified four), `CAP_KO` (the monster KO boards) and `CAP_BODY` (the wide
+  bodies) -- and the `.py` builds only the group its `--case` needs. `CAP_KO`
+  is 262 bytes over on its own and cannot be built at all for now; nothing
+  gates on it, those cases are opt-in diagnostics. `--body-family` became
+  `--body-job`, which costs far less code: scenario `1000 + job` dresses all
+  thirteen in one family.
+
+### The body banks are in the core package now
+
+`packages/core.json` declares `"body_art_format": "FMB1"` and carries `ffmb`,
+`ffmc` and `ffmd` beside `ffma`, `ffeg` and `ffwb`; `chapter_packages.py`
+`core_package()` requires the declaration, requires `ffmb` first and the three
+in order, and runs `monster_body_bank.validate()` on each. They are the same
+bytes for every chapter -- the player may breed any family and deploy it
+anywhere -- so they belong to the core, and a chapter package no longer has to
+reason about them.
+
+### The renderer moved to the companion image, and everything ships
+
+`fftbat` was 528 bytes over the limit with the shifted-body work in it, so the
+wide-body renderer now lives in the **companion image** (`MOD_COMPANION`),
+which has its own heap block and is never swapped out of it. The resident
+reaches it through `companion_body()`, modelled on `special()`: one indirect
+call per body, no zone install. `ModCtx` gained what the renderer reads -- the
+`body_gfx` banks, the `vbuf`/`vplane` depth (refreshed per call: the scene
+buffer moves without the map or the roster moving), the addresses of
+`rt_light`/`rt_dark` since the planes are swapped each frame, and
+`unit_flash`/`unit_in_water`/`unit_pose`. `body_blit.h` split into a type part
+(before `Work`, which embeds `BodyRow`) and a code part included from
+`monster_body.inc` after `module.h`, where those names become the context's.
+`companion.inc` answers op 253.
+
+**It cost two envelopes, both raised:**
+
+| | before | after |
+|:--|---:|---:|
+| companion image | 1,612 | **5,024** bytes |
+| `FFT_CORE_COMPANION_MAX` (its heap block) | 3,072 | **5,376** |
+| module banks | 3 (max 64,896 of 65,000) | **4**: 49,248 / 48,818 / 50,048 / 46,478 |
+
+The fourth bank is `ffbp`. The loader already knew how: `mod_ready` reads four
+banks through `module_four_valid`, and `module.py` already had `quad_banks`
+("the companion's own image grew past what three hold"). Only the Makefile
+rule, `BANKS` and `packages/core.json` needed it.
+
+**The indirect call costs about 7,500 cycles a frame** at thirteen bodies
+(289,912 against 282,423 resident), roughly 600 a body. Caching the context and
+entry pointers instead of reading `mod_images` and the image header each time
+recovered only 180 of it, so the cost is the boundary itself, not the address
+arithmetic.
+
+**Where the numbers land**, thirteen bodies with the real chapter banks:
+
+| all thirteen in | before this branch | now |
+|:--|---:|---:|
+| the mixed set | 312,103 | **289,912** |
+| job 130 (the worst family) | 458,284 | **359,855** |
+| job 139 | 410,555 | **286,140** |
+
+The worst family clears the 360k budget by 145 cycles. That is tight enough to
+be worth saying out loud: any future growth in the body path puts it back over.
+
+**Everything builds and passes.** `make packages` (core 582,204 transport
+bytes, chapter 291,789), `make packages-check` (43 host checks, 915 C checks,
+`6B6DB6DB`, PC/sanitizers/68000 agree), `check.py` (37 replays),
+`check_flow.py` (81 + 14 + 81), `check_monster_body.py` (97E50FE8, 35 shared +
+4,687 PC checks, the same nineteen screens on the 68000), the four certified
+board checksums 0546/ECF7/A87E/AA26, formation 87, eggs 90.
+
+### The record of how it got there: the resident was 528 bytes too big
+
+`make packages` fails at its first step. `fftbat` (`native_battle.c`,
+`-pack ffbcore`) comes out at **66,042 bytes, 528 over** the limit. Verified by
+stashing `fft.c` and `monster_body.inc` and building it again: **the baseline
+builds, this branch does not.** The shifted-body work is what overruns it, and
+`CLAUDE.md` already warned the margin was 1,509 bytes.
+
+`monster_body.inc` has no `MOD_PART` guard, so the body renderer and everything
+it calls sit in `MOD_CORE`, the resident. There is no fat left to trim: the
+whole feature is about 470 bytes of code (`body_row_shift`, the unrolled blit,
+the key compare, the slot lookup, the fill tail), and the shavings already
+taken -- dropping the height from the key, looping the three planes in the
+shift, removing the redundant on-screen test -- bought 26 of the 528.
+
+Two ways out, and this is a design decision:
+
+1. **Move the body renderer behind a module boundary.** `CLAUDE.md`'s own rule
+   ("keep new mechanics modular") points here, but `draw_monster_body` is on
+   the render hot path and would take an `M.` indirection per body per frame.
+2. **Find 530 bytes elsewhere in `MOD_CORE`**, which is what the resident
+   overlay zones were introduced for.
+
+Until one is done the campaign packages cannot be built. Everything else on
+this branch is verified and passing.
+
+**One policy measurement worth keeping.** Replacing `body_shift_slot` with
+`i < MB_SHIFT_N ? &W->bshift[i] : RT_NULL` -- slot k for unit k -- saves 16
+bytes and costs **58,000 cycles a frame** (the mixed thirteen go from 282,423
+to 340,000, worse than no cache at all). The claim-on-first-draw policy follows
+the draw order, and that is what matters; it was restored.
+
+**Next:** making the resident fit, then the opening-ramp peak, which is now the
+fill cost and nothing else.
+
+## Chapter I needs ten monster families, in two banks (2026-11-15)
+
+The earlier note said four. It was wrong: it scanned six ENTD instead of the
+chapter's 33 encounters. `chapter_audit.py` already enumerates them (story
+battles ENTD 0x180..0x191 plus the first-tier random formations of Mandalia,
+Fovoham, Sweegy, Lenalia and Zeklaus), and they place **ten** appearances:
+Chocobo, Goblin, Bomb, Cuar, Pisco Demon, Skeleton, Ahriman, Steel Hawk,
+Minitaurus and Dragon. Ghoul is not one of them -- it appears in eleven
+encounters elsewhere in the game, none in Chapter I.
+
+Ten families are 83,396 bytes, past one archive variable, so
+`monster_body_assets.py` splits them in order and the chapter loader reads
+**`ffmb` then `ffmc`** (63,622 + 19,774). A job belongs to exactly one bank and
+`monster_body_of` picks it; `body_gfx` is now an array of `MB_BANKS`. All
+sixteen appearances would be 135,386 bytes, still two banks.
+
+Ahriman and Steel Hawk are the first flying sheets to ship: their idle is the
+original hover and their walk its flight. Pictures pinned for decision under
+`campaign/x/monster-body/review/` and `review-c/`.
+
+Measured on the board with those banks (`--body-chapter`): thirteen wide bodies
+cost **346,342 average / 460,906 peak** ordinary cycles, six 306,953 / 420,478.
+Nine of the 89 ordinary frames are over 360k and they are frames 1 to 9, the
+opening ramp the board does without any monster; from frame 10 the median is
+340,396 and nothing exceeds the budget. The 35 body checks and 19 screens stay
+97E50FE8 on PC, ASan/UBSan and the 68000; the four 13-actor board checks keep
+0546/ECF7/A87E/AA26; status/save/scene/actor-cache/map tests pass.
+
+Monsters now cost **97,403 bytes** installed: `ffmb` 63,622 + `ffmc` 19,774 +
+`ffma` 13,082 + `ffeg` 640 + `ffwb` 285.
+
+One build note: the native capacity harness no longer fits 64 KB with thirteen
+bodies and two banks, so it is built with `FFT_CHECK_NO_ZONES`. The gate reads
+`FRAME_END` values, not zone markers; only the per-zone breakdown is lost, and
+removing the flag brings it back when a frame needs dissecting.
+
+## Thirteen wide monsters now fit an ordinary frame (2026-11-15)
+
+Read [MONSTER_BODY.md](MONSTER_BODY.md), "CPU of a full board". With the real
+Chapter I bank, thirteen wide bodies on the Gariland board cost **353,522
+average / 458,402 peak** ordinary cycles, down from 395,033 / 488,982 and from
+834,948 / 947,338 when the engine was first written. **Only nine of the 89
+ordinary frames are still over the 360k budget, and they are frames 1 to 9**:
+the opening, while the banner runs and every unit's cover is read for the first
+time. The board's own first frames ramp the same way with no monster at all.
+From frame 10 the median is 347,710 and nothing exceeds the budget. Six bodies
+cost 296,546 / 417,320, four 282,740 / 397,752. Every picture is unchanged: the
+35 body checks and 19 screens agree on PC, ASan/UBSan and the 68000, the four
+13-actor board checks keep 0546/ECF7/A87E/AA26, and every body count keeps its
+checksum.
+
+What changed: FMB1 now carries **a box per family**, the one every picture of
+every pose sits in (validated), so the renderer reads what stands in front of
+that box once per place instead of once per picture -- a body changes picture
+every three to five ticks, and the probe costs about 1,235 cycles a row.
+`Cover` keeps that place, depth, orientation, the covered box rows and their
+bytes, so a new picture reads nothing: over 90 frames the probe runs six times
+instead of 540. The row loop also lost its per-body `memset`, keeps each
+strip's interior plane in a register, and reads a plain word inline instead of
+calling out for it.
+
+**It costs 3,320 bytes of `Work`** (266 a unit), which is the whole price of
+this result; `Work` is now 33,400 bytes and the AMS block still has 15,958 to
+spare, but the installed 16KiB/peak certification moves that much further away.
+Say so before packaging.
+
+Two traps worth knowing, both of which cost time here. `MOD_SIG` contains
+`sizeof(Work)`, so any change to `Work` makes the prebuilt module banks stale
+and the battle then refuses to start with no memory message at all (`vbuf` and
+`sbuf` null, the body checks fall to two) -- rebuild `data/ffbm.89y
+data/ffbn.89y data/ffbo.89y`, **and read that build's output**, because a
+module compile error leaves the old banks in place and `make` reports nothing
+wrong. And any constant in `Work`'s layout must be defined where both the core
+and a module see it, not behind `MOD_CORE`.
+
+**Next:** the type-3 deployment/party veto (`deployment.inc`, `save.inc`) and
+the real deploy/Save/Continue/battle/results flows. The art and the frame
+budget are no longer what blocks it.
+
+## Monster art shown for decision, and what it costs (2026-11-15)
+
+`games/fft/tools/monster_body_review.py` decodes a packed `ffmb` and shows what
+the game draws: `pictures.png` (every picture of every pose, front then back,
+with its wait), `animations-N.gif` (each pose at the bank's own rhythm, the
+original facing and its mirror) and `review.json`. Both are pinned for decision
+in the gallery, under `campaign/x/monster-body/review/`.
+
+**Nothing worth dropping.** Placed on their feet and compared pixel by pixel,
+the closest two of the 99 Chapter I pictures differ by 8 pixels and the median
+picture differs from its nearest neighbour by 111, about a seventh of a body.
+A 4-pixel tolerance drops none, 8 pixels drops one (324 bytes), 64 pixels --
+which would visibly change the animation -- drops eight (2,072 of 31,484).
+Shrinking to four greys has not made the source frames collide; pooling the
+exact repeats already took 385 KB to 32 KB. Idle and walk cost nothing against
+each other (the original plays the same eight pictures at two rhythms, stored
+once); the attack is the only large block and the only pose whose 15,280 bytes
+nothing else uses. Shortening attacks is the single remaining lever, and it
+changes what the player sees.
+
+**Monsters cost 46,427 bytes today**: `ffmb` 32,420 (Chapter I bodies) + `ffma`
+13,082 (formation/Status bodies, portraits, 48 aliases) + `ffeg` 640 (eggs) +
+`ffwb` 285 (breeding rules). All sixteen appearances would make `ffmb` 135,386,
+about 149,393 in all, over three archive variables.
+
+No palette-only copy is in any of it: Chocobo/Black Chocobo/Red Chocobo,
+Goblin/Black Goblin/Gobbledeguck, Bomb/Grenade/Explosive and Red
+Panther/Cuar/Vampire each share one appearance and keep their own names, stats
+and save identities.
+
+## The real monster bodies are extracted and packed (2026-11-15)
+
+Read [MONSTER_BODY.md](MONSTER_BODY.md). `games/fft/tools/monster_body_assets.py`
+builds the shipping `ffmb` bank from the disc: it replays each selected family's
+retail body timelines with the bounded oracle, converts every displayed frame at
+the family's approved scale and palette (checked against the approved FMR1
+standing planes), writes four-grey PNGs with a manifest and packs them. Source
+waits are halved (the original counts 60 ticks a second, the game about 30); a
+flying family hovers for its idle and flies for its walk, so the bank keeps five
+poses. `make -C games/fft/campaign data/ffmb.89y` builds the chapter's families,
+`MONSTER_BODY_FAMILIES` picks them.
+
+FMB1 grew what the real art needs: **a wait per frame slot** (the original
+repeats pictures inside a sequence at different rhythms) and **pooled pictures**
+(slots showing the same picture share their bytes, identical whole sequences
+share their slots). Offsets are no longer chained and the cold validator checks
+every slot from its own header, each wait, each animation's total ticks and that
+the pictures end at the bank size. Banks packed before this must be packed again.
+
+The Chapter I bank -- Chocobo, Goblin, Bomb and Cuar, the families Sweegy Woods
+and the other Chapter I encounters place -- is **239 slots, 99 pictures, 32,420
+bytes**: one archive variable. Pooling is what makes that possible: 385 KB of
+repeated frames become 32 KB. All sixteen families come to 135,386 bytes, so a
+chapter carries the families it meets, not the whole set.
+
+Measured on the board with the real bank (`--body-bank data/ffmb.bin`): thirteen
+bodies cost 395,033 average / 488,982 peak ordinary cycles, six 315,600 /
+446,392, four 307,161 / 442,602. The average fits the 360k budget, the peak does
+not; the lever is still the one below. The four 13-actor board checks keep
+0546/ECF7/A87E/AA26 with the bank installed, and the 31 body checks and 19
+screens stay 93DECFE8 on PC, ASan/UBSan and the 68000.
+
+`check_monster_body.py` and `check_capacity_render.py` now unlink `ffmb.bin`
+before writing their own: `data_links` symlinks the chapter's bank and writing
+through the link would have overwritten it. `chapter1-monster-battle-check`
+fails on its save fixture (line 55) with and without the bank, a third stale
+fixture beside `test_manage` and `deploy-test`.
+
+**Next:** the peak frame, then the type-3 deployment/party veto
+(`deployment.inc`, `save.inc`) and the real deploy/Save/Continue/battle/results
+flows. The art the player's own monsters need is now buildable per chapter.
+Packaging `ffmb` into the shipping chapter group belongs with that work, not
+before it.
+
+## Wide monster bodies: board CPU measured and cut (2026-11-15)
+
+Read [MONSTER_BODY.md](MONSTER_BODY.md) section "CPU of a full board".
+`check_capacity_render.py` now has a `monster-body` case (`--bodies N`,
+`--body-scale`) that dresses the thirteen actors of the private descriptor in
+wide bodies and replays 90 Gariland board frames under `ti-cycles`. Thirteen
+bodies at the selected art's 32x26 bounds cost 834,948 average / 947,338 peak
+ordinary cycles; four changes bring that to 349,259 / 490,348, and the 48x40
+worst-case shapes from 1,402,592 / 1,522,714 to 490,536 / 650,458. The changes:
+FMB1 keeps each plane's 16-column strips contiguous; the scenery in front is
+read once per row for every strip, with the view's depth base and stride taken
+once per body; a strip nothing changes goes to `draw_sprite` straight from the
+archive on the 68000, as the human sprite already did; and `Cover` remembers,
+per unit, the pose/place/depth/orientation it probed and the rows each strip
+was covered on (16 bytes a unit, 208 bytes of `Work`), so only those rows are
+read again -- 93% of a board's rows are covered by nothing. Pixels are
+untouched: 31 body checks and 19 screens stay 93DECFE8 on PC, ASan/UBSan and
+the 68000, the four 13-actor board checks keep 0546/ECF7/A87E/AA26, and every
+body count keeps its checksum. The campaign tests pass except `test_manage` and
+`deploy-test`, which fail on their obsolete fixtures exactly as at baseline.
+
+**The average now fits the 360k budget; the peak (490,348) does not.** The
+board alone already peaks at 343,150 for a 225,815 average, so there are 17k
+to spare before any monster. An ordinary visible body costs about 19,000
+cycles; the peaks are the frames where several units change pose at once,
+because the remembered span is keyed on the pose. Next lever: make it
+pose-independent by probing a fixed feet-anchored box instead of the pose's
+own box (a larger probe on a miss, but misses then only follow movement and
+rotation), or bound how many wide bodies a battle shows at once.
+
+**Correction for the record:** an earlier note in this session said that
+growing `Work` stopped the native battle from starting and that caching the
+cover was therefore a RAM decision. That was wrong. `MOD_SIG` contains
+`sizeof(Work)`, so the prebuilt module banks had simply gone stale and the
+battle refused to start with no memory message (`vbuf`/`sbuf` null). Rebuilding
+`data/ffbm.89y data/ffbn.89y data/ffbo.89y` fixes it. Scene + `Work` + 2 leaves
+19,070 bytes under the 65,520-byte AMS block ceiling. `Work` is now 30,288
+bytes and `MOD_SIG` changed, so the module banks, the shipping core package and
+the matching chapter packages must be rebuilt. The installed 16KiB/peak
+certification stays open and is 208 bytes further away.
+
+Banks packed before this change must be packed again (`monster_body_bank.py`);
+the FMB1 header, tables and validator are unchanged. No save, deployment gate,
+shipping group or TiEmu run changed.
+
+## Wide monster body engine (2026-11-15)
+
+The battle renderer now draws FMB1 wide bodies (`ffmb`): see
+[MONSTER_BODY.md](MONSTER_BODY.md). Tested with synthetic creatures only on PC,
+sanitizers and the 68000. The bank content is packed from local PNG poses by
+`tools/monster_body_bank.py`, one command. Still open: CPU of a full 13-actor
+frame, the type-3 deployment/party veto and the real flows below.
+
 ## Latest handoff to Claude: monster animations approved (2026-11-14)
 
 **The user has approved both monster animation previews.** Their latest message

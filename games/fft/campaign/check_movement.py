@@ -23,7 +23,7 @@ def trial(name,source,out,native):
   run([ROOT/"tools/bin/ti-cc","-DRT_CYCLES","-o",out/"movechk",*src,ROOT/"lib/unpack68k.s",ROOT/"tools/extgraph/lib/tilemap.a"])
   cmd=[ROOT/"tools/bin/ti-cycles","--frames",0,"--arg",61,"--max",10000]
   if name!="movement_rules":
-   for bank in "ffbm ffbn ffbo ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj".split():cmd += ["--file",HERE/"data"/(bank+".89y")]
+   for bank in "ffbm ffbn ffbo ffbp ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj".split():cmd += ["--file",HERE/"data"/(bank+".89y")]
   log=run([*cmd,out/"movechk.89z"]);(out/"native.log").write_text(log)
   values=[int(v,16) for v in re.findall(r"value: .*?\(0x([0-9a-f]+)\)",log)]
   assert values[-3:]==[int(m[1],16),0,int(m[2])] and "_main returned" in log,log[-2500:]

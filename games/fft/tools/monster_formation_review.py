@@ -22,7 +22,8 @@ from review_files import save_image, write_changed
 
 
 def thumbnail(canvas, spr, palette, *, scale_milli=None, width=32, height=26,
-              feet=(16, 21)):
+              feet=(16, 21), outline=True):
+    """outline=False leaves the white ring out: a body bank's packer adds its own."""
     yy, xx = np.mgrid[:128, :128]
     opaque = canvas != 0
     # Preserve the source feet origin; the selected family palette shares this fit.
@@ -53,7 +54,9 @@ def thumbnail(canvas, spr, palette, *, scale_milli=None, width=32, height=26,
     cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
     edge = mask & ~ndimage.binary_erosion(mask, structure=cross)
     ring = ndimage.binary_dilation(mask, structure=cross) & ~mask
-    gray[edge], gray[ring] = 3, 0
+    gray[edge] = 3
+    if outline:
+        gray[ring] = 0
     color = np.full((height, width, 3), 170, np.uint8)
     for c in range(3):
         channel = count(rgb[canvas, c]*opaque)/body.clip(1)

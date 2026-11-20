@@ -15,7 +15,7 @@
 // The companion image's block (campaign/COMPANION.md), reserved at battle start whatever its
 // current size: tools/module.py refuses a bigger image, fft.c a bigger loaded one. Raise it
 // with the image (a core change); the battle's RAM requirement counts it.
-#define FFT_CORE_COMPANION_MAX 3072U
+#define FFT_CORE_COMPANION_MAX 5376U
 typedef u8 CoreTileId;                  // compact node0..255, includes both floors
 typedef u16 CoreTileCount;              // can represent count256 and loop endpoint
 typedef struct { u8 x, z_layer; } CoreTilePosition; // z in bits0..4; layer in bit5

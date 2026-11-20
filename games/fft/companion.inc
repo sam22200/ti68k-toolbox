@@ -19,6 +19,9 @@ static u16 __attribute__((unused)) special(u8 a,u8 t,AbId ab,u8 query){return co
 u16 mod_entry(u8 op,u8 a)
 {
     (void)a;if(op==254)return save_load(M.save_out);
+    // The wide monster bodies draw from here: their renderer is far too big for the
+    // resident, and this image is never swapped out of its block (fft.c: companion_body).
+    if(op==253)return draw_monster_body(M.body_x,M.body_y,M.body_rot,a,M.body_cover);
     return companion_query(M.cast_actor,M.cast_ref,M.cast_ability,op);
 }
 #endif
