@@ -310,10 +310,17 @@ core rebuild: keep chapter data, scripts and encounters in packs.
 
 ## Known open items
 
-- `make test`: `manage-test` expects 3 units in `x/check/ffsave_won.sav`, which `check.py`
-  now writes with 5 (the previous build writes the same fixture: a stale test).
-- `core-capacity-render-check`: `equipment-last` frame 0 costs 370,642 cycles (368,076 before
-  the ragged depth), over the 360k budget it asserts.
+**Closed 2026-11-20** (wide monster bodies, see `HANDOVER.md`): `manage-test` now reads the
+Chemist recruit at its real slot and passes against the regenerated five-unit fixture;
+`core-capacity-render-check` `equipment-last` peaks at 356,042 cycles, inside the 360k budget
+it asserts (it was 370,642). The four certified board checksums are unchanged.
+
+**Spent 2026-11-20, and it came out of this chapter's margin:** the shifted-body slots added
+about 4.9 KB to `Work` and the companion's rules envelope went 3,072 -> 5,376 bytes, so
+`BATTLE_RAM_BYTES` grew by roughly 7.3 KB. `CHAPTER1_ARCHIVE_PLAN.md` called those 2,682 spare
+companion bytes a reserve rather than scratch; they are now in use. The archive side gained a
+fourth module bank (`ffbp`, 46,574 bytes) and the three body banks moved into the core.
+
 - The standalone demo (`games/fft`, `make test`) no longer compiles (`nature_rules.h`
   needs campaign-only Work/State fields), before and after this change.
 
