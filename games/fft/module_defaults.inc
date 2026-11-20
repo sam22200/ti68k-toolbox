@@ -3,6 +3,12 @@
 static const ModCtx mod_defaults={
     .sig=MOD_SIG,
     .views=views,
+#ifdef FFT_CHAPTER
+    .ctx_body_gfx=body_gfx,
+    .ctx_unit_flash=unit_flash,
+    .ctx_unit_in_water=unit_in_water,
+    .ctx_unit_pose=unit_pose,
+#endif
     .highlight_seq=&hl_seq,
     .rand15=rand15,
     .known=known,

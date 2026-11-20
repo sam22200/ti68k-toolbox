@@ -12,8 +12,8 @@ PACKAGE_RESERVE ?= 131072
 PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
-BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
-BANKS += ffwb ffeg ffma
+BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffbp ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
+BANKS += ffwb ffeg ffma ffmb ffmc ffmd
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
@@ -320,9 +320,9 @@ data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin &: ../tools/campaign
 data/ffgd.bin: ../tools/chapter_desc.py ../tools/surface_data.py ../core_limits.h data/battle.h data/interface.h ../map.h data/actors.h data/ffcj.bin data/ffcp.bin
 	$(PY) ../tools/chapter_desc.py campaign
 
-data/ffbm.bin data/ffbn.bin data/ffbo.bin &: ../tools/module.py battle.c ../fft.c ../fft.h ../core_limits.h ../chapter.h ../module.h ../unit_card.h ../choice_menu.h ../action_effect.h ../status_rules.h ../status_policy.h ../status_unit.h ../status_lifetime.h ../status_control.h ../reflect_rules.h ../common.h $(wildcard ../*.inc ../*.h *.inc *.h) ../opening/opening.inc
-	$(PY) ../tools/module.py data/ffbm.bin battle.c 28 --second data/ffbn.bin --third data/ffbo.bin --companion 27
-	@touch data/ffbm.bin data/ffbn.bin data/ffbo.bin data/modules.h
+data/ffbm.bin data/ffbn.bin data/ffbo.bin data/ffbp.bin &: ../tools/module.py battle.c ../fft.c ../fft.h ../core_limits.h ../chapter.h ../module.h ../unit_card.h ../choice_menu.h ../action_effect.h ../status_rules.h ../status_policy.h ../status_unit.h ../status_lifetime.h ../status_control.h ../reflect_rules.h ../common.h $(wildcard ../*.inc ../*.h *.inc *.h) ../opening/opening.inc
+	$(PY) ../tools/module.py data/ffbm.bin battle.c 28 --second data/ffbn.bin --third data/ffbo.bin --fourth data/ffbp.bin --companion 27
+	@touch data/ffbm.bin data/ffbn.bin data/ffbo.bin data/ffbp.bin data/modules.h
 
 data/ffcp.bin ../opening/data/ffcp.bin &: ../tools/common_portraits.py ../tools/identity_assets.py ../tools/management_data.py
 	$(PY) ../tools/common_portraits.py "$(DISC)"
@@ -342,6 +342,13 @@ data/ffeg.bin: ../tools/egg_art.py
 	$(PY) ../tools/egg_art.py "$(DISC)" $@ --pooled
 data/ffma.bin: ../tools/monster_formation_bank.py ../tools/monster_appearance.py x/monster-family-review/ffmr.bin
 	$(PY) ../tools/monster_formation_bank.py x/monster-family-review/ffmr.bin $@
+# The wide battle bodies (MONSTER_BODY.md). All sixteen appearances, not just the ten
+# the chapter's own encounters place: the player may breed any family and deploy it.
+# They pass one archive variable, so the loader reads ffmb, ffmc then ffmd.
+MONSTER_BODY_FAMILIES ?= all
+data/ffmb.bin data/ffmc.bin data/ffmd.bin &: ../tools/monster_body_assets.py ../tools/monster_body_bank.py ../tools/monster_appearance.py x/monster-family-review/ffmr.bin x/monster-combat-review/results.json
+	$(PY) ../tools/monster_body_assets.py --families $(MONSTER_BODY_FAMILIES) -o data/ffmb.bin --preview x/monster-body/sheet.png
+	@touch data/ffmb.bin data/ffmc.bin data/ffmd.bin
 
 FLOW_STATE := x/mandalia/gariland-deployment.state
 $(FLOW_STATE):

@@ -19,6 +19,7 @@ from PIL import Image
 from scipy import ndimage
 
 JOB0, JOBS, FAMILIES, ANIMS, ROWS, FRAMES = 94, 48, 48, 10, 40, 1024
+BOX_W = 64                                    # the family probe box, wider than a picture
 HEADER = 8+JOBS
 POSES = ('idle', 'walk', 'attack', 'hurt', 'dead')
 CROSS = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
@@ -57,46 +58,80 @@ def encode(tones, mask, foot):
     t, m, o = tones[sl], mask[sl], outline[sl]
     planes = ((t & 1).astype(bool) & m, (t & 2).astype(bool) & m, ~o, m)
     head = bytes((bottom-top, width//8, fy-top, fx-left))
-    return head+b''.join(np.packbits(p, axis=1).tobytes() for p in planes)
+    # Each plane holds its 16-column strips one after the other, every strip a run of
+    # h 16-bit rows: the renderer draws an uncovered strip straight from the archive.
+    return head+b''.join(np.packbits(p, axis=1).reshape(bottom-top, width//16, 2)
+                         .transpose(1, 0, 2).tobytes() for p in planes)
+
+
+def envelope(frames):
+    """The box every picture of a family sits in: rows, row bytes, feet."""
+    above = max(f[2] for f in frames)
+    below = max(f[0]-f[2] for f in frames)
+    left = max(f[3] for f in frames)
+    right = max(8*f[1]-f[3] for f in frames)
+    rows, width = above+below, (left+right+15)//16*16
+    # The box is only a probe window, never a picture: it may be wider than a frame,
+    # because the source shifts a body sideways between poses.
+    if rows > ROWS or width > BOX_W or below > 12:
+        raise ValueError(f'family box {width}x{rows} exceeds {BOX_W}x{ROWS}')
+    return bytes((rows, width//8, above, left))
 
 
 def pack(families):
-    """families: [{'jobs': [...], 'anims': {anim index: ([frames], wait)}}] -> bytes, info."""
+    """families: [{'jobs': [...], 'anims': {anim index: ([frames], [waits])}}] -> bytes, info.
+
+    A frame slot carries its own wait in ticks, so a source sequence keeps its
+    original rhythm without repeating a picture; slots holding the same pixels
+    share them, and identical whole sequences share their slots.
+    """
     if not 1 <= len(families) <= FAMILIES:
         raise ValueError('1..48 families')
     jobmap = [255]*JOBS
-    records, physical, table = [], {}, []
+    slots, physical, table, boxes = [], {}, [], []   # slots: (frame bytes, wait)
     for f, fam in enumerate(families):
+        boxes.append([])
         for job in fam['jobs']:
             if not 0 <= job-JOB0 < JOBS or jobmap[job-JOB0] != 255:
                 raise ValueError(f'job {job}: not a free monster job')
             jobmap[job-JOB0] = f
         for a in range(ANIMS):
-            frames, wait = fam['anims'][a]
-            if not frames or not 1 <= wait <= 255 or len(frames) > 255:
-                raise ValueError(f'family {f} animation {a}: frames/wait')
-            # A sequence is stored contiguously; identical whole sequences are pooled.
-            key = tuple(frames)
+            frames, waits = fam['anims'][a]
+            if not frames or len(frames) > 255 or len(waits) != len(frames):
+                raise ValueError(f'family {f} animation {a}: frames/waits')
+            if any(not 1 <= w <= 255 for w in waits):
+                raise ValueError(f'family {f} animation {a}: wait out of 1..255')
+            if not 1 <= sum(waits) <= 255:
+                raise ValueError(f'family {f} animation {a}: the loop must last 1..255 ticks')
+            boxes[f].extend(frames)
+            key = tuple(zip(frames, waits))
             if key not in physical:
-                physical[key] = len(records)
-                records.extend(frames)
-            table.append((physical[key], len(frames), wait))
-    if len(records) > FRAMES:
-        raise ValueError('too many frames')
-    out = bytearray(b'FMB1'+struct.pack('>HH', len(families), len(records)))
+                physical[key] = len(slots)
+                slots.extend(key)
+            table.append((physical[key], len(frames), sum(waits)))
+    if len(slots) > FRAMES:
+        raise ValueError('too many frame slots')
+    out = bytearray(b'FMB1'+struct.pack('>HH', len(families), len(slots)))
     out += bytes(jobmap)
+    out += b''.join(envelope(f) for f in boxes)      # one box per family, any pose
     out += b''.join(struct.pack('>HBB', *e) for e in table)
-    offset = len(out)+2*(len(records)+1)
-    offsets = [offset]
-    for raw in records:
-        offset += len(raw)
-        offsets.append(offset)
-    if offset > 65512:
-        raise ValueError('FMB1 exceeds one archive variable')
-    out += struct.pack(f'>{len(offsets)}H', *offsets)
-    raw = bytes(out)+b''.join(records)
-    validate(raw)
-    return raw, dict(families=len(families), frames=len(records), bytes=len(raw))
+    base = len(out)
+    store = base+2*(len(slots)+1)+len(slots)+(len(slots) & 1)
+    offsets, blobs, raw = [], {}, bytearray()
+    for data, _ in slots:
+        if data not in blobs:
+            blobs[data] = store+len(raw)
+            raw += data
+        offsets.append(blobs[data])
+    size = store+len(raw)
+    if size > 65512:
+        raise ValueError(f'FMB1 is {size} bytes: one archive variable holds 65512')
+    out += struct.pack(f'>{len(offsets)+1}H', *offsets, size)
+    out += bytes(w for _, w in slots)+bytes(len(slots) & 1)
+    out += raw
+    validate(bytes(out))
+    return bytes(out), dict(families=len(families), slots=len(slots),
+                            pictures=len(blobs), bytes=size)
 
 
 def validate(raw):
@@ -105,38 +140,61 @@ def validate(raw):
         raise ValueError(f'Invalid FMB1 bank: {why}')
     if len(raw) < HEADER or raw[:4] != b'FMB1':
         reject('magic')
-    fams, frames = struct.unpack_from('>HH', raw, 4)
-    if not 1 <= fams <= FAMILIES or not 1 <= frames <= FRAMES:
+    fams, slots = struct.unpack_from('>HH', raw, 4)
+    if not 1 <= fams <= FAMILIES or not 1 <= slots <= FRAMES:
         reject('counts')
-    base = HEADER+4*ANIMS*fams
-    last = base+2*(frames+1)
-    if last > len(raw) or len(raw) > 65512:
+    base = HEADER+4*fams+4*ANIMS*fams
+    waits = base+2*(slots+1)
+    first = waits+slots+(slots & 1)
+    if first > len(raw) or len(raw) > 65512:
         reject('size')
     if any(v != 255 and v >= fams for v in raw[8:8+JOBS]):
         reject('job map')
+    if any(w == 0 for w in raw[waits:waits+slots]):
+        reject('a frame slot waits no tick')
+    for f in range(fams):
+        rows, wb, ay, ax = raw[HEADER+4*f:HEADER+4*f+4]
+        if not 1 <= rows <= ROWS or wb not in (2, 4, 6, 8) or not 1 <= ay <= ROWS \
+                or rows-ay > 12 or ax > 8*wb:
+            reject('family box')
     for i in range(ANIMS*fams):
-        first, n, wait = struct.unpack_from('>HBB', raw, HEADER+4*i)
-        if not n or not wait or first+n > frames:
+        start, n, total = struct.unpack_from('>HBB', raw, HEADER+4*fams+4*i)
+        if not n or not total or start+n > slots:
             reject('animation')
-    for start, end in zip(*(lambda o: (o, o[1:]))(struct.unpack_from(f'>{frames+1}H', raw, base))):
-        if start != last or start & 1 or end > len(raw) or end-start < 4:
+        if sum(raw[waits+start:waits+start+n]) != total:
+            reject('animation total ticks')
+    offsets = struct.unpack_from(f'>{slots+1}H', raw, base)
+    for i in range(ANIMS*fams):
+        start, n, _ = struct.unpack_from('>HBB', raw, HEADER+4*fams+4*i)
+        box = raw[HEADER+4*(i//ANIMS):HEADER+4*(i//ANIMS)+4]
+        for k in range(n):
+            g = raw[offsets[start+k]:offsets[start+k]+4]
+            if not (g[3] <= box[3] and g[2] <= box[2] and 8*g[1]-g[3] <= 8*box[1]-box[3]
+                    and g[0]-g[2] <= box[0]-box[2]):
+                reject('a picture leaves its family box')
+    top = 0
+    for start in offsets[:-1]:
+        if start & 1 or start < first or len(raw)-start < 4:
             reject('offsets')
         h, wb, ay, ax = raw[start:start+4]
         if not 1 <= h <= ROWS or wb not in (2, 4, 6) or not 1 <= ay <= ROWS or h-ay > 12 \
-                or ax > 8*wb or end-start != 4+4*h*wb:
+                or ax > 8*wb or len(raw)-start < 4+4*h*wb:
             reject('frame header')
         n = h*wb
         p = [raw[start+4+k*n:start+4+(k+1)*n] for k in range(4)]
         if any((a | b | c) & m for a, b, m, c in zip(p[0], p[1], p[2], p[3])):
             reject('opaque bits under the transparency mask')
-        last = end
-    if last != len(raw):
+        top = max(top, start+4+4*n)
+    if top != len(raw) or offsets[-1] != len(raw):
         reject('trailing bytes')
     return True
 
 
 def load(manifest):
-    """Manifest JSON -> pack() families; PNG paths relative to the manifest."""
+    """Manifest JSON -> pack() families; PNG paths relative to the manifest.
+
+    A pose gives `wait` (the same for every frame) or `waits` (one per frame).
+    """
     spec = json.loads(Path(manifest).read_text())
     root = Path(manifest).parent
     families = []
@@ -149,23 +207,28 @@ def load(manifest):
                 for name in entry[facing]:
                     foot = entry.get('foot', fam.get('foot'))
                     frames.append(encode(*body(Image.open(root/name), foot)))
-                anims[2*p+side] = (frames, int(entry['wait']))
+                waits = entry.get('waits')
+                waits = list(waits[facing]) if isinstance(waits, dict) else \
+                    list(waits) if waits else [int(entry['wait'])]*len(frames)
+                anims[2*p+side] = (frames, waits)
         families.append(dict(jobs=fam['jobs'], anims=anims))
     return families
 
 
 def preview(raw, path, scale=3):
     """Every physical frame on light grey, outlined, for the visual decision pass."""
-    fams, frames = struct.unpack_from('>HH', raw, 4)
-    base = HEADER+4*ANIMS*fams
-    offsets = struct.unpack_from(f'>{frames+1}H', raw, base)
+    fams, slots = struct.unpack_from('>HH', raw, 4)
+    base = HEADER+4*fams+4*ANIMS*fams
+    offsets = struct.unpack_from(f'>{slots+1}H', raw, base)
+    pictures = sorted(set(offsets[:-1]))
     cols = 8
-    sheet = Image.new('L', (cols*52, (frames+cols-1)//cols*46), 170)
-    for i, start in enumerate(offsets[:-1]):
+    sheet = Image.new('L', (cols*52, (len(pictures)+cols-1)//cols*46), 170)
+    for i, start in enumerate(pictures):
         h, wb, ay, ax = raw[start:start+4]
         n = h*wb
         planes = [np.unpackbits(np.frombuffer(raw[start+4+k*n:start+4+(k+1)*n], np.uint8)
-                                ).reshape(h, 8*wb) for k in range(4)]
+                                ).reshape(wb//2, h, 16).transpose(1, 0, 2).reshape(h, 8*wb)
+                  for k in range(4)]
         tone = planes[0]+2*planes[1]
         pix = np.where(planes[2] == 1, 170, 255-85*tone).astype(np.uint8)
         x, y = i % cols*52+26-ax, i//cols*46+40-ay

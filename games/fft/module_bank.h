@@ -37,6 +37,21 @@ static u8 module_banks_valid(const u8 *a,u16 asize,const u8 *b,u16 bsize,
         module_bank_part_valid(a,asize,0,split,count,context_bytes,signature,zone,big)&&
         module_bank_part_valid(b,bsize,split,count-split,count,context_bytes,signature,zone,big);
 }
+// Four shards: the companion image outgrew what three archive variables hold.
+static u8 module_four_valid(const u8 *a,u16 asize,const u8 *b,u16 bsize,const u8 *c,u16 csize,
+    const u8 *d,u16 dsize,u16 split,u16 end,u16 end2,u16 count,u16 context_bytes,u16 signature,
+    u16 zone,u16 big)
+{
+    if(!a||!b||!c||!d||asize<14||bsize<14||csize<14||dsize<14||
+       !split||split>=end||end>=end2||end2>=count||count>255||context_bytes<2)return 0;
+    return mb_word(a,5)==mb_word(b,5)&&mb_word(a,6)==mb_word(b,6)&&
+        mb_word(a,5)==mb_word(c,5)&&mb_word(a,6)==mb_word(c,6)&&
+        mb_word(a,5)==mb_word(d,5)&&mb_word(a,6)==mb_word(d,6)&&
+        module_bank_part_valid(a,asize,0,split,count,context_bytes,signature,zone,big)&&
+        module_bank_part_valid(b,bsize,split,end-split,count,context_bytes,signature,zone,big)&&
+        module_bank_part_valid(c,csize,end,end2-end,count,context_bytes,signature,zone,big)&&
+        module_bank_part_valid(d,dsize,end2,count-end2,count,context_bytes,signature,zone,big);
+}
 static u8 module_three_valid(const u8 *a,u16 asize,const u8 *b,u16 bsize,const u8 *c,u16 csize,
     u16 split,u16 end,u16 count,u16 context_bytes,u16 signature,u16 zone,u16 big)
 {
