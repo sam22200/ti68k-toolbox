@@ -31,7 +31,10 @@ def main():
     run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','sav','before.sav','ffsave'],inputs)
     ti=inputs/'ffsave.89y';results=[]
     with tempfile.TemporaryDirectory(prefix='fft-flow-menu-data-') as name:
-        data=Path(name);data_links(data)
+        # Campaign banks only: the opening's historical view controls (ffov*) are
+        # not in this package, and letting the PC fall back to them diverges from
+        # the 68000 run, which is given this chapter's variables alone.
+        data=Path(name);data_links(data,HERE/'data')
         def committed(s):
             assert len(s['party'])==7 and s['money']==2000 and s['flow']==2 and len(s['deployment'])==5,s
             assert [p['slot'] for p in s['deployment']]==[0,2,3,4,6]
@@ -40,8 +43,27 @@ def main():
              ('return',200,frame+6,return_back),('cancel',200,frame+4,escape)]
         cases += [(f'glove-pose-{i}',200,frame+2+4*i,confirm) for i in range(1,8)]
         cases += [('commit',200,frame+6,commit)]
-        results+=check.program('flowdep','check_deploy.c',['ffmg','ffcp','ffcj','ffflow'],0x44504c31,
+        banks=['ffmg','ffcp','ffcj','ffflow','ffeg','ffma']
+        results+=check.program('flowdep','check_deploy.c',banks,0x44504c31,
                                cases,prep,ti,committed,workdir=data)
+        # The same roster and the same keys, with slot 6 an adult Chocobo: the
+        # real deployment program must list it, place it and commit it like any
+        # other fighter. Only the roster byte differs from the run above.
+        monster=bytearray(initial);at=294+176*6
+        monster[at+0]=94;monster[at+1]=255;monster[at+2]=3    # Chocobo, no human sheet, source monster
+        monster[at+9]=0;monster[at+25:at+30]=bytes(5)         # no secondary skill set, nothing equipped
+        monster[at+30:at+36]=bytes(6);monster[at+116:at+176]=bytes(60)
+        mon_inputs=target/'monster';mon_inputs.mkdir(exist_ok=True)
+        mon_prep=mon_inputs/'ffsave.sav';mon_prep.write_bytes(monster)
+        run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','sav','ffsave.sav','ffsave'],mon_inputs)
+        def committed_monster(s):
+            committed(s)
+            unit=s['party'][6]
+            assert unit['job']==94 and unit['type']==3 and unit['gfx']==255,unit
+        results+=check.program('flowmon','check_deploy.c',banks,0x44504c31,
+                               [('monster-roster',200,4,empty),('monster-picked',200,frame,picked),
+                                ('monster-commit',200,frame+6,commit)],
+                               mon_prep,mon_inputs/'ffsave.89y',committed_monster,workdir=data)
         if args.deployment_only:
             (target/'results.json').write_text(json.dumps(results,indent=2)+'\n')
             print('Deployment UI:',len(results),'PC/68000 input, pixel, state and save replays passed')
@@ -50,13 +72,16 @@ def main():
         run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','sav','before.sav','ffsave'],inputs)
         advance=check.keys(target/'advance.keys',[(f,'ENTER') for f in range(30,1601,15)])
         def academy(s):assert s['flow']==1 and len(s['party'])==7 and s['money']==2000,s
+        # The scene player wants its contour art in ffcu, as a package stores it.
+        scene_banks=check.shared_contour_banks(target/'banks')
         banks=['ffs1','ffs2','ffflow','ffcp','ffcu','ffca','ffcb']
         results+=check.program('flowcin','check_flow_scene.c',banks,0xacad0001,
-            [('narration',1,30,empty),('chapter',1,330,advance),('complete',1,1600,advance)],prep,ti,academy,workdir=data)
+            [('narration',1,30,empty),('chapter',1,330,advance),('complete',1,1600,advance)],prep,ti,academy,
+            workdir=scene_banks,bank_dir=scene_banks)
         prep.write_bytes(fixture());run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','sav','before.sav','ffsave'],inputs)
         def title(s):assert s['flow']==3 and len(s['deployment'])==5,s
         results+=check.program('flowtit','check_flow_scene.c',banks,0xacad0001,
-            [('title',2,40,empty),('complete',2,180,empty)],prep,ti,title,workdir=data)
+            [('title',2,40,empty),('complete',2,180,empty)],prep,ti,title,workdir=scene_banks,bank_dir=scene_banks)
     (target/'results.json').write_text(json.dumps(results,indent=2)+'\n')
     print('Flow UI:',len(results),'PC/68000 input, pixel, state and save replays passed')
 

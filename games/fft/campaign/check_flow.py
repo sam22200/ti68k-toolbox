@@ -21,12 +21,17 @@ def run(args,cwd=HERE):
 def fixture():
     q=(HERE/'data/ffflow.bin').read_bytes();a,d=struct.unpack_from('>2H',q,4)
     roster=q[a:a+1493];dep=q[d:d+79]
-    b=bytearray(b'FSV3'+bytes(32)+bytes((7,7))+roster[5:261]+roster[261:]+bytes(9*176))
+    b=bytearray(b'FSV7'+bytes(32)+bytes((7,7))+roster[5:261]+roster[261:]+bytes(9*176))
     assert len(b)==3110
     cells=[dep[4+3*i:7+3*i] for i in range(25) if dep[4+3*i]]
     placements=b''.join(bytes((slot,c[1],c[2],dep[3])) for slot,c in zip((0,2,3,4,6),cells))
     b+=roster[1:5]+bytes((2,5))+struct.pack('>H',200)+placements
-    b[4]=1;assert len(b)==3138
+    b[4]=1;assert len(b)==3138                      # FSV3: flags, party, money, deployment
+    b+=bytes(66)                                    # FSV4/5: discovered maps, raw-current bitmap
+    b+=bytes(714)                                   # FSV6: no guest (an all-zero block is valid)
+    b+=bytes((1,1,0,0))+bytes(65)                   # FSV7: day one of year one, no egg
+    b+=bytes((0x25,0x45,0xf4,0x91))+bytes(1)        # save_world_init's seed, even-size pad
+    assert len(b)==3992
     return bytes(b)
 
 def data_links(folder,source=None):
@@ -41,7 +46,7 @@ def main():
     ap.add_argument('--data-dir',type=Path,help='validate actual installed pack data in isolation')
     args=ap.parse_args();OUT=args.out.resolve();save_name='ffsave'   # the session; a --slot is seeded and must stay untouched
     if args.data_dir:args.data_dir=args.data_dir.resolve()
-    OUT.mkdir(parents=True,exist_ok=True);initial=b'FSV5'+fixture()[4:]+bytes(66);write_changed(OUT/'initial.sav',initial)
+    OUT.mkdir(parents=True,exist_ok=True);initial=fixture();write_changed(OUT/'initial.sav',initial)
     run(['cc','-std=gnu99','-O1','-g','-w','-o',OUT/'battle',HERE/'check_flow_battle.c',
          ROOT/'runtime/core/rt_core.c',ROOT/'runtime/platform-sw/rt_sw.c'])
     with tempfile.TemporaryDirectory(prefix='fft-flow-') as name:
@@ -66,6 +71,25 @@ def main():
         overflow_saved=(temp/(save_name+'.sav')).read_bytes();decoded=save_dump.decode(overflow_saved)
         q=(HERE/'data/ffflow.bin').read_bytes();price=struct.unpack_from('>H',q,struct.unpack_from('>H',q,12)[0]+4)[0]
         assert decoded['money']==4500+price and decoded['inventory'][2]==99
+    # The same Gariland battle with an adult monster at roster slot 6, which the
+    # fixture's committed deployment already selects: it must be fielded like any
+    # fighter and keep its record through the victory and the save.
+    monster=bytearray(initial);at=294+176*6
+    monster[at+0]=94;monster[at+1]=255;monster[at+2]=3    # Chocobo, no human sheet, source monster
+    monster[at+9]=0;monster[at+25:at+30]=bytes(5)         # no secondary skill set, nothing equipped
+    monster[at+30:at+36]=bytes(6);monster[at+116:at+176]=bytes(60)
+    write_changed(OUT/'monster.sav',bytes(monster))
+    with tempfile.TemporaryDirectory(prefix='fft-flow-monster-') as name:
+        temp=Path(name);data_links(temp,args.data_dir);shots=temp/'shots';shots.mkdir()
+        (temp/(save_name+'.sav')).write_bytes(monster)
+        mon=run([OUT/'battle',shots],temp);write_changed(OUT/'monster-pc.log',mon.encode());print(mon.strip())
+        assert ' failures 0 ' in mon,mon
+        kept=save_dump.decode((temp/(save_name+'.sav')).read_bytes())
+        assert kept['money']==4500 and len(kept['party'])==7,kept
+        fighter=kept['party'][6]
+        assert fighter['job']==94 and fighter['type']==3 and fighter['gfx']==255,fighter
+        publish_images(shots,OUT/'monster')
+
     if args.native:
         # Keep each instrumented fixture below AMS's per-variable limit without
         # dropping any checks or packing a checker the headless runner cannot load.

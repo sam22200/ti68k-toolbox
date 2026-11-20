@@ -59,8 +59,7 @@ def chain_fixture(source, guests=False):
         spec['variables'].append('ffgu')
         source['ffgu'] = packages.Variable('ffgu', 0x1c, 3, guest_bank.build([dict(route=p, slot=0, id=4) for p in ('g', 'h')])+packages.resources.TRAILER)
     source = {name: source[name] for name in core['variables']+spec['variables']}
-    initial = bytearray(b'FSV7'+fixture()[4:]+bytes(3918-len(fixture()))+
-                        bytes((1,1,0,0))+bytes(65)+bytes((0x25,0x45,0xf4,0x91,0)))
+    initial = bytearray(fixture())
     initial[4] = 3; initial[36] = 16; initial[3114] = 4; initial[3115:3138] = bytes(23)
     for slot in range(7, 16):
         initial[294+176*slot:294+176*(slot+1)] = initial[470:646]

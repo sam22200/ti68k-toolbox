@@ -19,10 +19,10 @@ int main(void)
         assert(rt_save(SAVE_NAME, &save, sizeof save));
     }
     sw_init(0); assert(sw_step(0));
-    assert(bank && save.n == 3);
-    r = unit(0); c = unit(1);
+    assert(bank && save.n == 5);
+    r = unit(0); c = unit(3);
     assert(r->type == 2 && career(r) == 0 && c->job == 0x4B && career(c) == 1);
-    // levels and unlocks: Ramza 258 JP earned as a Squire: level 2, Knight and Archer open
+    // levels and unlocks: Ramza 242 JP earned as a Squire: level 2, Knight and Archer open
     assert(job_level(r, 0) == 2 && unlocked(r, 2, RT_NULL) && unlocked(r, 3, RT_NULL));
     assert(!unlocked(r, 4, &what) && what == 2);           // Monk: Knight first
     assert(!unlocked(r, 18, &what) && what == 0xFF);       // Dancer: women only

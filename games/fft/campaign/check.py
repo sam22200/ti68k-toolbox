@@ -18,6 +18,32 @@ def run(args,cwd=HERE/'data'):
         for staged,dest in images:
             if staged.exists():write_changed(dest,staged.read_bytes())
         return p.stdout
+def shared_contour_banks(dest):
+    """A package-shaped data folder.
+
+    `tools/chapter_resources.py` `shared_contours()` hoists the engine contour
+    tail into `ffcu` when a package is built; loose `data/` keeps it in
+    `ffgv0`. `scene.c` looks in `ffcu`, then falls back to the opening's
+    historical `ffov0`, so a scene replay run straight on this chapter's loose
+    data finds no contour art and refuses every set ("Missing scene set").
+    Hand both CPUs the bytes the package ships instead."""
+    import struct
+    from chapter_resources import contour_tail
+    dest.mkdir(parents=True,exist_ok=True)
+    for src in sorted((HERE/'data').glob('*.bin'))+sorted((HERE/'data').glob('*.89y')):
+        if src.stem=='ffcu':continue
+        link=dest/src.name;link.unlink(missing_ok=True);link.symlink_to(src.resolve())
+    base,_=contour_tail((HERE/'data/ffcu.bin').read_bytes())
+    _,shared=contour_tail((HERE/'data/ffgv0.bin').read_bytes())
+    if shared is None:raise ValueError('data/ffgv0.bin carries no contour tail')
+    at=(len(base)+1)&~1
+    (dest/'ffcu.bin').write_bytes(base+bytes(at-len(base))+shared+
+                                  b'FC02'+struct.pack('>3H',len(base),at,len(shared)))
+    run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','ffcu.bin','ffcu'],cwd=dest)
+    raw=bytearray((dest/'ffcu.89y').read_bytes());raw[0x49]=3
+    (dest/'ffcu.89y').write_bytes(bytes(raw))
+    return dest
+
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     run([ROOT/'tools/pyenv/bin/python',HERE/'../tools/contour_assets.py','--attach',HERE/'data/ffgv0.bin'])
@@ -47,17 +73,20 @@ def main():
     results=[]
     for name,flags,banks,cases in (
         ('scene',['-DCHECK_SCENE'],['ffs1','ffflow','ffcp','ffcu','ffca','ffcb'],[('narration',1,30,empty),('chapter',1,120,advance),('academy-complete',1,1000,advance)]),
-        ('gariland',['-DCHECK_GAR'],['ffbm','ffbn','ffbo','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
+        ('gariland',['-DCHECK_GAR'],['ffbm','ffbn','ffbo','ffbp','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
          [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won),('party',70,90,empty),('wide',70,90,wide)])):
         if '--status-only' in sys.argv:
             cases=[c for c in cases if c[0]=='status']
             if not cases:continue
         if '--academy-only' in sys.argv and name!='scene':continue
+        # The scene player reads its contour art from ffcu alone, as a package
+        # stores it; the battle path still falls back to this chapter's ffgv0.
+        bank_dir=shared_contour_banks(OUT/'banks') if name=='scene' else HERE/'data'
         common=[HERE/'check_native.c',ROOT/'runtime/core/rt_core.c']
         run(['cc','-std=gnu99','-O1',*flags,'-o',OUT/name,*common,ROOT/'runtime/platform-sw/rt_sw.c'])
         run([ROOT/'tools/bin/ti-cc','-o',OUT/(name+'c'),'-DRT_CYCLES',*flags,*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
         for case,scenario,frames,keys in cases:
-            sav=HERE/'data/ffsave.sav';sav.unlink(missing_ok=True);(OUT/'ffsave.89y').unlink(missing_ok=True)
+            sav=bank_dir/'ffsave.sav';sav.unlink(missing_ok=True);(OUT/'ffsave.89y').unlink(missing_ok=True)
             if case in ('party','wide'):sav.write_bytes((OUT/'ffsave_won.sav').read_bytes())
             if case=='wide':
                 # A legal Ramza Chemist with Phoenix Down at source position 13;
@@ -68,9 +97,9 @@ def main():
                 sav.write_bytes(fixture)
                 door=OUT/'wide-save';door.mkdir(exist_ok=True);(door/'ffsave.sav').write_bytes(fixture)
                 run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','sav','ffsave.sav','ffsave'],cwd=door)
-            pc=run([OUT/name,scenario,frames,keys,OUT/(name+'-'+case+'-pc.png')])
+            pc=run([OUT/name,scenario,frames,keys,OUT/(name+'-'+case+'-pc.png')],cwd=bank_dir)
             command=[ROOT/'tools/bin/ti-cycles','--max',10000,'--arg',scenario,'--frames',frames,'--keys',keys,'--png',OUT/(name+'-'+case+'-ti.png')]
-            for bank in banks:command+=['--file',HERE/'data'/(bank+'.89y')]
+            for bank in banks:command+=['--file',bank_dir/(bank+'.89y')]
             if case=='won':command+=['--save-dir',OUT]
             if case=='party':command+=['--file',OUT/'ffsave_won.89y']
             if case=='wide':command+=['--file',OUT/'wide-save/ffsave.89y']
@@ -99,19 +128,20 @@ def main():
 def keys(path,events):
     path.write_text(''.join(f'{f} {k}\n{f+1}\n' for f,k in events));return path
 
-def program(name,source,banks,magic,cases,pc_save,ti_save,check_save,workdir=None):
+def program(name,source,banks,magic,cases,pc_save,ti_save,check_save,workdir=None,bank_dir=None):
     """A campaign program (manage.c, worldmap.c) on the party Gariland's victory saved, per key
     script: PC and 68000 screens and states alike, and the save it writes (the last case)."""
     common=[HERE/source,ROOT/'runtime/core/rt_core.c']
     run(['cc','-std=gnu99','-O1','-o',OUT/name,*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     run([ROOT/'tools/bin/ti-cc','-o',OUT/(name+'c'),'-DRT_CYCLES',*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     workdir=Path(workdir) if workdir else HERE/'data'
+    bank_dir=Path(bank_dir) if bank_dir else HERE/'data'
     sav=workdir/'ffsave.sav';out=[]
     for k,(case,door,frames,script) in enumerate(cases):
         sav.write_bytes(pc_save.read_bytes());(OUT/'ffsave.89y').unlink(missing_ok=True)
         pc=run([OUT/name,door,frames,script,OUT/(name+'-'+case+'-pc.png')],cwd=workdir)
         command=[ROOT/'tools/bin/ti-cycles','--max',2000,'--arg',door,'--frames',frames,'--keys',script,'--png',OUT/(name+'-'+case+'-ti.png')]
-        for bank in banks:command+=['--file',HERE/'data'/(bank+'.89y')]
+        for bank in banks:command+=['--file',bank_dir/(bank+'.89y')]
         ti=run([*command,'--file',ti_save,'--save-dir',OUT,OUT/(name+'c.89z')])
         write_changed(OUT/(name+'-'+case+'.log'),ti.encode())
         write_changed(OUT/(name+'-'+case+'-pc.log'),pc.encode())
@@ -136,13 +166,13 @@ def manage(pc_save,ti_save):
     def knight(s): assert s['party'][0]['job']==0x4C,'Ramza a Knight'
     if '--carousel-only' in sys.argv:
         spin=keys(OUT/'carousel.keys',[(2,'RIGHT')])
-        return program('manage','check_manage.c',['ffmg','ffcp','ffcj'],0x4d4e4701,
+        return program('manage','check_manage.c',['ffmg','ffcp','ffcj','ffeg','ffma'],0x4d4e4701,
                        [('spin-start',5,4,spin),('spin-middle',5,6,spin),('spin-settled',5,16,spin)],
                        pc_save,ti_save,None)
     slide=keys(OUT/'formation-slide.keys',[(2,'RIGHT')])
     confirmation=keys(OUT/'job-confirm.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER')])
     change=keys(OUT/'job-change.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER'),(28,'ENTER')])
-    return program('manage','check_manage.c',['ffmg','ffcp','ffcj'],0x4d4e4701,
+    return program('manage','check_manage.c',['ffmg','ffcp','ffcj','ffeg','ffma'],0x4d4e4701,
                    [('formation',0,4,empty),('status',1,4,empty),('equip',2,4,empty),('abilities',3,4,empty),
                     ('learn',4,4,empty),('jobs',5,4,empty),('menu',6,4,empty),
                     ('slide-start',0,3,slide),('slide-mid',0,5,slide),('slide-done',0,8,slide),
@@ -171,7 +201,7 @@ def worldmap(pc_save,ti_save):
     def mandalia(s): assert s['location']==24,'Ramza at Mandalia'
     menu=keys(OUT/'map-menu.keys',[(2,'C')]);last=keys(OUT/'map-menu-last.keys',[(2,'C'),(4,'UP')])
     blank=OUT/'map-blank.keys';blank.write_text('0 LEFT UP\n60\n64 ENTER\n65\n')
-    return program('worldmap','check_worldmap.c',['ffwm','ffmg'],0x4d415001,
+    return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb'],0x4d415001,
                    [('gariland',0,4,empty),('menu',0,4,menu),('menu-last',0,8,last),
                     ('blank-return',0,68,blank),('choose',0,f,choose),('walk',0,f+12,walk),('arrived',0,f+401,trip),('trip',0,f+410,trip)],
                    pc_save,ti_save,mandalia)

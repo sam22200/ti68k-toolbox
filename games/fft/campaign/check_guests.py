@@ -18,7 +18,7 @@ def main():
     args = ap.parse_args(); out = args.out.resolve(); out.mkdir(parents=True, exist_ok=True)
     source = args.data_dir.resolve() if args.data_dir else None
     bank = guest_bank.build([dict(route='g', slot=0, id=4)])
-    initial = bytearray(b'FSV5'+fixture()[4:]+bytes(66)); initial[36] = 16
+    initial = bytearray(fixture()); initial[36] = 16
     for i in range(7, 16): initial[294+176*i:294+176*(i+1)] = initial[470:646]
     logs = []
     for mode, flags in [('pc', []), ('san', ['-fsanitize=address,undefined', '-fno-sanitize=shift', '-fno-pie', '-no-pie'])]:
