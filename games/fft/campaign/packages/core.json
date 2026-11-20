@@ -16,6 +16,6 @@
   "variables": [
     "fftstory", "ffttitle", "ffttcore", "fftmap", "ffwmcore", "fftmng", "ffmgcore",
     "fftdep", "ffpccore", "fftbat", "ffbcore", "fftscn", "ffscore",
-    "ffbm", "ffbn", "ffbo", "ffbp", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw", "ffwb", "ffeg", "ffma", "ffmb", "ffmc", "ffmd"
+    "ffbm", "ffbn", "ffbo", "ffbp", "ffmg", "fftitle", "ffcj", "ffcp", "ffcu", "ffcw", "ffwb", "ffeg", "ffma", "ffmb", "ffmc", "ffmd", "ffsh"
   ]
 }

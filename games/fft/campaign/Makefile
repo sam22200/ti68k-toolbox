@@ -13,7 +13,7 @@ PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffbp ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
-BANKS += ffwb ffeg ffma ffmb ffmc ffmd
+BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
@@ -335,6 +335,9 @@ data/ffcj.bin ../opening/data/ffcj.bin &: ../tools/common_tables.py ../tools/bat
 
 data/ffwm.bin: ../tools/world_assets.py ../tools/management_data.py ../tools/units.py ../tools/interface.py
 	$(PY) ../tools/world_assets.py "$(DISC)" $@
+
+data/ffsh.bin: ../tools/shop_assets.py ../tools/world_assets.py ../tools/management_data.py
+	$(PY) ../tools/shop_assets.py "$(DISC)" $@
 
 data/ffwb.bin: ../tools/breeding_rules.py
 	$(PY) ../tools/breeding_rules.py "$(DISC)" $@
