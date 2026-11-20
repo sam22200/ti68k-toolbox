@@ -80,7 +80,7 @@ def build_fixture(out, party_level, enemy_level):
     location = next(i for i, name in enumerate(names) if 'Sweegy' in name)
     put('LOCATION', location)
 
-    initial = bytearray(b'FSV4' + fixture()[4:] + bytes(64))
+    initial = bytearray(fixture())
     initial[3114] = 4
     initial[3115] = 0             # no retained Gariland deployment
     initial[3116:3118] = bytes(2)

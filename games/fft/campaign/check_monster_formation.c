@@ -94,7 +94,13 @@ int main(int argc,char **argv)
     if(!strcmp(argv[1],"flow")){
         Save before=save;
 #ifdef MONSTER_DEPLOY_REVIEW
-        Deployment placed=dp;dp.unit=1;CHECK(!deploy_place()&&dp.note==6);dp=placed;
+        // An adult monster is a fighter now; an egg is still refused.
+        Deployment placed=dp;u8 free_cell;
+        for(free_cell=0;free_cell<25;free_cell++)
+            if(deploy_cell(free_cell)[0]&&dp.placed[free_cell]==255)break;
+        CHECK(free_cell<25);
+        dp.unit=1;dp.row=(u8)(free_cell/5);dp.col=(u8)(free_cell%5);
+        CHECK(deploy_place()&&!dp.note&&dp.placed[free_cell]==1);dp=placed;
         dp.unit=7;CHECK(!deploy_place()&&dp.note==6);dp=placed;
 #else
         // Real input must open adult Status, retain job IDs, skip eggs and lock

@@ -157,6 +157,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='fft-monster-body-') as name:
             data = Path(name)
             data_links(data)
+            (data/'ffmb.bin').unlink(missing_ok=True)   # data_links symlinks the chapter's own
             (data/'ffmb.bin').write_bytes(raw)
             result = subprocess.run(['env', 'ASAN_OPTIONS=detect_leaks=0', 'UBSAN_OPTIONS=halt_on_error=1', str(binary)],
                                     cwd=data, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -169,7 +170,7 @@ def main():
                 for p in data.glob('body-*.png'):
                     (out/p.name).write_bytes(p.read_bytes())
     assert logs[0] == logs[1], 'sanitizer replay differs'
-    match = re.search(r'monster-body (\w+) failures 0 checks (\d+)', logs[0])
+    match = re.search(r'monster-body (\w+) failures 0 checks (\d+) party 0/(\d+)', logs[0])
     assert match, logs[0]
     # Idle screens 0..7: family, direction (front, back, mirrored front, mirrored back).
     for i, (job, _, foot, _) in enumerate(FAMILIES):
@@ -191,7 +192,8 @@ def main():
     diff = np.nonzero((plain != enemy).any(1))[0]
     top = np.nonzero((plain != 170).any(1))[0].min()
     assert diff.size and diff.max() < top, 'enemy marker overlaps the body'
-    record = dict(hash=match[1], checks=int(match[2]), sanitizer_equal=True, screens=19,
+    record = dict(hash=match[1], checks=int(match[2]), party_checks=int(match[3]),
+                  sanitizer_equal=True, screens=19,
                   bank=info, bank_sha256=hashlib.sha256(raw).hexdigest(), native=False)
     print(match[0], flush=True)
     if args.native:

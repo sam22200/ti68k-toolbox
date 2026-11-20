@@ -18,6 +18,7 @@ void body_no_runtime_render(void){}
 #include "../../../runtime/platform-sw/rt_sw.h"
 #endif
 #include "gariland.c"
+#include "../body_blit.h"
 static u16 checks,failures;static u32 digest=17;
 static void check(u32 a,u32 b,u16 line)
 {
@@ -31,6 +32,12 @@ static void check(u32 a,u32 b,u16 line)
     }
 }
 #define CHECK(a,b) check((u32)(a),(u32)(b),__LINE__)
+#ifndef __m68k__
+// PC-only checks stay out of the shared digest, so both CPUs still agree on it.
+static u16 party_checks,party_failures;
+#define PCHECK(a,b) do{party_checks++;if((u32)(a)!=(u32)(b)){party_failures++;\
+    printf("monster-body party line%u: %lu expected%lu\n",__LINE__,(unsigned long)(a),(unsigned long)(b));}}while(0)
+#endif
 static u32 pixels(void)
 {
     u16 r,x;u8 p;u32 hash=17;
@@ -60,15 +67,21 @@ static void trials(void)
 {
     Unit *u;u8 i,dir,n=0,misses;u16 size,cell;u8 *copy;const u8 *bank;u32 seed,before;
     u16 keys[AC_N];
-    CHECK(W!=RT_NULL,1);CHECK(body_gfx!=RT_NULL,1);if(!W||!body_gfx)return;
+    CHECK(W!=RT_NULL,1);CHECK(body_gfx[0]!=RT_NULL,1);if(!W||!body_gfx[0])return;
     bank=resource_file("ffmb",&size);CHECK(monster_body_valid(bank,size),1);
     copy=malloc(size);CHECK(copy!=RT_NULL,1);if(!copy)return;
     memcpy(copy,bank,size);copy[3]='2';CHECK(monster_body_valid(copy,size),0);
     memcpy(copy,bank,size);WR16(copy,2,49);CHECK(monster_body_valid(copy,size),0);
     memcpy(copy,bank,size);copy[8]=200;CHECK(monster_body_valid(copy,size),0);
-    memcpy(copy,bank,size);copy[MB_HEADER+3]=0;CHECK(monster_body_valid(copy,size),0);
-    memcpy(copy,bank,size);WR16(copy+MB_HEADER,0,1000);CHECK(monster_body_valid(copy,size),0);
-    {u16 base=(u16)(MB_HEADER+4*MB_ANIMS*RD16(bank,2)),f=RD16(bank+base,0);
+    {u16 fam=RD16(bank,2),a0=(u16)MB_ANIM(fam,0);
+     memcpy(copy,bank,size);copy[a0+3]=0;CHECK(monster_body_valid(copy,size),0);
+     memcpy(copy,bank,size);copy[a0+3]++;CHECK(monster_body_valid(copy,size),0);  // ticks disagree
+     memcpy(copy,bank,size);WR16(copy+a0,0,1000);CHECK(monster_body_valid(copy,size),0);
+     memcpy(copy,bank,size);copy[MB_ENV(0)+1]=3;CHECK(monster_body_valid(copy,size),0);
+     memcpy(copy,bank,size);copy[MB_ENV(0)+2]=1;CHECK(monster_body_valid(copy,size),0);  // box too small
+     memcpy(copy,bank,size);copy[(u16)(MB_TABLE(fam)+2*(RD16(bank,3)+1))]=0;    // a slot waits no tick
+     CHECK(monster_body_valid(copy,size),0);}
+    {u16 base=(u16)MB_TABLE(RD16(bank,2)),f=RD16(bank+base,0);
      memcpy(copy,bank,size);copy[f+1]=8;CHECK(monster_body_valid(copy,size),0);
      memcpy(copy,bank,size);copy[f+4]|=1;copy[f+4+2*copy[f]*copy[f+1]]|=1;   // opaque under mask
      CHECK(monster_body_valid(copy,size),bank[f+4+2*bank[f]*bank[f+1]]&1?0:1);}
@@ -97,16 +110,16 @@ static void trials(void)
     st.tick=12;draw();CHECK(pixels(),before);st.tick=0;
     // Walk, attack held on its last frame, hurt, Dead.
     st.mode=M_WALK;st.sel=0;draw();shot(n++);                              // 9
-    CHECK(monster_body_pose(0,0)==monster_body_frame(bank,94,2*MB_WALK,0,0),1);
+    CHECK(monster_body_pose(bank,0,0)==monster_body_frame(bank,94,2*MB_WALK,0,0),1);
     st.mode=M_ACT;st.atk=0;st.tgt=1;st.abil=NO_ABIL;
     st.act_t=ACT_WIND;draw();shot(n++);                                    // 10
-    CHECK(monster_body_pose(0,0)==monster_body_frame(bank,94,2*MB_ATTACK,0,1),1);
-    st.act_t=ACT_HIT-1;CHECK(monster_body_pose(0,0)==monster_body_frame(bank,94,2*MB_ATTACK,ACT_HIT-1-ACT_WIND,1),1);
+    CHECK(monster_body_pose(bank,0,0)==monster_body_frame(bank,94,2*MB_ATTACK,0,1),1);
+    st.act_t=ACT_HIT-1;CHECK(monster_body_pose(bank,0,0)==monster_body_frame(bank,94,2*MB_ATTACK,ACT_HIT-1-ACT_WIND,1),1);
     st.act_t=ACT_HIT-1;draw();shot(n++);                                   // 11
     st.atk=1;st.tgt=0;st.hit=1;st.act_t=ACT_HIT;
-    if(unit_pose(0)==P_HIT){CHECK(monster_body_pose(0,0)==monster_body_frame(bank,94,2*MB_HURT,0,0),1);}
+    if(unit_pose(0)==P_HIT){CHECK(monster_body_pose(bank,0,0)==monster_body_frame(bank,94,2*MB_HURT,0,0),1);}
     st.mode=M_MENU;u->hp=0;draw();shot(n++);                               // 12
-    CHECK(monster_body_pose(0,0)==monster_body_frame(bank,94,2*MB_DEAD,0,0),1);
+    CHECK(monster_body_pose(bank,0,0)==monster_body_frame(bank,94,2*MB_DEAD,0,0),1);
     u->hp=50;
     // Enemy diamond above the taller family; flash, cover, edge clipping, water.
     u->team=TEAM_ENEMY;u->job=133;face(0);draw();shot(n++);                // 13
@@ -129,12 +142,63 @@ static void trials(void)
     // A human with the bank present draws exactly as without it.
     for(cell=0;cell<MAP_N;cell++){unit_place(u,cell);if(!unit_in_water(0))break;}
     u->job=0x4a;u->gfx=UG_SQUIRE_M;W->actor_budget=255;draw();before=pixels();
-    body_gfx=RT_NULL;W->actor_budget=255;draw();CHECK(pixels(),before);body_gfx=bank;
+    body_gfx[0]=RT_NULL;W->actor_budget=255;draw();CHECK(pixels(),before);body_gfx[0]=bank;
     // Reentry reacquires the borrowed archive pointer.
-    chapter_now=0;game_scenario(261);CHECK(body_gfx==bank,1);
+    chapter_now=0;game_scenario(261);CHECK(body_gfx[0]==bank,1);
+#ifndef __m68k__
+    // A grown monster is an ordinary party member: chosen like anyone else, built as a
+    // monster, and drawn by its own bank rather than the human 16-column lookup. Party
+    // selection is portable logic, so it is checked here and not on the 68000, whose
+    // build of this harness holds no campaign save.
+    {
+        SaveUnit *s;
+        save.n=3;memset(save.unit,0,3*sizeof save.unit[0]);
+        save.unit[0].type=2;save.unit[0].job=0x4A;save.unit[0].level=1;
+        save.unit[1].type=0;save.unit[1].job=0x4A;save.unit[1].level=1;
+        s=&save.unit[2];s->type=3;s->job=94;s->gfx=255;s->level=1;
+        PCHECK(party_next(0,1),0);                  // Ramza
+        PCHECK(party_next(0,0),1);                  // the first of the rest
+        PCHECK(party_next(2,0),2);                  // the monster, no longer skipped
+        saved_unit_load(0,s,2);st.unit[0].dc=3;st.unit[0].hp=1;
+        PCHECK(st.unit[0].job,94);PCHECK(st.unit[0].gfx,255);
+        PCHECK(monster_body_active(0),1);
+        PCHECK(monster_body_of(94)==bank,1);
+    }
+    // The shifted blit must put exactly the pixels draw_sprite puts, at every sub-word
+    // x, on both planes, over a non-empty screen and past each edge. Only then can the
+    // renderer stop paying ExtGraph's per-row shift for a body that has not moved.
+    {
+        static u8 ref[2][RT_DRAW_BYTES];
+        static BodyRow rows[12];
+        static const u16 art[3][12]={
+            {0x9C3F,0x0001,0xFFFF,0x1234,0x8000,0x5A5A,0x0F0F,0xFFFF,0x0000,0xC003,0x7FFE,0xA5A5},
+            {0x0C30,0x8001,0x0FF0,0x4321,0x0001,0xA5A5,0xF0F0,0x00FF,0xFFFF,0x3FFC,0x0001,0x5A5A},
+            {0x639C,0x7FFE,0x0000,0xEDCB,0x7FFF,0x0000,0xFFFF,0x0F0F,0x5555,0x0FF0,0x8000,0x3C3C}};
+        RtSprite sp;s16 x,y;u8 r,h;
+        sp.w=16;
+        for(h=1;h<=12;h++)for(y=-3;y<(s16)RT_DRAW_ROWS;y+=29)for(x=-20;x<250;x+=7){
+            for(r=0;r<h;r++)
+                body_row_shift(&rows[r],art[0][r],art[1][r],art[2][r],
+                               art[1][(r+5)%12],art[2][(r+5)%12],art[0][(r+5)%12],(u8)(x&15));
+            memset(rt_light,0x6D,RT_DRAW_BYTES);memset(rt_dark,0xB2,RT_DRAW_BYTES);
+            sp.h=h;sp.light=art[0];sp.dark=art[1];sp.mask=art[2];
+            draw_sprite(x,y,&sp);
+            {   // the right strip, its rows rotated so the two halves differ
+                static u16 bl[12],bd[12],bm[12];u8 k;
+                for(k=0;k<12;k++){bl[k]=art[1][(k+5)%12];bd[k]=art[2][(k+5)%12];bm[k]=art[0][(k+5)%12];}
+                sp.light=bl;sp.dark=bd;sp.mask=bm;draw_sprite((s16)(x+16),y,&sp);
+            }
+            memcpy(ref[0],rt_light,RT_DRAW_BYTES);memcpy(ref[1],rt_dark,RT_DRAW_BYTES);
+            memset(rt_light,0x6D,RT_DRAW_BYTES);memset(rt_dark,0xB2,RT_DRAW_BYTES);
+            body_rows_blit(x,y,rows,h);
+            PCHECK(memcmp(ref[0],rt_light,RT_DRAW_BYTES),0);
+            PCHECK(memcmp(ref[1],rt_dark,RT_DRAW_BYTES),0);
+        }
+    }
+#endif
 }
 #ifndef __m68k__
-int main(void){sw_init(61);trials();printf("monster-body %08lX failures %u checks %u\n",(unsigned long)digest,failures,checks);return failures!=0;}
+int main(void){sw_init(61);trials();printf("monster-body %08lX failures %u checks %u party %u/%u\n",(unsigned long)digest,failures,checks,party_failures,party_checks);return failures||party_failures;}
 #else
 void _main(void){body_runtime_main();trials();BENCH_VALUE(digest);BENCH_VALUE(failures);BENCH_VALUE(checks);}
 #endif

@@ -45,7 +45,7 @@ def main():
         reports[mode]=rows
     assert reports['pc']==reports['san']
     image=Image.new('RGB',(992,656),'white');draw=ImageDraw.Draw(image)
-    for i,(name,label)in enumerate([('formation','Integrated Formation'),('status','Integrated Status'),('selected-black-chocobo','Same art / real Black Chocobo job'),('deploy','Placement picture / battle gate still closed')]):
+    for i,(name,label)in enumerate([('formation','Integrated Formation'),('status','Integrated Status'),('selected-black-chocobo','Same art / real Black Chocobo job'),('deploy','Placement / an adult monster deploys')]):
         x,y=(i%2)*496,(i//2)*328;draw.text((x+12,y+7),label,fill='black')
         image.paste(Image.open(out/(name+'.png')).resize((480,300),Image.Resampling.NEAREST),(x+8,y+24))
     save_image(image,out/'review.png')
@@ -63,7 +63,7 @@ def main():
                 checksum=re.search(r'checksum (\w+)',log)[1].upper();assert checksum==reports['pc'][label]['checksum'],log
                 values=[int(x,16)for x in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',log)];assert values[-2:]==[55,0],values
                 native.append(dict(case=label,checksum=checksum,checks=values[-2]));print('native',native[-1],flush=True)
-    reports.update(native=native,art_bytes=len(raw),physical_pictures=16,logical_jobs=48,battle_deployment_enabled=False)
+    reports.update(native=native,art_bytes=len(raw),physical_pictures=16,logical_jobs=48,battle_deployment_enabled=True)
     (out/'results.json').write_text(json.dumps(reports,indent=2)+'\n');print(out/'review.png')
 
 
