@@ -449,9 +449,10 @@ which has its own heap block and is never swapped out of it. The resident
 reaches it through `companion_body()`, modelled on `special()`: one indirect
 call per body, no zone install. `ModCtx` gained what the renderer reads -- the
 `body_gfx` banks, the `vbuf`/`vplane` depth (refreshed per call: the scene
-buffer moves without the map or the roster moving), the addresses of
-`rt_light`/`rt_dark` since the planes are swapped each frame, and
-`unit_flash`/`unit_in_water`/`unit_pose`. `body_blit.h` split into a type part
+buffer moves without the map or the roster moving) and
+`unit_flash`/`unit_in_water`/`unit_pose`. The screen planes needed nothing --
+`M.rt_light`/`M.rt_dark` were already there; the first attempt added duplicates
+and `check_banks` caught them. `body_blit.h` split into a type part
 (before `Work`, which embeds `BodyRow`) and a code part included from
 `monster_body.inc` after `module.h`, where those names become the context's.
 `companion.inc` answers op 253.
@@ -464,10 +465,20 @@ buffer moves without the map or the roster moving), the addresses of
 | `FFT_CORE_COMPANION_MAX` (its heap block) | 3,072 | **5,376** |
 | module banks | 3 (max 64,896 of 65,000) | **4**: 49,248 / 48,818 / 50,048 / 46,478 |
 
-The fourth bank is `ffbp`. The loader already knew how: `mod_ready` reads four
-banks through `module_four_valid`, and `module.py` already had `quad_banks`
-("the companion's own image grew past what three hold"). Only the Makefile
-rule, `BANKS` and `packages/core.json` needed it.
+The fourth bank is `ffbp`, and it is all new: `quad_banks()` and `--fourth` in
+`module.py`, `MOD_BANK2_END`, `module_four_valid()` beside the three-bank
+validator, the four-way routing in `mod_ready`, then the Makefile rule,
+`BANKS`, `packages/core.json`, `closure.py` and the check scripts that list the
+banks. The three held 194,584 bytes for 195,000 available -- it would have
+balanced, but `module.py` cuts the images into **contiguous** shards by id and
+the companion is last, so the arithmetic could not be rescued by a better split.
+
+**Two traps on the way, both now fixed:** `ctx_vbuf` bound only at install time
+drew two of the nineteen screens wrong on the 68000, because the scene buffer
+moves without the map or the roster moving; and `check_banks.c`'s
+`expected_context()` rebuilds the context field by field and had never set
+`load_save` -- growing `ModCtx` exposed it as 54 failures, one per zone image
+per pass. Its hard-coded `sizeof(ModCtx)` guard moved from 352 to **384**.
 
 **The indirect call costs about 7,500 cycles a frame** at thirteen bodies
 (289,912 against 282,423 resident), roughly 600 a body. Caching the context and
@@ -481,7 +492,7 @@ arithmetic.
 |:--|---:|---:|
 | the mixed set | 312,103 | **289,912** |
 | job 130 (the worst family) | 458,284 | **359,855** |
-| job 139 | 410,555 | **286,140** |
+| job 139 | 410,555 | **285,962** |
 
 The worst family clears the 360k budget by 145 cycles. That is tight enough to
 be worth saying out loud: any future growth in the body path puts it back over.
@@ -495,7 +506,8 @@ board checksums 0546/ECF7/A87E/AA26, formation 87, eggs 90.
 
 ### The record of how it got there: the resident was 528 bytes too big
 
-`make packages` fails at its first step. `fftbat` (`native_battle.c`,
+Before the move, `make packages` failed at its first step. `fftbat`
+(`native_battle.c`,
 `-pack ffbcore`) comes out at **66,042 bytes, 528 over** the limit. Verified by
 stashing `fft.c` and `monster_body.inc` and building it again: **the baseline
 builds, this branch does not.** The shifted-body work is what overruns it, and
