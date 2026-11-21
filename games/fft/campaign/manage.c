@@ -145,41 +145,39 @@ u8 can_equip(const SaveUnit *u, u8 slot, u8 id)
     return core_equipment_allowed(common,u->job,u->type==1,b16(u->support),eq,slot,id?id:255);
 }
 
-typedef struct { u16 hp, mp; u8 sp, pa, ma, move, jump; } Stats;
 #include "../movement_rules.h"
-#include "../raw_stats.h"
-Stats stats(const SaveUnit *u)             // fft.c unit_stats, from the save's records
+// A monster's growth and multipliers live in ffcj, not in the twenty career records.
+static u8 mg_monster_job[JOB_SIZE];
+static const u8 *mg_job_of(const SaveUnit *u)
 {
-    const u8 *j = job_rec(record(u, career(u)));
-    u8 monster_job[JOB_SIZE];
-    if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
-    Stats s;
-    u16 v16[5];
-    u8 i,k,current=0;
-    for(k=0;k<save.n;k++)if(u==&save.unit[k]){current=save_raw_current(&save,k);break;}
-    for (i = 0; i < 5; i++) {
-        u32 v = (u32)u->raw[i][0] << 16 | (u16)u->raw[i][1] << 8 | u->raw[i][2];
-        if(!current)v=core_raw_grown(v,j[J_GROWTH+i],u->level);
-        v = v * j[J_MULT + i] / 100 >> 14;
-        v16[i] = v ? (u16)v : 1;
+    if (u->type != 3) return job_rec(record(u, career(u)));
+    {
+        const u8 *p = cj_section(common, CJ_JOBS) + 14U * u->job;
+        memset(mg_monster_job, 0, sizeof mg_monster_job);
+        memcpy(mg_monster_job + J_GROWTH, p, 10);
+        mg_monster_job[J_MOVE] = p[10]; mg_monster_job[J_JUMP] = p[11];
     }
-    s.hp = v16[0]; s.mp = v16[1]; s.move = j[J_MOVE]; s.jump = j[J_JUMP];
-    for (i = 0; i < SLOTS; i++) if (u->eq[i]) {
-        const u8 *it = item_rec(u->eq[i]);
-        s.hp += it[I_HP]; s.mp += it[I_HP + 1];
-        v16[2] += it[I_HP + 4]; v16[3] += it[I_HP + 2]; v16[4] += it[I_HP + 3];
-        s.move += it[I_HP + 5]; s.jump += it[I_HP + 6];
-    }
-    if (s.hp > 999) s.hp = 999;
-    if (s.mp > 999) s.mp = 999;
-    {u8 f[3];u16 id=b16(u->movement);cj_movement(common,u->job,(u16)(id-486)<24U?(u8)(id-485):0,f);
-     core_movement_bonus(f[0],&s.move,&s.jump);}
-    if (s.jump > 7) s.jump = 7;
-    s.sp = (u8)(v16[2] > 50 ? 50 : v16[2]);
-    s.pa = (u8)(v16[3] > 99 ? 99 : v16[3]);
-    s.ma = (u8)(v16[4] > 99 ? 99 : v16[4]);
-    return s;
+    return mg_monster_job;
 }
+static u8 mg_raw_current(const SaveUnit *u)
+{
+    u8 k;
+    for (k = 0; k < save.n; k++) if (u == &save.unit[k]) return save_raw_current(&save, k);
+    return 0;
+}
+static void mg_move_bonus(const SaveUnit *u, u8 *move, u8 *jump)
+{
+    u8 f[3];
+    u16 id = b16(u->movement);
+    cj_movement(common, u->job, (u16)(id - 486) < 24U ? (u8)(id - 485) : 0, f);
+    core_movement_bonus(f[0], move, jump);
+}
+#define UST_JOB(u) mg_job_of(u)
+#define UST_ITEM(id) item_rec(id)
+#define UST_CURRENT(u) mg_raw_current(u)
+#define UST_MOVE(u,m,j) mg_move_bonus(u,m,j)
+#include "../unit_stats.inc"
+#define stats unit_stats
 
 void equip(SaveUnit *u, u8 slot, u8 id)    // id 0: taken off; the inventory keeps the count
 {
