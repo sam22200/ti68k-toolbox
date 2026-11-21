@@ -498,8 +498,8 @@ static u8 town_update(u32 key)
         return 1;
     }
     if (wm.screen == SC_FUR) {           // the poached hides are a system of their own
-        wm.trow = choice_move(wm.trow, 2, key);
-        if ((key & (K_ENTER | K_A)) && wm.trow == 1) { wm.screen = SC_TOWN; wm.trow = 0; }
+        wm.trow = choice_move(wm.trow, 3, key);
+        if ((key & (K_ENTER | K_A)) && wm.trow == 2) { wm.screen = SC_TOWN; wm.trow = 0; }
         else if (key & (K_ENTER | K_A)) wm.note = NOTE_LATER;
         return 1;
     }
@@ -868,8 +868,9 @@ static void action_menu(const char *title, const char *const *labels, u8 n, u8 g
 }
 // The source's own first menu. Picking a soldier hires one; the screen that follows it in the
 // original (its stats, its name) has no reference capture yet, so Change Name stays grey.
+// The disc's own labels (WORLD/WORLD.BIN's world-menu strings), not the retranslation's.
 static const char *const office_rows_text[OFFICE_ROWS] =
-    { "Male Soldier", "Female Soldier", "Change Name", "Exit" };
+    { "Male fighter", "Female fighter", "Change name", "Leave store" };
 static void office_rows(void)
 {
     ChoiceLayout *p = &office_box;
@@ -944,7 +945,7 @@ static void shop_rows(void)
 static void town_compose(void)
 {
     static const char *const store_rows[3] = { "Buy", "Sell", "Leave store" };
-    static const char *const fur_rows[2] = { "Buy", "Leave store" };
+    static const char *const fur_rows[3] = { "Buy", "Sell", "Leave store" };
     u8 office = (u8)(wm.screen == SC_OFFICE);
     void *l = rt_light, *d = rt_dark;
     rt_light = page; rt_dark = page + PAGE_PLANE;
@@ -964,7 +965,7 @@ static void town_compose(void)
             office_rows();
             office_plates(save.n, PARTY_MAX, office_price(wm.trow < 2 ? wm.trow : 0), gil());
         } else if (wm.screen == SC_FUR) {
-            action_menu("Menu", fur_rows, 2, 0, 0);      // Buy waits on the poaching loop
+            action_menu("Menu", fur_rows, 3, 0, 0);      // Buy waits on the poaching loop
             war_funds(gil());
         } else {
             action_menu("Menu", store_rows, 3, 255, 0);

@@ -75,6 +75,44 @@ and with air left after the guildmaster.
 The **town's own menu stays over the world map**, as the source keeps it over
 its world map: there is no town picture to rip, and none is needed.
 
+## Every world menu, read off the disc
+
+OBSERVED in **`WORLD/WORLD.BIN`**, in FFT's ordinary text encoding, one
+0xFE-terminated run after another. This is the whole set, in the order the game
+stores it, and it settles what each screen owes:
+
+| run | strings |
+| --- | --- |
+| store | **Buy / Sell / Fitting room / Leave store** |
+| fitting room | **Try it on / Best fit / Quit fitting**, then Sell / Fitting over |
+| | Sell equip / Stock |
+| | Yes / No, then O K / N O |
+| fur shop | **Buy / Sell / Leave store** |
+| soldier office | **Male fighter / Female fighter / Change name / Leave store** |
+| | then **Hire / Quit / Check status** |
+| | then Yes / No / Ask name again, Num, Quit / No |
+| name entry | A-Z, a-z, 0-9, one run each |
+
+What that changed, and what it still asks for:
+
+- the store's menu was already right.
+- the office's labels were the War of the Lions wording ("Male Soldier",
+  "Exit"); the disc we port says **Male fighter / Female fighter / Change name
+  / Leave store**, and that is what ships.
+- **the Fur Shop sells as well as buys** -- its menu is Buy / Sell / Leave
+  store, not Buy alone.
+- **the office does not hire on the spot.** Choosing a fighter opens a second
+  menu, **Hire / Quit / Check status**: the recruit is generated, shown, and
+  only then taken or refused. Naming follows, with its own alphabet runs and an
+  "Ask name again" to reroll. None of that is built yet.
+- **the Fitting room is a try-on bench**, not a shop: *Try it on* puts a piece
+  of the store's stock on a unit to show what it would do, *Best fit* picks the
+  best the stock offers, *Quit fitting* leaves. *Sell equip* and *Stock* switch
+  what the list shows. Not built either.
+
+The Bar's own strings are not in this run; `WORLD/WLDMES.BIN` holds its rumours
+(the Death Corps, King Omdolia's collapse...), several thousand lines of them.
+
 ## The shared pieces
 
 The three overlays are the campaign's own, not new ones:

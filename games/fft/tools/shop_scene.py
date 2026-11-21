@@ -128,7 +128,7 @@ VARIANTS = (
     ('BK_SHOP', 8, 18, 8, dict(lo=15, hi=97, gamma=1.4)),
     # The office's stone and its near-white candles are too far apart for four flat greys: the
     # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
-    ('BK_FITR', 26, 8, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
+    ('BK_FITR', 26, 8, 12, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
                                outline=(GUILDMASTER,))),
     ('BK_HONE', 8, 26, 9, dict(lo=45, hi=95, dither=0.72,
                                outline=(FUR_RAMZA, FUR_KEEPER))),
