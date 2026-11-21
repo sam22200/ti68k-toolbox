@@ -1,5 +1,16 @@
 # Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-12)
 
+Delivered (2026-11-20): [a town's services and a field's encounters](TOWN_SERVICES.md).
+Shop and Soldier Office, absent from every campaign document until now, are
+integrated into fftmap from the new core bank ffsh (FSH2,1468 bytes): FFT's own
+prices, stock tiers and categories, the six shop types, the two out-of-battle
+generator rows and each field's formation table. The shop and the office are
+complete and checked PC/68000. The random-encounter roll, table and door return
+are in place, but **no random battle is ripped**: all five Chapter I field doors
+are0, so a field still answers "Not ripped yet". Authoring those formations as
+chapter battles stays open, and the Bar (decorative in I), Propositions (II) and
+the Fur Shop (III) remain out of this chapter by the original's own unlocks.
+
 Latest steering (2026-11-13): finish the [user prerequisites](CAMPAIGN_PREREQUISITES.md)
 before route automation and campaign extraction. The user also requires
 [monster breeding, Bars/rumors/Propositions and the full poaching/Fur Shop loop](CAMPAIGN_SIDE_SYSTEMS.md).

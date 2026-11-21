@@ -8,7 +8,22 @@ Claude's next step is wide battle rendering/cache/cover/water/flash/facing,
 then actual deployment/Save/Continue/battle/results. The real monster deployment
 veto stays until that rendering is integrated; no repeat visual vote is needed.
 
-Latest delivery (2026-11-14): [actual adult Formation/Status](MONSTER_FORMATION.md).
+Latest delivery (2026-11-20): [a town's services and a field's encounters](TOWN_SERVICES.md).
+The world map's towns and castles open a Shop and a Soldier Office; a field rolls
+one of its random formations. New bank ffsh (FSH2,1468 bytes, core): FFT's own
+prices, stock tiers and item categories read from the disc, the six shop types'
+lists, the two out-of-battle generator rows a recruit comes from, and each
+field's formation table. The shop sells Gariland's ten tier-1 items at the
+original prices and buys back at half; the office hires a level-1 Squire or
+Chemist from the source generator, equipped as the source equips it. Only
+worldmap.c, ffsh and the map's manifests change: no battle, Save or ABI change.
+Steady frames306638 (shop),242054 (office),149136 (town) of360k; the list is a
+256-bit set because rescanning the ids cost1276832. Five new PC/68000 replays
+(28 map/menu replays), map-test and927 package checks pass. The random battles
+themselves are not ripped: every field door is still0, so a field answers "Not
+ripped yet". Bar/Fur Shop and16KiB remain open.
+
+Earlier delivery (2026-11-14): [actual adult Formation/Status](MONSTER_FORMATION.md).
 Universal FMA1/ffma13082 holds16 selected body/portrait pairs and255 names for48
 distinct jobs. Actual pages match the approval on PC/sanitizers and two selected
 native frames. Input tests cover adults/eggs, full16 browsing and human-page

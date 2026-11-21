@@ -10,6 +10,10 @@
 // Keys: arrows move a free cursor, with nearby locations snapped on release. ENTER travels
 // shown routes: FFT's costs) or enters the one Ramza stands on, ALPHA / DIAMOND the menus, ESC
 // quits.
+// A town (ffsh, tools/shop_assets.py) opens its services instead: the Shop buys and sells
+// FFT's items at FFT's prices, by the stock tier a story flag has opened, and the Soldier
+// Office hires a Squire or a Chemist from the source's own out-of-battle generator. A field
+// location rolls one of its random formations and enters it like any other battle door.
 #include "../../../runtime/core/rt.h"
 #include "../art.h"
 #include "save.h"
@@ -21,7 +25,10 @@
 #include "story_choice_file.h"
 #endif
 
-enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED };
+enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED,
+       NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
+enum { SC_MAP = 0, SC_TOWN, SC_SHOP, SC_OFFICE };   // what the screen shows
+enum { SHOP_ROWS = 7, OFFICE_ROWS = 4, ENC_MAX = 3, OFFICE_REC = 17 };
 typedef struct {
     u8 at, sel;                          // Ramza's location, the chosen one
     u8 moving, leg, legs, step;          // travelling: leg of path[], its point
@@ -29,12 +36,15 @@ typedef struct {
     s16 x, y;                            // Ramza on the map (texture pixels)
     s16 handx, handy;                    // free hand hotspot; never commits a journey
     u8 menu, row;
+    u8 screen, trow, ttop, buy;          // a town's services: its row, the list's first row
     u8 note, changed, tick;
     u16 result;                          // what fftmap returns
 } Wm;
 Wm wm;
 Save save;
 static const u8 *bank, *mgb,*breed_rules;
+static const u8 *shop,*sh_price,*sh_tier,*sh_kind,*sh_cats,*sh_lone,*sh_shop,*sh_tierflag;
+static const u8 *sh_place,*sh_office,*sh_jobs,*sh_enc;
 static RtTilemap map;
 static u8 *wmcache,*idle_sprites;
 static u8 strip_tag[16];
@@ -61,7 +71,6 @@ static s16 loc_y(u8 i) { return s16v(loc(i) + 2); }
 static const char *loc_name(u8 i) { return (const char *)bank + b16(loc(i) + 6); }
 static const u8 *route(u8 r) { return part(3) + 6 * r; }
 static const u8 *menu_font(void) { return mgb + b16(mgb + 4 + 2 * 7); }
-#define MGTEXT_TEXT_ONLY
 #include "mgtext.inc"
 
 static u8 map_menu_width(const char *s)
@@ -165,6 +174,132 @@ static void travel_step(void)            // a pixel a frame along the route's po
     if (++wm.leg == wm.legs) arrive();
 }
 
+// ------------------------------------------------- a town's services, a field's encounters
+// The bank ffsh (FSH2) holds FFT's own prices, stock tiers and item categories, the shop type
+// of each location, the two Soldier Office generator rows and the random formations of each
+// field. Lists are walked over the item ids rather than materialized: 255 cheap tests cost far
+// less than the32-byte buffer a cached list would add to Wm and to every state file.
+static u16 wdraw(void) { return (u16)(world_draw(&save) & 32767U); }
+static u32 gil(void)
+{ return (u32)save.money[0] << 24 | (u32)save.money[1] << 16 | (u32)save.money[2] << 8 | save.money[3]; }
+static void gil_set(u32 v)
+{
+    if (v > 99999999UL) v = 99999999UL;
+    save.money[0] = (u8)(v >> 24); save.money[1] = (u8)(v >> 16);
+    save.money[2] = (u8)(v >> 8); save.money[3] = (u8)v;
+}
+#define MG_ITEM_SIZE 14
+static const char *item_name(u8 id)
+{
+    u16 at = b16(mgb + b16(mgb + 4 + 2 * 1) + (u16)id * MG_ITEM_SIZE);
+    return at ? (const char *)mgb + at : "";
+}
+static u16 item_price(u8 id) { return b16(sh_price + 2 * (u16)id); }
+static u8 shop_type(void) { return shop && wm.at < LOC_N ? sh_shop[wm.at] : 0; }
+// A stock tier opens with its story flag (0: from the start, 255: no battle of this build
+// reaches it), exactly as the source widens a shop's stock as the chapter advances.
+static u8 tier_open(u8 tier)
+{
+    u8 f;
+    if (!tier || tier >= 16) return 0;
+    f = sh_tierflag[tier];
+    return f == 255 ? 0 : (u8)(!f || flag((u8)(f - 1)));
+}
+static u8 on_sale(u8 id)
+{
+    u8 t = shop_type(), k;
+    if (!t || !id) return 0;
+    k = sh_kind[id];
+    if (!(sh_cats[5 * (u16)t + (k >> 3)] & (u8)(1u << (k & 7))) && id != sh_lone[t]) return 0;
+    return tier_open(sh_tier[id]);
+}
+static u8 shop_has(u8 id)
+{ return wm.buy ? on_sale(id) : (u8)(save.inv[id] && item_price(id)); }
+// The list as a 256-bit set rather than a rescan: walking the ids cost 1.3M cycles a frame on
+// the 68000, four times the budget. One pass per trade or page switch, then a byte-skipping
+// walk; the set is a static, so no state file grows by it.
+static u8 shop_bits[32], shop_n;
+static void shop_refresh(void)
+{
+    u16 i;
+    shop_n = 0; memset(shop_bits, 0, sizeof shop_bits);
+    for (i = 1; i < 256; i++)
+        if (shop_has((u8)i)) { shop_bits[i >> 3] |= (u8)(0x80 >> (i & 7)); shop_n++; }
+}
+static u8 shop_nth(u8 n)
+{
+    u8 i, k;
+    for (i = 0; i < 32; i++) {
+        u8 b = shop_bits[i];
+        if (!b) continue;
+        for (k = 0; k < 8; k++) if ((b & (u8)(0x80 >> k)) && !n--) return (u8)(8 * (u16)i + k);
+    }
+    return 0;
+}
+
+// FFT sells back at half the shop price; the row leaves the list with its last copy.
+static void shop_trade(void)
+{
+    u8 id = shop_nth(wm.trow);
+    u16 price;
+    if (!id) return;
+    price = item_price(id);
+    if (wm.buy) {
+        if (save.inv[id] >= 99) { wm.note = NOTE_STOCK; return; }
+        if (gil() < price) { wm.note = NOTE_NOGIL; return; }
+        gil_set(gil() - price); save.inv[id]++;
+    } else {
+        gil_set(gil() + (price >> 1)); save.inv[id]--;
+        if (!shop_has(id) && wm.trow) wm.trow--;
+    }
+    shop_refresh();
+    wm.changed = 1;
+}
+
+// FFT's Soldier Office: a Squire or a Chemist, man or woman, from the source out-of-battle
+// generator (the same seeds, variances and draw order breeding.h runs for monsters), equipped
+// as the source equips a recruit. Price: the guide's, we have not found it on the disc.
+static u8 office_sex(u8 row) { return (u8)(row & 1); }
+static u8 office_job(u8 row) { return sh_jobs[row >> 1]; }
+static const u8 *office_rec(u8 row) { return sh_office + OFFICE_REC * (u16)office_sex(row); }
+static u16 office_price(u8 row) { return b16(office_rec(row) + 15); }
+static void hire(u8 row)
+{
+    const u8 *g = office_rec(row);
+    SaveUnit *u;
+    u8 i, name, used, sex = office_sex(row);
+    if (save.n >= PARTY_MAX) { wm.note = NOTE_PARTY; return; }
+    if (gil() < office_price(row)) { wm.note = NOTE_NOGIL; return; }
+    gil_set(gil() - office_price(row));
+    u = &save.unit[save.n];
+    memset(u, 0, sizeof *u);
+    u->job = office_job(row); u->gfx = 255; u->type = sex; u->level = 1;
+    u->brave = (u8)((muls16((s16)wdraw(), 31) >> 15) + 40);
+    u->faith = (u8)((muls16((s16)wdraw(), 31) >> 15) + 40);
+    for (i = 0; i < 5; i++) {
+        u32 raw = ((u32)g[i] << 14) + (u32)(muls16((s16)wdraw(), g[5 + i]) >> 1);
+        u->raw[i][0] = (u8)(raw >> 16); u->raw[i][1] = (u8)(raw >> 8); u->raw[i][2] = (u8)raw;
+    }
+    do {
+        name = (u8)(muls16((s16)wdraw(), 255) >> 15); used = 0;
+        for (i = 0; i < save.n; i++)
+            if (save.unit[i].type == sex && save.unit[i].name == name) { used = 1; break; }
+    } while (used);
+    u->name = name;
+    u->zodiac = wb_birth_sign(breed_rules, (u16)(wdraw() % 365 + 1));
+    memcpy(u->eq, g + 10, 5);
+    save_raw_set(&save, save.n, 0);
+    world_party_clear_slot(&save.world, save.n);
+    save.n++; wm.changed = 1;
+}
+
+// A field location: one of its three authored formations, 0 while none is ripped.
+static u16 encounter(void)
+{
+    if (!shop || sh_place[wm.at] < 2) return 0;
+    return b16(sh_enc + 2 * (ENC_MAX * (u16)wm.at + wdraw() % ENC_MAX));
+}
+
 // A bounded magnetic radius, measured in texture pixels. No destination on hover alone.
 static u8 magnet(void)
 {
@@ -187,7 +322,7 @@ void game_init(void)
     release_map();
 #endif
     wmcache=idle_sprites=RT_NULL;
-    bank = mgb = RT_NULL;                    // (statics survive between runs)
+    bank = mgb = shop = RT_NULL;             // (statics survive between runs)
     strip_decor=decor_ready=0;
     memset(&wm, 0, sizeof wm);
     bank = rt_file("ffwm", &size);
@@ -195,6 +330,17 @@ void game_init(void)
     mgb = rt_file("ffmg", &size);
     if (mgb && memcmp(mgb, "FMG3", 4)) mgb = RT_NULL;
     save_load(&save);
+    // A town without its services is still a map: ffsh only disables them.
+    shop = rt_file("ffsh", &size);
+    if (shop && !memcmp(shop, "FSH2", 4) && size > 6 && shop[4] == 255) {
+        u16 types = (u16)shop[5] + 1;
+        sh_price = shop + 6; sh_tier = sh_price + 512; sh_kind = sh_tier + 256;
+        sh_cats = sh_kind + 256; sh_lone = sh_cats + 5 * types; sh_shop = sh_lone + types;
+        sh_tierflag = sh_shop + LOC_N; sh_place = sh_tierflag + 16;
+        sh_office = sh_place + LOC_N; sh_jobs = sh_office + 2 * OFFICE_REC; sh_enc = sh_jobs + 2;
+        // A TI variable reports its trailing tag bytes too: the bank must fit, not match.
+        if ((u16)(sh_enc + 2 * ENC_MAX * LOC_N - shop) > size) shop = RT_NULL;
+    } else shop = RT_NULL;
     breed_rules=rt_file("ffwb",&size);
     if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
@@ -219,6 +365,7 @@ void game_scenario(u16 n)                 // the save's location (n: test doors,
     wm.sel = wm.at; wm.moving = 0; wm.note = n==1?NOTE_SAVED:0; wm.result = 0;
     if (bank) { wm.x = loc_x(wm.at); wm.y = loc_y(wm.at); }
     wm.handx=wm.x;wm.handy=wm.y;wm.menu=wm.row=0;
+    wm.screen=SC_MAP;wm.trow=wm.ttop=0;wm.buy=1;
     decor_ready=0;
 }
 
@@ -239,6 +386,48 @@ static u8 leave(u16 result)
     return 0;
 }
 
+// The town's own screens. They replace the map until ESC/SHIFT walks back out, so the map's
+// cursor, menu and travel keep their meaning untouched.
+static u8 town_update(u32 key)
+{
+    if (key & (K_ESC | K_B)) {
+        wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP : SC_TOWN);
+        wm.trow = wm.ttop = 0;
+        return 1;
+    }
+    if (wm.screen == SC_TOWN) {
+        wm.trow = choice_move(wm.trow, 3, key);
+        if (key & (K_ENTER | K_A)) {
+            wm.screen = (u8)(wm.trow == 2 ? SC_MAP : wm.trow ? SC_OFFICE : SC_SHOP);
+            wm.trow = wm.ttop = 0; wm.buy = 1;
+            if (wm.screen == SC_SHOP) shop_refresh();
+        }
+        return 1;
+    }
+    if (wm.screen == SC_OFFICE) {
+        wm.trow = choice_move(wm.trow, OFFICE_ROWS, key);
+        if (key & (K_ENTER | K_A)) hire(wm.trow);
+        return 1;
+    }
+    {
+        u8 n;
+        if (key & (K_LEFT | K_RIGHT)) { wm.buy ^= 1; wm.trow = wm.ttop = 0; shop_refresh(); }
+        n = shop_n;
+        if (n) {
+            wm.trow = choice_move(wm.trow, n, key);
+            if (key & (K_ENTER | K_A)) shop_trade();
+            n = shop_n;
+        }
+        if (!n) wm.trow = 0;
+        else if (wm.trow >= n) wm.trow = (u8)(n - 1);
+        if (wm.trow < wm.ttop) wm.ttop = wm.trow;
+        if (wm.trow >= wm.ttop + SHOP_ROWS) wm.ttop = (u8)(wm.trow - SHOP_ROWS + 1);
+        if (wm.ttop && wm.ttop + SHOP_ROWS > n)
+            wm.ttop = (u8)(n > SHOP_ROWS ? n - SHOP_ROWS : 0);
+        return 1;
+    }
+}
+
 u8 game_update(void)
 {
     u32 key = rt_keys & ~rt_prev;
@@ -246,6 +435,7 @@ u8 game_update(void)
     if (!bank || !mgb) return !(key & K_ESC);
     if (wm.moving) { travel_step(); if(wm.moving)travel_step(); return 1; }
     if (wm.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) wm.note = 0; return 1; }
+    if (wm.screen) return town_update(key);
     if (key & K_ESC) {if(wm.menu){wm.menu=0;return 1;}return leave(0);}
     if (key & (K_C | K_D)) { wm.menu^=1;wm.row=0;return 1; }
     if (wm.menu) {
@@ -285,6 +475,9 @@ u8 game_update(void)
             const u8 *s = story(wm.at);
             u16 door = s ? b16(s + 2) : 0;
             if (door && !(s[4] && flag((u8)(s[4] - 1)))) return leave(door);   // its battle
+            if (shop_type()) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; return 1; }
+            door = encounter();                                  // a field: a random formation
+            if (door) return leave(door);
             wm.note = NOTE_LATER;
         }
     }
@@ -477,11 +670,74 @@ static void map_background(s16 cx,s16 cy,u8 decor)
     }
 }
 
+// ------------------------------------------------- the town's screens
+// One frame, one list: the same geometry for the three screens, so the shop's six rows, the
+// office's four and the town's three share one layout and one cursor.
+static const ChoiceLayout town_list = { 16, 16, 0, 0, 0, CHOICE_BARE, 0, 0, 0, 0, 0, 9, 152, -26, -3 };
+static s16 right32(s16 x, s16 y, u32 n)          // gil goes past a u16 long before the cap
+{
+    char b[9];
+    u8 k = 8;
+    b[k] = 0;
+    do { b[--k] = (char)('0' + (u8)(n % 10)); n /= 10; } while (n);
+    return black((s16)(x - 4 * (8 - k)), y, b + k);
+}
+static const char *job_name(u8 job)
+{ return (const char *)mgb + b16(mgb + b16(mgb + 4 + 2 * 0) + (u16)(u8)(job - 0x4A) * 32); }
+
+// The cleared screen is already the panel's inside: its border is four thin rectangles, not
+// two full-screen fills (which cost about 130k cycles a frame on the 68000 for nothing).
+static void town_frame(const char *title)
+{
+    draw_clear();
+    draw_rect(0, 0, 160, 1, C_BLACK); draw_rect(0, 99, 160, 1, C_BLACK);
+    draw_rect(0, 1, 1, 98, C_BLACK); draw_rect(159, 1, 1, 98, C_BLACK);
+    draw_rect(2, 2, 156, 1, C_LGRAY);
+    black(6, 4, title);
+    right32(154, 4, gil());
+    draw_rect(4, 12, 152, 1, C_BLACK);
+}
+
+static void town_render(void)
+{
+    static const char *const town_rows[] = { "Shop", "Soldier Office", "Leave" };
+    u8 r;
+    if (wm.screen == SC_TOWN) {
+        town_frame(loc_name(wm.at));
+        for (r = 0; r < 3; r++) choice_row(&town_list, r, town_rows[r], C_BLACK);
+        choice_cursor_animated(&town_list, wm.trow, rt_frame);
+    } else if (wm.screen == SC_OFFICE) {
+        town_frame("Soldier Office");
+        for (r = 0; r < OFFICE_ROWS; r++) {
+            s16 y = (s16)(town_list.y + (u16)r * town_list.pitch);
+            black(town_list.x, y, job_name(office_job(r)));
+            black((s16)(town_list.x + 46), y, office_sex(r) ? "Woman" : "Man");
+            right(140, y, office_price(r));
+        }
+        choice_cursor_animated(&town_list, wm.trow, rt_frame);
+        black(16, 88, save.n < PARTY_MAX ? "ENTER hires" : "Party full");
+    } else {
+        u8 n = shop_n;
+        town_frame(wm.buy ? "Shop - Buy" : "Shop - Sell");
+        for (r = 0; r < SHOP_ROWS && wm.ttop + r < n; r++) {
+            u8 id = shop_nth((u8)(wm.ttop + r));
+            s16 y = (s16)(town_list.y + (u16)r * town_list.pitch);
+            black(town_list.x, y, item_name(id));
+            if (!wm.buy) { black(104, y, "x"); number(110, y, save.inv[id]); }
+            right(140, y, wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
+        }
+        if (n) choice_cursor_animated(&town_list, (u8)(wm.trow - wm.ttop), rt_frame);
+        else black(town_list.x, town_list.y, wm.buy ? "Nothing in stock" : "Nothing to sell");
+        black(16, 88, "LEFT/RIGHT buy or sell");
+    }
+}
+
 void game_render(void)
 {
     s16 cx, cy;
     u8 i;
     if (!bank || !mgb) { draw_clear(); draw_text(4, 40, "Missing ffwm / ffmg", 0, C_BLACK); return; }
+    if (wm.screen) { town_render(); if (!wm.note) return; }
     cx = (s16)((wm.moving?wm.x:wm.handx) - 80); cy = (s16)((wm.moving?wm.y:wm.handy) - 50);
     rt_clamp_cam(&map, &cx, &cy);
     map_background(cx,cy,1);
@@ -509,7 +765,8 @@ void game_render(void)
         choice_cursor_animated(&menu,wm.row,rt_frame);
     }
     if (wm.note) {
-        static const char *const notes[] = { "", "No road there yet", "Not ripped yet", "Not available yet", "Campaign saved" };
+        static const char *const notes[] = { "", "No road there yet", "Not ripped yet", "Not available yet",
+            "Campaign saved", "Not enough gil", "99 of those already", "The party is full" };
         panel(20, 36, 120, 22);
         black(26, 40, notes[wm.note]);
         black(26, 48, "ENTER or SHIFT");

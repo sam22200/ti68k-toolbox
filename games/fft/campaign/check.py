@@ -201,8 +201,16 @@ def worldmap(pc_save,ti_save):
     def mandalia(s): assert s['location']==24,'Ramza at Mandalia'
     menu=keys(OUT/'map-menu.keys',[(2,'C')]);last=keys(OUT/'map-menu-last.keys',[(2,'C'),(4,'UP')])
     blank=OUT/'map-blank.keys';blank.write_text('0 LEFT UP\n60\n64 ENTER\n65\n')
-    return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb'],0x4d415001,
+    # Gariland's own services: its battle is won, so ENTER opens the town instead.
+    town=keys(OUT/'map-town.keys',[(2,'ENTER')])
+    shop=keys(OUT/'map-shop.keys',[(2,'ENTER'),(4,'ENTER')])
+    sell=keys(OUT/'map-sell.keys',[(2,'ENTER'),(4,'ENTER'),(6,'ENTER'),(8,'LEFT')])
+    office=keys(OUT/'map-office.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER')])
+    hire=keys(OUT/'map-hire.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER'),(8,'ENTER')])
+    return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb','ffsh'],0x4d415001,
                    [('gariland',0,4,empty),('menu',0,4,menu),('menu-last',0,8,last),
+                    ('town',0,6,town),('shop',0,8,shop),('shop-sell',0,12,sell),
+                    ('office',0,10,office),('hire',0,12,hire),
                     ('blank-return',0,68,blank),('choose',0,f,choose),('walk',0,f+12,walk),('arrived',0,f+401,trip),('trip',0,f+410,trip)],
                    pc_save,ti_save,mandalia)
 

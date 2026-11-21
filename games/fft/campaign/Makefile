@@ -203,7 +203,7 @@ dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
 	./fftscn_dialogue_test
 .PHONY: map-test
-map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin
+map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin
 	$(CC) $(PC_CFLAGS) -o fftmap_test test_worldmap.c $(RT_CORE) $(RT_SW)
 	./fftmap_test
 .PHONY: manage-test
