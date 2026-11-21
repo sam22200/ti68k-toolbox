@@ -80,6 +80,12 @@ Rebuilt to the source's own screen on 2026-11-20:
 
 ## In the game
 
+The world map's own furniture moved with it (2026-11-20, the user's layout):
+the place the cursor is on is a **floating plate at the top of the screen**,
+centred, black with white text, one pixel of air over and under it and no wider
+than its name -- never a bar at the foot of the screen. The day sits in a small
+panel right under it, a third narrower than before. The town's menu is centred.
+
 `worldmap.c` ships the three screens: the town menu over the world map, the
 store's Buy / Sell / Leave store over its room, its item list, and the Soldier
 Office's four hire rows. The map shows the same War Funds plate. The item list
