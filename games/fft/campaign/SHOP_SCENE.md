@@ -59,6 +59,14 @@ an INTERPRETATION: matched by eye, not read from the game's own table. The
 Soldier Office's clerk is one of the bald faces beside him and still borrows
 the shopkeeper's.
 
+**The sheet's own palettes are its last 2048 bytes**: the 168 faces take
+129,024, and what follows is 64 CLUTs of 16 BGR555 colours. The 4-bit value is
+a palette slot, not a brightness -- a face's skin is index 8 and its hair
+index 1..3 -- so reading it as luminance printed the portrait in negative.
+Those faces also live in a narrow band (palette 0 runs 5.3 to 26.2 of 31), so
+the port's fixed thresholds left every pixel mid-grey: the fifteen drawn
+colours are stretched over the full range before the four greys are chosen.
+
 ## The Buy and Sell lists
 
 Rebuilt to the source's own screen on 2026-11-20:
@@ -72,9 +80,8 @@ Rebuilt to the source's own screen on 2026-11-20:
   price (half when selling).
 - the list **scrolls** six rows at a time with the shared triangles.
 - **[MODE] opens the item's detail** through `item_detail.inc`, the campaign's
-  one detail panel: icon, name, family, a weapon's power and every non-zero
-  bonus. The disc's own flavour text is not in it yet -- it lives
-  LZW-compressed in `EVENT/HELP.LZW`, which we have not decoded.
+  one detail panel: icon, name, family, a weapon's power, **FFT's own
+  description** and every non-zero bonus. See [ITEM_DETAIL.md](ITEM_DETAIL.md).
 - **Eqp./All** sits beside the War Funds in the same plates: how many of the
   party can wear the item the cursor is on, out of how many are in it.
 

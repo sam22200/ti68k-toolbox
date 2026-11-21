@@ -27,8 +27,12 @@ the user's shop screenshot shows; the Soldier Office's clerk is one of the bald
 ones beside him and is not pinned down yet (INTERPRETATION: matched by eye
 against the user's screenshot, not read from the game's own table).
 
-The sheet carries no palette we have found, so the greys come from the 4-bit
-index itself, mapped by the same luminance rule as the rest of the port.
+The sheet's own palettes are the last 2048 bytes of the file: 168 faces of
+32x48 take 129,024 bytes, and what follows is **64 CLUTs of 16 BGR555 colours**.
+The index is a palette slot, not a brightness -- a face's skin is index 8 and
+its hair index 1..3 -- so reading the index as luminance produced a negative.
+The greys come from the palette's own luminance, through the same rule as the
+rest of the port.
 
 FSK3: magic, u8 rooms, one pad byte, u16 offsets (portrait 32x29/348 bytes, then
 each room's u8 height and ZX0-compressed planes), then those records. The pad
@@ -46,7 +50,9 @@ import interface
 import zx0pack
 
 KEEPER = 8                        # EVENT/WLDFACE.BIN face index
+KEEPER_PAL = 0                    # INTERPRETATION: the sheet's face/palette pairing is unknown
 FACE_W, FACE_H = 32, 48
+FACE_BYTES = 168 * FACE_W * FACE_H // 2
 W, H = 160, 100                   # the whole screen: the dialogue box is drawn over the room
 # name, window origin in the source, and the grey mapping. The store is a bright room full of
 # dark goods, the office a dim one, so the percentiles that become white and black differ.
@@ -58,21 +64,31 @@ VARIANTS = (
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 
 
-def portrait(disc, files, index):
+def face_greys(px, pal):
+    """Four greys from the palette's own range. These faces live in a narrow band -- palette 0
+    runs 5.3 to 26.2 of 31 -- so the port's fixed thresholds leave almost every pixel mid-grey
+    and the portrait unreadable. Stretch the fifteen drawn colours over the full range first."""
+    lum = (pal & 31) * .299 + (pal >> 5 & 31) * .587 + (pal >> 10 & 31) * .114
+    low, high = lum[1:].min(), lum[1:].max()
+    lum = (lum - low) / max(high - low, 1e-6) * 31
+    g = np.where(lum <= 7, 3, np.where(lum <= 16, 2, np.where(lum <= 22, 1, 0)))
+    return np.where(px == 0, -1, g[px])
+
+
+def portrait(disc, files, index, palette=KEEPER_PAL):
     """One EVENT/WLDFACE.BIN face as the campaign's 32x29 portrait record (348 bytes)."""
-    raw = np.frombuffer(disc.read(*files['EVENT/WLDFACE.BIN']), np.uint8)
+    b = disc.read(*files['EVENT/WLDFACE.BIN'])
+    raw = np.frombuffer(b[:FACE_BYTES], np.uint8)
     px = np.empty(raw.size * 2, np.uint8)
     px[0::2] = raw & 15; px[1::2] = raw >> 4
     sheet = px.reshape(-1, 256)
+    pal = np.frombuffer(b[FACE_BYTES:], '<u2')[palette * 16:(palette + 1) * 16].astype(int)
     r, c = divmod(index, 8)
     face = sheet[r * FACE_H:(r + 1) * FACE_H, c * FACE_W:(c + 1) * FACE_W]
-    # The sheet has no palette of its own here: index 0 is the background, and the remaining
-    # fifteen run dark to light, so the four greys follow the index directly.
-    small = np.asarray(Image.fromarray(face.astype(np.uint8) * 17)
+    small = np.asarray(Image.fromarray(face.astype(np.uint8))
                        .resize((17, 27), Image.Resampling.NEAREST), dtype=int)
     im = np.full((29, 32), -1, dtype=int)
-    body = np.where(small <= 3 * 17, 3, np.where(small <= 7 * 17, 2, np.where(small <= 11 * 17, 1, 0)))
-    im[1:28, 1:18] = np.where(small == 0, -1, body)
+    im[1:28, 1:18] = face_greys(small, pal)           # index 0 is the background
     interface.outline(im)
     return bytes(interface.planes(im, 32))
 
