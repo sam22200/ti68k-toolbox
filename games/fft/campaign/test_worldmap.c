@@ -88,6 +88,21 @@ int main(void)
         assert(gil() == 50 && !save.inv[dagger] && !shop_n && !wm.trow);
     }
     assert(sw_step(K_ESC) && wm.screen == SC_STORE);
+    // The fitting bench: the store's Fitting room, on the party.
+    assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && sw_step(K_DOWN) && sw_step(0));
+    assert(sw_step(K_ENTER) && wm.screen == SC_FIT && wm.trow == 0);
+    {
+        u8 id = best_fit(&save.unit[0]);
+        assert(!id || (on_sale(id) && item_fits(&save.unit[0], id) && fit_slot(id) < 5));
+        if (id) {
+            u8 slot = fit_slot(id); u32 before = gil();
+            gil_set(item_price(id));
+            assert(sw_step(0) && sw_step(K_ENTER) && !wm.note);
+            assert(save.unit[0].eq[slot] == id && gil() == 0);
+            gil_set(before);
+        }
+    }
+    assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_STORE);
     assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_TOWN);
     assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0));
     assert(sw_step(K_ENTER) && wm.screen == SC_OFFICE && wm.trow == 0);
@@ -96,11 +111,17 @@ int main(void)
         const SaveUnit *u = &save.unit[before];
         assert(office_job(0) == 0x4A && office_job(1) == 0x4A);   // the source hires a Squire
         assert(office_price(0) == 1500 && office_price(1) == 1400);
+        // The source generates the fighter, shows him, and only then asks: Hire / Quit.
         gil_set(1499);
+        assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_HIRE && save.n == before);
         assert(sw_step(0) && sw_step(K_ENTER) && wm.note == NOTE_NOGIL && save.n == before);
         assert(sw_step(K_B) && !wm.note);
         gil_set(2000);
-        assert(sw_step(0) && sw_step(K_ENTER) && !wm.note);       // Male Soldier
+        assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && sw_step(K_DOWN) && sw_step(0));
+        assert(sw_step(K_ENTER) && wm.card);                      // Check status
+        assert(sw_step(K_B) && !wm.card);
+        assert(sw_step(0) && sw_step(K_UP) && sw_step(0) && sw_step(K_UP) && sw_step(0));
+        assert(sw_step(K_ENTER) && wm.screen == SC_OFFICE && !wm.note);   // Hire
         assert(save.n == before + 1 && gil() == 500);
         assert(u->job == 0x4A && u->type == 0 && u->level == 1 && u->gfx == 255);
         assert(u->brave >= 40 && u->brave <= 71 && u->faith >= 40 && u->faith <= 71);

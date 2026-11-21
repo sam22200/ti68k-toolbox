@@ -103,12 +103,22 @@ What that changed, and what it still asks for:
   store, not Buy alone.
 - **the office does not hire on the spot.** Choosing a fighter opens a second
   menu, **Hire / Quit / Check status**: the recruit is generated, shown, and
-  only then taken or refused. Naming follows, with its own alphabet runs and an
-  "Ask name again" to reroll. None of that is built yet.
+  only then taken or refused. That is built: the candidate is generated into
+  the party's own free slot, which nothing reads until `save.n` grows, so no
+  byte of state is added for him; Check status shows his name, job, sex, Brave,
+  Faith, level and sign; Hire is the only answer that spends the gil. The name
+  comes from `ffcp`, the campaign's own generic-name bank. The naming screen
+  with its alphabet and "Ask name again" is not built, and *Change name* stays
+  grey: renaming an existing unit needs a roster picker.
 - **the Fitting room is a try-on bench**, not a shop: *Try it on* puts a piece
-  of the store's stock on a unit to show what it would do, *Best fit* picks the
-  best the stock offers, *Quit fitting* leaves. *Sell equip* and *Stock* switch
-  what the list shows. Not built either.
+  of the store's stock on a unit, *Best fit* picks the best the stock offers,
+  *Quit fitting* leaves. **Best fit is built** as one bench: the party on the
+  left, and under the cursor the best piece the store carries for that unit
+  with its price; ENTER buys it and puts it on, the piece it replaces going
+  back to the bag. "Best" is ranked on the item's own bonuses, which `ffmg`
+  gives directly, so no unit statistic is derived here and management keeps
+  that engine to itself. *Try it on* -- one named piece at a time, with the
+  resulting statistics -- is not built.
 
 The Bar's own strings are not in this run; `WORLD/WLDMES.BIN` holds its rumours
 (the Death Corps, King Omdolia's collapse...), several thousand lines of them.

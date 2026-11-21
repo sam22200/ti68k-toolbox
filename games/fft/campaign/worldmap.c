@@ -21,13 +21,15 @@
 #include <string.h>
 #include "../base.inc"
 #include "breeding.h"
+#include "../identity_pool.h"
 #ifndef __m68k__
 #include "story_choice_file.h"
 #endif
 
 enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED,
        NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
-enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_OFFICE, SC_FUR };   // what the screen shows
+enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_FIT, SC_OFFICE, SC_HIRE, SC_FUR };
+enum { FIT_ROWS = 4 };               // the party rows the fitting bench shows at once
 enum { ROOM_STORE = 0, ROOM_OFFICE, ROOM_FUR, ROOM_N };
 // The Fur Shop opens in the source's Chapter III; no battle of this build sets its flag.
 enum { FUR_FLAG = 255 };
@@ -45,6 +47,7 @@ typedef struct {
     u8 menu, row;
     u8 screen, trow, ttop, buy;          // a town's services: its row, the list's first row
     u8 cat, detail;                      // the shop tab (F1/F5) and whether [MODE] is showing
+    u8 card, cand;                       // SC_HIRE: the status panel, and which row made him
     u8 note, changed, tick;
     u16 result;                          // what fftmap returns
 } Wm;
@@ -54,6 +57,7 @@ static const u8 *bank, *mgb,*breed_rules;
 static const u8 *shop,*sh_price,*sh_tier,*sh_kind,*sh_cats,*sh_lone,*sh_shop,*sh_tierflag;
 static const u8 *sh_place,*sh_office,*sh_jobs,*sh_enc;
 static const u8 *scene;                  // ffsk: the source's rooms and the speaker's portrait
+static const u8 *identity;               // ffcp: the generic names a recruit is given
 static const u8 *help;                   // ffid: FFT's own item descriptions, read in place
 #define PAGE_PLANE (100 * RT_PBYTES)
 static u8 *page;
@@ -111,10 +115,12 @@ static const u8 *scene_face(u8 room) { return scene_part(room); }
 static const u8 *scene_room(u8 room) { return scene_part((u8)(ROOM_N + room)); }
 // Which room a screen shows, and who speaks in it.
 static u8 town_room(void)
-{ return (u8)(wm.screen == SC_OFFICE ? ROOM_OFFICE : wm.screen == SC_FUR ? ROOM_FUR : ROOM_STORE); }
+{ return (u8)(wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? ROOM_OFFICE :
+               wm.screen == SC_FUR ? ROOM_FUR : ROOM_STORE); }
 static const char *town_speaker(void)
 {
-    return wm.screen == SC_OFFICE ? "Guildmaster" : wm.screen == SC_FUR ? "Fur Merchant" : "Shopkeeper";
+    return wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? "Guildmaster" :
+           wm.screen == SC_FUR ? "Fur Merchant" : "Shopkeeper";
 }
 static u8 fur_open(void)
 { return (u8)(FUR_FLAG != 255 && flag(FUR_FLAG)); }
@@ -252,9 +258,12 @@ static void item_icon(s16 x, s16 y, u8 id)
 #define MJ_CATS 16
 static u8 item_fits(const SaveUnit *u, u8 id)
 {
-    const u8 *j = mgb + b16(mgb + 4) + (u16)(u8)(u->job - 0x4A) * MG_JOB_SIZE;
+    // Ramza's own Squire is not one of the twenty generic careers; management reads it as the
+    // generic Squire's record, and so does this.
+    u8 career = (u8)(u->job >= 0x4A && u->job <= 0x5D ? u->job - 0x4A : 0);
+    const u8 *j = mgb + b16(mgb + 4) + (u16)career * MG_JOB_SIZE;
     u8 type = item_rec(id)[MI_TYPE];
-    if (u->job < 0x4A || u->job > 0x5D || type >= 32) return 0;
+    if (type >= 32) return 0;
     return (u8)((j[MJ_CATS + (type >> 3)] >> (7 - (type & 7))) & 1);
 }
 static u8 item_wearers(u8 id)
@@ -323,6 +332,56 @@ static u8 shop_nth(u8 n)
     return 0;
 }
 
+// The fitting bench. The source's *Best fit* puts the best the store carries on a unit; what
+// "best" means here is the item's own bonuses, which ffmg gives directly -- no unit statistic is
+// derived, so management keeps that engine to itself.
+static u16 item_worth(u8 id)
+{
+    const u8 *r = item_rec(id);
+    u8 i;
+    u16 w = (u16)r[MI_WP] * 4;
+    for (i = 0; i < 7; i++) w = (u16)(w + (s8)r[MI_HP + i] + ((s8)r[MI_HP + i] < 0 ? -2 * (s8)r[MI_HP + i] : 0));
+    return w;
+}
+// The best stock item unit `u` could wear, 0 when the store carries none for it.
+static u8 best_fit(const SaveUnit *u)
+{
+    u16 i;
+    u8 best = 0;
+    u16 worth = 0;
+    for (i = 1; i < 256; i++) {
+        u8 id = (u8)i, flags;
+        if (!on_sale(id) || !item_fits(u, id)) continue;
+        flags = item_rec(id)[MI_FLAGS];
+        if (!(flags & 0xF8)) continue;              // not a thing one wears
+        if (item_worth(id) > worth) { worth = item_worth(id); best = id; }
+    }
+    return best;
+}
+// Where it goes, by the slot flags management rules on: head, body, accessory, weapon, shield.
+static u8 fit_slot(u8 id)
+{
+    static const u8 flag_of[5] = { 0x20, 0x10, 0x08, 0x80, 0x40 };
+    u8 f = item_rec(id)[MI_FLAGS], i;
+    for (i = 0; i < 5; i++) if (f & flag_of[i]) return i;
+    return 255;
+}
+static void fit_buy(void)
+{
+    SaveUnit *u = &save.unit[wm.trow];
+    u8 id = best_fit(u), slot;
+    u16 price;
+    if (!id) { wm.note = NOTE_LATER; return; }
+    slot = fit_slot(id);
+    if (slot == 255) { wm.note = NOTE_LATER; return; }
+    price = item_price(id);
+    if (gil() < price) { wm.note = NOTE_NOGIL; return; }
+    gil_set(gil() - price);
+    if (u->eq[slot]) save.inv[u->eq[slot]]++;      // what comes off goes back to the bag
+    u->eq[slot] = id;
+    wm.changed = 1;
+}
+
 // FFT sells back at half the shop price; the row leaves the list with its last copy.
 static void shop_trade(void)
 {
@@ -349,14 +408,14 @@ static u8 office_sex(u8 row) { return (u8)(row & 1); }
 static u8 office_job(u8 row) { (void)row; return sh_jobs[0]; }   // the source's menu offers only a soldier
 static const u8 *office_rec(u8 row) { return sh_office + OFFICE_REC * (u16)office_sex(row); }
 static u16 office_price(u8 row) { return b16(office_rec(row) + 15); }
-static void hire(u8 row)
+// The source generates the fighter first and shows him; Hire is a second, separate answer.
+// The candidate lives in the party's own free slot, which nothing reads until save.n grows.
+static void office_make(u8 row)
 {
     const u8 *g = office_rec(row);
     SaveUnit *u;
     u8 i, name, used, sex = office_sex(row);
     if (save.n >= PARTY_MAX) { wm.note = NOTE_PARTY; return; }
-    if (gil() < office_price(row)) { wm.note = NOTE_NOGIL; return; }
-    gil_set(gil() - office_price(row));
     u = &save.unit[save.n];
     memset(u, 0, sizeof *u);
     u->job = office_job(row); u->gfx = 255; u->type = sex; u->level = 1;
@@ -376,7 +435,27 @@ static void hire(u8 row)
     memcpy(u->eq, g + 10, 5);
     save_raw_set(&save, save.n, 0);
     world_party_clear_slot(&save.world, save.n);
+    wm.screen = SC_HIRE; wm.trow = 0; wm.card = 0;
+}
+// Hire: the fighter in the free slot joins, and only now does he cost anything.
+static void office_take(u8 row)
+{
+    if (save.n >= PARTY_MAX) { wm.note = NOTE_PARTY; return; }
+    if (gil() < office_price(row)) { wm.note = NOTE_NOGIL; return; }
+    gil_set(gil() - office_price(row));
     save.n++; wm.changed = 1;
+    wm.screen = SC_OFFICE; wm.trow = 0;
+}
+static const char *unit_label(const SaveUnit *u)
+{
+    if (u->type == 2) return "Ramza";
+    return identity ? identity_name(identity, (u16)u->name + (u->type == 1 ? 255 : 0)) : "";
+}
+static const char *candidate_name(void)
+{
+    const SaveUnit *u = &save.unit[save.n];
+    if (!identity) return "";
+    return unit_label(u);
 }
 
 // A field location: one of its three authored formations, 0 while none is ripped.
@@ -408,7 +487,7 @@ void game_init(void)
     release_map();
 #endif
     wmcache=idle_sprites=RT_NULL;
-    bank = mgb = shop = scene = help = RT_NULL;   // (statics survive between runs)
+    bank = mgb = shop = scene = help = identity = RT_NULL;   // (statics survive between runs)
     strip_decor=decor_ready=0;
     memset(&wm, 0, sizeof wm);
     bank = rt_file("ffwm", &size);
@@ -429,6 +508,8 @@ void game_init(void)
     } else shop = RT_NULL;
     scene = rt_file("ffsk", &size);
     if (scene && (memcmp(scene, "FSK4", 4) || scene[4] < ROOM_N)) scene = RT_NULL;
+    identity = rt_file("ffcp", &size);
+    if (!identity_valid(identity, size)) identity = RT_NULL;
     help = rt_file("ffid", &size);
     if (help && (memcmp(help, "FID1", 4) || b16(help + 4) != 256)) help = RT_NULL;
     breed_rules=rt_file("ffwb",&size);
@@ -483,7 +564,10 @@ static u8 leave(u16 result)
 static u8 town_update(u32 key)
 {
     if ((key & (K_ESC | K_B)) && !wm.detail) {
-        wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP : wm.screen == SC_SHOP ? SC_STORE : SC_TOWN);
+        if (wm.card) { wm.card = 0; return 1; }
+        wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP :
+                         wm.screen == SC_SHOP || wm.screen == SC_FIT ? SC_STORE :
+                         wm.screen == SC_HIRE ? SC_OFFICE : SC_TOWN);
         wm.trow = wm.ttop = 0;
         return 1;
     }
@@ -503,20 +587,41 @@ static u8 town_update(u32 key)
         else if (key & (K_ENTER | K_A)) wm.note = NOTE_LATER;
         return 1;
     }
-    if (wm.screen == SC_STORE) {                 // the source's own Buy / Sell / Leave store
-        wm.trow = choice_move(wm.trow, 3, key);
+    if (wm.screen == SC_STORE) {       // Buy / Sell / Fitting room / Leave store
+        wm.trow = choice_move(wm.trow, 4, key);
         if (key & (K_ENTER | K_A)) {
-            if (wm.trow == 2) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; return 1; }
+            if (wm.trow == 3) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; return 1; }
+            if (wm.trow == 2) { wm.screen = SC_FIT; wm.trow = wm.ttop = 0; return 1; }
             wm.buy = (u8)(wm.trow == 0); wm.screen = SC_SHOP; wm.trow = wm.ttop = wm.cat = 0;
             wm.detail = 0; shop_refresh();
         }
+        return 1;
+    }
+    if (wm.screen == SC_FIT) {         // the source's Best fit, on one bench
+        if (save.n) {
+            wm.trow = choice_move(wm.trow, save.n, key);
+            if (key & (K_ENTER | K_A)) fit_buy();
+        }
+        if (wm.trow < wm.ttop) wm.ttop = wm.trow;
+        if (wm.trow >= wm.ttop + FIT_ROWS) wm.ttop = (u8)(wm.trow - FIT_ROWS + 1);
         return 1;
     }
     if (wm.screen == SC_OFFICE) {
         wm.trow = choice_move(wm.trow, OFFICE_ROWS, key);
         if (key & (K_ENTER | K_A)) {
             if (wm.trow == 3) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; }
-            else if (wm.trow < 2) hire(wm.trow);
+            else if (wm.trow < 2) { wm.cand = wm.trow; office_make(wm.trow); }
+            else wm.note = NOTE_LATER;           // Change name: a roster picker of its own
+        }
+        return 1;
+    }
+    if (wm.screen == SC_HIRE) {                  // the source's Hire / Quit / Check status
+        if (wm.card) { if (key) wm.card = 0; return 1; }
+        wm.trow = choice_move(wm.trow, 3, key);
+        if (key & (K_ENTER | K_A)) {
+            if (!wm.trow) office_take(wm.cand);
+            else if (wm.trow == 1) { wm.screen = SC_OFFICE; wm.trow = 0; }
+            else wm.card = 1;
         }
         return 1;
     }
@@ -799,8 +904,13 @@ u8 wm_room_pick = 1;
 #else
 #define TOWN_ROOM(office) ((void)(office), town_room())
 #endif
+// FFT's generic careers are 0x4A..0x5D; Ramza's own Squire is not one of them, and reading
+// outside the table printed rubbish on the PC and nothing on the 68000.
 static const char *job_name(u8 job)
-{ return (const char *)mgb + b16(mgb + b16(mgb + 4) + (u16)(u8)(job - 0x4A) * MG_JOB_SIZE); }
+{
+    if (job < 0x4A || job > 0x5D) return "Squire";
+    return (const char *)mgb + b16(mgb + b16(mgb + 4) + (u16)(job - 0x4A) * MG_JOB_SIZE);
+}
 // The room decompresses into the map's own strip cache: it is 32 KB and idle while a town
 // screen is up, so the rooms cost no second allocation. Each owner invalidates the other.
 // A town screen is composed once into an off-screen page of two 100-row planes, then blitted:
@@ -871,6 +981,38 @@ static void action_menu(const char *title, const char *const *labels, u8 n, u8 g
 // The disc's own labels (WORLD/WORLD.BIN's world-menu strings), not the retranslation's.
 static const char *const office_rows_text[OFFICE_ROWS] =
     { "Male fighter", "Female fighter", "Change name", "Leave store" };
+// The candidate the guildmaster has just produced: his name, his job and what the source shows
+// of him before you take him. The derived statistics belong to management's own page.
+static void candidate_card(void)
+{
+    const SaveUnit *u = &save.unit[save.n];
+    static const char *const signs[13] = { "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+        "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces", "Serpentarius" };
+    draw_rect(8, 16, 144, 62, C_BLACK);
+    draw_rect(9, 17, 142, 60, C_WHITE);
+    black(13, 20, candidate_name());
+    black(13, 29, job_name(u->job));
+    black(84, 29, u->type ? "Woman" : "Man");
+    black(13, 40, "Brave"); number(48, 40, u->brave);
+    black(76, 40, "Faith"); number(111, 40, u->faith);
+    black(13, 49, "Level"); number(48, 49, u->level);
+    black(76, 49, "Zodiac"); black(111, 49, u->zodiac < 13 ? signs[u->zodiac] : "?");
+    black(13, 66, "Any key closes");
+}
+static void hire_rows(void)
+{
+    static const char *const rows[3] = { "Hire", "Quit", "Check status" };
+    const SaveUnit *u = &save.unit[save.n];
+    ChoiceLayout *p = &office_box;
+    u8 i, w = 0;
+    for (i = 0; i < 3; i++) { u8 k = map_menu_width(rows[i]); if (k > w) w = k; }
+    p->width = (u8)(w + 12);
+    p->height = (u8)(13 + 9 * 3);
+    p->x = 24; p->y = 38;
+    choice_frame(p, candidate_name());
+    for (i = 0; i < 3; i++) choice_row(p, i, rows[i], C_BLACK);
+    (void)u;
+}
 static void office_rows(void)
 {
     ChoiceLayout *p = &office_box;
@@ -942,33 +1084,69 @@ static void shop_rows(void)
     }
     if (shop_n) scroll_marks(p, shop_n, shown);
 }
+
+// The bench itself: the party on the left, and under the cursor what the store would put on
+// that unit and what it would cost.
+static ChoiceLayout fit_box =
+    { 20, 14, 124, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+static void fit_rows(void)
+{
+    ChoiceLayout *p = &fit_box;
+    u8 r, shown = save.n - wm.ttop > FIT_ROWS ? FIT_ROWS : (u8)(save.n - wm.ttop);
+    u8 id = save.n ? best_fit(&save.unit[wm.trow]) : 0;
+    if (!save.n) shown = 1;
+    p->height = (u8)(13 + 9 * shown);
+    choice_frame(p, "Best fit");
+    if (!save.n) black((s16)(p->x + p->text_x), (s16)(p->y + p->row_y), "No one to fit");
+    for (r = 0; r < shown; r++) {
+        const SaveUnit *u = &save.unit[wm.ttop + r];
+        s16 y = (s16)(p->y + p->row_y + (u16)r * p->pitch);
+        black((s16)(p->x + p->text_x), y, identity ? unit_label(u) : job_name(u->job));
+        black((s16)(p->x + 62), y, job_name(u->job));
+    }
+    if (save.n) scroll_marks(p, save.n, shown);
+    draw_rect(20, 64, 124, 11, C_BLACK);
+    if (id) {
+        item_icon(23, 66, id);
+        text(34, 67, item_name(id), C_WHITE, 110);
+        { char d[9]; const char *n = wf_digits(d, item_price(id));
+             text((s16)(140 - 4 * (s16)strlen(n)), 67, n, C_WHITE, 142); }
+    } else text(24, 67, "The store has nothing for this one", C_WHITE, 142);
+}
 static void town_compose(void)
 {
-    static const char *const store_rows[3] = { "Buy", "Sell", "Leave store" };
+    static const char *const store_rows[4] = { "Buy", "Sell", "Fitting room", "Leave store" };
     static const char *const fur_rows[3] = { "Buy", "Sell", "Leave store" };
     u8 office = (u8)(wm.screen == SC_OFFICE);
     void *l = rt_light, *d = rt_dark;
     rt_light = page; rt_dark = page + PAGE_PLANE;
     zx0_unpack(scene_room(TOWN_ROOM(office)) + 1, page);   // the room, straight into the page
-    if (wm.screen == SC_SHOP) {
+    if (wm.screen == SC_SHOP) {          // a list screen keeps the room but takes its height
         shop_rows();
         {
             s16 left = war_funds(gil());
             u8 id = shop_n ? shop_nth(wm.trow) : 0;
             eqp_all((s16)(left - 3), id ? item_wearers(id) : 0, save.n);
         }
+    } else if (wm.screen == SC_FIT) {
+        fit_rows();
+        war_funds(gil());
     } else {
-        says(town_speaker(), "Welcome.",
-             office ? "What recruit are you after?" :
+        says(town_speaker(),
+             wm.screen == SC_HIRE ? "This one is ready." : "Welcome.",
+             office || wm.screen == SC_HIRE ? "What recruit are you after?" :
              wm.screen == SC_FUR ? "Anything from the hunt?" : "What can I do for you?");
         if (office) {
             office_rows();
             office_plates(save.n, PARTY_MAX, office_price(wm.trow < 2 ? wm.trow : 0), gil());
+        } else if (wm.screen == SC_HIRE) {
+            hire_rows();
+            office_plates(save.n, PARTY_MAX, office_price(wm.cand), gil());
         } else if (wm.screen == SC_FUR) {
             action_menu("Menu", fur_rows, 3, 0, 0);      // Buy waits on the poaching loop
             war_funds(gil());
         } else {
-            action_menu("Menu", store_rows, 3, 255, 0);
+            action_menu("Menu", store_rows, 4, 255, 0);
             war_funds(gil());
         }
     }
@@ -983,7 +1161,9 @@ static void town_page(void)
         town_compose();
     page_blit();
     if (wm.screen == SC_SHOP) { if (shop_n) choice_cursor_animated(&shop_box, (u8)(wm.trow - wm.ttop), rt_frame); }
-    else choice_cursor_animated(wm.screen == SC_OFFICE ? &office_box : &store_box, wm.trow, rt_frame);
+    else if (wm.screen == SC_FIT) { if (save.n) choice_cursor_animated(&fit_box, (u8)(wm.trow - wm.ttop), rt_frame); }
+    else choice_cursor_animated(wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? &office_box : &store_box,
+                                wm.trow, rt_frame);
 }
 
 static void town_render(void)
@@ -1003,6 +1183,7 @@ static void town_render(void)
     }
     town_page();
     if (wm.screen == SC_SHOP && wm.detail && shop_n) item_detail(shop_nth(wm.trow));
+    if (wm.screen == SC_HIRE && wm.card) candidate_card();
 }
 
 void game_render(void)
