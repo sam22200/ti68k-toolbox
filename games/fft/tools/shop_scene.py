@@ -66,14 +66,12 @@ FACE_BYTES = 168 * FACE_W * FACE_H // 2
 W, H = 160, 100                   # the whole screen: the dialogue box is drawn over the room
 # name, window origin in the source, and the grey mapping. The store is a bright room full of
 # dark goods, the office a dim one, so the percentiles that become white and black differ.
-# The user chose the 15/97 percentiles with a 1.4 gamma on 2026-11-20.
+# The user chose the store's 15/97 percentiles with a 1.4 gamma on 2026-11-20.
 VARIANTS = (
     ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
-    ('BK_FITR', 32, 8, dict(lo=15, hi=97, gamma=1.4)),
-    ('BK_FITR', 32, 8, dict(lo=35, hi=92, gamma=1.0)),
-    ('BK_FITR', 32, 8, dict(lo=45, hi=88, gamma=1.0)),
-    ('BK_FITR', 32, 8, dict(lo=35, hi=92, gamma=1.6)),
-    ('BK_FITR', 32, 8, dict(lo=40, hi=90, dither=True)),
+    # The office's stone and its near-white candles are too far apart for four flat greys: the
+    # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
+    ('BK_FITR', 4, 28, dict(lo=40, hi=90, dither=True)),
 )
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 
