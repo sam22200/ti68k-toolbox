@@ -1,5 +1,33 @@
 # Shared choice menus
 
+## The pattern every menu follows
+
+Decided with the user on 2026-11-20, after the town menu shipped too wide, with
+its glove off the screen and no room under its last row. **Every new menu obeys
+these five rules, and a menu that cannot must say in a comment why.**
+
+1. **One renderer.** `choice_frame` / `choice_row` / `choice_cursor_animated`
+   from `../choice_menu.inc`. No menu draws its own frame, rows or hand.
+2. **Width fits the labels.** `width = widest label + 12`, measured with the
+   screen's own font, never a constant chosen by eye. A menu is as wide as it
+   needs and no wider.
+3. **The same air above the first row and below the last.** With the usual
+   `body_y 7`, `row_y 12`, `pitch 9`, that is `height = 13 + 9 * rows`: five
+   pixels over the first label and five under the last. The world map's own
+   menu (`body_y 3`, `row_y 10`, `pitch 7`, `height 57` for six rows) already
+   satisfies it with seven.
+4. **The glove is wholly on screen.** The hand sprite is 32 wide and its
+   pointing tip sits at its right edge, so `x + hand_x >= 0`: with the usual
+   `hand_x -16`, the menu starts at `x >= 16`. A menu against the left edge
+   moves right rather than losing its cursor.
+5. **The glove is animated**, always: `choice_cursor_animated(layout, row,
+   rt_frame)`, never the still `choice_cursor`. A menu that does not move its
+   hand looks frozen.
+
+Disabled entries are drawn in `C_DGRAY`, as the source greys what it will not
+let you pick.
+
+
 `../choice_menu.h` and `../choice_menu.inc` share the command-window frame,
 title tab, proportional text rows, white hand and wrapping selection between
 battle, management, world map and deployment. Layout owns screen coordinates,

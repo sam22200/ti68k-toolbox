@@ -1,56 +1,104 @@
 #!/usr/bin/env python3
-"""Shop scene art candidates (FSK1): the shopkeeper's portrait and body, Ramza's body.
+"""The source's own shop and Soldier Office rooms (FSK3), four greys.
 
 usage: shop_scene.py DISC.cue OUT.bin
 
-Review art for the town/shop layout proposals (campaign/SHOP_SCENE.md). The
-shopkeeper is the disc's 40M townsperson sheet, the same one the source shows
-behind a store counter; his portrait comes from that sheet's portrait block
-exactly as common_portraits.py reads a speaker's, and his body from TYPE1 frame
-9 (idle, facing the camera) exactly as units.py reads a unit's. Ramza is RAMUZA
-frame 14 (idle, facing away), so the two face each other across the counter.
-Both bodies stay at the battle size, 16x26: the map's 67% poses are too small to
-read against a room.
+OBSERVED on the disc: MENU/BK_SHOP.TIM and MENU/BK_HONE.TIM are the rooms the
+source draws behind the store and the Soldier Office -- 256x128 16-bit TIM
+images, pre-rendered, **with their people already in them** (the shopkeeper
+behind his counter at x 130..155, his customer at x 96..118, the office clerk
+at his desk and a recruit before him). There is nothing to place: the room is
+one picture, the way a battle map is one view. BK_SHOP2/3 and BK_HONE2/3 are
+the other towns' rooms, and BK_FITR* the fitting room.
 
-FSK1: magic, u16 offsets (portrait 32x29/348 bytes, Ramza 16x26/156, shopkeeper
-16x26/156), then those records.
+Each record is a 160x100 window of the source taken at 1:1 -- the source's own
+pixels read far better in four greys than a scaled-down room -- framed to put
+both figures to the right of the menu box, and ZX0-compressed as two planes.
+The whole screen is ripped: the dialogue box is drawn over the room, and an
+empty band above it looked wrong.
+
+The grey mapping is the one the user chose on 2026-11-20 out of five: the 15th
+and 97th luminance percentiles become black and white, through a 1.4 gamma.
+
+The speaker's portrait is provisional: the shopkeeper's own event portrait has
+not been identified yet (EVENT/EVTFACE.BIN holds 32 of them, 32x48, 4bpp). The
+bank carries the 40M townsperson's battle portrait meanwhile, read exactly as
+common_portraits.py reads a speaker's.
+
+FSK3: magic, u8 rooms, one pad byte, u16 offsets (portrait 32x29/348 bytes, then
+each room's u8 height and ZX0-compressed planes), then those records. The pad
+keeps the portrait record even: the 68000 reads it as longs.
 """
 from pathlib import Path
 import struct
 import sys
 
+import numpy as np
+
 import extract
 import common_portraits
-import interface
-import units
+import zx0pack
 
 KEEPER = '40M'
-RAMZA = 'RAMUZA'
+W, H = 160, 100                   # the whole screen: the dialogue box is drawn over the room
+# name, window origin in the source, and the grey mapping. The store is a bright room full of
+# dark goods, the office a dim one, so the percentiles that become white and black differ.
+# The user chose the 15/97 percentiles with a 1.4 gamma on 2026-11-20.
+VARIANTS = (
+    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
+    ('BK_HONE', 8, 23, dict(lo=10, hi=99, gamma=1.4)),
+)
+BAYER = np.array([[0, 2], [3, 1]]) / 4.0
+
+
+def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False):
+    """One MENU/BK_*.TIM window in the runtime's colours (C_WHITE 0 .. C_BLACK 3),
+    so a dark source pixel is black."""
+    b = disc.read(*files['MENU/%s.TIM' % name])
+    _, _, _, w, h = struct.unpack_from('<IHHHH', b, 8)
+    px = np.frombuffer(b, '<u2', count=w * h, offset=20).reshape(h, w).astype(int)
+    lum = (px & 31) / 31 * .299 + (px >> 5 & 31) / 31 * .587 + (px >> 10 & 31) / 31 * .114
+    crop = lum[y0:y0 + H, x0:x0 + W]
+    crop = np.pad(crop, ((0, H - crop.shape[0]), (0, W - crop.shape[1])))
+    a, b2 = np.percentile(crop, lo), np.percentile(crop, hi)
+    n = np.clip((crop - a) / max(b2 - a, 1e-6), 0, 1) ** gamma
+    d = BAYER[np.arange(H)[:, None] % 2, np.arange(W)[None, :] % 2] if dither else .5
+    return 3 - np.clip(np.floor(n * 3 + d), 0, 3).astype(int)
+
+
+def planes(grey):
+    """The two planes the LCD wants: bit 0 of the colour is light, bit 1 is dark."""
+    out = bytearray()
+    for bit in (1, 2):
+        for row in grey:
+            for x in range(0, W, 8):
+                out.append(int(np.packbits((row[x:x + 8] & bit) != 0)[0]))
+    return bytes(out)
 
 
 def build(cue):
     disc, files = extract.disc_files(cue)
-    shp = units.shp_frames(disc.read(*files['BATTLE/TYPE1.SHP']))
-    portrait = common_portraits.portrait(disc, files, KEEPER)
-    bodies = []
-    for name, frame in ((RAMZA, 14), (KEEPER, 9)):
-        spr = disc.read(*files['BATTLE/%s.SPR' % name])
-        bodies.append(interface.planes(units.sprite(spr, shp[frame]), 16))
-    at = 10
-    head = b'FSK1'
-    for record in (portrait,) + tuple(bodies):
+    records = [common_portraits.portrait(disc, files, KEEPER)]
+    for name, x0, y0, how in VARIANTS:
+        records.append(bytes((H,)) + zx0pack.pack(planes(room(disc, files, name, x0, y0, **how))))
+    # The portrait is drawn straight from the bank by a 32-wide sprite routine, which reads
+    # longs: its record must start on an even address, so the header is padded to six bytes.
+    at = 6 + 2 * len(records)
+    head = b'FSK3' + bytes((len(VARIANTS), 0))
+    for record in records:
         head += struct.pack('>H', at)
         at += len(record)
-    out = head + portrait + b''.join(bodies)
+    out = head + b''.join(records)
     assert len(out) == at
-    return out, dict(bytes=len(out), keeper=KEEPER)
+    return out, dict(bytes=len(out), keeper=KEEPER, rooms=[len(r) for r in records[1:]])
 
 
 def main():
     cue, out = sys.argv[1], Path(sys.argv[2])
     raw, info = build(cue)
     out.write_bytes(raw)
-    print('%s: %d bytes, shopkeeper %s' % (out.name, info['bytes'], info['keeper']))
+    print('%s: %d bytes, rooms %s, shopkeeper %s' %
+          (out.name, info['bytes'], info['rooms'], info['keeper']))
 
 
 if __name__ == '__main__':

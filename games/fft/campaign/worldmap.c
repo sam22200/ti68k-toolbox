@@ -27,8 +27,8 @@
 
 enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED,
        NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
-enum { SC_MAP = 0, SC_TOWN, SC_SHOP, SC_OFFICE };   // what the screen shows
-enum { SHOP_ROWS = 7, OFFICE_ROWS = 4, ENC_MAX = 3, OFFICE_REC = 17 };
+enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_OFFICE };   // what the screen shows
+enum { SHOP_ROWS = 6, OFFICE_ROWS = 4, ENC_MAX = 3, OFFICE_REC = 17 };
 typedef struct {
     u8 at, sel;                          // Ramza's location, the chosen one
     u8 moving, leg, legs, step;          // travelling: leg of path[], its point
@@ -45,6 +45,8 @@ Save save;
 static const u8 *bank, *mgb,*breed_rules;
 static const u8 *shop,*sh_price,*sh_tier,*sh_kind,*sh_cats,*sh_lone,*sh_shop,*sh_tierflag;
 static const u8 *sh_place,*sh_office,*sh_jobs,*sh_enc;
+static const u8 *scene;                  // ffsk: the source's rooms and the speaker's portrait
+static u8 room_tag=255;
 static RtTilemap map;
 static u8 *wmcache,*idle_sprites;
 static u8 strip_tag[16];
@@ -82,6 +84,12 @@ static u8 map_menu_width(const char *s)
 #define CHOICE_TEXT(x,y,s,c,l) text(x,y,s,c,l)
 #define CHOICE_WIDTH(s) map_menu_width(s)
 #include "../choice_menu.inc"
+
+#define DLG_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#include "../dialogue_box.inc"
+#define WF_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define WF_WIDTH(s) map_menu_width(s)
+#include "../war_funds.inc"
 
 static u8 flag(u8 k) { return (u8)(save.flags[k >> 3] >> (k & 7) & 1); }
 // the story list's entry of location i (RT_NULL: none): location, flag + 1 that shows it,
@@ -322,7 +330,7 @@ void game_init(void)
     release_map();
 #endif
     wmcache=idle_sprites=RT_NULL;
-    bank = mgb = shop = RT_NULL;             // (statics survive between runs)
+    bank = mgb = shop = scene = RT_NULL;     // (statics survive between runs)
     strip_decor=decor_ready=0;
     memset(&wm, 0, sizeof wm);
     bank = rt_file("ffwm", &size);
@@ -341,6 +349,9 @@ void game_init(void)
         // A TI variable reports its trailing tag bytes too: the bank must fit, not match.
         if ((u16)(sh_enc + 2 * ENC_MAX * LOC_N - shop) > size) shop = RT_NULL;
     } else shop = RT_NULL;
+    scene = rt_file("ffsk", &size);
+    if (scene && (memcmp(scene, "FSK3", 4) || scene[4] < 2)) scene = RT_NULL;
+    room_tag = 255;
     breed_rules=rt_file("ffwb",&size);
     if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
@@ -391,16 +402,24 @@ static u8 leave(u16 result)
 static u8 town_update(u32 key)
 {
     if (key & (K_ESC | K_B)) {
-        wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP : SC_TOWN);
+        wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP : wm.screen == SC_SHOP ? SC_STORE : SC_TOWN);
         wm.trow = wm.ttop = 0;
         return 1;
     }
     if (wm.screen == SC_TOWN) {
         wm.trow = choice_move(wm.trow, 3, key);
         if (key & (K_ENTER | K_A)) {
-            wm.screen = (u8)(wm.trow == 2 ? SC_MAP : wm.trow ? SC_OFFICE : SC_SHOP);
+            wm.screen = (u8)(wm.trow == 2 ? SC_MAP : wm.trow ? SC_OFFICE : SC_STORE);
             wm.trow = wm.ttop = 0; wm.buy = 1;
-            if (wm.screen == SC_SHOP) shop_refresh();
+        }
+        return 1;
+    }
+    if (wm.screen == SC_STORE) {                 // the source's own Buy / Sell / Leave store
+        wm.trow = choice_move(wm.trow, 3, key);
+        if (key & (K_ENTER | K_A)) {
+            if (wm.trow == 2) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; return 1; }
+            wm.buy = (u8)(wm.trow == 0); wm.screen = SC_SHOP; wm.trow = wm.ttop = 0;
+            shop_refresh();
         }
         return 1;
     }
@@ -671,65 +690,111 @@ static void map_background(s16 cx,s16 cy,u8 decor)
 }
 
 // ------------------------------------------------- the town's screens
-// One frame, one list: the same geometry for the three screens, so the shop's six rows, the
-// office's four and the town's three share one layout and one cursor.
-static const ChoiceLayout town_list = { 16, 16, 0, 0, 0, CHOICE_BARE, 0, 0, 0, 0, 0, 9, 152, -26, -3 };
-static s16 right32(s16 x, s16 y, u32 n)          // gil goes past a u16 long before the cap
-{
-    char b[9];
-    u8 k = 8;
-    b[k] = 0;
-    do { b[--k] = (char)('0' + (u8)(n % 10)); n /= 10; } while (n);
-    return black((s16)(x - 4 * (8 - k)), y, b + k);
-}
+// The source's own arrangement: its room behind everything (ffsk, tools/shop_scene.py: the
+// disc's MENU/BK_SHOP.TIM and BK_HONE.TIM, people included), the shared dialogue box at the
+// top, the shared action menu at the left and the shared War Funds plate at the bottom right.
+// Every menu obeys CHOICE_MENU.md's five rules.
+static const u8 *scene_part(u8 k) { return scene + b16(scene + 6 + 2 * k); }
+#define MG_JOB_SIZE 32
 static const char *job_name(u8 job)
-{ return (const char *)mgb + b16(mgb + b16(mgb + 4 + 2 * 0) + (u16)(u8)(job - 0x4A) * 32); }
-
-// The cleared screen is already the panel's inside: its border is four thin rectangles, not
-// two full-screen fills (which cost about 130k cycles a frame on the 68000 for nothing).
-static void town_frame(const char *title)
+{ return (const char *)mgb + b16(mgb + b16(mgb + 4) + (u16)(u8)(job - 0x4A) * MG_JOB_SIZE); }
+// The room decompresses into the map's own strip cache: it is 32 KB and idle while a town
+// screen is up, so the rooms cost no second allocation. Each owner invalidates the other.
+static void room_draw(u8 which)
 {
-    draw_clear();
-    draw_rect(0, 0, 160, 1, C_BLACK); draw_rect(0, 99, 160, 1, C_BLACK);
-    draw_rect(0, 1, 1, 98, C_BLACK); draw_rect(159, 1, 1, 98, C_BLACK);
-    draw_rect(2, 2, 156, 1, C_LGRAY);
-    black(6, 4, title);
-    right32(154, 4, gil());
-    draw_rect(4, 12, 152, 1, C_BLACK);
+    s16 y;
+    if (!scene || !wmcache) { draw_clear(); return; }
+    if (room_tag != which) {
+        zx0_unpack(scene_part((u8)(which + 1)) + 1, wmcache);
+        room_tag = which;
+        memset(strip_tag, 255, sizeof strip_tag);
+    }
+    for (y = 0; y < 100; y++) {
+        memcpy((u8 *)rt_light + (u16)y * RT_PBYTES, wmcache + (u16)y * 20, 20);
+        memcpy((u8 *)rt_dark + (u16)y * RT_PBYTES, wmcache + 2000 + (u16)y * 20, 20);
+    }
+}
+static void says(const char *name, const char *first, const char *second)
+{
+    s16 x = DLG_FACE_W + 4;
+    u8 w = (u8)(map_menu_width(first) + 10), k = (u8)(map_menu_width(second) + 10);
+    if (k > w) w = k;
+    dlg_name(x, 1, (u8)(map_menu_width(name) + 8), name, 0);
+    dlg_frame(x, 13, w, 20, 0);
+    text(x + 4, 17, first, C_WHITE, 156);
+    text(x + 4, 24, second, C_WHITE, 156);
+    dlg_face(scene_part(0), 1, 1, 0);
+}
+// CHOICE_MENU.md: one renderer, a width fitted to the labels, the same five pixels above the
+// first row and below the last, the glove wholly on screen, the glove animated.
+static void action_menu(const char *title, const char *const *labels, u8 n, u8 grey)
+{
+    ChoiceLayout p = { 24, 36, 0, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    u8 i, w = 0;
+    for (i = 0; i < n; i++) { u8 k = map_menu_width(labels[i]); if (k > w) w = k; }
+    p.width = (u8)(w + 12);
+    p.height = (u8)(13 + 9 * n);
+    choice_frame(&p, title);
+    for (i = 0; i < n; i++) choice_row(&p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
+    choice_cursor_animated(&p, wm.trow, rt_frame);
+}
+static void office_rows(void)
+{
+    ChoiceLayout p = { 24, 36, 104, 49, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    u8 r;
+    choice_frame(&p, "Hire");
+    for (r = 0; r < OFFICE_ROWS; r++) {
+        s16 y = (s16)(p.y + p.row_y + (u16)r * p.pitch);
+        black((s16)(p.x + p.text_x), y, job_name(office_job(r)));
+        black((s16)(p.x + p.text_x + 42), y, office_sex(r) ? "Woman" : "Man");
+        right((s16)(p.x + p.width - 4), y, office_price(r));
+    }
+    choice_cursor_animated(&p, wm.trow, rt_frame);
+}
+static void shop_rows(void)
+{
+    ChoiceLayout p = { 24, 12, 112, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    u8 r, shown = shop_n - wm.ttop > SHOP_ROWS ? SHOP_ROWS : (u8)(shop_n - wm.ttop);
+    if (!shop_n) shown = 1;
+    p.height = (u8)(13 + 9 * shown);
+    choice_frame(&p, wm.buy ? "Buy" : "Sell");
+    if (!shop_n) black((s16)(p.x + p.text_x), (s16)(p.y + p.row_y), wm.buy ? "Nothing here" : "Nothing to sell");
+    for (r = 0; r < shown; r++) {
+        u8 id = shop_nth((u8)(wm.ttop + r));
+        s16 y = (s16)(p.y + p.row_y + (u16)r * p.pitch);
+        black((s16)(p.x + p.text_x), y, item_name(id));
+        if (!wm.buy) number((s16)(p.x + 62), y, save.inv[id]);
+        right((s16)(p.x + p.width - 4), y, wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
+    }
+    if (shop_n) choice_cursor_animated(&p, (u8)(wm.trow - wm.ttop), rt_frame);
 }
 
 static void town_render(void)
 {
-    static const char *const town_rows[] = { "Shop", "Soldier Office", "Leave" };
-    u8 r;
+    static const char *const town_rows[3] = { "Shop", "Soldier Office", "Leave" };
+    static const char *const store_rows[3] = { "Buy", "Sell", "Leave store" };
+    u8 office = (u8)(wm.screen == SC_OFFICE);
     if (wm.screen == SC_TOWN) {
-        town_frame(loc_name(wm.at));
-        for (r = 0; r < 3; r++) choice_row(&town_list, r, town_rows[r], C_BLACK);
-        choice_cursor_animated(&town_list, wm.trow, rt_frame);
-    } else if (wm.screen == SC_OFFICE) {
-        town_frame("Soldier Office");
-        for (r = 0; r < OFFICE_ROWS; r++) {
-            s16 y = (s16)(town_list.y + (u16)r * town_list.pitch);
-            black(town_list.x, y, job_name(office_job(r)));
-            black((s16)(town_list.x + 46), y, office_sex(r) ? "Woman" : "Man");
-            right(140, y, office_price(r));
-        }
-        choice_cursor_animated(&town_list, wm.trow, rt_frame);
-        black(16, 88, save.n < PARTY_MAX ? "ENTER hires" : "Party full");
-    } else {
-        u8 n = shop_n;
-        town_frame(wm.buy ? "Shop - Buy" : "Shop - Sell");
-        for (r = 0; r < SHOP_ROWS && wm.ttop + r < n; r++) {
-            u8 id = shop_nth((u8)(wm.ttop + r));
-            s16 y = (s16)(town_list.y + (u16)r * town_list.pitch);
-            black(town_list.x, y, item_name(id));
-            if (!wm.buy) { black(104, y, "x"); number(110, y, save.inv[id]); }
-            right(140, y, wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
-        }
-        if (n) choice_cursor_animated(&town_list, (u8)(wm.trow - wm.ttop), rt_frame);
-        else black(town_list.x, town_list.y, wm.buy ? "Nothing in stock" : "Nothing to sell");
-        black(16, 88, "LEFT/RIGHT buy or sell");
+        s16 cx = (s16)(wm.x - 80), cy = (s16)(wm.y - 50);
+        rt_clamp_cam(&map, &cx, &cy);
+        map_background(cx, cy, 1);
+        ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
+        room_tag = 255;                       // the strips have taken the shared buffer back
+        draw_rect(0, 0, 160, 11, C_WHITE); draw_rect(0, 11, 160, 1, C_BLACK);
+        black(4, 2, loc_name(wm.at));
+        action_menu("Town", town_rows, 3, 255);
+        war_funds(gil());
+        return;
     }
+    room_draw(office);
+    // The list screen keeps the room but gives its rows the whole height, as the source does.
+    if (wm.screen == SC_SHOP) shop_rows();
+    else {
+        says("Shopkeeper", "Welcome.",
+             office ? "Looking for a soldier?" : "What can I do for you?");
+        if (office) office_rows(); else action_menu("Menu", store_rows, 3, 255);
+    }
+    war_funds(gil());
 }
 
 void game_render(void)
@@ -738,6 +803,7 @@ void game_render(void)
     u8 i;
     if (!bank || !mgb) { draw_clear(); draw_text(4, 40, "Missing ffwm / ffmg", 0, C_BLACK); return; }
     if (wm.screen) { town_render(); if (!wm.note) return; }
+    room_tag = 255;                 // the map is about to take the shared buffer back
     cx = (s16)((wm.moving?wm.x:wm.handx) - 80); cy = (s16)((wm.moving?wm.y:wm.handy) - 50);
     rt_clamp_cam(&map, &cx, &cy);
     map_background(cx,cy,1);
@@ -749,6 +815,7 @@ void game_render(void)
     }
     draw_rect(0, 91, 160, 9, C_WHITE); draw_rect(0, 90, 160, 1, C_BLACK);
     black(3, 93, wm.sel==255?"Move cursor":loc_name(wm.sel));
+    war_funds(gil());               // the same plate as the town screens
     {
         static const char months[12][4]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
         char date[7];u8 day=save.world.day;

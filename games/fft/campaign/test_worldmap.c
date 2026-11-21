@@ -61,7 +61,8 @@ int main(void)
     sw_init(0); assert(sw_step(0));
     assert(shop && shop_type() == 1 && sh_place[24] == 2);   // Gariland a town, Mandalia a field
     assert(sw_step(K_ENTER) && wm.screen == SC_TOWN);        // its services, not its won battle
-    assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_SHOP && wm.buy);
+    assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_STORE);     // Shop
+    assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_SHOP && wm.buy);   // Buy
     {
         u8 dagger = shop_nth(0), i, n = shop_n;
         assert(n == 10 && item_price(dagger) == 100);        // the guide's Gariland stock
@@ -75,7 +76,8 @@ int main(void)
         assert(sw_step(0) && sw_step(K_ENTER));
         assert(gil() == 50 && !save.inv[dagger] && !shop_n && !wm.trow);
     }
-    assert(sw_step(K_ESC) && wm.screen == SC_TOWN);
+    assert(sw_step(K_ESC) && wm.screen == SC_STORE);
+    assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_TOWN);
     assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0));
     assert(sw_step(K_ENTER) && wm.screen == SC_OFFICE && wm.trow == 0);
     {

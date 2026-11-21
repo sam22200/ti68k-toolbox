@@ -1,142 +1,86 @@
-// Town/shop layout candidates for the user's visual decision (SHOP_SCENE.md). PC only: no
-// shipping behaviour, no save write. The art is the disc's own (ffsk, tools/shop_scene.py):
-// the 40M townsperson's portrait and body for the shopkeeper, RAMUZA's body for Ramza.
+// The town's screens in the source's own arrangement, for the user's visual decision
+// (SHOP_SCENE.md). PC only: no shipping behaviour, no save write.
+// The room is the disc's own picture (ffsk, tools/shop_scene.py): MENU/BK_SHOP.TIM and
+// MENU/BK_HONE.TIM already contain the shopkeeper, the clerk and their customers, so nothing
+// is placed on top of them, and only the 66 rows the dialogue box leaves visible are ripped.
+// The dialogue box, the menu and the War Funds plate are the campaign's shared ones
+// (dialogue_box.inc, choice_menu.inc, war_funds.inc).
 #include "worldmap.c"
-#include "../portrait32.inc"
+#define DLG_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#include "../dialogue_box.inc"
+#define WF_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define WF_WIDTH(s) map_menu_width(s)
+#include "../war_funds.inc"
 #include "../../../runtime/platform-sw/rt_sw.h"
 #include "fixture_save.h"
 
+enum { ROOM_W = 160, ROOM_TOP = 0 };             // the room fills the screen; the box sits on it
 static const u8 *sk;
-static const u8 *sk_part(u8 k) { return sk + b16(sk + 4 + 2 * k); }
-static void body(u8 which, s16 x, s16 y)            // 0 Ramza, 1 the shopkeeper
+static u8 *picture;
+static const u8 *sk_part(u8 k) { return sk + b16(sk + 6 + 2 * k); }
+static void show_room(u8 which)
 {
-    const u8 *p = sk_part((u8)(which + 1));
-    u16 rows[3][26];
-    u8 i, j;
-    RtSprite sp = { 16, 26, rows[0], rows[1], rows[2] };
-    for (i = 0; i < 3; i++) for (j = 0; j < 26; j++) rows[i][j] = b16(p + i * 52 + 2 * j);
-    draw_sprite(x, y, &sp);
-}
-// A back wall of shelves and a counter, drawn natively: a readable suggestion of the source
-// room, not a rip of it.
-static void shelves(s16 x, s16 y, s16 w, s16 h)
-{
-    s16 r, c;
-    draw_rect(x, y, w, h, C_WHITE);
-    for (r = 0; r + 9 <= h; r += 9) {
-        draw_rect(x, y + r + 8, w, 1, C_DGRAY);
-        for (c = 0; c + 11 <= w; c += 11) draw_rect(x + 3 + c, y + r + 3, 4, 5, C_LGRAY);
+    const u8 *rec = sk_part((u8)(which + 1));
+    u8 h = rec[0];
+    s16 y;
+    zx0_unpack(rec + 1, picture);
+    for (y = 0; y < h && ROOM_TOP + y < 100; y++) {
+        memcpy((u8 *)rt_light + (u16)(ROOM_TOP + y) * RT_PBYTES, picture + (u16)y * 20, 20);
+        memcpy((u8 *)rt_dark + (u16)(ROOM_TOP + y) * RT_PBYTES, picture + (u16)h * 20 + (u16)y * 20, 20);
     }
 }
-static void counter(s16 x, s16 y, s16 w)
+// The shared dialogue look, at the top of the screen as the source puts it in a store.
+static void says(const char *name, const char *first, const char *second)
 {
-    draw_rect(x, y, w, 10, C_LGRAY);
-    draw_rect(x, y, w, 1, C_BLACK); draw_rect(x, y + 9, w, 1, C_BLACK);
-    draw_rect(x, y + 1, w, 3, C_WHITE);
+    s16 x = DLG_FACE_W + 4;
+    u8 w = (u8)(map_menu_width(second ? second : first) + 10);
+    if (w < map_menu_width(first) + 10) w = (u8)(map_menu_width(first) + 10);
+    dlg_name(x, 1, (u8)(map_menu_width(name) + 8), name, 0);
+    dlg_frame(x, 13, w, (u8)(6 + 7 * (second ? 2 : 1)), 0);
+    text(x + 4, 17, first, C_WHITE, 156);
+    if (second) text(x + 4, 24, second, C_WHITE, 156);
+    dlg_face(sk_part(0), 1, 1, 0);
 }
-// The town seen from its gate: roofs, walls and windows, same native treatment.
-static void town_view(s16 x, s16 y, s16 w, s16 h)
+static u8 rows_width(const char *const *labels, u8 n)
 {
-    s16 c, k = 0;
-    draw_rect(x, y, w, h, C_WHITE);
-    for (c = 0; c + 24 <= w; c += 24, k++) {
-        s16 bh = (s16)(h - 4 - (k & 1 ? 8 : 0)), top = (s16)(y + h - bh);
-        draw_rect(x + c + 2, top, 20, bh, C_LGRAY);
-        draw_rect(x + c + 2, top, 20, 2, C_BLACK);
-        draw_rect(x + c + 5, top + 6, 4, 5, C_DGRAY);
-        draw_rect(x + c + 13, top + 6, 4, 5, C_DGRAY);
-    }
-    draw_rect(x, y + h - 1, w, 1, C_BLACK);
+    u8 i, w = 0;
+    for (i = 0; i < n; i++) { u8 k = map_menu_width(labels[i]); if (k > w) w = k; }
+    return (u8)(w + 12);
 }
-static void room(s16 y, s16 h, u8 town)       // the picture, with its two actors
+// The shared menu, narrowed to its labels and pushed right so the glove is wholly on screen.
+static void action_menu(const char *title, const char *const *labels, u8 n, u8 grey)
 {
-    if (town) { town_view(0, y, 160, h); body(0, 70, (s16)(y + h - 26)); return; }
-    shelves(0, y, 160, (s16)(h - 14));
-    body(1, 120, (s16)(y + h - 42));
-    counter(0, (s16)(y + h - 14), 160);
-    body(0, 86, (s16)(y + h - 26));
-}
-static void funds(s16 y)
-{
-    black(92, y, "War Funds"); right32(156, y, gil());
-}
-// A shop has a speaker and his portrait; a town has none, only its name.
-static void greeting(s16 x, s16 y, u8 town, const char *line)
-{
-    if (town) { black(x, y, loc_name(wm.at)); black(x, (s16)(y + 9), "Where to?"); return; }
-    black(x, y, "Shopkeeper"); black(x, (s16)(y + 9), line);
-}
-static const char *const menu_rows[3] = { "Buy", "Sell", "Leave store" };
-static const char *const town_rows[3] = { "Shop", "Soldier Office", "Leave" };
-static void rows3(s16 x, s16 y, u8 town)
-{
-    const char *const *labels = town ? town_rows : menu_rows;
-    u8 r;
-    for (r = 0; r < 3; r++) black(x, (s16)(y + 9 * r), labels[r]);
-    choice_hand_at((s16)(x - 26), (s16)(y - 3));
-}
-static void items(s16 x, s16 y, u8 n, s16 price_at)
-{
-    u8 r;
-    for (r = 0; r < n; r++) {
-        u8 id = shop_nth(r);
-        black(x, (s16)(y + 9 * r), item_name(id));
-        right(price_at, (s16)(y + 9 * r), item_price(id));
-    }
-    choice_hand_at((s16)(x - 26), (s16)(y - 3));
-}
-static void border(const char *title)
-{
-    draw_rect(0, 0, 160, 1, C_BLACK); draw_rect(0, 99, 160, 1, C_BLACK);
-    draw_rect(0, 0, 1, 100, C_BLACK); draw_rect(159, 0, 1, 100, C_BLACK);
-    black(6, 4, title); right32(154, 4, gil());
-    draw_rect(4, 12, 152, 1, C_BLACK);
+    ChoiceLayout p = { 24, 36, 0, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    u8 i;
+    p.width = rows_width(labels, n);
+    p.height = (u8)(13 + 9 * n);        // CHOICE_MENU.md: the same five rows above and below
+    choice_frame(&p, title);
+    for (i = 0; i < n; i++) choice_row(&p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
+    choice_cursor_animated(&p, 0, rt_frame);
 }
 
-// ---------------------------------------------------------------- the five candidates
-static void variant(u8 v, u8 town)
+static void screen(u8 v)
 {
+    static const char *const store[4] = { "Buy", "Sell", "Fitting room", "Leave store" };
+    static const char *const office[4] = { "Hire", "Dismiss", "Rename", "Leave office" };
+    static const char *const town[3] = { "Shop", "Soldier Office", "Leave" };
     draw_clear();
-    switch (v) {
-    case 0:                      // 1. the source's own: portrait and words, menu over the picture
-        room(34, 50, town);
-        draw_rect(0, 0, 160, 33, C_WHITE); draw_rect(0, 33, 160, 1, C_BLACK);
-        if (!town) portrait32(sk_part(0), 2, 2);
-        greeting(town ? 6 : 38, town ? 8 : 4, town, "What can I do for you?");
-        panel(4, 40, 76, 40);
-        rows3(32, 48, town);
-        funds(90);
-        break;
-    case 1:                      // 2. a picture band over the list
-        room(0, 38, town);
-        draw_rect(0, 38, 160, 1, C_BLACK);
-        if (town) rows3(44, 52, 1); else items(30, 44, 5, 140);
-        funds(90);
-        break;
-    case 2:                      // 3. the list, with the counter kept in a side column
-        border(town ? loc_name(wm.at) : "Shop - Buy");
-        draw_rect(103, 13, 1, 86, C_BLACK);
-        if (town) { town_view(104, 14, 55, 50); body(0, 124, 38); }
-        else { shelves(104, 14, 55, 34); body(1, 136, 30); counter(104, 58, 55); body(0, 110, 46); }
-        if (town) rows3(44, 26, 1); else items(18, 18, 7, 98);
-        break;
-    case 3:                      // 4. an arrival picture first, the plain list after it
-        room(0, 62, town);
-        draw_rect(0, 62, 160, 38, C_WHITE); draw_rect(0, 62, 160, 1, C_BLACK);
-        if (!town) portrait32(sk_part(0), 2, 66);
-        greeting(town ? 6 : 38, town ? 70 : 66, town, "Welcome.");
-        black(town ? 6 : 38, 88, town ? "ENTER opens the menu" : "ENTER opens the shop");
-        break;
-    default:                     // 5. portrait and menu, with a small picture beside them
-        border(town ? loc_name(wm.at) : "Shop");
-        if (!town) portrait32(sk_part(0), 3, 15);
-        greeting(town ? 6 : 40, town ? 18 : 16, town, "What now?");
-        rows3(44, 48, town);
-        if (town) { town_view(100, 40, 58, 40); body(0, 120, 56); }
-        else { shelves(100, 40, 58, 26); body(1, 136, 44); counter(100, 70, 58); body(0, 104, 56); }
-        funds(90);
-        break;
+    if (v == 2) {                               // the town's own menu, over the world map
+        s16 cx = (s16)(wm.x - 80), cy = (s16)(wm.y - 50);
+        rt_clamp_cam(&map, &cx, &cy);
+        map_background(cx, cy, 1);
+        ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
+        draw_rect(0, 0, 160, 11, C_WHITE); draw_rect(0, 11, 160, 1, C_BLACK);
+        black(4, 2, loc_name(wm.at));
+        action_menu("Town", town, 3, 255);
+    } else {
+        u8 office_room = v == 1;
+        show_room(v);
+        says("Shopkeeper", "Welcome.",
+             office_room ? "Looking for a soldier?" : "What can I do for you?");
+        action_menu("Menu", office_room ? office : store, 4, 2);
     }
+    war_funds(gil());
 }
 
 int main(int argc, char **argv)
@@ -150,16 +94,16 @@ int main(int argc, char **argv)
     f = fopen(argv[2], "rb"); if (!f) return 4;
     if (!read_save_fixture(f, &save)) return 5;
     fclose(f);
-    sk = rt_file("ffsk", &size); if (!sk || memcmp(sk, "FSK1", 4)) return 6;
+    sk = rt_file("ffsk", &size); if (!sk || memcmp(sk, "FSK3", 4)) return 6;
+    picture = malloc(2 * ROOM_W * 100 / 8); if (!picture) return 7;
     game_scenario(0);
-    wm.at = 6; wm.buy = 1; shop_refresh();
-    for (v = 0; v < 5; v++) {
-        variant(v, 0);
-        snprintf(path, sizeof path, "%s/shop-%u-store.png", argv[1], v + 1);
-        if (sw_write_png(path, 1)) return 7;
-        variant(v, 1);
-        snprintf(path, sizeof path, "%s/shop-%u-town.png", argv[1], v + 1);
-        if (sw_write_png(path, 1)) return 7;
+    wm.at = 6; wm.x = loc_x(6); wm.y = loc_y(6); wm.tick = 4;
+    for (v = 0; v < 3; v++) {
+        static const char *const names[3] = { "shop-store", "shop-office", "shop-town" };
+        screen(v);
+        snprintf(path, sizeof path, "%s/%s.png", argv[1], names[v]);
+        if (sw_write_png(path, 1)) return 8;
     }
+    free(picture);
     return 0;
 }

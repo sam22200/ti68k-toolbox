@@ -983,6 +983,18 @@ Unarchive first and archive after if needed, as above.
   hard-coded AMS offsets (embed or pre-render your own, §2), ExtGraph 1.x colour values (§3).
 - Heavy maths loops: C first. Only consider 68000 ASM after profiling, and **ask first** (project rule).
 
+### A sprite read in place from a bank must start on an even address (verified, 2026-11-20)
+
+ExtGraph's wide sprite routines read their planes as longs. A 32-wide portrait
+drawn straight out of an archived bank (`RtSprite sp = {32, 29, p, p+116,
+p+232}`) therefore needs `p` even, and `p` is the bank's base plus the record's
+offset. The FFT town bank's header was `"FSK3"` plus a one-byte room count plus
+u16 offsets: 9 bytes, so the portrait landed odd and the 68000 took an address
+error on the first frame that drew it -- while the PC build, which copies the
+rows through `RD32`, was perfectly happy. **Pad such a header to an even length
+and keep every record that is read in place even.** `ti-cycles` reports it as
+`CPU exception`; `make xcheck` catches it, a PC run never will.
+
 ### Data-variable names when packaging banks (2026-10-18)
 
 Verified from the generated TI headers and a `ti-cycles` VAT lookup: the final
