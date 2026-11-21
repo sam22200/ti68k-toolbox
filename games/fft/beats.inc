@@ -43,7 +43,8 @@ static u8 opening_find(u8 event)
 
 // A known speaker's portrait (ffcp, tools/common_portraits.py: names, then 32x29 portraits),
 // at the bottom left of the dialogue; pgfx is the includer's (RT_NULL: none). 0xFF: none.
-#define DLG_FACE_W 20                   // its outlined art is 19 pixels wide; 22 with frame and gap
+#define DLG_TEXT(x,y,s,c,l) ui_text(x,y,s,c,l)
+#include "dialogue_box.inc"
 static u8 opening_face(const char *name)
 {
     const u8 *p;u8 n;
@@ -57,21 +58,7 @@ static u8 opening_face(const char *name)
     return 0xFF;
 }
 static void opening_face_draw(u8 face,s16 x)   // x: its frame's left, beside the box
-{
-    const u8 *q=pgfx+RD16(pgfx,2)+(u16)face*348;
-    {
-#ifdef __m68k__
-        RtSprite sp={32,29,q,q+116,q+232};
-#else
-        u32 rows[3][29];u8 k,r;
-        RtSprite sp={32,29,rows[0],rows[1],rows[2]};
-        for(k=0;k<3;k++)for(r=0;r<29;r++)rows[k][r]=RD32(q+k*116,r*2);
-#endif
-        draw_rect(x,RT_H-31,DLG_FACE_W+1,31,st.open_white?C_BLACK:C_WHITE);   // the box's frame
-        draw_rect(x+1,RT_H-30,DLG_FACE_W-1,30,st.open_white?C_WHITE:C_BLACK);
-        draw_sprite(x,RT_H-29,&sp);
-    }
-}
+{dlg_face(pgfx+RD16(pgfx,2)+(u16)face*348,x,RT_H-31,st.open_white);}
 
 // Fit words with the actual canonical glyph advances; six lines maximum, with
 // a continuation page instead of truncation. The box has no spare bottom rows.
@@ -199,24 +186,8 @@ static void opening_dialog_draw(void)
     for(col=0;name[col];col++)nw+=UI_SHARED(ADV)[(u8)name[col]-32];
     if(nw>156)nw=156;
     if(cold){
-        draw_rect(x,y,w,h,st.open_white?C_BLACK:C_WHITE);
-        draw_rect(x+1,y+1,w-2,h-2,st.open_white?C_WHITE:C_BLACK);
-        // Word masks apply the ordered gradient without a per-pixel loop.
-        for(row=2;row<5;row++){
-            u16 pat=row<2?0xFFFF:row==2?0xAAAA:row==3?0x8888:0;
-            u8 first=(u8)((x+2)>>4),last=(u8)((x+w-3)>>4),word;
-            u16 left=(u16)(0xFFFFU>>((x+2)&15)),right=(u16)(0xFFFFU<<(15-((x+w-3)&15)));
-            u8 *l=(u8*)rt_light+(y+row)*RT_PBYTES;
-            for(word=first;word<=last;word++){
-                u16 mask=pat&(word==first?left:0xFFFF)&(word==last?right:0xFFFF);
-                RMW16(l+2*word,mask,st.open_white?mask:0);
-            }
-        }
-        if(*name){                      // (an anonymous line: no name box)
-            draw_rect(x,y-11,nw,11,st.open_white?C_BLACK:C_WHITE);
-            draw_rect(x+1,y-10,nw-2,10,st.open_white?C_WHITE:C_BLACK);
-            ui_text(x+4,y-8,name,st.open_white?C_BLACK:C_WHITE,156);
-        }
+        dlg_frame(x,y,w,h,st.open_white);
+        if(*name)dlg_name(x,(s16)(y-11),(u8)nw,name,st.open_white);   // (anonymous: no name box)
     }
     if(cold||W->dialog_drawn!=st.open_reveal||W->dialog_part<W->dialog_n){
         for(row=0;row<W->dialog_n;row++){
