@@ -1,50 +1,53 @@
-# The town and the shop: five layout candidates
+# The town's screens: the source's own arrangement
 
-2026-11-20, awaiting the user's visual decision. The shop and the Soldier
-Office ship as plain lists ([TOWN_SERVICES.md](TOWN_SERVICES.md)); the source
-shows a room instead -- a shopkeeper behind his counter, Ramza in front of it,
-the speaker's portrait over a line of dialogue, the menu on the left and the
-War Funds at the bottom right. The user asked for at least **Ramza, the
-shopkeeper and perhaps the counter**, and for several candidates to choose
-from.
+2026-11-20. The user asked for the original's layout, not a candidate of our
+own: the shopkeeper's portrait over a dialogue box at the top, a battle-style
+action menu at the bottom left (Buy / Sell / Fitting room / Leave store), the
+War Funds at the bottom right, and the source's own room behind all of it.
 
-## The art
+## The room is a picture, not a scene to build
 
-`tools/shop_scene.py` writes `ffsk` (FSK1, 670 bytes), review art for now:
+OBSERVED on the disc: **`MENU/BK_SHOP.TIM`**, **`MENU/BK_HONE.TIM`** (the
+Soldier Office) and **`MENU/BK_FITR.TIM`** (the fitting room) are 256x128
+16-bit TIM images, pre-rendered, and **they already contain their people** --
+the shopkeeper leaning on his counter and a customer in front of it, the office
+clerk at his desk and a recruit before him. `BK_*2` and `BK_*3` are the other
+towns' rooms.
 
-- the **shopkeeper's portrait**, 32x29, read from the disc's `40M` townsperson
-  sheet exactly as `common_portraits.py` reads a speaker's (the portrait block
-  at 0x8200, rotated, scaled, greyed by luminance, outlined). `40M` is the
-  middle-aged man the source shows behind a store counter.
-- the **shopkeeper's body**, `40M` TYPE1 frame 9 (idle, facing the camera), and
-  **Ramza's**, `RAMUZA` frame 14 (idle, facing away), both through
-  `units.sprite` at the battle size 16x26 so the two face each other across the
-  counter. The map's 67% poses are too small to read against a room.
+So there is nothing to place on top: the room is one picture, the way a battle
+map is one view, and no sprite rip, no isometric renderer and no second
+orientation are involved. This replaces the earlier plan of drawing a room
+natively and standing two 16x26 bodies in it.
 
-The room itself is drawn natively -- shelves, goods, a counter, and for a town
-roofs and windows. It suggests the source's room; it does not rip it. Nothing
-here is isometric: at 160x100 an isometric interior costs far more than it
-reads.
+`tools/shop_scene.py` takes a **160x100 window of the source at 1:1** (the
+source's own pixels read far better in four greys than a scaled-down room),
+frames it so the shopkeeper and his counter fall to the right of the menu box,
+maps it to four greys between two measured luminance percentiles -- the store
+is a bright room full of dark goods, the office a dim one, so each has its own
+pair -- and ZX0-compresses the two planes. `ffsk` (FSK2) is about 5 KB for both
+rooms and the portrait.
 
-## The candidates
+The **town's own menu stays over the world map**, as the source keeps it over
+its world map: there is no town picture to rip, and none is needed.
 
-Rendered by `preview_shop.c` (`make shop-review`), PC only, no shipping
-behaviour and no save write. Each is rendered twice, for a shop and for a town
-(a town has no speaker, so it shows its own name instead of a portrait).
+## The portrait is not settled
 
-| # | shop | town |
-| --- | --- | --- |
-| 1 | portrait and dialogue band on top, the room below, the menu over it, War Funds bottom right -- the source's own arrangement | the town seen from its gate under the same band |
-| 2 | a picture band on top, the item list underneath | the picture band over the three-row menu |
-| 3 | the item list on the left, the counter kept in a narrow right-hand column | the menu left, the town in the right-hand column |
-| 4 | a full arrival picture with a caption band, ENTER then opens the plain list | the same for the town |
-| 5 | the portrait and the words on top, the menu on the left, a small picture beside it | the same without a portrait |
+The user was right to ask. The bank currently carries the **40M townsperson's
+battle portrait**, read exactly as `common_portraits.py` reads a speaker's.
+That was an informed guess, not an identification, and the office clerk is
+plainly a different man (bald, where 40M is bearded).
 
-Candidate 1 is the closest to the original and the only one that keeps the
-menu over the picture. Candidate 4 costs an extra key press but leaves the
-working screens exactly as they are today. Candidates 2, 3 and 5 keep one
-screen and give the picture a fixed share of it.
+The real bank is **`EVENT/EVTFACE.BIN`**: one 4bpp TIM whose pixels are stored
+as a 32-pixel-wide column, 32 faces of 32x48 with 16 CLUTs. It is decoded and
+its faces are legible, but which index the store and the office use, and which
+CLUT goes with each face, are still open. Until that is answered the portrait
+in the bank is a placeholder and the office borrows the store's speaker.
 
-Known rough edges of the review renders, to fix once a candidate is chosen:
-candidate 5 prints the town's name twice, and the pictures use placeholder
-spacing rather than the source's framing.
+## Still to frame
+
+The store room reads; the office room's window still puts its clerk in an
+awkward band and wants another pass.
+
+`make shop-review` renders `x/shop-review/shop-store.png`,
+`shop-office.png` and `shop-town.png` through `preview_shop.c` (PC only, no
+shipping behaviour, no save write).
