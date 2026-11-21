@@ -769,6 +769,29 @@ static void page_blit(void)
         memcpy((u8 *)rt_dark + (u16)y * RT_PBYTES, page + PAGE_PLANE + (u16)y * RT_PBYTES, 20);
     }
 }
+// Where the cursor is: a floating plate at the top of the screen, as wide as its name and no
+// wider, one pixel of air over and under the text. It never goes to the foot of the screen.
+static void place_plate(const char *name)
+{
+    s16 w = (s16)(map_menu_width(name) + 8), x = (s16)((160 - w) / 2);
+    draw_rect(x, 0, w, 7, C_BLACK);
+    text((s16)(x + 4), 1, name, C_WHITE, 158);
+}
+// The day, in its own small panel right under that plate.
+static void date_plate(void)
+{
+    static const char months[12][4] = { "Jan","Feb","Mar","Apr","May","Jun",
+                                        "Jul","Aug","Sep","Oct","Nov","Dec" };
+    char date[7];
+    u8 day = save.world.day;
+    s16 w, x;
+    memcpy(date, months[save.world.month - 1], 3); date[3] = ' ';
+    if (day >= 10) { date[4] = (char)('0' + day / 10); date[5] = (char)('0' + day % 10); date[6] = 0; }
+    else { date[4] = (char)('0' + day); date[5] = 0; }
+    w = (s16)(map_menu_width(date) + 8); x = (s16)((160 - w) / 2);
+    panel(x, 8, w, 10);
+    black((s16)(x + 4), 11, date);
+}
 static void says(const char *name, const char *first, const char *second)
 {
     s16 x = DLG_FACE_W + 4;
@@ -785,13 +808,15 @@ static void says(const char *name, const char *first, const char *second)
 // The glove is drawn after the page is blitted, so the layouts live here.
 static ChoiceLayout store_box = { 24, 36, 0, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
 static ChoiceLayout office_box = { 24, 36, 104, 49, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
-static void action_menu(const char *title, const char *const *labels, u8 n, u8 grey)
+static void action_menu(const char *title, const char *const *labels, u8 n, u8 grey, u8 centred)
 {
     ChoiceLayout *p = &store_box;
     u8 i, w = 0;
     for (i = 0; i < n; i++) { u8 k = map_menu_width(labels[i]); if (k > w) w = k; }
     p->width = (u8)(w + 12);
     p->height = (u8)(13 + 9 * n);
+    p->x = centred ? (s16)((160 - p->width) / 2) : 24;
+    p->y = centred ? (s16)((100 - p->height) / 2) : 36;
     choice_frame(p, title);
     for (i = 0; i < n; i++) choice_row(p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
 }
@@ -884,7 +909,7 @@ static void town_compose(void)
         }
     } else {
         says("Shopkeeper", "Welcome.", office ? "Looking for a soldier?" : "What can I do for you?");
-        if (office) office_rows(); else action_menu("Menu", store_rows, 3, 255);
+        if (office) office_rows(); else action_menu("Menu", store_rows, 3, 255, 0);
         war_funds(gil());
     }
     (void)town_rows;
@@ -910,9 +935,8 @@ static void town_render(void)
         rt_clamp_cam(&map, &cx, &cy);
         map_background(cx, cy, 1);
         ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
-        draw_rect(0, 0, 160, 11, C_WHITE); draw_rect(0, 11, 160, 1, C_BLACK);
-        black(4, 2, loc_name(wm.at));
-        action_menu("Town", town_rows, 3, 255);
+        place_plate(loc_name(wm.at));
+        action_menu("Town", town_rows, 3, 255, 1);
         choice_cursor_animated(&store_box, wm.trow, rt_frame);
         war_funds(gil());
         p_screen = 255;                 // the map wrote over nothing of the page, but the
@@ -937,17 +961,9 @@ void game_render(void)
         RtSprite sp = { 32, HAND_H, hand_gfx[0], hand_gfx[1], hand_gfx[2] };
         draw_sprite((s16)(hx - cx - 26), (s16)(hy - cy - 7), &sp);
     }
-    draw_rect(0, 91, 160, 9, C_WHITE); draw_rect(0, 90, 160, 1, C_BLACK);
-    black(3, 93, wm.sel==255?"Move cursor":loc_name(wm.sel));
+    place_plate(wm.sel==255?"Move cursor":loc_name(wm.sel));
+    date_plate();
     war_funds(gil());               // the same plate as the town screens
-    {
-        static const char months[12][4]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
-        char date[7];u8 day=save.world.day;
-        memcpy(date,months[save.world.month-1],3);date[3]=' ';
-        if(day>=10){date[4]=(char)('0'+day/10);date[5]=(char)('0'+day%10);date[6]=0;}
-        else{date[4]=(char)('0'+day);date[5]=0;}
-        panel(4,3,42,11);black(8,6,date);
-    }
     if(wm.menu) {
         static const char *const rows[]={"Move","Formation","Brave Story","Tutorial","Data","Option"};
         static const ChoiceLayout menu={88,43,72,57,3,CHOICE_TAB_PLAIN,3,1,25,6,10,7,158,-20,7};
