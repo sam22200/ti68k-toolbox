@@ -92,15 +92,26 @@ int main(void)
     assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && sw_step(K_DOWN) && sw_step(0));
     assert(sw_step(K_ENTER) && wm.screen == SC_FIT && wm.trow == 0);
     {
-        u8 id = best_fit(&save.unit[0]);
-        assert(!id || (on_sale(id) && item_fits(&save.unit[0], id) && fit_slot(id) < 5));
-        if (id) {
+        u8 who = 255, id = 0, i;
+        for (i = 0; i < save.n; i++) if ((id = best_fit(&save.unit[i]))) { who = i; break; }
+        assert(who != 255);                                   // the store helps someone
+        assert(on_sale(id) && item_fits(&save.unit[who], id) && fit_slot(id) < 5);
+        {   // and wearing it is an improvement by the bench's own measure
+            SaveUnit worn = save.unit[who];
+            Stats now = unit_stats(&save.unit[who]), then;
+            worn.eq[fit_slot(id)] = id; then = unit_stats(&worn);
+            assert(fit_score(&then, item_rec(id)[MI_WP]) > fit_score(&now, 0) ||
+                   now.hp != then.hp || now.pa != then.pa);
+        }
+        while (wm.trow != who) { assert(sw_step(0) && sw_step(K_DOWN)); }
+        {
             u8 slot = fit_slot(id); u32 before = gil();
             gil_set(item_price(id));
             assert(sw_step(0) && sw_step(K_ENTER) && !wm.note);
-            assert(save.unit[0].eq[slot] == id && gil() == 0);
+            assert(save.unit[who].eq[slot] == id && gil() == 0);
             gil_set(before);
         }
+        while (wm.trow) { assert(sw_step(0) && sw_step(K_UP)); }
     }
     assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_STORE);
     assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_TOWN);

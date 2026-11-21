@@ -114,11 +114,19 @@ What that changed, and what it still asks for:
   of the store's stock on a unit, *Best fit* picks the best the stock offers,
   *Quit fitting* leaves. **Best fit is built** as one bench: the party on the
   left, and under the cursor the best piece the store carries for that unit
-  with its price; ENTER buys it and puts it on, the piece it replaces going
   back to the bag. "Best" is ranked on the item's own bonuses, which `ffmg`
-  gives directly, so no unit statistic is derived here and management keeps
-  that engine to itself. *Try it on* -- one named piece at a time, with the
-  resulting statistics -- is not built.
+  with its price; ENTER buys it and puts it on, the piece it replaces going
+  back to the bag. **Try it on is in the same bench**: under the item, the
+  unit's HP, MP, PA, MA and Speed as they stand and, where the piece changes
+  one, what it would become -- "HP 44>52". "Best" is the piece that makes the
+  most of the unit by those same figures, not a rule of thumb.
+
+  The derivation is the campaign's one copy, `unit_stats.inc`, factored out of
+  management's own `stats()`: raw stats grown by level with the job's growth,
+  then its multipliers, then what it wears. Management's pages come out
+  byte-identical, which its PC/68000 replays prove. The bench shows no Move or
+  Jump: those take a movement ability's bonus, which needs `ffcj`, and the
+  world map does not carry it.
 
 The Bar's own strings are not in this run; `WORLD/WLDMES.BIN` holds its rumours
 (the Death Corps, King Omdolia's collapse...), several thousand lines of them.

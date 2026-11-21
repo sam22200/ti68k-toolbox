@@ -332,32 +332,27 @@ static u8 shop_nth(u8 n)
     return 0;
 }
 
-// The fitting bench. The source's *Best fit* puts the best the store carries on a unit; what
-// "best" means here is the item's own bonuses, which ffmg gives directly -- no unit statistic is
-// derived, so management keeps that engine to itself.
-static u16 item_worth(u8 id)
+// The fitting bench. The source's *Best fit* puts the best the store carries on a unit and
+// *Try it on* shows what it would make of them; the bench does both at once. The statistics
+// come from the campaign's one derivation (unit_stats.inc), the same management shows.
+static const u8 *fit_job(const SaveUnit *u)
 {
-    const u8 *r = item_rec(id);
-    u8 i;
-    u16 w = (u16)r[MI_WP] * 4;
-    for (i = 0; i < 7; i++) w = (u16)(w + (s8)r[MI_HP + i] + ((s8)r[MI_HP + i] < 0 ? -2 * (s8)r[MI_HP + i] : 0));
-    return w;
+    u8 career = (u8)(u->job >= 0x4A && u->job <= 0x5D ? u->job - 0x4A : 0);
+    return mgb + b16(mgb + 4) + (u16)career * MG_JOB_SIZE;
 }
-// The best stock item unit `u` could wear, 0 when the store carries none for it.
-static u8 best_fit(const SaveUnit *u)
+static u8 fit_current(const SaveUnit *u)
 {
-    u16 i;
-    u8 best = 0;
-    u16 worth = 0;
-    for (i = 1; i < 256; i++) {
-        u8 id = (u8)i, flags;
-        if (!on_sale(id) || !item_fits(u, id)) continue;
-        flags = item_rec(id)[MI_FLAGS];
-        if (!(flags & 0xF8)) continue;              // not a thing one wears
-        if (item_worth(id) > worth) { worth = item_worth(id); best = id; }
-    }
-    return best;
+    u8 k;
+    for (k = 0; k < save.n; k++) if (u == &save.unit[k]) return save_raw_current(&save, k);
+    return 0;
 }
+// The world map carries no ffcj, so a movement ability's bonus is not added here. The bench
+// shows HP, MP, PA, MA and Speed only, which that bonus never touches.
+#define UST_JOB(u) fit_job(u)
+#define UST_ITEM(id) item_rec(id)
+#define UST_CURRENT(u) fit_current(u)
+#define UST_MOVE(u,m,j) ((void)(u),(void)(m),(void)(j))
+#include "../unit_stats.inc"
 // Where it goes, by the slot flags management rules on: head, body, accessory, weapon, shield.
 static u8 fit_slot(u8 id)
 {
@@ -365,6 +360,51 @@ static u8 fit_slot(u8 id)
     u8 f = item_rec(id)[MI_FLAGS], i;
     for (i = 0; i < 5; i++) if (f & flag_of[i]) return i;
     return 255;
+}
+// What a unit is worth to the bench: the figures a player reads, weighted so a point of PA is
+// not traded for a point of HP. A weapon's power is counted too, being why one is worn.
+static u16 fit_score(const Stats *s, u8 power)
+{
+    return (u16)(s->hp + s->mp + 10U * (s->pa + s->ma + s->sp) + 8U * power);
+}
+// The best stock item unit `u` could wear: the one that makes the most of it, measured with
+// the campaign's own derivation rather than a rule of thumb. 0 when the store has none.
+static u8 best_fit(const SaveUnit *u)
+{
+    SaveUnit worn;
+    Stats now;
+    u16 i, score;
+    u8 best = 0, slot;
+    worn = *u;
+    now = unit_stats(u);
+    score = fit_score(&now, 0);
+    {
+        u8 k;
+        for (k = 0; k < 5; k++) if (u->eq[k]) {
+            u8 p = item_rec(u->eq[k])[MI_WP];
+            if (p) score = (u16)(score + 8U * p);
+        }
+    }
+    for (i = 1; i < 256; i++) {
+        u8 id = (u8)i;
+        Stats then;
+        u16 s2;
+        if (!on_sale(id) || !item_fits(u, id)) continue;
+        slot = fit_slot(id);
+        if (slot >= 5) continue;                    // not a thing one wears
+        worn = *u; worn.eq[slot] = id;
+        then = unit_stats(&worn);
+        s2 = fit_score(&then, item_rec(id)[MI_WP]);
+        {
+            u8 k;
+            for (k = 0; k < 5; k++) if (k != slot && worn.eq[k]) {
+                u8 p = item_rec(worn.eq[k])[MI_WP];
+                if (p) s2 = (u16)(s2 + 8U * p);
+            }
+        }
+        if (s2 > score) { score = s2; best = id; }
+    }
+    return best;
 }
 static void fit_buy(void)
 {
@@ -1089,6 +1129,22 @@ static void shop_rows(void)
 // that unit and what it would cost.
 static ChoiceLayout fit_box =
     { 20, 14, 124, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+// "HP 51>59" when it changes, "HP 51" when it does not; returns the next column.
+static s16 fit_pair(s16 x, const char *label, u16 now, u16 then)
+{
+    char d[9];
+    const char *n;
+    x = text(x, 75, label, C_DGRAY, 142);
+    x += 2;
+    n = wf_digits(d, now);
+    x = text(x, 75, n, C_WHITE, 142);
+    if (then != now) {
+        x = text(x, 75, ">", C_DGRAY, 142);
+        n = wf_digits(d, then);
+        x = text(x, 75, n, C_WHITE, 142);
+    }
+    return (s16)(x + 5);
+}
 static void fit_rows(void)
 {
     ChoiceLayout *p = &fit_box;
@@ -1105,13 +1161,28 @@ static void fit_rows(void)
         black((s16)(p->x + 62), y, job_name(u->job));
     }
     if (save.n) scroll_marks(p, save.n, shown);
-    draw_rect(20, 64, 124, 11, C_BLACK);
+    draw_rect(20, 64, 124, 18, C_BLACK);
+    if (!save.n) return;
     if (id) {
         item_icon(23, 66, id);
         text(34, 67, item_name(id), C_WHITE, 110);
         { char d[9]; const char *n = wf_digits(d, item_price(id));
-             text((s16)(140 - 4 * (s16)strlen(n)), 67, n, C_WHITE, 142); }
-    } else text(24, 67, "The store has nothing for this one", C_WHITE, 142);
+          text((s16)(140 - 4 * (s16)strlen(n)), 67, n, C_WHITE, 142); }
+    } else text(24, 67, "Nothing in stock would help", C_DGRAY, 142);
+    // Try it on: the unit as it stands, and as it would stand wearing this.
+    {
+        SaveUnit worn = save.unit[wm.trow];
+        Stats now = unit_stats(&save.unit[wm.trow]), then;
+        u8 slot = id ? fit_slot(id) : 255;
+        s16 x = 24;
+        if (slot < 5) worn.eq[slot] = id;
+        then = unit_stats(&worn);
+        x = fit_pair(x, "HP", now.hp, then.hp);
+        x = fit_pair(x, "MP", now.mp, then.mp);
+        x = fit_pair(x, "PA", now.pa, then.pa);
+        x = fit_pair(x, "MA", now.ma, then.ma);
+        fit_pair(x, "Sp", now.sp, then.sp);
+    }
 }
 static void town_compose(void)
 {
