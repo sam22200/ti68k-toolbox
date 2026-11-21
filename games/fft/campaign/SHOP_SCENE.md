@@ -42,7 +42,11 @@ the user out of five:
 | room | window | greys |
 | --- | --- | --- |
 | store | (8, 18) | 15th/97th percentiles through a 1.4 gamma (2026-11-20) |
-| office | (4, 28) | 40th/90th with a 2x2 ordered dither (2026-11-21) |
+| office | (26, 8) | 25th/85th, dithered **only above 0.62** (2026-11-21) |
+
+Dithering a whole room turned both of the office's figures into noise. The
+dither is now confined to the highlights: a candle or a stained window keeps
+its texture while the stone and the people stay on flat greys and read.
 
 The office picture is **adapted, not only cropped**. In the source Ramza stands
 sixty pixels from the guildmaster's desk, and no 160x100 window holds both once
@@ -50,9 +54,10 @@ the menu box takes the left half: framed on one, the other is off screen.
 `move_actor` lifts him off his own floor -- the stone is grey, he is not, so a
 saturation test and the largest connected blob cut him out cleanly -- patches
 the hole with the floor twenty-four pixels to his left, and sets him down
-sixteen right and twenty-four up, one step along the room's isometric floor.
-Nothing else in the picture moves. The window at (20, 8) then shows Ramza at
-screen x 94..118 and the guildmaster at 140..160, both clear of the menu.
+twenty-two right and twenty-four up, one step along the room's isometric floor.
+Nothing else in the picture moves. The window at (26, 8) then shows Ramza at
+screen x 94..118 and the guildmaster at 134..154, both clear of the menu box
+and with air left after the guildmaster.
 
 The **town's own menu stays over the world map**, as the source keeps it over
 its world map: there is no town picture to rip, and none is needed.
