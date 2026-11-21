@@ -45,8 +45,15 @@ the user out of five:
 | office | (26, 8) | 25th/85th, dithered **only above 0.62** (2026-11-21) |
 
 Dithering a whole room turned both of the office's figures into noise. The
-dither is now confined to the highlights: a candle or a stained window keeps
-its texture while the stone and the people stay on flat greys and read.
+dither is confined to the highlights: a candle or a stained window keeps its
+texture while the stone and the people stay on flat greys and read.
+
+Both office figures still stand against the window's glare, clear on clear, and
+no global grey mapping separates them. They get the port's own visibility rule,
+inverted: **a one-pixel contour, black here because the background is the
+light**. The same saturation mask that cuts Ramza out serves for it; the
+guildmaster needs a stricter threshold (5 instead of 4), the papers piled
+beside him being nearly as warm as his robe.
 
 The office picture is **adapted, not only cropped**. In the source Ramza stands
 sixty pixels from the guildmaster's desk, and no 160x100 window holds both once

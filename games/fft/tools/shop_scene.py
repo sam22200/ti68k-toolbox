@@ -73,28 +73,59 @@ BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 # cut out of his own floor and set down beside the desk, sixteen pixels right and twenty-four
 # up -- one step along the room's isometric floor. Nothing else in the picture moves.
 RAMZA_TO_DESK = dict(box=(98, 70, 124, 110), to=(22, -24), floor=-24)
+GUILDMASTER = dict(box=(160, 40, 184, 82), sat=5, val=99)   # behind his desk, in the glare
 
 
-def move_actor(rgb, box, to, floor):
-    """Lift the figure inside `box` off its floor and set it down at `to` (dx, dy)."""
+def actor_mask(sub, sat=4, val=22):
+    """The figure inside a box: the room's stone and its light are grey, a person is not.
+    `sat` is how colourful a pixel must be to count; the guildmaster needs more of it than
+    Ramza, the papers piled beside him being nearly as warm as his robe."""
     from scipy import ndimage
-    x0, y0, x1, y1 = box
-    sub = rgb[y0:y1, x0:x1]
-    sat = sub.max(2) - sub.min(2)
-    mask = (sat >= 4) | (sub.max(2) >= 22)         # the stone floor is grey; he is not
+    mask = (sub.max(2) - sub.min(2) >= sat) | (sub.max(2) >= val)
     mask = ndimage.binary_opening(ndimage.binary_closing(mask, np.ones((3, 3))), np.ones((2, 2)))
     label, n = ndimage.label(mask)
     if n:
         sizes = ndimage.sum(mask, label, range(1, n + 1))
         mask = label == int(np.argmax(sizes)) + 1
+    return mask
+
+
+def draw_outline(rgb, box, mask):
+    """A one-pixel black contour around the figure. Both of the office's people stand against
+    the window's glare, clear on clear; no global grey mapping separates them, and the port's
+    own visibility rule asks for a contour. Here it is black, the background being the light."""
+    from scipy import ndimage
+    x0, y0, x1, y1 = box
+    ring = ndimage.binary_dilation(mask, np.ones((3, 3))) & ~mask
+    rgb[y0:y1, x0:x1][ring] = 0
+
+
+def move_actor(rgb, box, to, floor):
+    """Lift the figure inside `box` off its floor, set it down at `to` (dx, dy), outline it."""
+    x0, y0, x1, y1 = box
+    sub = rgb[y0:y1, x0:x1]
+    mask = actor_mask(sub)
     actor = sub.copy()
     rgb[y0:y1, x0:x1][mask] = rgb[y0:y1, x0 + floor:x1 + floor][mask]   # the floor he stood on
     dx, dy = to
-    there = rgb[y0 + dy:y1 + dy, x0 + dx:x1 + dx]
-    there[mask] = actor[mask]
+    there = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+    rgb[there[1]:there[3], there[0]:there[2]][mask] = actor[mask]
+    draw_outline(rgb, there, mask)
     return rgb
 
 
+def outline_actor(rgb, box, sat=4, val=22):
+    draw_outline(rgb, box, actor_mask(rgb[box[1]:box[3], box[0]:box[2]], sat, val))
+    return rgb
+
+
+VARIANTS = (
+    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
+    # The office's stone and its near-white candles are too far apart for four flat greys: the
+    # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
+    ('BK_FITR', 26, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
+                            outline=(GUILDMASTER,))),
+)
 def face_greys(px, pal):
     """Four greys from the palette's own range. These faces live in a narrow band -- palette 0
     runs 5.3 to 26.2 of 31 -- so the port's fixed thresholds leave almost every pixel mid-grey
@@ -131,7 +162,7 @@ VARIANTS = (
     # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
     ('BK_FITR', 26, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK)),
 )
-def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=0, move=None):
+def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=0, move=None, outline=()):
     """One MENU/BK_*.TIM window in the runtime's colours (C_WHITE 0 .. C_BLACK 3),
     so a dark source pixel is black."""
     b = disc.read(*files['MENU/%s.TIM' % name])
@@ -140,6 +171,8 @@ def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=0, move=None)
     rgb = np.dstack([px & 31, px >> 5 & 31, px >> 10 & 31]).astype(float)
     if move:
         rgb = move_actor(rgb, **move)
+    for one in outline:
+        rgb = outline_actor(rgb, **one)
     lum = rgb[:, :, 0] / 31 * .299 + rgb[:, :, 1] / 31 * .587 + rgb[:, :, 2] / 31 * .114
     crop = lum[y0:y0 + H, x0:x0 + W]
     crop = np.pad(crop, ((0, H - crop.shape[0]), (0, W - crop.shape[1])))
