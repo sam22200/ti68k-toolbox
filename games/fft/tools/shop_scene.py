@@ -20,10 +20,15 @@ empty band above it looked wrong.
 The grey mapping is the one the user chose on 2026-11-20 out of five: the 15th
 and 97th luminance percentiles become black and white, through a 1.4 gamma.
 
-The speaker's portrait is provisional: the shopkeeper's own event portrait has
-not been identified yet (EVENT/EVTFACE.BIN holds 32 of them, 32x48, 4bpp). The
-bank carries the 40M townsperson's battle portrait meanwhile, read exactly as
-common_portraits.py reads a speaker's.
+OBSERVED: **EVENT/WLDFACE.BIN** is the world-map and menu portrait sheet -- 4bpp,
+256 pixels wide, 168 faces of 32x48, eight to a row. These are the faces the
+towns' speakers use, not the battle sheets' own. Face 8 is the moustached man
+the user's shop screenshot shows; the Soldier Office's clerk is one of the bald
+ones beside him and is not pinned down yet (INTERPRETATION: matched by eye
+against the user's screenshot, not read from the game's own table).
+
+The sheet carries no palette we have found, so the greys come from the 4-bit
+index itself, mapped by the same luminance rule as the rest of the port.
 
 FSK3: magic, u8 rooms, one pad byte, u16 offsets (portrait 32x29/348 bytes, then
 each room's u8 height and ZX0-compressed planes), then those records. The pad
@@ -34,12 +39,14 @@ import struct
 import sys
 
 import numpy as np
+from PIL import Image
 
 import extract
-import common_portraits
+import interface
 import zx0pack
 
-KEEPER = '40M'
+KEEPER = 8                        # EVENT/WLDFACE.BIN face index
+FACE_W, FACE_H = 32, 48
 W, H = 160, 100                   # the whole screen: the dialogue box is drawn over the room
 # name, window origin in the source, and the grey mapping. The store is a bright room full of
 # dark goods, the office a dim one, so the percentiles that become white and black differ.
@@ -49,6 +56,25 @@ VARIANTS = (
     ('BK_HONE', 8, 23, dict(lo=10, hi=99, gamma=1.4)),
 )
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
+
+
+def portrait(disc, files, index):
+    """One EVENT/WLDFACE.BIN face as the campaign's 32x29 portrait record (348 bytes)."""
+    raw = np.frombuffer(disc.read(*files['EVENT/WLDFACE.BIN']), np.uint8)
+    px = np.empty(raw.size * 2, np.uint8)
+    px[0::2] = raw & 15; px[1::2] = raw >> 4
+    sheet = px.reshape(-1, 256)
+    r, c = divmod(index, 8)
+    face = sheet[r * FACE_H:(r + 1) * FACE_H, c * FACE_W:(c + 1) * FACE_W]
+    # The sheet has no palette of its own here: index 0 is the background, and the remaining
+    # fifteen run dark to light, so the four greys follow the index directly.
+    small = np.asarray(Image.fromarray(face.astype(np.uint8) * 17)
+                       .resize((17, 27), Image.Resampling.NEAREST), dtype=int)
+    im = np.full((29, 32), -1, dtype=int)
+    body = np.where(small <= 3 * 17, 3, np.where(small <= 7 * 17, 2, np.where(small <= 11 * 17, 1, 0)))
+    im[1:28, 1:18] = np.where(small == 0, -1, body)
+    interface.outline(im)
+    return bytes(interface.planes(im, 32))
 
 
 def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False):
@@ -66,19 +92,25 @@ def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False):
     return 3 - np.clip(np.floor(n * 3 + d), 0, 3).astype(int)
 
 
+PBYTES = 30                       # the runtime's plane stride (rt.h RT_PBYTES)
+
+
 def planes(grey):
-    """The two planes the LCD wants: bit 0 of the colour is light, bit 1 is dark."""
+    """The two planes the LCD wants, at the runtime's own stride so the room can be
+    decompressed straight into an off-screen page: bit 0 of the colour is light, bit 1 dark."""
     out = bytearray()
     for bit in (1, 2):
         for row in grey:
+            line = bytearray(PBYTES)
             for x in range(0, W, 8):
-                out.append(int(np.packbits((row[x:x + 8] & bit) != 0)[0]))
+                line[x // 8] = int(np.packbits((row[x:x + 8] & bit) != 0)[0])
+            out += line
     return bytes(out)
 
 
 def build(cue):
     disc, files = extract.disc_files(cue)
-    records = [common_portraits.portrait(disc, files, KEEPER)]
+    records = [portrait(disc, files, KEEPER)]
     for name, x0, y0, how in VARIANTS:
         records.append(bytes((H,)) + zx0pack.pack(planes(room(disc, files, name, x0, y0, **how))))
     # The portrait is drawn straight from the bank by a 32-wide sprite routine, which reads
@@ -98,7 +130,7 @@ def main():
     raw, info = build(cue)
     out.write_bytes(raw)
     print('%s: %d bytes, rooms %s, shopkeeper %s' %
-          (out.name, info['bytes'], info['rooms'], info['keeper']))
+          (out.name, info['bytes'], info['rooms'], 'WLDFACE %d' % info['keeper']))
 
 
 if __name__ == '__main__':

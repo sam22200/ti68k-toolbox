@@ -24,8 +24,18 @@ these five rules, and a menu that cannot must say in a comment why.**
    rt_frame)`, never the still `choice_cursor`. A menu that does not move its
    hand looks frozen.
 
+6. **A list longer than its box shows where it continues.** A solid three-pixel
+   triangle at the box's right edge, pointing up when rows are hidden above and
+   down when they are hidden below, and nothing when the whole list fits.
+7. **A screen made of a picture and a list is composed once, not every frame.**
+   The town screens draw the room, their tabs, twelve icons and two plates into
+   an off-screen page and blit it: 419k cycles a frame became 78k. Only the
+   glove is drawn live, so it still sways. Recompose when anything shown
+   changes, never on a timer.
+
 Disabled entries are drawn in `C_DGRAY`, as the source greys what it will not
-let you pick.
+let you pick. **[MODE] opens the detail of whatever the cursor is on**, through
+the shared `item_detail.inc`; [MODE] or SHIFT closes it.
 
 
 `../choice_menu.h` and `../choice_menu.inc` share the command-window frame,

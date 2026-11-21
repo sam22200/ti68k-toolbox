@@ -29,6 +29,10 @@ enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UN
        NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
 enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_OFFICE };   // what the screen shows
 enum { SHOP_ROWS = 6, OFFICE_ROWS = 4, ENC_MAX = 3, OFFICE_REC = 17 };
+// The source's six shop tabs, by the item's category byte: [first, last] of each.
+enum { SHOP_TABS = 6 };
+static const u8 tab_first[SHOP_TABS] = { 1, 19, 20, 23, 26, 32 };
+static const u8 tab_last[SHOP_TABS]  = { 18, 19, 22, 25, 31, 34 };
 typedef struct {
     u8 at, sel;                          // Ramza's location, the chosen one
     u8 moving, leg, legs, step;          // travelling: leg of path[], its point
@@ -37,6 +41,7 @@ typedef struct {
     s16 handx, handy;                    // free hand hotspot; never commits a journey
     u8 menu, row;
     u8 screen, trow, ttop, buy;          // a town's services: its row, the list's first row
+    u8 cat, detail;                      // the shop tab (F1/F5) and whether [MODE] is showing
     u8 note, changed, tick;
     u16 result;                          // what fftmap returns
 } Wm;
@@ -46,7 +51,11 @@ static const u8 *bank, *mgb,*breed_rules;
 static const u8 *shop,*sh_price,*sh_tier,*sh_kind,*sh_cats,*sh_lone,*sh_shop,*sh_tierflag;
 static const u8 *sh_place,*sh_office,*sh_jobs,*sh_enc;
 static const u8 *scene;                  // ffsk: the source's rooms and the speaker's portrait
-static u8 room_tag=255;
+#define PAGE_PLANE (100 * RT_PBYTES)
+static u8 *page;
+static u8 p_screen = 255, p_cat, p_buy, p_trow, p_ttop, p_n;
+static u32 p_gil;
+
 static RtTilemap map;
 static u8 *wmcache,*idle_sprites;
 static u8 strip_tag[16];
@@ -197,10 +206,46 @@ static void gil_set(u32 v)
     save.money[2] = (u8)(v >> 8); save.money[3] = (u8)v;
 }
 #define MG_ITEM_SIZE 14
+// ffmg's item record: u16 name, flags, type, reserved, HP MP PA MA SP Move Jump, icon, WP
+#define MI_FLAGS 2
+#define MI_TYPE 3
+#define MI_HP 5
+#define MI_ICON 12
+#define MI_WP 13
+static const u8 *item_rec(u8 id) { return mgb + b16(mgb + 4 + 2 * 1) + (u16)id * MG_ITEM_SIZE; }
 static const char *item_name(u8 id)
+{ u16 at = b16(item_rec(id)); return at ? (const char *)mgb + at : ""; }
+static void item_icon(s16 x, s16 y, u8 id)
 {
-    u16 at = b16(mgb + b16(mgb + 4 + 2 * 1) + (u16)id * MG_ITEM_SIZE);
-    return at ? (const char *)mgb + at : "";
+    const u8 *p = mgb + b16(mgb + 4 + 2 * 4) + (u16)item_rec(id)[MI_ICON] * 24;
+    RtSprite sp = { 8, 8, p, p + 8, p + 16 };
+    draw_sprite(x, y, &sp);
+}
+// How many of the party can wear it: the job's equipment categories, as management rules it.
+#define MG_JOB_SIZE 32
+#define MJ_CATS 16
+static u8 item_fits(const SaveUnit *u, u8 id)
+{
+    const u8 *j = mgb + b16(mgb + 4) + (u16)(u8)(u->job - 0x4A) * MG_JOB_SIZE;
+    u8 type = item_rec(id)[MI_TYPE];
+    if (u->job < 0x4A || u->job > 0x5D || type >= 32) return 0;
+    return (u8)((j[MJ_CATS + (type >> 3)] >> (7 - (type & 7))) & 1);
+}
+static u8 item_wearers(u8 id)
+{ u8 i, n = 0; for (i = 0; i < save.n; i++) if (item_fits(&save.unit[i], id)) n++; return n; }
+#define ID_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define ID_NUM(x,y,n) number(x,y,n)
+#define ID_ICON(x,y,id) item_icon(x,y,id)
+#include "../item_detail.inc"
+static void item_detail(u8 id)
+{
+    const u8 *r = item_rec(id);
+    ItemDetail d;
+    u8 i;
+    d.id = id; d.kind = sh_kind[id]; d.flags = r[MI_FLAGS]; d.name = item_name(id);
+    for (i = 0; i < 7; i++) d.stat[i] = (s8)r[MI_HP + i];
+    d.power = r[MI_WP];
+    item_detail_draw(&d);
 }
 static u16 item_price(u8 id) { return b16(sh_price + 2 * (u16)id); }
 static u8 shop_type(void) { return shop && wm.at < LOC_N ? sh_shop[wm.at] : 0; }
@@ -221,8 +266,13 @@ static u8 on_sale(u8 id)
     if (!(sh_cats[5 * (u16)t + (k >> 3)] & (u8)(1u << (k & 7))) && id != sh_lone[t]) return 0;
     return tier_open(sh_tier[id]);
 }
+static u8 in_tab(u8 id)
+{ u8 k = sh_kind[id]; return (u8)(k >= tab_first[wm.cat] && k <= tab_last[wm.cat]); }
 static u8 shop_has(u8 id)
-{ return wm.buy ? on_sale(id) : (u8)(save.inv[id] && item_price(id)); }
+{
+    if (!in_tab(id)) return 0;
+    return wm.buy ? on_sale(id) : (u8)(save.inv[id] && item_price(id));
+}
 // The list as a 256-bit set rather than a rescan: walking the ids cost 1.3M cycles a frame on
 // the 68000, four times the budget. One pass per trade or page switch, then a byte-skipping
 // walk; the set is a static, so no state file grows by it.
@@ -351,15 +401,16 @@ void game_init(void)
     } else shop = RT_NULL;
     scene = rt_file("ffsk", &size);
     if (scene && (memcmp(scene, "FSK3", 4) || scene[4] < 2)) scene = RT_NULL;
-    room_tag = 255;
     breed_rules=rt_file("ffwb",&size);
     if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
         map.w = bank[14]; map.h = bank[15];
         stride=b16(part(0));strip_bytes=stride<<4;
-        wmcache=malloc((u16)(strip_bytes<<4)+5*156);
+        wmcache=malloc((u16)(strip_bytes<<4)+5*156+2*PAGE_PLANE);
         if(!wmcache){bank=RT_NULL;return;}
         idle_sprites=wmcache+(strip_bytes<<4);
+        page=idle_sprites+5*156;             // the town screens' own composed page
+        p_screen=255;
         zx0_unpack(part(1)+8,idle_sprites);
         memset(strip_tag,255,sizeof strip_tag);
 #ifdef __m68k__
@@ -401,7 +452,7 @@ static u8 leave(u16 result)
 // cursor, menu and travel keep their meaning untouched.
 static u8 town_update(u32 key)
 {
-    if (key & (K_ESC | K_B)) {
+    if ((key & (K_ESC | K_B)) && !wm.detail) {
         wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP : wm.screen == SC_SHOP ? SC_STORE : SC_TOWN);
         wm.trow = wm.ttop = 0;
         return 1;
@@ -418,8 +469,8 @@ static u8 town_update(u32 key)
         wm.trow = choice_move(wm.trow, 3, key);
         if (key & (K_ENTER | K_A)) {
             if (wm.trow == 2) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; return 1; }
-            wm.buy = (u8)(wm.trow == 0); wm.screen = SC_SHOP; wm.trow = wm.ttop = 0;
-            shop_refresh();
+            wm.buy = (u8)(wm.trow == 0); wm.screen = SC_SHOP; wm.trow = wm.ttop = wm.cat = 0;
+            wm.detail = 0; shop_refresh();
         }
         return 1;
     }
@@ -430,7 +481,14 @@ static u8 town_update(u32 key)
     }
     {
         u8 n;
+        if (wm.detail) { if (key & (K_MODE | K_B | K_ESC | K_ENTER | K_A)) wm.detail = 0; return 1; }
+        if (key & (K_F1 | K_F5)) {      // the source's L1/R1: the next tab, wrapping
+            wm.cat = (u8)(key & K_F1 ? (wm.cat ? wm.cat - 1 : SHOP_TABS - 1)
+                                     : (wm.cat + 1 < SHOP_TABS ? wm.cat + 1 : 0));
+            wm.trow = wm.ttop = 0; shop_refresh();
+        }
         if (key & (K_LEFT | K_RIGHT)) { wm.buy ^= 1; wm.trow = wm.ttop = 0; shop_refresh(); }
+        if ((key & K_MODE) && shop_n) { wm.detail = 1; return 1; }
         n = shop_n;
         if (n) {
             wm.trow = choice_move(wm.trow, n, key);
@@ -695,23 +753,20 @@ static void map_background(s16 cx,s16 cy,u8 decor)
 // top, the shared action menu at the left and the shared War Funds plate at the bottom right.
 // Every menu obeys CHOICE_MENU.md's five rules.
 static const u8 *scene_part(u8 k) { return scene + b16(scene + 6 + 2 * k); }
-#define MG_JOB_SIZE 32
 static const char *job_name(u8 job)
 { return (const char *)mgb + b16(mgb + b16(mgb + 4) + (u16)(u8)(job - 0x4A) * MG_JOB_SIZE); }
 // The room decompresses into the map's own strip cache: it is 32 KB and idle while a town
 // screen is up, so the rooms cost no second allocation. Each owner invalidates the other.
-static void room_draw(u8 which)
+// A town screen is composed once into an off-screen page of two 100-row planes, then blitted:
+// the room, the tabs, twelve icons and the two plates cost 419k cycles a frame when redrawn,
+// 75k when copied. The room is stored at the runtime's own stride, so it decompresses straight
+// into the page. Nothing below row 99 is ever drawn into it.
+static void page_blit(void)
 {
     s16 y;
-    if (!scene || !wmcache) { draw_clear(); return; }
-    if (room_tag != which) {
-        zx0_unpack(scene_part((u8)(which + 1)) + 1, wmcache);
-        room_tag = which;
-        memset(strip_tag, 255, sizeof strip_tag);
-    }
     for (y = 0; y < 100; y++) {
-        memcpy((u8 *)rt_light + (u16)y * RT_PBYTES, wmcache + (u16)y * 20, 20);
-        memcpy((u8 *)rt_dark + (u16)y * RT_PBYTES, wmcache + 2000 + (u16)y * 20, 20);
+        memcpy((u8 *)rt_light + (u16)y * RT_PBYTES, page + (u16)y * RT_PBYTES, 20);
+        memcpy((u8 *)rt_dark + (u16)y * RT_PBYTES, page + PAGE_PLANE + (u16)y * RT_PBYTES, 20);
     }
 }
 static void says(const char *name, const char *first, const char *second)
@@ -727,74 +782,144 @@ static void says(const char *name, const char *first, const char *second)
 }
 // CHOICE_MENU.md: one renderer, a width fitted to the labels, the same five pixels above the
 // first row and below the last, the glove wholly on screen, the glove animated.
+// The glove is drawn after the page is blitted, so the layouts live here.
+static ChoiceLayout store_box = { 24, 36, 0, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+static ChoiceLayout office_box = { 24, 36, 104, 49, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
 static void action_menu(const char *title, const char *const *labels, u8 n, u8 grey)
 {
-    ChoiceLayout p = { 24, 36, 0, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    ChoiceLayout *p = &store_box;
     u8 i, w = 0;
     for (i = 0; i < n; i++) { u8 k = map_menu_width(labels[i]); if (k > w) w = k; }
-    p.width = (u8)(w + 12);
-    p.height = (u8)(13 + 9 * n);
-    choice_frame(&p, title);
-    for (i = 0; i < n; i++) choice_row(&p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
-    choice_cursor_animated(&p, wm.trow, rt_frame);
+    p->width = (u8)(w + 12);
+    p->height = (u8)(13 + 9 * n);
+    choice_frame(p, title);
+    for (i = 0; i < n; i++) choice_row(p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
 }
 static void office_rows(void)
 {
-    ChoiceLayout p = { 24, 36, 104, 49, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    ChoiceLayout *p = &office_box;
     u8 r;
-    choice_frame(&p, "Hire");
+    choice_frame(p, "Hire");
     for (r = 0; r < OFFICE_ROWS; r++) {
-        s16 y = (s16)(p.y + p.row_y + (u16)r * p.pitch);
-        black((s16)(p.x + p.text_x), y, job_name(office_job(r)));
-        black((s16)(p.x + p.text_x + 42), y, office_sex(r) ? "Woman" : "Man");
-        right((s16)(p.x + p.width - 4), y, office_price(r));
+        s16 y = (s16)(p->y + p->row_y + (u16)r * p->pitch);
+        black((s16)(p->x + p->text_x), y, job_name(office_job(r)));
+        black((s16)(p->x + p->text_x + 42), y, office_sex(r) ? "Woman" : "Man");
+        right((s16)(p->x + p->width - 4), y, office_price(r));
     }
-    choice_cursor_animated(&p, wm.trow, rt_frame);
 }
+static u8 shop_tab_face(u8 t)
+{
+    u16 i;
+    for (i = 1; i < 256; i++) {
+        u8 k = sh_kind[i];
+        if (k >= tab_first[t] && k <= tab_last[t] && sh_tier[i] && sh_tier[i] < 20) return (u8)i;
+    }
+    return 0;
+}
+// The source's tab strip: one icon a category, the chosen one boxed, F1/F5 between them.
+static void shop_tabs(void)
+{
+    u8 t;
+    draw_rect(0, 0, 160, 11, C_WHITE); draw_rect(0, 11, 160, 1, C_BLACK);
+    for (t = 0; t < SHOP_TABS; t++) {
+        s16 x = (s16)(4 + 13 * t);
+        u8 id = shop_tab_face(t);
+        if (t == wm.cat) {                   // an outline, so the icon stays readable
+            draw_rect((s16)(x - 2), 0, 12, 1, C_BLACK); draw_rect((s16)(x - 2), 10, 12, 1, C_BLACK);
+            draw_rect((s16)(x - 2), 0, 1, 11, C_BLACK); draw_rect((s16)(x + 9), 0, 1, 11, C_BLACK);
+        }
+        if (id) item_icon(x, 2, id);
+        else text(x, 3, "?", C_DGRAY, 158);
+    }
+    text(88, 3, "F1/F5", C_BLACK, 158);
+    text(120, 3, "MODE:info", C_BLACK, 158);
+}
+// Scroll marks in the shared style: a solid triangle at the box's right edge, only when the
+// list runs past it. CHOICE_MENU.md rule 6.
+static void scroll_marks(const ChoiceLayout *p, u8 n, u8 shown)
+{
+    s16 x = (s16)(p->x + p->width - 7), r;
+    if (wm.ttop) for (r = 0; r < 3; r++) draw_rect((s16)(x + r), (s16)(p->y + 4 - r), (s16)(1 + 2 * r), 1, C_BLACK);
+    if (wm.ttop + shown < n)
+        for (r = 0; r < 3; r++)
+            draw_rect((s16)(x + r), (s16)(p->y + p->height - 5 + r), (s16)(5 - 2 * r), 1, C_BLACK);
+}
+static ChoiceLayout shop_box =
+    { 24, 14, 120, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 16, 12, 9, 158, -16, 9 };
+// Everything but the swaying glove. Composed once per change into the page below, because
+// redrawing the room, the tabs, twelve icons and the two plates cost 419k cycles a frame.
 static void shop_rows(void)
 {
-    ChoiceLayout p = { 24, 12, 112, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
+    ChoiceLayout *p = &shop_box;
     u8 r, shown = shop_n - wm.ttop > SHOP_ROWS ? SHOP_ROWS : (u8)(shop_n - wm.ttop);
     if (!shop_n) shown = 1;
-    p.height = (u8)(13 + 9 * shown);
-    choice_frame(&p, wm.buy ? "Buy" : "Sell");
-    if (!shop_n) black((s16)(p.x + p.text_x), (s16)(p.y + p.row_y), wm.buy ? "Nothing here" : "Nothing to sell");
+    p->height = (u8)(13 + 9 * shown);
+    shop_tabs();
+    choice_frame(p, wm.buy ? "Buy" : "Sell");
+    if (!shop_n) black((s16)(p->x + p->text_x), (s16)(p->y + p->row_y), wm.buy ? "Nothing here" : "Nothing to sell");
     for (r = 0; r < shown; r++) {
         u8 id = shop_nth((u8)(wm.ttop + r));
-        s16 y = (s16)(p.y + p.row_y + (u16)r * p.pitch);
-        black((s16)(p.x + p.text_x), y, item_name(id));
-        if (!wm.buy) number((s16)(p.x + 62), y, save.inv[id]);
-        right((s16)(p.x + p.width - 4), y, wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
+        s16 y = (s16)(p->y + p->row_y + (u16)r * p->pitch);
+        item_icon((s16)(p->x + 5), (s16)(y - 1), id);
+        black((s16)(p->x + p->text_x), y, item_name(id));
+        if (!wm.buy) number((s16)(p->x + 76), y, save.inv[id]);
+        right((s16)(p->x + p->width - 10), y, wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
     }
-    if (shop_n) choice_cursor_animated(&p, (u8)(wm.trow - wm.ttop), rt_frame);
+    if (shop_n) scroll_marks(p, shop_n, shown);
+}
+static void town_compose(void)
+{
+    static const char *const town_rows[3] = { "Shop", "Soldier Office", "Leave" };
+    static const char *const store_rows[3] = { "Buy", "Sell", "Leave store" };
+    u8 office = (u8)(wm.screen == SC_OFFICE);
+    void *l = rt_light, *d = rt_dark;
+    rt_light = page; rt_dark = page + PAGE_PLANE;
+    zx0_unpack(scene_part((u8)(office + 1)) + 1, page);     // the room, straight into the page
+    if (wm.screen == SC_SHOP) {
+        shop_rows();
+        {
+            s16 left = war_funds(gil());
+            u8 id = shop_n ? shop_nth(wm.trow) : 0;
+            eqp_all((s16)(left - 3), id ? item_wearers(id) : 0, save.n);
+        }
+    } else {
+        says("Shopkeeper", "Welcome.", office ? "Looking for a soldier?" : "What can I do for you?");
+        if (office) office_rows(); else action_menu("Menu", store_rows, 3, 255);
+        war_funds(gil());
+    }
+    (void)town_rows;
+    rt_light = l; rt_dark = d;
+    p_screen = wm.screen; p_cat = wm.cat; p_buy = wm.buy; p_trow = wm.trow;
+    p_ttop = wm.ttop; p_n = shop_n; p_gil = gil();
+}
+static void town_page(void)
+{
+    if (p_screen != wm.screen || p_cat != wm.cat || p_buy != wm.buy || p_trow != wm.trow ||
+        p_ttop != wm.ttop || p_n != shop_n || p_gil != gil())
+        town_compose();
+    page_blit();
+    if (wm.screen == SC_SHOP) { if (shop_n) choice_cursor_animated(&shop_box, (u8)(wm.trow - wm.ttop), rt_frame); }
+    else choice_cursor_animated(wm.screen == SC_OFFICE ? &office_box : &store_box, wm.trow, rt_frame);
 }
 
 static void town_render(void)
 {
     static const char *const town_rows[3] = { "Shop", "Soldier Office", "Leave" };
-    static const char *const store_rows[3] = { "Buy", "Sell", "Leave store" };
-    u8 office = (u8)(wm.screen == SC_OFFICE);
     if (wm.screen == SC_TOWN) {
         s16 cx = (s16)(wm.x - 80), cy = (s16)(wm.y - 50);
         rt_clamp_cam(&map, &cx, &cy);
         map_background(cx, cy, 1);
         ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
-        room_tag = 255;                       // the strips have taken the shared buffer back
         draw_rect(0, 0, 160, 11, C_WHITE); draw_rect(0, 11, 160, 1, C_BLACK);
         black(4, 2, loc_name(wm.at));
         action_menu("Town", town_rows, 3, 255);
+        choice_cursor_animated(&store_box, wm.trow, rt_frame);
         war_funds(gil());
-        return;
+        p_screen = 255;                 // the map wrote over nothing of the page, but the
+        return;                         // next town screen must be composed again anyway
     }
-    room_draw(office);
-    // The list screen keeps the room but gives its rows the whole height, as the source does.
-    if (wm.screen == SC_SHOP) shop_rows();
-    else {
-        says("Shopkeeper", "Welcome.",
-             office ? "Looking for a soldier?" : "What can I do for you?");
-        if (office) office_rows(); else action_menu("Menu", store_rows, 3, 255);
-    }
-    war_funds(gil());
+    town_page();
+    if (wm.screen == SC_SHOP && wm.detail && shop_n) item_detail(shop_nth(wm.trow));
 }
 
 void game_render(void)
@@ -803,7 +928,6 @@ void game_render(void)
     u8 i;
     if (!bank || !mgb) { draw_clear(); draw_text(4, 40, "Missing ffwm / ffmg", 0, C_BLACK); return; }
     if (wm.screen) { town_render(); if (!wm.note) return; }
-    room_tag = 255;                 // the map is about to take the shared buffer back
     cx = (s16)((wm.moving?wm.x:wm.handx) - 80); cy = (s16)((wm.moving?wm.y:wm.handy) - 50);
     rt_clamp_cam(&map, &cx, &cy);
     map_background(cx,cy,1);

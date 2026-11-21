@@ -49,18 +49,34 @@ The three overlays are the campaign's own, not new ones:
   from the bottom and the right. The world map uses the same plate. The
   battle's result screen keeps its own reviewed layout.
 
-## The portrait is not settled
+## The portrait
 
-The user was right to ask. The bank currently carries the **40M townsperson's
-battle portrait**, read exactly as `common_portraits.py` reads a speaker's.
-That was an informed guess, not an identification, and the office clerk is
-plainly a different man (bald, where 40M is bearded).
+Found: **`EVENT/WLDFACE.BIN`** is the world-map and menu portrait sheet, 4bpp,
+256 pixels wide, **168 faces of 32x48**, eight to a row -- not the battle
+sheets, and not `EVENT/EVTFACE.BIN` (which holds the 32 event faces). The
+shopkeeper is **face 8**, the moustached man of the user's screenshot. That is
+an INTERPRETATION: matched by eye, not read from the game's own table. The
+Soldier Office's clerk is one of the bald faces beside him and still borrows
+the shopkeeper's.
 
-The real bank is **`EVENT/EVTFACE.BIN`**: one 4bpp TIM whose pixels are stored
-as a 32-pixel-wide column, 32 faces of 32x48 with 16 CLUTs. It is decoded and
-its faces are legible, but which index the store and the office use, and which
-CLUT goes with each face, are still open. Until that is answered the portrait
-in the bank is a placeholder and the office borrows the store's speaker.
+## The Buy and Sell lists
+
+Rebuilt to the source's own screen on 2026-11-20:
+
+- **six category tabs**, by the item's category byte -- weapons 1..18, shield
+  19, head 20..22, body 23..25, accessory 26..31, item 32..34 -- each shown by
+  the icon of the first item it ever sells, the chosen one outlined.
+  **F1 and F5 move between them**, wrapping, as L1 and R1 do on the original.
+- **every row carries the item's 8x8 icon**, the one `ffmg` already holds for
+  management's Equip screen, then its name, its count when selling, and its
+  price (half when selling).
+- the list **scrolls** six rows at a time with the shared triangles.
+- **[MODE] opens the item's detail** through `item_detail.inc`, the campaign's
+  one detail panel: icon, name, family, a weapon's power and every non-zero
+  bonus. The disc's own flavour text is not in it yet -- it lives
+  LZW-compressed in `EVENT/HELP.LZW`, which we have not decoded.
+- **Eqp./All** sits beside the War Funds in the same plates: how many of the
+  party can wear the item the cursor is on, out of how many are in it.
 
 ## In the game
 
@@ -68,9 +84,11 @@ in the bank is a placeholder and the office borrows the store's speaker.
 store's Buy / Sell / Leave store over its room, its item list, and the Soldier
 Office's four hire rows. The map shows the same War Funds plate. The item list
 takes the room's full height and drops the dialogue box, as the source does.
-Steady shop frame: 328,264 cycles of the 360k budget; the room decompresses
-once per entry into the map's own 32 KB strip cache, which is idle meanwhile,
-so no second allocation.
+Steady shop frame: **77,682 cycles** of the 360k budget. The screen is composed
+once into an off-screen page of two 100-row planes and blitted; only the glove
+is drawn live. Redrawing it whole cost 418,766, over budget. The rooms are
+stored at the runtime's own plane stride so they decompress straight into that
+page, which costs 6,000 bytes beside the map's strip cache.
 
 A sprite read in place from a bank must start on an even address: the portrait
 landed odd and the 68000 took an address error while the PC build was happy.

@@ -64,8 +64,19 @@ int main(void)
     assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_STORE);     // Shop
     assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_SHOP && wm.buy);   // Buy
     {
-        u8 dagger = shop_nth(0), i, n = shop_n;
-        assert(n == 10 && item_price(dagger) == 100);        // the guide's Gariland stock
+        u8 dagger = shop_nth(0), i, n = shop_n, total = 0;
+        assert(!wm.cat && n == 4 && item_price(dagger) == 100);   // the weapon tab: four of them
+        for (i = 0; i < SHOP_TABS; i++) { wm.cat = i; shop_refresh(); total = (u8)(total + shop_n); }
+        assert(total == 10);                                 // the guide's whole Gariland stock
+        wm.cat = 0; shop_refresh();
+        assert(sw_step(0) && sw_step(K_F5) && wm.cat == 1);  // the source's L1/R1
+        assert(sw_step(0) && sw_step(K_F1) && wm.cat == 0);
+        assert(sw_step(0) && sw_step(K_F1) && wm.cat == SHOP_TABS - 1);   // wrapping
+        assert(sw_step(0) && sw_step(K_F5) && !wm.cat && shop_n == 4);
+        assert(sw_step(0) && sw_step(K_MODE) && wm.detail);  // the shared item detail
+        assert(sw_step(0) && sw_step(K_MODE) && !wm.detail);
+        assert(item_wearers(dagger) <= save.n);
+        n = shop_n;
         for (i = 0; i < n; i++) assert(on_sale(shop_nth(i)) && item_price(shop_nth(i)));
         memset(save.inv, 0, sizeof save.inv); gil_set(100);
         assert(sw_step(0) && sw_step(K_ENTER));
