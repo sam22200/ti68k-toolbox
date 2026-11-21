@@ -113,8 +113,8 @@ int main(void)
     // The Fur Shop: its town row waits on the source's Chapter III, and its own door shows it.
     assert(!fur_open() && scene && scene[4] == ROOM_N);
     game_scenario(2); assert(wm.screen == SC_FUR && wm.trow == 0);
-    assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0));
-    assert(sw_step(K_ENTER) && wm.screen == SC_TOWN);         // Leave store
+    assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && sw_step(K_DOWN) && sw_step(0));
+    assert(sw_step(K_ENTER) && wm.screen == SC_TOWN);         // Buy / Sell / Leave store
     assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_MAP);
     game_scenario(0);
     // A field answers with one of its formations; Chapter I has none ripped, so it still waits.
