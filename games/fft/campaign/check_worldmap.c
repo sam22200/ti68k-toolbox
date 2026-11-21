@@ -27,6 +27,8 @@ static u32 state_hash(void)
     h=(h<<1|h>>31)^(u16)wm.handx;h=(h<<1|h>>31)^(u16)wm.handy;
     h=(h<<1|h>>31)^wm.moving;h=(h<<1|h>>31)^wm.leg;h=(h<<1|h>>31)^wm.step;
     h=(h<<1|h>>31)^wm.menu;h=(h<<1|h>>31)^wm.row;h=(h<<1|h>>31)^wm.note;
+    h=(h<<1|h>>31)^wm.screen;h=(h<<1|h>>31)^wm.trow;h=(h<<1|h>>31)^wm.ttop;
+    h=(h<<1|h>>31)^wm.buy;h=(h<<1|h>>31)^(u8)(shop!=RT_NULL);
     return h;
 }
 #ifndef __m68k__

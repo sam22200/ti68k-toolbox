@@ -1,5 +1,6 @@
 // The world map (worldmap.c) on the save a Gariland victory wrote (x/check/ffsave_won.sav,
-// campaign check.py), headless: shown locations, the cheapest route, travel, the save.
+// campaign check.py), headless: shown locations, the cheapest route, travel, the save, and the
+// town's services -- the shop's stock and prices, selling back, the Soldier Office's recruit.
 #include "worldmap.c"
 #include "../../../runtime/platform-sw/rt_sw.h"
 #include <assert.h>
@@ -55,7 +56,50 @@ int main(void)
     use_save(&fresh);
     sw_init(0); assert(sw_step(0)); assert(!shown(24));
     assert(sw_step(K_ENTER) == 0 && wm.result == 200);
+    // ------------------------------------------------ the town's services (ffsh)
+    use_save(&won);
+    sw_init(0); assert(sw_step(0));
+    assert(shop && shop_type() == 1 && sh_place[24] == 2);   // Gariland a town, Mandalia a field
+    assert(sw_step(K_ENTER) && wm.screen == SC_TOWN);        // its services, not its won battle
+    assert(sw_step(0) && sw_step(K_ENTER) && wm.screen == SC_SHOP && wm.buy);
+    {
+        u8 dagger = shop_nth(0), i, n = shop_n;
+        assert(n == 10 && item_price(dagger) == 100);        // the guide's Gariland stock
+        for (i = 0; i < n; i++) assert(on_sale(shop_nth(i)) && item_price(shop_nth(i)));
+        memset(save.inv, 0, sizeof save.inv); gil_set(100);
+        assert(sw_step(0) && sw_step(K_ENTER));
+        assert(gil() == 0 && save.inv[dagger] == 1 && !wm.note);
+        assert(sw_step(0) && sw_step(K_ENTER) && wm.note == NOTE_NOGIL);
+        assert(sw_step(K_B) && !wm.note);
+        assert(sw_step(0) && sw_step(K_LEFT) && !wm.buy && shop_n == 1);
+        assert(sw_step(0) && sw_step(K_ENTER));
+        assert(gil() == 50 && !save.inv[dagger] && !shop_n && !wm.trow);
+    }
+    assert(sw_step(K_ESC) && wm.screen == SC_TOWN);
+    assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0));
+    assert(sw_step(K_ENTER) && wm.screen == SC_OFFICE && wm.trow == 0);
+    {
+        u8 before = save.n;
+        const SaveUnit *u = &save.unit[before];
+        assert(office_job(0) == 0x4A && office_job(2) == 0x4B);   // Squire, Chemist
+        assert(office_price(0) == 1500 && office_price(1) == 1400);
+        gil_set(1499);
+        assert(sw_step(0) && sw_step(K_ENTER) && wm.note == NOTE_NOGIL && save.n == before);
+        assert(sw_step(K_B) && !wm.note);
+        gil_set(2000);
+        assert(sw_step(0) && sw_step(K_ENTER) && !wm.note);
+        assert(save.n == before + 1 && gil() == 500);
+        assert(u->job == 0x4A && u->type == 0 && u->level == 1 && u->gfx == 255);
+        assert(u->brave >= 40 && u->brave <= 71 && u->faith >= 40 && u->faith <= 71);
+        assert(u->zodiac < 12 && !save_egg(&save, before) && !save_raw_current(&save, before));
+        assert(u->eq[0] && u->eq[1] && !u->eq[2] && u->eq[3] && !u->eq[4]);  // hat, clothes, sword
+        assert(u->eq[3] == shop_nth(1 - 1) || item_price(u->eq[3]) == 200);  // a Broad Sword
+    }
+    assert(sw_step(K_ESC) && wm.screen == SC_TOWN);
+    assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_MAP && !wm.moving);
+    // A field answers with one of its formations; Chapter I has none ripped, so it still waits.
+    wm.at = 24; assert(!encounter() && sh_enc[2 * 3 * 24] == 0);
     remove("ffsave.sav");
-    puts("World map: shown locations, routes, travel to Mandalia, its notice, the save, menus and a battle door");
+    puts("World map: shown locations, routes, travel to Mandalia, its notice, the save, menus, a battle door,\n           Gariland's shop (10 items, buying, selling back) and its Soldier Office");
     return 0;
 }
