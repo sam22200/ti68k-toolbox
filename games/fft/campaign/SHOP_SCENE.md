@@ -35,9 +35,20 @@ frames it so the shopkeeper, his customer and the counter all fall to the right
 of the menu box, maps it to four greys between two measured luminance
 percentiles, and ZX0-compresses the two planes. Each room costs about 2 KB.
 
-The user chose, out of five mappings, the **15th and 97th luminance percentiles
-through a 1.4 gamma** (2026-11-20). The whole 160x100 screen is ripped, not just
-the rows under the dialogue box: an empty band above it looked wrong.
+The whole 160x100 screen is ripped, not just the rows under the dialogue box:
+an empty band above it looked wrong. Each room has its own mapping, chosen by
+the user out of five:
+
+| room | window | greys |
+| --- | --- | --- |
+| store | (8, 18) | 15th/97th percentiles through a 1.4 gamma (2026-11-20) |
+| office | (4, 28) | 40th/90th with a 2x2 ordered dither (2026-11-21) |
+
+The office is framed on Ramza: he stands at source x 100..122, y 72..108, which
+puts him at screen x 96..118, y 44..80 -- clear of the menu box on his left and
+of the bottom plates below him. The guildmaster falls off the right edge at
+that framing; the source room is only 128 rows tall, so a 100-row window cannot
+lift Ramza any higher.
 
 The **town's own menu stays over the world map**, as the source keeps it over
 its world map: there is no town picture to rip, and none is needed.
