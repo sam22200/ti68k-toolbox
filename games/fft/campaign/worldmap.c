@@ -766,6 +766,12 @@ static void map_background(s16 cx,s16 cy,u8 decor)
 // top, the shared action menu at the left and the shared War Funds plate at the bottom right.
 // Every menu obeys CHOICE_MENU.md's five rules.
 static const u8 *scene_part(u8 k) { return scene + b16(scene + 6 + 2 * k); }
+#ifdef WM_ROOM_PICK                      // review door (preview_shop.c): compose any room
+u8 wm_room_pick = 1;
+#define TOWN_ROOM(office) wm_room_pick
+#else
+#define TOWN_ROOM(office) ((u8)((office) + 1))
+#endif
 static const char *job_name(u8 job)
 { return (const char *)mgb + b16(mgb + b16(mgb + 4) + (u16)(u8)(job - 0x4A) * MG_JOB_SIZE); }
 // The room decompresses into the map's own strip cache: it is 32 KB and idle while a town
@@ -912,7 +918,7 @@ static void town_compose(void)
     u8 office = (u8)(wm.screen == SC_OFFICE);
     void *l = rt_light, *d = rt_dark;
     rt_light = page; rt_dark = page + PAGE_PLANE;
-    zx0_unpack(scene_part((u8)(office + 1)) + 1, page);     // the room, straight into the page
+    zx0_unpack(scene_part(TOWN_ROOM(office)) + 1, page);    // the room, straight into the page
     if (wm.screen == SC_SHOP) {
         shop_rows();
         {
