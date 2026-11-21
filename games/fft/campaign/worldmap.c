@@ -790,8 +790,8 @@ static void date_plate(void)
     if (day >= 10) { date[4] = (char)('0' + day / 10); date[5] = (char)('0' + day % 10); date[6] = 0; }
     else { date[4] = (char)('0' + day); date[5] = 0; }
     w = (s16)(map_menu_width(date) + 8); x = 4;
-    panel(x, 3, w, 10);
-    black((s16)(x + 4), 6, date);
+    panel(x, 1, w, 10);                  // its top flush with the place plate's
+    black((s16)(x + 4), 4, date);
 }
 static void says(const char *name, const char *first, const char *second)
 {
