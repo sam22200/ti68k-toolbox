@@ -44,11 +44,15 @@ the user out of five:
 | store | (8, 18) | 15th/97th percentiles through a 1.4 gamma (2026-11-20) |
 | office | (4, 28) | 40th/90th with a 2x2 ordered dither (2026-11-21) |
 
-The office is framed on Ramza: he stands at source x 100..122, y 72..108, which
-puts him at screen x 96..118, y 44..80 -- clear of the menu box on his left and
-of the bottom plates below him. The guildmaster falls off the right edge at
-that framing; the source room is only 128 rows tall, so a 100-row window cannot
-lift Ramza any higher.
+The office picture is **adapted, not only cropped**. In the source Ramza stands
+sixty pixels from the guildmaster's desk, and no 160x100 window holds both once
+the menu box takes the left half: framed on one, the other is off screen.
+`move_actor` lifts him off his own floor -- the stone is grey, he is not, so a
+saturation test and the largest connected blob cut him out cleanly -- patches
+the hole with the floor twenty-four pixels to his left, and sets him down
+sixteen right and twenty-four up, one step along the room's isometric floor.
+Nothing else in the picture moves. The window at (20, 8) then shows Ramza at
+screen x 94..118 and the guildmaster at 140..160, both clear of the menu.
 
 The **town's own menu stays over the world map**, as the source keeps it over
 its world map: there is no town picture to rip, and none is needed.

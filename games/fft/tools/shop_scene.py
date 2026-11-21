@@ -67,13 +67,32 @@ W, H = 160, 100                   # the whole screen: the dialogue box is drawn 
 # name, window origin in the source, and the grey mapping. The store is a bright room full of
 # dark goods, the office a dim one, so the percentiles that become white and black differ.
 # The user chose the store's 15/97 percentiles with a 1.4 gamma on 2026-11-20.
-VARIANTS = (
-    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
-    # The office's stone and its near-white candles are too far apart for four flat greys: the
-    # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
-    ('BK_FITR', 4, 28, dict(lo=40, hi=90, dither=True)),
-)
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
+# ADAPTED, not OBSERVED: in the source office Ramza stands sixty pixels from the guildmaster's
+# desk, and at 160x100 a window cannot hold both once the menu box takes the left half. He is
+# cut out of his own floor and set down beside the desk, sixteen pixels right and twenty-four
+# up -- one step along the room's isometric floor. Nothing else in the picture moves.
+RAMZA_TO_DESK = dict(box=(98, 70, 124, 110), to=(16, -24), floor=-24)
+
+
+def move_actor(rgb, box, to, floor):
+    """Lift the figure inside `box` off its floor and set it down at `to` (dx, dy)."""
+    from scipy import ndimage
+    x0, y0, x1, y1 = box
+    sub = rgb[y0:y1, x0:x1]
+    sat = sub.max(2) - sub.min(2)
+    mask = (sat >= 4) | (sub.max(2) >= 22)         # the stone floor is grey; he is not
+    mask = ndimage.binary_opening(ndimage.binary_closing(mask, np.ones((3, 3))), np.ones((2, 2)))
+    label, n = ndimage.label(mask)
+    if n:
+        sizes = ndimage.sum(mask, label, range(1, n + 1))
+        mask = label == int(np.argmax(sizes)) + 1
+    actor = sub.copy()
+    rgb[y0:y1, x0:x1][mask] = rgb[y0:y1, x0 + floor:x1 + floor][mask]   # the floor he stood on
+    dx, dy = to
+    there = rgb[y0 + dy:y1 + dy, x0 + dx:x1 + dx]
+    there[mask] = actor[mask]
+    return rgb
 
 
 def face_greys(px, pal):
@@ -105,13 +124,23 @@ def portrait(disc, files, index, palette=KEEPER_PAL):
     return bytes(interface.planes(im, 32))
 
 
-def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False):
+
+VARIANTS = (
+    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
+    # The office's stone and its near-white candles are too far apart for four flat greys: the
+    # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
+    ('BK_FITR', 20, 8, dict(lo=40, hi=90, dither=True, move=RAMZA_TO_DESK)),
+)
+def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False, move=None):
     """One MENU/BK_*.TIM window in the runtime's colours (C_WHITE 0 .. C_BLACK 3),
     so a dark source pixel is black."""
     b = disc.read(*files['MENU/%s.TIM' % name])
     _, _, _, w, h = struct.unpack_from('<IHHHH', b, 8)
     px = np.frombuffer(b, '<u2', count=w * h, offset=20).reshape(h, w).astype(int)
-    lum = (px & 31) / 31 * .299 + (px >> 5 & 31) / 31 * .587 + (px >> 10 & 31) / 31 * .114
+    rgb = np.dstack([px & 31, px >> 5 & 31, px >> 10 & 31]).astype(float)
+    if move:
+        rgb = move_actor(rgb, **move)
+    lum = rgb[:, :, 0] / 31 * .299 + rgb[:, :, 1] / 31 * .587 + rgb[:, :, 2] / 31 * .114
     crop = lum[y0:y0 + H, x0:x0 + W]
     crop = np.pad(crop, ((0, H - crop.shape[0]), (0, W - crop.shape[1])))
     a, b2 = np.percentile(crop, lo), np.percentile(crop, hi)
