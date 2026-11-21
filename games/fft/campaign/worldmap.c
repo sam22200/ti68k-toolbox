@@ -769,15 +769,17 @@ static void page_blit(void)
         memcpy((u8 *)rt_dark + (u16)y * RT_PBYTES, page + PAGE_PLANE + (u16)y * RT_PBYTES, 20);
     }
 }
-// Where the cursor is: a floating plate near the top of the screen, as wide as its name and no
-// wider, one pixel of air over and under the text and one off the screen's edge. It never goes
-// to the foot of the screen.
-static void place_plate(const char *name)
+// The map's two labels, one style: black, white text, one pixel of air over and under it, as
+// wide as the text needs, one pixel off the screen's top edge. The place is centred and the
+// day sits at the left; neither ever goes to the foot of the screen.
+static void plate(s16 x, const char *s)
 {
-    s16 w = (s16)(map_menu_width(name) + 8), x = (s16)((160 - w) / 2);
+    s16 w = (s16)(map_menu_width(s) + 8);
+    if (x < 0) x = (s16)((160 - w) / 2);
     draw_rect(x, 1, w, 7, C_BLACK);
-    text((s16)(x + 4), 2, name, C_WHITE, 158);
+    text((s16)(x + 4), 2, s, C_WHITE, 158);
 }
+static void place_plate(const char *name) { plate(-1, name); }
 // The day, in its own small panel at the top left, where it has always been.
 static void date_plate(void)
 {
@@ -785,13 +787,10 @@ static void date_plate(void)
                                         "Jul","Aug","Sep","Oct","Nov","Dec" };
     char date[7];
     u8 day = save.world.day;
-    s16 w, x;
     memcpy(date, months[save.world.month - 1], 3); date[3] = ' ';
     if (day >= 10) { date[4] = (char)('0' + day / 10); date[5] = (char)('0' + day % 10); date[6] = 0; }
     else { date[4] = (char)('0' + day); date[5] = 0; }
-    w = (s16)(map_menu_width(date) + 8); x = 4;
-    panel(x, 1, w, 10);                  // its top flush with the place plate's
-    black((s16)(x + 4), 4, date);
+    plate(4, date);
 }
 static void says(const char *name, const char *first, const char *second)
 {
