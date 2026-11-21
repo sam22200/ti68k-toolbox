@@ -3,13 +3,23 @@
 
 usage: shop_scene.py DISC.cue OUT.bin
 
-OBSERVED on the disc: MENU/BK_SHOP.TIM and MENU/BK_HONE.TIM are the rooms the
-source draws behind the store and the Soldier Office -- 256x128 16-bit TIM
-images, pre-rendered, **with their people already in them** (the shopkeeper
-behind his counter at x 130..155, his customer at x 96..118, the office clerk
-at his desk and a recruit before him). There is nothing to place: the room is
-one picture, the way a battle map is one view. BK_SHOP2/3 and BK_HONE2/3 are
-the other towns' rooms, and BK_FITR* the fitting room.
+OBSERVED on the disc: the whole game holds **nine** 256x128 16-bit TIM rooms,
+and no others -- `MENU/BK_SHOP`, `BK_HONE`, `BK_FITR`, each with a 2 and a 3 for
+the other towns' styles. They are pre-rendered, **with their people already in
+them**, so there is nothing to place: a room is one picture, the way a battle
+map is one view.
+
+Which is which, read off the pictures against the user's own screenshots:
+
+- **BK_SHOP** the store: the shopkeeper behind his counter at x 130..155, his
+  customer at x 96..118.
+- **BK_HONE** (hone: bone) the **Fur Shop**, hides and a skeleton hanging over
+  the room. It is not the Soldier Office, which is what this bank shipped by
+  mistake until 2026-11-21.
+- **BK_FITR** the **Soldier Office**: a stone room of books and candles, the
+  guildmaster seated at x 160..180 and a recruit before him at x 100..122.
+
+The Bar has no picture here at all; neither does anything else.
 
 Each record is a 160x100 window of the source taken at 1:1 -- the source's own
 pixels read far better in four greys than a scaled-down room -- framed to put
@@ -59,7 +69,11 @@ W, H = 160, 100                   # the whole screen: the dialogue box is drawn 
 # The user chose the 15/97 percentiles with a 1.4 gamma on 2026-11-20.
 VARIANTS = (
     ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
-    ('BK_HONE', 8, 23, dict(lo=10, hi=99, gamma=1.4)),
+    ('BK_FITR', 20, 8, dict(lo=15, hi=97, gamma=1.4)),
+    ('BK_FITR', 20, 8, dict(lo=35, hi=92, gamma=1.0)),
+    ('BK_FITR', 20, 8, dict(lo=45, hi=88, gamma=1.0)),
+    ('BK_FITR', 20, 8, dict(lo=35, hi=92, gamma=1.6)),
+    ('BK_FITR', 20, 8, dict(lo=40, hi=90, dither=True)),
 )
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 

@@ -7,12 +7,22 @@ War Funds at the bottom right, and the source's own room behind all of it.
 
 ## The room is a picture, not a scene to build
 
-OBSERVED on the disc: **`MENU/BK_SHOP.TIM`**, **`MENU/BK_HONE.TIM`** (the
-Soldier Office) and **`MENU/BK_FITR.TIM`** (the fitting room) are 256x128
-16-bit TIM images, pre-rendered, and **they already contain their people** --
-the shopkeeper leaning on his counter and a customer in front of it, the office
-clerk at his desk and a recruit before him. `BK_*2` and `BK_*3` are the other
-towns' rooms.
+OBSERVED on the disc: the whole game holds **nine** 256x128 16-bit TIM rooms
+and no others -- `MENU/BK_SHOP`, `BK_HONE`, `BK_FITR`, each with a 2 and a 3
+for the other towns' styles. They are pre-rendered and **already contain their
+people**. Which is which, read off the pictures against the user's own
+screenshots:
+
+| file | room |
+| --- | --- |
+| `BK_SHOP` | the store: the shopkeeper behind his counter at x 130..155, his customer at x 96..118 |
+| `BK_HONE` | *hone*, bone: the **Fur Shop**, hides and a skeleton over the room |
+| `BK_FITR` | the **Soldier Office**: books and candles, the guildmaster at x 160..180, a recruit at x 100..122 |
+
+The bank shipped `BK_HONE` as the Soldier Office until 2026-11-21; it is the
+Fur Shop's room, and the office now uses `BK_FITR`. **The Bar has no picture on
+the disc at all**, and neither has anything else: those screens are drawn by
+the engine, not stored.
 
 So there is nothing to place on top: the room is one picture, the way a battle
 map is one view, and no sprite rip, no isometric renderer and no second
