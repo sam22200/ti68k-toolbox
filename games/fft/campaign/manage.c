@@ -33,6 +33,7 @@ enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD };   // the save's order
 enum { JOB_CHANGE_FRAMES=96 }; // source-observed light column, adapted to30Hz/four greys
 typedef struct {
     u8 screen, back, unit, row, top, slot, confirm, note;   // note: a message (NOTE_*)
+    u8 detail;                          // [MODE]: the shared item detail panel
     u8 pick_n;                          // S_PICK: entries (pick[]: an item id or an ability)
     u16 pick[64];
     u8 changed;                         // the party edited (written at the end)
@@ -44,7 +45,7 @@ typedef struct {
 enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED, NOTE_SAVE };
 Mg mg;
 Save save;
-static const u8 *bank, *common,*identity,*egg_bank,*monster_bank;
+static const u8 *bank, *common,*identity,*egg_bank,*monster_bank,*item_text;
 static u8 *cache;
 static u8 dirty;
 
@@ -70,6 +71,7 @@ static const char *set_name(u8 s) { return cj_set_name(common, s); }
 #define I_TYPE 3
 #define I_HP 5
 #define I_ICON 12
+#define I_WP 13
 static const u8 slot_flag[SLOTS] = { 0x20, 0x10, 0x08, 0x80, 0x40 };
 
 static u16 job_ability(const u8 *j, u8 k) { return cj_set_ability(common, j[J_SET], k); }
@@ -324,6 +326,19 @@ static void icon(s16 x, s16 y, u8 id)
     RtSprite sp = { 8, 8, p, p + 8, p + 16 };
     draw_sprite(x, y, &sp);
 }
+// ffid (tools/item_help.py): FFT's own description, read in place from the archive.
+static const char *item_help(u8 id)
+{
+    u16 at;
+    if (!item_text) return "";
+    at = b16(item_text + 6 + 2 * (u16)id);
+    return at ? (const char *)item_text + at : "";
+}
+#define ID_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define ID_NUM(x,y,n) number(x,y,n)
+#define ID_ICON(x,y,id) icon(x,y,id)
+#define ID_ADV(c) (menu_font()[103 + (u8)(c) - 32])
+#include "../item_detail.inc"
 static void hand(s16 x, s16 y)
 {
     choice_hand_at(x,y);
@@ -598,6 +613,27 @@ static void list_cursor(void)
     choice_cursor_animated(&cursor,mg.row,rt_frame);
 }
 
+// The item the cursor is on, 0 when it is not on one.
+static u8 detail_item(void)
+{
+    if (mg.screen == S_EQUIP) return unit(mg.unit)->eq[slot_order[mg.row]];
+    if (mg.screen == S_PICK && mg.back == S_EQUIP) return (u8)mg.pick[mg.top + mg.row];
+    return 0;
+}
+static void detail_panel(void)
+{
+    u8 id = detail_item();
+    const u8 *r;
+    ItemDetail d;
+    u8 i;
+    if (!id) { mg.detail = 0; return; }
+    r = item_rec(id);
+    d.id = id; d.kind = r[I_TYPE]; d.flags = r[I_FLAGS]; d.name = str(b16(r));
+    d.help = item_help(id); d.power = r[I_WP];
+    for (i = 0; i < 7; i++) d.stat[i] = (s8)r[I_HP + i];
+    item_detail_draw(&d);
+}
+
 static void page(void)
 {
     static const char *const titles[] = { "Formation", "Formation", "Status", "Equip", "Abilities", "Learn", "Change Job", "" };
@@ -626,9 +662,10 @@ static void page(void)
         foot("ENTER:learn SHIFT:back F1/F5:unit"); break;
     case S_PICK:
         list_rows(mg.pick_n, pick_row);
-        foot("ENTER:choose SHIFT:back"); break;
+        foot(item_help(detail_item())[0] ? "ENTER:choose MODE:info" : "ENTER:choose SHIFT:back"); break;
     }
     note_panel();
+    if (mg.detail) detail_panel();
     // Recover six rows beneath the compact title; all body/overlay coordinates
     // above remain shared with the existing equipment and ability list layout.
     memmove((u8 *)rt_light+7*RT_PBYTES,(u8 *)rt_light+13*RT_PBYTES,87*RT_PBYTES);
@@ -656,7 +693,7 @@ void game_init(void)
 #ifndef __m68k__
     if(cache)free(cache);
 #endif
-    bank = RT_NULL; cache = RT_NULL;     // (statics survive between runs)
+    bank = RT_NULL; cache = RT_NULL; item_text = RT_NULL;   // (statics survive between runs)
     memset(&mg, 0, sizeof mg);
     bank = rt_file("ffmg", &size);
     if (bank && memcmp(bank, "FMG3", 4)) bank = RT_NULL;
@@ -665,6 +702,8 @@ void game_init(void)
     if (!cj_valid(common, size)) bank = RT_NULL;
     save_load(&save);
     egg_bank=rt_file("ffeg",&size);if(!egg_art_valid(egg_bank,size))bank=RT_NULL;
+    item_text=rt_file("ffid",&size);
+    if(item_text&&(memcmp(item_text,"FID1",4)||b16(item_text+4)!=256))item_text=RT_NULL;
     monster_bank=rt_file("ffma",&size);if(!monster_formation_valid(monster_bank,size))monster_bank=RT_NULL;
     if (save.n > PARTY_MAX) save.n = 0;
     cache = (u8 *)malloc(2 * RT_PSIZE);
@@ -728,6 +767,8 @@ u8 game_update(void)
     if (!bank || !save.n) { if (key & K_ESC)return leave();return 1; }
     u = unit(mg.unit);
     if (mg.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) mg.note = 0; return 1; }
+    if (mg.detail) { if (key & (K_MODE | K_B | K_ESC | K_ENTER | K_A)) mg.detail = 0; return 1; }
+    if ((key & K_MODE) && detail_item()) { mg.detail = 1; return 1; }
     if (mg.confirm) {
         if(save_egg(&save,mg.unit)){
             if(key&(K_B|K_ESC))mg.confirm=0;
@@ -873,6 +914,7 @@ void game_render(void)
     }
     memcpy(rt_light, cache, RT_PSIZE); memcpy(rt_dark, cache + RT_PSIZE, RT_PSIZE);
     if(!bank||!save.n)return;
+    if(mg.detail)return;                 // the detail panel is modal: no live cursor over it
     if(mg.screen==S_FORM)formation_cursor();
     if(mg.screen==S_MENU)command_menu();
     list_cursor();

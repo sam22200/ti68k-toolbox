@@ -51,6 +51,7 @@ static const u8 *bank, *mgb,*breed_rules;
 static const u8 *shop,*sh_price,*sh_tier,*sh_kind,*sh_cats,*sh_lone,*sh_shop,*sh_tierflag;
 static const u8 *sh_place,*sh_office,*sh_jobs,*sh_enc;
 static const u8 *scene;                  // ffsk: the source's rooms and the speaker's portrait
+static const u8 *help;                   // ffid: FFT's own item descriptions, read in place
 #define PAGE_PLANE (100 * RT_PBYTES)
 static u8 *page;
 static u8 p_screen = 255, p_cat, p_buy, p_trow, p_ttop, p_n;
@@ -215,6 +216,14 @@ static void gil_set(u32 v)
 static const u8 *item_rec(u8 id) { return mgb + b16(mgb + 4 + 2 * 1) + (u16)id * MG_ITEM_SIZE; }
 static const char *item_name(u8 id)
 { u16 at = b16(item_rec(id)); return at ? (const char *)mgb + at : ""; }
+// ffid (tools/item_help.py): FFT's own description, read in place from the archive.
+static const char *item_help(u8 id)
+{
+    u16 at;
+    if (!help) return "";
+    at = b16(help + 6 + 2 * (u16)id);
+    return at ? (const char *)help + at : "";
+}
 static void item_icon(s16 x, s16 y, u8 id)
 {
     const u8 *p = mgb + b16(mgb + 4 + 2 * 4) + (u16)item_rec(id)[MI_ICON] * 24;
@@ -236,6 +245,7 @@ static u8 item_wearers(u8 id)
 #define ID_TEXT(x,y,s,c,l) text(x,y,s,c,l)
 #define ID_NUM(x,y,n) number(x,y,n)
 #define ID_ICON(x,y,id) item_icon(x,y,id)
+#define ID_ADV(c) (menu_font()[103 + (u8)(c) - 32])
 #include "../item_detail.inc"
 static void item_detail(u8 id)
 {
@@ -243,6 +253,7 @@ static void item_detail(u8 id)
     ItemDetail d;
     u8 i;
     d.id = id; d.kind = sh_kind[id]; d.flags = r[MI_FLAGS]; d.name = item_name(id);
+    d.help = item_help(id);
     for (i = 0; i < 7; i++) d.stat[i] = (s8)r[MI_HP + i];
     d.power = r[MI_WP];
     item_detail_draw(&d);
@@ -380,7 +391,7 @@ void game_init(void)
     release_map();
 #endif
     wmcache=idle_sprites=RT_NULL;
-    bank = mgb = shop = scene = RT_NULL;     // (statics survive between runs)
+    bank = mgb = shop = scene = help = RT_NULL;   // (statics survive between runs)
     strip_decor=decor_ready=0;
     memset(&wm, 0, sizeof wm);
     bank = rt_file("ffwm", &size);
@@ -401,6 +412,8 @@ void game_init(void)
     } else shop = RT_NULL;
     scene = rt_file("ffsk", &size);
     if (scene && (memcmp(scene, "FSK3", 4) || scene[4] < 2)) scene = RT_NULL;
+    help = rt_file("ffid", &size);
+    if (help && (memcmp(help, "FID1", 4) || b16(help + 4) != 256)) help = RT_NULL;
     breed_rules=rt_file("ffwb",&size);
     if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
