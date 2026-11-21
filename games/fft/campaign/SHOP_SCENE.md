@@ -43,6 +43,12 @@ the user out of five:
 | --- | --- | --- |
 | store | (8, 18) | 15th/97th percentiles through a 1.4 gamma (2026-11-20) |
 | office | (26, 8) | 25th/85th, dithered **only above 0.62** (2026-11-21) |
+| fur shop | (8, 26) | 45th/95th, dithered above 0.72 (2026-11-21) |
+
+The Fur Shop needs no compositing: Ramza stands at source x 105..125, y 78..115
+and the bald merchant at x 140..165, y 60..95, only thirty-five pixels apart,
+so one window holds both. Both are outlined, the room being almost black
+behind them.
 
 Dithering a whole room turned both of the office's figures into noise. The
 dither is confined to the highlights: a candle or a stained window keeps its
@@ -86,15 +92,19 @@ The three overlays are the campaign's own, not new ones:
   from the bottom and the right. The world map uses the same plate. The
   battle's result screen keeps its own reviewed layout.
 
-## The portrait
+## The portraits
 
 Found: **`EVENT/WLDFACE.BIN`** is the world-map and menu portrait sheet, 4bpp,
 256 pixels wide, **168 faces of 32x48**, eight to a row -- not the battle
 sheets, and not `EVENT/EVTFACE.BIN` (which holds the 32 event faces). The
-shopkeeper is **face 8**, the moustached man of the user's screenshot. That is
-an INTERPRETATION: matched by eye, not read from the game's own table. The
-Soldier Office's clerk is one of the bald faces beside him and still borrows
-the shopkeeper's.
+shopkeeper is **face 8**, the moustached man of the user's screenshot, and the
+**Fur Shop's merchant face 9**, the bald one. Both are INTERPRETATION: matched
+by eye against the user's screenshots, not read from the game's own table. The
+Soldier Office's guildmaster is blond with a white collar and has not been
+found in the sheet yet; he borrows the shopkeeper's portrait, though his name
+is right.
+
+The bank carries one speaker a room, so each screen names and shows its own.
 
 **The sheet's own palettes are its last 2048 bytes**: the 168 faces take
 129,024, and what follows is 64 CLUTs of 16 BGR555 colours. The 4-bit value is

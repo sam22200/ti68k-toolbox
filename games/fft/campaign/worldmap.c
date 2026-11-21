@@ -27,7 +27,10 @@
 
 enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED,
        NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
-enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_OFFICE };   // what the screen shows
+enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_OFFICE, SC_FUR };   // what the screen shows
+enum { ROOM_STORE = 0, ROOM_OFFICE, ROOM_FUR, ROOM_N };
+// The Fur Shop opens in the source's Chapter III; no battle of this build sets its flag.
+enum { FUR_FLAG = 255 };
 enum { SHOP_ROWS = 6, OFFICE_ROWS = 4, ENC_MAX = 3, OFFICE_REC = 17 };
 // The source's six shop tabs, by the item's category byte: [first, last] of each.
 enum { SHOP_TABS = 6 };
@@ -102,6 +105,20 @@ static u8 map_menu_width(const char *s)
 #include "../war_funds.inc"
 
 static u8 flag(u8 k) { return (u8)(save.flags[k >> 3] >> (k & 7) & 1); }
+
+static const u8 *scene_part(u8 k) { return scene + b16(scene + 6 + 2 * k); }
+static const u8 *scene_face(u8 room) { return scene_part(room); }
+static const u8 *scene_room(u8 room) { return scene_part((u8)(ROOM_N + room)); }
+// Which room a screen shows, and who speaks in it.
+static u8 town_room(void)
+{ return (u8)(wm.screen == SC_OFFICE ? ROOM_OFFICE : wm.screen == SC_FUR ? ROOM_FUR : ROOM_STORE); }
+static const char *town_speaker(void)
+{
+    return wm.screen == SC_OFFICE ? "Guildmaster" : wm.screen == SC_FUR ? "Fur Merchant" : "Shopkeeper";
+}
+static u8 fur_open(void)
+{ return (u8)(FUR_FLAG != 255 && flag(FUR_FLAG)); }
+
 // the story list's entry of location i (RT_NULL: none): location, flag + 1 that shows it,
 // battle door (u16, 0 none), flag + 1 its victory sets
 static const u8 *story(u8 i)
@@ -411,7 +428,7 @@ void game_init(void)
         if ((u16)(sh_enc + 2 * ENC_MAX * LOC_N - shop) > size) shop = RT_NULL;
     } else shop = RT_NULL;
     scene = rt_file("ffsk", &size);
-    if (scene && (memcmp(scene, "FSK3", 4) || scene[4] < 2)) scene = RT_NULL;
+    if (scene && (memcmp(scene, "FSK4", 4) || scene[4] < ROOM_N)) scene = RT_NULL;
     help = rt_file("ffid", &size);
     if (help && (memcmp(help, "FID1", 4) || b16(help + 4) != 256)) help = RT_NULL;
     breed_rules=rt_file("ffwb",&size);
@@ -440,7 +457,7 @@ void game_scenario(u16 n)                 // the save's location (n: test doors,
     wm.sel = wm.at; wm.moving = 0; wm.note = n==1?NOTE_SAVED:0; wm.result = 0;
     if (bank) { wm.x = loc_x(wm.at); wm.y = loc_y(wm.at); }
     wm.handx=wm.x;wm.handy=wm.y;wm.menu=wm.row=0;
-    wm.screen=SC_MAP;wm.trow=wm.ttop=0;wm.buy=1;
+    wm.screen=n==2?SC_FUR:SC_MAP;wm.trow=wm.ttop=0;wm.buy=1;   // n==2: the Fur Shop door
     decor_ready=0;
 }
 
@@ -471,11 +488,19 @@ static u8 town_update(u32 key)
         return 1;
     }
     if (wm.screen == SC_TOWN) {
-        wm.trow = choice_move(wm.trow, 3, key);
+        wm.trow = choice_move(wm.trow, 4, key);
         if (key & (K_ENTER | K_A)) {
-            wm.screen = (u8)(wm.trow == 2 ? SC_MAP : wm.trow ? SC_OFFICE : SC_STORE);
+            if (wm.trow == 2 && !fur_open()) { wm.note = NOTE_LATER; return 1; }
+            wm.screen = (u8)(wm.trow == 3 ? SC_MAP : wm.trow == 2 ? SC_FUR :
+                             wm.trow ? SC_OFFICE : SC_STORE);
             wm.trow = wm.ttop = 0; wm.buy = 1;
         }
+        return 1;
+    }
+    if (wm.screen == SC_FUR) {           // the poached hides are a system of their own
+        wm.trow = choice_move(wm.trow, 2, key);
+        if ((key & (K_ENTER | K_A)) && wm.trow == 1) { wm.screen = SC_TOWN; wm.trow = 0; }
+        else if (key & (K_ENTER | K_A)) wm.note = NOTE_LATER;
         return 1;
     }
     if (wm.screen == SC_STORE) {                 // the source's own Buy / Sell / Leave store
@@ -768,12 +793,11 @@ static void map_background(s16 cx,s16 cy,u8 decor)
 // disc's MENU/BK_SHOP.TIM and BK_HONE.TIM, people included), the shared dialogue box at the
 // top, the shared action menu at the left and the shared War Funds plate at the bottom right.
 // Every menu obeys CHOICE_MENU.md's five rules.
-static const u8 *scene_part(u8 k) { return scene + b16(scene + 6 + 2 * k); }
 #ifdef WM_ROOM_PICK                      // review door (preview_shop.c): compose any room
 u8 wm_room_pick = 1;
 #define TOWN_ROOM(office) wm_room_pick
 #else
-#define TOWN_ROOM(office) ((u8)((office) + 1))
+#define TOWN_ROOM(office) ((void)(office), town_room())
 #endif
 static const char *job_name(u8 job)
 { return (const char *)mgb + b16(mgb + b16(mgb + 4) + (u16)(u8)(job - 0x4A) * MG_JOB_SIZE); }
@@ -823,7 +847,7 @@ static void says(const char *name, const char *first, const char *second)
     dlg_frame(x, 13, w, 20, 0);
     text(x + 4, 17, first, C_WHITE, 156);
     text(x + 4, 24, second, C_WHITE, 156);
-    dlg_face(scene_part(0), 1, 1, 0);
+    dlg_face(scene_face(town_room()), 1, 1, 0);
 }
 // CHOICE_MENU.md: one renderer, a width fitted to the labels, the same five pixels above the
 // first row and below the last, the glove wholly on screen, the glove animated.
@@ -919,12 +943,12 @@ static void shop_rows(void)
 }
 static void town_compose(void)
 {
-    static const char *const town_rows[3] = { "Shop", "Soldier Office", "Leave" };
     static const char *const store_rows[3] = { "Buy", "Sell", "Leave store" };
+    static const char *const fur_rows[2] = { "Buy", "Leave store" };
     u8 office = (u8)(wm.screen == SC_OFFICE);
     void *l = rt_light, *d = rt_dark;
     rt_light = page; rt_dark = page + PAGE_PLANE;
-    zx0_unpack(scene_part(TOWN_ROOM(office)) + 1, page);    // the room, straight into the page
+    zx0_unpack(scene_room(TOWN_ROOM(office)) + 1, page);   // the room, straight into the page
     if (wm.screen == SC_SHOP) {
         shop_rows();
         {
@@ -933,17 +957,20 @@ static void town_compose(void)
             eqp_all((s16)(left - 3), id ? item_wearers(id) : 0, save.n);
         }
     } else {
-        says("Shopkeeper", "Welcome.",
-             office ? "What recruit are you after?" : "What can I do for you?");
+        says(town_speaker(), "Welcome.",
+             office ? "What recruit are you after?" :
+             wm.screen == SC_FUR ? "Anything from the hunt?" : "What can I do for you?");
         if (office) {
             office_rows();
             office_plates(save.n, PARTY_MAX, office_price(wm.trow < 2 ? wm.trow : 0), gil());
+        } else if (wm.screen == SC_FUR) {
+            action_menu("Menu", fur_rows, 2, 0, 0);      // Buy waits on the poaching loop
+            war_funds(gil());
         } else {
             action_menu("Menu", store_rows, 3, 255, 0);
             war_funds(gil());
         }
     }
-    (void)town_rows;
     rt_light = l; rt_dark = d;
     p_screen = wm.screen; p_cat = wm.cat; p_buy = wm.buy; p_trow = wm.trow;
     p_ttop = wm.ttop; p_n = shop_n; p_gil = gil();
@@ -960,14 +987,14 @@ static void town_page(void)
 
 static void town_render(void)
 {
-    static const char *const town_rows[3] = { "Shop", "Soldier Office", "Leave" };
+    static const char *const town_rows[4] = { "Shop", "Soldier Office", "Fur Shop", "Leave" };
     if (wm.screen == SC_TOWN) {
         s16 cx = (s16)(wm.x - 80), cy = (s16)(wm.y - 50);
         rt_clamp_cam(&map, &cx, &cy);
         map_background(cx, cy, 1);
         ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
         place_plate(loc_name(wm.at));
-        action_menu("Town", town_rows, 3, 255, 1);
+        action_menu("Town", town_rows, 4, (u8)(fur_open() ? 255 : 2), 1);
         choice_cursor_animated(&store_box, wm.trow, rt_frame);
         war_funds(gil());
         p_screen = 255;                 // the map wrote over nothing of the page, but the

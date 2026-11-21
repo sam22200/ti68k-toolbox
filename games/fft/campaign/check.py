@@ -215,7 +215,7 @@ def worldmap(pc_save,ti_save):
     info=keys(OUT/'map-info.keys',[(2,'ENTER'),(4,'ENTER'),(6,'ENTER'),(8,'MODE')])
     return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb','ffsh','ffsk','ffid'],0x4d415001,
                    [('gariland',0,4,empty),('menu',0,4,menu),('menu-last',0,8,last),
-                    ('town',0,6,town),('store',0,6,town),('shop',0,10,shop),('shop-tab',0,12,tab),('shop-info',0,10,info),('shop-sell',0,14,sell),
+                    ('town',0,6,town),('fur',2,6,empty),('store',0,6,town),('shop',0,10,shop),('shop-tab',0,12,tab),('shop-info',0,10,info),('shop-sell',0,14,sell),
                     ('office',0,10,office),('hire',0,12,hire),
                     ('blank-return',0,68,blank),('choose',0,f,choose),('walk',0,f+12,walk),('arrived',0,f+401,trip),('trip',0,f+410,trip)],
                    pc_save,ti_save,mandalia)

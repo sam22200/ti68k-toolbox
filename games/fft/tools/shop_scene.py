@@ -44,9 +44,10 @@ its hair index 1..3 -- so reading the index as luminance produced a negative.
 The greys come from the palette's own luminance, through the same rule as the
 rest of the port.
 
-FSK3: magic, u8 rooms, one pad byte, u16 offsets (portrait 32x29/348 bytes, then
-each room's u8 height and ZX0-compressed planes), then those records. The pad
-keeps the portrait record even: the 68000 reads it as longs.
+FSK4: magic, u8 rooms, one pad byte, then a u16 offset for each room's speaker
+portrait (32x29, 348 bytes) and one for each room's picture (u8 height, then
+ZX0-compressed planes). The pad keeps the portraits even: the 68000 reads them
+as longs.
 """
 from pathlib import Path
 import struct
@@ -59,7 +60,6 @@ import extract
 import interface
 import zx0pack
 
-KEEPER = 8                        # EVENT/WLDFACE.BIN face index
 KEEPER_PAL = 0                    # INTERPRETATION: the sheet's face/palette pairing is unknown
 FACE_W, FACE_H = 32, 48
 FACE_BYTES = 168 * FACE_W * FACE_H // 2
@@ -74,6 +74,10 @@ BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 # up -- one step along the room's isometric floor. Nothing else in the picture moves.
 RAMZA_TO_DESK = dict(box=(98, 70, 124, 110), to=(22, -24), floor=-24)
 GUILDMASTER = dict(box=(160, 40, 184, 82), sat=5, val=99)   # behind his desk, in the glare
+# The Fur Shop's two stand close enough together to need no moving: Ramza at x 105..125,
+# y 78..115 and the bald merchant at x 140..165, y 60..95, both against dark hides.
+FUR_RAMZA = dict(box=(103, 76, 127, 117), sat=4, val=22)
+FUR_KEEPER = dict(box=(138, 58, 167, 97), sat=4, val=22)
 
 
 def actor_mask(sub, sat=4, val=22):
@@ -119,13 +123,18 @@ def outline_actor(rgb, box, sat=4, val=22):
     return rgb
 
 
+# name, window origin, the speaker's EVENT/WLDFACE.BIN face, and the grey mapping.
 VARIANTS = (
-    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
+    ('BK_SHOP', 8, 18, 8, dict(lo=15, hi=97, gamma=1.4)),
     # The office's stone and its near-white candles are too far apart for four flat greys: the
     # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
-    ('BK_FITR', 26, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
-                            outline=(GUILDMASTER,))),
+    ('BK_FITR', 26, 8, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
+                               outline=(GUILDMASTER,))),
+    ('BK_HONE', 8, 26, 9, dict(lo=45, hi=95, dither=0.72,
+                               outline=(FUR_RAMZA, FUR_KEEPER))),
 )
+
+
 def face_greys(px, pal):
     """Four greys from the palette's own range. These faces live in a narrow band -- palette 0
     runs 5.3 to 26.2 of 31 -- so the port's fixed thresholds leave almost every pixel mid-grey
@@ -156,12 +165,7 @@ def portrait(disc, files, index, palette=KEEPER_PAL):
 
 
 
-VARIANTS = (
-    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
-    # The office's stone and its near-white candles are too far apart for four flat greys: the
-    # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
-    ('BK_FITR', 26, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK)),
-)
+# name, window origin, the speaker's EVENT/WLDFACE.BIN face, and the grey mapping.
 def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=0, move=None, outline=()):
     """One MENU/BK_*.TIM window in the runtime's colours (C_WHITE 0 .. C_BLACK 3),
     so a dark source pixel is black."""
@@ -206,19 +210,21 @@ def planes(grey):
 
 def build(cue):
     disc, files = extract.disc_files(cue)
-    records = [portrait(disc, files, KEEPER)]
-    for name, x0, y0, how in VARIANTS:
+    records = [portrait(disc, files, face) for _, _, _, face, _ in VARIANTS]
+    for name, x0, y0, _, how in VARIANTS:
         records.append(bytes((H,)) + zx0pack.pack(planes(room(disc, files, name, x0, y0, **how))))
     # The portrait is drawn straight from the bank by a 32-wide sprite routine, which reads
     # longs: its record must start on an even address, so the header is padded to six bytes.
     at = 6 + 2 * len(records)
-    head = b'FSK3' + bytes((len(VARIANTS), 0))
+    head = b'FSK4' + bytes((len(VARIANTS), 0))
     for record in records:
         head += struct.pack('>H', at)
         at += len(record)
     out = head + b''.join(records)
     assert len(out) == at
-    return out, dict(bytes=len(out), keeper=KEEPER, rooms=[len(r) for r in records[1:]])
+    n = len(VARIANTS)
+    return out, dict(bytes=len(out), keeper=[v[3] for v in VARIANTS],
+                     rooms=[len(r) for r in records[n:]])
 
 
 def main():
@@ -226,7 +232,7 @@ def main():
     raw, info = build(cue)
     out.write_bytes(raw)
     print('%s: %d bytes, rooms %s, shopkeeper %s' %
-          (out.name, info['bytes'], info['rooms'], 'WLDFACE %d' % info['keeper']))
+          (out.name, info['bytes'], info['rooms'], 'WLDFACE %s' % info['keeper']))
 
 
 if __name__ == '__main__':
