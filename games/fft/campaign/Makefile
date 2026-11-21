@@ -13,7 +13,7 @@ PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffbp ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
-BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh
+BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh ffsk
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
@@ -203,7 +203,7 @@ dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
 	./fftscn_dialogue_test
 .PHONY: map-test
-map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin
+map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin
 	$(CC) $(PC_CFLAGS) -o fftmap_test test_worldmap.c $(RT_CORE) $(RT_SW)
 	./fftmap_test
 .PHONY: manage-test

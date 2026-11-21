@@ -14,10 +14,10 @@
 #include "../../../runtime/platform-sw/rt_sw.h"
 #include "fixture_save.h"
 
-enum { ROOM_W = 160, ROOM_TOP = 34 };            // the rows the dialogue box leaves visible
+enum { ROOM_W = 160, ROOM_TOP = 0 };             // the room fills the screen; the box sits on it
 static const u8 *sk;
 static u8 *picture;
-static const u8 *sk_part(u8 k) { return sk + b16(sk + 5 + 2 * k); }
+static const u8 *sk_part(u8 k) { return sk + b16(sk + 6 + 2 * k); }
 static void show_room(u8 which)
 {
     const u8 *rec = sk_part((u8)(which + 1));
@@ -53,7 +53,7 @@ static void action_menu(const char *title, const char *const *labels, u8 n, u8 g
     ChoiceLayout p = { 24, 36, 0, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
     u8 i;
     p.width = rows_width(labels, n);
-    p.height = (u8)(10 + 9 * n);
+    p.height = (u8)(13 + 9 * n);        // CHOICE_MENU.md: the same five rows above and below
     choice_frame(&p, title);
     for (i = 0; i < n; i++) choice_row(&p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
     choice_cursor_animated(&p, 0, rt_frame);
@@ -65,7 +65,7 @@ static void screen(u8 v)
     static const char *const office[4] = { "Hire", "Dismiss", "Rename", "Leave office" };
     static const char *const town[3] = { "Shop", "Soldier Office", "Leave" };
     draw_clear();
-    if (v == 6) {                               // the town's own menu, over the world map
+    if (v == 2) {                               // the town's own menu, over the world map
         s16 cx = (s16)(wm.x - 80), cy = (s16)(wm.y - 50);
         rt_clamp_cam(&map, &cx, &cy);
         map_background(cx, cy, 1);
@@ -74,7 +74,7 @@ static void screen(u8 v)
         black(4, 2, loc_name(wm.at));
         action_menu("Town", town, 3, 255);
     } else {
-        u8 office_room = v == 5;
+        u8 office_room = v == 1;
         show_room(v);
         says("Shopkeeper", "Welcome.",
              office_room ? "Looking for a soldier?" : "What can I do for you?");
@@ -95,13 +95,13 @@ int main(int argc, char **argv)
     if (!read_save_fixture(f, &save)) return 5;
     fclose(f);
     sk = rt_file("ffsk", &size); if (!sk || memcmp(sk, "FSK3", 4)) return 6;
-    picture = malloc(2 * ROOM_W * 66 / 8); if (!picture) return 7;
+    picture = malloc(2 * ROOM_W * 100 / 8); if (!picture) return 7;
     game_scenario(0);
     wm.at = 6; wm.x = loc_x(6); wm.y = loc_y(6); wm.tick = 4;
-    for (v = 0; v < 7; v++) {
+    for (v = 0; v < 3; v++) {
+        static const char *const names[3] = { "shop-store", "shop-office", "shop-town" };
         screen(v);
-        if (v < 5) snprintf(path, sizeof path, "%s/shop-grey-%u.png", argv[1], v + 1);
-        else snprintf(path, sizeof path, "%s/shop-%s.png", argv[1], v == 5 ? "office" : "town");
+        snprintf(path, sizeof path, "%s/%s.png", argv[1], names[v]);
         if (sw_write_png(path, 1)) return 8;
     }
     free(picture);

@@ -11,21 +11,23 @@ at his desk and a recruit before him). There is nothing to place: the room is
 one picture, the way a battle map is one view. BK_SHOP2/3 and BK_HONE2/3 are
 the other towns' rooms, and BK_FITR* the fitting room.
 
-Only the rows the screen actually shows are ripped: the dialogue box covers the
-top 34, so each record is a 160x66 window taken at 1:1 (the source's own pixels
-read far better in four greys than a scaled-down room), framed to put both
-figures to the right of the menu box, and ZX0-compressed as two planes.
+Each record is a 160x100 window of the source taken at 1:1 -- the source's own
+pixels read far better in four greys than a scaled-down room -- framed to put
+both figures to the right of the menu box, and ZX0-compressed as two planes.
+The whole screen is ripped: the dialogue box is drawn over the room, and an
+empty band above it looked wrong.
 
-Five grey mappings of the store are shipped for the user's choice; the office
-follows whichever wins.
+The grey mapping is the one the user chose on 2026-11-20 out of five: the 15th
+and 97th luminance percentiles become black and white, through a 1.4 gamma.
 
 The speaker's portrait is provisional: the shopkeeper's own event portrait has
 not been identified yet (EVENT/EVTFACE.BIN holds 32 of them, 32x48, 4bpp). The
 bank carries the 40M townsperson's battle portrait meanwhile, read exactly as
 common_portraits.py reads a speaker's.
 
-FSK3: magic, u8 rooms, u16 offsets (portrait 32x29/348 bytes, then each room's
-u8 height and ZX0-compressed planes), then those records.
+FSK3: magic, u8 rooms, one pad byte, u16 offsets (portrait 32x29/348 bytes, then
+each room's u8 height and ZX0-compressed planes), then those records. The pad
+keeps the portrait record even: the 68000 reads it as longs.
 """
 from pathlib import Path
 import struct
@@ -38,16 +40,13 @@ import common_portraits
 import zx0pack
 
 KEEPER = '40M'
-W, H = 160, 66                    # the window the dialogue box does not cover
+W, H = 160, 100                   # the whole screen: the dialogue box is drawn over the room
 # name, window origin in the source, and the grey mapping. The store is a bright room full of
 # dark goods, the office a dim one, so the percentiles that become white and black differ.
+# The user chose the 15/97 percentiles with a 1.4 gamma on 2026-11-20.
 VARIANTS = (
-    ('BK_SHOP', 8, 52, dict(lo=10, hi=95)),
-    ('BK_SHOP', 8, 52, dict(lo=20, hi=99)),
-    ('BK_SHOP', 8, 52, dict(lo=30, hi=99.5)),
-    ('BK_SHOP', 8, 52, dict(lo=20, hi=99, dither=True)),
-    ('BK_SHOP', 8, 52, dict(lo=15, hi=97, gamma=1.4)),
-    ('BK_HONE', 8, 46, dict(lo=20, hi=99)),
+    ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
+    ('BK_HONE', 8, 23, dict(lo=10, hi=99, gamma=1.4)),
 )
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 
@@ -82,8 +81,10 @@ def build(cue):
     records = [common_portraits.portrait(disc, files, KEEPER)]
     for name, x0, y0, how in VARIANTS:
         records.append(bytes((H,)) + zx0pack.pack(planes(room(disc, files, name, x0, y0, **how))))
-    at = 5 + 2 * len(records)
-    head = b'FSK3' + bytes((len(VARIANTS),))
+    # The portrait is drawn straight from the bank by a 32-wide sprite routine, which reads
+    # longs: its record must start on an even address, so the header is padded to six bytes.
+    at = 6 + 2 * len(records)
+    head = b'FSK3' + bytes((len(VARIANTS), 0))
     for record in records:
         head += struct.pack('>H', at)
         at += len(record)

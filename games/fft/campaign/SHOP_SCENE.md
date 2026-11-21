@@ -23,13 +23,11 @@ natively and standing two 16x26 bodies in it.
 source's own pixels read far better in four greys than a scaled-down room),
 frames it so the shopkeeper, his customer and the counter all fall to the right
 of the menu box, maps it to four greys between two measured luminance
-percentiles, and ZX0-compresses the two planes. Only 66 rows are ripped: the
-dialogue box covers the top 34 and nothing of the room shows there. Each room
-costs about 1.4 KB.
+percentiles, and ZX0-compresses the two planes. Each room costs about 2 KB.
 
-**Five grey mappings of the store are shipped for the user to choose from**
-(`shop-grey-1..5.png`): 10/95, 20/99, 30/99.5 percentiles, 20/99 with a 2x2
-ordered dither, and 15/97 with a 1.4 gamma. The office follows the winner.
+The user chose, out of five mappings, the **15th and 97th luminance percentiles
+through a 1.4 gamma** (2026-11-20). The whole 160x100 screen is ripped, not just
+the rows under the dialogue box: an empty band above it looked wrong.
 
 The **town's own menu stays over the world map**, as the source keeps it over
 its world map: there is no town picture to rip, and none is needed.
@@ -64,10 +62,19 @@ its faces are legible, but which index the store and the office use, and which
 CLUT goes with each face, are still open. Until that is answered the portrait
 in the bank is a placeholder and the office borrows the store's speaker.
 
-## Still to frame
+## In the game
 
-The store room reads. The office room's window has not had the same
-measurement pass and still wants one.
+`worldmap.c` ships the three screens: the town menu over the world map, the
+store's Buy / Sell / Leave store over its room, its item list, and the Soldier
+Office's four hire rows. The map shows the same War Funds plate. The item list
+takes the room's full height and drops the dialogue box, as the source does.
+Steady shop frame: 328,264 cycles of the 360k budget; the room decompresses
+once per entry into the map's own 32 KB strip cache, which is idle meanwhile,
+so no second allocation.
+
+A sprite read in place from a bank must start on an even address: the portrait
+landed odd and the 68000 took an address error while the PC build was happy.
+The bank header is padded; the lesson is in `ti68k-c-patterns.md`.
 
 `make shop-review` renders `x/shop-review/shop-store.png`,
 `shop-office.png` and `shop-town.png` through `preview_shop.c` (PC only, no
