@@ -72,7 +72,7 @@ BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 # desk, and at 160x100 a window cannot hold both once the menu box takes the left half. He is
 # cut out of his own floor and set down beside the desk, sixteen pixels right and twenty-four
 # up -- one step along the room's isometric floor. Nothing else in the picture moves.
-RAMZA_TO_DESK = dict(box=(98, 70, 124, 110), to=(16, -24), floor=-24)
+RAMZA_TO_DESK = dict(box=(98, 70, 124, 110), to=(22, -24), floor=-24)
 
 
 def move_actor(rgb, box, to, floor):
@@ -129,9 +129,9 @@ VARIANTS = (
     ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
     # The office's stone and its near-white candles are too far apart for four flat greys: the
     # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
-    ('BK_FITR', 20, 8, dict(lo=40, hi=90, dither=True, move=RAMZA_TO_DESK)),
+    ('BK_FITR', 26, 8, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK)),
 )
-def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False, move=None):
+def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=0, move=None):
     """One MENU/BK_*.TIM window in the runtime's colours (C_WHITE 0 .. C_BLACK 3),
     so a dark source pixel is black."""
     b = disc.read(*files['MENU/%s.TIM' % name])
@@ -145,7 +145,13 @@ def room(disc, files, name, x0, y0, lo=2, hi=70, gamma=1.0, dither=False, move=N
     crop = np.pad(crop, ((0, H - crop.shape[0]), (0, W - crop.shape[1])))
     a, b2 = np.percentile(crop, lo), np.percentile(crop, hi)
     n = np.clip((crop - a) / max(b2 - a, 1e-6), 0, 1) ** gamma
-    d = BAYER[np.arange(H)[:, None] % 2, np.arange(W)[None, :] % 2] if dither else .5
+    # The dither is confined to the highlights (`dither` is where it starts): a candle or a
+    # stained window keeps its texture, while the stone and the people stay on flat greys and
+    # read. Dithering the whole picture turned both figures into noise.
+    d = np.full(n.shape, .5)
+    if dither:
+        bayer = BAYER[np.arange(H)[:, None] % 2, np.arange(W)[None, :] % 2]
+        d = np.where(n >= dither, bayer, d)
     return 3 - np.clip(np.floor(n * 3 + d), 0, 3).astype(int)
 
 
