@@ -69,11 +69,11 @@ W, H = 160, 100                   # the whole screen: the dialogue box is drawn 
 # The user chose the 15/97 percentiles with a 1.4 gamma on 2026-11-20.
 VARIANTS = (
     ('BK_SHOP', 8, 18, dict(lo=15, hi=97, gamma=1.4)),
-    ('BK_FITR', 20, 8, dict(lo=15, hi=97, gamma=1.4)),
-    ('BK_FITR', 20, 8, dict(lo=35, hi=92, gamma=1.0)),
-    ('BK_FITR', 20, 8, dict(lo=45, hi=88, gamma=1.0)),
-    ('BK_FITR', 20, 8, dict(lo=35, hi=92, gamma=1.6)),
-    ('BK_FITR', 20, 8, dict(lo=40, hi=90, dither=True)),
+    ('BK_FITR', 32, 8, dict(lo=15, hi=97, gamma=1.4)),
+    ('BK_FITR', 32, 8, dict(lo=35, hi=92, gamma=1.0)),
+    ('BK_FITR', 32, 8, dict(lo=45, hi=88, gamma=1.0)),
+    ('BK_FITR', 32, 8, dict(lo=35, hi=92, gamma=1.6)),
+    ('BK_FITR', 32, 8, dict(lo=40, hi=90, dither=True)),
 )
 BAYER = np.array([[0, 2], [3, 1]]) / 4.0
 

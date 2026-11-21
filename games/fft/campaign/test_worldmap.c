@@ -94,13 +94,13 @@ int main(void)
     {
         u8 before = save.n;
         const SaveUnit *u = &save.unit[before];
-        assert(office_job(0) == 0x4A && office_job(2) == 0x4B);   // Squire, Chemist
+        assert(office_job(0) == 0x4A && office_job(1) == 0x4A);   // the source hires a Squire
         assert(office_price(0) == 1500 && office_price(1) == 1400);
         gil_set(1499);
         assert(sw_step(0) && sw_step(K_ENTER) && wm.note == NOTE_NOGIL && save.n == before);
         assert(sw_step(K_B) && !wm.note);
         gil_set(2000);
-        assert(sw_step(0) && sw_step(K_ENTER) && !wm.note);
+        assert(sw_step(0) && sw_step(K_ENTER) && !wm.note);       // Male Soldier
         assert(save.n == before + 1 && gil() == 500);
         assert(u->job == 0x4A && u->type == 0 && u->level == 1 && u->gfx == 255);
         assert(u->brave >= 40 && u->brave <= 71 && u->faith >= 40 && u->faith <= 71);
