@@ -52,9 +52,16 @@ its owner draws no live cursor over it.
 - **The shop** (`worldmap.c`), on the Buy and Sell lists.
 - **Management** (`manage.c`), on the Equip screen's slot and on the item
   picker's rows.
+- **The battle** (`fft.c`), on the Status screen's equipment column -- it
+  already had its own per-item detail, built a line a frame so that entering it
+  stays inside the frame budget. That renderer stays; what it gains is FFT's
+  description, through the same `item_detail_line` the panel wraps with, and
+  one line's worth of room: the slot's label and the item's name now share a
+  line, and its bonuses two instead of three. The module reaches `ffid` through
+  `M.rt_file`, so no context field and no ABI change.
 - **Deployment** (`deploy.c`) has no item or equipment view -- it picks party
   slots and positions -- so there is nothing to attach it to.
-- **The battle** (`fft.c`) likewise: its unit card is portrait, name, job, HP,
-  MP, level, EXP, Brave and Faith, with no equipment. Showing a unit's or an
-  enemy's equipment in battle is a new screen in the resident, not a call, and
-  is left open.
+
+`item_detail_draw` and `item_detail_wrap` compile only where `ID_ICON` is
+defined; the battle, which has no icon bank in its resident, takes the wrap
+alone.

@@ -66,6 +66,8 @@ def main():
     rotate=OUT/'rotate.keys';rotate.write_text('12 F5\n13\n50 F1\n51\n')
     fast=OUT/'fast.keys';fast.write_text('0 A\n')
     status=OUT/'status.keys';status.write_text('1 UP\n2\n3 UP\n4\n5 ENTER\n6\n30 B\n31\n')
+    # The equipment page and one item's detail, where FFT's own description shows.
+    equip=OUT/'status-equip.keys';equip.write_text('1 UP\n2\n3 UP\n4\n5 ENTER\n6\n20 RIGHT\n21\n40 A\n41\n')
     wide=OUT/'wide.keys';wide.write_text('20 DOWN\n21\n22 ENTER\n23\n24 DOWN\n25\n26 ENTER\n27\n28 ENTER\n29\n')
     reach=OUT/'reach.keys';reach.write_text('20 ENTER\n21\n45 RIGHT\n46\n60 LEFT\n61\n80 MODE\n81\n110 B\n111\n130 ENTER\n131\n155 F5\n156\n190 F1\n191\n220 B\n221\n')
     won=OUT/'won.keys';won.write_text('0 A\n'+''.join(f'{f} A ENTER\n{f+1} A\n' for f in range(9000,20001,40)))
@@ -73,10 +75,10 @@ def main():
     results=[]
     for name,flags,banks,cases in (
         ('scene',['-DCHECK_SCENE'],['ffs1','ffflow','ffcp','ffcu','ffca','ffcb'],[('narration',1,30,empty),('chapter',1,120,advance),('academy-complete',1,1000,advance)]),
-        ('gariland',['-DCHECK_GAR'],['ffbm','ffbn','ffbo','ffbp','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj'],
-         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won),('party',70,90,empty),('wide',70,90,wide)])):
+        ('gariland',['-DCHECK_GAR'],['ffbm','ffbn','ffbo','ffbp','ffgv0','ffgv1','ffgv2','ffgv3','ffga','ffgi','ffgd','ffcp','ffcu','ffcw','ffca','ffcb','ffcj','ffid'],
+         [('manual',61,90,empty),('rotations',61,100,rotate),('ai',16,9500,fast),('status',61,90,status),('status-equip',61,70,equip),('reach',61,260,reach),('reach-settings',61,200,settings),('reach-contour',61,70,settings),('reach-menu',61,44,settings),('won',16,20000,won),('party',70,90,empty),('wide',70,90,wide)])):
         if '--status-only' in sys.argv:
-            cases=[c for c in cases if c[0]=='status']
+            cases=[c for c in cases if c[0].startswith('status')]
             if not cases:continue
         if '--academy-only' in sys.argv and name!='scene':continue
         # The scene player reads its contour art from ffcu alone, as a package
