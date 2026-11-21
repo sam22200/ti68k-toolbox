@@ -329,7 +329,7 @@ static void shop_trade(void)
 // generator (the same seeds, variances and draw order breeding.h runs for monsters), equipped
 // as the source equips a recruit. Price: the guide's, we have not found it on the disc.
 static u8 office_sex(u8 row) { return (u8)(row & 1); }
-static u8 office_job(u8 row) { return sh_jobs[row >> 1]; }
+static u8 office_job(u8 row) { (void)row; return sh_jobs[0]; }   // the source's menu offers only a soldier
 static const u8 *office_rec(u8 row) { return sh_office + OFFICE_REC * (u16)office_sex(row); }
 static u16 office_price(u8 row) { return b16(office_rec(row) + 15); }
 static void hire(u8 row)
@@ -489,7 +489,10 @@ static u8 town_update(u32 key)
     }
     if (wm.screen == SC_OFFICE) {
         wm.trow = choice_move(wm.trow, OFFICE_ROWS, key);
-        if (key & (K_ENTER | K_A)) hire(wm.trow);
+        if (key & (K_ENTER | K_A)) {
+            if (wm.trow == 3) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; }
+            else if (wm.trow < 2) hire(wm.trow);
+        }
         return 1;
     }
     {
@@ -839,17 +842,20 @@ static void action_menu(const char *title, const char *const *labels, u8 n, u8 g
     choice_frame(p, title);
     for (i = 0; i < n; i++) choice_row(p, i, labels[i], i == grey ? C_DGRAY : C_BLACK);
 }
+// The source's own first menu. Picking a soldier hires one; the screen that follows it in the
+// original (its stats, its name) has no reference capture yet, so Change Name stays grey.
+static const char *const office_rows_text[OFFICE_ROWS] =
+    { "Male Soldier", "Female Soldier", "Change Name", "Exit" };
 static void office_rows(void)
 {
     ChoiceLayout *p = &office_box;
-    u8 r;
-    choice_frame(p, "Hire");
-    for (r = 0; r < OFFICE_ROWS; r++) {
-        s16 y = (s16)(p->y + p->row_y + (u16)r * p->pitch);
-        black((s16)(p->x + p->text_x), y, job_name(office_job(r)));
-        black((s16)(p->x + p->text_x + 42), y, office_sex(r) ? "Woman" : "Man");
-        right((s16)(p->x + p->width - 4), y, office_price(r));
-    }
+    u8 r, w = 0;
+    for (r = 0; r < OFFICE_ROWS; r++) { u8 k = map_menu_width(office_rows_text[r]); if (k > w) w = k; }
+    p->width = (u8)(w + 12);
+    p->height = (u8)(13 + 9 * OFFICE_ROWS);
+    choice_frame(p, "Menu");
+    for (r = 0; r < OFFICE_ROWS; r++)
+        choice_row(p, r, office_rows_text[r], r == 2 ? C_DGRAY : C_BLACK);
 }
 static u8 shop_tab_face(u8 t)
 {
@@ -927,9 +933,15 @@ static void town_compose(void)
             eqp_all((s16)(left - 3), id ? item_wearers(id) : 0, save.n);
         }
     } else {
-        says("Shopkeeper", "Welcome.", office ? "Looking for a soldier?" : "What can I do for you?");
-        if (office) office_rows(); else action_menu("Menu", store_rows, 3, 255, 0);
-        war_funds(gil());
+        says("Shopkeeper", "Welcome.",
+             office ? "What recruit are you after?" : "What can I do for you?");
+        if (office) {
+            office_rows();
+            office_plates(save.n, PARTY_MAX, office_price(wm.trow < 2 ? wm.trow : 0), gil());
+        } else {
+            action_menu("Menu", store_rows, 3, 255, 0);
+            war_funds(gil());
+        }
     }
     (void)town_rows;
     rt_light = l; rt_dark = d;
