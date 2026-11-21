@@ -339,6 +339,17 @@ data/ffwm.bin: ../tools/world_assets.py ../tools/management_data.py ../tools/uni
 data/ffsh.bin: ../tools/shop_assets.py ../tools/world_assets.py ../tools/management_data.py
 	$(PY) ../tools/shop_assets.py "$(DISC)" $@
 
+data/ffsk.bin: ../tools/shop_scene.py ../tools/units.py ../tools/common_portraits.py
+	$(PY) ../tools/shop_scene.py "$(DISC)" $@
+
+.PHONY: shop-review
+shop-review: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin
+	@mkdir -p x/shop-review
+	$(CC) $(PC_CFLAGS) -o x/check/preview_shop preview_shop.c $(RT_CORE) $(RT_SW)
+	cp x/check/ffsave_won.sav data/ffsave.sav
+	cd data && ../x/check/preview_shop ../x/shop-review ../x/check/ffsave_won.sav
+	rm -f data/ffsave.sav
+
 data/ffwb.bin: ../tools/breeding_rules.py
 	$(PY) ../tools/breeding_rules.py "$(DISC)" $@
 data/ffeg.bin: ../tools/egg_art.py
