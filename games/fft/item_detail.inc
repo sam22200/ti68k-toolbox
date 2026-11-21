@@ -28,13 +28,13 @@ static const char *item_family(u8 kind)
     return kind == 33 ? "Bomb" : "Item";
 }
 
-// FFT's description, wrapped on the panel's own font. Three lines are enough for every one of
-// the 253 the disc carries.
-static void item_detail_wrap(const char *s, s16 x, s16 y, u8 limit, u8 lines)
+// FFT's description, wrapped on the caller's own font. Three lines are enough for every one of
+// the 253 the disc carries. `item_detail_line` gives one line at a time, so a caller that draws
+// a line a frame (the battle's status page) and one that draws a whole panel share the wrap.
+static u8 item_detail_line(const char *s, u8 limit, u8 want, char *out)
 {
-    char line[64];
     u8 row;
-    for (row = 0; row < lines && *s; row++) {
+    for (row = 0; *s; row++) {
         u8 n = 0, last = 0, width = 0;
         while (s[n] && n < 63) {
             u8 adv = ID_ADV(s[n]);
@@ -43,13 +43,26 @@ static void item_detail_wrap(const char *s, s16 x, s16 y, u8 limit, u8 lines)
             width = (u8)(width + adv); n++;
         }
         if (s[n] && last) n = last;
-        memcpy(line, s, n); line[n] = 0;
-        ID_TEXT(x, (s16)(y + 7 * row), line, C_BLACK, 158);
+        if (row == want) { memcpy(out, s, n); out[n] = 0; return n; }
         s += n;
         while (*s == ' ') s++;
     }
+    out[0] = 0;
+    return 0;
 }
+#ifdef ID_ICON
+static void item_detail_wrap(const char *s, s16 x, s16 y, u8 limit, u8 lines)
+{
+    char line[64];
+    u8 row;
+    for (row = 0; row < lines; row++) {
+        if (!item_detail_line(s, limit, row, line)) break;
+        ID_TEXT(x, (s16)(y + 7 * row), line, C_BLACK, 158);
+    }
+}
+#endif
 
+#ifdef ID_ICON
 static void item_detail_draw(const ItemDetail *d)
 {
     static const char *const label[7] = { "HP", "MP", "PA", "MA", "Spd", "Mov", "Jmp" };
@@ -73,4 +86,5 @@ static void item_detail_draw(const ItemDetail *d)
     }
     ID_TEXT(10, 78, "MODE or SHIFT closes", C_DGRAY, 152);
 }
+#endif
 #endif

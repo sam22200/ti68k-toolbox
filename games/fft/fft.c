@@ -6851,20 +6851,46 @@ static const char *const equip_labels[5] = { "Head", "Body", "Accessory", "Weapo
 #define st_names CONTOUR_REF_st_names
 #endif
 // Details describe the equipped item or learned ability; browsing never changes the loadout.
+// ffid (tools/item_help.py): FFT's own description, read in place from the archive. The
+// pointer is cached in this image; a module swap only makes the next call bind it again.
+static const char *item_help(u8 id)
+{
+    static const u8 *help;
+    static u8 looked;
+    u16 at;
+    if (!looked) {
+        looked = 1;
+        help = rt_file("ffid", RT_NULL);
+        if (help && (memcmp(help, "FID1", 4) || RD16(help, 2) != 256)) help = RT_NULL;
+    }
+    if (!help) return "";
+    at = RD16(help, 3 + id);
+    return at ? (const char *)help + at : "";
+}
+#define ID_ADV(c) (UI_SHARED(ADV)[(u8)(c) - 32])
+#include "item_detail.inc"
+
 static void status_detail(u8 k)
 {
     char s[64];
     u8 n = 0; AbId id = st.status_col ? status_ability() : st.unit[st.sel].eq[st.status_row];
     if (!st.status_col) {
         const Item *it;
-        if (k == 3) { ui_text(6, 38, equip_labels[st.status_row], C_DGRAY, 159); return; }
-        if (k == 4) { ui_text(6, 47, id == 0xFF ? "No item" : items[id].name, C_BLACK, 159); return; }
+        // The equipment column: its label and name on one line, its bonuses on two, then
+        // FFT's own description on the three the page has left.
+        if (k == 3) {
+            ui_text(6, 38, equip_labels[st.status_row], C_DGRAY, 68);
+            ui_text(70, 38, id == 0xFF ? "No item" : items[id].name, C_BLACK, 159);
+            return;
+        }
         if (id == 0xFF) return;
         it = &items[id];
-        if (k == 5) { n = put_s(s, n, "HP +"); n = put_n(s, n, it->hp); n = put_s(s, n, "   MP +"); n = put_n(s, n, it->mp); }
-        else if (k == 6) { n = put_s(s, n, "PA +"); n = put_n(s, n, it->pa); n = put_s(s, n, "   MA +"); n = put_n(s, n, it->ma); n = put_s(s, n, "   Speed +"); n = put_n(s, n, it->sp); }
-        else if (k == 7) { n = put_s(s, n, "Move +"); n = put_n(s, n, it->move); n = put_s(s, n, "   Jump +"); n = put_n(s, n, it->jump); }
-        else if (it->wp) { n = put_s(s, n, "Weapon power "); n = put_n(s, n, it->wp); }
+        if (k == 4) { n = put_s(s, n, "HP +"); n = put_n(s, n, it->hp); n = put_s(s, n, "   MP +"); n = put_n(s, n, it->mp);
+                      n = put_s(s, n, "   PA +"); n = put_n(s, n, it->pa); n = put_s(s, n, "   MA +"); n = put_n(s, n, it->ma); }
+        else if (k == 5) { n = put_s(s, n, "Speed +"); n = put_n(s, n, it->sp); n = put_s(s, n, "   Move +"); n = put_n(s, n, it->move);
+                           n = put_s(s, n, "   Jump +"); n = put_n(s, n, it->jump);
+                           if (it->wp) { n = put_s(s, n, "   Power "); n = put_n(s, n, it->wp); } }
+        else { item_detail_line(item_help((u8)id), 150, (u8)(k - 6), s); n = (u8)strlen(s); }
     } else {
         const Ability *ab;
         if (k == 3) { ui_text(6, 38, id == NO_ABIL ? "No ability" : id == ABIL_DEFEND ? "Defend" : ABIL_NAME(id), C_BLACK, 159); return; }
@@ -6901,7 +6927,9 @@ static const char *const effects[] = { "Physical damage", "Removes status ailmen
                 st.bag[ab->bag]):put_s(s,n,"Unlimited"); }
         else if (k == 8) n = put_s(s, n, ab->flags & AF_EVADE ? "Can be evaded" : "Cannot be evaded");
     }
-    s[n] = 0; ui_text(6, 38 + 8 * (k - 3), s, C_BLACK, 159);
+    s[n] = 0;
+    ui_text(6, st.status_col ? (s16)(38 + 8 * (k - 3)) : k < 6 ? (s16)(38 + 8 * (k - 3)) : (s16)(64 + 7 * (k - 6)),
+            s, C_BLACK, 159);
 }
 
 // Full-screen Status with original FFT fields and selectable equipment / abilities.
