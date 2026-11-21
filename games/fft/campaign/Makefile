@@ -13,7 +13,7 @@ PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffbp ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
-BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh ffsk
+BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh ffsk ffid
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
@@ -203,11 +203,11 @@ dialogue-test:
 	$(CC) $(PC_CFLAGS) -o fftscn_dialogue_test test_dialogue.c $(RT_CORE) $(RT_SW)
 	./fftscn_dialogue_test
 .PHONY: map-test
-map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin
+map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin data/ffid.bin
 	$(CC) $(PC_CFLAGS) -o fftmap_test test_worldmap.c $(RT_CORE) $(RT_SW)
 	./fftmap_test
 .PHONY: manage-test
-manage-test: data/ffmg.bin data/ffcj.bin data/ffeg.bin
+manage-test: data/ffmg.bin data/ffcj.bin data/ffeg.bin data/ffid.bin
 	$(CC) $(PC_CFLAGS) -o fftmng_test test_manage.c $(RT_CORE) $(RT_SW)
 	./fftmng_test
 fftmng_pc: manage.c pc_entry.c ../common.h
@@ -338,6 +338,9 @@ data/ffwm.bin: ../tools/world_assets.py ../tools/management_data.py ../tools/uni
 
 data/ffsh.bin: ../tools/shop_assets.py ../tools/world_assets.py ../tools/management_data.py
 	$(PY) ../tools/shop_assets.py "$(DISC)" $@
+
+data/ffid.bin: ../tools/item_help.py ../tools/management_data.py
+	$(PY) ../tools/item_help.py "$(DISC)" $@
 
 data/ffsk.bin: ../tools/shop_scene.py ../tools/units.py ../tools/common_portraits.py
 	$(PY) ../tools/shop_scene.py "$(DISC)" $@

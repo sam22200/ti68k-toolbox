@@ -166,14 +166,16 @@ def manage(pc_save,ti_save):
     def knight(s): assert s['party'][0]['job']==0x4C,'Ramza a Knight'
     if '--carousel-only' in sys.argv:
         spin=keys(OUT/'carousel.keys',[(2,'RIGHT')])
-        return program('manage','check_manage.c',['ffmg','ffcp','ffcj','ffeg','ffma'],0x4d4e4701,
+        return program('manage','check_manage.c',['ffmg','ffcp','ffcj','ffeg','ffma','ffid'],0x4d4e4701,
                        [('spin-start',5,4,spin),('spin-middle',5,6,spin),('spin-settled',5,16,spin)],
                        pc_save,ti_save,None)
+    info=keys(OUT/'equip-info.keys',[(2,'MODE')])
+    pick=keys(OUT/'equip-pick.keys',[(2,'ENTER'),(4,'MODE')])
     slide=keys(OUT/'formation-slide.keys',[(2,'RIGHT')])
     confirmation=keys(OUT/'job-confirm.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER')])
     change=keys(OUT/'job-change.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER'),(28,'ENTER')])
-    return program('manage','check_manage.c',['ffmg','ffcp','ffcj','ffeg','ffma'],0x4d4e4701,
-                   [('formation',0,4,empty),('status',1,4,empty),('equip',2,4,empty),('abilities',3,4,empty),
+    return program('manage','check_manage.c',['ffmg','ffcp','ffcj','ffeg','ffma','ffid'],0x4d4e4701,
+                   [('formation',0,4,empty),('status',1,4,empty),('equip',2,4,empty),('equip-info',2,6,info),('equip-pick',2,8,pick),('abilities',3,4,empty),
                     ('learn',4,4,empty),('jobs',5,4,empty),('menu',6,4,empty),
                     ('slide-start',0,3,slide),('slide-mid',0,5,slide),('slide-done',0,8,slide),
                     ('job-confirm',5,28,confirmation),('job-change-start',5,30,change),
@@ -209,7 +211,7 @@ def worldmap(pc_save,ti_save):
     hire=keys(OUT/'map-hire.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER'),(8,'ENTER')])
     tab=keys(OUT/'map-tab.keys',[(2,'ENTER'),(4,'ENTER'),(6,'ENTER'),(8,'F5'),(10,'F5')])
     info=keys(OUT/'map-info.keys',[(2,'ENTER'),(4,'ENTER'),(6,'ENTER'),(8,'MODE')])
-    return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb','ffsh','ffsk'],0x4d415001,
+    return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb','ffsh','ffsk','ffid'],0x4d415001,
                    [('gariland',0,4,empty),('menu',0,4,menu),('menu-last',0,8,last),
                     ('town',0,6,town),('store',0,6,town),('shop',0,10,shop),('shop-tab',0,12,tab),('shop-info',0,10,info),('shop-sell',0,14,sell),
                     ('office',0,10,office),('hire',0,12,hire),

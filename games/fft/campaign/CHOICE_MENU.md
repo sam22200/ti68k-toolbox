@@ -35,7 +35,8 @@ these five rules, and a menu that cannot must say in a comment why.**
 
 Disabled entries are drawn in `C_DGRAY`, as the source greys what it will not
 let you pick. **[MODE] opens the detail of whatever the cursor is on**, through
-the shared `item_detail.inc`; [MODE] or SHIFT closes it.
+the shared `item_detail.inc` ([ITEM_DETAIL.md](ITEM_DETAIL.md)); [MODE] or
+SHIFT closes it, and while it is up its owner draws no live cursor over it.
 
 
 `../choice_menu.h` and `../choice_menu.inc` share the command-window frame,
