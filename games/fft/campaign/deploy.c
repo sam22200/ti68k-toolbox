@@ -146,9 +146,8 @@ void game_render(void)
         void *light=rt_light,*dark=rt_dark;
         rt_light=cache;rt_dark=cache+RT_PSIZE;
         if(dirty)deploy_background();
-        draw_rect(0,7,160,31,C_WHITE);
         deploy_stats=stats(unit(dp.unit));stats_unit=dp.unit;
-        formation_details(unit(dp.unit),&deploy_stats,9);
+        plate_unit(unit(dp.unit),RT_NULL,7);   // the sheet's own plate (unit_sheet.inc)
         rt_light=light;rt_dark=dark;dirty=0;
     }
     memcpy(rt_light,cache,RT_PSIZE);memcpy(rt_dark,cache+RT_PSIZE,RT_PSIZE);

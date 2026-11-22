@@ -47,8 +47,8 @@ int main(void)
         memset(chemist.learned[1], 0, sizeof chemist.learned[1]);
         set16(chemist.jp[1], 300);
         assert(job_ability(job_rec(1), 13) == 0x17D);
-        assert(learn(&chemist, 13) && learned(&chemist, 1, 13) && jp(&chemist, 1) == 210);
-        assert(!learn(&chemist, 13));                  // already learned: no second charge
+        assert(learn(&chemist, 1, 13) && learned(&chemist, 1, 13) && jp(&chemist, 1) == 210);
+        assert(!learn(&chemist, 1, 13));                  // already learned: no second charge
     }
     // a job change keeps what the job can equip, takes off the rest into the inventory
     before = save.inv[r->eq[EQ_WEAPON]];
@@ -64,7 +64,7 @@ int main(void)
         for (k = 0; k < 22 && !done; k++) {
             const u8 *j = job_rec(record(r, 0));
             if (job_ability(j, k) && !learned(r, 0, k) && ability_cost(job_ability(j, k)) <= left) {
-                assert(learn(r, k) && learned(r, 0, k) && jp(r, 0) == left - ability_cost(job_ability(j, k))); done = 1;
+                assert(learn(r, 0, k) && learned(r, 0, k) && jp(r, 0) == left - ability_cost(job_ability(j, k))); done = 1;
             }
         }
         assert(done);
@@ -73,21 +73,28 @@ int main(void)
     choices(c, 0); assert(find(mg.pick, mg.pick_n, 0x05) != 0xFF);
     choices(c, 2); assert(find(mg.pick, mg.pick_n, 0x1E0) != 0xFF);
     choices(c, 1); assert(mg.pick_n == 1);                 // no reaction learned
-    // the menus: Formation -> menu -> Change Job -> Knight -> yes, then ESC writes the save
+    // the tabs: Formation -> the unit's sheet -> Job tab -> Knight -> yes, then ESC saves
     sw_init(0);
     assert(sw_step(K_RIGHT)&&mg.slide==4&&sw_step(0)&&mg.slide==3);
     for(i=0;i<4;i++)assert(sw_step(0));
     assert(!mg.slide&&mg.unit==1);assert(sw_step(K_LEFT)&&sw_step(0));
     for(i=0;i<4;i++)assert(sw_step(0));
     assert(mg.unit==0&&!mg.slide);
-    assert(sw_step(K_C)); assert(sw_step(0)); assert(mg.screen == S_MENU);
-    for (i = 0; i < 3; i++) { assert(sw_step(K_DOWN)); assert(sw_step(0)); }
-    assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.screen == S_JOBS);
+    assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.screen == S_EQUIP);
+    assert(sw_step(K_RIGHT)); assert(sw_step(0)); assert(mg.screen == S_SET);
+    assert(sw_step(K_RIGHT)); assert(sw_step(0)); assert(mg.screen == S_JOBTABLE);
+    assert(sw_step(K_RIGHT)); assert(sw_step(0)); assert(mg.screen == S_JOBS);
+    assert(sw_step(K_LEFT)); do { assert(sw_step(0)); } while (mg.spin);        // the wheel keeps its arrows
+    assert(mg.screen == S_JOBS);
+    assert(sw_step(K_B)); assert(sw_step(0)); assert(mg.screen == S_FORM);
+    assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.screen == S_EQUIP);
+    for (i = 0; i < 3; i++) { assert(sw_step(K_RIGHT)); assert(sw_step(0)); }
+    assert(mg.screen == S_JOBS);
     for (i = 0; i < 2; i++) { assert(sw_step(K_DOWN)); do {assert(sw_step(0));}while(mg.spin); }
     assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.confirm);
     assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(unit(0)->job == 0x4C);
     assert(mg.job_anim);for(i=0;i<JOB_CHANGE_FRAMES;i++)assert(sw_step(0));assert(!mg.job_anim);
-    assert(sw_step(K_B)); assert(sw_step(0)); assert(sw_step(K_B)); assert(sw_step(0));
+    assert(sw_step(K_B)); assert(sw_step(0)); assert(mg.screen == S_FORM);
     assert(!sw_step(K_ESC));
     {
         Save back; assert(rt_load(SAVE_NAME, &back, sizeof back) && back.unit[0].job == 0x4C);
@@ -100,10 +107,97 @@ int main(void)
     assert(mg.unit==15&&mg.top==2);
     assert(sw_step(K_UP));assert(sw_step(0));assert(mg.unit==10);
     assert(sw_step(K_LEFT));assert(sw_step(0));assert(mg.unit==9&&mg.top==1);
-    assert(sw_step(K_ENTER));assert(sw_step(0));assert(mg.screen==S_STATUS);
+    assert(sw_step(K_ENTER));assert(sw_step(0));assert(mg.screen==S_EQUIP);
     for(i=0;i<6;i++){assert(sw_step(K_F5));assert(sw_step(0));}
     assert(mg.unit==15);
     assert(sw_step(K_B));assert(sw_step(0));assert(mg.screen==S_FORM&&mg.top==2);
-    puts("Management: levels, unlocks, statistics, job change, equipment, learning, slots and the save");
+    // Remove Unit: the source returns the equipment to the bag and closes the gap.
+    {
+        u8 n0 = save.n, id, before_count;
+        u8 target = 1;
+        char keep[13];
+        const char *nm = unit_name(unit(2));
+        for (i = 0; i < 12 && nm[i]; i++) keep[i] = nm[i];
+        keep[i] = 0;
+        id = unit(target)->eq[EQ_HEAD];
+        before_count = id ? save.inv[id] : 0;
+        assert(!roster_remove(&save, 0) || unit(0)->type != 2);   // Ramza stays
+        assert(roster_remove(&save, target));
+        assert(save.n == n0 - 1);
+        if (id) assert(save.inv[id] == before_count + 1);
+        assert(!strcmp(unit_name(unit(1)), keep));                // the next unit moved up
+    }
+    // Order Unit: Level ranks the strongest first, Number leaves the roster alone.
+    {
+        u8 k;
+        for (k = 0; k < save.n; k++) save.unit[k].level = (u8)(k + 1);
+        for (i = 0; i + 1 < save.n; i++) {
+            u8 best = i, j2;
+            for (j2 = (u8)(i + 1); j2 < save.n; j2++) {
+                Stats a = stats(&save.unit[best]), b = stats(&save.unit[j2]);
+                if (roster_key(&save, j2, ORD_LEVEL, b.hp, b.mp) <
+                    roster_key(&save, best, ORD_LEVEL, a.hp, a.mp)) best = j2;
+            }
+            if (best != i) roster_slot_swap(&save, i, best);
+        }
+        for (i = 0; i + 1 < save.n; i++) assert(save.unit[i].level >= save.unit[i + 1].level);
+    }
+    // Inventory: Eqp. keeps what this unit could wear, All the whole bag.
+    {
+        u8 all, fit;
+        memset(save.inv, 0, sizeof save.inv);
+        save.inv[0x13] = 2; save.inv[0x9D] = 1; save.inv[0xFD] = 3;   // sword, hat, Phoenix Down
+        mg.unit = 0; mg.top = mg.row = 0;
+        mg.inv_all = 1; build_inventory(unit(0)); all = mg.inv_n;
+        mg.inv_all = 0; build_inventory(unit(0)); fit = mg.inv_n;
+        assert(all == 3 && fit < all && fit >= 1);
+    }
+    // Best fit: never worse than what the unit wears, and the bag stays consistent.
+    {
+        u8 k, held[5];
+        u16 before, after;
+        memset(save.inv, 0, sizeof save.inv);
+        save.inv[0x13] = 1; save.inv[0x1D] = 1; save.inv[0x9D] = 1;
+        for (k = 0; k < SLOTS; k++) held[k] = unit(0)->eq[k];
+        before = mg_fit(unit(0));
+        best_fit_unit(unit(0));
+        after = mg_fit(unit(0));
+        assert(after >= before);
+        for (k = 0; k < SLOTS; k++) if (unit(0)->eq[k] && unit(0)->eq[k] != held[k])
+            assert(save.inv[unit(0)->eq[k]] < 99);
+        remove_all_equipment(unit(0));
+        for (k = 0; k < SLOTS; k++) assert(!unit(0)->eq[k]);
+    }
+    // The Remove Unit screens: the check, the unit's own answer, then the party is shorter.
+    {
+        u8 n0;
+        mg.unit = 0;
+        while (mg.unit < save.n && unit(mg.unit)->type == 2) mg.unit++;
+        assert(mg.unit < save.n);
+        n0 = save.n;
+        mg.screen = S_FORM; mg.row = 0;
+        assert(sw_step(K_C)); assert(sw_step(0)); assert(mg.screen == S_MENU);
+        assert(mg.row == 0);
+        assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.remove == 1);
+        assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.remove == 2);
+        assert(sw_step(K_DOWN)); assert(sw_step(0));            // Quit
+        assert(sw_step(K_ENTER)); assert(sw_step(0));
+        assert(!mg.remove && save.n == n0);
+        assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.remove == 1);
+        assert(sw_step(K_ENTER)); assert(sw_step(0)); assert(mg.remove == 2);
+        assert(sw_step(K_ENTER)); assert(sw_step(0));
+        assert(!mg.remove && save.n == n0 - 1 && mg.screen == S_FORM);
+    }
+    // The job table opens on the unit's own jobs and leads to that job's abilities.
+    {
+        mg.unit = 0; mg.screen = S_EQUIP; mg.row = 0; mg.top = 0; mg.ljob = career(unit(0));
+        for (i = 0; i < 2; i++) { assert(sw_step(K_RIGHT)); assert(sw_step(0)); }
+        assert(mg.screen == S_JOBTABLE);
+        assert(jobtable_count(unit(0)) >= 2 && jobtable_entry(unit(0), 0) < CAREERS);
+        assert(sw_step(K_ENTER)); assert(sw_step(0));
+        assert(mg.screen == S_LEARN && mg.ljob == jobtable_entry(unit(0), 0));
+        assert(sw_step(K_B)); assert(sw_step(0)); assert(mg.screen == S_JOBTABLE);
+    }
+    puts("Management: levels, unlocks, statistics, job change, equipment, learning, slots,\n            Remove Unit, Order Unit, Best fit, the inventory, the job table and the save");
     return 0;
 }

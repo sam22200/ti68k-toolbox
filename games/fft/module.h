@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 92U
+#define MOD_ABI 94U   // 94: status_header, the shared unit plate and tab bar
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -82,6 +82,7 @@ typedef struct {
     const char *(*unit_name)(u8 i);
     void (*text_into)(u16 *l, u16 *d, s16 x, s16 y, const char *s, u8 color);
     void (*unit_card_battle)(u8 i,u8 layout,u8 part,u8 context);
+    void (*status_header)(u8 i,u8 tab,u8 slots);  // the shared plate, tabs and pictograms
     u8 (*area_paint)(u8 who);             // pure card-cache preparation/blits, never an image load
     void (*draw_hand)(s16 x, s16 y);
     void (*copy_box)(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows);
@@ -195,6 +196,7 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define unit_name M.unit_name
 #define text_into M.text_into
 #define unit_card_battle M.unit_card_battle
+#define status_header M.status_header
 #define area_paint M.area_paint
 #define draw_hand M.draw_hand
 #define copy_box M.copy_box

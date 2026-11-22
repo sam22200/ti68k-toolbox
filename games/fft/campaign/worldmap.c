@@ -229,13 +229,14 @@ static void gil_set(u32 v)
     save.money[0] = (u8)(v >> 24); save.money[1] = (u8)(v >> 16);
     save.money[2] = (u8)(v >> 8); save.money[3] = (u8)v;
 }
-#define MG_ITEM_SIZE 14
+#define MG_ITEM_SIZE 16
 // ffmg's item record: u16 name, flags, type, reserved, HP MP PA MA SP Move Jump, icon, WP
 #define MI_FLAGS 2
 #define MI_TYPE 3
 #define MI_HP 5
 #define MI_ICON 12
 #define MI_WP 13
+#define MI_PEV 14        // a weapon's W-EV, a shield's or accessory's P-EV
 static const u8 *item_rec(u8 id) { return mgb + b16(mgb + 4 + 2 * 1) + (u16)id * MG_ITEM_SIZE; }
 static const char *item_name(u8 id)
 { u16 at = b16(item_rec(id)); return at ? (const char *)mgb + at : ""; }
@@ -244,7 +245,7 @@ static const char *item_help(u8 id)
 {
     u16 at;
     if (!help) return "";
-    at = b16(help + 6 + 2 * (u16)id);
+    at = b16(help + 8 + 2 * (u16)id);
     return at ? (const char *)help + at : "";
 }
 static void item_icon(s16 x, s16 y, u8 id)
@@ -272,6 +273,8 @@ static u8 item_wearers(u8 id)
 #define ID_NUM(x,y,n) number(x,y,n)
 #define ID_ICON(x,y,id) item_icon(x,y,id)
 #define ID_ADV(c) (menu_font()[103 + (u8)(c) - 32])
+#define US_TEXT(x,y,t,c,l) text(x,y,t,c,l)
+#include "../unit_sheet.inc"
 #include "../item_detail.inc"
 static void item_detail(u8 id)
 {
@@ -281,7 +284,7 @@ static void item_detail(u8 id)
     d.id = id; d.kind = sh_kind[id]; d.flags = r[MI_FLAGS]; d.name = item_name(id);
     d.help = item_help(id);
     for (i = 0; i < 7; i++) d.stat[i] = (s8)r[MI_HP + i];
-    d.power = r[MI_WP];
+    d.power = r[MI_WP]; d.evade = r[MI_PEV];
     item_detail_draw(&d);
 }
 static u16 item_price(u8 id) { return b16(sh_price + 2 * (u16)id); }
@@ -540,7 +543,7 @@ void game_init(void)
     bank = rt_file("ffwm", &size);
     if (bank && memcmp(bank, "FWM3", 4)) bank = RT_NULL;
     mgb = rt_file("ffmg", &size);
-    if (mgb && memcmp(mgb, "FMG3", 4)) mgb = RT_NULL;
+    if (mgb && memcmp(mgb, "FMG5", 4)) mgb = RT_NULL;
     save_load(&save);
     // A town without its services is still a map: ffsh only disables them.
     shop = rt_file("ffsh", &size);
@@ -558,7 +561,8 @@ void game_init(void)
     identity = rt_file("ffcp", &size);
     if (!identity_valid(identity, size)) identity = RT_NULL;
     help = rt_file("ffid", &size);
-    if (help && (memcmp(help, "FID1", 4) || b16(help + 4) != 256)) help = RT_NULL;
+    if (help && (memcmp(help, "FID2", 4) || b16(help + 4) != 256 || b16(help + 6) != 512))
+        help = RT_NULL;
     breed_rules=rt_file("ffwb",&size);
     if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
@@ -1152,19 +1156,21 @@ static void shop_rows(void)
 static ChoiceLayout fit_box =
     { 20, 14, 124, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 6, 12, 9, 158, -16, 9 };
 // "HP 51>59" when it changes, "HP 51" when it does not; returns the next column.
+// The bench shows what the unit would become, exactly as the unit sheet's plate does: the
+// value it would have, lifted out with its triangle (`us_changed`, ../unit_sheet.inc).
+// One emphasis for a preview, whichever screen is asking.
 static s16 fit_pair(s16 x, const char *label, u16 now, u16 then)
 {
     char d[9];
     const char *n;
     x = text(x, 75, label, C_DGRAY, 142);
     x += 2;
-    n = wf_digits(d, now);
-    x = text(x, 75, n, C_WHITE, 142);
-    if (then != now) {
-        x = text(x, 75, ">", C_DGRAY, 142);
-        n = wf_digits(d, then);
-        x = text(x, 75, n, C_WHITE, 142);
+    if (then == now) {
+        n = wf_digits(d, now);
+        return (s16)(text(x, 75, n, C_WHITE, 142) + 5);
     }
+    x = (s16)(x + us_width(then, 0) + 7);
+    us_changed(x, 75, then, (u8)(then > now));
     return (s16)(x + 5);
 }
 static void fit_rows(void)

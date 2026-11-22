@@ -7,9 +7,8 @@ typedef struct {
     u16 hp,max_hp,mp,max_mp;
     u8 level,exp,brave,faith;
 } UnitCard;
-enum { UC_FORMATION,UC_MANAGEMENT,UC_BATTLE_LEFT,UC_BATTLE_RIGHT,UC_STATUS };
+enum { UC_FORMATION,UC_MANAGEMENT,UC_BATTLE_LEFT,UC_BATTLE_RIGHT };
 // The first five parts retain the battle HUD's existing incremental cache schedule.
 enum { UC_PORTRAIT,UC_NAME,UC_HP,UC_MP,UC_LEVEL,UC_JOB,UC_EXP,UC_BRAVE,UC_FAITH,UC_PARTS };
-enum { UC_STATUS_HEADER=128 }; // one snapshot, same portrait/name/job/level draw order
-enum { UC_BAR_FULL,UC_BAR_FLAT,UC_BAR_ROUND };
+enum { UC_BAR_FULL,UC_BAR_FLAT,UC_BAR_ROUND };   // FLAT: no caller left
 #endif

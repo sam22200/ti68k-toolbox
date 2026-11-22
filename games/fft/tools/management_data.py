@@ -4,8 +4,8 @@
 
 usage: management_data.py DISC.cue OUT.bin [preview.png]
 Everything the menus show or rule on, by FFT's own ids (campaign/save.h), big-endian:
-- "FMG3", then u16 offsets: jobs, items, two reserved entries (names now in ffcj), icons, sprites,
-  portrait IDs, font, a reserved field (offsets from the bank's start);
+- "FMG5", then u16 offsets: jobs, items, two reserved entries (names now in ffcj), icons, sprites,
+  portrait IDs, font, and Remove Unit's own text (offsets from the bank's start);
 - 21 jobs of JOB_SIZE bytes: the 20 generic ones (Squire 0x4A .. Mime 0x5D, a unit's career
   row) then Ramza's own Squire (0x01): name, FFT id, skill set, growth and multiplier per raw
   stat (HP MP SP PA MA), Move, Jump, equipment type bits, the job levels each career needs
@@ -14,7 +14,7 @@ Everything the menus show or rule on, by FFT's own ids (campaign/save.h), big-en
   read from the shared ffcj catalogue, indexed by its skill set / ability id;
 - 256 items of ITEM_SIZE bytes: name, slot flags (0x80 weapon, 0x40 shield, 0x20 head, 0x10
   body, 0x08 accessory), type (its equipment bit), level, HP, MP, PA, MA, Speed, Move, Jump,
-  icon, WP;
+  icon, WP, then its physical and magical evasion (a weapon's W-EV in the first);
 - Ability and skill set names are shared with the battle catalogue in ffcj (FCJ2);
 - 8x8 icons (EVENT/ITEM.BIN, 24 bytes: light, dark, mask; 0: empty), 16x26 sprites (one still
   idle frame, white outline, 156 bytes) and 32x29 portraits (348 bytes) per career and sex
@@ -42,10 +42,42 @@ REQUIRE = 0x800660c4                    # 19 rows of 10 bytes (Chemist .. Mime),
 CAREERS = 20
 SHEETS = 'MINA ITEM KNIGHT YUMI MONK SIRO KURO TOKI SYOU THIEF WAJU ONMYO FUSUI RYU SAMU NINJA SAN GIN ODORI MONO'.split()
 ONLY = {17: 1, 18: 2}                   # Bard: men, Dancer: women
-JOB_SIZE, ITEM_SIZE = 32, 14
+JOB_SIZE, ITEM_SIZE = 32, 16
 # FFT's text: digits, capitals, small letters, then a few signs (two-byte ones: page * 208 + byte)
 SIGNS = {0x3E: '!', 0x42: '+', 0x93: "'", 0xFA: ' ', 0xB0: '-', 0xB1: "'", 0xB2: '.', 0xFD: ''}   # FD: a break
-PAGED = {237: '-', 2054: '.', 2061: ':', 2065: "'", 2062: '(', 2063: ')', 2195: ' ', 2196: ',', 2198: "'"}
+PAGED = {237: '-', 2054: '.', 2061: ':', 2065: "'", 2062: '(', 2063: ')', 2195: ' ', 2196: ',', 2198: "'",
+         234: '!', 2073: '?'}   # both read off EVENT/FONT.BIN's own glyphs
+# WORLD/WORLD.BIN holds the world menus' own text. Remove Unit's two beats and the labels
+# the management screens needed are taken from it by offset, each checked on its decoded text.
+WORLD_TEXT = (('check', 0xb039e), ('menu', 0xab7b1), ('best', 0xab778), ('assigned', 0xb0455),
+              ('ramza', 0xb10ad), ('bye0', 0xb0829), ('bye1', 0xb085f), ('bye2', 0xb08a2),
+              ('bye3', 0xb08dc), ('bye4', 0xb091d), ('bye5', 0xb0960), ('bye6', 0xb0995),
+              ('bye7', 0xb0b1b))
+WORLD_EXPECT = {'check': 'Remove', 'menu': 'Remove\nQuit', 'best': 'Equip to the maximum',
+                'assigned': 'Cannot be removed', 'ramza': 'Remove me? No way.',
+                'bye0': 'more help', 'bye7': "don't\nwant to leave"}
+
+
+def world_text(b, at):
+    """One WORLD.BIN entry as plain text: the speaker/name codes that open a line are
+    dropped, F8 ends a line, and the entry ends at FE."""
+    end = b.index(0xFE, at)
+    t, i, s = b[at:end], 0, ''
+    while i < len(t):
+        c = t[i]; i += 1
+        if c < 10: s += chr(48 + c)
+        elif c < 36: s += chr(55 + c)
+        elif c < 62: s += chr(c - 36 + 97)
+        elif c == 0xF8: s += '\n'
+        elif c in SIGNS: s += SIGNS[c]
+        elif 0xD0 <= c <= 0xDF and i < len(t):
+            g = (c & 15) * 208 + t[i]; i += 1
+            if g not in PAGED: raise ValueError('world glyph %d at %x' % (g, at))
+            s += PAGED[g]
+        elif 0xE0 <= c <= 0xEF: i += 2          # a speaker/name reference: two argument bytes
+        else: raise ValueError('world byte %02X at %x' % (c, at))
+    return s.strip('\n').rstrip()
+
 
 
 def decode(t):
@@ -105,6 +137,7 @@ def main():
     cue, out = sys.argv[1], Path(sys.argv[2])
     d = battle.Disc(cue)
     disc, files = extract.disc_files(cue)
+    world = disc.read(*files['WORLD/WORLD.BIN'])
     bat = d.bat
     jobn, itemn = names(bat, JOB_NAMES, 0xA0), names(bat, ITEM_NAMES, 256)
     abiln, setn = names(bat, ABILITY_NAMES, 512), names(bat, SET_NAMES, 64)
@@ -125,7 +158,13 @@ def main():
         j = d.job(jid)
         rows = req[(k - 1) * 10:k * 10] if 0 < k < CAREERS else bytes(10)
         jobs.append((string(jobn[jid]), jid, j['set'], j['growth'], j['mult'], j['move'], j['jump'], j['cats'],
-                     rows, ONLY.get(k, 0)))
+                     rows, ONLY.get(k, 0), j['cev']))
+    # The source keeps evasion out of the attribute record: a weapon's W-EV is the sixth byte
+    # of its weapon record, a shield's and an accessory's P-EV/M-EV their own two-byte tables,
+    # which sit between the weapon and armour tables and right after them (checked on the
+    # shields: Buckler 13/3, Escutcheon 75/50).
+    SHIELDS, ACCESSORIES = 0x80063eb8, 0x80063f58
+    assert d.at(SHIELDS + 2, 2) == bytes((13, 3)) and d.at(SHIELDS + 30, 2) == bytes((75, 50))
     raw = disc.read(*files['EVENT/ITEM.BIN'])
     a = np.frombuffer(raw[:32768], np.uint8).reshape(256, 128)
     sheet = np.empty((256, 256), np.uint8); sheet[:, ::2] = a & 15; sheet[:, 1::2] = a >> 4
@@ -141,8 +180,13 @@ def main():
             p = icon(sheet, palettes, b)
             if p: icon_of[(b[0], b[1])] = len(icons); icons.append(p)
         if i: k = icon_of.get((b[0], b[1]), 0)
+        pev = mev = 0
+        if i:
+            if b[3] & 0x80: pev = d.at(battle.WEAPONS + 8 * i, 8)[5]      # W-EV
+            elif b[3] & 0x40: pev, mev = d.at(SHIELDS + 2 * b[4], 2)      # a shield's two evades
+            elif b[3] & 0x08: pev, mev = d.at(ACCESSORIES + 2 * b[4], 2)  # an accessory's
         items.append((string(itemn[i]) if i else None, b[3], b[5], b[2], it['hp'], it['mp'], it['pa'], it['ma'],
-                      it['sp'], it['move'], it['jump'], k, wp))
+                      it['sp'], it['move'], it['jump'], k, wp, pev, mev))
     shp = {t: units.shp_frames(disc.read(*files['BATTLE/%s.SHP' % t])) for t in ('TYPE1', 'TYPE2')}
     sprites, faces, previews = [], [], []
     for k in range(CAREERS + 1):
@@ -163,7 +207,7 @@ def main():
     for i,face in enumerate(faces):
         at=int.from_bytes(pool[4:6],'big')+pool[directory+i]*348
         assert face==pool[at:at+348],('portrait mismatch',i)
-    body = bytearray(b'FMG3' + bytes(18))
+    body = bytearray(b'FMG5' + bytes(18))
     offs = []
 
     def section():
@@ -171,14 +215,14 @@ def main():
         offs.append(len(body))
 
     section()
-    for (nm, jid, st, gr, mu, mv, jp, cats, rows, only) in jobs:
-        rec = struct.pack('>HBB5B5BBB4s10sBB', 0, jid, st, *gr, *mu, mv, jp, bytes(cats), rows, only, 0)
+    for (nm, jid, st, gr, mu, mv, jp, cats, rows, only, cev) in jobs:
+        rec = struct.pack('>HBB5B5BBB4s10sBB', 0, jid, st, *gr, *mu, mv, jp, bytes(cats), rows, only, cev)
         assert len(rec) == JOB_SIZE, len(rec)
         body += rec
     section()
     for it in items:
-        body += struct.pack('>H12B', 0, *it[1:])
-    assert ITEM_SIZE == 14
+        body += struct.pack('>H14B', 0, *it[1:])
+    assert ITEM_SIZE == 16
     section()                                  # reserved: ability names moved to ffcj
     section()                                  # reserved: skill set names moved to ffcj
     section()
@@ -188,12 +232,21 @@ def main():
     section()
     body += pool[directory:directory+len(faces)]
     section(); body += font
-    section()                                  # reserved: generic names live in ffcp
+    section()                                  # Remove Unit's own text, from WORLD/WORLD.BIN
+    world_ids = []
+    for key, at in WORLD_TEXT:
+        t = world_text(world, at)
+        want = WORLD_EXPECT.get(key)
+        assert want is None or want in t, (key, t)
+        world_ids.append(string(t))
+    world_at = len(body)
+    body += bytes((len(WORLD_TEXT), 0)) + bytes(2 * len(WORLD_TEXT))
     if len(body) & 1: body.append(0)
     text_at = len(body); body += strings
     put = lambda at, s: struct.pack_into('>H', body, at, 0 if s is None else text_at + s)
     for k, j in enumerate(jobs): put(offs[0] + JOB_SIZE * k, j[0])
     for k, it in enumerate(items): put(offs[1] + ITEM_SIZE * k, it[0])
+    for k, sid in enumerate(world_ids): put(world_at + 2 + 2 * k, sid)
     body = body[:text_at] + strings                # (the names put last are added here)
     struct.pack_into('>9H', body, 4, *offs)
     assert len(body) < 65000, len(body)

@@ -16,10 +16,16 @@ these five rules, and a menu that cannot must say in a comment why.**
    pixels over the first label and five under the last. The world map's own
    menu (`body_y 3`, `row_y 10`, `pitch 7`, `height 57` for six rows) already
    satisfies it with seven.
-4. **The glove is wholly on screen.** The hand sprite is 32 wide and its
-   pointing tip sits at its right edge, so `x + hand_x >= 0`: with the usual
-   `hand_x -16`, the menu starts at `x >= 16`. A menu against the left edge
-   moves right rather than losing its cursor.
+4. **The glove is placed by the rule, not by eye.** The sprite is 32 wide and
+   14 tall; its pointing finger ends at +16 on rows 4..6 and the sway adds up
+   to three. So `hand_x = CHOICE_HAND_X(text_x)` (= `text_x - 21`): at its
+   rightmost frame the finger all but touches the label, and it leans out over
+   the frame's left border the way the source's own cursor does. Vertically
+   `hand_y = CHOICE_HAND_Y(row_y)` (= `row_y - 2`) puts the *finger*, not the
+   fist, on the label's middle row; over a 12-pixel pictogram it is the
+   pictogram's top row. Both macros live in `../choice_menu.h`.
+   The glove must stay wholly on screen: a menu against the left edge moves
+   right rather than losing its cursor.
 5. **The glove is animated**, always: `choice_cursor_animated(layout, row,
    rt_frame)`, never the still `choice_cursor`. A menu that does not move its
    hand looks frozen.
@@ -33,10 +39,37 @@ these five rules, and a menu that cannot must say in a comment why.**
    glove is drawn live, so it still sways. Recompose when anything shown
    changes, never on a timer.
 
+8. **One look for every command window.** The source gives each of its boxes
+   the same small title tab -- `Eqp.`, `Ability`, `Menu`, `Help`
+   (`fft_guides/orig/mgt_item.png`, `mgt_ability.png`, `item_help.png`) -- so
+   every command menu here uses `CHOICE_TAB`, never a second style for the same
+   job. Management's Item, Order Unit, the formation's Menu and its Learn/Change
+   Job confirmations all go through the one `overlay_at()` in `manage.c`, which
+   fits the box to its labels and greys the rows it will not let you pick.
+
+9. **Factor before you add.** A screen that shows what another screen already
+   shows reuses that renderer instead of drawing its own: one stat plate
+   (`../unit_sheet.inc`, [UNIT_SHEET.md](../UNIT_SHEET.md)), one unit card
+   (`../unit_card.inc`), one item detail (`../item_detail.inc`), one ability
+   detail. When two screens disagree about a number or a spacing, the fix is in
+   the shared renderer, not in one of the callers. Shipping a second copy of an
+   existing panel is a defect, not a shortcut. The shared renderer takes a
+   presentation snapshot, never the owner's own state: that is what lets the
+   management menus, the deployment screen and (next) the battle fill it from
+   three different structures.
+
+Management's own Item and Order Unit menus measure their rows with `card_width`
+at draw time (`fit_width`), so rule 2 holds whatever the labels say.
+
 Disabled entries are drawn in `C_DGRAY`, as the source greys what it will not
-let you pick. **[MODE] opens the detail of whatever the cursor is on**, through
+let you pick: Formation's Remove Unit is grey on Ramza, whom FFT refuses to
+let go. **[MODE] opens the detail of whatever the cursor is on**, through
 the shared `item_detail.inc` ([ITEM_DETAIL.md](ITEM_DETAIL.md)); [MODE] or
 SHIFT closes it, and while it is up its owner draws no live cursor over it.
+Over an ability (Learn's list, the four ability slots' choices) the same frame
+carries the ability's own panel -- name, kind, JP and FFT's text for all 489
+described abilities -- and over the Status tab, where the cursor points at no
+one thing, it carries the legend of the plate's short names.
 
 
 `../choice_menu.h` and `../choice_menu.inc` share the command-window frame,

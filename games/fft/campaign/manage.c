@@ -27,8 +27,9 @@
 #include "../../../tools/m68kbench/bench.h"
 #endif
 
-enum { S_FORM, S_MENU, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_PICK, S_NONE };
-enum { CAREERS = 20, RAMZA_JOB = 20, JOB_SIZE = 32, ITEM_SIZE = 14, SLOTS = 5, ROWS = 6 };
+enum { S_FORM, S_MENU, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_PICK,
+       S_ITEM, S_INV, S_ORDER, S_JOBTABLE, S_NONE };
+enum { CAREERS = 20, RAMZA_JOB = 20, JOB_SIZE = 32, ITEM_SIZE = 16, SLOTS = 5, ROWS = 6 };
 enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD };   // the save's order
 enum { JOB_CHANGE_FRAMES=96 }; // source-observed light column, adapted to30Hz/four greys
 typedef struct {
@@ -40,14 +41,22 @@ typedef struct {
     u8 jobs[CAREERS], angle[CAREERS], job_n, job_pos;
     s8 spin;
     u8 slide,job_anim,old_picture;
+    u8 remove;                          // Remove Unit: 1 the check, 2 the unit's reply
+    u8 remove_row;                      // its Yes/No, then Remove/Quit
+    u8 ljob;                            // S_LEARN: the career whose abilities are listed
+    u8 inv_all;                         // Inventory: 0 what this unit can equip, 1 everything
+    u8 inv_n;                           // its entries
+    u8 inv[128];                        // their item ids
     s16 floor_from_x,floor_from_y;
 } Mg;
-enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED, NOTE_SAVE };
+enum { NOTE_NONE, NOTE_JP, NOTE_LOCKED, NOTE_SAVE, NOTE_RAMZA };
+#define MENU_ROWS 2
 Mg mg;
 Save save;
 static const u8 *bank, *common,*identity,*egg_bank,*monster_bank,*item_text;
 static u8 *cache;
 static u8 dirty;
+static u8 settled;                       // hidden planes already carrying this page
 
 static u16 b16(const u8 *p) { return (u16)((u16)p[0] << 8 | p[1]); }
 static const u8 *section(u8 k) { return bank + b16(bank + 4 + 2 * k); }
@@ -72,6 +81,9 @@ static const char *set_name(u8 s) { return cj_set_name(common, s); }
 #define I_HP 5
 #define I_ICON 12
 #define I_WP 13
+#define I_PEV 14        // a weapon's W-EV, a shield's or an accessory's P-EV
+#define I_MEV 15
+#define J_CEV 31        // the job's own class evasion
 static const u8 slot_flag[SLOTS] = { 0x20, 0x10, 0x08, 0x80, 0x40 };
 
 static u16 job_ability(const u8 *j, u8 k) { return cj_set_ability(common, j[J_SET], k); }
@@ -177,6 +189,7 @@ static void mg_move_bonus(const SaveUnit *u, u8 *move, u8 *jump)
 #define UST_CURRENT(u) mg_raw_current(u)
 #define UST_MOVE(u,m,j) mg_move_bonus(u,m,j)
 #include "../unit_stats.inc"
+#include "roster_edit.inc"
 #define stats unit_stats
 
 void equip(SaveUnit *u, u8 slot, u8 id)    // id 0: taken off; the inventory keeps the count
@@ -198,9 +211,8 @@ static void validate_equipment(SaveUnit *u)
 }
 
 // k-th entry of the unit's current job: learned with its JP (1), else 0
-u8 learn(SaveUnit *u, u8 k)
+u8 learn(SaveUnit *u, u8 c, u8 k)
 {
-    u8 c = career(u);
     const u8 *j = job_rec(record(u, c));
     u16 id = job_ability(j, k), cost = ability_cost(id);
     if (u->type==3 || !id || learned(u, c, k) || jp(u, c) < cost) return 0;
@@ -329,7 +341,15 @@ static const char *item_help(u8 id)
 {
     u16 at;
     if (!item_text) return "";
-    at = b16(item_text + 6 + 2 * (u16)id);
+    at = b16(item_text + 8 + 2 * (u16)id);
+    return at ? (const char *)item_text + at : "";
+}
+// The same bank's second table: the source's own text for all 512 abilities (HELP.LZW).
+static const char *ability_help(u16 a)
+{
+    u16 at;
+    if (!item_text || a >= 512) return "";
+    at = b16(item_text + 8 + 2 * (256 + a));
     return at ? (const char *)item_text + at : "";
 }
 #define ID_TEXT(x,y,s,c,l) text(x,y,s,c,l)
@@ -365,38 +385,125 @@ static void floor_diamond(s16 x,s16 y)
 
 #include "egg_draw.inc"
 
-#include "../unit_card.h"
-#define CARD_TEXT(x,y,s,c,l,context) text(x,y,s,c,l)
-#define CARD_WIDTH(s) card_width(s)
-#define CARD_MANAGEMENT_LAYOUTS
-#include "../unit_card.inc"
-static void management_card(UnitCard *d,const SaveUnit *u,const Stats *s)
-{
-    const u8 *p=u->type==3?monster_formation_frame(monster_bank,u->job):RT_NULL;
-    d->portrait=u->type==3?(p?p+312:RT_NULL):identity_portrait(identity,section(6)[picture(u,career(u))]);
-    d->name=unit_name(u);d->job=job_name(u,career(u));
-    d->hp=d->max_hp=s->hp;d->mp=d->max_mp=s->mp;
-    d->level=u->level;d->exp=u->exp;d->brave=u->brave;d->faith=u->faith;
-}
+#include "data/slot_icons.h"
+// The unit sheet, decided with the user on 2026-11-22: the card and the tab bar are black
+// plates with white text, like the world map's own; the body below them is white and fills
+// every row, so no screen reads as an empty sheet. The card's rows are one pixel apart,
+// which is what frees the three columns of statistics on its right.
+enum { TAB_Y = 31, TAB_H = 8, BODY_Y = 39, LIST_Y = 41, LIST_H = 10 };   // the plate is US_PLATE_H tall, its last row under the bar
 
-// Formation and deployment use the same portrait/stat layout and full HP/MP bars.
-static void formation_details(const SaveUnit *u,const Stats *s,s16 y)
+// The campaign's own evasion, which the source keeps out of its attribute record: the class
+// evade is the job's own byte, the shield's and the accessory's their items', and the
+// weapon's its own (ffmg, I_PEV).
+// The class evade is the job's own byte; the shield's, the accessory's and the weapon's are
+// their items'. Magic evasion is the M-EV the same records carry, which only shields and
+// mantles ever hold (16 items on the disc, Aegis Shield 50, Feather Mantle 30).
+static void evades(const SaveUnit *u, u8 *ce, u8 *se, u8 *ae, u8 *we, u8 *me)
 {
-    UnitCard d;u8 part;management_card(&d,u,s);
-    for(part=0;part<UC_PARTS;part++)unit_card_draw(&d,UC_FORMATION,y,part,0,0);
+    u8 shield = u->eq[EQ_SHIELD], acc = u->eq[EQ_ACC], weapon = u->eq[EQ_WEAPON], k, m = 0;
+    *ce = u->type == 3 ? 0 : job_rec(record(u, career(u)))[J_CEV];
+    *se = shield && (item_rec(shield)[I_FLAGS] & 0x40) ? item_rec(shield)[I_PEV] : 0;
+    *ae = acc ? item_rec(acc)[I_PEV] : 0;
+    *we = weapon ? item_rec(weapon)[I_PEV] : 0;
+    for (k = 0; k < SLOTS; k++) if (u->eq[k]) m = (u8)(m + item_rec(u->eq[k])[I_MEV]);
+    *me = m;
 }
+#define US_TEXT(x,y,t,c,l) text(x,y,t,c,l)
+#define US_PORTRAIT(p,x,y) portrait32(p,x,y)
+#define US_WIDTH(t) card_width(t)
+#include "../unit_sheet.inc"
 
-static void unit_header(void)
+// One snapshot of a saved unit, which is all the shared plate ever sees. The portrait is
+// filled separately, because finding it is by far the dearest part (175k cycles on the
+// 68000) and a preview of the same unit already has it.
+static void sheet_values(UnitSheet *d, const SaveUnit *u)
 {
-    const SaveUnit *u = unit(mg.unit);
     Stats s = stats(u);
-    UnitCard d;u8 part;management_card(&d,u,&s);
-    for(part=0;part<=UC_JOB;part++)unit_card_draw(&d,UC_MANAGEMENT,0,part,0,0);
-    if(u->type==3)monster_actor(132,15,u);else actor(140,15,picture(u,career(u)));
-    draw_rect(2, 46, 156, 1, C_LGRAY);
+    u8 c = career(u), ce, se, ae, we, me;
+    evades(u, &ce, &se, &ae, &we, &me);
+    d->portrait = RT_NULL;
+    d->shown = US_ALL & ~(1UL << US_CT);     // a saved roster knows no charge time
+    d->max_hp = d->max_mp = 0;               // and its units are never hurt between battles
+    d->name = unit_name(u);
+    d->job = job_name(u, c);
+    d->v[US_LV] = u->level;    d->v[US_HP] = s.hp;      d->v[US_MP] = s.mp;
+    d->v[US_PA] = s.pa;        d->v[US_MA] = s.ma;
+    d->v[US_AT] = u->eq[EQ_WEAPON] ? item_rec(u->eq[EQ_WEAPON])[I_WP] : 0;
+    d->v[US_BRAVE] = u->brave; d->v[US_FAITH] = u->faith;
+    d->v[US_MOVE] = s.move;    d->v[US_JUMP] = s.jump;  d->v[US_SPEED] = s.sp;
+    d->v[US_JLV] = job_level(u, c);
+    d->v[US_CEV] = ce;         d->v[US_SEV] = se;       d->v[US_AEV] = ae;
+    d->v[US_WEV] = we;         d->v[US_MEV] = me;
+}
+static void sheet_fill(UnitSheet *d, const SaveUnit *u)
+{
+    sheet_values(d, u);
+    if (u->type != 3)
+        d->portrait = identity_portrait(identity, section(6)[picture(u, career(u))]);
+}
+// FFT previews a fitting before it is confirmed: while the cursor walks the candidates it
+// shows what the unit WOULD have. The snapshot of that unit, or 0 when nothing is pending.
+static const UnitSheet *sheet_preview(UnitSheet *t)
+{
+    SaveUnit c;
+    if (mg.screen != S_PICK || mg.back != S_EQUIP || !mg.pick_n) return RT_NULL;
+    c = *unit(mg.unit);
+    c.eq[mg.slot] = (u8)mg.pick[mg.top + mg.row];
+    if (mg.slot == EQ_WEAPON && c.eq[EQ_SHIELD] && !can_equip(&c, EQ_SHIELD, c.eq[EQ_SHIELD]))
+        c.eq[EQ_SHIELD] = 0;
+    sheet_values(t, &c);         // the preview is the same unit: it needs no second portrait
+    return t;
+}
+// The plate, wherever it goes: the top of the unit sheet, the foot of the roster, the head
+// of the deployment screen (deploy.c). Any saved unit, not only the one the menus are on.
+void plate_unit(const SaveUnit *u, const UnitSheet *soon, s16 top)
+{
+    UnitSheet d;
+    sheet_fill(&d, u);
+    unit_sheet_plate(&d, soon, top);
+    if (u->type == 3) monster_actor(16, top, u);
+}
+static void plate_at(s16 top)
+{
+    UnitSheet t;
+    plate_unit(unit(mg.unit), sheet_preview(&t), top);
+}
+static void plate(void) { plate_at(0); }
+// Status, Eqp., Abil., Learn and Job: the tab replaces a whole menu level. Left and right
+// change tab, F1/F5 change unit.
+enum { TAB_STATUS, TAB_EQUIP, TAB_ABIL, TAB_LEARN, TAB_JOB, TAB_N };
+static const char *const tab_name[TAB_N] = { "Status", "Eqp.", "Abil.", "Learn", "Job" };
+static u8 screen_tab(u8 screen)
+{
+    switch (screen) {
+    case S_EQUIP: case S_INV: case S_ITEM: return TAB_EQUIP;
+    case S_SET: return TAB_ABIL;
+    case S_PICK: return mg.back == S_EQUIP ? TAB_EQUIP : TAB_ABIL;
+    case S_LEARN: case S_JOBTABLE: return TAB_LEARN;
+    case S_JOBS: return TAB_JOB;
+    default: return TAB_STATUS;
+    }
+}
+static void tab_bar(u8 active)
+{ unit_sheet_tabs(TAB_Y, tab_name, TAB_N, active, save.n > 1 ? "F1 F5" : RT_NULL); }
+static void body(void) { draw_rect(0, BODY_Y, 160, (s16)(100 - BODY_Y), C_WHITE); }
+// Learn, the job table and the inventory carry a floating plate on their first row, so
+// their list starts one row lower and shows one row less.
+static u8 has_plate(void)
+{ return mg.screen == S_LEARN || mg.screen == S_JOBTABLE || mg.screen == S_INV; }
+static s16 list_top(void) { return (s16)(LIST_Y + (has_plate() ? 11 : 0)); }
+static u8 list_shown(void) { return (u8)(has_plate() ? ROWS - 1 : ROWS); }
+static void slot_pictogram(s16 x, s16 y, u8 k)
+{
+    RtSprite sp = { 16, 12, slot_icon[k][0], slot_icon[k][1], slot_icon[k][2] };
+    draw_sprite(x, y, &sp);
 }
 
-static const char *const menu_rows[] = { "Equip", "Abilities", "Learn", "Change Job" };
+// The tabs carry the unit's own pages, so the formation menu keeps only what acts on the
+// roster itself.
+static const char *const menu_rows[] = { "Remove Unit", "Order Unit" };
+static const char *const item_rows[] = { "Equip", "Best", "Remove all", "Inventory" };
+static const char *const order_rows[] = { "Job", "Number", "Level", "MAX MP", "MAX HP", "Faith", "Brave" };
 static const char *const slot_rows[] = { "Head", "Body", "Accessory", "R.Hand", "L.Hand" };
 static const char *const set_rows[] = { "Secondary", "Reaction", "Support", "Movement" };
 static const u8 slot_order[SLOTS] = { EQ_WEAPON, EQ_SHIELD, EQ_HEAD, EQ_BODY, EQ_ACC };   // shown
@@ -410,11 +517,11 @@ static void formation(void)
         s16 x = 8 + (i % 5) * 32, y = 7 + (i / 5) * 27;
         formation_actor(x,y,(u8)(first+i));
     }
-    draw_rect(0,62,160,1,C_BLACK);
     if(save.n>10){black(154,8,mg.top?"^":"");black(154,54,first+10<save.n?"v":"");}
-    if(save_egg(&save,mg.unit)){egg_card(mg.unit);return;}
-    formation_details(u,&s,65);
-    if(mg.screen==S_FORM)black(37,95,"ENTER:status ALPHA:menu");
+    if(save_egg(&save,mg.unit)){draw_rect(0,62,160,1,C_BLACK);egg_card(mg.unit);return;}
+    (void)s;
+    plate_at(62);                        // the sheet's own plate, under the roster
+    if(mg.screen==S_FORM)black(37,95,"ENTER:unit  ALPHA:menu");
 }
 
 static void formation_cursor(void)
@@ -472,59 +579,74 @@ static void jobs_page(void)
     black(15,94,unlocked(u,mg.row,RT_NULL)?"< > jobs ENTER:change":"Known by another unit");
 }
 
-static void status_page(void)
-{
-    const SaveUnit *u = unit(mg.unit);
-    Stats s = stats(u);
-    u8 c = career(u);
-    static const char *const names[] = { "Move", "Jump", "Speed", "PA", "MA", "Brave", "Faith", "Job Lv" };
-    u8 v[8], i;
-    v[0] = s.move; v[1] = s.jump; v[2] = s.sp; v[3] = s.pa; v[4] = s.ma; v[5] = u->brave; v[6] = u->faith;
-    v[7] = job_level(u, c);
-    for (i = 0; i < (u->type==3?7:8); i++) {
-        s16 x = i < 4 ? 6 : 85, y = 50 + (i & 3) * 7;
-        black(x, y, names[i]); right(x + 66, y, v[i]);
-    }
-    black(6, 80, "EXP"); number(26, 80, u->exp);
-    if(u->type!=3){black(85, 80, "Total JP"); right(151, 80, tjp(u, c));}
-    foot("F1/F5:unit SHIFT:back");
-}
-
-static void equip_page(void)
-{
-    const SaveUnit *u = unit(mg.unit);
-    u8 i;
-    for (i = 0; i < SLOTS; i++) {
-        u8 s = slot_order[i], id = u->eq[s];
-        s16 y = 49 + i * 8;
-        black(31, y, slot_rows[s]);
-        if (id) { icon(72, y - 1, id); black(82, y, str(b16(item_rec(id)))); }
-        else black(82, y, "-");
-    }
-    foot("ENTER:change SHIFT:back F1/F5:unit");
-}
-
 static const char *ability_or_set(u8 which, u16 a) { return !a ? "-" : which ? ability_name(a) : set_name((u8)a); }
 static u16 slot_value(const SaveUnit *u, u8 which)
 {
     return which ? b16(slot_of((SaveUnit *)u, which)) : u->secondary;
 }
 
+// The unit's primary skill set: its job's own, which no menu can change, so the source
+// prints it above the four it can (orig/mgt_ability.png, greyed out).
+static const char *primary_set(const SaveUnit *u)
+{
+    if (u->type == 3) return "-";
+    return set_name(job_rec(record(u, career(u)))[J_SET]);
+}
+// Status: what the plate cannot carry -- the unit's birth sign, sex, the JP it has earned
+// in this job and the four ability sets it goes to battle with.
+static void status_page(void)
+{
+    static const char *const signs[13] = { "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+        "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces", "Serpentarius" };
+    const SaveUnit *u = unit(mg.unit);
+    u8 c = career(u), i;
+    text(4, 42, "Zodiac", C_DGRAY, 40);
+    black(44, 42, u->zodiac < 13 ? signs[u->zodiac] : "-");
+    text(96, 42, "Total JP", C_DGRAY, 134);
+    right(156, 42, u->type == 3 ? 0 : tjp(u, c));
+    draw_rect(2, 50, 156, 1, C_LGRAY);
+    text(4, 53, "Primary", C_DGRAY, 56);
+    black(60, 53, primary_set(u));
+    for (i = 0; i < 4; i++) {
+        s16 y = (s16)(62 + i * 9);
+        text(4, y, set_rows[i], C_DGRAY, 56);
+        black(60, y, ability_or_set(i, slot_value(u, i)));
+    }
+    text(112, 90, "MODE:help", C_DGRAY, 158);
+}
+
+// Equipment: the source's own slot pictograms down the left, then the item's icon and name.
+static void equip_page(void)
+{
+    const SaveUnit *u = unit(mg.unit);
+    u8 i;
+    for (i = 0; i < SLOTS; i++) {
+        u8 s = slot_order[i], id = u->eq[s];
+        s16 y = (s16)(LIST_Y + i * 12);
+        slot_pictogram(20, y, i);
+        if (id) { icon(36, (s16)(y + 2), id); black(48, (s16)(y + 4), str(b16(item_rec(id)))); }
+        else text(48, (s16)(y + 4), "-", C_DGRAY, 157);
+    }
+}
+
 static void set_page(void)
 {
     const SaveUnit *u = unit(mg.unit);
     u8 i;
+    text(22, (s16)(LIST_Y + 1), "Primary", C_DGRAY, 76);
+    text(80, (s16)(LIST_Y + 1), primary_set(u), C_DGRAY, 157);
+    draw_rect(20, (s16)(LIST_Y + 9), 136, 1, C_LGRAY);
     for (i = 0; i < 4; i++) {
-        black(31, 49 + i * 8, set_rows[i]);
-        black(82, 49 + i * 8, ability_or_set(i, slot_value(u, i)));
+        s16 y = (s16)(LIST_Y + 13 + i * 11);
+        text(22, y, set_rows[i], C_DGRAY, 76);
+        black(80, y, ability_or_set(i, slot_value(u, i)));
     }
-    foot("ENTER:change SHIFT:back F1/F5:unit");
 }
 
 // Learn: the current job's abilities (its list's entries), cost or learned
 static u8 learn_entry(const SaveUnit *u, u8 row)   // the row-th entry of the list (22: none)
 {
-    const u8 *j = job_rec(record(u, career(u)));
+    const u8 *j = job_rec(record(u, mg.ljob));
     u8 monster_job[JOB_SIZE];
     if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
     u8 k;
@@ -535,37 +657,272 @@ static u8 learn_count(const SaveUnit *u) { u8 n = 0; while (learn_entry(u, n) < 
 
 static void list_rows(u8 n, void (*one)(u8 k, s16 y))
 {
-    u8 i;
-    for (i = mg.top; i < n && i < mg.top + ROWS; i++) one(i, (s16)(49 + (i - mg.top) * 7));
-    if (mg.top) black(154, 49, "^");
-    if (mg.top + ROWS < n) black(154, 84, "v");
+    s16 top = list_top();
+    u8 shown = list_shown(), i;
+    for (i = mg.top; i < n && i < mg.top + shown; i++)
+        one(i, (s16)(top + (i - mg.top) * LIST_H));
+    // CHOICE_MENU.md rule 6: a solid three-pixel triangle where the list goes on.
+    if (mg.top) for (i = 0; i < 3; i++)
+        draw_rect((s16)(153 + i), (s16)(top + 3 - i), (s16)(1 + 2 * i), 1, C_BLACK);
+    if (mg.top + shown < n) for (i = 0; i < 3; i++)
+        draw_rect((s16)(153 + i), (s16)(top + (shown - 1) * LIST_H + 2 + i), (s16)(5 - 2 * i), 1, C_BLACK);
 }
 
 static void learn_row(u8 i, s16 y)
 {
     const SaveUnit *u = unit(mg.unit);
-    const u8 *j = job_rec(record(u, career(u)));
+    const u8 *j = job_rec(record(u, mg.ljob));
+    y = (s16)(y + 2);
     u8 monster_job[JOB_SIZE];
     if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
     u8 k = learn_entry(u, i);
-    black(31, y, ability_name(job_ability(j, k)));
-    if (learned(u, career(u), k)) black(118, y, "Learned");
-    else right(146, y, ability_cost(job_ability(j, k)));
+    black(26, y, ability_name(job_ability(j, k)));
+    if (learned(u, mg.ljob, k)) text(118, y, "Learned", C_DGRAY, 151);
+    else right(150, y, ability_cost(job_ability(j, k)));
 }
 
 static void pick_row(u8 i, s16 y)
 {
     u16 a = mg.pick[i];
+    y = (s16)(y + 2);
     if (mg.back == S_EQUIP) {
-        if (!a) { black(31, y, "Remove"); return; }
-        icon(29, y - 1, (u8)a); black(39, y, str(b16(item_rec((u8)a))));
-        black(134, y, "x"); number(138, y, save.inv[a]);
-    } else black(31, y, a ? ability_or_set(mg.slot, a) : "Remove");
+        if (!a) { black(26, y, "Remove"); return; }
+        icon(24, (s16)(y - 2), (u8)a); black(36, y, str(b16(item_rec((u8)a))));
+        black(132, y, "x"); number(136, y, save.inv[a]);
+    } else black(26, y, a ? ability_or_set(mg.slot, a) : "Remove");
+}
+
+// ---------------------------------------------- FFT's Remove Unit, Order Unit and Inventory
+// Their text is the source's own, read in place from ffmg's world section
+// (WORLD/WORLD.BIN through tools/management_data.py).
+enum { W_REMOVE, W_MENU, W_BEST, W_ASSIGNED, W_RAMZA, W_BYE, W_BYE_N = 8 };
+static const char *world_str(u8 k)
+{
+    const u8 *p = section(8);
+    return !p || k >= p[0] ? "" : str(b16(p + 2 + 2 * k));
+}
+static const char *world_line2(const char *s)   // the entry's second line
+{
+    while (*s && *s != '\n') s++;
+    return *s ? s + 1 : "";
+}
+static s16 world_line1(s16 x, s16 y, const char *s)
+{
+    char b[40];
+    u8 k = 0;
+    while (s[k] && s[k] != '\n' && k < 39) { b[k] = s[k]; k++; }
+    b[k] = 0;
+    return black(x, y, b);
+}
+// Which farewell the source picks is not measured; this spreads its eight over the party
+// from the unit's own numbers, so one unit always answers the same way.
+static const char *farewell(const SaveUnit *u)
+{
+    if (u->type == 2) return world_str(W_RAMZA);
+    return world_str((u8)(W_BYE + (u8)(u->brave + u->faith + u->level) % W_BYE_N));
+}
+
+// The equipment score: the campaign's own stat derivation plus the weapon's power,
+// the same measure the shop's Best fit ranks with.
+static u16 mg_fit(const SaveUnit *u)
+{
+    Stats s = stats(u);
+    u16 v = (u16)(s.hp + s.mp + 10U * (s.pa + s.ma + s.sp));
+    u8 k;
+    for (k = 0; k < SLOTS; k++) if (u->eq[k]) v = (u16)(v + 8U * item_rec(u->eq[k])[I_WP]);
+    return v;
+}
+// "Equip to the maximum": the best owned item per slot, weapon first so the hand it frees
+// (or the two hands it takes) is settled before the shield is chosen. Two passes.
+static void best_fit_unit(SaveUnit *u)
+{
+    u8 pass, k, id, moved = 1;
+    if (u->type == 3) return;
+    for (pass = 0; pass < 2 && moved; pass++) for (moved = 0, k = 0; k < SLOTS; k++) {
+        u8 slot = slot_order[k], best = u->eq[slot], old = u->eq[slot];
+        u16 score = mg_fit(u), s2;
+        for (id = 1; id; id++) {
+            if (!save.inv[id] || !can_equip(u, slot, id)) continue;
+            u->eq[slot] = id; s2 = mg_fit(u); u->eq[slot] = old;
+            if (s2 > score) { score = s2; best = id; }
+        }
+        if (best != old) { equip(u, slot, best); moved = 1; }
+    }
+}
+static void remove_all_equipment(SaveUnit *u)
+{
+    u8 k;
+    for (k = 0; k < SLOTS; k++) equip(u, k, 0);
+}
+
+static u8 fits_any_slot(const SaveUnit *u, u8 id)
+{
+    u8 s;
+    for (s = 0; s < SLOTS; s++) if (can_equip(u, s, id)) return 1;
+    return 0;
+}
+// Eqp.: what this unit could wear; All: the whole bag, as the source's own indicator switches.
+static void build_inventory(const SaveUnit *u)
+{
+    u16 id;
+    u8 n = 0;
+    for (id = 1; id < 256; id++)
+        if (save.inv[id] && (mg.inv_all || fits_any_slot(u, (u8)id)) && n < 128) mg.inv[n++] = (u8)id;
+    mg.inv_n = n;
+    if (mg.top + mg.row >= n) { mg.top = 0; mg.row = 0; }
+}
+static void inventory_row(u8 i, s16 y)
+{
+    u8 id = mg.inv[i];
+    y = (s16)(y + 2);
+    icon(24, (s16)(y - 2), id); black(36, y, str(b16(item_rec(id))));
+    black(132, y, "x"); number(136, y, save.inv[id]);
+}
+// The source's own Eqp./All indicator, on a floating plate over the list.
+static void float_plate(const char *label, u16 value, u8 number)
+{
+    draw_rect(104, (s16)(BODY_Y + 1), 54, 10, C_BLACK);
+    text(108, (s16)(BODY_Y + 3), label, C_WHITE, 150);
+    if (number) us_number(154, (s16)(BODY_Y + 3), value, 0, C_WHITE);
+}
+// The source heads its bag with two options, "Eqp." and "ALL", the active one lit
+// (orig/mgt_item_list.png): Eqp. keeps what this unit could wear, All shows the whole bag.
+static void inventory_filter(void)
+{
+    static const char *const choice[2] = { "Eqp.", "All" };
+    s16 w0 = (s16)(card_width(choice[0]) + 6), w1 = (s16)(card_width(choice[1]) + 6);
+    s16 x = (s16)(158 - w0 - w1), y = (s16)(BODY_Y + 1);
+    u8 i;
+    for (i = 0; i < 2; i++) {
+        s16 w = i ? w1 : w0;
+        if (i == mg.inv_all) draw_rect(x, y, w, 10, C_BLACK);
+        text((s16)(x + 3), (s16)(y + 2), choice[i], i == mg.inv_all ? C_WHITE : C_DGRAY, 157);
+        x = (s16)(x + w);
+    }
+}
+static void inventory_page(void)
+{
+    if (!mg.inv_n) text(26, 56, "Nothing in the bag", C_DGRAY, 158);
+    else list_rows(mg.inv_n, inventory_row);
+    inventory_filter();
+}
+
+// Learn: the source opens on the unit's jobs, one row each, before their abilities.
+static u8 jobtable_entry(const SaveUnit *u, u8 row)
+{
+    u8 c;
+    for (c = 0; c < CAREERS; c++) if (job_visible(u, c) && !row--) return c;
+    return CAREERS;
+}
+static u8 jobtable_count(const SaveUnit *u)
+{
+    u8 n = 0;
+    while (jobtable_entry(u, n) < CAREERS) n++;
+    return n;
+}
+static u8 job_mastered(const SaveUnit *u, u8 c)
+{
+    const u8 *j = job_rec(record(u, c));
+    u8 k;
+    for (k = 0; k < 22; k++) if (job_ability(j, k) && !learned(u, c, k)) return 0;
+    return 1;
+}
+static void jobtable_row(u8 i, s16 y)
+{
+    const SaveUnit *u = unit(mg.unit);
+    u8 c = jobtable_entry(u, i);
+    static const u16 need[7] = { 200, 350, 550, 800, 1150, 1550, 2100 };
+    u8 lv = job_level(u, c);
+    y = (s16)(y + 2);
+    black(26, y, job_name(u, c));
+    right(100, y, lv);
+    right(124, y, tjp(u, c));
+    if (job_mastered(u, c)) text(126, y, "Master", C_DGRAY, 151);
+    else right(150, y, lv < 8 ? (u16)(need[lv - 1] - tjp(u, c)) : jp(u, c));
+}
+static void jobtable_page(void)
+{
+    const SaveUnit *u = unit(mg.unit);
+    u8 c = jobtable_entry(u, (u8)(mg.top + mg.row));
+    list_rows(jobtable_count(u), jobtable_row);
+    float_plate("JP", c < CAREERS ? jp(u, c) : 0, 1);
+}
+
+// A command overlay: fitted to its labels, no air under the last row, its glove outside
+// the frame on the left (CHOICE_MENU.md).
+static void overlay_at(const char *const *rows, u8 n, const char *title, u8 at,
+                       s16 x, s16 y, u8 grey)       // grey: a bitmask of unselectable rows
+{
+    ChoiceLayout menu = { 0, 0, 0, 0, 7, CHOICE_TAB, 3, 1, 0, 8, 12, 9, 0, CHOICE_HAND_X(8), CHOICE_HAND_Y(12) };
+    u8 i, w = card_width(title);
+    for (i = 0; i < n; i++) { u8 v = card_width(rows[i]); if (v > w) w = v; }
+    menu.width = (u8)(menu.text_x + w + 6);
+    menu.height = (u8)(13 + 9 * n);
+    menu.x = x < 0 ? (s16)(158 - menu.width) : x;
+    menu.y = y < 0 ? (s16)(98 - menu.height) : y;
+    menu.limit = (u8)(menu.x + menu.width - 3);
+    choice_frame(&menu, title);
+    for (i = 0; i < n; i++)
+        choice_row(&menu, i, rows[i], (grey >> i) & 1 ? C_DGRAY : C_BLACK);
+    choice_cursor_animated(&menu, at, rt_frame);
+}
+static void overlay(const char *const *rows, u8 n, const char *title, u8 at)
+{ overlay_at(rows, n, title, at, -1, -1, 0); }
+static void item_menu(void) { overlay(item_rows, 4, "Item", mg.row); }
+static void order_menu(void) { overlay(order_rows, ORD_N, "Order", mg.row); }
+
+// The abbreviations the plate's three columns use, as a page of its own: the source has no
+// such screen, but its plate spells every word out and ours cannot.
+static void legend_panel(void)
+{
+    // Laid out as the plate is, column for column, so the legend is read the same way.
+    static const char *const word[3][5] = {
+        { "PA Phys.atk", "MA Magic atk", "AT Atk power", "Br Brave", "Fa Faith" },
+        { "Mv Move", "Jp Jump", "Sp Speed", "JLv Job lv", "" },
+        { "CE Class ev", "SE Shield ev", "AE Access ev", "WE Weapon ev", "ME Magic ev" } };
+    static const u8 col[3] = { 4, 56, 108 };
+    u8 i, k;
+    draw_rect(0, BODY_Y, 160, (s16)(100 - BODY_Y), C_WHITE);
+    draw_rect(0, BODY_Y, 160, 1, C_BLACK);
+    for (k = 0; k < 3; k++) for (i = 0; i < 5; i++)
+        text((s16)col[k], (s16)(BODY_Y + 5 + i * 10), word[k][i], C_BLACK, 158);
+}
+
+// Remove Unit's two beats: the source's Check, then the unit's own answer with Remove/Quit.
+static void remove_panel(void)
+{
+    const SaveUnit *u = unit(mg.unit);
+    static const ChoiceLayout ask = { 40, 38, 60, 29, 3, CHOICE_TAB, 3, 1, 0, 24, 10, 9, 155, CHOICE_HAND_X(24), CHOICE_HAND_Y(10) };
+    static const ChoiceLayout reply = { 0, 0, 160, 100, 0, CHOICE_BARE, 0, 0, 0, 52, 72, 9, 150, CHOICE_HAND_X(52), CHOICE_HAND_Y(72) };
+    if (!mg.remove) return;
+    if (mg.remove == 1) {
+        char title[26];
+        const char *word = world_str(W_REMOVE), *name = unit_name(u);
+        u8 k = 0;
+        while (*word && k < 20) title[k++] = *word++;
+        title[k++] = ' ';
+        while (*name && k < 24) title[k++] = *name++;
+        title[k++] = '?'; title[k] = 0;
+        choice_frame(&ask, title);
+        choice_row(&ask, 0, "Yes", C_BLACK);
+        choice_row(&ask, 1, "No", C_BLACK);
+        choice_cursor_animated(&ask, mg.remove_row, rt_frame);
+        return;
+    }
+    panel(4, 40, 152, 52);
+    { const u8 *p = identity_portrait(identity, section(6)[picture(u, career(u))]);
+      if (u->type != 3 && p) portrait32(p, 8, 44); }
+    black(44, 44, unit_name(u));
+    world_line1(44, 54, farewell(u));
+    black(44, 62, world_line2(farewell(u)));
+    world_line1(52, 72, world_str(W_MENU));
+    black(52, 81, world_line2(world_str(W_MENU)));
+    choice_cursor_animated(&reply, mg.remove_row, rt_frame);
 }
 
 static void note_panel(void)
 {
-    static const char *const notes[] = { "", "Not enough JP", "", "Save failed" };
+    static const char *const notes[] = { "", "Not enough JP", "", "Save failed", "" };
     if (!mg.note) return;
     panel(5, 60, 150, 24);
     if (mg.note == NOTE_LOCKED) {
@@ -577,6 +934,10 @@ static void note_panel(void)
             need = (u8)(job_rec(c)[J_REQ + (what >> 1)] >> (what & 1 ? 0 : 4) & 15);
             black(12, 64, "Needs"); { s16 x = black(36, 64, job_name(u, what)); black(x + 4, 64, "Lv"); number(x + 14, 64, need); }
         }
+    } else if (mg.note == NOTE_RAMZA) {
+        world_line1(12, 64, world_str(W_RAMZA));
+        black(12, 72, world_line2(world_str(W_RAMZA)));
+        return;
     } else black(12, 64, notes[mg.note]);
     black(12, 74, "ENTER or SHIFT");
 }
@@ -584,7 +945,7 @@ static void note_panel(void)
 static void confirm_panel(void)
 {
     const SaveUnit *u = unit(mg.unit);
-    static const ChoiceLayout menu={65,53,94,27,3,CHOICE_TAB,3,1,0,6,10,8,157,-15,7};
+    static const ChoiceLayout menu={65,53,94,27,3,CHOICE_TAB,3,1,0,6,10,8,157,CHOICE_HAND_X(6),CHOICE_HAND_Y(10)};
     if (!mg.confirm) return;
     if(save_egg(&save,mg.unit)){egg_menu(mg.confirm);return;}
     choice_frame(&menu,mg.screen==S_JOBS?job_name(u,mg.row):"Learn ability?");
@@ -595,19 +956,24 @@ static void confirm_panel(void)
 
 static void command_menu(void)
 {
-    static const ChoiceLayout menu={56,15,101,50,0,CHOICE_PANEL,9,4,0,25,14,8,159,1,10};
-    u8 i;if(save_egg(&save,mg.unit)){if(!mg.confirm)egg_menu(0);return;}
-    choice_frame(&menu,"Menu");
-    for(i=0;i<4;i++)choice_row(&menu,i,menu_rows[i],C_BLACK);
-    choice_cursor_animated(&menu,mg.row,rt_frame);
+    if(save_egg(&save,mg.unit)){if(!mg.confirm)egg_menu(0);return;}
+    overlay_at(menu_rows, MENU_ROWS, "Menu", mg.row, 56, 15,
+               unit(mg.unit)->type == 2 ? 1 : 0);
 }
 
 static void list_cursor(void)
 {
-    ChoiceLayout cursor={0,0,160,100,0,CHOICE_BARE,0,0,0,0,0,7,159,5,39};
-    if(mg.note||mg.confirm)return;
-    if(mg.screen==S_EQUIP||mg.screen==S_SET)cursor.pitch=8;
-    else if(mg.screen!=S_LEARN&&mg.screen!=S_PICK)return;
+    ChoiceLayout cursor={0,0,160,100,0,CHOICE_BARE,0,0,0,0,0,LIST_H,159,0,0};
+    cursor.hand_y=(s8)(list_top()-1);
+    if(mg.note||mg.confirm||mg.remove)return;
+    switch(mg.screen) {
+    case S_EQUIP: cursor.pitch=12; cursor.hand_y=LIST_Y-1; break;   // centred on the 12px pictogram
+    case S_SET: cursor.pitch=11; cursor.hand_y=LIST_Y+12; break;    // under the Primary line
+    case S_STATUS: return;
+    case S_INV: if(!mg.inv_n)return; break;
+    case S_LEARN: case S_PICK: case S_JOBTABLE: break;
+    default: return;
+    }
     choice_cursor_animated(&cursor,mg.row,rt_frame);
 }
 
@@ -616,7 +982,36 @@ static u8 detail_item(void)
 {
     if (mg.screen == S_EQUIP) return unit(mg.unit)->eq[slot_order[mg.row]];
     if (mg.screen == S_PICK && mg.back == S_EQUIP) return (u8)mg.pick[mg.top + mg.row];
+    if (mg.screen == S_INV && mg.inv_n) return mg.inv[mg.top + mg.row];
     return 0;
+}
+// The ability under the cursor, 0 when there is none: Learn's own list and the four
+// ability slots' choices both point at one, and both open its description with [MODE].
+static u16 detail_ability(void)
+{
+    const SaveUnit *u = unit(mg.unit);
+    if (mg.screen == S_LEARN) {
+        u8 k = learn_entry(u, (u8)(mg.top + mg.row));
+        return k < 22 ? job_ability(job_rec(record(u, mg.ljob)), k) : 0;
+    }
+    if (mg.screen == S_PICK && mg.back == S_SET && mg.slot) return mg.pick[mg.top + mg.row];
+    return 0;
+}
+// The ability's own panel: the same frame the item detail uses, so the two read as one
+// screen, with FFT's text for all 489 described abilities (ffid's second table).
+static void ability_panel(void)
+{
+    static const char *const kind_name[4] = { "Action", "Reaction", "Support", "Movement" };
+    u16 a = detail_ability();
+    if (!a) { mg.detail = 0; return; }
+    draw_rect(5, 13, 150, 74, C_BLACK);
+    draw_rect(6, 14, 148, 72, C_WHITE);
+    text(10, 17, ability_name(a), C_BLACK, 152);
+    text(10, 26, kind_name[kind(a)], C_DGRAY, 100);
+    text(104, 26, "JP", C_DGRAY, 152);
+    right(146, 26, ability_cost(a));
+    item_detail_wrap(ability_help(a), 10, 38, 140, 4);
+    text(10, 78, "MODE or SHIFT closes", C_DGRAY, 152);
 }
 static void detail_panel(void)
 {
@@ -627,20 +1022,20 @@ static void detail_panel(void)
     if (!id) { mg.detail = 0; return; }
     r = item_rec(id);
     d.id = id; d.kind = r[I_TYPE]; d.flags = r[I_FLAGS]; d.name = str(b16(r));
-    d.help = item_help(id); d.power = r[I_WP];
+    d.help = item_help(id); d.power = r[I_WP]; d.evade = r[I_PEV];
     for (i = 0; i < 7; i++) d.stat[i] = (s8)r[I_HP + i];
     item_detail_draw(&d);
 }
 
 static void page(void)
 {
-    static const char *const titles[] = { "Formation", "Formation", "Status", "Equip", "Abilities", "Learn", "Change Job", "" };
     draw_clear();
     if (!bank) { draw_text(4, 40, "Missing ffmg", 0, C_BLACK); return; }
     if (!save.n) { heading("Formation"); black(8, 40, "No campaign save:"); black(8, 48, "win the battle at Gariland."); foot("ESC:quit"); return; }
-    heading(mg.screen == S_PICK ? (mg.back == S_EQUIP ? slot_rows[mg.slot] : set_rows[mg.slot]) : titles[mg.screen]);
-    if (mg.screen == S_FORM || mg.screen == S_MENU) {
+    if (mg.screen == S_FORM || mg.screen == S_MENU || mg.screen == S_ORDER) {
+        heading("Formation");
         formation();
+        if (mg.screen == S_ORDER) { note_panel(); return; }
         if (mg.screen == S_MENU) {
             formation_cursor();
             if(!save_egg(&save,mg.unit))foot("ENTER:open SHIFT:back");
@@ -648,34 +1043,37 @@ static void page(void)
         note_panel();
         return;
     }
-    if(mg.screen==S_JOBS){jobs_page();note_panel();return;}
-    unit_header();
-    if(mg.screen==S_LEARN){black(91,25,"JP");right(127,25,jp(unit(mg.unit),career(unit(mg.unit))));}
+    if (mg.screen == S_JOBS) { heading("Change Job"); jobs_page(); note_panel(); return; }
+    // Every other screen is a tab of the unit's own sheet: the plate, the bar, the body.
+    plate();
+    tab_bar(screen_tab(mg.screen));
+    body();
     switch (mg.screen) {
     case S_STATUS: status_page(); break;
-    case S_EQUIP: equip_page(); break;
+    case S_EQUIP: case S_ITEM: equip_page(); break;
     case S_SET: set_page(); break;
     case S_LEARN:
         list_rows(learn_count(unit(mg.unit)), learn_row);
-        foot("ENTER:learn SHIFT:back F1/F5:unit"); break;
-    case S_PICK:
-        list_rows(mg.pick_n, pick_row);
-        foot(item_help(detail_item())[0] ? "ENTER:choose MODE:info" : "ENTER:choose SHIFT:back"); break;
+        float_plate("JP", jp(unit(mg.unit), mg.ljob), 1); break;
+    case S_PICK: list_rows(mg.pick_n, pick_row); break;
+    case S_INV: inventory_page(); break;
+    case S_JOBTABLE: jobtable_page(); break;
     }
     note_panel();
-    if (mg.detail) detail_panel();
-    // Recover six rows beneath the compact title; all body/overlay coordinates
-    // above remain shared with the existing equipment and ability list layout.
-    memmove((u8 *)rt_light+7*RT_PBYTES,(u8 *)rt_light+13*RT_PBYTES,87*RT_PBYTES);
-    memmove((u8 *)rt_dark+7*RT_PBYTES,(u8 *)rt_dark+13*RT_PBYTES,87*RT_PBYTES);
-    draw_rect(0,94,160,6,C_WHITE);
+    if (mg.detail) {
+        if (mg.screen == S_STATUS) legend_panel();
+        else if (detail_ability()) ability_panel();
+        else detail_panel();
+    }
 }
 
 // ---------------------------------------------------------------- the frame loop
 static void open_list(u8 screen, u8 at)          // a scrolling list, its entry at shown
 {
+    u8 shown;
     mg.screen = screen;
-    mg.top = at >= ROWS ? (u8)(at - ROWS + 1) : 0;
+    shown = list_shown();
+    mg.top = at >= shown ? (u8)(at - shown + 1) : 0;
     mg.row = (u8)(at - mg.top);
 }
 
@@ -694,14 +1092,15 @@ void game_init(void)
     bank = RT_NULL; cache = RT_NULL; item_text = RT_NULL;   // (statics survive between runs)
     memset(&mg, 0, sizeof mg);
     bank = rt_file("ffmg", &size);
-    if (bank && memcmp(bank, "FMG3", 4)) bank = RT_NULL;
+    if (bank && memcmp(bank, "FMG5", 4)) bank = RT_NULL;
     identity=rt_file("ffcp",&size);if(!identity_valid(identity,size))bank=RT_NULL;
     common = rt_file("ffcj", &size);
     if (!cj_valid(common, size)) bank = RT_NULL;
     save_load(&save);
     egg_bank=rt_file("ffeg",&size);if(!egg_art_valid(egg_bank,size))bank=RT_NULL;
     item_text=rt_file("ffid",&size);
-    if(item_text&&(memcmp(item_text,"FID1",4)||b16(item_text+4)!=256))item_text=RT_NULL;
+    if(item_text&&(memcmp(item_text,"FID2",4)||b16(item_text+4)!=256||b16(item_text+6)!=512))
+        item_text=RT_NULL;
     monster_bank=rt_file("ffma",&size);if(!monster_formation_valid(monster_bank,size))monster_bank=RT_NULL;
     if (save.n > PARTY_MAX) save.n = 0;
     cache = (u8 *)malloc(2 * RT_PSIZE);
@@ -711,12 +1110,21 @@ void game_init(void)
 
 void game_scenario(u16 n)                // test doors: a screen of the first unit
 {
-    static const u8 doors[] = { S_FORM, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_MENU };
+    static const u8 doors[] = { S_FORM, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_MENU,
+                                S_ITEM, S_INV, S_ORDER, S_JOBTABLE, S_FORM, S_FORM };
     mg.screen = n < sizeof doors ? doors[n] : S_FORM;
     mg.unit = mg.row = mg.top = 0;
     if(save_egg(&save,0))mg.screen=S_FORM;
     else if(unit(0)->type==3&&mg.screen!=S_FORM&&mg.screen!=S_MENU)mg.screen=S_STATUS;
     if (mg.screen == S_JOBS) open_jobs();
+    if (mg.screen == S_LEARN || mg.screen == S_JOBTABLE) mg.ljob = career(unit(mg.unit));
+    if (mg.screen == S_INV) build_inventory(unit(mg.unit));
+    if (n == 11 || n == 12) {             // Remove Unit's two beats, on a unit it lets go
+        while (mg.unit < save.n && unit(mg.unit)->type == 2) mg.unit++;
+        if (mg.unit < save.n) {
+            mg.screen = S_MENU; mg.row = 4; mg.remove = (u8)(n - 10); mg.remove_row = 0;
+        } else mg.unit = 0;
+    }
     dirty = 1;
 }
 
@@ -743,7 +1151,7 @@ static u8 list_move(u32 key, u8 n)              // up / down in a scrolling list
     if (key & K_UP) at = at ? (u8)(at - 1) : (u8)(n - 1);
     if (key & K_DOWN) at = (u8)(at + 1 == n ? 0 : at + 1);
     if (at < mg.top) mg.top = at;
-    if (at >= mg.top + ROWS) mg.top = (u8)(at - ROWS + 1);
+    if (at >= mg.top + list_shown()) mg.top = (u8)(at - list_shown() + 1);
     mg.row = (u8)(at - mg.top);
     return at;
 }
@@ -765,8 +1173,25 @@ u8 game_update(void)
     if (!bank || !save.n) { if (key & K_ESC)return leave();return 1; }
     u = unit(mg.unit);
     if (mg.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) mg.note = 0; return 1; }
+    if (mg.remove) {
+        if (key & (K_B | K_ESC)) { mg.remove = 0; mg.remove_row = 0; return 1; }
+        mg.remove_row = choice_move(mg.remove_row, 2, key);
+        if (key & (K_ENTER | K_A)) {
+            u8 yes = !mg.remove_row;
+            if (!yes) { mg.remove = 0; mg.remove_row = 0; return 1; }
+            if (mg.remove == 1) { mg.remove = 2; mg.remove_row = 0; return 1; }
+            mg.remove = 0; mg.remove_row = 0;
+            if (roster_remove(&save, mg.unit)) {
+                mg.changed = 1;
+                if (mg.unit >= save.n) mg.unit = save.n ? (u8)(save.n - 1) : 0;
+                roster_position(S_FORM); mg.row = mg.slide = 0;
+            }
+        }
+        return 1;
+    }
     if (mg.detail) { if (key & (K_MODE | K_B | K_ESC | K_ENTER | K_A)) mg.detail = 0; return 1; }
-    if ((key & K_MODE) && detail_item()) { mg.detail = 1; return 1; }
+    if ((key & K_MODE) && (detail_item() || detail_ability() || mg.screen == S_STATUS))
+        { mg.detail = 1; return 1; }
     if (mg.confirm) {
         if(save_egg(&save,mg.unit)){
             if(key&(K_B|K_ESC))mg.confirm=0;
@@ -785,18 +1210,32 @@ u8 game_update(void)
             mg.confirm = 0;
             if(accept) {
                 if (mg.screen == S_JOBS) {mg.old_picture=picture(u,career(u));change_job(u,mg.row);mg.job_anim=JOB_CHANGE_FRAMES;}
-                else if (!learn(u, learn_entry(u, (u8)(mg.top + mg.row)))) mg.note = NOTE_JP;
+                else if (!learn(u, mg.ljob, learn_entry(u, (u8)(mg.top + mg.row)))) mg.note = NOTE_JP;
             }
         }else mg.confirm=choice_move(mg.confirm-1,2,key)+1;
         return 1;
     }
-    if ((key & (K_F1 | K_F5)) && mg.screen != S_FORM && mg.screen != S_MENU && mg.screen != S_PICK) {
+    if ((key & (K_F1 | K_F5)) && mg.screen != S_FORM && mg.screen != S_MENU && mg.screen != S_PICK
+        && mg.screen != S_INV) {        // the inventory's own F1/F5 switches Eqp./All
         u8 tries=save.n;
         do{mg.unit=(u8)((mg.unit+(key&K_F1?save.n-1:1))%save.n);}
         while((save_egg(&save,mg.unit)||(unit(mg.unit)->type==3&&mg.screen!=S_STATUS))&&--tries);
         if(save_egg(&save,mg.unit)||(unit(mg.unit)->type==3&&mg.screen!=S_STATUS)){roster_position(S_FORM);return 1;}
         if (mg.screen == S_JOBS) open_jobs();
         else if (mg.screen == S_LEARN) mg.row = mg.top = 0;
+        return 1;
+    }
+    // Left and right change tab on the unit's own sheet; its screens have no horizontal
+    // navigation of their own (the job wheel keeps its arrows and is left with SHIFT).
+    if ((key & (K_LEFT | K_RIGHT)) && mg.screen != S_FORM && mg.screen != S_MENU &&
+        mg.screen != S_ORDER && mg.screen != S_JOBS && mg.screen != S_PICK && mg.screen != S_ITEM) {
+        static const u8 dest[TAB_N] = { S_STATUS, S_EQUIP, S_SET, S_JOBTABLE, S_JOBS };
+        u8 tab = screen_tab(mg.screen);
+        tab = (u8)(key & K_LEFT ? (tab ? tab - 1 : TAB_N - 1) : (tab + 1 == TAB_N ? 0 : tab + 1));
+        if (u->type == 3 && (tab == TAB_LEARN || tab == TAB_JOB)) tab = TAB_STATUS;
+        mg.screen = dest[tab]; mg.row = mg.top = 0;
+        if (mg.screen == S_JOBS) open_jobs();
+        else if (mg.screen == S_JOBTABLE) mg.ljob = career(u);
         return 1;
     }
     switch (mg.screen) {
@@ -815,7 +1254,7 @@ u8 game_update(void)
         mg.unit = at;
         if (at / 5 < mg.top) mg.top = at / 5;
         if (at / 5 > mg.top + 1) mg.top = at / 5 - 1;
-        if ((key & (K_ENTER | K_A))&&!save_egg(&save,mg.unit)) mg.screen = S_STATUS;
+        if ((key & (K_ENTER | K_A))&&!save_egg(&save,mg.unit)) { mg.screen = S_EQUIP; mg.row = mg.top = 0; }
         if (key & (K_C | K_D)) { mg.screen = S_MENU; mg.row = 0;mg.slide=0; }
         return 1;
     case S_MENU:
@@ -824,19 +1263,65 @@ u8 game_update(void)
             if(key&(K_ENTER|K_A))mg.confirm=1;
             return 1;
         }
-        mg.row=choice_move(mg.row,4,key);
+        mg.row=choice_move(mg.row,MENU_ROWS,key);
         if (key & (K_ENTER | K_A)) {
-            static const u8 dest[] = { S_EQUIP, S_SET, S_LEARN, S_JOBS };
-            if(u->type==3){mg.note=NOTE_LOCKED;return 1;}
-            mg.screen = dest[mg.row]; mg.row = mg.top = 0;
-            if (mg.screen == S_JOBS) open_jobs();
+            if (!mg.row) {                           // Remove Unit
+                if (u->type == 2) { mg.note = NOTE_RAMZA; return 1; }
+                mg.remove = 1; mg.remove_row = 0; return 1;
+            }
+            mg.screen = S_ORDER; mg.row = mg.top = 0;
+        }
+        return 1;
+    case S_ITEM:
+        if (key & (K_B | K_ESC)) { mg.screen = S_EQUIP; mg.row = 0; return 1; }
+        mg.row = choice_move(mg.row, 4, key);
+        if (key & (K_ENTER | K_A)) {
+            if (mg.row == 0) { mg.screen = S_EQUIP; mg.row = mg.top = 0; }
+            else if (mg.row == 1) best_fit_unit(u);   // the source equips, with no notice
+            else if (mg.row == 2) remove_all_equipment(u);
+            else { mg.screen = S_INV; mg.row = mg.top = 0; build_inventory(u); }
+        }
+        return 1;
+    case S_INV:
+        if (key & (K_B | K_ESC)) { mg.screen = S_EQUIP; mg.row = 0; mg.top = 0; return 1; }
+        if (key & (K_F1 | K_F5)) { mg.inv_all ^= 1; build_inventory(u); return 1; }
+        list_move(key, mg.inv_n);
+        return 1;
+    case S_ORDER:
+        if (key & (K_B | K_ESC)) { roster_position(S_MENU); mg.row = 1; return 1; }
+        mg.row = choice_move(mg.row, ORD_N, key);
+        if (key & (K_ENTER | K_A)) {
+            u8 i, k, best;
+            if (mg.row != ORD_NUMBER) {
+                for (i = 0; i + 1 < save.n; i++) {
+                    best = i;
+                    for (k = (u8)(i + 1); k < save.n; k++) {
+                        Stats a, b;
+                        a = stats(&save.unit[best]); b = stats(&save.unit[k]);
+                        if (roster_key(&save, k, mg.row, b.hp, b.mp) <
+                            roster_key(&save, best, mg.row, a.hp, a.mp)) best = k;
+                    }
+                    if (best != i) roster_slot_swap(&save, i, best);
+                }
+                mg.changed = 1;
+            }
+            mg.unit = 0; roster_position(S_FORM); mg.row = mg.slide = 0;
+        }
+        return 1;
+    case S_JOBTABLE:
+        if (key & (K_B | K_ESC)) { roster_position(S_FORM); return 1; }
+        at = list_move(key, jobtable_count(u));
+        if (key & (K_ENTER | K_A)) {
+            u8 c = jobtable_entry(u, at);
+            if (c < CAREERS) { mg.ljob = c; mg.screen = S_LEARN; mg.row = mg.top = 0; }
         }
         return 1;
     case S_STATUS:
-        if (key & (K_B | K_ESC | K_ENTER | K_A)) roster_position(S_FORM);
+        if (key & (K_B | K_ESC)) roster_position(S_FORM);
         return 1;
     case S_EQUIP: case S_SET:
-        if (key & (K_B | K_ESC)) { mg.row = mg.screen == S_EQUIP ? 0 : 1; roster_position(S_MENU); return 1; }
+        if (key & (K_B | K_ESC)) { roster_position(S_FORM); return 1; }
+        if ((key & (K_C | K_D)) && mg.screen == S_EQUIP) { mg.screen = S_ITEM; mg.row = 0; return 1; }
         {
             u8 n = mg.screen == S_EQUIP ? SLOTS : 4;
             mg.row=choice_move(mg.row,n,key);
@@ -869,18 +1354,22 @@ u8 game_update(void)
         }
         return 1;
     case S_LEARN:
-        if (key & (K_B | K_ESC)) { roster_position(S_MENU); mg.row = 2; return 1; }
+        if (key & (K_B | K_ESC)) {
+            if (u->type == 3) { roster_position(S_MENU); mg.row = 2; }
+            else { mg.screen = S_JOBTABLE; mg.row = mg.top = 0; }
+            return 1;
+        }
         at = list_move(key, learn_count(u));
-        if ((key & (K_ENTER | K_A)) && !learned(u, career(u), learn_entry(u, at))) {
-            const u8 *j = job_rec(record(u, career(u)));
+        if ((key & (K_ENTER | K_A)) && !learned(u, mg.ljob, learn_entry(u, at))) {
+            const u8 *j = job_rec(record(u, mg.ljob));
     u8 monster_job[JOB_SIZE];
     if(u->type==3){const u8 *p=cj_section(common,CJ_JOBS)+14U*u->job;memset(monster_job,0,sizeof monster_job);memcpy(monster_job+J_GROWTH,p,10);monster_job[J_MOVE]=p[10];monster_job[J_JUMP]=p[11];j=monster_job;}
-            if (jp(u, career(u)) < ability_cost(job_ability(j, learn_entry(u, at)))) mg.note = NOTE_JP;
+            if (jp(u, mg.ljob) < ability_cost(job_ability(j, learn_entry(u, at)))) mg.note = NOTE_JP;
             else mg.confirm = 1;
         }
         return 1;
     case S_JOBS:
-        if (key & (K_B | K_ESC)) { roster_position(S_MENU); mg.row = 3; return 1; }
+        if (key & (K_B | K_ESC)) { roster_position(S_FORM); return 1; }
         if(key&(K_LEFT|K_UP|K_RIGHT|K_DOWN)) {
             u8 old=mg.job_pos;
             s16 delta;
@@ -908,14 +1397,23 @@ void game_render(void)
         rt_light = cache; rt_dark = cache + RT_PSIZE;
         page();
         rt_light = l; rt_dark = d;
-        dirty = 0;
+        dirty = 0; settled = 0;
     }
+    // A page with nothing live on it has to reach the hidden planes once each and no more:
+    // the TI alternates two of them (GrayDBufToggleSync), so once both carry the picture the
+    // display is already right and the frame can cost nothing. The detail panel is the case
+    // that matters -- it is modal and full screen, so no cursor is drawn over it.
+    if (mg.detail && settled >= 2) return;
     memcpy(rt_light, cache, RT_PSIZE); memcpy(rt_dark, cache + RT_PSIZE, RT_PSIZE);
+    if (settled < 2) settled++;
     if(!bank||!save.n)return;
     if(mg.detail)return;                 // the detail panel is modal: no live cursor over it
     if(mg.screen==S_FORM)formation_cursor();
-    if(mg.screen==S_MENU)command_menu();
+    if(mg.screen==S_MENU&&!mg.remove)command_menu();
+    if(mg.screen==S_ITEM)item_menu();
+    if(mg.screen==S_ORDER)order_menu();
     list_cursor();
     confirm_panel();
+    remove_panel();
 }
 

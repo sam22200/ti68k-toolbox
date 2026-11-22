@@ -161,10 +161,8 @@ def program(name,source,banks,magic,cases,pc_save,ti_save,check_save,workdir=Non
 def manage(pc_save,ti_save):
     """The management menus: each screen, then a tour that makes Ramza a Knight and leaves."""
     empty=OUT/'none.keys'
-    tour=keys(OUT/'tour.keys',[(2,'C'),(4,'DOWN'),(6,'DOWN'),(8,'DOWN'),(10,'ENTER'),
-        (12,'DOWN'),(24,'DOWN'),(36,'ENTER'),(38,'ENTER'),(40,'B'),(42,'UP'),(44,'UP'),(46,'UP'),
-        (48,'ENTER'),(50,'ENTER'),(52,'B'),(54,'B'),(56,'DOWN'),(58,'DOWN'),(60,'ENTER'),(62,'ENTER'),
-        (64,'ENTER'),(66,'B'),(68,'B'),(70,'ESC')])
+    tour=keys(OUT/'tour.keys',[(2,'ENTER'),(8,'RIGHT'),(14,'RIGHT'),(20,'RIGHT'),
+        (32,'DOWN'),(44,'DOWN'),(56,'ENTER'),(58,'ENTER'),(60,'B'),(66,'B'),(70,'ESC')])
     def knight(s): assert s['party'][0]['job']==0x4C,'Ramza a Knight'
     if '--carousel-only' in sys.argv:
         spin=keys(OUT/'carousel.keys',[(2,'RIGHT')])
@@ -172,6 +170,8 @@ def manage(pc_save,ti_save):
                        [('spin-start',5,4,spin),('spin-middle',5,6,spin),('spin-settled',5,16,spin)],
                        pc_save,ti_save,None)
     info=keys(OUT/'equip-info.keys',[(2,'MODE')])
+    removal=keys(OUT/'remove-unit.keys',[(2,'ENTER'),(6,'ENTER')])
+    best=keys(OUT/'best-fit.keys',[(2,'DOWN'),(4,'ENTER')])
     pick=keys(OUT/'equip-pick.keys',[(2,'ENTER'),(4,'MODE')])
     slide=keys(OUT/'formation-slide.keys',[(2,'RIGHT')])
     confirmation=keys(OUT/'job-confirm.keys',[(2,'RIGHT'),(14,'RIGHT'),(26,'ENTER')])
@@ -182,6 +182,9 @@ def manage(pc_save,ti_save):
                     ('slide-start',0,3,slide),('slide-mid',0,5,slide),('slide-done',0,8,slide),
                     ('job-confirm',5,28,confirmation),('job-change-start',5,30,change),
                     ('job-change-mid',5,78,change),('job-change-done',5,130,change),
+                    ('item',7,4,empty),('inventory',8,4,empty),('order',9,4,empty),
+                    ('job-table',10,4,empty),('remove-check',11,4,empty),('remove-reply',12,4,empty),
+                    ('remove-done',11,12,removal),('best-fit',7,10,best),
                     ('tour',0,80,tour)],pc_save,ti_save,knight)
 
 def worldmap(pc_save,ti_save):

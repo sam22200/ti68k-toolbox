@@ -177,6 +177,14 @@ test: map-test
 test: dialogue-test
 test: scene-test
 test: actor-cache-test
+.PHONY: status-frames-test
+# The reference hash is the one a build that redraws everything produces
+# (-DFFT_NO_SETTLE); the two must stay equal.
+status-frames-test: data/ffcj.bin data/ffgd.bin
+	$(CC) $(PC_CFLAGS) -w -DSTATUS_FRAMES_HASH=0x07A3D49DUL -o x/qa/status-frames-test \
+	  check_status_frames.c $(RT_CORE) $(RT_SW)
+	cd data && ../x/qa/status-frames-test
+test: status-frames-test
 test: deploy-test
 test: title-test
 .PHONY: title-test
@@ -207,10 +215,10 @@ map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin 
 	$(CC) $(PC_CFLAGS) -o fftmap_test test_worldmap.c $(RT_CORE) $(RT_SW)
 	./fftmap_test
 .PHONY: manage-test
-manage-test: data/ffmg.bin data/ffcj.bin data/ffeg.bin data/ffid.bin
+manage-test: data/ffmg.bin data/ffcj.bin data/ffeg.bin data/ffid.bin data/slot_icons.h
 	$(CC) $(PC_CFLAGS) -o fftmng_test test_manage.c $(RT_CORE) $(RT_SW)
 	./fftmng_test
-fftmng_pc: manage.c pc_entry.c ../common.h
+fftmng_pc: manage.c pc_entry.c ../common.h data/slot_icons.h
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ manage.c $(RT_CORE) $(RT_SW) $(RT)platform-sdl/rt_sdl.c $(SDL_LIBS)
 .PHONY: save-test
 save-test: data/ffcj.bin data/ffgd.bin
@@ -327,6 +335,9 @@ data/ffbm.bin data/ffbn.bin data/ffbo.bin data/ffbp.bin &: ../tools/module.py ba
 data/ffcp.bin ../opening/data/ffcp.bin &: ../tools/common_portraits.py ../tools/identity_assets.py ../tools/management_data.py
 	$(PY) ../tools/common_portraits.py "$(DISC)"
 	@touch data/ffcp.bin ../opening/data/ffcp.bin
+data/slot_icons.h: ../tools/slot_icons.py
+	$(PY) ../tools/slot_icons.py "$(DISC)" $@
+
 data/ffmg.bin: ../tools/management_data.py ../tools/battle.py ../tools/units.py ../tools/interface.py data/ffcp.bin
 	$(PY) ../tools/management_data.py "$(DISC)" $@
 

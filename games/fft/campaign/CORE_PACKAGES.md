@@ -1,5 +1,21 @@
 # Shared core and replaceable chapter packages
 
+ABI94 update (2026-11-22): the battle's Status screen became the shared unit sheet
+([UNIT_SHEET.md](../UNIT_SHEET.md)) -- the campaign's plate, the sheet's tab bar and the
+source's slot pictograms -- so `MOD_ABI` is 94 and core and chapter must match. The battle
+program grows **63,269 -> 64,503 bytes** (measured with the same `ti-cc` line; the dead
+`UC_STATUS` card layout came out in exchange). Core 643,751 + chapter 291,789 transport
+bytes, core key 5e10e934de49acac0b01059ef8fffee5.
+
+**Measured on the Titanium, 2026-11-22**: the groups install and `fftstory()` runs -- title,
+New Game, the Orbonne opening with its portraits and its skip prompt. **The battle then
+refuses to start: "need 99 KB, free 94 KB."** That is the installed-RAM peak this file has
+listed as open since 2026-11-14, not a new fault: at HEAD the program is 63,269 bytes, which
+leaves about 95 KB free against the same 99 KB `BATTLE_RAM_BYTES`, so it was already about
+5 KB short. This work makes the gap 1.2 KB wider and does not create it. The screen itself is
+checked on the PC (`status-frames-test`, 360 frames) and by the campaign's 62 PC/68000
+replays; **a battle has not been seen running on hardware with this core.**
+
 FMA1 update (2026-11-14): shared core ffma13082 supplies approved monster
 Formation/Status. `formation_art_format: FMA1` is required and validated by
 packaging. Only ffmgcore/ffpccore and manifests change; all program stubs,
