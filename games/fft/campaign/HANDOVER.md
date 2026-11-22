@@ -1,5 +1,43 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## C / D / C / D accepted; original Bar has graphical paging (2026-11-22)
+
+The user selected C/D/C/D for Shopkeeper114, Guildmaster115, Fur Merchant116
+and Bar owner117. `town_service_assets.py` now owns the one shared conversion
+and explicit selection; `shop_scene.py` uses the source-correct reader. The
+active `data/ffsk.bin/.89y` pair is updated for the three existing rooms.
+FSK4 remains8368 bytes with exact original room payloads and directory offsets.
+The fourth selected face is used in the Bar prototype; no shipping Bar route
+or rumor save state is added yet. All24 review records and the four selected
+screens reproduce the accepted evidence exactly.
+
+The user asked whether original long Bar texts display page numbers. The
+original init/render/input/scroll-indicator routines show graphical prompt,
+up/down and scroll-thumb windows, **no numeric counter**. Both preview styles
+now use the campaign's exact3x2 blinking indicator via shared `dlg_continue`
+in `dialogue_box.inc`; `beats.inc` calls the same function with unchanged
+readiness/coordinates/colour/phase. A fully displayed final page shows the
+same ready-to-advance cue. No invented page-number UI remains in the preview.
+
+New private proof: `x/town-services-accepted/` contains selected portraits,
+the corrected reader sheet/GIF, production bank and before copies. Run
+`rtk proxy tools/pyenv/bin/python games/fft/campaign/accept_town_portraits.py`.
+38 PC/sanitizer screens match; blink differences are exactly3x2 and first/final
+pages return after32 frames. Actual map service tests pass PC/sanitizers;
+campaign dialogue preserves all words over37 pages/35 beats.147 previous
+input/review files retain hashes and mtimes. No native sweep, live emulator,
+ABI/save change or installed package replacement was performed. Rebuild the
+core/package at the next release for these source/data changes; old groups
+and their keys are intentionally preserved.
+
+Approval sidecar: `x/town-portrait-contrast/approval.json`, tied to the exact
+reviewed sheet. Both old portrait and Bar comparison decision markers are
+cleared; pictures/results were not rewritten. The user's choice specifies
+contrast and paging policy, not an earlier A/B reader-layout letter. Continue
+the actual Bar route and source-filtered rumor/persistence work next, then
+Propositions and Fur stock/migration. Do not reopen the accepted portraits or
+the existing campaign cue design. See [TOWN_SERVICES_REVIEW.md](TOWN_SERVICES_REVIEW.md).
+
 ## Four town faces accepted; five contrast treatments to choose (2026-11-22)
 
 The user's follow-up accepts the speaker identities but dislikes the contrast

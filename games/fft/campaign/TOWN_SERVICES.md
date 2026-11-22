@@ -1,10 +1,11 @@
 # A town's services and a field's encounters
 
 Current follow-up2026-11-22: [source portraits and Bar proposals](TOWN_SERVICES_REVIEW.md).
-The existing Shop, Office and Fur portraits are the wrong story characters;
-correct faces114/115/116 and Bar owner117 are prepared for visual approval.
-The Bar has a stored original room in WLDBK, outside the MENU TIMs. Shipping
-routes/save/stock remain unchanged at this review boundary. The original
+The user selected C/D/C/D for source faces114/115/116/117. The active FSK4
+bank and extractor now use the correct Shop/Office/Fur portraits; the Bar
+prototype uses its selected owner and the shared campaign continuation cue,
+with no numeric counter. The Bar's stored room is in WLDBK, outside MENU TIMs.
+Shipping routes/save/stock and installed groups remain unchanged. The original
 service implementation and earlier measurements below are retained.
 
 2026-11-20. The world map's locations do something when Ramza stands on them

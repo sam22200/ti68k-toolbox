@@ -170,10 +170,13 @@ characters and are wrong. Their corrected records and the Bar owner are in
 the isolated review, using the same17x27 face,32x29 record, outline and shared
 dialogue renderer. The three existing room payloads are byte-identical.
 
-The old palette-zero/linear-atlas extractor is retained as the current
-before-control until the user approves the [comparison](TOWN_SERVICES_REVIEW.md).
-Then switch it to the shared `tools/town_service_assets.py` reader; do not
-copy the candidate bank into shipping by hand or rerip the approved rooms.
+The user approved **C/D/C/D** for Shopkeeper/Guildmaster/Fur Merchant/Bar owner.
+The extractor now uses shared `tools/town_service_assets.py`, and the active
+FSK4 bank is updated with the three existing rooms' selected faces. The Bar's
+selected face is ready in the prototype/shared reader. Every approved room
+payload remains byte-identical; size8368 and offsets are unchanged. Historical
+controls are preserved in the review directories. Full package replacement is
+left to the next release; see [acceptance](TOWN_SERVICES_REVIEW.md).
 
 ## The Buy and Sell lists
 

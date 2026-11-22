@@ -11,9 +11,10 @@ holds (§ 2), so what is left for Chapter I is, in order:
    described by the previous version of this list is already closed:
    [the handover](HANDOVER.md) records adult placement and the real deployment
    -> Save -> battle -> results flow. Continue with town services, as the user
-   requested. [Source portraits and Bar A/B proposals](TOWN_SERVICES_REVIEW.md)
-   are ready for a visual decision; the source Bar room and all four service
-   speakers are identified. Town/story eligibility, actual rumor routes,
+   requested. [Portraits C/D/C/D are accepted and applied](TOWN_SERVICES_REVIEW.md);
+   the Bar prototypes now use the existing campaign continuation cue rather
+   than page numbers, following the source's graphical paging. The source
+   room and all four speakers are identified. Town/story eligibility, actual rumor routes,
    pagination/input and durable effects still need implementation.
 2. **Reusable Propositions and the poaching/Fur Shop loop.** These are required
    before content extraction, with Propositions locked until Chapter II and
@@ -32,10 +33,10 @@ holds (§ 2), so what is left for Chapter I is, in order:
 
 | Service | State | What is missing |
 |---|---|---|
-| **Shop** | **Functional**, checked PC/68000: bank `ffsh` (FSH2, 1,468 bytes), FFT's prices, stock tiers and six shop types, buy and sell at half price, category tabs, shared [MODE] detail and fitting bench. Earlier measured steady frame: 306,638 cycles. | Correct portrait114 is prepared for visual approval; the shipping extractor still uses the wrong face8. Later stock gates stay separate. |
-| **Soldier Office** | **Functional**: two-step hire, source generator, birthday/zodiac, renaming, 16 cap. Earlier measured steady frame: 242,054 cycles. | Correct portrait115 awaits visual approval (shipping face12 is wrong). The price (1,500/1,400 gil) remains an interpretation, not source-certified. |
-| **Bar** | **Source assets and PC proposals prepared**, including the real `WLDBK` room and portrait117. No shipping town route or rumor state yet. | Approve A/B, then bind town/story-filtered entries, paginated details, safe cancel and durable effects. Propositions must not appear early. |
-| **Fur Shop** | **The room only**: `SC_FUR`, Buy/Sell/Leave and test door2 exist; `FUR_FLAG`255 locks entry and transactions answer "later". | Correct portrait116 awaits approval (shipping face9 is wrong). Secret Hunt still gives loot directly to the bag; implement separate saturating255 stock, migration, access and atomic transactions. Keep the Chapter III gate. |
+| **Shop** | **Functional**, checked PC/68000: bank `ffsh` (FSH2, 1,468 bytes), source prices/stock/categories, shared details and fitting bench. Correct portrait114/C is accepted and active. Earlier measured steady frame: 306,638 cycles. | Rebuild the installation package at the next release for the corrected bank. Later stock gates stay separate. |
+| **Soldier Office** | **Functional**: two-step hire, source generator, birthday/zodiac, renaming, 16 cap. Correct portrait115/D is accepted and active. Earlier measured steady frame: 242,054 cycles. | The price (1,500/1,400 gil) remains an interpretation, not source-certified. |
+| **Bar** | **Source assets and PC proposals prepared**, real `WLDBK` room and approved portrait117/D. Both readers now share the campaign's blinking continuation cue; original has no numeric counter. | Actual town/story-filtered rumor route, pagination/input and durable effects remain; the earlier A/B layout letter is not specified. Propositions must not appear early. |
+| **Fur Shop** | **The room only**, with approved portrait116/C active: `SC_FUR`, Buy/Sell/Leave and test door2; `FUR_FLAG`255 locks entry and transactions answer "later". | Secret Hunt still gives loot directly to the bag; implement separate saturating255 stock, migration, access and atomic transactions. Keep the Chapter III gate. |
 
 ### Historical delivery notes
 

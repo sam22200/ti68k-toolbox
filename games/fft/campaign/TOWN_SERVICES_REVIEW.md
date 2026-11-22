@@ -4,15 +4,49 @@
 services, finally use the correct portraits, reuse the shared menus/design
 system and offer several concrete choices for new screens.
 
-**Speaker identities accepted; contrast decision pending.** The user approved
-the four faces but requested five contrast treatments. The new decision sheet
-is `x/town-portrait-contrast/portraits-five-contrasts.png`, replacing the old
-portrait comparison's marker. Bar A/B is not resolved to a particular letter.
-This delivery prepares real PC-rendered proposals;
-it does not integrate a Bar route, change the installed portraits, migrate a
-save or certify the remaining services. Do not mistake the isolated candidate
-`x/town-services-review/ffsk.bin` for the shipping bank.
-Work branch: `feat/fft-town-services-review`; keep it open for the verdict.
+**Approved and applied2026-11-22: C / D / C / D**, in order Shopkeeper,
+Guildmaster, Fur Merchant, Bar owner. The actual FSK4 extractor and active
+`data/ffsk.bin/.89y` now carry the first three selected faces; the fourth is
+selected in the shared reader and Bar prototype. The Bar still has no shipping
+route or persistent rumor machinery. No save/ABI change or installed package
+replacement is included. The historical review banks/results remain intact.
+
+The user also requests the original game's page indicator policy. Source
+inspection finds graphical continuation/scroll windows, **no numeric page
+counter**. Both Bar prototypes now reuse the campaign's exact3x2 blinking cue,
+factored into `dialogue_box.inc::dlg_continue`. No new symbol or style is drawn.
+The campaign call preserves its readiness, position, colour and blink phase;
+the Bar uses the same ready-to-advance cue on the final page too.
+
+Current pictures: `x/town-services-accepted/selected-portraits.png`,
+`bar-continuation.png` and `bar-continuation.gif`. The old decision markers
+are cleared. The precise earlier A/B reader-layout letter is not inferred from
+the contrast choice; both layouts implement this correction.
+
+`x/town-portrait-contrast/approval.json` records the exact selected sheet hash
+and supersedes the historical capture's pending field. Acceptance verifies all
+24 original review records remain exact after factoring and all four selected
+screens reproduce their approved pictures. Production ffsk is8368 bytes, the
+same size and directory layout; all three room payloads are byte-identical.
+Thirty-eight PC/ASan/UBSan screens agree. The two blink phases differ only at
+the expected3x2 pixels, and both first/final pages return exactly after32
+frames. The actual map service tests pass on PC/sanitizers, and the shared
+campaign dialogue retains every word across37 pages/35 beats.147 existing
+bank/save/review files retain bytes and mtimes; copies of the intentionally
+replaced active ffsk pair preserve the preceding bank. No TI run was needed:
+no archive layout/loader/arithmetic/hardware path changed.
+
+Reproduce acceptance in its new private directory:
+
+```sh
+rtk proxy tools/pyenv/bin/python games/fft/campaign/accept_town_portraits.py
+```
+
+The original Bar source evidence is in
+`wldcore_text_init_scrollable_window`, `wldcore_text_render_scrollable_window_page`,
+`wldcore_text_update_scroll_indicators` and `wldcore_text_is_window_finished`.
+Their source hashes and the scoped proof are recorded in the acceptance
+directory. This is source inspection, not a new full PS1 gameplay replay.
 
 ## Five portrait contrast treatments (user follow-up2026-11-22)
 
@@ -133,12 +167,11 @@ scope and pending approval are in `results.json`; `preserved.json` records the
 protected inputs. No TI binary or emulator run is needed for these isolated
 PC proposals. Existing performance figures are not re-certified here.
 
-## After the user's decision
+## Remaining town work
 
-1. Record the exact approved pictures/hashes, clear their gallery markers,
-   and integrate the corrected portrait reader into `shop_scene.py` without
-   regenerating approved rooms. Retain one shared grey conversion; avoid a
-   circular dependency between the two asset modules during that change.
+1. The portrait selection/reader integration and counter correction above are
+   done. At the next release, rebuild the core package to include the corrected
+   ffsk and shared cue; preserve old installation groups and matching keys.
 2. Bind the approved Bar layout into `worldmap.c` using the same cached town
    page and shared components. Reuse the borrowed archive pointer; retain the
    moving hand and invalidate the page only when displayed state changes.
