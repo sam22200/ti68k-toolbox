@@ -45,27 +45,28 @@ static void trials(void)
     abank[2]=RT_NULL;acache=(u16 (*)[UNIT_FB/2])storage;
     ac_key=(u16 *)acache[AC_N];ac_age=ac_key+AC_N;
     actor_reset();
+    // The cache's size is AC_N, not a number: the trial fills it, then walks past its end.
     for(i=0;i<AC_N;i++){W->ac_now++;p=actor_frame(i,0);check(*p==i);}
-    check(decodes==48);
-    p=actor_frame(47,1);check(p==(const u8 *)acache[47]);
+    check(decodes==AC_N);
+    p=actor_frame(AC_N-1,1);check(p==(const u8 *)acache[AC_N-1]);
 #ifdef __m68k__
     BENCH_BEGIN(61);
 #endif
-    for(i=0;i<1000;i++){W->ac_now++;p=actor_frame(47,1);}
+    for(i=0;i<1000;i++){W->ac_now++;p=actor_frame(AC_N-1,1);}
 #ifdef __m68k__
     BENCH_END(61);
 #endif
-    check(*p==47&&decodes==48&&ac_age[47]==W->ac_now);
-    for(i=48;i<96;i++){W->ac_now++;actor_frame(i,0);}
+    check(*p==AC_N-1&&decodes==AC_N&&ac_age[AC_N-1]==W->ac_now);
+    for(i=AC_N;i<2*AC_N;i++){W->ac_now++;actor_frame(i,0);}
     check(ac_key[W->actor_ent[1]]!=W->actor_key[1]);
-    p=actor_frame(47,1);check(*p==47&&decodes==97);
-    p=actor_frame(94,1);check(*p==94&&decodes==97);
+    p=actor_frame(AC_N-1,1);check(*p==AC_N-1&&decodes==2*AC_N+1);
+    p=actor_frame(2*AC_N-2,1);check(*p==2*AC_N-2&&decodes==2*AC_N+1);
     W->actor_budget=0;
-    p=actor_frame(96,1);check(*p==94&&W->actor_key[1]==94&&decodes==97);
+    p=actor_frame(2*AC_N,1);check(*p==2*AC_N-2&&W->actor_key[1]==2*AC_N-2&&decodes==2*AC_N+1);
     W->actor_budget=1;
-    p=actor_frame(96,1);check(*p==96&&W->actor_key[1]==96&&decodes==98);
+    p=actor_frame(2*AC_N,1);check(*p==2*AC_N&&W->actor_key[1]==2*AC_N&&decodes==2*AC_N+2);
     actor_reset();W->actor_budget=0;
-    p=actor_frame(97,1);check(*p==97&&decodes==99);
+    p=actor_frame(2*AC_N+1,1);check(*p==2*AC_N+1&&decodes==2*AC_N+3);
     check(W->actor_misses==1);
     // Three banks (ffca 64, ffcb 20, ffcc 30 frames): frames are numbered across them in order,
     // the lookup stops at the last bank present.

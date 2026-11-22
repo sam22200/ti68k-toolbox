@@ -29,7 +29,11 @@ static u8 actor_banks(const u8 **b)
 // a frame (1.8 with one pose per actor). Its own block: Gariland's Work + planes
 // block (57,006 bytes) cannot grow by 7 KB under AMS's ~64 KB block limit.
 #ifndef AC_N
-#define AC_N 48
+// 2026-11-22: 48 -> 42. The battle would not start on the Titanium, 1,088 bytes short
+// (campaign/CORE_PACKAGES.md); six frames of this cache are 1,272 of them and the only
+// block of that size left. It is a measured trade, not a cleanup: README.md has Gariland's
+// AI battle at ~9,073 frames with 48 and ~10,445 with 32, so six frames cost roughly 5 %.
+#define AC_N 42
 #endif
 static u16 (*acache)[UNIT_FB / 2];      // AC_N frames, then ac_key and ac_age
 static u16 *ac_key, *ac_age;            // frame key (0xFFFF: free), last frame drawn
