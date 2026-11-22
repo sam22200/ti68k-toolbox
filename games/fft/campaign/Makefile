@@ -261,6 +261,8 @@ fftbatflow_pc fftdep_pc fftmng_pc fftgar_pc fftintro_pc fftmap_pc: ../unit_card.
 fftbatflow_pc fftdep_pc fftmng_pc fftgar_pc fftintro_pc fftmap_pc: save.h save_slots.h
 fftbatflow_pc fftdep_pc fftmng_pc fftgar_pc fftintro_pc fftmap_pc ffttitle_pc fftscn_pc: save_types.h
 fftscn_pc: flow.h flow_draw.inc save.h
+fftmap_pc fftscn_pc fftgar_pc fftintro_pc fftbatflow_pc: ../dialogue_box.inc
+fftscn_pc fftgar_pc fftintro_pc: ../beats.inc
 fftgar_pc fftintro_pc: ../stats.inc ../unit_setup.inc ../formula.inc
 fftgar_pc fftintro_pc fftbatflow_pc: ../action_effect.h ../action_resolve.inc
 fftgar_pc fftintro_pc fftbatflow_pc: ../status_rules.h ../common.h
@@ -358,7 +360,7 @@ data/ffsh.bin: ../tools/shop_assets.py ../tools/world_assets.py ../tools/managem
 data/ffid.bin: ../tools/item_help.py ../tools/management_data.py
 	$(PY) ../tools/item_help.py "$(DISC)" $@
 
-data/ffsk.bin: ../tools/shop_scene.py ../tools/units.py ../tools/common_portraits.py
+data/ffsk.bin: ../tools/shop_scene.py ../tools/town_service_assets.py ../tools/units.py ../tools/common_portraits.py
 	$(PY) ../tools/shop_scene.py "$(DISC)" $@
 
 .PHONY: shop-review

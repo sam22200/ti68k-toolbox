@@ -12,6 +12,8 @@ PY := $(TI)/tools/pyenv/bin/python
 DISC := "$(TI)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue"
 include ../../runtime/rt.mk
 
+$(NAME)_pc $(NAME)_test $(NAME).89z $(NAME)c.89z: beats.inc dialogue_box.inc
+
 VIEWS := fftv0 fftv1 fftv2 fftv3
 map.h: tools/extract.py
 	@test -f $(DISC) || { echo "missing the local disc roms/ps1/Final Fantasy Tactics (USA) (not in git)"; exit 1; }

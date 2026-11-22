@@ -20,9 +20,11 @@ screenshots:
 | `BK_FITR` | the **Soldier Office**: books and candles, the guildmaster at x 160..180, a recruit at x 100..122 |
 
 The bank shipped `BK_HONE` as the Soldier Office until 2026-11-21; it is the
-Fur Shop's room, and the office now uses `BK_FITR`. **The Bar has no picture on
-the disc at all**, and neither has anything else: those screens are drawn by
-the engine, not stored.
+Fur Shop's room, and the office now uses `BK_FITR`. **Correction2026-11-22:
+the Bar does have a stored picture**, in `WORLD/WLDBK.BIN`, outside these nine
+MENU TIMs. Set0 is a256x240 raw BGR555 picture with its people already drawn;
+the source selects sets22/23 for other town styles. See the pending
+[town-service proposals](TOWN_SERVICES_REVIEW.md).
 
 So there is nothing to place on top: the room is one picture, the way a battle
 map is one view, and no sprite rip, no isometric renderer and no second
@@ -157,25 +159,24 @@ The three overlays are the campaign's own, not new ones:
 
 ## The portraits
 
-Found: **`EVENT/WLDFACE.BIN`** is the world-map and menu portrait sheet, 4bpp,
-256 pixels wide, **168 faces of 32x48**, eight to a row -- not the battle
-sheets, and not `EVENT/EVTFACE.BIN` (which holds the 32 event faces). The
-shopkeeper is **face 8**, the moustached man of the user's screenshot, and the
-**Fur Shop's merchant face 9**, the bald one. Both are INTERPRETATION: matched
-by eye against the user's screenshots, not read from the game's own table. The
-Soldier Office's guildmaster is blond with a white collar and has not been
-found in the sheet yet; he borrows the shopkeeper's portrait, though his name
-is right.
+Correction2026-11-22: **`EVENT/WLDFACE.BIN` is four256x256 4bpp pages**, not a
+continuous168-face sheet. Each page contains forty32x48 faces and its CLUT
+rows. `world_gfx_load_wldface_to_frame_buffer` uploads each0x8000-byte page;
+`world_gfx_set_portrait_poly_texture` selects the correct page and CLUT.
 
-The bank carries one speaker a room, so each screen names and shows its own.
+The user's source screenshots match **114Shopkeeper,115Guildmaster,
+116Fur Merchant and117Bar owner**. Faces8/12/9 in the shipping bank are story
+characters and are wrong. Their corrected records and the Bar owner are in
+the isolated review, using the same17x27 face,32x29 record, outline and shared
+dialogue renderer. The three existing room payloads are byte-identical.
 
-**The sheet's own palettes are its last 2048 bytes**: the 168 faces take
-129,024, and what follows is 64 CLUTs of 16 BGR555 colours. The 4-bit value is
-a palette slot, not a brightness -- a face's skin is index 8 and its hair
-index 1..3 -- so reading it as luminance printed the portrait in negative.
-Those faces also live in a narrow band (palette 0 runs 5.3 to 26.2 of 31), so
-the port's fixed thresholds left every pixel mid-grey: the fifteen drawn
-colours are stretched over the full range before the four greys are chosen.
+The user approved **C/D/C/D** for Shopkeeper/Guildmaster/Fur Merchant/Bar owner.
+The extractor now uses shared `tools/town_service_assets.py`, and the active
+FSK4 bank is updated with the three existing rooms' selected faces. The Bar's
+selected face is ready in the prototype/shared reader. Every approved room
+payload remains byte-identical; size8368 and offsets are unchanged. Historical
+controls are preserved in the review directories. Full package replacement is
+left to the next release; see [acceptance](TOWN_SERVICES_REVIEW.md).
 
 ## The Buy and Sell lists
 

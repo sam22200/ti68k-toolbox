@@ -1,9 +1,10 @@
 # Pre-extraction requirements: breeding, Bars and poaching
 
-2026-11-13. The user requires these systems in the core readiness queue **before
-starting campaign extraction**. They extend CAMPAIGN_PREREQUISITES.md; they do
-not replace the active target/protect objective work. This is an initial rules
-survey and code audit, not an implementation or a completed source oracle.
+2026-11-13, status updated2026-11-22. The user requires these systems in the core readiness queue **before
+starting campaign extraction**. They extend CAMPAIGN_PREREQUISITES.md and build
+on the delivered objective/scene-choice/calendar/monster work. The guide survey
+below is orientation; current delivery status is in the table and linked notes,
+not a claim of a complete source oracle for every side system.
 
 Target: the original US PlayStation game. Keep PS1 names/limits, rather than
 silently importing War of the Lions or Ivalice Chronicles changes. Chapter I
@@ -77,8 +78,8 @@ percentages; neither should replace original conditions/tables.
 
 | System | Native state | Original routines identified for the bounded follow-up |
 |---|---|---|
-| Calendar/breeding | [FSV7 calendar/eggs](BREEDING.md) and [actual adult Formation/Status](MONSTER_FORMATION.md) are integrated:16 shared family appearances,48 distinct jobs. Wide battle poses/animations and real deployment remain; selectors still reject type3. | `world_unit_update_monster_breeding`, `main_party_create_monster_egg`, hatch progress/total helpers; one day at completed route-leg arrival. |
-| Bar/rumors | No Bar/rumor route in worldmap.c. The generic menu's unavailable entries are not working Bars. Save has no rumor-specific state. | `wldcore_list_open_rumors`, `wldcore_bar_push_rumor_detail_level`, rumor input/close handlers and their script variables. |
+| Calendar/breeding | [FSV7 calendar/eggs](BREEDING.md), [adult Formation/Status](MONSTER_FORMATION.md), wide bodies and the real deployment/Save/battle/results loop are integrated; see [HANDOVER.md](HANDOVER.md). Eggs remain excluded from battle. | `world_unit_update_monster_breeding`, `main_party_create_monster_egg`, hatch progress/total helpers; one day at completed route-leg arrival. |
+| Bar/rumors | [Source portraits C/D/C/D are approved](TOWN_SERVICES_REVIEW.md); the active town bank/prototype use them. Bar readers share the campaign's graphical cue, with no numeric counter. No shipping Bar/rumor route or rumor-specific save state yet. | `wldcore_list_open_rumors`, `wldcore_bar_push_rumor_detail_level`, rumor input/close handlers and their script variables. |
 | Propositions | No worker dispatch, away-unit state, active job timers or return settlement in the native save/UI. | `wldcore_list_open_available_propositions`, dispatch candidate/confirmation handlers, proposition states, `main_job_add_proposition_jp`. |
 | Poaching | `nature_runtime.inc::nature_hit_commit` removes the victim and rolls source loot. Its explicit policy gives blue-party loot directly to capped inventory. There is no independent Fur Shop stock or purchase UI. | `battle_action_add_poached_item_to_fur_shop_inventory`, `world_shop_adjust_poached_item_quantity`, shop eligibility/price/transaction handlers. |
 
