@@ -1322,6 +1322,99 @@ diamond and no gray floor lines. Its refined picture still needs review. `ffmg` 
 names/lists/costs still come from FCJ5 `ffcj`. All other rule families remain listed
 in CORE_STATUS.md; showing a learned passive does not implement its battle effect.
 
+**The unit sheet** (`manage.c`, redesigned with the user on 2026-11-22 against the
+original's own screens, captured with `tools/psxrun.py` and a player's memory card).
+Formation and Change Job keep the pictures the user approved; every other screen was
+rebuilt, because they were mostly white and wasted rows.
+
+- **A black plate** carries the unit: its portrait, name, job, Lv, HP and MP down the left,
+  then **every column is one family of numbers**, so a glance goes straight down to the
+  group it wants:
+
+  | the unit | its blow | its reach | its guard |
+  | --- | --- | --- | --- |
+  | *name* | PA | Mv | C-EV |
+  | *job* | MA | Jp | S-EV |
+  | Lv | **AT** | Sp | A-EV |
+  | HP | Br | JLv | **W-EV** |
+  | MP | Fa | | **M-EV** |
+
+  Brave and Faith sit with the blow because FFT multiplies by them -- Faith scales magic
+  both ways, Brave drives the physical reactions. Job level is the one number with no family
+  of its own, so it rides at the foot of the reach column rather than leave a hole.
+
+  **AT is not PA**: PA is the unit's physical-attack attribute, grown by its jobs; AT is the
+  power the weapon brings, and FFT's damage multiplies the two, so the same sword hits
+  differently in two hands. Checked against the disc: Dagger 3, Main Gauche 6, Rune Blade
+  14, Slasher 16, Scorpion Tail 23. **M-EV** is magic evasion, which only shields and
+  mantles carry -- sixteen items on the disc, Aegis Shield 50, Feather Mantle 30. FFT has no
+  defence attribute at all: armour gives HP and MP, and what blunts a blow is evasion.
+
+  Experience was dropped for the room, with the user: it is the one number here that no
+  screen acts on. Rows are one pixel apart, which is what the HP/MP bars used to cost. White
+  on black, like the world map's own plates. **The plate is shared**: it heads the unit
+  sheet, sits at the foot of Formation and heads the deployment screen (`../unit_sheet.inc`,
+  [UNIT_SHEET.md](../UNIT_SHEET.md)); the shop's fitting bench shares its change emphasis,
+  and **the battle's own Status screen is now the same sheet** -- the same plate, carrying
+  live `HP 51/51` and `CT` which a saved roster has not and leaves blank, under the same tab
+  bar, with three tabs of its own (**Eqp. | Abil. | Status**) opening on the equipment and
+  drawing the source's slot pictograms exactly as the management sheet does. [2nd] there
+  opens the item's or the ability's detail.
+- **A tab bar** replaces a whole menu level: **Status | Eqp. | Abil. | Learn | Job**,
+  left and right change tab, F1/F5 change unit, SHIFT returns to Formation. ENTER on a
+  unit in Formation opens its sheet; the formation menu keeps only Remove Unit and
+  Order Unit. The bar's right end carries the **F1/F5 badge** between two arrows, where
+  the source puts its own L1 / R1 corner badges (`fft_guides/orig/mgt_item.png`).
+- **The equipment preview**, as the source previews its own ("current / new" under
+  Weap.Power and the four evasion columns, `fft_guides/orig/mgt_item_list.png`): while
+  the cursor walks the candidates, the plate shows the values the unit *would* have. **A
+  cell that moved is lifted out of the plate** -- white ground, black ink -- with a solid
+  triangle, up when it grows and down when it drops, so the change reads at a glance.
+- **Primary**: the job's own skill set, which no menu can change, is printed above the
+  four it can -- on Status and on Abil., as the source prints it in its Ability box
+  (`fft_guides/orig/mgt_ability.png`).
+- **[MODE] on Status** opens the legend of the plate's short names (Exp, JLv, Br, Fa, Mv,
+  Jp, Sp, PA, MA, C-EV, S-EV, A-EV, W-EV, M-EV), the one screen the source never needed
+  because its own plate spells every word out.
+- **Eqp.** draws the source's own slot pictograms (a hand holding a weapon, a hand, a
+  helmet, a ring, a tunic) from `EVENT/FRAME.BIN` rows 171..182 (`tools/slot_icons.py`,
+  twelve by twelve in four greys with a black outline), then the item's icon and name.
+  [ALPHA] opens the Item commands (Equip / Best / Remove all / Inventory) as a fitted
+  overlay whose glove hangs outside its frame; [MODE] opens the shared item detail, which
+  now carries the item's **evade %** beside its power, as the source's Help box does.
+  The bag heads itself with the source's own two options, **Eqp.** and **All**, the
+  active one lit (F1/F5 switch them there).
+- **Learn** opens the job table (Job, Lv, Total JP, the JP its next level needs, or
+  Master), then that job's abilities with their costs; [MODE] opens the ability's own
+  description -- name, kind, JP and FFT's own text. **JP rides on a floating black plate**
+  over the list, its amount on the column the costs are right-aligned to.
+- **Evasion comes from the disc**: the class evade is the job's own byte, the shield's
+  and the accessory's their two-byte tables between the weapon and armour tables
+  (checked on Buckler 13/3 and Escutcheon 75/50). `ffmg` is **FMG5**, its item record 16
+  bytes.
+- **Ability descriptions** come from `EVENT/HELP.LZW` section 15 through the source's own
+  byte-counted back-references (`management_research.expanded`): ATCHELP leaves every
+  action blank, HELP.LZW holds all 512. `ffid` is **FID2**, 253 items and 489 abilities.
+
+The source's Remove Unit and Order Unit keep their own behaviour: the Check, then the
+unit's own farewell (FFT's text, from `WORLD/WORLD.BIN` in `ffmg`'s world section) with
+Remove / Quit, Ramza refusing to go; and a sort by Job, Number, Level, MAX MP, MAX HP,
+Faith or Brave. A party slot is a key, so `roster_edit.inc` moves the egg record, the
+current-raw-stats bit and the deployment's slot references with the unit.
+
+Costs on the actual 68000 (`check.py`, `ti-cycles`): a **still** frame of the sheet's pages
+costs 47k to 52k cycles, the formation menu 127k, the Item overlay 152k -- all well under
+the 360k frame budget, and unchanged by the move onto the shared plate (`status` 47,574 and
+`equip` 51,676 to the cycle, before and after).
+
+**Open, and not caused by this work: the frame on which a key is read costs ten times a
+still frame** -- 516k for a tab change on Status, 440k for opening the fitting list, up to
+848k for the scripted tour. A key that changes *nothing* (DOWN on Status) costs 559k, more
+than the tab change does, so the cost is not in what gets redrawn; it tracks the key frame
+on every screen, including ones this work never touched. It has not been attributed yet and
+is the next thing to measure. Sixty-two PC/68000 replays cover the screens, the removal
+through to the shorter party and Best fit.
+
 On the PC:
 
 ```sh
