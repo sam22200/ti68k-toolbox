@@ -177,11 +177,16 @@ test: map-test
 test: dialogue-test
 test: scene-test
 test: actor-cache-test
+.PHONY: secondary-test
+secondary-test: data/ffcj.bin data/ffgd.bin
+	$(CC) $(PC_CFLAGS) -w -o x/qa/secondary-test check_secondary.c $(RT_CORE) $(RT_SW)
+	cd data && ../x/qa/secondary-test
+test: secondary-test
 .PHONY: status-frames-test
 # The reference hash is the one a build that redraws everything produces
 # (-DFFT_NO_SETTLE); the two must stay equal.
 status-frames-test: data/ffcj.bin data/ffgd.bin
-	$(CC) $(PC_CFLAGS) -w -DSTATUS_FRAMES_HASH=0x07A3D49DUL -o x/qa/status-frames-test \
+	$(CC) $(PC_CFLAGS) -w -DSTATUS_FRAMES_HASH=0xA1E1D4ACUL -o x/qa/status-frames-test \
 	  check_status_frames.c $(RT_CORE) $(RT_SW)
 	cd data && ../x/qa/status-frames-test
 test: status-frames-test

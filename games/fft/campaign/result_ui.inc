@@ -25,7 +25,7 @@ static void result_money(u32 value,s16 y)
 }
 static void result_icon(s16 x,s16 y,u8 item)
 {
-    const u8 *it=flow_ui+qword(flow_ui+6)+(u16)item*14;
+    const u8 *it=flow_ui+qword(flow_ui+6)+(u16)item*16;   // ffmg item record: sixteen bytes
     const u8 *p=flow_ui+qword(flow_ui+12)+(u16)it[12]*24;
     u16 l[10],d[10],m[10],ink[12];u8 r;
     memset(ink,0,sizeof ink);

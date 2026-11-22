@@ -34,13 +34,18 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
         n = put_s(s, 0, entries[k]);
         if (k <= MN_ACT && W->win_k[1] & (1 << k)) c = C_DGRAY;
     } else if (m == M_ACTS) {
-        #ifdef FFT_CHAPTER
-        if(k==2+u->defend)n=put_s(s,0,"Equip Change");else
-#endif
+#ifdef FFT_CHAPTER
+        u8 base = (u8)(2 + ACTS_TWO(W->win_k[2]));
+        if(k==base+u->defend)n=put_s(s,0,"Equip Change");
+        else n = put_s(s, 0, k == base ? window_defend
+                           : k == 2 ? SKILL_NAME(u->set2)      // the Secondary command
+                           : k ? SKILL_NAME(u->set) : "Attack");
+#else
         n = put_s(s, 0, k == 2 ? window_defend : k ? SKILL_NAME(u->set) : "Attack");
+#endif
         if (k == 1 && W->win_k[1]) c = C_DGRAY;
     } else if (m == M_SKILLS) {                    // an item: how many are left
-        AbId ab = known(W->win_k[2], k + W->win_k[1]);
+        AbId ab = known_cmd(W->win_k[2], (u8)(k + (W->win_k[1] & 0x7F)));
         n = put_s(s, 0, ABIL_NAME(ab));
         if (abilities[ab].flags & AF_ITEM &&
 #ifdef FFT_CHAPTER

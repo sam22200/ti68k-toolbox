@@ -1,4 +1,9 @@
 // Status input shared by the PC engine and the calculator screens overlay.
+// The sheet's pages: five equipment slots, and the four ability slots a unit carries under
+// its job's own primary set, which no menu can change.
+#ifdef FFT_CHAPTER
+static u8 status_ability_count(void) { return 4; }
+#else
 static u8 status_ability_count(void)
 {
     u8 n = 0;
@@ -12,6 +17,7 @@ static AbId status_ability(void)
     AbId ab = known(st.sel, st.status_row);
     return ab == NO_ABIL && st.unit[st.sel].defend ? ABIL_DEFEND : ab;
 }
+#endif
 
 // Three tabs, as the management sheet has them: Eqp., Abil., Status. Left and right change
 // tab, up and down walk the page's rows, ENTER opens the detail of whatever is under the

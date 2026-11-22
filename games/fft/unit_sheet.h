@@ -28,4 +28,26 @@ typedef struct UnitSheet {
     u16 max_hp, max_mp;              // when set, the cell prints "cur/max", as a battle must
 } UnitSheet;
 enum { US_PLATE_H = 32 };   // the portrait's own height, so it never spills
+
+// The sheet's two list pages. Every screen that shows a unit's equipment, or the ability
+// sets it fights with, draws them here -- whatever it reads them from (CHOICE_MENU.md rule
+// 9): the owner resolves each row to a string and an icon, the renderer owns where they go.
+// So the battle's Status screen and the management sheet are literally the same picture.
+enum { US_SLOTS = 5, US_LIST_Y = 41, US_EQ_PITCH = 12, US_SET_PITCH = 11 };
+typedef struct UnitEquip {
+    const u8 *icon[US_SLOTS];        // the item's own 8x8 icon (three planes of 8), 0: none
+    const char *name[US_SLOTS];      // 0: the slot is empty
+} UnitEquip;
+typedef struct UnitSets {
+    const char *primary;             // the job's own set, which no menu can change
+    const char *set[4];              // Secondary, Reaction, Support, Movement; 0: none
+} UnitSets;
+// Where the glove goes on each, by choice_menu.h's own rule: its finger stops two pixels
+// short of the label instead of landing on it, and sits on the label's own middle row --
+// the glove is 14 tall and its finger is on rows 4..6, so the Y is the ink's centre minus
+// five. On the sets page a label's ink runs y+1..y+5 of an eleven-pixel row.
+#define US_EQ_HAND_X       (-1)
+#define US_EQ_HAND_Y(row)  (US_LIST_Y - 1 + (row) * US_EQ_PITCH)
+#define US_SET_HAND_X      1
+#define US_SET_HAND_Y(row) (US_LIST_Y + 10 + (row) * US_SET_PITCH)
 #endif

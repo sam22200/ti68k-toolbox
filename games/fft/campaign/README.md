@@ -1357,9 +1357,16 @@ rebuilt, because they were mostly white and wasted rows.
   [UNIT_SHEET.md](../UNIT_SHEET.md)); the shop's fitting bench shares its change emphasis,
   and **the battle's own Status screen is now the same sheet** -- the same plate, carrying
   live `HP 51/51` and `CT` which a saved roster has not and leaves blank, under the same tab
-  bar, with three tabs of its own (**Eqp. | Abil. | Status**) opening on the equipment and
-  drawing the source's slot pictograms exactly as the management sheet does. [2nd] there
-  opens the item's or the ability's detail.
+  bar, with three tabs of its own (**Eqp. | Abil. | Status**) opening on the equipment.
+  Its **Eqp.** and **Abil.** pages are not lookalikes: they are the management sheet's own
+  renderers (`unit_sheet_equip`, `unit_sheet_sets`), so the battle shows the same slot
+  pictograms, the same item icons -- read in place from `ffmg`, the management bank -- and
+  the same Primary / Secondary / Reaction / Support / Movement rows, with the glove placed
+  by the same macros. [2nd] opens the item's bonuses and FFT's own description, or the
+  ability's own text. **Secondary is wired**: the roster's second command reaches the battle
+  (`u->set2`, its learned bits read from the career that owns the set), the turn menu carries
+  it as its own row when the unit has one, and each command lists its own abilities
+  (`check_secondary.c`). The AI still plans with the primary set only.
 - **A tab bar** replaces a whole menu level: **Status | Eqp. | Abil. | Learn | Job**,
   left and right change tab, F1/F5 change unit, SHIFT returns to Formation. ENTER on a
   unit in Formation opens its sheet; the formation menu keeps only Remove Unit and

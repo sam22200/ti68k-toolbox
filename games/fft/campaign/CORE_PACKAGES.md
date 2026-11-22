@@ -12,9 +12,48 @@ New Game, the Orbonne opening with its portraits and its skip prompt. **The batt
 refuses to start: "need 99 KB, free 94 KB."** That is the installed-RAM peak this file has
 listed as open since 2026-11-14, not a new fault: at HEAD the program is 63,269 bytes, which
 leaves about 95 KB free against the same 99 KB `BATTLE_RAM_BYTES`, so it was already about
-5 KB short. This work makes the gap 1.2 KB wider and does not create it. The screen itself is
-checked on the PC (`status-frames-test`, 360 frames) and by the campaign's 62 PC/68000
-replays; **a battle has not been seen running on hardware with this core.**
+5 KB short. The screen itself is checked on the PC (`status-frames-test`, 360 frames) and by
+the campaign's 62 PC/68000 replays; **a battle has not been seen running on hardware with
+this core.**
+
+**Re-measured on the Titanium, 2026-11-22, with `fftbat(200)` run on its own from a freshly
+installed core and chapter -- no supervisor, no leftovers.** `ti-mem heap` at the refusal
+names every block, which is what finally made the budget legible:
+
+| bytes | what it is |
+| --- | --- |
+| 64,948 | the battle program itself, unpacked and locked in RAM |
+| 53,952 | `sbuf`: the scene planes plus `Work` |
+| 20,122 | AMS's own |
+| 18,490 | `vbuf`, the depth envelope |
+| 16,384 | AMS's own |
+| 10,178 | the actor cache (`AC_N` = 48 frames) |
+| 8,934 | the module execution zone |
+
+So the game's own RAM is the program, one 54 KB block, the depth and the cache. Two
+reservations were the worst case rather than what the battle takes, and both are now sized
+to what is actually loaded:
+
+- **the map envelope** was `malloc(MAP_NMAX * 20)` = 5,120 at cold boot, for 256 nodes.
+  `nav_reserve(MAP_N, 2)` already takes exactly the loaded map's nodes and grows if a later
+  map needs more, so the reservation is gone: **2,120 bytes** for Gariland's 150 nodes.
+- **the depth envelope** `FFT_CORE_DEPTH_MAX` was 20,480 against a biggest existing view of
+  18,488: **1,992 bytes**. It is now that measured maximum; a bigger view is still refused,
+  at packaging and at load, as before.
+
+**4,112 bytes freed, and the battle still refuses.** The same session wired the Secondary
+command, which put about 950 bytes back into the program -- and the program is resident, so
+that is RAM too. Net, the battle is roughly 3 KB short of starting.
+
+The one remaining block of that size is **the actor cache, 10,178 bytes**: 48 decoded frames
+down to 32 would free 3,392 and close the gap. That is not a free change -- `README.md`
+measures Gariland's AI battle winning at frame ~9,073 with 48 frames against ~10,445 with
+32, about 15 % slower -- so it is a decision about what the chapter is for, not a cleanup,
+and it has not been made. Everything else measured here is already exact.
+
+The screens are checked on the PC (`status-frames-test`, 360 frames; `secondary-test`) and
+by the campaign's 62 PC/68000 replays; **a battle has still not been seen running on
+hardware with this core.**
 
 FMA1 update (2026-11-14): shared core ffma13082 supplies approved monster
 Formation/Status. `formation_art_format: FMA1` is required and validated by
