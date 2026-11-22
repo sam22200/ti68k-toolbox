@@ -12,6 +12,7 @@
 #include "action_context.h"
 #include "reaction_policy.h"
 #include "tactical_grid.h"
+#include "unit_sheet.h"          // the shared sheet's geometry: its pages and where their glove goes
 // FFT_BATTLE: the campaign's battle program, every chapter (campaign/ENGINE.md M4): the chapter
 // comes with the scenario number: 100 + door Orbonne, 200 + door Gariland (below 100: the
 // door of FFT_DEFAULT_CHAPTER)
@@ -381,6 +382,10 @@ enum { TEAM_PLAYER, TEAM_ENEMY, TEAM_GUEST };   // a guest (Delita) fights on it
 #define U_CHEMIST 8                    // the female Chemist
 #define U_HIDE 2                       // the enemy the occlusion scenarios move behind a house
 enum { EQ_HEAD, EQ_BODY, EQ_ACC, EQ_WEAPON, EQ_SHIELD, EQ_N };
+// The source's own equipment slot order, as every sheet shows them: the weapon hand, the
+// free hand, the helmet, the tunic, the ring.
+static const u8 status_slot_order[5] = { EQ_WEAPON, EQ_SHIELD, EQ_HEAD, EQ_BODY, EQ_ACC };
+
 
 typedef struct {
     u8 x, z, gfx, team, face;          // face: world +x, -x, +z, -z
@@ -411,6 +416,10 @@ typedef struct {
     u32 raw[5];                        // FFT's raw stats (24 bits): HP MP SP PA MA
     u16 sq_jp, sq_tjp;                 // drawn with them, kept for the campaign save: another job's
     LearnBits sq_learned;
+#ifdef FFT_CHAPTER
+    u8 set2;                           // the Secondary command, the set of another job the unit
+    LearnBits learned2;                // has taken (0: none); which of its four it has learned
+#endif
     u8 rsm;                            // Squire JP (left, in all) and abilities (bit k: SET_BASIC's
                                        // k-th); the reactions and supports learned (bit k: rsm_pre's
                                        // k-th, 0x80 Defend)
@@ -465,6 +474,9 @@ typedef struct {
     union {u16 self,effect_mp;};
     AbId abil;
     u8 sub, skill;                     // M_ACTS's and M_SKILLS's entries
+#ifdef FFT_CHAPTER
+    u8 skill2;                         // M_SKILLS is listing the Secondary command, not the job's
+#endif
     u8 bag[BAG_MAX];                   // the party's items
     u8 gain, lvup, jpg;                // M_ACT: the EXP the user earned (0 none), its level up,
                                        // its JP
@@ -644,6 +656,18 @@ u8 attack_sequence(u8 a,u8 t,u8 count); // bounded engine API; no Two Swords pro
 // now (an item left), its reach (st.reach 1), the hit chance, the amount (damage or HP healed;
 // r: the random roll 0..32767 of Dash, Throw Stone and Phoenix Down), the ability used
 AbId known(u8 who, u8 k);               // k255 queries count in one pass
+#ifdef FFT_CHAPTER
+AbId known2(u8 who, u8 k);              // the Secondary command's list
+AbId known_cmd(u8 who, u8 k);           // whichever of the two the turn menu is listing
+// The turn menu carries the Secondary row only for a unit that has one it can act with.
+#define ACTS_TWO(who) (st.unit[who].set2 && known2(who, 0) != NO_ABIL)
+#define CMD_SET(u) (st.skill2 ? (u)->set2 : (u)->set)   // the command M_SKILLS is listing
+#else
+#define known2(w,k) NO_ABIL
+#define known_cmd(w,k) known(w,k)
+#define ACTS_TWO(who) 0
+#define CMD_SET(u) ((u)->set)
+#endif
 u8 can_use(u8 who, AbId ab);
 void skill_range(u8 who, AbId ab);
 u8 skill_hit(u8 a, u8 t, AbId ab);

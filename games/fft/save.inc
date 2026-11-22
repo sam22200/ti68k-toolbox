@@ -246,6 +246,19 @@ static void saved_unit_load(u8 i,const SaveUnit *s,u8 slot)
     u->learned = 0;
     for (k = 0; k < SET_N; k++)
         if (s->learned[c][k >> 3] & (0x80 >> (k & 7))) u->learned |= (LearnBits)(1U << k);
+    // The Secondary command: the set of another job the unit has taken. What it has learned of
+    // it is kept under that job's own career row, so the set names the career to read.
+    u->set2 = 0; u->learned2 = 0;
+    {
+        u8 want = s->secondary, c2;
+        if (want && want != u->set) for (c2 = 0; c2 < CAREER_N; c2++)
+            if (job_sets[0x4A + c2] == want) {
+                u->set2 = want;
+                for (k = 0; k < SET_N; k++)
+                    if (s->learned[c2][k >> 3] & (0x80 >> (k & 7))) u->learned2 |= (LearnBits)(1U << k);
+                break;
+            }
+    }
     u->defend = (u16)(s->support[0] << 8 | s->support[1]) == CD(DEFEND_ID);
     st.reaction[i]=(u16)(s->reaction[0]<<8|s->reaction[1]);
     st.support[i]=(u16)(s->support[0]<<8|s->support[1]);

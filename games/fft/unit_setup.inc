@@ -79,6 +79,7 @@ void battle_units(void)
         const UnitDef *d = &unit_defs[i];
         Unit *u = &st.unit[i];
         u->set = d->set; unit_status_seed(u,0); u->learned = DEF_LEARN(d);
+        u->set2 = 0; u->learned2 = 0;         // a drawn unit takes no second command
         if (DEF_LEARN(d) == DRAW_LEARNED) {                  // its job's JP, then each ability in order:
             u16 jp = (u16)(100 + ((100UL * rand15()) >> 15));   // its learn rate, if JP are left
             LearnBits mask = DEF_DRAW(d);

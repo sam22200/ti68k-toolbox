@@ -11,7 +11,7 @@ static const ModCtx mod_defaults={
 #endif
     .highlight_seq=&hl_seq,
     .rand15=rand15,
-    .known=known,
+    .known=known,.known2=known2,.known_cmd=known_cmd,
     .can_use=can_use,
     .spread_start=spread_start,
     .spread_go=spread_go,

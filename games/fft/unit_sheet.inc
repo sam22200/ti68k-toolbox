@@ -121,4 +121,54 @@ static void unit_sheet_plate(const UnitSheet *d, const UnitSheet *soon, s16 top)
     for (k = 0; k < US_N; k++) us_cell(d, soon, k, top);
 }
 #endif
+
+#ifdef US_PAGES
+// The two list pages themselves. They need the source's own slot pictograms, so the caller
+// includes campaign/data/slot_icons.h before this file.
+// Named one by one, not through a table of pointers: a module image may carry no relocation.
+static const char *us_set_row(u8 k)
+{ return k == 0 ? "Secondary" : k == 1 ? "Reaction" : k == 2 ? "Support" : "Movement"; }
+// slot_icons.h is generated in the source's own order -- R.Hand, L.Hand, Head, Accessory,
+// Body -- and the pages show the slots weapon, shield, head, body, accessory.
+static const u8 us_pict[US_SLOTS] = { 0, 1, 2, 4, 3 };
+static void us_pictogram(s16 x, s16 y, u8 k)
+{
+    const u16 (*g)[12] = slot_icon[us_pict[k]];
+    RtSprite sp = { 16, 12, g[0], g[1], g[2] };
+    draw_sprite(x, y, &sp);
+}
+static void us_icon(s16 x, s16 y, const u8 *p)
+{
+    RtSprite sp = { 8, 8, p, p + 8, p + 16 };
+    draw_sprite(x, y, &sp);
+}
+
+// Equipment: the source's own slot pictograms down the left, then the item's icon and name.
+static void unit_sheet_equip(const UnitEquip *e)
+{
+    u8 i;
+    for (i = 0; i < US_SLOTS; i++) {
+        s16 y = (s16)(US_LIST_Y + i * US_EQ_PITCH);
+        us_pictogram(20, y, i);
+        if (!e->name[i]) { US_TEXT(48, (s16)(y + 4), "-", C_DGRAY, 157); continue; }
+        if (e->icon[i]) us_icon(36, (s16)(y + 2), e->icon[i]);
+        US_TEXT(48, (s16)(y + 4), e->name[i], C_BLACK, 157);
+    }
+}
+
+// Abilities: the job's own primary set above the thin rule, because no menu can change it,
+// then the four the unit carries -- which is how the source lays the page out.
+static void unit_sheet_sets(const UnitSets *s)
+{
+    u8 i;
+    US_TEXT(22, (s16)(US_LIST_Y + 1), "Primary", C_DGRAY, 76);
+    US_TEXT(80, (s16)(US_LIST_Y + 1), s->primary ? s->primary : "-", C_DGRAY, 157);
+    draw_rect(20, (s16)(US_LIST_Y + 9), 136, 1, C_LGRAY);
+    for (i = 0; i < 4; i++) {
+        s16 y = (s16)(US_LIST_Y + 13 + i * US_SET_PITCH);
+        US_TEXT(22, y, us_set_row(i), C_DGRAY, 76);
+        US_TEXT(80, y, s->set[i] ? s->set[i] : "-", C_BLACK, 157);
+    }
+}
+#endif
 #endif

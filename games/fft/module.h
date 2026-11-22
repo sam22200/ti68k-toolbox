@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 94U   // 94: status_header, the shared unit plate and tab bar
+#define MOD_ABI 95U   // 95: known2 / known_cmd, the Secondary command
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -47,6 +47,8 @@ typedef struct {
     u8 *highlight_seq;
     u16 (*rand15)(void);
     AbId (*known)(u8 who, u8 k);
+    AbId (*known2)(u8 who, u8 k);       // the Secondary command's list
+    AbId (*known_cmd)(u8 who, u8 k);    // whichever of the two the turn menu is listing
     void (*spread_start)(u8 who, u8 c, u8 limit, u8 *dist, u8 *from, u8 out, const u8 *need, u16 left);
     u8 (*spread_go)(u16 n);
     void (*bfs)(u8 who, u8 *from);
@@ -151,6 +153,8 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define hl_seq (*M.highlight_seq)
 #define rand15 M.rand15
 #define known M.known
+#define known2 M.known2
+#define known_cmd M.known_cmd
 #define can_use M.can_use
 #define spread_start M.spread_start
 #define spread_go M.spread_go

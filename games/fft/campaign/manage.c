@@ -411,6 +411,7 @@ static void evades(const SaveUnit *u, u8 *ce, u8 *se, u8 *ae, u8 *we, u8 *me)
 #define US_TEXT(x,y,t,c,l) text(x,y,t,c,l)
 #define US_PORTRAIT(p,x,y) portrait32(p,x,y)
 #define US_WIDTH(t) card_width(t)
+#define US_PAGES
 #include "../unit_sheet.inc"
 
 // One snapshot of a saved unit, which is all the shared plate ever sees. The portrait is
@@ -493,11 +494,6 @@ static u8 has_plate(void)
 { return mg.screen == S_LEARN || mg.screen == S_JOBTABLE || mg.screen == S_INV; }
 static s16 list_top(void) { return (s16)(LIST_Y + (has_plate() ? 11 : 0)); }
 static u8 list_shown(void) { return (u8)(has_plate() ? ROWS - 1 : ROWS); }
-static void slot_pictogram(s16 x, s16 y, u8 k)
-{
-    RtSprite sp = { 16, 12, slot_icon[k][0], slot_icon[k][1], slot_icon[k][2] };
-    draw_sprite(x, y, &sp);
-}
 
 // The tabs carry the unit's own pages, so the formation menu keeps only what acts on the
 // roster itself.
@@ -615,32 +611,29 @@ static void status_page(void)
     text(112, 90, "MODE:help", C_DGRAY, 158);
 }
 
-// Equipment: the source's own slot pictograms down the left, then the item's icon and name.
+// Equipment and abilities: both pages are the shared sheet's own (../unit_sheet.inc), so
+// they read exactly as they do on the battle's Status screen.
 static void equip_page(void)
 {
     const SaveUnit *u = unit(mg.unit);
+    UnitEquip e;
     u8 i;
     for (i = 0; i < SLOTS; i++) {
-        u8 s = slot_order[i], id = u->eq[s];
-        s16 y = (s16)(LIST_Y + i * 12);
-        slot_pictogram(20, y, i);
-        if (id) { icon(36, (s16)(y + 2), id); black(48, (s16)(y + 4), str(b16(item_rec(id)))); }
-        else text(48, (s16)(y + 4), "-", C_DGRAY, 157);
+        u8 id = u->eq[slot_order[i]];
+        e.icon[i] = id ? section(4) + (u16)item_rec(id)[I_ICON] * 24 : RT_NULL;
+        e.name[i] = id ? str(b16(item_rec(id))) : RT_NULL;
     }
+    unit_sheet_equip(&e);
 }
 
 static void set_page(void)
 {
     const SaveUnit *u = unit(mg.unit);
+    UnitSets d;
     u8 i;
-    text(22, (s16)(LIST_Y + 1), "Primary", C_DGRAY, 76);
-    text(80, (s16)(LIST_Y + 1), primary_set(u), C_DGRAY, 157);
-    draw_rect(20, (s16)(LIST_Y + 9), 136, 1, C_LGRAY);
-    for (i = 0; i < 4; i++) {
-        s16 y = (s16)(LIST_Y + 13 + i * 11);
-        text(22, y, set_rows[i], C_DGRAY, 76);
-        black(80, y, ability_or_set(i, slot_value(u, i)));
-    }
+    d.primary = primary_set(u);
+    for (i = 0; i < 4; i++) d.set[i] = ability_or_set(i, slot_value(u, i));
+    unit_sheet_sets(&d);
 }
 
 // Learn: the current job's abilities (its list's entries), cost or learned
@@ -967,8 +960,10 @@ static void list_cursor(void)
     cursor.hand_y=(s8)(list_top()-1);
     if(mg.note||mg.confirm||mg.remove)return;
     switch(mg.screen) {
-    case S_EQUIP: cursor.pitch=12; cursor.hand_y=LIST_Y-1; break;   // centred on the 12px pictogram
-    case S_SET: cursor.pitch=11; cursor.hand_y=LIST_Y+12; break;    // under the Primary line
+    case S_EQUIP: cursor.pitch=US_EQ_PITCH; cursor.hand_x=US_EQ_HAND_X;   // the shared page's own
+                  cursor.hand_y=US_EQ_HAND_Y(0); break;
+    case S_SET: cursor.pitch=US_SET_PITCH; cursor.hand_x=US_SET_HAND_X;
+                cursor.hand_y=US_SET_HAND_Y(0); break;
     case S_STATUS: return;
     case S_INV: if(!mg.inv_n)return; break;
     case S_LEARN: case S_PICK: case S_JOBTABLE: break;

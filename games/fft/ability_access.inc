@@ -9,13 +9,13 @@ u8 can_use(u8 who, AbId ab)
         for(k=0;k<4;k++)if(SET_ABILITY(st.unit[who].set,k)==ab)return (st.unit[who].learned&(1U<<k))!=0;
         return 0;
     }
-    if(jump_ability(ab))return st.unit[who].set==18;
+    if(jump_ability(ab))return st.unit[who].set==18||st.unit[who].set2==18;
     if(ab<0x170&&(cj_range(common,ab)[6]&8)){   // flags_4 0x08 (range records only): a sword or knight sword
         u8 h,w,ok=0;for(h=0;h<2;h++)if((w=hand_weapon(&st.unit[who],h))!=255&&(u8)(cj_equipment_item(common,w)[0]-3)<=1)ok=1;
         if(!ok)return 0;
     }
     if(ab>=512)return throw_available(who,ab);
-    if(st.unit[who].set==21)return math_available(who,ab);
+    if(st.unit[who].set==21||st.unit[who].set2==21)return math_available(who,ab);
     // Other dual weapon-skill families still require their own source fixtures.
     if(hand_count(who)==2&&(abilities[ab].flags&AF_WEAPON)&&!(abilities[ab].flags&AF_CHARGE))return 0;
     if((abilities[ab].formula==0x24||draw_out_formula(abilities[ab].formula))&&magic_heal(who,who,ab,4)!=ab)return 0;

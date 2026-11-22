@@ -103,20 +103,25 @@ static u8 acts_keys(void)
     if(!unit_can_act(&st.unit[st.act])){to_menu();return 0;}
 #endif
     if (st.mode == M_ACTS) {
-        u8 m=(u8)(2+st.unit[st.act].defend+cj_support(common,st.unit[st.act].job,st.support[st.act],480));  // Attack, the skill set, Defend
+        // Attack, the job's own command, the Secondary when the unit carries one, Defend
+        u8 two = ACTS_TWO(st.act), base = (u8)(2 + two);
+        u8 m=(u8)(base+st.unit[st.act].defend+cj_support(common,st.unit[st.act].job,st.support[st.act],480));
         st.sub=choice_move(st.sub,m,rt_keys&~rt_prev);
         if (input_pressed(K_A | K_ENTER)) {
             if (!st.sub) {st.abil=NO_ABIL;return 2;}
-            else if(st.sub==2+st.unit[st.act].defend)return 4;
-            else if (st.sub == 2) { st.acted = 1; return 3; }
-            else if (known(st.act, 0) != NO_ABIL) { st.mode = M_SKILLS; st.skill = 0; }
+            else if(st.sub==base+st.unit[st.act].defend)return 4;
+            else if (st.sub == base) { st.acted = 1; return 3; }
+            else {
+                st.skill2 = (u8)(st.sub == 2);
+                if (known_cmd(st.act, 0) != NO_ABIL) { st.mode = M_SKILLS; st.skill = 0; }
+            }
         } else if (input_pressed(K_ESC | K_B)) st.mode = M_MENU;
         return 0;
     }
-    n=(u8)known(st.act,255);
+    n=(u8)known_cmd(st.act,255);
     st.skill=choice_move(st.skill,n,rt_keys&~rt_prev);
     if (input_pressed(K_A | K_ENTER)) {
-        AbId ab = known(st.act, st.skill);
+        AbId ab = known_cmd(st.act, st.skill);
         if (can_use(st.act, ab)) {st.abil=ab;return 2;}
     } else if (input_pressed(K_ESC | K_B)) st.mode = M_ACTS;
     return 0;

@@ -35,9 +35,10 @@ static u8 bootstrap_files(void)
     if(!*p->p_acache&&*p->p_sbuf){free(*p->p_sbuf);*p->p_sbuf=RT_NULL;}
     if(!*p->p_sbuf){if(*p->p_vbuf)free(*p->p_vbuf);*p->p_vbuf=RT_NULL;return 0;}
     *p->p_ac_key=(u16 *)(*p->p_acache)[AC_N];*p->p_ac_age=*p->p_ac_key+AC_N;
-    if(!*p->p_navbuf){                         // the core's map envelope, once: any map fits
-        *p->p_navbuf=malloc(NAV_ENVELOPE);*p->p_nav_capacity=*p->p_navbuf?NAV_ENVELOPE:0;
-    }
+    // The map envelope is NOT reserved here any more: nav_reserve(MAP_N, 2) takes exactly
+    // what the loaded map needs, and grows it if a later one needs more. Reserving the
+    // 256-node worst case cost 2,120 bytes of RAM that Gariland's 150 nodes never use --
+    // and the battle is short of RAM, not of maps (campaign/CORE_PACKAGES.md).
     return 1;
 }
 

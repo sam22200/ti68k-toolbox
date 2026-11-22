@@ -11,7 +11,13 @@
 // RAM of one view's unpacked ragged depth (extract.ragged_depth, fft.c vbuf), 2026-11-10:
 // Orbonne 16,400..18,488, Gariland 16,968..18,304; a bigger view is refused when packaged
 // (chapter_desc.py) and loaded (chapter_files.inc). Full planes would take 32,320.
-#define FFT_CORE_DEPTH_MAX 20480U
+//
+// 2026-11-22: the envelope WAS 20,480, which reserved 1,992 bytes above the biggest view
+// that exists. The battle is short of RAM on the Titanium (campaign/CORE_PACKAGES.md), so
+// it is now the measured maximum itself. The contract is unchanged -- a bigger view is
+// still refused, at packaging and at load -- it simply has no slack: raise this with the
+// view that needs it, as a core change.
+#define FFT_CORE_DEPTH_MAX 18488U
 // The companion image's block (campaign/COMPANION.md), reserved at battle start whatever its
 // current size: tools/module.py refuses a bigger image, fft.c a bigger loaded one. Raise it
 // with the image (a core change); the battle's RAM requirement counts it.

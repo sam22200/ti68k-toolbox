@@ -25,7 +25,7 @@ static void monster_refresh(void)
 {
  u8 i,j;W->nature_units=0;
  for(i=0;i<NUNIT;i++)if(unit_monster(&st.unit[i])){
-  Unit *u=&st.unit[i];W->nature_units|=(u16)1<<i;u->set=cj_section(common,CJ_JOB_SETS)[u->job];u->learned=7;
+  Unit *u=&st.unit[i];W->nature_units|=(u16)1<<i;u->set=cj_section(common,CJ_JOB_SETS)[u->job];u->learned=7;u->set2=0;u->learned2=0;
   for(j=0;j<NUNIT;j++)if(i!=j){
    const Unit *v=&st.unit[j];s16 dx=(s16)u->x-v->x,dz=(s16)u->z-v->z,h;
    if(!unit_on_field(u)||!unit_on_field(v)||!v->hp||(core_status_current(&v->statuses,0)&0x64)||

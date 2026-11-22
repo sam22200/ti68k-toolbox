@@ -7,13 +7,13 @@ static u8 win_lines(u8 m)
     if (m == M_AUTO) return 3;
     if (m == M_QUIT) return 3;
     if (m == M_ORDER) { while (n < ORDER_N && st.turns[n] != 0xFF) n++; return n; }
-    if (m == M_ACTS) return (u8)(2 + st.unit[W->win_k[2]].defend
+    if (m == M_ACTS) return (u8)(2 + ACTS_TWO(W->win_k[2]) + st.unit[W->win_k[2]].defend
 #ifdef FFT_CHAPTER
         +cj_support(common,st.unit[W->win_k[2]].job,st.support[W->win_k[2]],480)
 #endif
     );
     if (m == M_ACT || m == M_PICK) return 1;
-    while (n < SKILL_ROWS && known(W->win_k[2], n + W->win_k[1]) != NO_ABIL) n++; // M_SKILLS
+    while (n < SKILL_ROWS && known_cmd(W->win_k[2], (u8)(n + (W->win_k[1] & 0x7F))) != NO_ABIL) n++; // M_SKILLS
     return n;
 }
 
@@ -31,7 +31,7 @@ next_part:
     if (!k) {
         u8 h = win_lines(m) * 6 + (m == M_MENU || m == M_AUTO || m == M_ACTS || m == M_SKILLS || m == M_QUIT ? 15 : 11), w = 4;
         const char *title = m == M_MENU ? "Menu" : m == M_ACTS || m == M_ACT ? "Act"
-            : m == M_AUTO ? "Auto-battle" : m == M_SKILLS ? SKILL_NAME(u->set) : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
+            : m == M_AUTO ? "Auto-battle" : m == M_SKILLS ? SKILL_NAME(CMD_SET(u)) : m == M_ORDER ? "Turn order" : m == M_PICK ? "Found" : "Quit?";
 #ifdef FFT_CHAPTER
         if(m==M_PICK&&W->trap_message)title="Trap";
 #endif
@@ -50,7 +50,7 @@ next_part:
             // Cached with the page: triangles occupy its unused top/bottom margin.
             void *sl = rt_light, *sd = rt_dark;
             rt_light = l; rt_dark = d;
-            for (i = 0; i < 2; i++) if (i ? known(W->win_k[2], W->win_k[1] + SKILL_ROWS) != NO_ABIL : W->win_k[1] != 0) {
+            for (i = 0; i < 2; i++) if (i ? known_cmd(W->win_k[2], (u8)((W->win_k[1] & 0x7F) + SKILL_ROWS)) != NO_ABIL : (W->win_k[1] & 0x7F) != 0) {
                 u8 y = i ? h - 5 : 5;
                 for (r = 0; r < 3; r++) {
                     u8 width = i ? 5 - 2 * r : 1 + 2 * r;
