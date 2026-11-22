@@ -47,4 +47,11 @@ static void dlg_name(s16 x, s16 y, u8 w, const char *name, u8 inverted)   // y: 
     draw_rect(x + 1, y + 1, w - 2, 10, inverted ? C_WHITE : C_BLACK);
     DLG_TEXT(x + 4, y + 3, name, inverted ? C_BLACK : C_WHITE, 156);
 }
+
+// Campaign's existing3x2 continuation cue, shared with other paged text owners.
+// The caller owns readiness/page navigation and redraws the background before each blink.
+static void dlg_continue(s16 x, s16 y, u16 clock, u8 inverted)
+{
+    if (clock & 16) draw_rect(x, y, 3, 2, inverted ? C_BLACK : C_WHITE);
+}
 #endif

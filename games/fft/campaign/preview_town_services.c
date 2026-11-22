@@ -78,7 +78,7 @@ static void rumor_list(u8 variant)
 
 static void rumor_page(u8 variant, u8 page_number)
 {
-    char line[64], count[16];
+    char line[64];
     u8 row, total = 0, rows = variant ? 5 : 7, y = variant ? 43 : 31;
     u8 first = (u8)(rows * page_number);
     u8 width = variant ? 126 : 142;
@@ -102,9 +102,9 @@ static void rumor_page(u8 variant, u8 page_number)
         if (!item_detail_line(article, width, (u8)(first + row), line)) break;
         text(x, (s16)(y + row * 7), line, variant ? C_WHITE : C_BLACK, 153);
     }
-    snprintf(count, sizeof count, "%u/%u", page_number + 1, (total + rows - 1) / rows);
-    if (!variant) text(127, 35, count, C_WHITE, 152);
-    else { draw_rect(130, 84, 22, 6, C_BLACK); text(132, 84, count, C_WHITE, 153); }
+    // The original uses graphical continuation/scroll cues, not a numeric page counter.
+    // Reuse the campaign's exact ready-to-advance cue, including the final page.
+    dlg_continue(variant ? 152 : 151, variant ? 87 : 91, rt_frame, !variant);
     draw_rect(4, 94, 152, 6, C_BLACK);
     text(7, 95, "L/R page     SHIFT back", C_WHITE, 155);
     shot(variant ? (page_number ? "b-read-2" : "b-read") : (page_number ? "a-read-2" : "a-read"));
@@ -137,7 +137,8 @@ int main(int argc, char **argv)
     FILE *f; char path[512]; long size; u8 i;
     static const u8 screens[] = { SC_STORE, SC_OFFICE, SC_FUR };
     static const char *const names[] = { "store", "office", "fur" };
-    assert(argc == 3 || (argc == 4 && !strcmp(argv[3], "--portraits"))); output = argv[1];
+    assert(argc == 3 || (argc == 4 && (!strcmp(argv[3], "--portraits") ||
+                                     !strcmp(argv[3], "--selected")))); output = argv[1];
     sw_init(0); assert(bank && mgb && shop && scene);
     f = fopen(argv[2], "rb"); assert(f); assert(read_save_fixture(f, &save)); fclose(f);
     game_scenario(0); wm.at = 6; wm.x = loc_x(6); wm.y = loc_y(6); wm.tick = 4;
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
     read_bytes("bar-planes.bin", bar_page, sizeof bar_page);
     snprintf(path, sizeof path, "%s/rumor.txt", output); f = fopen(path, "rb"); assert(f);
     size = (long)fread(article, 1, sizeof article - 1, f); assert(feof(f)); fclose(f); article[size] = 0;
-    if (argc == 4) {
+    if (argc == 4 && !strcmp(argv[3], "--portraits")) {
         portrait_contrasts(corrected);
         assert(!memcmp(&save, &before, sizeof save));
         wm = wm_before; scene = old; free(corrected); release_map();
@@ -168,6 +169,14 @@ int main(int argc, char **argv)
     for (i = 0; i < 8; i++) {
         rt_frame = (u16)(i * 4); bar_menu();
         snprintf(path, sizeof path, "bar-hand-%u", i); shot(path);
+    }
+    if (argc == 4) {
+        // Same source rumor, first and final page, through one complete blink cycle.
+        for (i = 0; i <= 8; i++) {
+            rt_frame = (u16)(i * 4);
+            rumor_page(1, 0); snprintf(path, sizeof path, "continue-%u", i); shot(path);
+            rumor_page(1, 1); snprintf(path, sizeof path, "final-%u", i); shot(path);
+        }
     }
     // Review only: no calendar, story, money, inventory, party or durable RNG edits.
     assert(!memcmp(&save, &before, sizeof save));

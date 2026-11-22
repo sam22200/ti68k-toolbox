@@ -212,5 +212,5 @@ static void opening_dialog_draw(void)
 #ifndef OPENING_DECISION
 #define OPENING_DECISION 0
 #endif
-    if(!OPENING_DECISION&&st.open_reveal>=W->dialog_total && (st.tick&16))draw_rect(x+w-5,96,3,2,st.open_white?C_BLACK:C_WHITE);
+    if(!OPENING_DECISION&&st.open_reveal>=W->dialog_total)dlg_continue(x+w-5,96,st.tick,st.open_white);
 }
