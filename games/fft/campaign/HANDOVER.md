@@ -1,12 +1,34 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Four town faces accepted; five contrast treatments to choose (2026-11-22)
+
+The user's follow-up accepts the speaker identities but dislikes the contrast
+and asks for all four faces in five different treatments. The new decision is
+`x/town-portrait-contrast/portraits-five-contrasts.png`: column0 is the exact
+preceding control, A natural, B balanced, C deeper, D crisp, E midtone dithering.
+Each row shows a6x portrait and its actual1x screen. The previous portrait
+comparison's decision marker is cleared; its files/evidence remain intact.
+The separate Bar A/B letter is not specified by the user's general approval.
+
+Run `rtk proxy tools/pyenv/bin/python games/fft/campaign/review_town_portraits.py`.
+Twenty-four PC/ASan/UBSan screens match. The source faces, sampling, contour,
+transparency and scene are unchanged; differences stay inside the face.113
+input/review files retain hashes and mtimes; complete Save unchanged. The new
+`--portraits` door is PC review only. No shipping bank, runtime, TI check or
+save schema changes. Keep the task branch open and wait for A..E (one common
+choice or per speaker); then integrate the selected records. Details and
+source/treatment/proof hashes are in [TOWN_SERVICES_REVIEW.md](TOWN_SERVICES_REVIEW.md)
+and the new `x/` directory. Do not rerun the source Bar/rumor study for a
+palette choice or reopen the accepted identity selection.
+
 ## Town services next: correct portraits and Bar A/B ready (2026-11-22)
 
 The user explicitly moved readiness work to town services and requires the
 shared design system, correct speaker portraits and several proposals for
 new screens. [TOWN_SERVICES_REVIEW.md](TOWN_SERVICES_REVIEW.md) is the current
-entry point. **Two gallery decisions are pending:**
-`x/town-services-review/portraits-before-after.png` and `bar-options.png`.
+entry point. The original two gallery decisions were
+`x/town-services-review/portraits-before-after.png` and `bar-options.png`;
+the follow-up above supersedes the first.
 Do not integrate or benchmark these changed pictures until the user decides.
 
 The correct source faces are114Shopkeeper,115Guildmaster,116Fur Merchant,

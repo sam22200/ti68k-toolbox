@@ -4,11 +4,46 @@
 services, finally use the correct portraits, reuse the shared menus/design
 system and offer several concrete choices for new screens.
 
-**Visual decision pending.** This delivery prepares real PC-rendered proposals;
+**Speaker identities accepted; contrast decision pending.** The user approved
+the four faces but requested five contrast treatments. The new decision sheet
+is `x/town-portrait-contrast/portraits-five-contrasts.png`, replacing the old
+portrait comparison's marker. Bar A/B is not resolved to a particular letter.
+This delivery prepares real PC-rendered proposals;
 it does not integrate a Bar route, change the installed portraits, migrate a
 save or certify the remaining services. Do not mistake the isolated candidate
 `x/town-services-review/ffsk.bin` for the shipping bank.
 Work branch: `feat/fft-town-services-review`; keep it open for the verdict.
+
+## Five portrait contrast treatments (user follow-up2026-11-22)
+
+`review_town_portraits.py` prepares all four accepted speakers in five new ways,
+with the preceding contrast retained as column0:
+
+| Choice | Treatment |
+| --- | --- |
+| A | Natural: absolute source luminance, the existing7/16/22 thresholds. |
+| B | Balanced: normalized palette, gamma1.35 and uniform four-grey quantization. |
+| C | Deeper midtones: gamma1.85. |
+| D | Crisp: gamma1.35 and1.5x contrast around the midtone. |
+| E | Ordered2x2 dither in midtones, gamma1.35; flat shadows/highlights. |
+
+The sheet shows each shared-renderer portrait at6x nearest and its actual
+160x100 screen at1x. Each speaker also has a separate `contrast-1..4.png`
+strip. Identity,17x27 sampling, outline, transparency, framing and scene remain
+unchanged; users can choose a common treatment or one per speaker.
+
+```sh
+rtk proxy tools/pyenv/bin/python games/fft/campaign/review_town_portraits.py
+```
+
+The PC-only `--portraits` door in `preview_town_services.c` uses the same
+`town_render`/Bar and shared dialogue renderer as before. Twenty-four screens
+(four controls plus twenty candidates) agree on PC and ASan/UBSan. Controls
+are exact record copies; all masks are identical, and pixel differences stay
+inside the portrait. Complete Save unchanged;113 existing bank/save/preceding
+review files retain their bytes and mtimes. The original review evidence is
+untouched. No shipping, native, save-format or runtime change is included.
+Proofs and exact treatment definitions are in the new directory's `results.json`.
 
 ## Source findings
 
@@ -50,7 +85,7 @@ not the original game's crop or a newly measured performance result.
 
 ## Concrete choices
 
-The gallery's two decision-marked sheets are:
+The initial review sheets were:
 
 - `x/town-services-review/portraits-before-after.png`: the actual existing
   Shop, Office and Fur screens, before/after,4x nearest at the same framing.
