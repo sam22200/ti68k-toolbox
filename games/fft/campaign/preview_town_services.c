@@ -110,13 +110,34 @@ static void rumor_page(u8 variant, u8 page_number)
     shot(variant ? (page_number ? "b-read-2" : "b-read") : (page_number ? "a-read-2" : "a-read"));
 }
 
+static void portrait_contrasts(u8 *corrected)
+{
+    char path[512]; FILE *f; u8 variant, speaker;
+    static const u8 screens[] = { SC_STORE, SC_OFFICE, SC_FUR };
+    snprintf(path, sizeof path, "%s/portraits.bin", output);
+    f = fopen(path, "rb"); assert(f);
+    for (variant = 0; variant < 6; variant++) for (speaker = 0; speaker < 4; speaker++) {
+        if (speaker < 3) {
+            u16 at = b16(corrected + 6 + 2 * speaker);
+            assert(fread(corrected + at, 1, 348, f) == 348);
+            wm.screen = screens[speaker]; wm.trow = 0; scene = corrected; p_screen = 255;
+            draw_clear(); town_render();
+        } else {
+            assert(fread(bar_face, 1, sizeof bar_face, f) == sizeof bar_face);
+            bar_menu();
+        }
+        snprintf(path, sizeof path, "portrait-%u-%u", variant, speaker); shot(path);
+    }
+    assert(fgetc(f) == EOF); fclose(f);
+}
+
 int main(int argc, char **argv)
 {
     u8 *corrected; const u8 *old; Save before; Wm wm_before;
     FILE *f; char path[512]; long size; u8 i;
     static const u8 screens[] = { SC_STORE, SC_OFFICE, SC_FUR };
     static const char *const names[] = { "store", "office", "fur" };
-    assert(argc == 3); output = argv[1];
+    assert(argc == 3 || (argc == 4 && !strcmp(argv[3], "--portraits"))); output = argv[1];
     sw_init(0); assert(bank && mgb && shop && scene);
     f = fopen(argv[2], "rb"); assert(f); assert(read_save_fixture(f, &save)); fclose(f);
     game_scenario(0); wm.at = 6; wm.x = loc_x(6); wm.y = loc_y(6); wm.tick = 4;
@@ -129,6 +150,13 @@ int main(int argc, char **argv)
     read_bytes("bar-planes.bin", bar_page, sizeof bar_page);
     snprintf(path, sizeof path, "%s/rumor.txt", output); f = fopen(path, "rb"); assert(f);
     size = (long)fread(article, 1, sizeof article - 1, f); assert(feof(f)); fclose(f); article[size] = 0;
+    if (argc == 4) {
+        portrait_contrasts(corrected);
+        assert(!memcmp(&save, &before, sizeof save));
+        wm = wm_before; scene = old; free(corrected); release_map();
+        puts("Portrait contrasts: 24 shared-renderer screens; Save unchanged.");
+        return 0;
+    }
     for (i = 0; i < 3; i++) {
         wm.screen = screens[i]; wm.trow = 0; scene = old; p_screen = 255;
         draw_clear(); town_render(); snprintf(path, sizeof path, "%s-before", names[i]); shot(path);
