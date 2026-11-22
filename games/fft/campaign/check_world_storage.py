@@ -36,9 +36,12 @@ def main():
     ref=b'FWM2'+struct.pack('>5HBB',16,16+len(raw),0,0,0,g.shape[1]//16,g.shape[0]//16)+raw+animation
     (OUT/'ffwref.bin').write_bytes(ref)
     run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','ffwref.bin','ffwref'],OUT)
-    for bank in ('ffwm','ffmg'):
+    for bank in ('ffwm','ffmg','ffwb'):
         p=OUT/(bank+'.bin')
         if not p.exists():p.symlink_to(HERE/'data'/(bank+'.bin'))
+    # The map only builds its cache on a world the save validates: use the checked party.
+    for name in ('ffsave_won.sav','ffsave_won.89y'):
+        (OUT/name.replace('_won','')).write_bytes((HERE/'x/check'/name).read_bytes())
     # Review-independent oracle fixture: all source locations/routes visible.
     # It is never installed into the campaign or used as shipping progression.
     bank=bytearray((HERE/'data/ffwm.bin').read_bytes())
@@ -52,8 +55,9 @@ def main():
     pc=run([OUT/'storage'],OUT)
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',OUT/'wstorec',*common,ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     ti=run([ROOT/'tools/bin/ti-cycles','--frames',0,'--max',10000,
-            '--file',HERE/'data/ffwm.89y','--file',HERE/'data/ffmg.89y','--file',OUT/'ffwref.89y',
-            '--file',OUT/'ffwall.89y',OUT/'wstorec.89z'],OUT)
+            '--file',HERE/'data/ffwm.89y','--file',HERE/'data/ffmg.89y','--file',HERE/'data/ffwb.89y',
+            '--file',OUT/'ffwref.89y',
+            '--file',OUT/'ffwall.89y','--file',OUT/'ffsave.89y',OUT/'wstorec.89z'],OUT)
     (OUT/'native.log').write_text(ti);(OUT/'pc.log').write_text(pc)
     match=re.search(r'storage ([0-9A-F]+) failures 0 checks (\d+)',pc)
     values=[int(v,16) for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',ti)]

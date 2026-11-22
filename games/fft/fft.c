@@ -3930,6 +3930,8 @@ static void draw_hand(s16 x, s16 y);
 static void copy_box(const u16 *l, const u16 *d, u8 x, u8 y, u8 words, u8 rows);
 static void gauge(s16 x, s16 y, u16 v, u16 max, u8 color, u8 width);
 static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context);
+static void status_header(u8 i,u8 tab,u8 slots);  // the plate, the tab bar and the slot
+                                                 // pictograms (unit_sheet.inc), in MOD_CORE
 static u8 area_paint(u8 who);
 
 static u16 special(u8 a,u8 t,AbId ab,u8 query);
@@ -6454,6 +6456,13 @@ static void battle_card_text(s16 x,s16 y,const char *s,u8 color,s16 limit,u8 con
 #define CHOICE_TEXT(x,y,s,c,l) ui_text(x,y,s,c,l)
 #define CHOICE_WIDTH(s) ui_width(s)
 #include "choice_menu.inc"
+#define US_TEXT(x,y,t,c,l) ui_text(x,y,t,c,l)
+#define US_PORTRAIT(p,x,y) portrait32(p,x,y)
+#define US_WIDTH(t) ui_width(t)
+#include "unit_sheet.inc"
+#ifdef FFT_CHAPTER
+#include "campaign/data/slot_icons.h"   // the source's slot pictograms, as the sheet draws them
+#endif
 
 
 static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context)
@@ -6473,12 +6482,7 @@ static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context)
     d.name=unit_name(i);
     d.hp=u->hp;d.max_hp=u->max_hp;d.mp=u->mp;d.max_mp=u->max_mp;
     d.level=u->level;d.exp=u->exp;d.brave=u->brave;d.faith=u->faith;
-    if(part==UC_STATUS_HEADER){
-        unit_card_draw(&d,layout,0,UC_PORTRAIT,context,opacity);
-        unit_card_draw(&d,layout,0,UC_NAME,context,opacity);
-        unit_card_draw(&d,layout,0,UC_JOB,context,opacity);
-        unit_card_draw(&d,layout,0,UC_LEVEL,context,opacity);
-    }else unit_card_draw(&d,layout,0,part,context,opacity);
+    unit_card_draw(&d,layout,0,part,context,opacity);
     if(part==UC_PORTRAIT&&opacity) {
         const u8 *p=d.portrait+232;u8 r;
         for(r=0;r<29;r++) {
@@ -6493,6 +6497,68 @@ static void unit_card_battle(u8 i,u8 layout,u8 part,u8 context)
         }
     }
 }
+
+// The battle fills the campaign's own unit plate (../unit_sheet.inc), so a unit reads the
+// same here as in the management sheet, in Formation and on the deployment screen. What the
+// battle has and a saved roster has not -- live HP and MP against their maxima, and CT --
+// the snapshot carries too; what it lacks it simply leaves blank.
+static u8 status_item_evade(const Unit *u, u8 slot)
+{ return u->eq[slot] == 255 ? 0 : items[u->eq[slot]].sev; }
+static u8 status_magic_evade(const Unit *u)
+{
+#ifdef FFT_CHAPTER
+    u8 k, m = 0;                      // the magic evade a chapter packs into the item's tag
+    for (k = 0; k < EQ_N; k++) if (u->eq[k] != 255)
+        m = (u8)(m + ((items[u->eq[k]].pad >> ITEM_MAGIC_SHIFT) & ITEM_MAGIC_MASK));
+    return m;
+#else
+    (void)u; return 0;                // the tech demo's item table carries none
+#endif
+}
+// The sheet's own three tabs, in the order a battle wants them: what it carries first.
+// The body starts under the bar; each page lays its rows on the same grid.
+static const char *const status_tabs[3] = { "Eqp.", "Abil.", "Status" };
+static void status_header(u8 i, u8 tab, u8 slots)
+{
+    const Unit *u = &st.unit[i];
+    UnitSheet sheet, *d = &sheet;
+    u8 k;
+    u8 gfx = u->gfx;
+#ifdef FFT_CHAPTER
+    gfx = GFX_PORTRAIT(gfx); d->job = JOB_NAME(u->job);
+    d->portrait = identity_portrait(pgfx, pgfx[UI_PORTRAITS + gfx]);
+#else
+    d->job = GFX_CHEMIST(gfx) ? "Chemist" : "Squire";
+    d->portrait = igfx + UI_PORTRAITS + (u16)gfx * 348;
+#endif
+    d->name = unit_name(i);
+    d->shown = US_ALL;
+    d->max_hp = u->max_hp; d->max_mp = u->max_mp;
+    d->v[US_LV] = u->level;  d->v[US_HP] = u->hp;     d->v[US_MP] = u->mp;
+    d->v[US_PA] = u->pa;     d->v[US_MA] = u->ma;
+    d->v[US_AT] = u->eq[EQ_WEAPON] == 255 ? 0 : items[u->eq[EQ_WEAPON]].wp;
+    d->v[US_BRAVE] = u->brave; d->v[US_FAITH] = u->faith;
+    d->v[US_MOVE] = u->move; d->v[US_JUMP] = u->jump; d->v[US_SPEED] = u->sp;
+    d->v[US_JLV] = job_level(u); d->v[US_CT] = u->ct;
+    d->v[US_CEV] = jobs[u->job].cev;
+    d->v[US_SEV] = status_item_evade(u, EQ_SHIELD);
+    d->v[US_AEV] = status_item_evade(u, EQ_ACC);
+    d->v[US_WEV] = status_item_evade(u, EQ_WEAPON);
+    d->v[US_MEV] = status_magic_evade(u);
+    unit_sheet_plate(d, 0, 0);
+    unit_sheet_tabs(US_PLATE_H, status_tabs, 3, tab, 0);
+    // The keys live at the bar's free right end, which frees the whole body for the page.
+    ui_text(108, US_PLATE_H + 1, slots ? "2nd ESC" : "ESC back", C_LGRAY, 158);
+#ifdef FFT_CHAPTER
+    // The source's own slot pictograms, in the order the management sheet shows them so the
+    // two screens agree: the weapon hand, the free hand, the helmet, the tunic, the ring.
+    if (!tab && slots) for (k = 0; k < 5; k++) {
+        RtSprite sp = { 16, 12, slot_icon[k][0], slot_icon[k][1], slot_icon[k][2] };
+        draw_sprite(18, (s16)(STATUS_ROW0 + (s16)k * STATUS_PITCH), &sp);
+    }
+#endif
+}
+
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define st_names CONTOUR_REF_st_names
@@ -6870,17 +6936,21 @@ static const char *item_help(u8 id)
 #define ID_ADV(c) (UI_SHARED(ADV)[(u8)(c) - 32])
 #include "item_detail.inc"
 
+// The source's own slot order, as the management sheet shows them.
+static const u8 status_slot_order[5] = { EQ_WEAPON, EQ_SHIELD, EQ_HEAD, EQ_BODY, EQ_ACC };
+
 static void status_detail(u8 k)
 {
     char s[64];
-    u8 n = 0; AbId id = st.status_col ? status_ability() : st.unit[st.sel].eq[st.status_row];
+    u8 n = 0; AbId id = st.status_col ? status_ability()
+                                     : st.unit[st.sel].eq[status_slot_order[st.status_row]];
     if (!st.status_col) {
         const Item *it;
         // The equipment column: its label and name on one line, its bonuses on two, then
         // FFT's own description on the three the page has left.
         if (k == 3) {
-            ui_text(6, 38, equip_labels[st.status_row], C_DGRAY, 68);
-            ui_text(70, 38, id == 0xFF ? "No item" : items[id].name, C_BLACK, 159);
+            ui_text(6, 42, equip_labels[status_slot_order[st.status_row]], C_DGRAY, 68);
+            ui_text(70, 42, id == 0xFF ? "No item" : items[id].name, C_BLACK, 159);
             return;
         }
         if (id == 0xFF) return;
@@ -6893,9 +6963,9 @@ static void status_detail(u8 k)
         else { item_detail_line(item_help((u8)id), 150, (u8)(k - 6), s); n = (u8)strlen(s); }
     } else {
         const Ability *ab;
-        if (k == 3) { ui_text(6, 38, id == NO_ABIL ? "No ability" : id == ABIL_DEFEND ? "Defend" : ABIL_NAME(id), C_BLACK, 159); return; }
+        if (k == 3) { ui_text(6, 42, id == NO_ABIL ? "No ability" : id == ABIL_DEFEND ? "Defend" : ABIL_NAME(id), C_BLACK, 159); return; }
         if (id == NO_ABIL) return;
-        if (id == ABIL_DEFEND) { if (k == 4) ui_text(6, 47, "Raises evasion until next turn", C_BLACK, 159); return; }
+        if (id == ABIL_DEFEND) { if (k == 4) ui_text(6, 51, "Raises evasion until next turn", C_BLACK, 159); return; }
         ab = &abilities[id];
         if (k == 4) {
             n = put_s(s, n, "Range "); n = put_n(s, n,
@@ -6928,12 +6998,35 @@ static const char *const effects[] = { "Physical damage", "Removes status ailmen
         else if (k == 8) n = put_s(s, n, ab->flags & AF_EVADE ? "Can be evaded" : "Cannot be evaded");
     }
     s[n] = 0;
-    ui_text(6, st.status_col ? (s16)(38 + 8 * (k - 3)) : k < 6 ? (s16)(38 + 8 * (k - 3)) : (s16)(64 + 7 * (k - 6)),
-            s, C_BLACK, 159);
+    ui_text(6, k < 6 ? (s16)(42 + 8 * (k - 3)) : (s16)(68 + 7 * (k - 6)), s, C_BLACK, 159);
 }
 
-// Full-screen Status with original FFT fields and selectable equipment / abilities.
+#ifndef STATUS_BLIT
+#define STATUS_BLIT() ((void)0)
+#endif
+#ifndef STATUS_BAND
+#define STATUS_BAND() ((void)0)
+#endif
+static u8 status_rows(void)
+{ return st.page == 0 ? 5 : st.page == 1 ? status_ability_count() : 0; }
+
+// Full-screen Status: the campaign's unit plate, the sheet's own tab bar and one page under
+// it -- the unit's equipment, the abilities it fights with, or what it is and what ails it.
 // Building a line per frame keeps even entry and paging within the ordinary frame budget.
+static u8 status_settled;      // hidden planes already carrying the finished page
+static u8 status_hand_y, status_hand_live;   // where its glove last stood
+// The page under the glove, restored a band at a time: 5 words by 14 rows instead of the
+// whole screen, which is all the sway and the sprite can reach.
+static void status_band(u8 y)
+{
+    const u8 *l = (const u8 *)W->status[0] + (u16)y * RT_PBYTES;
+    const u8 *d = (const u8 *)W->status[1] + (u16)y * RT_PBYTES;
+    u8 rows = (u8)(y + 14 > RT_H ? RT_H - y : 14);
+    copy_box((const u16 *)l, (const u16 *)d, 0, y, 5, rows);
+}
+static u8 status_hand_row(void)
+{ return (u8)(STATUS_ROW0 + st.status_row * STATUS_PITCH + (st.page ? 0 : 1)); }
+
 static void draw_status(void)
 {
     void *sl = rt_light, *sd = rt_dark;
@@ -6948,41 +7041,64 @@ static void draw_status(void)
     rt_light = W->status[0]; rt_dark = W->status[1];
     k = W->status_n;
     if (k < 9) {
-        W->status_n++;
+        W->status_n++; status_settled = 0;
         if (!k) {
             memset(W->status, 0, sizeof W->status);
-            draw_rect(0, 0, RT_W, 32, C_LGRAY); draw_rect(0, 32, RT_W, 1, C_DGRAY);
-            unit_card_battle(st.sel,UC_STATUS,UC_STATUS_HEADER,2);
-            ui_text(24, 25, st.page ? "EQUIP / SKILLS" : "STATUS", C_DGRAY, 92);
-            ui_text(4, 95, st.status_info ? "[ESC] back" : st.page ? "[2nd] details" : "< > page", C_DGRAY, 81);
-            if (!st.status_info) ui_text(94, 95, "[ESC] return", C_DGRAY, 159);
+            // the campaign's own plate, the sheet's tab bar, and the page's furniture
+            status_header(st.sel, st.page, (u8)(!st.status_info));
         } else if (k <= 2) {
-            unit_card_battle(st.sel,UC_STATUS,k==1?UC_HP:UC_MP,2);
+            // the plate and the pictograms carry what the card parts used to
         } else if (st.status_info) status_detail(k);
-        else if (!st.page) {
-            if (k == 3) { n = put_s(s, 0, "Brave "); n = put_n(s, n, u->brave); n = put_s(s, n, "   Faith "); n = put_n(s, n, u->faith); }
-            else if (k == 4) { n = put_s(s, 0, "Zodiac "); n = put_s(s, n, signs[u->zodiac]); }
-            else if (k == 5) { n = put_s(s, 0, "Move "); n = put_n(s, n, u->move); n = put_s(s, n, "   Jump "); n = put_n(s, n, u->jump); n = put_s(s, n, "   Speed "); n = put_n(s, n, u->sp); }
-            else if (k == 6) { n = put_s(s, 0, "PA "); n = put_n(s, n, u->pa); n = put_s(s, n, "   MA "); n = put_n(s, n, u->ma); n = put_s(s, n, "   CT "); n = put_n(s, n, u->ct); }
-            else if (k == 7) { n = put_s(s, 0, "JP "); n = put_n(s, n, u->jp); n = put_s(s, n, "   Job Lv "); n = put_n(s, n, job_level(u)); }
-            else { n = put_s(s, 0, "Status "); if (!u->hp) n = put_s(s, n, "KO"); else if (!u->status) n = put_s(s, n, "Normal"); else for (i = 0; i < 4; i++) if (u->status & (1 << i)) { n = put_s(s, n, st_names[i]); s[n++] = ' '; } }
-            s[n] = 0; ui_text(6, 38 + 8 * (k - 3), s, C_BLACK, 159);
-        } else {
-            if (k == 3) {
-                ui_text(23, 38, "EQUIPMENT", C_DGRAY, 81);
-                ui_text(103, 38, "ABILITIES", C_DGRAY, 159);
-            } else {
-                u8 slot = k - 4; AbId ab = known(st.sel, slot);
-                ui_text(23, 44 + 8 * slot, u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name, C_BLACK, 81);
-                ui_text(103, 44 + 8 * slot, ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-" : ABIL_NAME(ab), C_BLACK, 159);
-                if (!slot && u->defend && status_ability_count() == 6) ui_text(103, 84, "Defend", C_BLACK, 159);
+        else {
+            s16 y = (s16)(STATUS_ROW0 + (k - 3) * STATUS_PITCH);
+            if (!st.page) {                     // Eqp.: the source's pictograms, then the item
+                u8 slot = status_slot_order[k - 3];
+                if (k - 3 < 5) ui_text(36, (s16)(y + 3), u->eq[slot] == 0xFF ? "-" : items[u->eq[slot]].name,
+                                       C_BLACK, 159);
+            } else if (st.page == 1) {          // Abil.: what it goes into battle with
+                u8 slot = (u8)(k - 3);
+                if (slot < status_ability_count()) {
+                    AbId ab = known(st.sel, slot);
+                    ui_text(20, (s16)(y + 3),
+                            ab == NO_ABIL ? u->defend && slot == status_ability_count() - 1 ? "Defend" : "-"
+                                          : ABIL_NAME(ab), C_BLACK, 159);
+                }
+            } else {                            // Status: who it is and what ails it
+                if (k == 3) { n = put_s(s, 0, "Zodiac "); n = put_s(s, n, signs[u->zodiac]); }
+                else if (k == 4) { n = put_s(s, 0, "JP "); n = put_n(s, n, u->jp); }
+                else if (k == 5) { n = put_s(s, 0, "Status "); if (!u->hp) n = put_s(s, n, "KO"); else if (!u->status) n = put_s(s, n, "Normal"); else for (i = 0; i < 4; i++) if (u->status & (1 << i)) { n = put_s(s, n, st_names[i]); s[n++] = ' '; } }
+                if (k <= 5) { s[n] = 0; ui_text(6, (s16)(y + 3), s, C_BLACK, 159); }
             }
         }
     }
     rt_light = sl; rt_dark = sd;
+#ifndef FFT_NO_SETTLE
+    // A finished page with nothing live on it has to reach the hidden planes once each and
+    // no more: the TI alternates two of them (GrayDBufToggleSync), so once both carry the
+    // picture the screen is already right and the frame can cost nothing.
+    if (W->status_n == 9 && (st.status_info || !status_rows())) {
+        if (status_settled >= 2) return;
+        status_settled++;
+    } else status_settled = 0;
+    // A page with a glove never settles, but only the glove changes: the page comes back a
+    // band at a time -- the band it stands on, and the one it has just left.
+    if (W->status_n == 9 && !st.status_info && status_rows() && status_hand_live) {
+        u8 hy = status_hand_row();
+        STATUS_BAND();
+        if (status_hand_y != hy) status_band(status_hand_y);
+        status_band(hy);
+        status_hand_y = hy;
+        draw_hand(2, hy);
+        return;
+    }
+#endif
+    STATUS_BLIT();
     copy_box(W->status[0], W->status[1], 0, 0, 10, RT_H);
-    if (st.page && !st.status_info && W->status_n == 9)
-        draw_hand(st.status_col ? 81 : 1, 41 + 8 * st.status_row);
+    if (!st.status_info && status_rows() && W->status_n == 9) {
+        status_hand_y = status_hand_row();
+        status_hand_live = 1;
+        draw_hand(2, status_hand_y);
+    } else status_hand_live = 0;
 }
 #if !MOD_CORE
 #if defined(FFT_CHAPTER) && defined(FFT_REACH_CONTOUR)

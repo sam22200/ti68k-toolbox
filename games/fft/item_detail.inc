@@ -12,6 +12,7 @@ typedef struct {
     const char *help;                   // FFT's own description (ffid), "" when it has none
     s8 stat[7];                         // HP MP PA MA SP Move Jump, as the record gives them
     u8 power;                           // a weapon's WP, 0 otherwise
+    u8 evade;                           // its evade %, which the source prints beside the power
 } ItemDetail;
 
 // The family names the Shop Guide uses, by the item's category byte.
@@ -73,7 +74,10 @@ static void item_detail_draw(const ItemDetail *d)
     ID_ICON(10, 16, d->id);
     ID_TEXT(22, 17, d->name, C_BLACK, 152);
     ID_TEXT(22, 26, item_family(d->kind), C_DGRAY, 152);
-    if (d->power) { ID_TEXT(96, 26, "Power", C_DGRAY, 152); ID_NUM(124, 26, d->power); }
+    // The source's own Help box prints "Attack power:13  Evade:5%" under the name.
+    if (d->power) { ID_TEXT(80, 26, "Power", C_DGRAY, 152); ID_NUM(106, 26, d->power); }
+    if (d->evade) { ID_TEXT(118, 26, "Ev", C_DGRAY, 152); ID_NUM(130, 26, d->evade);
+                    ID_TEXT((s16)(130 + (d->evade > 9 ? 9 : 5)), 26, "%", C_DGRAY, 152); }
     if (d->help && *d->help) item_detail_wrap(d->help, 10, 36, 140, 3);
     y = 60;
     for (i = 0; i < 7; i++) {

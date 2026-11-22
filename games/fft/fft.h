@@ -94,6 +94,11 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // descriptor (tools/chapter_desc.py, campaign/ENGINE.md), read at load, not from headers.
 #define FFT_CHAPTER
 #endif
+// The Status screen's body: the rows of its equipment, abilities and ailments pages, on one
+// grid, so the core's pictograms and the screens module's text line up.
+#define STATUS_BODY 41
+#define STATUS_ROW0 41
+#define STATUS_PITCH 11
 #if defined(FFT_CHAPTER) && !defined(FFT_WATER_DUMP)
 #define FFT_WATER_BANK                        // glints read from the descriptor, not computed
 #endif

@@ -76,20 +76,9 @@ static void unit_card_draw(const UnitCard *d,u8 layout,s16 y,u8 part,u8 context,
         }
     }
 #else
-    if(layout==UC_STATUS) {
-        if(part==UC_NAME)CARD_TEXT(24,y+2,d->name,C_BLACK,92,context);
-        else if(part==UC_JOB)CARD_TEXT(24,y+9,d->job,C_BLACK,92,context);
-        else if(part==UC_LEVEL) {
-            n=card_string(s,n,"Lv ");n=card_uint(s,n,d->level);
-            n=card_string(s,n," Exp ");n=card_uint(s,n,d->exp);s[n]=0;
-            CARD_TEXT(24,y+17,s,C_BLACK,92,context);
-        } else if(part==UC_HP||mp) {
-            u16 v=mp?d->mp:d->hp,m=mp?d->max_mp:d->max_hp;
-            n=card_string(s,n,mp?"MP ":"HP ");n=card_uint(s,n,v);s[n++]='/';
-            n=card_uint(s,n,m);s[n]=0;CARD_TEXT(96,y+(mp?17:3),s,C_BLACK,159,context);
-            unit_card_bar(96,y+(mp?24:10),v,m,60,mp?C_DGRAY:C_BLACK,UC_BAR_FLAT,0);
-        }
-    } else {
+    // UC_STATUS is gone: the battle's Status screen is the shared unit sheet's own plate
+    // (../unit_sheet.inc), which says the same in a quarter of the room.
+    {
         u8 side=layout==UC_BATTLE_RIGHT; s16 x=side?19:22,limit=side?60:74;
         if(part==UC_NAME)CARD_TEXT(side?limit-CARD_WIDTH(d->name):x,y+1,d->name,C_BLACK,limit,context);
         else if(part==UC_LEVEL) {

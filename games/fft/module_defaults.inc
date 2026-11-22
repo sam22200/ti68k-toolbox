@@ -47,7 +47,7 @@ static const ModCtx mod_defaults={
     .put_n=put_n,
     .unit_name=unit_name,
     .text_into=text_into,
-    .unit_card_battle=unit_card_battle,
+    .unit_card_battle=unit_card_battle,.status_header=status_header,
     .area_paint=area_paint,
     .draw_hand=draw_hand,
     .copy_box=copy_box,
