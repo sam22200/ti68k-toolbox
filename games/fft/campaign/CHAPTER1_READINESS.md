@@ -1,4 +1,42 @@
-# Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-12)
+# Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-22)
+
+## The next three steps (2026-11-22)
+
+Read this first. The battle itself now runs on the Titanium
+([CORE_PACKAGES.md](CORE_PACKAGES.md), § the heap at the refusal), the core
+executes 155 of 155 audited Chapter I actions (§ 4) and the archive projection
+holds (§ 2), so what is left for Chapter I is, in order:
+
+1. **Monsters in battle for real.** Formation/Status is integrated (FMA1/ffma,
+   16 shared body/portrait records, 255 names, 48 jobs) and the user approved
+   the wide animations on 2026-11-14, but **the battle and deployment selectors
+   still reject type 3**: neither a bred monster nor a field's random formation
+   can be deployed, and the deployment -> Save -> battle -> results loop does
+   not exist yet. See [MONSTER_FORMATION.md](MONSTER_FORMATION.md) and
+   [MONSTER_COMBAT_REVIEW.md](MONSTER_COMBAT_REVIEW.md). This gate also unblocks
+   part of step 2, so it comes first.
+2. **The chapter's own content.** Chapter I is about 20 battle maps and 20
+   scenes; the pilot ships 2 of each. The five Chapter I field doors are all 0,
+   so a field still answers "Not ripped yet" although the roll, the table and
+   the door return are in place ([TOWN_SERVICES.md](TOWN_SERVICES.md)). Pair it
+   with § 3 below, the one-command native chapter run: 20 battles cannot be
+   recetted by hand, and that script still needs a placement `tilog` in
+   `deploy.c` and one key script per step.
+3. **The side systems the user requires before extraction**
+   ([CAMPAIGN_SIDE_SYSTEMS.md](CAMPAIGN_SIDE_SYSTEMS.md)). The calendar, the
+   eggs, the named objectives, the Save checkpoints and the story choices are
+   delivered; the **Bar and its rumors** and the **poaching -> Fur Shop stock**
+   loop are not, and the Propositions machinery has to exist while staying
+   locked in Chapter I.
+
+### Where the town's four services stand
+
+| Service | State | What is missing |
+|---|---|---|
+| **Shop** | **Complete**, checked PC/68000: bank `ffsh` (FSH2, 1,468 bytes), FFT's prices, stock tiers and six shop types, buy and sell at half price, category tabs, the shared [MODE] detail with the disc's own text, the fitting bench. 306,638 cycles a frame. | Nothing for this chapter: tiers above 4 open with later chapters' story flags. |
+| **Soldier Office** | **Complete**: two-step hire, the source's out-of-battle generator (seeds, variances, arrival equipment), a zodiac from a drawn birthday, renaming, the 16 cap. 242,054 cycles a frame. | The price (1,500 gil, 1,400 for a woman) is INTERPRETATION from the Final Fantasy Wiki; **it has not been found on the disc**. |
+| **Bar** | **Nothing.** No row in the town menu, no route in `worldmap.c`, no rumor state in the save. | Everything: the 64 source entries filtered by location mask and script variable (`wldcore_list_open_rumors`), paginated detail pages with safe cancel, portraits for known speakers, durable state. Rumors belong to Chapter I in the original, so this is in-chapter work, not deferred. |
+| **Fur Shop** | **The room only**: merchant, `SC_FUR` screen, Buy/Sell/Leave menu and the `game_scenario(2)` test door exist, but `FUR_FLAG` is 255 (no battle of this build opens it) and Buy/Sell answer "later". | The stock itself. In battle, Secret Hunt (support 471) is wired in `nature_hit_commit` but **gives the item straight to the party inventory**, which is not the source rule: the original writes the Fur Shop's own stock, saturating at 255 independently of the inventory cap. Needs that persistent state, its save migration and the purchase UI, with the Chapter III unlock preserved. |
 
 Delivered (2026-11-20): [a town's services and a field's encounters](TOWN_SERVICES.md).
 Shop and Soldier Office, absent from every campaign document until now, are
@@ -8,8 +46,10 @@ generator rows and each field's formation table. The shop and the office are
 complete and checked PC/68000. The random-encounter roll, table and door return
 are in place, but **no random battle is ripped**: all five Chapter I field doors
 are0, so a field still answers "Not ripped yet". Authoring those formations as
-chapter battles stays open, and the Bar (decorative in I), Propositions (II) and
-the Fur Shop (III) remain out of this chapter by the original's own unlocks.
+chapter battles stays open. Propositions (II) and the Fur Shop's stock (III)
+stay locked by the original's own unlocks, but their machinery is still required
+before extraction, and the Bar's rumors belong to Chapter I itself: see the
+three steps above.
 
 Latest steering (2026-11-13): finish the [user prerequisites](CAMPAIGN_PREREQUISITES.md)
 before route automation and campaign extraction. The user also requires
@@ -19,7 +59,7 @@ unlocks preserved (rumors in I, Propositions from II, Fur Shops from III).
 [Safe scene ESC and permanent Brave/Faith saves](SCENE_SAVE_FIXES.md)
 and [four traps/level-down persistence](TRAPS.md) are delivered and approved.
 Approved [monster KO support](MONSTER_KO.md) renders six source families through
-optional chapter art and the unchanged48-entry cache. [Large named objectives](OBJECTIVES.md)
+optional chapter art and the actor cache (48 entries then, 42 since 2026-11-22). [Large named objectives](OBJECTIVES.md)
 are approved and integrated: target/protect/combined, explicit binding and
 repeated-receipt fixes. [Consecutive Save checkpoints](CHAINS.md) and
 [persistent story guests](GUESTS.md) now pass real PC/sanitizer child-process
@@ -103,7 +143,14 @@ formation/deployment is now the active step in the prerequisite queue.
 **Current status:** the100-row hidden target and archive-based reach restoration
 are delivered; see [current measurements and limits](CORE_REACH_ARCHIVE.md).
 Per the user decision above, proceed without further difficult RAM refactoring.
-Production installed-flow measurement is still required before claiming16KiB.
+**Measured on the installed flow 2026-11-22: the Gariland battle starts on the
+Titanium** through `fftstory()`. The refusal was 1,088 bytes short; nav envelope
+(2,120), depth envelope (1,992), companion block (328) and the actor cache,
+48 -> 42 frames (1,272), gave back 5,712. Two traps are recorded in
+[CORE_PACKAGES.md](CORE_PACKAGES.md): `fftbat(200)` is Gariland's story door,
+not its battle, and `HeapAvail()` read at the refusal is taken after the cleanup
+has freed everything, so it flatters the figure. The 16KiB claim itself is still
+unproven.
 The old ring-backup estimate below is historical.
 
 **Historical status 2026-11-10 (before companion/program growth): ~11.4 KB free.** Measured natively (Titanium AMS 3.10, Orbonne, `ti-mem heap`): 187,554
