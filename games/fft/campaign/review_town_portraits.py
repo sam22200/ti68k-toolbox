@@ -30,23 +30,7 @@ PROPOSALS = (
 
 def treatment(face, colors, variant):
     small = np.asarray(Image.fromarray(face).resize((17, 27), Image.Resampling.NEAREST))
-    lum = (colors & 31) * .299 + (colors >> 5 & 31) * .587 + (colors >> 10 & 31) * .114
-    if variant == 0:
-        return review.shop_scene.face_greys(small, colors)
-    if variant == 1:
-        g = np.where(lum <= 7, 3, np.where(lum <= 16, 2, np.where(lum <= 22, 1, 0)))
-        return np.where(small == 0, -1, g[small])
-    low, high = lum[1:].min(), lum[1:].max()
-    n = np.clip((lum[small] - low) / max(high - low, 1e-6), 0, 1)
-    n **= 1.85 if variant == 3 else 1.35
-    if variant == 4:
-        n = np.clip((n - .5) * 1.5 + .5, 0, 1)
-    threshold = np.full(n.shape, .5)
-    if variant == 5:
-        bayer = np.array([[0, 2], [3, 1]]) / 4 + .125
-        threshold = np.where((n > .12) & (n < .88),
-                             bayer[np.indices(n.shape)[0] % 2, np.indices(n.shape)[1] % 2], .5)
-    return np.where(small == 0, -1, 3 - np.floor(n * 3 + threshold).astype(int))
+    return assets.face_greys(small, colors, variant)
 
 
 def main():

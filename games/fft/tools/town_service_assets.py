@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
-"""Source-correct town speakers and the Bar room, for an isolated visual review.
-
-No shipping bank is rewritten. WORLD's four WLDFACE uploads and its portrait
-texture routine define the page/CLUT layout; the user's reference pictures
-identify the four service faces. The existing shop extractor's linear atlas
-and palette-zero interpretation must not be reused for these records.
-"""
+"""Shared source-correct town portraits, selected contrast and Bar-room extraction."""
 import struct
 
 import numpy as np
 from PIL import Image
 
 import interface
-import shop_scene
-
 SPEAKERS = {'store': 114, 'office': 115, 'fur': 116, 'bar': 117}
+# User2026-11-22, in sheet order: C / D / C / D. Keep all four identities distinct.
+SELECTED = {'store': 3, 'office': 4, 'fur': 3, 'bar': 4}
 PAGE_BYTES = 0x8000
 
 
@@ -45,17 +39,41 @@ def face_source(raw, index, palette=0):
     return face, colors
 
 
-def portrait(raw, index):
+def face_greys(px, colors, variant=0):
+    """The original review control0 and its five explicitly reviewed treatments1..5."""
+    if not 0 <= variant <= 5:
+        raise ValueError('unknown town portrait contrast')
+    lum = (colors & 31) * .299 + (colors >> 5 & 31) * .587 + (colors >> 10 & 31) * .114
+    if variant in (0, 1):
+        if variant == 0:
+            low, high = lum[1:].min(), lum[1:].max()
+            lum = (lum - low) / max(high - low, 1e-6) * 31
+        g = np.where(lum <= 7, 3, np.where(lum <= 16, 2, np.where(lum <= 22, 1, 0)))
+        return np.where(px == 0, -1, g[px])
+    low, high = lum[1:].min(), lum[1:].max()
+    n = np.clip((lum[px] - low) / max(high - low, 1e-6), 0, 1)
+    n **= 1.85 if variant == 3 else 1.35
+    if variant == 4:
+        n = np.clip((n - .5) * 1.5 + .5, 0, 1)
+    threshold = np.full(n.shape, .5)
+    if variant == 5:
+        bayer = np.array([[0, 2], [3, 1]]) / 4 + .125
+        y, x = np.indices(n.shape)
+        threshold = np.where((n > .12) & (n < .88), bayer[y % 2, x % 2], .5)
+    return np.where(px == 0, -1, 3 - np.floor(n * 3 + threshold).astype(int))
+
+
+def portrait(raw, index, variant=0, palette=0):
     """Keep the shared 32x29 record, 17x27 face, outline and four-grey mapping."""
-    face, colors = face_source(raw, index)
+    face, colors = face_source(raw, index, palette)
     small = np.asarray(Image.fromarray(face).resize((17, 27), Image.Resampling.NEAREST))
     grey = np.full((29, 32), -1, dtype=int)
-    grey[1:28, 1:18] = shop_scene.face_greys(small, colors)
+    grey[1:28, 1:18] = face_greys(small, colors, variant)
     interface.outline(grey)
     return bytes(interface.planes(grey, 32))
 
 
-def corrected_rooms(current, faces):
+def corrected_rooms(current, faces, selections=None):
     """Replace only three existing FSK4 portrait records; preserve every room byte."""
     if current[:6] != b'FSK4\x03\x00':
         raise ValueError('review expects the three-room FSK4 bank')
@@ -65,7 +83,7 @@ def corrected_rooms(current, faces):
         end = struct.unpack_from('>H', current, 8 + 2 * slot)[0]
         if at & 1 or end - at != 348:
             raise ValueError('invalid/alignment-unsafe portrait record')
-        out[at:end] = portrait(faces, SPEAKERS[role])
+        out[at:end] = portrait(faces, SPEAKERS[role], selections[role] if selections else 0)
     return bytes(out)
 
 

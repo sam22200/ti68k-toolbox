@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The source's own shop and Soldier Office rooms (FSK3), four greys.
+"""The source's own shop, Soldier Office and Fur Shop rooms (FSK4), four greys.
 
 usage: shop_scene.py DISC.cue OUT.bin
 
@@ -19,7 +19,7 @@ Which is which, read off the pictures against the user's own screenshots:
 - **BK_FITR** the **Soldier Office**: a stone room of books and candles, the
   guildmaster seated at x 160..180 and a recruit before him at x 100..122.
 
-The Bar has no picture here at all; neither does anything else.
+The Bar's stored picture is separate, in WORLD/WLDBK.BIN (town_service_assets.py).
 
 Each record is a 160x100 window of the source taken at 1:1 -- the source's own
 pixels read far better in four greys than a scaled-down room -- framed to put
@@ -30,19 +30,10 @@ empty band above it looked wrong.
 The grey mapping is the one the user chose on 2026-11-20 out of five: the 15th
 and 97th luminance percentiles become black and white, through a 1.4 gamma.
 
-OBSERVED: **EVENT/WLDFACE.BIN** is the world-map and menu portrait sheet -- 4bpp,
-256 pixels wide, 168 faces of 32x48, eight to a row. These are the faces the
-towns' speakers use, not the battle sheets' own. Face 8 is the moustached man
-the user's shop screenshot shows; the Soldier Office's clerk is one of the bald
-ones beside him and is not pinned down yet (INTERPRETATION: matched by eye
-against the user's screenshot, not read from the game's own table).
-
-The sheet's own palettes are the last 2048 bytes of the file: 168 faces of
-32x48 take 129,024 bytes, and what follows is **64 CLUTs of 16 BGR555 colours**.
-The index is a palette slot, not a brightness -- a face's skin is index 8 and
-its hair index 1..3 -- so reading the index as luminance produced a negative.
-The greys come from the palette's own luminance, through the same rule as the
-rest of the port.
+OBSERVED: EVENT/WLDFACE.BIN contains four256x256 4bpp pages, forty32x48 faces
+per page, each with its own CLUT. The shared town_service_assets reader follows
+the original upload/texture routines. Speakers114/115/116 are the actual shop,
+office and fur merchants. User2026-11-22 selects C/D/C; the Bar owner117 uses D.
 
 FSK4: magic, u8 rooms, one pad byte, then a u16 offset for each room's speaker
 portrait (32x29, 348 bytes) and one for each room's picture (u8 height, then
@@ -54,15 +45,11 @@ import struct
 import sys
 
 import numpy as np
-from PIL import Image
 
 import extract
-import interface
+import town_service_assets as town
 import zx0pack
 
-KEEPER_PAL = 0                    # INTERPRETATION: the sheet's face/palette pairing is unknown
-FACE_W, FACE_H = 32, 48
-FACE_BYTES = 168 * FACE_W * FACE_H // 2
 W, H = 160, 100                   # the whole screen: the dialogue box is drawn over the room
 # name, window origin in the source, and the grey mapping. The store is a bright room full of
 # dark goods, the office a dim one, so the percentiles that become white and black differ.
@@ -125,43 +112,23 @@ def outline_actor(rgb, box, sat=4, val=22):
 
 # name, window origin, the speaker's EVENT/WLDFACE.BIN face, and the grey mapping.
 VARIANTS = (
-    ('BK_SHOP', 8, 18, 8, dict(lo=15, hi=97, gamma=1.4)),
+    ('BK_SHOP', 8, 18, town.SPEAKERS['store'], dict(lo=15, hi=97, gamma=1.4)),
     # The office's stone and its near-white candles are too far apart for four flat greys: the
     # user chose the dithered mapping on 2026-11-21, framed so Ramza clears the menu box.
-    ('BK_FITR', 26, 8, 12, dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
+    ('BK_FITR', 26, 8, town.SPEAKERS['office'], dict(lo=25, hi=85, dither=0.62, move=RAMZA_TO_DESK,
                                outline=(GUILDMASTER,))),
-    ('BK_HONE', 8, 26, 9, dict(lo=45, hi=95, dither=0.72,
+    ('BK_HONE', 8, 26, town.SPEAKERS['fur'], dict(lo=45, hi=95, dither=0.72,
                                outline=(FUR_RAMZA, FUR_KEEPER))),
 )
 
 
-def face_greys(px, pal):
-    """Four greys from the palette's own range. These faces live in a narrow band -- palette 0
-    runs 5.3 to 26.2 of 31 -- so the port's fixed thresholds leave almost every pixel mid-grey
-    and the portrait unreadable. Stretch the fifteen drawn colours over the full range first."""
-    lum = (pal & 31) * .299 + (pal >> 5 & 31) * .587 + (pal >> 10 & 31) * .114
-    low, high = lum[1:].min(), lum[1:].max()
-    lum = (lum - low) / max(high - low, 1e-6) * 31
-    g = np.where(lum <= 7, 3, np.where(lum <= 16, 2, np.where(lum <= 22, 1, 0)))
-    return np.where(px == 0, -1, g[px])
+face_greys = town.face_greys  # Historical review control, shared with the selected treatments.
 
 
-def portrait(disc, files, index, palette=KEEPER_PAL):
-    """One EVENT/WLDFACE.BIN face as the campaign's 32x29 portrait record (348 bytes)."""
-    b = disc.read(*files['EVENT/WLDFACE.BIN'])
-    raw = np.frombuffer(b[:FACE_BYTES], np.uint8)
-    px = np.empty(raw.size * 2, np.uint8)
-    px[0::2] = raw & 15; px[1::2] = raw >> 4
-    sheet = px.reshape(-1, 256)
-    pal = np.frombuffer(b[FACE_BYTES:], '<u2')[palette * 16:(palette + 1) * 16].astype(int)
-    r, c = divmod(index, 8)
-    face = sheet[r * FACE_H:(r + 1) * FACE_H, c * FACE_W:(c + 1) * FACE_W]
-    small = np.asarray(Image.fromarray(face.astype(np.uint8))
-                       .resize((17, 27), Image.Resampling.NEAREST), dtype=int)
-    im = np.full((29, 32), -1, dtype=int)
-    im[1:28, 1:18] = face_greys(small, pal)           # index 0 is the background
-    interface.outline(im)
-    return bytes(interface.planes(im, 32))
+def portrait(disc, files, index, palette=0):
+    """One source-correct348-byte portrait in its explicitly approved contrast."""
+    role = next(role for role, face in town.SPEAKERS.items() if face == index)
+    return town.portrait(disc.read(*files['EVENT/WLDFACE.BIN']), index, town.SELECTED[role], palette)
 
 
 
