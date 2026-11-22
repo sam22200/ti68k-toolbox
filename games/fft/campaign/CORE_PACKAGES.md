@@ -16,9 +16,14 @@ leaves about 95 KB free against the same 99 KB `BATTLE_RAM_BYTES`, so it was alr
 the campaign's 62 PC/68000 replays; **a battle has not been seen running on hardware with
 this core.**
 
-**Re-measured on the Titanium, 2026-11-22, with `fftbat(200)` run on its own from a freshly
-installed core and chapter -- no supervisor, no leftovers.** `ti-mem heap` at the refusal
-names every block, which is what finally made the budget legible:
+**The battle runs on the Titanium, 2026-11-22.** `fftstory()`, New Game, the Orbonne opening
+and the Academy bridge skipped, and Gariland's battle comes up: the map, Ramza's card
+(HP 154/154, MP 25/25) and the turn menu. The Status screen's three tabs work on the machine,
+item icons and all, and [2nd] shows FFT's own description. **This is the first battle seen
+running on hardware with this core**; the installed-RAM peak this file listed as open since
+2026-11-14 is closed.
+
+What it took. `ti-mem heap` at the refusal named every block, which made the budget legible:
 
 | bytes | what it is |
 | --- | --- |
@@ -27,33 +32,34 @@ names every block, which is what finally made the budget legible:
 | 20,122 | AMS's own |
 | 18,490 | `vbuf`, the depth envelope |
 | 16,384 | AMS's own |
-| 10,178 | the actor cache (`AC_N` = 48 frames) |
+| 10,178 | the actor cache |
 | 8,934 | the module execution zone |
 
-So the game's own RAM is the program, one 54 KB block, the depth and the cache. Two
-reservations were the worst case rather than what the battle takes, and both are now sized
-to what is actually loaded:
+The message was printing truncated kilobytes, which hid how close it was; printed in sixteens
+it read **need 6080, free 6012 -- 1,088 bytes short**. Four reservations were the worst case
+rather than what the battle takes, and all four are now sized to what is loaded:
 
-- **the map envelope** was `malloc(MAP_NMAX * 20)` = 5,120 at cold boot, for 256 nodes.
-  `nav_reserve(MAP_N, 2)` already takes exactly the loaded map's nodes and grows if a later
-  map needs more, so the reservation is gone: **2,120 bytes** for Gariland's 150 nodes.
-- **the depth envelope** `FFT_CORE_DEPTH_MAX` was 20,480 against a biggest existing view of
-  18,488: **1,992 bytes**. It is now that measured maximum; a bigger view is still refused,
-  at packaging and at load, as before.
+- **the map envelope** was `malloc(MAP_NMAX * 20)` = 5,120 at cold boot. `nav_reserve(MAP_N,
+  2)` already takes the loaded map's nodes and grows if a later map needs more, so the
+  reservation is gone: **2,120 bytes** for Gariland's 150 nodes of 256.
+- **the depth envelope** `FFT_CORE_DEPTH_MAX` 20,480 -> 18,488, the biggest view that exists:
+  **1,992 bytes**. Confirmed in the heap: `vbuf` 20,482 -> 18,490.
+- **the companion block** 5,376 -> 5,048, its image being 5,046: **328 bytes**.
+- **the actor cache** 48 -> 42 frames: **1,272 bytes**. This one is a trade, not a cleanup:
+  `README.md` has Gariland's AI battle at ~9,073 frames with 48 and ~10,445 with 32, so six
+  frames cost roughly 5 % of a battle's length. It was the last block of that size and the
+  1,088 needed a margin; `test_actor_cache.c` now reads `AC_N` instead of 48, and at 48 it
+  still produces its old digest `00000002` over 63 checks, so the trial itself did not move.
 
-**4,112 bytes freed, and the battle still refuses.** The same session wired the Secondary
-command, which put about 950 bytes back into the program -- and the program is resident, so
-that is RAM too. Net, the battle is roughly 3 KB short of starting.
+Together **5,712 bytes**, against 1,088 needed; the rest is the margin the earlier attempts
+lacked. Wiring the Secondary command in the same session put about 950 bytes back into the
+program, which is resident, and the battle still starts.
 
-The one remaining block of that size is **the actor cache, 10,178 bytes**: 48 decoded frames
-down to 32 would free 3,392 and close the gap. That is not a free change -- `README.md`
-measures Gariland's AI battle winning at frame ~9,073 with 48 frames against ~10,445 with
-32, about 15 % slower -- so it is a decision about what the chapter is for, not a cleanup,
-and it has not been made. Everything else measured here is already exact.
-
-The screens are checked on the PC (`status-frames-test`, 360 frames; `secondary-test`) and
-by the campaign's 62 PC/68000 replays; **a battle has still not been seen running on
-hardware with this core.**
+Two things learned the hard way, for the next person: `fftbat(200)` is Gariland's **door 0**,
+a story start, not its battle -- `fftbat(261)` is the battle, and from a cold HOME it wants a
+save the story makes, so `fftstory()` is the way in. And `HeapAvail()` read at the refusal is
+measured after the cleanup has freed everything, so it flatters the figure; the useful
+numbers are the heap listing and the needed total.
 
 FMA1 update (2026-11-14): shared core ffma13082 supplies approved monster
 Formation/Status. `formation_art_format: FMA1` is required and validated by

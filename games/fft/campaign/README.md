@@ -1492,10 +1492,14 @@ Data the two chapters share is stored once in the campaign group:
   frame entry (`opening/data/ffoa.bin`, `campaign/data/ffga.bin`) flips it after decoding
   (ExtGraph `SpriteX8_MIRROR_H_R` on the TI). Blades alone are `ffcw` (3,024 bytes).
   Orbonne's actors and Gariland's raw `fftu`/`fftw` (125.6 KB) become 89.7 KB.
-- **Decoded frames:** one LRU cache of 48 frames (`AC_N`, 10.2 KB, its own block) shared by
+- **Decoded frames:** one LRU cache of 42 frames (`AC_N`, 8.9 KB, its own block) shared by
   every actor, at most one ordinary decode a frame; each decode is charged to the frame
   budget. Gariland's AI battle wins at frame ~9,073 (raw frames: 8,882; 32 cached frames:
-  10,445; one frame per actor: 12,615). `FFT_RAW_ACTORS` builds the raw-bank control.
+  10,445; one frame per actor: 12,615). `FFT_RAW_ACTORS` builds the raw-bank control. It was
+  48 until 2026-11-22, when the battle would not start on the Titanium for want of 1,088
+  bytes and six of these frames were the last 1,272 available
+  ([CORE_PACKAGES.md](CORE_PACKAGES.md)); by that curve the six cost roughly 5 % of a
+  battle's length, and the battle now runs.
 - **Scenery views** (`ffov0..3`, `ffgv0..3`) store each occlusion-mask row XORed with the
   row above before ZX0 (`tools/extract.py:rowxor_masks`). `fft.c:unxor_masks` undoes it after
   each decode, one long at a time: Orbonne −3,031 bytes, Gariland −2,940. A view decode
