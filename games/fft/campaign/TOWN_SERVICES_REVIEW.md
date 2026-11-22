@@ -18,10 +18,36 @@ factored into `dialogue_box.inc::dlg_continue`. No new symbol or style is drawn.
 The campaign call preserves its readiness, position, colour and blink phase;
 the Bar uses the same ready-to-advance cue on the final page too.
 
+**Reader selected2026-11-22: A**, black text in the wide shared grey panel,
+with the list on the left. The user explicitly prefers it to the dialogue-on-
+scenery version B. `BAR_READER` in the PC review door records this choice;
+B remains only a historical comparison. Do not ask the user to choose again.
+The source Bar room, owner117/D and campaign blink remain accepted.
+
+`check_bar_a.py` reuses those exact accepted assets in a new private directory,
+with the real third WLDMES entry as long prose. Its2549 source bytes render
+across68 wrapped lines/10 pages without dropped/duplicated non-space text.
+33 actual shared-renderer screens agree PC/ASan/UBSan; the short frame matches
+the previous accepted A frame exactly. First/final pages blink at the expected
+3x2 pixels on grey and return after32 frames. Complete Save unchanged;200
+preceding bank/save/review files retain bytes and mtimes. No new TI run,
+shipping route, save/ABI or package change is included.
+
+```sh
+rtk proxy tools/pyenv/bin/python games/fft/campaign/check_bar_a.py
+```
+
+Evidence: `x/bar-reader-a/`, especially `bar-a-selected.png`,
+`bar-a-indicator.gif` and `results.json`. The long article's topic caption is
+still a review label; town/story eligibility and original title IDs are not
+certified by this visual fixture. The approved visual lot is ready to commit;
+**the town services as a whole remain incomplete** until the actual Bar/
+rumors, Propositions and Fur stock/purchases are implemented.
+
 Current pictures: `x/town-services-accepted/selected-portraits.png`,
 `bar-continuation.png` and `bar-continuation.gif`. The old decision markers
-are cleared. The precise earlier A/B reader-layout letter is not inferred from
-the contrast choice; both layouts implement this correction.
+are cleared. Those earlier mixed-layout proofs remain intact; the selected A
+proof above supersedes their unresolved A/B choice.
 
 `x/town-portrait-contrast/approval.json` records the exact selected sheet hash
 and supersedes the historical capture's pending field. Acceptance verifies all
@@ -84,7 +110,7 @@ Proofs and exact treatment definitions are in the new directory's `results.json`
 The user's `Fft_shop_protrait.png`, `Fft_warriors_portrait.png`,
 `fft_fur_portrait.png` and `Fft_bar.png` identify these actual WLDFACE indices:
 
-| Speaker | Correct index | Current shipping index |
+| Speaker | Correct index | Before correction |
 | --- | ---: | ---: |
 | Shopkeeper | 114 | 8, a different story character |
 | Guildmaster | 115 | 12, a different story character |
@@ -112,7 +138,7 @@ WLDCORE0x8009E260, relative to LBA0x12995, the start of `WORLD/WLDBK.BIN`.
 Set0 is sixty2048-byte sectors: a256x240 raw BGR555 image with the owner,
 Ramza, customers and bar already drawn. No synthesized room is needed.
 
-**TARGET, pending approval:** crop(50,65),160x100 at1:1,15th/97th luminance
+**APPROVED TARGET:** crop(50,65),160x100 at1:1,15th/97th luminance
 percentiles and gamma1.2. This keeps the owner and Ramza visible beside the
 left command window without moving actors. This is a readability adaptation,
 not the original game's crop or a newly measured performance result.

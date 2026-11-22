@@ -5,12 +5,13 @@ The actual adult-monster placement/Save/battle/results flow is delivered
 ([HANDOVER.md](HANDOVER.md)); the older type3-veto queue is obsolete.
 The user accepted portrait contrasts C/D/C/D: Shopkeeper114, Guildmaster115,
 Fur Merchant116 and Bar owner117. The active FSK4 bank now has the first three;
-the Bar prototype uses the fourth and the same campaign continuation cue,
+the Bar prototype uses the fourth, selected reader A (black text on grey), and the same campaign continuation cue,
 without a numeric page counter, matching the original's graphical policy.
 All four selected screens reproduce the approved pictures;38 PC/sanitizer
 screens and actual map service tests pass, with previous proofs preserved.
 Existing installation groups are unchanged; rebuild them at the next release.
-The Bar town route and source-gated persistent rumors remain next, then
+Reader A preserves10 pages of original prose on PC/sanitizers. The Bar town
+route and source-gated persistent rumors remain next, then
 Propositions and Fur stock/migration
 before extraction, as [Chapter I readiness](CHAPTER1_READINESS.md) requires.
 
