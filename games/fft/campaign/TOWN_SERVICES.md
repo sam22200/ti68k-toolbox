@@ -1,5 +1,12 @@
 # A town's services and a field's encounters
 
+Current follow-up2026-11-22: [source portraits and Bar proposals](TOWN_SERVICES_REVIEW.md).
+The existing Shop, Office and Fur portraits are the wrong story characters;
+correct faces114/115/116 and Bar owner117 are prepared for visual approval.
+The Bar has a stored original room in WLDBK, outside the MENU TIMs. Shipping
+routes/save/stock remain unchanged at this review boundary. The original
+service implementation and earlier measurements below are retained.
+
 2026-11-20. The world map's locations do something when Ramza stands on them
 and no story battle is pending: a town or a castle opens its **Shop** and its
 **Soldier Office**, a field rolls one of its **random formations**. Everything

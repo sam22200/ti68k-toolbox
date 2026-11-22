@@ -1,12 +1,15 @@
 # Opening -> Academy -> Gariland
 
-Current private step: [wide monster body animation review](MONSTER_COMBAT_REVIEW.md)
-was approved by the user on2026-11-14.16 chosen families share44 original-MIPS timelines;
-compressed attack pages are checked against the retail decoder and approved
-standing planes remain exact. PC-only previews, no shipping/runtime changes.
-Claude's next step is wide battle rendering/cache/cover/water/flash/facing,
-then actual deployment/Save/Continue/battle/results. The real monster deployment
-veto stays until that rendering is integrated; no repeat visual vote is needed.
+Current step (2026-11-22): [town services and correct source portraits](TOWN_SERVICES_REVIEW.md).
+The actual adult-monster placement/Save/battle/results flow is delivered
+([HANDOVER.md](HANDOVER.md)); the older type3-veto queue is obsolete.
+Source-correct Shopkeeper114, Guildmaster115 and Fur Merchant116 are prepared
+in a before/after comparison. The original Bar room and owner117 feed two
+PC-rendered rumor proposals using the shared design system. Visual decision
+pending; shipping portraits and town routes are unchanged. PC/sanitizer pictures
+agree and78 bank/save hashes/mtimes are preserved. Next is the approved Bar
+integration and source-gated rumors, then Propositions and Fur stock/migration
+before extraction, as [Chapter I readiness](CHAPTER1_READINESS.md) requires.
 
 Latest delivery (2026-11-20): [a town's services and a field's encounters](TOWN_SERVICES.md).
 The world map's towns and castles open a Shop and a Soldier Office; a field rolls

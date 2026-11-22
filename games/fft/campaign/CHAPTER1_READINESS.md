@@ -1,42 +1,46 @@
 # Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-22)
 
-## The next three steps (2026-11-22)
+## The next three steps (2026-11-22, town-services follow-up)
 
 Read this first. The battle itself now runs on the Titanium
 ([CORE_PACKAGES.md](CORE_PACKAGES.md), § the heap at the refusal), the core
 executes 155 of 155 audited Chapter I actions (§ 4) and the archive projection
 holds (§ 2), so what is left for Chapter I is, in order:
 
-1. **Monsters in battle for real.** Formation/Status is integrated (FMA1/ffma,
-   16 shared body/portrait records, 255 names, 48 jobs) and the user approved
-   the wide animations on 2026-11-14, but **the battle and deployment selectors
-   still reject type 3**: neither a bred monster nor a field's random formation
-   can be deployed, and the deployment -> Save -> battle -> results loop does
-   not exist yet. See [MONSTER_FORMATION.md](MONSTER_FORMATION.md) and
-   [MONSTER_COMBAT_REVIEW.md](MONSTER_COMBAT_REVIEW.md). This gate also unblocks
-   part of step 2, so it comes first.
-2. **The chapter's own content.** Chapter I is about 20 battle maps and 20
+1. **Bar and rumors, with the correct town portraits.** The monster gate
+   described by the previous version of this list is already closed:
+   [the handover](HANDOVER.md) records adult placement and the real deployment
+   -> Save -> battle -> results flow. Continue with town services, as the user
+   requested. [Source portraits and Bar A/B proposals](TOWN_SERVICES_REVIEW.md)
+   are ready for a visual decision; the source Bar room and all four service
+   speakers are identified. Town/story eligibility, actual rumor routes,
+   pagination/input and durable effects still need implementation.
+2. **Reusable Propositions and the poaching/Fur Shop loop.** These are required
+   before content extraction, with Propositions locked until Chapter II and
+   the Fur Shop until III. Add away-worker/calendar/return settlement and
+   separate poach stock/purchases with save migration and transactional checks.
+   See [CAMPAIGN_SIDE_SYSTEMS.md](CAMPAIGN_SIDE_SYSTEMS.md).
+3. **The chapter's own content, after the side-system gates.** Chapter I is about 20 battle maps and 20
    scenes; the pilot ships 2 of each. The five Chapter I field doors are all 0,
    so a field still answers "Not ripped yet" although the roll, the table and
    the door return are in place ([TOWN_SERVICES.md](TOWN_SERVICES.md)). Pair it
    with § 3 below, the one-command native chapter run: 20 battles cannot be
    recetted by hand, and that script still needs a placement `tilog` in
    `deploy.c` and one key script per step.
-3. **The side systems the user requires before extraction**
-   ([CAMPAIGN_SIDE_SYSTEMS.md](CAMPAIGN_SIDE_SYSTEMS.md)). The calendar, the
-   eggs, the named objectives, the Save checkpoints and the story choices are
-   delivered; the **Bar and its rumors** and the **poaching -> Fur Shop stock**
-   loop are not, and the Propositions machinery has to exist while staying
-   locked in Chapter I.
 
 ### Where the town's four services stand
 
 | Service | State | What is missing |
 |---|---|---|
-| **Shop** | **Complete**, checked PC/68000: bank `ffsh` (FSH2, 1,468 bytes), FFT's prices, stock tiers and six shop types, buy and sell at half price, category tabs, the shared [MODE] detail with the disc's own text, the fitting bench. 306,638 cycles a frame. | Nothing for this chapter: tiers above 4 open with later chapters' story flags. |
-| **Soldier Office** | **Complete**: two-step hire, the source's out-of-battle generator (seeds, variances, arrival equipment), a zodiac from a drawn birthday, renaming, the 16 cap. 242,054 cycles a frame. | The price (1,500 gil, 1,400 for a woman) is INTERPRETATION from the Final Fantasy Wiki; **it has not been found on the disc**. |
-| **Bar** | **Nothing.** No row in the town menu, no route in `worldmap.c`, no rumor state in the save. | Everything: the 64 source entries filtered by location mask and script variable (`wldcore_list_open_rumors`), paginated detail pages with safe cancel, portraits for known speakers, durable state. Rumors belong to Chapter I in the original, so this is in-chapter work, not deferred. |
-| **Fur Shop** | **The room only**: merchant, `SC_FUR` screen, Buy/Sell/Leave menu and the `game_scenario(2)` test door exist, but `FUR_FLAG` is 255 (no battle of this build opens it) and Buy/Sell answer "later". | The stock itself. In battle, Secret Hunt (support 471) is wired in `nature_hit_commit` but **gives the item straight to the party inventory**, which is not the source rule: the original writes the Fur Shop's own stock, saturating at 255 independently of the inventory cap. Needs that persistent state, its save migration and the purchase UI, with the Chapter III unlock preserved. |
+| **Shop** | **Functional**, checked PC/68000: bank `ffsh` (FSH2, 1,468 bytes), FFT's prices, stock tiers and six shop types, buy and sell at half price, category tabs, shared [MODE] detail and fitting bench. Earlier measured steady frame: 306,638 cycles. | Correct portrait114 is prepared for visual approval; the shipping extractor still uses the wrong face8. Later stock gates stay separate. |
+| **Soldier Office** | **Functional**: two-step hire, source generator, birthday/zodiac, renaming, 16 cap. Earlier measured steady frame: 242,054 cycles. | Correct portrait115 awaits visual approval (shipping face12 is wrong). The price (1,500/1,400 gil) remains an interpretation, not source-certified. |
+| **Bar** | **Source assets and PC proposals prepared**, including the real `WLDBK` room and portrait117. No shipping town route or rumor state yet. | Approve A/B, then bind town/story-filtered entries, paginated details, safe cancel and durable effects. Propositions must not appear early. |
+| **Fur Shop** | **The room only**: `SC_FUR`, Buy/Sell/Leave and test door2 exist; `FUR_FLAG`255 locks entry and transactions answer "later". | Correct portrait116 awaits approval (shipping face9 is wrong). Secret Hunt still gives loot directly to the bag; implement separate saturating255 stock, migration, access and atomic transactions. Keep the Chapter III gate. |
+
+### Historical delivery notes
+
+The notes below retain earlier measurements and milestones; the current queue
+and service table above supersede their old monster-veto and town-service status.
 
 Delivered (2026-11-20): [a town's services and a field's encounters](TOWN_SERVICES.md).
 Shop and Soldier Office, absent from every campaign document until now, are
@@ -128,15 +132,15 @@ debug aids and logs" and "Native test loop").
 ## Before campaign extraction: world/party side systems
 
 Required by the user2026-11-13; [initial GameFAQs overview and native audit](CAMPAIGN_SIDE_SYSTEMS.md).
-Calendar/egg lifecycle, fixed offspring and full-roster handling are delivered;
-grown-monster formation/deployment/art is still required. Bars need town/story-
+Calendar/egg lifecycle, fixed offspring, full-roster handling and the actual
+grown-monster placement/battle/results flow are delivered. Bars need town/story-
 filtered rumors and later dispatch/return jobs.
 Poaching currently gives an item directly to the party: source-correct Fur Shop
 stock/access/purchases and save migration remain. These are explicit gates,
 not implicit completion under generic R/S/M coverage. Preserve later chapter
 unlocking while testing reusable machinery with PC injection doors. Named
-objectives, Save checkpoints and story choices are delivered; grown-monster
-formation/deployment is now the active step in the prerequisite queue.
+objectives, Save checkpoints and story choices are delivered; town services
+are now the active step in the prerequisite queue.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)
 

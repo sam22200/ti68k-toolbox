@@ -1,5 +1,44 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Town services next: correct portraits and Bar A/B ready (2026-11-22)
+
+The user explicitly moved readiness work to town services and requires the
+shared design system, correct speaker portraits and several proposals for
+new screens. [TOWN_SERVICES_REVIEW.md](TOWN_SERVICES_REVIEW.md) is the current
+entry point. **Two gallery decisions are pending:**
+`x/town-services-review/portraits-before-after.png` and `bar-options.png`.
+Do not integrate or benchmark these changed pictures until the user decides.
+
+The correct source faces are114Shopkeeper,115Guildmaster,116Fur Merchant,
+117Bar owner. The shipping8/12/9 are wrong story faces. The review fixes the
+WLDFACE interpretation: four256x256 pages, forty32x48 faces each, their own
+CLUTs. A private FSK4 copy replaces only the portrait records; every existing
+room byte stays identical. `tools/town_service_assets.py` holds the reader.
+
+The Bar's original room is **WLDBK set0**,256x240 raw BGR555,60 sectors; sets22
+and23 are other styles. The old claim that it had no source picture was wrong.
+The proposed unscaled crop keeps the owner and Ramza without moving actors.
+The preview uses the actual town `says` and shared dialogue/menu/War Funds/
+font-wrap functions. A offers a left list and wide reader; B offers a centered
+list and dialogue over the room. The first source rumor's full prose is used,
+but topic labels/availability are review fixtures, not source-certified gates.
+
+Run `rtk proxy tools/pyenv/bin/python games/fft/campaign/review_town_services.py`.
+PC and ASan/UBSan PNG hashes agree; complete Save unchanged;78 bank/save bytes
+and mtimes preserved. No shipping bank, save schema, runtime, ABI, package,
+native fixture or live emulator changed. Results/provenance are private in
+`x/town-services-review/`. The gallery remains running at port8000.
+
+Next, record the user's choice and integrate portraits/the selected Bar
+presentation. Then source-check rumor titles/location/story variables and
+implement real list/detail/pagination/back/durable effects, followed by
+Propositions and the Fur stock/migration/purchase loop. Keep original unlocks
+(rumorsI, PropositionsII, FurIII) and PC-first validation. In WLDCORE,
+0x80096A4C points to the masks at0x800970AC; do not serialize the pointer table
+as rumor masks. The adult monster flow below is already delivered; older
+readiness text claiming selectors still reject alltype3 was stale and is
+corrected in the current readiness queue. The16KiB target remains unpassed.
+
 ## The type-3 veto is lifted: a grown monster deploys and fights (2026-11-15)
 
 A player's grown monster is now an ordinary party member. The four gates are
