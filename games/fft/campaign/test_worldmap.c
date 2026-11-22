@@ -131,7 +131,16 @@ int main(void)
         assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && sw_step(K_DOWN) && sw_step(0));
         assert(sw_step(K_ENTER) && wm.card);                      // Check status
         assert(sw_step(K_B) && !wm.card);
+        assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0));      // Ask name again
+        // Ask name again draws another generic name, and no one else's.
+        {
+            u8 before = save.unit[save.n].name, tries = 0;
+            while (save.unit[save.n].name == before && ++tries < 40)
+                { assert(sw_step(0) && sw_step(K_ENTER)); }
+            assert(tries < 40 && save.unit[save.n].name != before);
+        }
         assert(sw_step(0) && sw_step(K_UP) && sw_step(0) && sw_step(K_UP) && sw_step(0));
+        assert(sw_step(K_UP) && sw_step(0));
         assert(sw_step(K_ENTER) && wm.screen == SC_OFFICE && !wm.note);   // Hire
         assert(save.n == before + 1 && gil() == 500);
         assert(u->job == 0x4A && u->type == 0 && u->level == 1 && u->gfx == 255);
@@ -140,7 +149,20 @@ int main(void)
         assert(u->eq[0] && u->eq[1] && !u->eq[2] && u->eq[3] && !u->eq[4]);  // hat, clothes, sword
         assert(u->eq[3] == shop_nth(1 - 1) || item_price(u->eq[3]) == 200);  // a Broad Sword
     }
-    assert(sw_step(K_ESC) && wm.screen == SC_TOWN);
+    // Change name: the guildmaster draws another for a party member who is not Ramza.
+    assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && sw_step(K_DOWN) && sw_step(0));
+    assert(sw_step(K_ENTER) && wm.screen == SC_RENAME && wm.trow == 0);
+    assert(sw_step(0) && sw_step(K_ENTER) && wm.note == NOTE_LATER);   // Ramza keeps his
+    assert(sw_step(K_B) && !wm.note);
+    assert(sw_step(0) && sw_step(K_DOWN) && sw_step(0) && wm.trow == 1);
+    {
+        u8 before = save.unit[1].name, tries = 0;
+        while (save.unit[1].name == before && ++tries < 40)
+            { assert(sw_step(K_ENTER) && sw_step(0)); }
+        assert(tries < 40 && save.unit[1].name != before && wm.changed);
+    }
+    assert(sw_step(K_ESC) && wm.screen == SC_OFFICE);
+    assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_TOWN);
     assert(sw_step(0) && sw_step(K_ESC) && wm.screen == SC_MAP && !wm.moving);
     // The Fur Shop: its town row waits on the source's Chapter III, and its own door shows it.
     assert(!fur_open() && scene && scene[4] == ROOM_N);

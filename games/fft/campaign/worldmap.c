@@ -28,7 +28,7 @@
 
 enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED,
        NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
-enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_FIT, SC_OFFICE, SC_HIRE, SC_FUR };
+enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_FIT, SC_OFFICE, SC_HIRE, SC_RENAME, SC_FUR };
 enum { FIT_ROWS = 4 };               // the party rows the fitting bench shows at once
 enum { ROOM_STORE = 0, ROOM_OFFICE, ROOM_FUR, ROOM_N };
 // The Fur Shop opens in the source's Chapter III; no battle of this build sets its flag.
@@ -115,12 +115,12 @@ static const u8 *scene_face(u8 room) { return scene_part(room); }
 static const u8 *scene_room(u8 room) { return scene_part((u8)(ROOM_N + room)); }
 // Which room a screen shows, and who speaks in it.
 static u8 town_room(void)
-{ return (u8)(wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? ROOM_OFFICE :
-               wm.screen == SC_FUR ? ROOM_FUR : ROOM_STORE); }
+{ return (u8)(wm.screen == SC_OFFICE || wm.screen == SC_HIRE || wm.screen == SC_RENAME ?
+               ROOM_OFFICE : wm.screen == SC_FUR ? ROOM_FUR : ROOM_STORE); }
 static const char *town_speaker(void)
 {
-    return wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? "Guildmaster" :
-           wm.screen == SC_FUR ? "Fur Merchant" : "Shopkeeper";
+    return wm.screen == SC_OFFICE || wm.screen == SC_HIRE || wm.screen == SC_RENAME ?
+           "Guildmaster" : wm.screen == SC_FUR ? "Fur Merchant" : "Shopkeeper";
 }
 static u8 fur_open(void)
 { return (u8)(FUR_FLAG != 255 && flag(FUR_FLAG)); }
@@ -448,6 +448,18 @@ static u8 office_sex(u8 row) { return (u8)(row & 1); }
 static u8 office_job(u8 row) { (void)row; return sh_jobs[0]; }   // the source's menu offers only a soldier
 static const u8 *office_rec(u8 row) { return sh_office + OFFICE_REC * (u16)office_sex(row); }
 static u16 office_price(u8 row) { return b16(office_rec(row) + 15); }
+// A generic name no one in the party already wears, as the source's generator draws it.
+static void reroll_name(SaveUnit *u)
+{
+    u8 name, used, i;
+    do {
+        name = (u8)(muls16((s16)wdraw(), 255) >> 15); used = 0;
+        for (i = 0; i < save.n; i++)
+            if (&save.unit[i] != u && save.unit[i].type == u->type && save.unit[i].name == name)
+                { used = 1; break; }
+    } while (used);
+    u->name = name;
+}
 // The source generates the fighter first and shows him; Hire is a second, separate answer.
 // The candidate lives in the party's own free slot, which nothing reads until save.n grows.
 static void office_make(u8 row)
@@ -465,12 +477,7 @@ static void office_make(u8 row)
         u32 raw = ((u32)g[i] << 14) + (u32)(muls16((s16)wdraw(), g[5 + i]) >> 1);
         u->raw[i][0] = (u8)(raw >> 16); u->raw[i][1] = (u8)(raw >> 8); u->raw[i][2] = (u8)raw;
     }
-    do {
-        name = (u8)(muls16((s16)wdraw(), 255) >> 15); used = 0;
-        for (i = 0; i < save.n; i++)
-            if (save.unit[i].type == sex && save.unit[i].name == name) { used = 1; break; }
-    } while (used);
-    u->name = name;
+    reroll_name(u);
     u->zodiac = wb_birth_sign(breed_rules, (u16)(wdraw() % 365 + 1));
     memcpy(u->eq, g + 10, 5);
     save_raw_set(&save, save.n, 0);
@@ -607,7 +614,7 @@ static u8 town_update(u32 key)
         if (wm.card) { wm.card = 0; return 1; }
         wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP :
                          wm.screen == SC_SHOP || wm.screen == SC_FIT ? SC_STORE :
-                         wm.screen == SC_HIRE ? SC_OFFICE : SC_TOWN);
+                         wm.screen == SC_HIRE || wm.screen == SC_RENAME ? SC_OFFICE : SC_TOWN);
         wm.trow = wm.ttop = 0;
         return 1;
     }
@@ -651,18 +658,31 @@ static u8 town_update(u32 key)
         if (key & (K_ENTER | K_A)) {
             if (wm.trow == 3) { wm.screen = SC_TOWN; wm.trow = wm.ttop = 0; }
             else if (wm.trow < 2) { wm.cand = wm.trow; office_make(wm.trow); }
-            else wm.note = NOTE_LATER;           // Change name: a roster picker of its own
+            else if (save.n) { wm.screen = SC_RENAME; wm.trow = wm.ttop = 0; }
         }
         return 1;
     }
-    if (wm.screen == SC_HIRE) {                  // the source's Hire / Quit / Check status
+    if (wm.screen == SC_HIRE) {       // Hire / Quit / Check status / Ask name again
         if (wm.card) { if (key) wm.card = 0; return 1; }
-        wm.trow = choice_move(wm.trow, 3, key);
+        wm.trow = choice_move(wm.trow, 4, key);
         if (key & (K_ENTER | K_A)) {
             if (!wm.trow) office_take(wm.cand);
             else if (wm.trow == 1) { wm.screen = SC_OFFICE; wm.trow = 0; }
-            else wm.card = 1;
+            else if (wm.trow == 2) wm.card = 1;
+            else reroll_name(&save.unit[save.n]);
         }
+        return 1;
+    }
+    if (wm.screen == SC_RENAME) {     // Change name, on the party the source lets you rename
+        if (save.n) {
+            wm.trow = choice_move(wm.trow, save.n, key);
+            if (key & (K_ENTER | K_A)) {
+                if (save.unit[wm.trow].type == 2) wm.note = NOTE_LATER;   // not Ramza
+                else { reroll_name(&save.unit[wm.trow]); wm.changed = 1; }
+            }
+        }
+        if (wm.trow < wm.ttop) wm.ttop = wm.trow;
+        if (wm.trow >= wm.ttop + FIT_ROWS) wm.ttop = (u8)(wm.trow - FIT_ROWS + 1);
         return 1;
     }
     {
@@ -1041,22 +1061,24 @@ static void candidate_card(void)
 }
 static void hire_rows(void)
 {
-    static const char *const rows[3] = { "Hire", "Quit", "Check status" };
-    const SaveUnit *u = &save.unit[save.n];
+    static const char *const rows[4] = { "Hire", "Quit", "Check status", "Ask name again" };
     ChoiceLayout *p = &office_box;
     u8 i, w = 0;
-    for (i = 0; i < 3; i++) { u8 k = map_menu_width(rows[i]); if (k > w) w = k; }
+    for (i = 0; i < 4; i++) { u8 k = map_menu_width(rows[i]); if (k > w) w = k; }
+    // Four rows between the dialogue band and the plates need an eight-pixel pitch, not nine;
+    // the air above the first row and below the last stays equal (CHOICE_MENU.md rule 3).
     p->width = (u8)(w + 12);
-    p->height = (u8)(13 + 9 * 3);
-    p->x = 24; p->y = 38;
+    p->pitch = 8;
+    p->height = (u8)(13 + 8 * 4);
+    p->x = 24; p->y = 34;
     choice_frame(p, candidate_name());
-    for (i = 0; i < 3; i++) choice_row(p, i, rows[i], C_BLACK);
-    (void)u;
+    for (i = 0; i < 4; i++) choice_row(p, i, rows[i], C_BLACK);
 }
 static void office_rows(void)
 {
     ChoiceLayout *p = &office_box;
     u8 r, w = 0;
+    p->pitch = 9;
     for (r = 0; r < OFFICE_ROWS; r++) { u8 k = map_menu_width(office_rows_text[r]); if (k > w) w = k; }
     p->width = (u8)(w + 12);
     p->height = (u8)(13 + 9 * OFFICE_ROWS);
@@ -1184,6 +1206,26 @@ static void fit_rows(void)
         fit_pair(x, "Sp", now.sp, then.sp);
     }
 }
+
+// Change name: the party, each with the name it would be given again.
+static void rename_rows(void)
+{
+    ChoiceLayout *p = &fit_box;
+    u8 r, shown = save.n - wm.ttop > FIT_ROWS ? FIT_ROWS : (u8)(save.n - wm.ttop);
+    if (!save.n) shown = 1;
+    p->height = (u8)(13 + 9 * shown);
+    choice_frame(p, "Change name");
+    if (!save.n) black((s16)(p->x + p->text_x), (s16)(p->y + p->row_y), "No one to name");
+    for (r = 0; r < shown; r++) {
+        const SaveUnit *u = &save.unit[wm.ttop + r];
+        s16 y = (s16)(p->y + p->row_y + (u16)r * p->pitch);
+        black((s16)(p->x + p->text_x), y, unit_label(u));
+        black((s16)(p->x + 62), y, job_name(u->job));
+    }
+    if (save.n) scroll_marks(p, save.n, shown);
+    draw_rect(20, 64, 124, 11, C_BLACK);
+    text(24, 67, "ENTER draws another name", C_WHITE, 142);
+}
 static void town_compose(void)
 {
     static const char *const store_rows[4] = { "Buy", "Sell", "Fitting room", "Leave store" };
@@ -1205,6 +1247,7 @@ static void town_compose(void)
     } else {
         says(town_speaker(),
              wm.screen == SC_HIRE ? "This one is ready." : "Welcome.",
+             wm.screen == SC_RENAME ? "Which one needs a name?" :
              office || wm.screen == SC_HIRE ? "What recruit are you after?" :
              wm.screen == SC_FUR ? "Anything from the hunt?" : "What can I do for you?");
         if (office) {
@@ -1213,6 +1256,9 @@ static void town_compose(void)
         } else if (wm.screen == SC_HIRE) {
             hire_rows();
             office_plates(save.n, PARTY_MAX, office_price(wm.cand), gil());
+        } else if (wm.screen == SC_RENAME) {
+            rename_rows();
+            war_funds(gil());
         } else if (wm.screen == SC_FUR) {
             action_menu("Menu", fur_rows, 3, 0, 0);      // Buy waits on the poaching loop
             war_funds(gil());
@@ -1233,6 +1279,7 @@ static void town_page(void)
     page_blit();
     if (wm.screen == SC_SHOP) { if (shop_n) choice_cursor_animated(&shop_box, (u8)(wm.trow - wm.ttop), rt_frame); }
     else if (wm.screen == SC_FIT) { if (save.n) choice_cursor_animated(&fit_box, (u8)(wm.trow - wm.ttop), rt_frame); }
+    else if (wm.screen == SC_RENAME) { if (save.n) choice_cursor_animated(&fit_box, (u8)(wm.trow - wm.ttop), rt_frame); }
     else choice_cursor_animated(wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? &office_box : &store_box,
                                 wm.trow, rt_frame);
 }
