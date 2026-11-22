@@ -107,9 +107,16 @@ What that changed, and what it still asks for:
   the party's own free slot, which nothing reads until `save.n` grows, so no
   byte of state is added for him; Check status shows his name, job, sex, Brave,
   Faith, level and sign; Hire is the only answer that spends the gil. The name
-  comes from `ffcp`, the campaign's own generic-name bank. The naming screen
-  with its alphabet and "Ask name again" is not built, and *Change name* stays
-  grey: renaming an existing unit needs a roster picker.
+  comes from `ffcp`, the campaign's own generic-name bank. **Ask name again**
+  is the menu's fourth row and draws another, never one the party already
+  wears, and **Change name** opens a picker over the party and does the same
+  for a member who is not Ramza.
+
+  What is *not* built is entry letter by letter. `SaveUnit` carries a generic
+  name **index**, not a string: free text would need a name per slot in the
+  save -- 16 bytes times twenty, an FSV8 and its migration -- before a single
+  letter could be typed. The disc's alphabet runs are in `WORLD/WORLD.BIN`
+  whenever that is wanted.
 - **the Fitting room is a try-on bench**, not a shop: *Try it on* puts a piece
   of the store's stock on a unit, *Best fit* picks the best the stock offers,
   *Quit fitting* leaves. **Best fit is built** as one bench: the party on the

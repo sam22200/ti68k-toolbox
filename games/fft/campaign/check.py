@@ -213,6 +213,10 @@ def worldmap(pc_save,ti_save):
     hire=keys(OUT/'map-hire.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER'),(8,'ENTER')])
     card=keys(OUT/'map-card.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER'),(8,'ENTER'),
                                    (10,'DOWN'),(12,'DOWN'),(14,'ENTER')])
+    rename=keys(OUT/'map-rename.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER'),
+                                       (8,'DOWN'),(10,'DOWN'),(12,'ENTER')])
+    again=keys(OUT/'map-again.keys',[(2,'ENTER'),(4,'DOWN'),(6,'ENTER'),(8,'ENTER'),
+                                     (10,'DOWN'),(12,'DOWN'),(14,'DOWN')])
     tab=keys(OUT/'map-tab.keys',[(2,'ENTER'),(4,'ENTER'),(6,'ENTER'),(8,'F5'),(10,'F5')])
     info=keys(OUT/'map-info.keys',[(2,'ENTER'),(4,'ENTER'),(6,'ENTER'),(8,'MODE')])
     fit=keys(OUT/'map-fit.keys',[(2,'ENTER'),(4,'ENTER'),(6,'DOWN'),(8,'DOWN'),(10,'ENTER')])
@@ -221,7 +225,7 @@ def worldmap(pc_save,ti_save):
     return program('worldmap','check_worldmap.c',['ffwm','ffmg','ffwb','ffsh','ffsk','ffid','ffcp'],0x4d415001,
                    [('gariland',0,4,empty),('menu',0,4,menu),('menu-last',0,8,last),
                     ('town',0,6,town),('fur',2,6,empty),('store',0,6,town),('shop',0,10,shop),('shop-tab',0,12,tab),('shop-info',0,10,info),('fitting',0,12,fit),('fitting-try',0,16,fit2),('shop-sell',0,14,sell),
-                    ('office',0,10,office),('hire',0,12,hire),('hire-card',0,16,card),
+                    ('office',0,10,office),('hire',0,12,hire),('hire-card',0,16,card),('hire-again',0,16,again),('rename',0,14,rename),
                     ('blank-return',0,68,blank),('choose',0,f,choose),('walk',0,f+12,walk),('arrived',0,f+401,trip),('trip',0,f+410,trip)],
                    pc_save,ti_save,mandalia)
 
