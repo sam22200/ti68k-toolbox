@@ -9,6 +9,8 @@ static const char *output;
 static u8 bar_face[348], bar_page[2 * PAGE_PLANE];
 static char article[4096];
 static const char *const topics[] = { "Death Corps", "King Omdolia", "Fifty Year War" };
+static u8 rumor_topic;
+enum { BAR_READER = 0 };  // User-selected A: left list and wide text on grey.
 
 static void read_bytes(const char *name, void *dst, unsigned size)
 {
@@ -23,6 +25,13 @@ static void shot(const char *name)
     char path[512];
     snprintf(path, sizeof path, "%s/%s.png", output, name);
     assert(!sw_write_png(path, 1));
+}
+
+static void read_article(const char *name)
+{
+    char path[512]; FILE *f; size_t size;
+    snprintf(path, sizeof path, "%s/%s", output, name); f = fopen(path, "rb"); assert(f);
+    size = fread(article, 1, sizeof article - 1, f); assert(feof(f)); fclose(f); article[size] = 0;
 }
 
 static void bar_background(void)
@@ -88,12 +97,12 @@ static void rumor_page(u8 variant, u8 page_number)
     bar_background();
     if (variant) {
         bar_header("The latest news", "about the Death Corps.");
-        dlg_name(24, 33, (u8)(map_menu_width(topics[0]) + 8), topics[0], 0);
+        dlg_name(24, 33, (u8)(map_menu_width(topics[rumor_topic]) + 8), topics[rumor_topic], 0);
         dlg_frame(24, 45, 133, 46, 0); y = 52;
     } else {
         dlg_face(bar_face, 1, 1, 0);
         dlg_name(24, 1, (u8)(map_menu_width("Bar owner") + 8), "Bar owner", 0);
-        dlg_name(24, 13, (u8)(map_menu_width(topics[0]) + 8), topics[0], 0);
+        dlg_name(24, 13, (u8)(map_menu_width(topics[rumor_topic]) + 8), topics[rumor_topic], 0);
         // Reuse the shared Help/command frame for the wider reading window.
         ChoiceLayout p = { 5, 33, 150, 61, 7, CHOICE_TAB, 3, 1, 0, 6, 12, 9, 154, 0, 0 };
         choice_frame(&p, "Rumor"); y = 46;
@@ -108,6 +117,38 @@ static void rumor_page(u8 variant, u8 page_number)
     draw_rect(4, 94, 152, 6, C_BLACK);
     text(7, 95, "L/R page     SHIFT back", C_WHITE, 155);
     shot(variant ? (page_number ? "b-read-2" : "b-read") : (page_number ? "a-read-2" : "a-read"));
+}
+
+static void approved_bar(void)
+{
+    char path[64], line[64]; u16 consumed = 0; u8 rows = 0, pages, page, row, col, phase;
+    rt_frame = 0; bar_menu(); shot("selected-home"); rumor_list(BAR_READER);
+    rumor_page(BAR_READER, 0); shot("selected-short");
+    read_article("long-rumor.txt"); rumor_topic = 2;
+    assert(strlen(article) >= 1000);
+    while (item_detail_line(article, 142, rows, line)) rows++;
+    pages = (u8)((rows + 6) / 7); assert(pages > 1);
+    for (page = 0; page < pages; page++) {
+        rt_frame = 16; rumor_page(BAR_READER, page);
+        snprintf(path, sizeof path, "long-page-%u", page); shot(path);
+        for (row = 0; row < 7; row++) {
+            if (!item_detail_line(article, 142, (u8)(page * 7 + row), line)) break;
+            for (col = 0; line[col]; col++) {
+                if (line[col] == ' ') continue;
+                while (article[consumed] == ' ') consumed++;
+                assert(line[col] == article[consumed++]);
+            }
+        }
+    }
+    while (article[consumed] == ' ') consumed++;
+    assert(!article[consumed]);
+    for (phase = 0; phase <= 8; phase++) {
+        rt_frame = (u16)(phase * 4);
+        rumor_page(BAR_READER, 0); snprintf(path, sizeof path, "a-first-%u", phase); shot(path);
+        rumor_page(BAR_READER, (u8)(pages - 1));
+        snprintf(path, sizeof path, "a-last-%u", phase); shot(path);
+    }
+    printf("Bar A: %u pages, %u wrapped lines, %u source bytes preserved.\n", pages, rows, consumed);
 }
 
 static void portrait_contrasts(u8 *corrected)
@@ -138,7 +179,8 @@ int main(int argc, char **argv)
     static const u8 screens[] = { SC_STORE, SC_OFFICE, SC_FUR };
     static const char *const names[] = { "store", "office", "fur" };
     assert(argc == 3 || (argc == 4 && (!strcmp(argv[3], "--portraits") ||
-                                     !strcmp(argv[3], "--selected")))); output = argv[1];
+                                     !strcmp(argv[3], "--selected") ||
+                                     !strcmp(argv[3], "--bar-a")))); output = argv[1];
     sw_init(0); assert(bank && mgb && shop && scene);
     f = fopen(argv[2], "rb"); assert(f); assert(read_save_fixture(f, &save)); fclose(f);
     game_scenario(0); wm.at = 6; wm.x = loc_x(6); wm.y = loc_y(6); wm.tick = 4;
@@ -149,8 +191,13 @@ int main(int argc, char **argv)
     read_bytes("ffsk.bin", corrected, (unsigned)size);
     read_bytes("bar-face.bin", bar_face, sizeof bar_face);
     read_bytes("bar-planes.bin", bar_page, sizeof bar_page);
-    snprintf(path, sizeof path, "%s/rumor.txt", output); f = fopen(path, "rb"); assert(f);
-    size = (long)fread(article, 1, sizeof article - 1, f); assert(feof(f)); fclose(f); article[size] = 0;
+    read_article("rumor.txt");
+    if (argc == 4 && !strcmp(argv[3], "--bar-a")) {
+        approved_bar(); assert(!memcmp(&save, &before, sizeof save));
+        wm = wm_before; scene = old; free(corrected); release_map();
+        puts("Bar A: shared grey reader; Save unchanged.");
+        return 0;
+    }
     if (argc == 4 && !strcmp(argv[3], "--portraits")) {
         portrait_contrasts(corrected);
         assert(!memcmp(&save, &before, sizeof save));

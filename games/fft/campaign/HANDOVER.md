@@ -1,5 +1,33 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Bar reader A accepted; commit the validated visual lot (2026-11-22)
+
+The user explicitly chooses **A: black text on the wide grey panel**, and
+requests `/ti-commit` if the town-service work checks out. Record A as settled:
+left list, shared command-style grey reader, campaign3x2 blinking prompt,
+no numeric counter, selected Bar owner117/D. The old B comparison is not the
+default and no new visual vote is needed for these accepted elements.
+
+`preview_town_services.c --bar-a` and `check_bar_a.py` add a bounded PC proof
+on the original third WLDMES article.2549 bytes/68 wrapped lines/10 pages are
+preserved in order; the short page exactly matches the preceding accepted A
+frame.33 PC/sanitizer screens agree, with first/final-page blink differences
+confined to(151,91)..(153,92), and exact32-frame return. Complete Save unchanged;
+200 prior bank/save/review files keep their bytes and mtimes. No native sweep,
+emulator, active bank, ABI/save or installed group changes in this follow-up.
+Evidence and the approved sheet/GIF are in `x/bar-reader-a/`. Reproduce with
+`rtk proxy tools/pyenv/bin/python games/fft/campaign/check_bar_a.py`.
+
+**Do not report all city services complete.** The Shop and Soldier Office are
+functional and their focused tests passed in the preceding lot. The Bar still
+needs its actual worldmap route, original titles/town/story eligibility and
+real input/persistence. Propositions and the poaching -> separate Fur stock ->
+purchase/migration path also remain. The user was told this distinction before
+the visual lot's commit. Next is implementation of the accepted Bar A, not more
+presentation alternatives or a Chapter I content rip. Preserve chapter unlocks,
+C/D/C/D portraits and the untouched installation groups. Details:
+[TOWN_SERVICES_REVIEW.md](TOWN_SERVICES_REVIEW.md).
+
 ## C / D / C / D accepted; original Bar has graphical paging (2026-11-22)
 
 The user selected C/D/C/D for Shopkeeper114, Guildmaster115, Fur Merchant116
