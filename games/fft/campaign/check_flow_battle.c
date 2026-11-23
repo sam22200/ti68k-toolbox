@@ -104,10 +104,9 @@ static void trials(void)
 {
     u8 i;u16 selected=0;Save input;
     CHECK(flow_bank&&flow_ui&&W);if(!flow_bank||!W)return;
-    // The fixture is generated in the current format, read here without migration.
-    // Older-format loads are exercised in the save suite/module, not duplicated in
-    // this size-bounded flow harness.
-    CHECK(rt_load(SAVE_NAME,&input,sizeof input)&&!memcmp(input.magic,SAVE_MAGIC,4)&&input.n==7);
+    // The preserved pilot fixture is FSV8. Use the real migration reader,
+    // including its new service tail, rather than requiring its old file size.
+    CHECK(save_load(&input)&&!memcmp(input.magic,SAVE_MAGIC,4)&&input.n==7);
 #ifdef FLOW_FIRST_FRAME_ONLY
     game_scenario(261);
     for(i=0;i<NUNIT;i++)if(st.unit[i].team==TEAM_ENEMY){st.unit[i].hp=0;st.unit[i].dc=3;}

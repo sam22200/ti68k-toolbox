@@ -1,6 +1,7 @@
 #ifndef FFT_SAVE_WORLD_H
 #define FFT_SAVE_WORLD_H
 #include "guest_roster.h"
+#include "proposition_shape.h"
 // Pilot anchor observed in the original Gariland deployment fixture. Legacy
 // saves cannot reconstruct travel they never recorded. No time passes on load.
 static void save_world_init(Save *s)
@@ -28,6 +29,9 @@ static u8 save_world_valid(const Save *s)
         if(born>365)return 0;
         if(egg&&(total<2||!left||left>total||born||u->type!=3||u->job<94||u->job>=142))return 0;
     }
+    if(!prop_state_shape_valid(&s->missions,s->n)||s->poach[0])return 0;
+    for(i=s->n;i<PARTY_MAX;i++)if(save_generic(s,i))return 0;
+    for(i=0;i<s->n;i++)if(save_generic(s,i)&&s->unit[i].type>=2)return 0;
     return 1;
 }
 // Only eggs can be dismissed here. Every moved record retains its raw and
@@ -35,13 +39,17 @@ static u8 save_world_valid(const Save *s)
 static u8 save_dismiss_egg(Save *s,u8 slot)
 {
     u8 i;
-    if(slot>=s->n||!save_egg(s,slot))return 0;
+    if(slot>=s->n||!save_egg(s,slot)||s->missions.report.ready)return 0;
+    {u8 a,k;for(a=0;a<s->missions.dispatches.n;a++)for(k=0;k<s->missions.dispatches.job[a].n;k++)
+        if(s->missions.dispatches.job[a].unit[k]>slot)s->missions.dispatches.job[a].unit[k]--;}
     for(i=slot;i+1<s->n;i++){
         memcpy(&s->unit[i],&s->unit[i+1],sizeof s->unit[0]);
         save_raw_set(s,i,save_raw_current(s,(u8)(i+1)));
+        save_generic_set(s,i,save_generic(s,(u8)(i+1)));
         world_party_move_slot(&s->world,i,(u8)(i+1));
     }
     i=--s->n;memset(&s->unit[i],0,sizeof s->unit[0]);save_raw_set(s,i,0);world_party_clear_slot(&s->world,i);
+    save_generic_set(s,i,0);
     s->deploy_n=0;memset(s->deploy_battle,0,sizeof s->deploy_battle);memset(s->deploy,0,sizeof s->deploy);
     return 1;
 }

@@ -54,4 +54,17 @@ static void dlg_continue(s16 x, s16 y, u16 clock, u8 inverted)
 {
     if (clock & 16) draw_rect(x, y, 3, 2, inverted ? C_BLACK : C_WHITE);
 }
+#ifdef DLG_WIDTH
+// A town speaker's two-line greeting, shared with service/dispatch screens.
+static void dlg_town_says(const u8 *portrait,const char *name,const char *first,const char *second)
+{
+    s16 x=DLG_FACE_W+4;
+    u8 w=(u8)(DLG_WIDTH(first)+10),k=(u8)(DLG_WIDTH(second)+10);
+    if(k>w)w=k;
+    dlg_name(x,1,(u8)(DLG_WIDTH(name)+8),name,0);
+    dlg_frame(x,13,w,20,0);
+    DLG_TEXT(x+4,17,first,C_WHITE,156);DLG_TEXT(x+4,24,second,C_WHITE,156);
+    dlg_face(portrait,1,1,0);
+}
+#endif
 #endif

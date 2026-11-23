@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 95U   // 95: known2 / known_cmd, the Secondary command
+#define MOD_ABI 97U   // 97: cold Save reader and warm graphics share the companion block
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -28,7 +28,7 @@ typedef struct {
         s16 *camera_out;                 // BEATS4: two camera target coordinates
         char *forecast_out;              // resident -> NUMBERS5 only
         CastBatch *cast_batch_out;        // resident -> TARGETS1/3 or SAVE7 only
-        Save *save_out;                  // resident -> pinned companion254; never the zone
+        Save *save_out;                  // resident -> shared-block Save reader254; never the zone
         struct {u16 desc_size,interface_size;}; // SAVE4: FCD3; RESOURCES14: catalogue size in desc_size;
                                         // RESOURCES12: AMS's free RAM / 16 in desc_size
         const u8 *chapter_ugfx;          // SAVE6 -> resident: the chapter's unit frames

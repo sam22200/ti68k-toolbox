@@ -24,6 +24,11 @@
 static u8 ko_board;
 static u8 ko_original_job;
 u8 game_update(void){
+#ifdef CAP_MENU
+    // Static13-actor UI frame: actual renderer/cache budget, no AI/turn work.
+    FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=0;W->ac_now++;
+    return 1;
+#else
 #ifdef CAP_KO
     if(ko_board){
     FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=0;W->ac_now++;
@@ -32,12 +37,19 @@ u8 game_update(void){
     if(ko_board==3&&rt_frame==35){st.unit[0].job=ko_original_job;st.unit[0].hp=st.unit[0].max_hp;}
     return 1;}
 #endif
-    return capacity_source_update();}
+    return capacity_source_update();
+#endif
+}
 void game_scenario(u16 scenario)
 {
     ko_board=0;
     capacity_source_scenario(61);
     if(!W)return;
+#ifdef CAP_MENU
+    st.mode=scenario?M_ACTS:M_MENU;st.ai=AI_OFF;st.turn=0;
+    st.open_stage=st.open_fade=st.banner=0;st.act=st.sel=U_RAMZA;
+    st.menu=st.sub=0;W->win_n=W->win_m=0;W->win_k[0]=0;
+#endif
 #ifdef CAP_STATUS
     if(scenario==1||scenario==2) {
         st.sel=(u8)(NUNIT-1);st.mode=M_STATUS;st.page=(u8)(scenario-1);

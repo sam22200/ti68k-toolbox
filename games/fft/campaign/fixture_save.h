@@ -6,6 +6,7 @@ static u8 read_save_fixture(FILE *f,Save *s)
     size_t n;
     memset(s,0,sizeof *s);n=fread(s,1,sizeof *s,f);
     if(n==sizeof *s&&!memcmp(s->magic,SAVE_MAGIC,4))return 1;
+    if(n==SAVE_V7_BYTES&&!memcmp(s->magic,"FSV7",4)){memcpy(s->magic,SAVE_MAGIC,4);return 1;}
     if(n==SAVE_V6_BYTES&&!memcmp(s->magic,"FSV6",4)){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}
     if(n==SAVE_V5_BYTES&&!memcmp(s->magic,"FSV5",4)){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}
     if(n==SAVE_V4_BYTES&&!memcmp(s->magic,"FSV4",4)){memcpy(s->magic,SAVE_MAGIC,4);save_world_init(s);return 1;}

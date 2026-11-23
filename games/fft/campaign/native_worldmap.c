@@ -6,9 +6,10 @@
 #undef _main
 #define _main map_runtime_main
 #define RT_TILOG                       // saves logged (lib/tilog.h, ti-mem log)
+#define RT_SAVE_ATOMIC
 #include "../../../runtime/platform-ti68k/rt_ti.c"
 #undef _main
 #define _main __main
 #undef off
 #include "worldmap.c"
-void _main(void) { map_runtime_main(); push_shortint((short)map_result()); }
+void _main(void) { u16 result;map_runtime_main();result=map_result();push_shortint((short)(result==4&&!rt_save_committed()?5:result)); }

@@ -2,7 +2,10 @@
 #define FFT_SAVE_TYPES_H
 // Serialized save layout only; no file calls before module context bindings.
 #include "../../../runtime/core/rt.h"
-#define SAVE_MAGIC "FSV7"
+#include <string.h>
+#define SAVE_MAGIC "FSV9"
+#define SAVE_V8_BYTES 4024U
+#define SAVE_V7_BYTES 3992U
 #define SAVE_V6_BYTES 3918U
 #define SAVE_V5_BYTES 3204U
 #define SAVE_V4_BYTES 3202U
@@ -30,6 +33,7 @@ typedef struct {
     u8 learned[CAREER_N][3];            // per job, FFT's bits: 0x800000 >> its list's k-th (the 16
                                         // actions, then the 6 reactions, supports, movements)
 } SaveUnit;
+#include "proposition_types.h"
 typedef struct {
     u8 magic[4];
     u8 flags[FLAG_N / 8];               // story progress: a chapter's flag set by its victory
@@ -47,7 +51,42 @@ typedef struct {
     SaveUnit guest[GUEST_MAX];
     WorldParty world;                   // append-only FSV7; old guest/prefix offsets stay
     u8 world_rng[4],world_pad;           // BE nonzero xorshift32 state; even total size
+    u8 profiles[32];                    // FSV8:64 source Brave Story profile nibbles
+    PropositionState missions;         // FSV9: pending reports and collection dates
+    u8 poach[256];                     // Fur Shop stock, separate from the bag, cap255
+    u8 generic_identity[2];            // source generic human identity, roster slots0..15
 } Save;
+static u8 save_generic(const Save *s,u8 slot)
+{return slot<PARTY_MAX&&(s->generic_identity[slot>>3]&(1U<<(slot&7)))!=0;}
+static void save_generic_set(Save *s,u8 slot,u8 value)
+{
+    u8 bit;if(slot>=PARTY_MAX)return;bit=(u8)(1U<<(slot&7));
+    if(value)s->generic_identity[slot>>3]|=bit;else s->generic_identity[slot>>3]&=(u8)~bit;
+}
+// Legacy FSV2..8 only knew the pilot's four generic models and Office-generated
+// humans. Named Ramza/Delita and monsters are excluded by their models/types.
+// New authored fixed identities must call save_generic_source explicitly.
+static void save_generic_legacy(Save *s)
+{
+    u8 i;s->generic_identity[0]=s->generic_identity[1]=0;
+    for(i=0;i<s->n;i++) {
+        const SaveUnit *u=&s->unit[i];
+        save_generic_set(s,i,u->type<2&&u->job>=74&&u->job<=93&&((u->gfx>=2&&u->gfx<=5)||u->gfx==255));
+    }
+}
+static void save_generic_source(Save *s,u8 slot,u8 identity)
+{save_generic_set(s,slot,slot<s->n&&s->unit[slot].type<2&&identity>=0x4a);}
+static u8 save_profile(const Save *s,u8 id)
+{ return id<64?(u8)(s->profiles[id>>1]>>((id&1)*4)&15):0; }
+static u8 save_profile_set(Save *s,u8 id,u8 value)
+{
+    u8 shift,old;
+    if(id>=64||value>15)return 0;
+    old=save_profile(s,id);if(old>=12||old==value)return 0;
+    shift=(u8)((id&1)*4);
+    s->profiles[id>>1]=(u8)((s->profiles[id>>1]&~(15U<<shift))|((u16)value<<shift));
+    return 1;
+}
 static u8 save_egg(const Save *s,u8 slot)
 {return slot<WB_SLOTS&&s->world.egg[slot]!=0;}
 static u8 save_raw_current(const Save *s,u8 slot)

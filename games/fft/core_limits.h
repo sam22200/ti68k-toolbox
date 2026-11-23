@@ -23,7 +23,14 @@
 // with the image (a core change); the battle's RAM requirement counts it.
 // 2026-11-22: was 5,376 against an image of 5,046, so it reserved 328 bytes nothing used.
 // Like the depth envelope above, it is now the image itself plus its even-size pad.
-#define FFT_CORE_COMPANION_MAX 5048U
+// Bar/FSV8 migration (2026-11-22) adds94 image bytes:5046 ->5140.
+// Reserve the measured image, +92 RAM bytes; retain all reviewed cache capacities.
+// Town services/FSV9 (2026-11-23): measured graphics companion7264, +2124
+// versus5140. It now also composes cached menus through its pinned252 entry.
+// ABI97: graphics4128 and cold Save reader3542 share one4128-byte block.
+// Saves3136 bytes versus7264; no play-time allocation or warm-frame switch.
+// Preserve42 actor frames/depth18488.
+#define FFT_CORE_COMPANION_MAX 4128U
 typedef u8 CoreTileId;                  // compact node0..255, includes both floors
 typedef u16 CoreTileCount;              // can represent count256 and loop endpoint
 typedef struct { u8 x, z_layer; } CoreTilePosition; // z in bits0..4; layer in bit5

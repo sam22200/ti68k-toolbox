@@ -41,21 +41,33 @@ def project(plan, manifest, spec):
     # overcounts the replaced colour streams; do not present it as actual size.
     legacy = sum(r['legacy_four_views_bytes'] for r in rows)
     calibrated = (legacy * plan['scenery_calibration_percent'] + 99) // 100
-    raw = len(rows) * 4 * envelope['scene_rows'] * 40 * 2
+    row_limits=[r.get('scene_rows_upper',envelope['scene_rows']) for r in rows]
+    if any(type(n) is not int or not 1<=n<=envelope['scene_rows'] for n in row_limits):
+        raise ValueError('Invalid per-map authoring row budget')
+    raw = sum(row_limits) * 4 * 40 * 2
+    all_max_raw=len(rows) * 4 * envelope['scene_rows'] * 40 * 2
     other = sum(plan['other_upper_estimates'].values())
     projected = calibrated + raw + other
-    allowance = manifest['planning_budget_bytes'] - manifest['reserved_bytes'] - manifest['core']['bytes']
+    core_stored=manifest['core']['stored_variable_bytes']
+    allowance = manifest['planning_budget_bytes'] - manifest['reserved_bytes'] - core_stored
+    depth_adaptations=[dict(map=r['map'],name=r['name'],estimated_max=max(r['cropped_depth_bytes']),
+                            ceiling=depth_max,excess=max(r['cropped_depth_bytes'])-depth_max)
+                       for r in rows if max(r['cropped_depth_bytes'])>depth_max]
     return dict(schema='FFT_CHAPTER1_ARCHIVE_PROJECTION_1', maps=len(rows),
                 evidence_date=plan['evidence_date'], core_key=manifest['core_key'],
                 core_bytes=manifest['core']['bytes'],
+                core_stored_bytes=core_stored,allocation_metric='Stored payloads plus AMS size words; transport headers excluded; Flash/VAT reserve retained',
                 pilot_chapter_bytes=[c['bytes'] for c in manifest['chapters']],
                 chapter_allowance_bytes=allowance, legacy_view_estimate_bytes=legacy,
                 calibrated_legacy_views_bytes=calibrated, raw_colour_upper_bytes=raw,
+                original_all_max_raw_colour_bytes=all_max_raw,
+                per_map_rows=[dict(map=r['map'],rows=n) for r,n in zip(rows,row_limits)],
                 other_upper_estimates=plan['other_upper_estimates'],
                 projected_chapter_bytes=projected, planning_margin_bytes=allowance-projected,
                 fits_planning_allowance=projected<=allowance,
                 cropped_depth_envelope_ok=all(len(r['cropped_depth_bytes'])==4 and
                     all(0<n<=depth_max for n in r['cropped_depth_bytes']) for r in rows),
+                depth_adaptations_required=depth_adaptations,
                 width_crop_maps=[r['map'] for r in rows if r['width_px']>320],
                 remaining=['Assemble and audit all actual chapter banks',
                            'Review per-map crops/placement; width flags are not artwork validation',

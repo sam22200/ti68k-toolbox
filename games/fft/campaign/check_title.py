@@ -96,9 +96,10 @@ def main():
                     assert after.get('ffslot')==initial.get('ffslot'),(name,'no slot chosen')
                 elif expected==3:
                     written=after['ffsave'+str(after['ffslot'][4])]   # the migrated session
-                    drop=lambda d:{k:v for k,v in d.items() if k!='discovered'}
+                    # The new service tail has its own title/migration cases.
+                    drop=lambda d:{k:v for k,v in d.items() if k not in ('discovered','missions','pending_report','poach_stock','generic_identity')}
                     copy=drop(save_dump.decode(written))
-                    assert written[:4]==b'FSV7' and copy==drop(save_dump.decode(bytes(base))),(name,'complete campaign snapshot')
+                    assert written[:4]==b'FSV9' and copy==drop(save_dump.decode(bytes(base))),(name,'complete campaign snapshot')
                 else:
                     slot=after['ffslot'][4];saved=save_dump.decode(after['ffsave'])
                     assert saved['party'][0]['level']==(22 if slot==3 else 8),(name,'session from the slot')

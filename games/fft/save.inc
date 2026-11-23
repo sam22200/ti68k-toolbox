@@ -104,12 +104,21 @@ static void party_update(void)
         if(lost[k]){world_party_clear_slot(&save.world,k);lost[k]=255;continue;}
         lost[k]=n;
         save_raw_set(&save,n,save_raw_current(&save,k));
+        save_generic_set(&save,n,save_generic(&save,k));
         world_party_move_slot(&save.world,n,k);
         if (n != k) memcpy(&save.unit[n], &save.unit[k], sizeof save.unit[0]);
         n++;
     }
     for(i=0;i<NUNIT;i++)if(st.unit[i].slot<save.n)st.unit[i].slot=lost[st.unit[i].slot];
     for (k = n; k < save.n; k++){memset(&save.unit[k],0,sizeof save.unit[0]);save_raw_set(&save,k,0);world_party_clear_slot(&save.world,k);}
+    {u8 j,v;for(j=0;j<save.missions.dispatches.n;j++)for(v=0;v<save.missions.dispatches.job[j].n;v++)
+        save.missions.dispatches.job[j].unit[v]=lost[save.missions.dispatches.job[j].unit[v]];}
+    if(save.missions.report.ready){
+        PropositionReport *r=&save.missions.report;
+        for(k=0;k<r->n;k++)r->unit[k]=lost[r->unit[k]];
+        r->speaker=lost[r->speaker];
+    }
+    for(k=n;k<PARTY_MAX;k++)save_generic_set(&save,k,0);
     save.n = n;
 }
 
@@ -123,6 +132,7 @@ static void save_new_unit(SaveUnit *s,Unit *u,u8 i,u8 slot)
     if (c >= CAREER_N) c = 0;
     s->gfx = u->gfx; s->type = unit_monster(u)?3:(u8)(i == U_RAMZA && u->team == TEAM_PLAYER ? 2 : u->female); s->name = u->name;
     s->level = u->level; s->exp = u->exp; save_permanent_stats(s,u,i,slot);
+    if(slot<PARTY_MAX)save_generic_set(&save,slot,s->type<2&&((s->gfx>=2&&s->gfx<=5)||s->gfx==255)&&s->job>=74&&s->job<=93);
     s->zodiac = u->zodiac;
     be16(s->reaction,st.reaction[i]);
     if(st.movement[i])be16(s->movement,(u16)(485+st.movement[i]));
@@ -190,13 +200,15 @@ static void save_party(void)
 static void save_campaign(void)
 {
     u8 w = (u8)CD(WON);
-    u8 already,inventory[256+SAVE_DISCOVERY_BYTES];
+    u8 already,inventory[512+SAVE_DISCOVERY_BYTES];
     u32 funds=qlong(save.money);       // save_load refreshes roster/flags, not the live balance
     memcpy(inventory,save.inv,256);memcpy(inventory+256,save.discovered,SAVE_DISCOVERY_BYTES);
+    memcpy(inventory+256+SAVE_DISCOVERY_BYTES,save.poach,256);
     if (!save_load(&save)) {
         save_init(&save);
     }
     qput(save.money,funds);memcpy(save.inv,inventory,256);memcpy(save.discovered,inventory+256,SAVE_DISCOVERY_BYTES);
+    memcpy(save.poach,inventory+256+SAVE_DISCOVERY_BYTES,256);
     already=w?(u8)(save.flags[(w-1)>>3]>>((w-1)&7)&1):0;
     if (w--) save.flags[w >> 3] |= (u8)(1 << (w & 7));
     if (CD(LOCATION)) save.loc = (u8)CD(LOCATION);      // the battle's place on the world map
@@ -221,7 +233,7 @@ static void save_campaign(void)
 // source positions, including unavailable actions; the bag comes from the inventory.
 static u8 party_next(u8 n, u8 ramza)          // the save's next unit (from n) that is / is not Ramza
 {
-    while (n < save.n && (save.unit[n].type == 2) != ramza) n++;
+    while (n < save.n && ((save.unit[n].type == 2) != ramza || save_egg(&save,n) || prop_away(&save.missions.dispatches,n))) n++;
     return n;
 }
 
@@ -283,7 +295,7 @@ static void party_load(void)
         u16 mask=0;u8 valid=1,has_ramza=0;
         for(i=0;i<save.deploy_n;i++) {
             const u8 *p=save.deploy[i];u8 j,legal=0;
-            if(p[0]>=save.n||(mask&(1U<<p[0]))){valid=0;break;}
+            if(p[0]>=save.n||save_egg(&save,p[0])||prop_away(&save.missions.dispatches,p[0])||(mask&(1U<<p[0]))){valid=0;break;}
             mask|=(u16)(1U<<p[0]);
             for(j=0;j<25;j++){const u8 *c=qpart(flow_bank,Q_DEPLOY)+4+3*j;if(c[0]&&c[1]==p[1]&&c[2]==p[2])legal=1;}
             for(j=0;j<i;j++)if(save.deploy[j][1]==p[1]&&save.deploy[j][2]==p[2])legal=0;

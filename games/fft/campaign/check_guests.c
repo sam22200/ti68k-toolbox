@@ -58,7 +58,7 @@ static u8 bind(void)
 static void trials(void)
 {
     Save a,b;Unit *u;u8 i,g;u16 oldjp;u8 raw_bank[28];
-    CHECK(sizeof(SaveUnit),176);CHECK(sizeof(Save),3992);
+    CHECK(sizeof(SaveUnit),176);CHECK(sizeof(Save),4684);
     CHECK(W!=RT_NULL,1);if(!W)return;
     CHECK(W->guest_key[0],4);CHECK(st.unit[0].team,TEAM_GUEST);CHECK(st.unit[0].slot,16);
     CHECK(save_load(&a),1);CHECK(a.n,16);CHECK(save_guest_find(&a,4),255);

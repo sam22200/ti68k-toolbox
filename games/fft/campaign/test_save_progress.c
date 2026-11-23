@@ -21,7 +21,7 @@ static void check(u8 ok,u16 line)
     }
 }
 #define CHECK(x) check(!!(x),__LINE__)
-static u8 core[38],packs[2][74],active,calls;
+static u8 core[38],packs[2][74],active,calls,services;
 static void put(u8 *p,u16 offset,u16 value){p[offset]=(u8)(value>>8);p[offset+1]=(u8)value;}
 static const u8 *read_fixture(const char *name,u16 *size)
 {
@@ -31,14 +31,19 @@ static const u8 *read_fixture(const char *name,u16 *size)
     if(n==6&&!memcmp(name,"ffpack",6)){*size=sizeof packs[0];return packs[active];}
     if(n==7&&!memcmp(name,"fixture",7)){*size=1;return &byte;}return RT_NULL;
 }
-static void progress_fixture(FpProgress *p){memset(p,0,sizeof *p);}
+static void progress_fixture(FpProgress *p){memset(p,0,sizeof *p);if(services)p->flags[0]=1;}
 static void reset_fixture(void){CHECK(0);}
 static u16 call_fixture(u8 op,u16 arg)
 {
     u8 old=active;calls++;
-    CHECK(calls==1?(op==FP_BATTLE&&arg==200):(calls==2&&op==FP_TITLE&&arg==3));
+    if(services) {
+        static const u8 ops[]={FP_MAP,FP_MANAGE,FP_MANAGE,FP_MANAGE,FP_MAP,FP_MAP,FP_MAP};
+        static const u8 args[]={0,100,100,101,0,100,101};
+        CHECK(calls<=7&&op==ops[calls-1]&&arg==args[calls-1]);
+    } else CHECK(calls==1?(op==FP_BATTLE&&arg==200):(calls==2&&op==FP_TITLE&&arg==3));
     active^=1;memcpy(packs[active],packs[old],sizeof packs[0]);
     memset(packs[old],0,sizeof packs[0]); // old archive view is invalid after every child
+    if(services){static const u8 results[]={3,2,3,1,4,5,0};return calls<=7?results[calls-1]:0;}
     return 1;
 }
 static void relocation(void)
@@ -53,10 +58,16 @@ static void relocation(void)
     memcpy(p+60,core+24,12);put(p,72,fp_check(p,72));
     CHECK(fp_story(read_fixture,call_fixture,progress_fixture,reset_fixture,2,&notice)==FP_OK);
     CHECK(calls==2); // the Save proposal survives both archive relocations
+    // Service saves and failed writes reload the child, with no borrowed
+    // manifest pointer surviving its return. Fur reentry retains its room.
+    p=packs[active];put(p,56,1);put(p,42,1);put(p,72,fp_check(p,72));
+    calls=0;services=1;
+    CHECK(fp_story(read_fixture,call_fixture,progress_fixture,reset_fixture,2,&notice)==FP_OK);
+    CHECK(calls==7);
 }
 static void trials(void)
 {
-    static const u16 sizes[]={SAVE_V2_BYTES,SAVE_V3_BYTES,SAVE_V4_BYTES,SAVE_V5_BYTES,SAVE_V6_BYTES,sizeof(Save)};
+    static const u16 sizes[]={SAVE_V2_BYTES,SAVE_V3_BYTES,SAVE_V4_BYTES,SAVE_V5_BYTES,SAVE_V6_BYTES,SAVE_V7_BYTES,SAVE_V8_BYTES,sizeof(Save)};
     u8 version,i;FpProgress p;
     for(version=0;version<sizeof sizes/sizeof sizes[0];version++){
         u16 n=sizes[version];memset(bytes,0,sizeof bytes);

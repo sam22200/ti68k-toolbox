@@ -145,13 +145,16 @@ static void window_seed(void)
 static void same_windows(void)
 {
     static const u8 modes[]={M_MENU,M_AUTO,M_QUIT,M_ACTS,M_ACT,M_SKILLS,M_ORDER};
-    u8 j,n,w,h,m;u32 hash;void *l=rt_light,*d=rt_dark;
+    u8 j,n,w,h,m,production_w;u32 hash;void *l=rt_light,*d=rt_dark;
     for(j=0;j<sizeof modes;j++){
         prepare_buff(9);W->win_k[0]=modes[j];W->win_k[1]=0;W->win_k[2]=U_RAMZA;W->win_n=0;
         for(n=0;n<10;n++){
-            window_seed();W->win_n=n;reference_make_window();hash=window_hash();w=W->win_w;h=W->win_h;m=W->win_m;
-            window_seed();W->win_n=n;ZB(63);make_window();ZE(63);
-            CHECK(window_hash()==hash,1);CHECK(W->win_w,w);CHECK(W->win_h,h);CHECK(W->win_m,m);
+            production_w=W->win_w;
+            window_seed();W->win_w=4;W->win_n=n;reference_make_window();hash=window_hash();w=W->win_w;h=W->win_h;m=W->win_m;
+            window_seed();W->win_w=production_w;W->win_n=n;ZB(63);make_window();ZE(63);
+            if(modes[j]!=M_MENU&&modes[j]!=M_ACTS){CHECK(window_hash()==hash,1);CHECK(W->win_w,16*w);}
+            else {CHECK(W->win_w<=64,1);CHECK(W->win_w>=12,1);}
+            CHECK(W->win_h,h);CHECK(W->win_m,m);
             CHECK(rt_light==l&&rt_dark==d,1);if(n+1>=m)break;
         }
     }

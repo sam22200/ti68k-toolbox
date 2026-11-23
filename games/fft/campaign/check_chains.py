@@ -136,7 +136,7 @@ def main():
         values = [int(v, 16) for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)', log)]
         assert values[-3:] == [int(expected[1], 16), 0, int(expected[2])], values
     summary = dict(cases=results, native_progress=args.native_progress, private_chain_not_retail_content=True,
-                   core_key=report['core_key'], abi=92, save_bytes=3992, persistent_guests=args.guests,
+                   core_key=report['core_key'], abi=97, save_bytes=4684, persistent_guests=args.guests,
                    initial_sha256=hashlib.sha256(initial).hexdigest(),
                    preserved=json.loads((HERE/'x/objectives/verification.json').read_text())['protected'])
     (out/'verification.json').write_text(json.dumps(summary, indent=2)+'\n')

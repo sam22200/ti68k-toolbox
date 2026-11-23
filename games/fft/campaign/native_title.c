@@ -1,3 +1,4 @@
+#define RT_SAVE_ATOMIC
 #define USE_TI89
 #define MIN_AMS 200
 #define RETURN_VALUE

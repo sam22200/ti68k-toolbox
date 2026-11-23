@@ -26,7 +26,7 @@ def main():
     # FSV7 tail is explicit fixture input; real FSV2..6 migration is checked
     # separately. One deterministic world seed forces a real first-route birth.
     tail=bytes((1,1,0,0))+bytes(65)+bytes((0,0,0,1,0))
-    initial=b'FSV7'+bytes(initial[4:])+tail;assert len(initial)==3992
+    initial=b'FSV8'+bytes(initial[4:])+tail+bytes(32);assert len(initial)==4024
     summaries=[];snapshots=[]
     for mode,flags in [('pc',[]),('san',['-fsanitize=address,undefined','-fno-sanitize=shift','-fno-pie','-no-pie'])]:
         executables={}

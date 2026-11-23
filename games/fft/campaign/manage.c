@@ -57,6 +57,14 @@ static const u8 *bank, *common,*identity,*egg_bank,*monster_bank,*item_text;
 static u8 *cache;
 static u8 dirty;
 static u8 settled;                       // hidden planes already carrying this page
+static u8 props_on;
+static u16 props_result=1;
+static void props_start(u16 n);
+static u8 props_update(u32 key);
+static void props_page(void);
+static void props_live(void);
+u16 manage_result(void){return props_result;}
+
 
 static u16 b16(const u8 *p) { return (u16)((u16)p[0] << 8 | p[1]); }
 static const u8 *section(u8 k) { return bank + b16(bank + 4 + 2 * k); }
@@ -1085,7 +1093,7 @@ void game_init(void)
     if(cache)free(cache);
 #endif
     bank = RT_NULL; cache = RT_NULL; item_text = RT_NULL;   // (statics survive between runs)
-    memset(&mg, 0, sizeof mg);
+    memset(&mg, 0, sizeof mg);props_on=0;props_result=1;
     bank = rt_file("ffmg", &size);
     if (bank && memcmp(bank, "FMG5", 4)) bank = RT_NULL;
     identity=rt_file("ffcp",&size);if(!identity_valid(identity,size))bank=RT_NULL;
@@ -1107,6 +1115,8 @@ void game_scenario(u16 n)                // test doors: a screen of the first un
 {
     static const u8 doors[] = { S_FORM, S_STATUS, S_EQUIP, S_SET, S_LEARN, S_JOBS, S_MENU,
                                 S_ITEM, S_INV, S_ORDER, S_JOBTABLE, S_FORM, S_FORM };
+    if(save.missions.report.ready&&n<100)n=100;
+    if(n>=100&&n<=101){props_start(n);return;}
     mg.screen = n < sizeof doors ? doors[n] : S_FORM;
     mg.unit = mg.row = mg.top = 0;
     if(save_egg(&save,0))mg.screen=S_FORM;
@@ -1156,6 +1166,7 @@ u8 game_update(void)
     u32 key = rt_keys & ~rt_prev;
     SaveUnit *u;
     u8 at;
+    if(props_on)return props_update(key);
     if(mg.slide)mg.slide--;
     if(mg.job_anim) {
         mg.job_anim--;dirty=1;
@@ -1167,8 +1178,11 @@ u8 game_update(void)
     dirty = 1;
     if (!bank || !save.n) { if (key & K_ESC)return leave();return 1; }
     u = unit(mg.unit);
+    if(prop_away(&save.missions.dispatches,mg.unit)&&mg.screen!=S_FORM&&mg.screen!=S_MENU&&mg.screen!=S_STATUS){mg.screen=S_STATUS;mg.note=NOTE_LOCKED;}
+    if(prop_away(&save.missions.dispatches,mg.unit)&&mg.screen==S_STATUS)key&=K_B|K_ESC|K_F1|K_F5|K_MODE;
     if (mg.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) mg.note = 0; return 1; }
     if (mg.remove) {
+        if(prop_away(&save.missions.dispatches,mg.unit)||save.missions.report.ready){mg.remove=0;mg.note=NOTE_LOCKED;return 1;}
         if (key & (K_B | K_ESC)) { mg.remove = 0; mg.remove_row = 0; return 1; }
         mg.remove_row = choice_move(mg.remove_row, 2, key);
         if (key & (K_ENTER | K_A)) {
@@ -1249,7 +1263,7 @@ u8 game_update(void)
         mg.unit = at;
         if (at / 5 < mg.top) mg.top = at / 5;
         if (at / 5 > mg.top + 1) mg.top = at / 5 - 1;
-        if ((key & (K_ENTER | K_A))&&!save_egg(&save,mg.unit)) { mg.screen = S_EQUIP; mg.row = mg.top = 0; }
+        if ((key & (K_ENTER | K_A))&&!save_egg(&save,mg.unit)) { mg.screen = prop_away(&save.missions.dispatches,mg.unit)?S_STATUS:S_EQUIP; mg.row = mg.top = 0; }
         if (key & (K_C | K_D)) { mg.screen = S_MENU; mg.row = 0;mg.slide=0; }
         return 1;
     case S_MENU:
@@ -1260,6 +1274,7 @@ u8 game_update(void)
         }
         mg.row=choice_move(mg.row,MENU_ROWS,key);
         if (key & (K_ENTER | K_A)) {
+            if(save.missions.report.ready||(!mg.row&&prop_away(&save.missions.dispatches,mg.unit))){mg.note=NOTE_LOCKED;return 1;}
             if (!mg.row) {                           // Remove Unit
                 if (u->type == 2) { mg.note = NOTE_RAMZA; return 1; }
                 mg.remove = 1; mg.remove_row = 0; return 1;
@@ -1390,7 +1405,7 @@ void game_render(void)
     if (dirty) {                         // a still page: drawn once into the cache
         void *l = rt_light, *d = rt_dark;
         rt_light = cache; rt_dark = cache + RT_PSIZE;
-        page();
+        if(props_on)props_page();else page();
         rt_light = l; rt_dark = d;
         dirty = 0; settled = 0;
     }
@@ -1402,6 +1417,7 @@ void game_render(void)
     memcpy(rt_light, cache, RT_PSIZE); memcpy(rt_dark, cache + RT_PSIZE, RT_PSIZE);
     if (settled < 2) settled++;
     if(!bank||!save.n)return;
+    if(props_on){props_live();return;}
     if(mg.detail)return;                 // the detail panel is modal: no live cursor over it
     if(mg.screen==S_FORM)formation_cursor();
     if(mg.screen==S_MENU&&!mg.remove)command_menu();
@@ -1412,3 +1428,5 @@ void game_render(void)
     remove_panel();
 }
 
+
+#include "proposition_ui.inc"

@@ -8,7 +8,7 @@
 #endif
 #include <string.h>
 #include "save_types.h"
-static u8 image[3993];static u16 image_size;
+static u8 image[sizeof(Save)+1];static u16 image_size;
 static u8 read_image(const char *name,void *p,u16 size)
 {(void)name;if(size!=image_size)return 0;memcpy(p,image,size);return 1;}
 #define rt_load read_image
@@ -35,22 +35,39 @@ static void serialize(void){image_size=sizeof a;memcpy(image,&a,image_size);}
 static void trials(void)
 {
     u8 i;u16 k;
-    CHECK(sizeof(Save),3992);CHECK(sizeof(WorldParty),69);
+    CHECK(sizeof(Save),4684);CHECK(sizeof(WorldParty),69);
     seed();CHECK(save_world_valid(&a),1);old=a;
-    for(i=0;i<5;i++){
-        static const u16 lengths[]={SAVE_V2_BYTES,SAVE_V3_BYTES,SAVE_V4_BYTES,SAVE_V5_BYTES,SAVE_V6_BYTES};
+    for(i=0;i<7;i++){
+        static const u16 lengths[]={SAVE_V2_BYTES,SAVE_V3_BYTES,SAVE_V4_BYTES,SAVE_V5_BYTES,SAVE_V6_BYTES,SAVE_V7_BYTES,SAVE_V8_BYTES};
         image_size=lengths[i];memcpy(image,&old,image_size);memcpy(image,"FSV2",4);image[3]+=i;
         memset(&b,255,sizeof b);CHECK(save_load(&b),1);CHECK(memcmp(b.magic,SAVE_MAGIC,4),0);
         CHECK(memcmp((u8 *)&b+4,(u8 *)&old+4,image_size-4),0);
         CHECK(b.world.month,1);CHECK(b.world.day,1);CHECK(b.world.era,0);CHECK(save_world_valid(&b),1);
-        if(i==4){CHECK(b.guest[0].exp,93);CHECK(save_raw_current(&b,16),1);}
+        for(k=0;k<32;k++)CHECK(b.profiles[k],0);
+        { const u8 *tail=(const u8 *)&b.missions;u16 changed=0;
+          for(k=0;k<sizeof b.missions+sizeof b.poach;k++)changed|=tail[k];
+          CHECK(changed,0); }
+        if(i>=4){CHECK(b.guest[0].exp,93);CHECK(save_raw_current(&b,16),1);}
         else CHECK(save_guest_find(&b,4),255);
     }
     seed();a.world.month=3;a.world.day=20;a.world.era=99;
+    CHECK(save_profile_set(&a,8,1),1);CHECK(save_profile_set(&a,9,2),1);
+    CHECK(save_profile(&a,8),1);CHECK(save_profile(&a,9),2);
+    CHECK(save_profile_set(&a,8,1),0);CHECK(save_profile_set(&a,64,1),0);
+    CHECK(save_profile_set(&a,63,12),1);CHECK(save_profile_set(&a,63,1),0);
+    CHECK(save_profile_set(&a,9,16),0);
     a.unit[15].type=3;a.unit[15].job=95;a.world.egg[15]=0x32;wb_color_set(&a.world,15,3);
+    a.poach[1]=255;a.poach[255]=3;save_generic_set(&a,0,1);
+    prop_set_status(&a.missions.dispatches,95,PROP_COMPLETE|PROP_ATTEMPTED);
+    prop_set_date(a.missions.completed_date,95,12*32+31);
+    prop_set_date(a.missions.treasure_date,30,1*32+1);
     serialize();CHECK(save_load(&b),1);CHECK(memcmp(&a,&b,sizeof a),0);
+    // FSV7 conversion keeps every old byte/calendar/RNG and appends zero profiles.
+    image_size=SAVE_V7_BYTES;memcpy(image,&a,image_size);memcpy(image,"FSV7",4);
+    CHECK(save_load(&b),1);CHECK(memcmp((u8 *)&a+4,(u8 *)&b+4,SAVE_V7_BYTES-4),0);
+    for(k=0;k<32;k++)CHECK(b.profiles[k],0);
     // Invalid current state cannot silently become a legacy save.
-    for(i=0;i<8;i++){
+    for(i=0;i<13;i++){
         seed();
         if(i==0)a.world.month=0;
         if(i==1){a.world.month=2;a.world.day=29;}
@@ -60,6 +77,11 @@ static void trials(void)
         if(i==5)memset(a.world_rng,0,4);
         if(i==6)a.world_pad=1;
         if(i==7)a.guest_id[1][1]=4;
+        if(i==8)a.poach[0]=1;
+        if(i==9){a.n=15;save_generic_set(&a,15,1);}
+        if(i==10){a.unit[1].type=3;save_generic_set(&a,1,1);}
+        if(i==11)a.missions.report.ready=1;
+        if(i==12)prop_set_status(&a.missions.dispatches,3,PROP_COMPLETE|PROP_ATTEMPTED);
         serialize();CHECK(save_load(&b),0);CHECK(b.n,0);CHECK(b.magic[0],0);
     }
     seed();old=a;CHECK(save_dismiss_egg(&a,1),0);CHECK(memcmp(&a,&old,sizeof a),0);

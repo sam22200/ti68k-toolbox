@@ -150,7 +150,8 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 #define MOD_AI_PREP 25                     // bounded victim/Math/collateral cache preparation
 #define MOD_COMPANION 27                   // non-canonical jobs', monsters' and bosses' rules: its own
                                            // heap block, resident while loaded (HW3Patch), never the zone
-#define MOD_COUNT 28
+#define MOD_SAVE_READER 28                 // shares the companion block only during cold Save reads
+#define MOD_COUNT 29
 #define AI_BAD (-0x7FFF)
 #ifdef FFT_MODULE
 #define MOD_CORE 0
@@ -561,6 +562,7 @@ typedef struct {
 enum { BN_NONE, BN_START, BN_VICTORY, BN_DEFEAT };
 #define DBG_GOD 1                      // allied blows kill, enemy actions on allies miss
 #define DBG_FAST 2                     // AI turns run as with [2nd] held, without the 1.5 s hold
+#define DBG_HEAP 4                     // one-shot native heap log on the next cached command window
 #ifdef FFT_CHAPTER
 #include "campaign/save_types.h"
 #define BATTLE_STORAGE_BYTES (sizeof(State)+sizeof(Save))
