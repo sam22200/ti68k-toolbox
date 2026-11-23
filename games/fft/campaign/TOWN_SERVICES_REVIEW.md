@@ -1,5 +1,13 @@
 # Town services: source portraits and Bar proposals
 
+Current integration (2026-11-23): accepted Propositions picker A is now a
+real management mode, including source prose and durable dispatch/day/recall/
+report/collection. Fur Buy/Sell uses the accepted room/portrait and existing
+Shop UI with separate stock. Both later unlocks remain locked in Chapter I.
+Current evidence is `x/town-complete/`; all earlier accepted visual/proof files
+remain intact. The private-backend/remaining-integration notes below are dated
+history, superseded by [HANDOVER.md](HANDOVER.md).
+
 2026-11-22. The user asks to continue Chapter I readiness through town
 services, finally use the correct portraits, reuse the shared menus/design
 system and offer several concrete choices for new screens.
@@ -194,6 +202,33 @@ protected inputs. No TI binary or emulator run is needed for these isolated
 PC proposals. Existing performance figures are not re-certified here.
 
 ## Remaining town work
+
+Propositions worker-picker A/B is now ready in
+`x/propositions-review/propositions-options.png`; see [PROPOSITIONS.md](PROPOSITIONS.md).
+The user selected **A** (Bar room and separate Team list); acceptance is saved
+in `x/propositions-review/approval.json`. Both reuse the actual management unit sheet and
+shared town components;22 PC/sanitizer pictures agree, Save is unchanged and
+459 protected files retain bytes/dates. These are review fixtures, with no
+dispatch, away-worker state, job timers or reward settlement integrated yet.
+The subsequent private dispatch/day/frozen-reward/settlement backend is delivered
+and checked, including rollback on save failure; its complete402-byte state is
+not yet part of the campaign Save. See the implementation
+scope and remaining integration in [PROPOSITIONS.md](PROPOSITIONS.md).
+
+Current follow-up: all six Chapter I rumor lifetimes and text effects are now
+verified through source event decoding and the actual Bar, including later
+replacements,3-row scrolling, pages/back and save reentry. The pilot bank and
+nine prior pictures stay exact. See [BAR_SERVICE.md](BAR_SERVICE.md). Next are
+Propositions and separate Fur stock; later scene flag bindings are content
+authoring. The prototype-era notes below retain their historical context.
+
+Update2026-11-22: [BAR_SERVICE.md](BAR_SERVICE.md) supersedes the old prototype
+items below for source rumors0..2. Bar A is wired into the town, with exact
+original titles/masks, actual input/back/pagination, a shared cached renderer
+and FSV8 profile effects. Only the progress1 pilot availability is certified.
+Continue later rumor/quest profiles, Propositions and separate Fur stock;
+do not rerun the accepted visual proposal generators. The old numbered list
+records what was missing at visual acceptance, not the current completed scope.
 
 1. The portrait selection/reader integration and counter correction above are
    done. At the next release, rebuild the core package to include the corrected

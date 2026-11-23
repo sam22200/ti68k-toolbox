@@ -1,12 +1,34 @@
 # A town's services and a field's encounters
 
-Current follow-up2026-11-22: [source portraits and Bar proposals](TOWN_SERVICES_REVIEW.md).
+## Current services (2026-11-23)
+
+Propositions are an actual mode of management, reached from the Bar when source
+Chapter II event075 is bound/completed; accepted picker A, source prose,
+dispatch/away/day/recall/saved report/one-shot collect are integrated.
+Poaching now feeds separate cap255 `Save.poach`, retained by real battle exit.
+The Fur room uses the shared Shop Buy/Sell/detail UI at half source prices,
+with atomic funds/bag/stock changes. Access requires source III event0CB,
+Dorter9/Warjilis12/Zarghidas14 and an equipped/innate Secret Hunt unit.
+The Chapter I pilot intentionally binds neither later service event.
+
+FSV9/4684 migrates FSV2..8, preserving previous offsets and slots. Core owns
+ffpr/FPR1, ffpe/FPE1, ffpt/FPT1; chapter owns8-byte ffsv/FSV1 event bindings.
+Current proofs/private matching groups are under `x/town-complete/`, detailed
+in [HANDOVER.md](HANDOVER.md). Installed groups are preserved; no current
+installed-RAM or16KiB claim. The2026-11-22/20 notes below are historical.
+
+Current follow-up2026-11-22: [playable pilot Bar](BAR_SERVICE.md).
 The user selected C/D/C/D for source faces114/115/116/117. The active FSK4
 bank and extractor now use the correct Shop/Office/Fur portraits; the Bar
-prototype uses its selected owner and the shared campaign continuation cue,
+uses its selected owner and the shared campaign continuation cue,
 with no numeric counter. The Bar's stored room is in WLDBK, outside MENU TIMs.
-Shipping routes/save/stock and installed groups remain unchanged. The original
-service implementation and earlier measurements below are retained.
+Town -> Bar -> source rumor list -> grey reader is now implemented for source
+IDs0..2 at progress1, with town masks, original titles, pages/back and FSV8 profile
+effects. All six Chapter I rumor conditions now have source-checked event bindings
+and actual input/scroll/reentry proof; the pilot still ships only its original
+three. Propositions and separate Fur stock remain; later chapter quests are separate.
+Installed groups are preserved and need a matching release rebuild. The original
+Shop/Office implementation and earlier measurements below are retained.
 
 2026-11-20. The world map's locations do something when Ramza stands on them
 and no story battle is pending: a town or a castle opens its **Shop** and its

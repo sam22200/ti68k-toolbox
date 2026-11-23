@@ -1,4 +1,45 @@
-# Chapter I archive planning checkpoint (2026-11-12)
+# Chapter I archive planning checkpoint (2026-11-23)
+
+The current ABI97 core is700091 transport bytes,699195 stored payload/size
+bytes. The matching pilot is295145 transport bytes; key
+`ac1de6c7a4d71264d1bee76df06f489d`. Stored bytes exclude transfer headers; the
+131072-byte Flash/VAT reserve remains. This is a plan, not a full chapter build.
+
+| Current planning component | Bytes |
+|---|---:|
+| Dated13-map view estimates with112% calibration |421016|
+| R4 raw colours under declared per-map row budgets |816000|
+| Other dated upper estimates |608000|
+| Projected chapter |1845016|
+| Allowance:2700000 -131072 -699195 |1869733|
+| Planning margin |24717|
+
+`packages/chapter1-plan.json` retains the cached source census and declares
+per-map authoring ceilings of `min(202, source_content_rows +8)`. The eight
+extra rows are an authoring allowance, not a measured final artwork bound.
+Keeping every map at202 rows would add24320 bytes. No scenery is re-ripped
+or silently cropped by this audit. Old compressed colours remain in the
+estimate, so their raw replacements are deliberately counted twice.
+
+**Two depth adaptations remain required:** Sweegy/map74 has an estimated
+19304 bytes (816 above18488); Fovoham/map72 has19176 (688 above). Zeklaus/map76
+still requires the336-to320 width crop. Keep the measured18488-byte depth
+capacity and42-frame actor cache. Resolve and visually review these crops
+during content authoring; a flag or matching PC/TI checksum cannot certify
+handedness or artwork. The tool deliberately exits1 while these gates remain.
+
+```sh
+tools/pyenv/bin/python games/fft/tools/chapter1_budget.py \
+  --packages games/fft/campaign/x/chapter1-ready/packages/packages.json \
+  --out games/fft/campaign/x/chapter1-ready/archive/projection.json
+```
+
+The actual groups, SHA/key and per-map rows are checked offline. Full chapter
+banks, installed Flash overhead/fragmentation and RAM are separate gates.
+The installed pilot check is documented in HANDOVER.md;16KiB free is not claimed.
+
+## Historical checkpoint
+
 
 The user requested a bounded search for the remaining roughly2KiB of RAM,
 then progression if recovery was complicated. No simple saving was selected:

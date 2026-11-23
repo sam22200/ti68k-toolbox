@@ -1,18 +1,45 @@
 # Opening -> Academy -> Gariland
 
-Current step (2026-11-22): [town services and correct source portraits](TOWN_SERVICES_REVIEW.md).
+Current delivery (2026-11-23): the ordinary-combat pilot passes end to end on
+PC and sanitizers, with one complete matching68000 Gariland fight. Matching
+ABI97 groups use a shared graphics/Save-reader block; real private Titanium
+launch/return and archived Save/Continue pass. The measured1504-byte Gariland
+free RAM is not the deferred16KiB target or future-map certification. See
+[HANDOVER.md](HANDOVER.md) for current packages and remaining content gates.
+[PC/TI save exchange](SAVE_TRANSFER.md) preserves all4684 FSV9 bytes in both
+directions; raw PC `.state` snapshots remain platform-specific. These checks
+use logs/state dumps and preserve the user's live emulator.
+
+Town-service delivery (2026-11-23): **Propositions and poaching/Fur Shop are
+playable and saved**, closing the two requested town-service gates. Accepted
+Bar A/shared unit sheet, all96 source descriptions, dispatch/away/day/recall,
+frozen reports/one-shot collection; separate cap255 stock, actual battle exit
+persistence and common half-price Fur Buy/Sell. FSV9/4684 migrates FSV2..8.
+The pilot retains original II/III locks. Matching private ABI96 release groups,
+PC/sanitizer flows, selected native evidence and current RAM limitations are
+in [HANDOVER.md](HANDOVER.md), `x/town-complete/`. Nothing was installed in the
+live emulator. The older dated delivery notes below are historical; follow
+[CHAPTER1_READINESS.md](CHAPTER1_READINESS.md) for the remaining chapter route,
+content and release work. The16KiB target remains unpassed.
+
+Current step (2026-11-22): [the playable pilot Bar](BAR_SERVICE.md).
 The actual adult-monster placement/Save/battle/results flow is delivered
 ([HANDOVER.md](HANDOVER.md)); the older type3-veto queue is obsolete.
 The user accepted portrait contrasts C/D/C/D: Shopkeeper114, Guildmaster115,
 Fur Merchant116 and Bar owner117. The active FSK4 bank now has the first three;
-the Bar prototype uses the fourth, selected reader A (black text on grey), and the same campaign continuation cue,
+the playable Bar uses the fourth, selected reader A (black text on grey), and the same campaign continuation cue,
 without a numeric page counter, matching the original's graphical policy.
 All four selected screens reproduce the approved pictures;38 PC/sanitizer
 screens and actual map service tests pass, with previous proofs preserved.
 Existing installation groups are unchanged; rebuild them at the next release.
-Reader A preserves10 pages of original prose on PC/sanitizers. The Bar town
-route and source-gated persistent rumors remain next, then
-Propositions and Fur stock/migration
+The real town/list/detail/back route covers the three original progress1 rumors,
+their exact titles/town masks and ten-page prose. FSV8/4024 saves the King's
+original profile8/9 effects and migrates FSV2..7. Nine PC/sanitizer screens,
+four selected native doors and focused save regressions pass. The follow-up
+verifies all six Chapter I rumor lifetimes against original events, with actual
+four-stage input/scroll/reentry and one selected native long-title case; the
+shipping pilot's pictures and three topics stay exact. Later scene flag bindings
+belong to campaign authoring. Next are Propositions and Fur stock/migration
 before extraction, as [Chapter I readiness](CHAPTER1_READINESS.md) requires.
 
 Latest delivery (2026-11-20): [a town's services and a field's encounters](TOWN_SERVICES.md).
