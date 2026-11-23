@@ -170,6 +170,10 @@ u8 rt_load(const char *name, void *data, u16 size)
 static const void *sv_data;
 static u16 sv_size;
 static char sv_name[10];
+#ifdef RT_SAVE_ATOMIC
+static u8 sv_ok=1;
+u8 rt_save_committed(void){return sv_ok;}
+#endif
 
 u8 rt_save(const char *name, const void *data, u16 size)
 {
@@ -178,6 +182,9 @@ u8 rt_save(const char *name, const void *data, u16 size)
     sv_name[k] = 0;
     sv_data = data;
     sv_size = size;
+#ifdef RT_SAVE_ATOMIC
+    sv_ok=0;
+#endif
     return 1;
 }
 
@@ -194,6 +201,30 @@ static void save_write(void)                       // after the teardown: c-patt
     HANDLE h;
     HSym hs;
     unsigned char *p;
+#ifdef RT_SAVE_ATOMIC
+    // Build the complete new handle before touching an existing symbol. An
+    // existing entry is rebound directly; SymAdd would delete it on failure.
+    // AMS archive sets both archived and locked (0x0208). Unarchiving
+    // clears both; only an unarchived lock is an explicit write prohibition.
+    if(e&&e->flags.bits.locked&&!e->flags.bits.archived){SAVE_LOG("FAILED: locked");return;}
+    h=HeapAlloc(2+sv_size+SAV_EXTRA);
+    if(h==H_NULL){SAVE_LOG("FAILED: no memory");return;}
+    p=HeapDeref(h);*(u16 *)p=sv_size+SAV_EXTRA;
+    memcpy(p+2,sv_data,sv_size);p+=2+sv_size;
+    *p++=0;*p++='s';*p++='a';*p++='v';*p++=0;*p=OTH_TAG;
+    e=SymFindPtr(s,0);
+    if(e&&e->flags.bits.archived)EM_moveSymFromExtMem(s,HS_NULL);
+    e=SymFindPtr(s,0);
+    if(e) {
+        HANDLE old;
+        if(e->flags.bits.archived||e->flags.bits.locked){HeapFree(h);SAVE_LOG("FAILED: unarchive/lock");return;}
+        old=e->handle;e->handle=h;if(old!=H_NULL)HeapFree(old);
+    } else {
+        hs=SymAdd(s);if(!hs.folder){HeapFree(h);SAVE_LOG("FAILED: no symbol");return;}
+        DerefSym(hs)->handle=h;
+    }
+    sv_ok=1;EM_moveSymToExtMem(s,HS_NULL);SAVE_LOG("written");
+#else
     if (e && e->flags.bits.archived) EM_moveSymFromExtMem(s, HS_NULL);   // unarchive FIRST
     h = HeapAlloc(2 + sv_size + SAV_EXTRA);
     if (h == H_NULL) { SAVE_LOG("FAILED: no memory"); return; }
@@ -207,6 +238,7 @@ static void save_write(void)                       // after the teardown: c-patt
     *p++ = 0; *p++ = 's'; *p++ = 'a'; *p++ = 'v'; *p++ = 0; *p = OTH_TAG;
     EM_moveSymToExtMem(s, HS_NULL);                // archived: survives a RAM reset
     SAVE_LOG("written");
+#endif
 }
 
 const void *rt_file(const char *name, u16 *size)   // c-patterns §1: data read in place
