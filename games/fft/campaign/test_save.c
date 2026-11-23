@@ -38,12 +38,14 @@ static void check_ko_party(void)
         remove("ffsave.sav");
         sw_init(61); save_campaign(); assert(rt_load(SAVE_NAME, &first, sizeof first));
         first.unit[first.n] = first.unit[first.n - 1]; first.unit[first.n++].name = 254;
+        assert(save_profile_set(&first,8,1));assert(save_profile_set(&first,9,2));
         assert(rt_save(SAVE_NAME, &first, sizeof first));
         party_load();
         slot = st.unit[recruit].slot;
         st.unit[recruit].hp = 0; st.unit[recruit].dc = death[k];
         save_campaign(); assert(rt_load(SAVE_NAME, &back, sizeof back));
         assert(back.n == first.n - lost);
+        assert(!memcmp(back.profiles,first.profiles,sizeof back.profiles));
         for (i = 0; i < back.n; i++)
             assert(!memcmp(&back.unit[i], &first.unit[i + (lost && i >= slot)], sizeof back.unit[i]));
         if (!lost) {
@@ -126,6 +128,32 @@ static void check_permanent_stats(void)
     remove("ffsave.sav");
 }
 
+static void check_away_compaction(void)
+{
+    Save a,b;u8 actor,slot,k;
+    remove("ffsave.sav");sw_init(61);save_campaign();assert(save_load(&a));
+    slot=a.n;a.unit[slot]=a.unit[slot-1];a.n++;save_generic_set(&a,slot,1);
+    a.missions.dispatches.n=1;
+    {PropositionJob *j=&a.missions.dispatches.job[0];
+     j->flags=PROP_SENT|PROP_RETURNED;j->id=30;j->days=j->elapsed=9;j->location=6;j->n=1;
+     j->unit[0]=slot;j->unit[1]=j->unit[2]=255;
+     prop_set_status(&a.missions.dispatches,30,PROP_PROGRESS|PROP_ATTEMPTED);}
+    // A frozen report may be left pending while another battle is played.
+    {PropositionReport *r=&a.missions.report;
+     r->ready=1;r->id=30;r->location=6;r->n=1;r->unit[0]=r->speaker=slot;
+     r->unit[1]=r->unit[2]=255;r->result=PROP_FAILURE;prop_put_word(r->jp[0],123);}
+    a.poach[17]=7;assert(save_world_valid(&a));assert(rt_save(SAVE_NAME,&a,sizeof a));party_load();
+    for(actor=0;actor<NUNIT;actor++)assert(st.unit[actor].slot!=slot);
+    for(actor=0;actor<NUNIT;actor++)if(unit_party_member(&st.unit[actor])&&actor!=U_RAMZA&&st.unit[actor].slot<slot)break;
+    assert(actor<NUNIT);st.unit[actor].hp=0;st.unit[actor].dc=DC_GONE;save_campaign();assert(save_load(&b));
+    assert(b.n==a.n-1&&b.missions.dispatches.job[0].unit[0]==slot-1);
+    assert(b.missions.report.unit[0]==slot-1&&b.missions.report.speaker==slot-1);
+    assert(prop_word(b.missions.report.jp[0])==123&&b.poach[17]==7&&save_generic(&b,slot-1));
+    assert(!memcmp(&b.unit[slot-1],&a.unit[slot],sizeof(SaveUnit)));
+    for(k=b.n;k<PARTY_MAX;k++)assert(!save_generic(&b,k));
+    remove("ffsave.sav");
+}
+
 int main(void)
 {
     u8 i,before,id;Save s;
@@ -134,6 +162,7 @@ int main(void)
     check_hp_roundtrip();
     check_gil_roundtrip();
     check_permanent_stats();
+    check_away_compaction();
     remove("ffsave.sav");
     sw_init(61);assert(sw_step(0));
     st.unit[1].hp=0;st.unit[1].dc=DC_CHEST;

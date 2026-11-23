@@ -1,3 +1,4 @@
+#define RT_SAVE_ATOMIC
 // The battle program fftbat (battle.c): returns the continuation flag (the chapter handed over)
 // after the grayscale runtime has restored AMS.
 #define USE_TI89

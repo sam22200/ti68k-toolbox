@@ -99,15 +99,8 @@ static void rumor_page(u8 variant, u8 page_number)
         bar_header("The latest news", "about the Death Corps.");
         dlg_name(24, 33, (u8)(map_menu_width(topics[rumor_topic]) + 8), topics[rumor_topic], 0);
         dlg_frame(24, 45, 133, 46, 0); y = 52;
-    } else {
-        dlg_face(bar_face, 1, 1, 0);
-        dlg_name(24, 1, (u8)(map_menu_width("Bar owner") + 8), "Bar owner", 0);
-        dlg_name(24, 13, (u8)(map_menu_width(topics[rumor_topic]) + 8), topics[rumor_topic], 0);
-        // Reuse the shared Help/command frame for the wider reading window.
-        ChoiceLayout p = { 5, 33, 150, 61, 7, CHOICE_TAB, 3, 1, 0, 6, 12, 9, 154, 0, 0 };
-        choice_frame(&p, "Rumor"); y = 46;
-    }
-    for (row = 0; row < rows; row++) {
+    } else bar_reader(bar_face,topics[rumor_topic],article,first);
+    for (row = 0; variant && row < rows; row++) {
         if (!item_detail_line(article, width, (u8)(first + row), line)) break;
         text(x, (s16)(y + row * 7), line, variant ? C_WHITE : C_BLACK, 153);
     }

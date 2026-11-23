@@ -22,7 +22,10 @@ static u8 deploy_ready(void)
 {
     u8 i,ramza=0;
     if(!dp.n||dp.n>deploy_rules()[2])return 0;
-    for(i=0;i<25;i++)if(dp.placed[i]!=255&&save.unit[dp.placed[i]].type==2)ramza=1;
+    for(i=0;i<25;i++)if(dp.placed[i]!=255){
+        u8 slot=dp.placed[i];if(slot>=save.n||save_egg(&save,slot)||prop_away(&save.missions.dispatches,slot))return 0;
+        if(save.unit[slot].type==2)ramza=1;
+    }
     return ramza;
 }
 static void deploy_init(void)
@@ -33,7 +36,7 @@ static void deploy_init(void)
         if(!save_world_valid(&save))save_init(&save);
         save.n=boot[0];memcpy(save.money,boot+1,4);memcpy(save.inv,boot+5,256);
         memcpy(save.unit,boot+261,(u16)save.n*sizeof(SaveUnit));
-        memcpy(save.magic,SAVE_MAGIC,4);
+        memcpy(save.magic,SAVE_MAGIC,4);save_generic_legacy(&save);
     }
     dp.row=2;dp.col=2;
     // Restore only a placement for this encounter; never commit a default party.
@@ -41,7 +44,7 @@ static void deploy_init(void)
         u8 k;
         for(k=0;k<save.deploy_n&&k<5;k++)for(i=0;i<25;i++) {
             const u8 *c=deploy_cell(i),*p=save.deploy[k];
-            if(c[0]&&c[1]==p[1]&&c[2]==p[2]&&p[0]<save.n&&dp.placed[i]==255&&deploy_where(p[0])==255) {
+            if(c[0]&&c[1]==p[1]&&c[2]==p[2]&&p[0]<save.n&&!save_egg(&save,p[0])&&!prop_away(&save.missions.dispatches,p[0])&&dp.placed[i]==255&&deploy_where(p[0])==255) {
                 dp.placed[i]=p[0];dp.n++;break;
             }
         }
@@ -60,6 +63,7 @@ static u8 deploy_place(void)
 {
     u8 cell=(u8)(dp.row*5+dp.col),old=deploy_where(dp.unit);
     if(save_egg(&save,dp.unit)){dp.note=6;return 0;}   // an egg is not a fighter
+    if(prop_away(&save.missions.dispatches,dp.unit)){dp.note=7;return 0;}
     if(!deploy_cell(cell)[0]){dp.note=1;return 0;}
     if(dp.placed[cell]!=255&&dp.placed[cell]!=dp.unit){dp.note=2;return 0;}
     if(old==255&&dp.n==deploy_rules()[2]){dp.note=3;return 0;}

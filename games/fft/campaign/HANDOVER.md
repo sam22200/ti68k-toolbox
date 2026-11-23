@@ -1,5 +1,559 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Repository snapshot committed through ti-commit (2026-11-23)
+
+The user requested committing the accumulated FFT delivery on
+`feat/fft-bar-service`. Source commits are `4d2258c` (atomic archived saves and
+VAT export), `8f4022f` (PC/TI interchange tool), and `ba7a2a2` (town services,
+ABI97 core and pilot checks), followed by the documentation snapshot. Older
+"uncommitted" and ABI96 status paragraphs below describe earlier checkpoints.
+Keep Tenchu, root/user art, generated `.s` controls and ignored binaries/proofs
+outside this delivery. Their working files and the live user emulator remain
+intact; no new TiEmu validation is required for a git-only operation.
+
+The commit check reruns PC/sanitizer save interchange in
+`x/commit-check/save-transfer/` and verifies the frozen core with the project's
+Python environment in `x/commit-check/core-contract/`. Existing ordinary-fight,
+native interchange and installed-lifecycle evidence below remains applicable;
+the recorded pilot/interchange source hashes match the committed files.
+
+## Bidirectional PC / TI save exchange delivered (2026-11-23)
+
+The user requested reusable saves between PC and TI for play and test setup.
+`../tools/save_transfer.py to-ti INPUT.sav OUTPUT.89y --slot 1` wraps the existing
+FSV bytes as `main\ffsave1`; `to-pc INPUT.89y PC_DIRECTORY` extracts the same named
+slot. All three slots and the session are supported; groups require `--name` if
+several saves are present. Existing outputs require explicit `--replace`.
+No live variable, emulator or shipping group is touched. Full usage and limits:
+[SAVE_TRANSFER.md](SAVE_TRANSFER.md).
+
+Six focused host codec tests pass (all slots, FSV2..9 preservation, ambiguity,
+safe replacement, corrupt envelopes/bounds and CLI errors). The actual shared
+save reader/writer passes on PC and ASan/UBSan. One small selected68000 run uses
+real `rt_ti.c`/AMS VAT I/O to load the PC slot1, atomically replace imported slot2,
+export it and reload the result on PC under sanitizers. The real pilot's entire
+4684-byte FSV9 remains equal, SHA
+`a53b1daa495fe5396e97835a6c2e8206715645081d4da19d05d0425314776e68`.
+An FSV8 control migrates equally through the production reader on both targets.
+Evidence: `x/save-transfer/final/{results.json,pc.log,san.log,returned-san.log,
+native/replay.log,native/ffsave2.89y,roundtrip.sav}`. Repeat with
+`make save-transfer-check`, optionally `SAVE_TRANSFER_FLAGS=--native`; use a new
+`SAVE_TRANSFER_OUTPUT` to preserve accepted proofs. The first native link attempt
+missed the existing tilemap library; the corrected private wrapper links it.
+
+This is portable **campaign saves at existing checkpoints**, not arbitrary
+mid-battle snapshots: raw PC `.state` dumps are platform-specific and rejected.
+The diagnostic `save_dump.py` now reuses the checked TI reader instead of a fixed
+single-variable offset. No engine/save ABI, production memory or accepted visual
+change; reuse existing hardware and full-fight evidence. No screenshots/TiEmu.
+Chapter readiness priorities remain the maps, authored story content and fields
+listed below; do not implicitly start a full battle-snapshot format or RAM hunt.
+
+## Ordinary-combat end-to-end pilot accepted (2026-11-23)
+
+The user requested a top3 and an end-to-end run of existing content, PC first,
+then selected TI checks, with logs/memory instead of screenshots. This section
+extends the lifecycle milestone below: those older wins used DEBUG skip; the
+new run uses **real All allies menu inputs, ordinary AI/combat and held2nd**, with
+`dbg=0` throughout, no God, no skip and no forged victory/save. Shipping core,
+chapter, ABI97 and accepted graphics are unchanged. No new TiEmu instance was
+needed; the user's session was untouched. No screenshots were generated.
+
+`make -C games/fft/campaign pilot-e2e-check` now runs the actual supervisor and
+cold title/scene/deploy/battle/world/management processes against matching groups.
+Add `PILOT_E2E_FLAGS=--native` for **one** full Gariland68000 replay. Default output
+is `x/pilot-e2e/latest`; set `PILOT_E2E_OUTPUT` to another private directory to keep
+proofs intact. This is separate from the fast `pilot-route-check` DEBUG control.
+Final evidence from this delivery is **`x/pilot-e2e/final/`**, not `latest/`.
+
+Three cases pass on PC and ASan/UBSan: New Game through both ordinary fights and
+world Save; Continue the completed pilot; defeat/Continue/retry (only defeat uses
+an explicit zero-HP fixture). Canonical input/state CSV traces and all durable
+snapshots match between builds. Start/end raw State dumps are retained. The same
+campaign session then travels Gariland→Mandalia→Gariland with real map inputs,
+buys twice/sells once, opens item detail, hires a real Office recruit, reads all
+three currently available rumors (13 pages, longest10), checks the II/III service
+locks, opens Formation, equips the purchased item, saves to slot1 and resumes.
+The field's existing `Not ripped yet` response is asserted, not called a random
+battle. Propositions/Fur trading and monster fights are not part of this pilot;
+retain their separate prior service/monster evidence.
+
+Observed ledger: Gariland's seven-person party and2000 gil become4500 gil after
+the battle; the Shop costs150 net, the recruit1500, leaving2850 with eight units.
+Two route legs advance the calendar fromJan1 toJan3. Ramza's EXP0→70 and Squire
+JP173→270 survive Formation and Save/Continue. Formation swaps weapon19→1 and
+returns the old weapon to inventory; every other SaveUnit byte stays unchanged.
+Continue of the completed pilot preserves the entire final4684-byte Save.
+Ordinary Orbonne completes in5025 controller updates and Gariland in8592 (the
+runtime also counts real menu-input steps). CSVs record593/1045 state events,
+including23/38 HP changes across eleven actors. These are state changes, not a
+claim that every one is a separate attack or tactical walk.
+
+The selected native test uses the actual engine with its29 installed module
+images and the same real pre-Gariland Save. The controller waits for menu states
+instead of replaying absolute PC frame numbers: PIC preparation has a different
+cadence. It wins in8736 runtime frames; God/skip remain off, the atomic save is
+committed and all owned battle buffers are released. **The full FSV9 Save equals
+the PC fight's4684 bytes**, SHA
+`c37b0544ac51bdcfa583c23c22ab35208c396ee45f85d3095173a08270cc7d4f`.
+This is a native correctness/reentry run, not a new per-frame CPU-budget or
+installed RAM measurement. Reuse the previous real Titanium hardware lifecycle
+and1704/1504-byte free-memory observations;16KiB remains a deferred target.
+
+The run exposed a test-runner limitation: `ti-cycles --save-dir` exported only
+`SymAdd` variables, omitting an atomic replacement that rebinds an imported VAT
+entry. It now also exports entries whose handle differs from the imported one,
+without hot-path tracking or exporting unchanged banks. This does not track
+arbitrary in-place edits of unchanged handles. The full native replay proves
+that imported `ffsave` is exported and no unchanged input bank is; the existing
+14-case atomic writer regression still passes. No game/runtime fix was needed.
+
+Evidence: `final/results.json`, `analysis.json`, PC/san per-case logs, CSV/keys/
+State/save snapshots, and `native/{replay.log,results.json,saved/ffsave.89y}`.
+The failed fixed-frame control is retained as `native/fixed-frame.log`; do not
+mislabel it as a game failure. Current core contract/key still verifies. Preserve
+all previous `x/chapter1-ready/` and `x/town-complete/` proof bytes/dates.
+
+Next priorities are the future-map memory/depth/width gates, remaining story
+maps/scenes with their bindings, then field formations and whole-chapter replay.
+Do not rerun the whole native suite or start a difficult RAM refactor implicitly.
+
+
+## Requested readiness steps1–3 completed within measured limits (2026-11-23)
+
+This section supersedes the ABI96 package/installed-status figures below.
+Branch is still `feat/fft-bar-service`, uncommitted. Do not commit/revert the
+unrelated Tenchu/root/user files. The user requested PC-first checks, selected
+native checks only, and a bounded RAM search; difficult recovery remains deferred.
+
+### Repeatable actual pilot on PC
+
+`make -C games/fft/campaign pilot-route-check` runs `check_pilot.py` against
+`PILOT_PACKAGE_DIR` (default `x/chapter1-ready/packages`). It extracts the matching
+installation groups into temporary directories and drives the actual `fp_story`
+supervisor plus cold title/scene/deployment/battle/map children. Three cases pass
+on PC and ASan/UBSan with identical saves/routes: New Game through the pilot and
+world Save; Continue a completed pilot; Continue pre-Gariland, defeat, Continue
+again, retry and world Save. Deployment fills five legal tiles; real results and
+guest persistence run, existing slot2 bytes stay intact. The driver snapshots the
+real pre-Gariland save. Battle wins use the **shipping DEBUG skip**, and defeat
+is an explicit zero-HP fixture; this does not certify normal full combat or the
+unripped chapter. Native deployment logs now record slot/tile/facing/count.
+
+Final evidence: `x/chapter1-ready/pilot-release/results.json` and per-case logs,
+not the older `pilot/`, `pilot-final/` or `pilot97/` intermediate package runs.
+No scene art, portraits or accepted menu/glove visuals were changed.
+
+### Real installed Titanium: two failures found and fixed
+
+A private container/display/profile (`tiemu-chapter1-ready`, Xvfb`:100`) loaded the
+actual matching core and pilot. The user's container `tiemu` (PID662887, started
+2026-11-22T21:38:27) was never restarted or sent keys. `private_ti.py` scopes every
+operation to the private PID/display; only that instance is stopped at the end.
+Original profile/state/image files and all old proofs retain bytes AND mtimes.
+The base's old `heaplow` diagnostic and HOME history were cleared only in the
+private profile before launch; the optional512-byte tilog ring remains installed.
+
+1. The combined7264-byte companion made navigation allocation fail. Graphics
+   image27 (4128) and a new cold Save reader28 (3542) now share **one preallocated
+   4128-byte block**, saving3136 RAM bytes. They never nest. Switching the owner
+   invalidates the fast body context/entry; warm graphics keep their fast path.
+   No play-time allocation or measured actor/depth cache reduction was added.
+   A selected68000 test performs three reader→graphics/body→reader cycles while
+   preserving the caller's zone:22 checks,0 failures, digest272.
+2. AMS3.10 archives a variable with BOTH archived and locked flags (`0x0208`);
+   unarchive clears both (`0xFDF7`). The opt-in atomic writer now rejects only an
+   unarchived manual lock before allocation, unarchives/re-fetches an archived
+   symbol, then requires both flags clear before rebinding. Its new handle is
+   filled before touching the old one. Real New Game/progress/slot replacement
+   succeeds. `ti-cycles` now models the observed two-bit archive behavior;
+   the selected actual VAT regression passes14 checks,0 failures. It includes
+   preserving an explicitly locked unarchived save. No power-loss claim.
+
+The installed final build ran New Game, scene skips, Orbonne, Academy, five-unit
+Gariland deployment, Gariland, real result/aftermath/save exits, the world map,
+Save slot1, clean exit, reopening the title and Continue directly to the world.
+Both `ffsave` and `ffsave1` are actual archived FSV9 payloads (4690 including
+six-byte trailer), byte-identical, with flags0/1 and persistent guest Delita/id4.
+Their payload SHA is`e3a833825027d042696c9c798db0a38c945c36444427103ea8661e1402df765c`.
+Hardware wins also use DEBUG skip, not an ordinary-combat oracle. No screenshot
+was needed. Final metadata and all four module bank bytes were read back from
+private Flash and compared with the final groups.
+
+| Installed command-window RAM, diagnostic ring present | HeapAvail | HeapMax |
+|---|---:|---:|
+| Orbonne |1704|1698|
+| Gariland |1504|1498|
+
+The same run returns185746 free/max65520 between all first-route children;
+reopening from HOME starts185662 after AMS's84-byte history growth. This is a
+bounded lifecycle observation, **not16KiB free, a whole-battle stack/peak test or
+full-envelope/future-map certification**. A larger navigation graph may need more
+RAM than this margin. Keep this explicit and do not silently shrink caches or
+start a difficult RAM refactor under the current task. Earlier14KiB/16KiB planning
+figures are not measurements of this installed release.
+
+RAM telemetry is one-shot `DBG_HEAP` (bit4), consumed while rebuilding a command
+window, with no ordinary-frame heap scan. In PIC/whole-program builds GCC4TI
+incorrectly inlined a static variadic logger, dropping its arguments. A local
+`noinline` declaration fixes the real stack call; its local C output callback
+avoids external relocations. The final numbers agree with the AMS3.10 ROM's
+free-list contents. The earlier `battle heap free0 max103760` is an invalid
+intermediate diagnostic, never evidence. No hand-written ASM was introduced.
+
+Final native evidence: `x/chapter1-ready/native-check/{shared-final.log,atomic.log}`
+and `ti/{orbonne-final.log,gariland-final.log,world-final.log,continue-final.log,
+final-results.json,installed-bytes.json}`. The private route scratch driver needed
+a resume at Academy because a completed Orbonne had already exited while the
+driver polled its state; this was a driver race, not a game failure. Do not restart
+the live user emulator to repeat these observations. `private_ti.py start` copies
+the protected base profile into its own directory; it never edits the original.
+
+### Frozen core and revised archive plan
+
+Final matching groups are `x/chapter1-ready/packages/fft-core.89g`700091 and
+`chapter-01.89g`295145 transport bytes; key`ac1de6c7a4d71264d1bee76df06f489d`.
+Native contract: **ABI97,29 images, State2278/Unit116/Work37790/ModCtx396,
+FSV9 Save4684**, signature`0x2389`, zone9114, shared companion4128/cold reader3542,
+actor cache42/depth18488 unchanged. Actual TTPack input64833 leaves103 bytes.
+Module shards are51364/50806/51310/49552 bytes with cuts7/14/21.
+
+`packages/core-contract.json` freezes exact core SHA/key, every shared variable,
+public interface hashes, native layouts and ownership/envelope. Run
+`make -C games/fft/campaign core-contract-check`. Changed layouts/core bytes fail;
+explicit review/rebuild/refreeze is required for a new interface. Chapters remain
+matched data-only packages, pooled resources and no saves/configuration. The
+packager rejects executable chapter members. Negative checks cover contract drift,
+invalid per-map row budgets, archive overflow and remaining depth gates.
+
+The dated13-map/20-battle/20-scene plan now uses cached source row bounds plus8
+allowed authoring rows, capped202. This is a declared content budget, not approved
+artwork. Projected chapter1845016 versus1869733 allowance leaves**24717 bytes**;
+core stored699195 excludes transport headers, with131072 Flash/VAT reserve retained.
+Other content estimates remain dated; the full chapter is not built. The budget
+command deliberately exits1 for two unresolved depth estimates: **Sweegy/map74
+19304 (+816)** and **Fovoham/map72 19176 (+688)** versus18488. **Zeklaus/map76
+still needs336→320 width cropping.** Resolve and visually review these during
+content authoring, not by raising fixed capacities or treating a crop flag as proof.
+See `CHAPTER1_ARCHIVE_PLAN.md` and `x/chapter1-ready/archive/projection.json`.
+
+### What is next
+
+Rip/author the remaining Chapter I scenes and maps with shared resources and
+explicit source event/rumor/choice/guest bindings; populate the five field doors
+(currently0, not ripped), then replay/assemble the whole chapter. Accepted monster
+animations and one readable palette per physical human/monster model remain.
+The current pilot/contract is ready for that work; whole-chapter installation,
+future map RAM and16KiB free remain open gates. Do not rerun the full old TI suites.
+All1255 protected files checked unchanged (bytes+mtimes), including the entire old
+`x/town-complete/`, production banks/groups, user saves/ASM and original TI profiles.
+
+
+## Playable town services delivered (2026-11-23)
+
+This section supersedes the private-backend queues below. Both requested town
+services are integrated: **Propositions and separate poach stock/Fur Shop**.
+Do not repeat their source census or reopen accepted visuals. Branch remains
+`feat/fft-bar-service`, uncommitted; unrelated Tenchu/user files stay untouched.
+
+- `proposition_ui.inc` is an actual mode of `manage.c`, scenario100 (101 after
+  a failed native save), with the accepted Bar A/real unit sheet/team list.
+  Home/list/source descriptions/worker selection/duration/final No-default
+  confirmation/active jobs/recall/origin-town reports/one-shot collection work.
+  All96 original descriptions and77 reward names live in FPT1. Reuse the common
+  grey reader, dialogue/portrait, menus, animated glove and War Funds.
+- FSV9 is4684 bytes, preserving every FSV8 offset. Tail:402-byte missions,
+  256-byte stock,2-byte generic-identity bitmap. FSV2..8 migrate with no
+  invented job or retrospective poach credit. Office recruits explicitly set
+  generic identity. Legacy conversion certifies only representable pilot/Office
+  human models; future fixed identities must call `save_generic_source`.
+- Away workers cannot deploy, redispatch, change job/equipment/abilities or be
+  dismissed. Roster reordering moves their indices; pending receipts block
+  manual roster edits. Battle deaths compact both job participants AND frozen
+  report participants/speaker. New regression covers a pending report surviving
+  another battle and a permanent death before its worker in roster order.
+- Completed route legs advance missions exactly once; idle/menu time does not.
+  Frozen RNG/receipt is saved before display. PC failure rolls back in memory;
+  native child returns2/3 so the supervisor reloads the committed save or shows
+  failure, rather than treating a queued write as durable. `RT_SAVE_ATOMIC` is
+  opt-in to these campaign frontends; the native writer allocates/fills first,
+  unarchives/rebinds an existing symbol and preserves it on allocation/lock/
+  unarchive failure. Real Flash fragmentation/power failure is not certified.
+- Secret Hunt's post-impact consumer handles ordinary Attack and Charge (the
+  existing Counter owner reaches it), keeps the one source loot draw and sends
+  the result to `Save.poach`, cap255, never the bag. The actual battle save
+  refresh preserves live stock instead of losing it when reloading the file.
+  Fur Buy/Sell uses the common Shop renderer, separate stock and half source
+  price, atomic funds/bag/stock changes, bag cap99 and stock cap255.
+- Source service gates remain:075/Chapter II Propositions;0CB/Chapter III Fur,
+  only Dorter9/Warjilis12/Zarghidas14 and a present unit's equipped/innate
+  Secret Hunt471. Chapter `service_events` binds original events to one-based
+  native flags; ffsv/FSV1 stores their zero-based indices. Missing=255/locked.
+  **The Chapter I pilot intentionally binds neither event.** Test flags33/34
+  are private injection bindings, not shipping progress.
+
+### Current validation and package
+
+`make town-service-test` passes11 actual PC and11 ASan/UBSan flows,10 identical
+screens, Save/Continue-session reentry, dispatch/day/recall/collect, deployment
+absence, Fur buy/sell/caps and failed replacement. Slots stay untouched.
+Current rules/rewards regressions pass5018/1056 checks, with original source
+availability and181 reward pipeline comparisons; new output is under
+`x/town-complete/`, never the older protected proof directories.
+
+Selected native checks (`check_town_native.py`, no emulator):397 migration/
+metadata checks;75 supervisor/progress checks including service reload after
+save failure and relocated archive pointers; actual compositor versus38400
+oracle bytes;13 real native VAT writer checks; actual management worker/report
+pixels equal PC (D496/D525) and full Save-state hashes. Additional PC/sanitizer
+battle regressions prove actual save exit preserves poach stock, repeat exit
+cannot duplicate it, and permanent death remaps pending reports. The pilot
+results/Orbonne/monster flows pass81/14/81 PC checks with a preserved slot.
+The unchanged cached-window modes pass189 PC reference checks. Two actual
+13-actor static menu carriers use the matching ABI96 shards and pinned blitter:
+PC/TI checksums7262/716D; ordinary peaks319576/310952 cycles, below360k.
+Cold/turn peaks1639794/1641128 remain explicitly separate. Evidence is
+`x/town-complete/menu-frame/`; this is not a new whole-battle or hardware sweep.
+
+The source preferred-job out-of-bounds fallback remains the documented safe
+participant-scan adaptation; no new retail replay claim is made for it or for
+full Counter/Charge animations.
+
+ABI96, ModCtx unchanged, Save4684,28 matching images/signature2288. The pinned
+companion owns cached-window blit opcode252 without a zone switch. Zone9114,
+companion7264, actor cache42/depth18488 retained. Against FSV8/zone8932/
+companion5140, fixed requests grow2966 bytes plus256 transient save-stack bytes.
+**16KiB and current installed peak/contiguous RAM remain unpassed.** Do not
+shrink caches or restart a RAM hunt. Previous successful live boots are dated
+baseline evidence, not certification of this new package.
+
+Private coherent release: `x/town-complete/packages/fft-core.89g`699535 bytes +
+`chapter-01.89g`295145 bytes; core key522698b3edc1e50102e6ef96b08662bf.
+`package-check.json` verifies all28 image signatures and the common shard CRC.
+`package-source.89g` is a build intermediate, never an install group.
+All native frontends and launcher were rebuilt together; the final SAVE-only
+change was re-exported without rewriting the other27 records. Old installed
+banks/groups and the live emulator are untouched. The971-file bytes/mtime
+snapshot in `x/town-complete/preserved.json` passes unchanged, recorded in
+`preservation-results.json`.
+
+### Menu request and next work
+
+User-approved width is retained: Menu52px, Act34px for the reviewed Gariland
+fixture, actual longest label+12 rather than cache width. `CHOICE_MENU.md`
+now requires small side margins, mandatory animation and **one empty pixel**
+before text at maximum right sway. The battle glove moves one pixel right to
+follow `CHOICE_HAND_X`; its eight poses return after32 frames. Current pictures:
+`battle-width/battle-menu-glove-final.png`, `battle-width/glove-final/menu-glove.gif`
+and `services-live.png`, all under `x/town-complete/`.
+
+Next is [CHAPTER1_READINESS.md](CHAPTER1_READINESS.md): repeatable PC pilot/
+chapter route and release handoff, remaining Chapter I maps/scenes/field
+formations, then assembled archive/full-chapter checks. The new package is
+prepared but not installed. Keep portrait C/D/C/D, Bar reader A/campaign cue,
+accepted monster animations and one palette per physical monster/human model.
+No new combat-family queue or broad TI sweep.
+
+## Propositions frozen rewards/settlement/rollback checked (2026-11-22)
+
+**A remains accepted.** Read [PROPOSITIONS.md](PROPOSITIONS.md), especially the
+new frozen-report section. `proposition_rewards.h` now implements score/base/
+bonus/day scaling, reporting unit, owned24-byte receipts, origin-town one-shot
+collection, capped gil/JP/tJP, packed completion/treasure/land dates, retry
+counts, worker release and safe job compaction. `proposition_transactions.h`
+rolls back preparation/RNG or settlement on a failed atomic whole-session
+write, with a119-byte undo record instead of another4KB Save/heap allocation.
+Do not reimplement/re-study these rules in the next step.
+
+Private state is now402 bytes, including dates and receipt (not217 alone).
+Private FPE1 scoring/reward bank437 bytes reuses the observed scoring/Faith
+overlap. FPR1 remains4079 and byte-identical. **Actual FSV8/Save4024, active
+banks/packages/ABI and installed groups are unchanged.** This is a reusable
+backend and private4426-byte file proof, not a new campaign save format or a
+playable Propositions route. Full Save/companion/module growth remains unmeasured.
+
+`make proposition-rewards-test` passes1056 PC/ASan/UBSan assertions,181 original
+pipeline comparisons, random-tier/preferred boundaries, real private-file
+temp/rename failure, reload before/after collection, double confirm, caps,
+multiple jobs and recall. ONE native executable agrees on244 selected cases,
+digest54D3CF1E/state402; no broad sweep/emulator.563 older files keep hashes AND
+dates, including all prior `x/propositions-rules/` and accepted review proofs.
+Evidence `x/propositions-rewards/` pins runtime and fixture hashes; PC-only runs
+reuse the native proof. Do not overwrite the older proof directories.
+
+Source exception is explicit: its preferred-job fallback reads beyond the
+participant list. Native safely scans assigned workers and retains the actual
+`<61` threshold. Source comparisons disable that undefined fallback and exclude
+matching cases; adapted boundaries are checked separately. The level lookup
+also crosses the declared source table into Faith bytes: preserve the observed
+31-byte span/alias, rather than inventing disjoint level tables.
+
+**Next: mission descriptions and generic sprite-identity eligibility, then
+append/migrate durable state into the actual Save and connect accepted A.**
+Use the atomic saved prepare/collect adapters; freeze/save RNG+receipt before
+displaying a result, and never award from a caller-supplied UI packet. Away
+units must be excluded from deployment, redispatch, job changes and dismissal;
+block roster changes during a pending receipt. Keep original II/III gates and
+the uncleared16KiB target, existing caches and unrelated user/Tenchu dirt.
+
+## Propositions rules/dispatch/day backend checked (2026-11-22)
+
+**A is accepted**, recorded against the reviewed sheet hash in
+`x/propositions-review/approval.json`; gallery marker cleared. Do not ask again.
+The private backend in `proposition_rules.h` and source builder
+`tools/proposition_rules.py` now provide all96 original rules/titles, eligibility,
+atomic dispatch/fees, up to eight jobs/three workers, away lookup, daily progress,
+recall, origin-town report readiness and safe roster remapping. See
+[PROPOSITIONS.md](PROPOSITIONS.md) before continuing. No active frontend routing,
+FSV migration, rewards or collection settlement is implemented yet.
+
+Private FPR1 bank4079 bytes; packed backend217 bytes. This is NOT the final save
+growth: collection/reward/date state and even layout still need design. FSV8/4024
+and installed banks/groups remain exact. A private Save-prefix+jobs snapshot
+round-trips funds, profiles, RNG and absence across reload, without modifying
+the real campaign save. No reduction of measured caches or16KiB claim.
+
+`make proposition-rules-test` passes5018 PC/ASan/UBSan assertions. Actual original
+availability/unpack/zodiac/daily functions are compiled unchanged through a
+narrow host environment:4704 availability decisions/96fees/36calendar boundaries/
+12day comparisons agree. ONE native backend executable passes153 selected
+boundaries, digest99BD7737/state217. Evidence `x/propositions-rules/`, source and
+runtime hashes retain native evidence on PC-only reruns. No broad sweep/emulator.
+
+Next: source-backed reward/collection fixtures and explicit generic sprite
+identity mapping, then durable append/migration and the accepted A UI routing.
+The rules accept an explicit eligible-worker mask; do not substitute type<2 for
+the source identity test. Preserve returned-worker absence until origin-town
+report/one-shot settlement. Do not enable Chapter II jobs in the Chapter I pilot.
+Unrelated Tenchu/user files, old proofs, banks and installation groups stay.
+
+## Propositions A accepted (2026-11-22)
+
+Read [PROPOSITIONS.md](PROPOSITIONS.md). The new worker picker has two PC-only
+proposals in `x/propositions-review/propositions-options.png`:
+A retains the Bar room and separate Team list; B uses the Formation background
+and includes jobs in the list. Mission detail and final confirmation are shared.
+The actual management `plate_unit` draws both unit sheets. The user's reply
+**A** accepts the Bar room and separate Team list, plus common detail/confirmation.
+The approval sidecar pins the exact sheet hash; its gallery marker is cleared.
+Proceed with A and do not ask again. B is a historical comparison only.
+Keep the accepted C/D/C/D portraits and Bar reader A; those are settled.
+
+Twenty-two PC/sanitizer pictures agree, full Save/file unchanged;459 protected
+files retain bytes AND dates. Source record30 is the original Chapter II
+Gariland job,600gil/8..11days; it is not enabled in the Chapter I pilot. Source
+study now covers candidate restrictions, final-only payment, eight active jobs,
+daily progress, recall and origin-town collection. No dispatch/away-state/timer/
+reward/save extension is implemented. Backend source fixtures can proceed
+independently of UI integration. See the source caveats
+and next implementation steps in the new note; do not repeat the source census.
+
+Shared factoring adds `dlg_town_says`, generic `town_reader` and common scroll
+marks. Actual worldmap callers preserve the old output. New private proof
+`x/propositions-review/shared-ui-check/` passes seven PC/sanitizer full-rumor
+images, nine exact pilot pictures and ONE native long-title reader door:
+F6D2/state150E9710/Save4024, cached70438 cycles. Native proof hashes include
+dialogue/choice helpers. Prior proof directories, active banks/install groups,
+emulator and unrelated user/Tenchu dirt remain untouched. No new native sweep.
+
+## Chapter I rumor rules verified; Propositions next (2026-11-22)
+
+Still on `feat/fft-bar-service`, uncommitted. [BAR_SERVICE.md](BAR_SERVICE.md)
+now documents all six Chapter I rumor lifetimes. `tools/rumor_rules.py` decodes
+the four original final assignment sequences:00C/progress1 enables0/1/2;
+02D/8 retires1 and opens3;03A/10 retires0 and opens4/5;075/15 retires0..5 and
+opens later6..8. All six texts are decoded: only King1 writes profiles8/9;
+the other five have no durable effects. Do not repeat this source study.
+
+Chapter `rumor_events` explicitly binds source event IDs to one-based native
+completion flags; the pilot binds only00C ->2 and keeps its3264-byte bank
+byte-identical. Later event producers are campaign authoring, not fabricated
+progress from reading. The full4669-byte six-rumor fixture uses flags2/33/34/35;
+the last three are TEST bindings, not reserved/active shipping flags. Packaging
+validates the declared bindings. Missing opening events enable no new records.
+The generator supports `--chapter-spec`; unchanged output keeps its dates.
+
+`RUMOR_ROWS=3` retains the accepted list height and adds ordinary shared scrolling
+for four active topics, preventing overlap with War Funds at y80. Source title5
+is33 characters/124px; the existing name badge fits it exactly. The validators'
+title bound is40; generation still enforces124px. No new renderer/style/art,
+Save/ABI/heap growth, companion change or cache reduction in this follow-up.
+
+`check_rumor_rules.py --native` passes: seven PC/sanitizer images, all six texts
+over19 indexed pages, four source milestones/all43 locations, replacements,
+scroll/wrap/back and durable reentry. Nine pilot pictures reproduce the old
+Bar proof exactly. ONE selected native long-title/deeper-directory case agrees
+in full pixels/state (F6D2,150E9710,Save4024); cached reader70438 cycles.405 older
+files keep bytes AND mtimes, including the complete old `x/bar-service/` proof.
+Evidence/new gallery sheet: `x/bar-rumor-rules/pc/rumor-transitions.png`;
+native proof has its own runtime/bank hashes and can be reused on PC-only runs.
+The real `fftmap_pc` builds. No emulator or installed-group operation.
+
+**Next: reusable Propositions dispatch/away workers/day progress/one-shot return,
+then poach -> separate Fur stock -> purchase/migration.** Preserve Chapter II/III
+unlocks, existing shared menus/unit sheets, all C/D/C/D/A approvals and monster
+animation validation. New screens need several proposals as requested earlier;
+reuse existing panels before proposing another one. Source leads: event075's
+same final sequence sets variable0x91=1 (Propositions, progress15); event0CB
+sets0x90=1 (Fur, progress31). These are source assignment observations, not
+implemented service unlocks yet. Chapter I rumor gate work is no longer the
+first blocker; later scene flag bindings belong to content authoring. FSV8,
+the pending matching full release rebuild and the unpassed16KiB gate below
+remain. Do not revisit difficult RAM hunting or run a broad TI sweep.
+
+## Playable Bar A, three original pilot rumors and FSV8 profiles (2026-11-22)
+
+Current work is on `feat/fft-bar-service`, uncommitted. Read
+[BAR_SERVICE.md](BAR_SERVICE.md) first. `worldmap.c` now routes Town -> Bar ->
+Rumor list -> pages, with original source titles0..2, town mask0x1120 and the
+existing post-Gariland flag1. LEFT/RIGHT/ENTER/2nd page; SHIFT/ESC unwind one
+level. The reader and remembered cursor work on actual input, with cached
+town pages and the accepted117/D/A appearance; no new visual decision needed.
+
+Important source finding: rumor1's F5/F6 prefix unlocks Brave Story profiles8/9.
+It is NOT wholly passive. Save now appends32 profile-nibble bytes: FSV8/4024,
+migrating FSV2..7 and retaining all old offsets/calendar/RNG. Passive0/2 leave
+the complete Save unchanged; only the two original profile writes dirty1,
+survive exit/reload and are idempotent. The full Brave Story browser remains
+separate. `save_profile_set` retains the source >=12 write guard.
+
+Core art ffbr/FBR1 is6360 bytes, equal to the approved room and portrait.
+Chapter-owned ffru/FRU1 pools the three source records and offline page offsets
+from ffmg. Never copy a whole article into RAM. `../bar_reader.inc` is shared
+with the old proposal; its accepted short picture remains byte-identical.
+The10-page War article retains2549 bytes/68 lines. Native last-page cold draw
+falls2979638 ->788818 cycles; cached reader70438, home76778. Cold transitions
+remain outside the360k ordinary-frame budget.
+
+`check_bar_service.py --native`: nine PC/sanitizer screens, four selected native
+full-image/state doors,334 save/migration and59 supervisor checks pass.
+267 historical bank/save/review files keep hashes AND mtimes; the final PC pass
+checks271 including the four new development-bank files. Additional PC/sanitizer
+title/management/deployment/battle-save regressions pass, including profile
+tail preservation. No broad TI sweep or emulator operation. Evidence:
+`x/bar-service/`; approved presentation sheet `pc/bar-service.png`.
+
+RAM/compatibility: current core was ABI95 with42 actor frames and companion
+5046/reserve5048 (not the old5376 reserve). FSV8 reader measures5140, so
+`FFT_CORE_COMPANION_MAX` is5140 (+92 reserve); Save adds32. Do not shrink caches.
+MOD_SIG automatically changes with sizeof(Save), despite unchanged ABI95.
+Packaging declares FSV8/FBR1/FRU1 and the new owners. Existing installed groups
+are not replaced; release requires matching frontends/battle/all28 images and
+new core/chapter keys.16KiB free/peak remains unpassed, no new RAM hunt.
+
+The real `fftmap_pc` entry builds; new development data ffbr/ffru bin/89y pairs
+are available with archive attribute3. A private28-image export passes: zone8932,
+companion5140; private packed map and battle compile. Installed groups and all
+old proofs remain unchanged. Native evidence is retained separately in
+`native-results.json`, with source/runtime hashes so a PC-only rerun reuses it.
+
+Scope: only original progress1's enabled0..2 are certified, using the existing
+PS1 `world/ram0.bin` and disc extraction. Later rumor conditions/quest effects,
+Propositions and separate Fur stock/purchases remain. No Chapter I readiness
+claim or full campaign rip. Next: extend the source availability/effect profiles,
+then reusable Propositions and poaching/Fur transactions with II/III gates.
+Keep all C/D/C/D, A and monster validations; unrelated Tenchu/user files stay.
+
 ## Bar reader A accepted; commit the validated visual lot (2026-11-22)
 
 The user explicitly chooses **A: black text on the wide grey panel**, and

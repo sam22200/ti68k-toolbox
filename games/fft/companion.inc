@@ -15,13 +15,18 @@ static u16 __attribute__((unused)) companion_query(u8 a,u8 t,AbId ab,u8 query)
 static u16 __attribute__((unused)) special(u8 a,u8 t,AbId ab,u8 query){return companion_query(a,t,ab,query);}
 #endif
 #if !MOD_CORE && MOD_PART(MOD_COMPANION)
-#include "campaign/save.h"
+#include "window_blit.inc"
 u16 mod_entry(u8 op,u8 a)
 {
-    (void)a;if(op==254)return save_load(M.save_out);
+    (void)a;
+    if(op==252){window_blit(M.cast_ref);return 0;}
     // The wide monster bodies draw from here: their renderer is far too big for the
     // resident, and this image is never swapped out of its block (fft.c: companion_body).
     if(op==253)return draw_monster_body(M.body_x,M.body_y,M.body_rot,a,M.body_cover);
     return companion_query(M.cast_actor,M.cast_ref,M.cast_ability,op);
 }
+#endif
+#if !MOD_CORE && MOD_PART(MOD_SAVE_READER)
+#include "campaign/save.h"
+u16 mod_entry(u8 op,u8 a){(void)a;return op==254?save_load(M.save_out):0;}
 #endif

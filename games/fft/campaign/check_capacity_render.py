@@ -42,7 +42,8 @@ def synthetic_body_bank(out,scale=1.0):
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,default=HERE/'x/core-capacity/render')
-    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition','monster-body'),
+    ap.add_argument('--module-dir',type=Path,help='private matching modules.h and four FMB3 .bin shards; active banks remain untouched')
+    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition','monster-body','battle-menu','battle-act'),
                     help='select affected cases; default is the original four-case certification')
     ap.add_argument('--ko-bank',type=Path,help='private FKO1 bank for the monster-ko case')
     ap.add_argument('--body-bank',type=Path,help='FMB1 bank for the monster-body case; the synthetic creatures of check_monster_body.py by default (games/fft/tools/monster_body_assets.py builds a real one)')
@@ -62,17 +63,26 @@ def main():
     # group of scenarios is its own build: the certified four (CAP_STATUS), the monster
     # KO boards (CAP_KO) and the wide bodies (CAP_BODY). Only the requested one is built.
     wanted=set(args.case or ('board','rotations','status-last','equipment-last'))
+    if wanted&{'battle-menu','battle-act'} and wanted-{'battle-menu','battle-act'}:
+        ap.error('Static menu carriers must be selected separately from gameplay/Status cases')
     groups=[]
+    if wanted&{'battle-menu','battle-act'}:groups.append('-DCAP_MENU')
     if wanted&{'status-last','equipment-last'}:groups.append('-DCAP_STATUS')
     if wanted&{'monster-ko','monster-ko-morph','monster-ko-transition'}:groups.append('-DCAP_KO')
     if 'monster-body'in wanted:groups.append('-DCAP_BODY')
     run(['cc','-std=gnu99','-O1','-w',*groups,'-o',out/'render',*common,ROOT/'runtime/platform-sw/rt_sw.c'])
     # The zone markers do not fit beside thirteen bodies and two banks; the per-frame
     # values the gate reads come from FRAME_END, not from them.
-    run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-DFFT_CHECK_NO_ZONES',*groups,'-o',out/'renderc',*common,
+    module_flags=['-DFFT_MODULE_HEADER="'+str(args.module_dir.resolve()/'modules.h')+'"'] if args.module_dir else []
+    run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-DFFT_CHECK_NO_ZONES',*module_flags,*groups,'-o',out/'renderc',*common,
          ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     results=[]
     files={p.stem:p for folder in (HERE.parent/'opening/data',HERE/'data')for p in folder.glob('*.89y')}
+    if args.module_dir:
+        import chapter_packages
+        for name in ('ffbm','ffbn','ffbo','ffbp'):
+            var=chapter_packages.Variable(name,0x1c,3,(args.module_dir/(name+'.bin')).read_bytes()+b'\0dat\0\xf8')
+            path=out/(name+'.89y');path.write_bytes(chapter_packages.group_bytes([var],single=True));files[name]=path
     with tempfile.TemporaryDirectory(prefix='fft-render13-')as name:
         data=Path(name);data_links(data);(data/'ffgd.bin').unlink()
         (data/'ffgd.bin').write_bytes(descriptor13())
@@ -92,7 +102,7 @@ def main():
         for label,scenario,frames,keys in (('board',0,90,empty),('rotations',0,100,rotations),
                                          ('status-last',1,100,empty),('equipment-last',2,100,empty),
                                          ('monster-ko',3,60,empty),('monster-ko-morph',4,60,empty),
-                                         ('monster-ko-transition',5,60,empty),('monster-body',1000+args.body_job if args.body_job else 5+args.bodies,90,empty)):
+                                         ('monster-ko-transition',5,60,empty),('monster-body',1000+args.body_job if args.body_job else 5+args.bodies,90,empty),('battle-menu',0,90,empty),('battle-act',1,90,empty)):
             if args.case and label not in args.case:continue
             if label.startswith('monster-')and not args.case:continue
             pc=run([out/'render',scenario,frames,keys,out/(label+'-pc.png')],data)
@@ -109,7 +119,7 @@ def main():
             frame_costs=values[:-2]
             ordinary=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if not mode>>31]
             cold=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if mode>>31]
-            if scenario in (1,2):assert(values[-1]>>16)&255==12
+            if label in ('status-last','equipment-last'):assert(values[-1]>>16)&255==12
             results.append(dict(case=label,checksum=match[1],identity=match[2],actors=13,
                                 bodies=args.bodies if label=='monster-body' else 0,
                                 ordinary_average_cycles=sum(ordinary)//len(ordinary),

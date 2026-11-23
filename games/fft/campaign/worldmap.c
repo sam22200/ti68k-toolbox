@@ -21,18 +21,21 @@
 #include <string.h>
 #include "../base.inc"
 #include "breeding.h"
+#include "services.h"
+#include "../common.h"
 #include "../identity_pool.h"
 #ifndef __m68k__
 #include "story_choice_file.h"
 #endif
 
 enum { LOC_N = 43, ROUTE_N = 48, NOTE_NONE = 0, NOTE_NOROAD, NOTE_LATER, NOTE_UNAVAILABLE, NOTE_SAVED,
-       NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY };
-enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_FIT, SC_OFFICE, SC_HIRE, SC_RENAME, SC_FUR };
+       NOTE_NOGIL, NOTE_STOCK, NOTE_PARTY, NOTE_HUNT };
+enum { SC_MAP = 0, SC_TOWN, SC_STORE, SC_SHOP, SC_FIT, SC_OFFICE, SC_HIRE, SC_RENAME, SC_FUR,
+       SC_BAR, SC_RUMORS, SC_RUMOR };
 enum { FIT_ROWS = 4 };               // the party rows the fitting bench shows at once
+enum { RUMOR_ROWS = 3 };             // accepted list height; keep its border above War Funds
 enum { ROOM_STORE = 0, ROOM_OFFICE, ROOM_FUR, ROOM_N };
-// The Fur Shop opens in the source's Chapter III; no battle of this build sets its flag.
-enum { FUR_FLAG = 255 };
+// Source Chapter III access comes from the chapter's explicit ffsv binding.
 enum { SHOP_ROWS = 6, OFFICE_ROWS = 4, ENC_MAX = 3, OFFICE_REC = 17 };
 // The source's six shop tabs, by the item's category byte: [first, last] of each.
 enum { SHOP_TABS = 6 };
@@ -46,8 +49,10 @@ typedef struct {
     s16 handx, handy;                    // free hand hotspot; never commits a journey
     u8 menu, row;
     u8 screen, trow, ttop, buy;          // a town's services: its row, the list's first row
+    u8 fur;
     u8 cat, detail;                      // the shop tab (F1/F5) and whether [MODE] is showing
     u8 card, cand;                       // SC_HIRE: the status panel, and which row made him
+    u8 rumor, rpage, rlast, rrow, rtop;   // archive record, page bounds and remembered list cursor
     u8 note, changed, tick;
     u16 result;                          // what fftmap returns
 } Wm;
@@ -59,9 +64,11 @@ static const u8 *sh_place,*sh_office,*sh_jobs,*sh_enc;
 static const u8 *scene;                  // ffsk: the source's rooms and the speaker's portrait
 static const u8 *identity;               // ffcp: the generic names a recruit is given
 static const u8 *help;                   // ffid: FFT's own item descriptions, read in place
+static const u8 *service_gates,*service_common;
+static const u8 *bar_art,*bar_text;      // core artwork / chapter-owned passive rumor records
 #define PAGE_PLANE (100 * RT_PBYTES)
 static u8 *page;
-static u8 p_screen = 255, p_cat, p_buy, p_trow, p_ttop, p_n;
+static u8 p_screen = 255, p_cat, p_buy, p_trow, p_ttop, p_n,p_rpage;
 static u32 p_gil;
 
 static RtTilemap map;
@@ -82,6 +89,7 @@ static void release_map(void)
 void rt_clamp_cam(const RtTilemap *m, s16 *cx, s16 *cy);   // (rt_core.c: draw_tilemap's camera)
 
 static u16 b16(const u8 *p) { return (u16)((u16)p[0] << 8 | p[1]); }
+#include "bar_bank.h"
 static s16 s16v(const u8 *p) { return (s16)b16(p); }
 static const u8 *part(u8 k) { return bank + b16(bank + 4 + 2 * k); }
 static const u8 *loc(u8 i) { return part(2) + 8 * i; }
@@ -103,6 +111,7 @@ static u8 map_menu_width(const char *s)
 #include "../choice_menu.inc"
 
 #define DLG_TEXT(x,y,s,c,l) text(x,y,s,c,l)
+#define DLG_WIDTH(s) map_menu_width(s)
 #include "../dialogue_box.inc"
 #define WF_TEXT(x,y,s,c,l) text(x,y,s,c,l)
 #define WF_WIDTH(s) map_menu_width(s)
@@ -116,14 +125,40 @@ static const u8 *scene_room(u8 room) { return scene_part((u8)(ROOM_N + room)); }
 // Which room a screen shows, and who speaks in it.
 static u8 town_room(void)
 { return (u8)(wm.screen == SC_OFFICE || wm.screen == SC_HIRE || wm.screen == SC_RENAME ?
-               ROOM_OFFICE : wm.screen == SC_FUR ? ROOM_FUR : ROOM_STORE); }
+               ROOM_OFFICE : (wm.screen == SC_FUR || (wm.screen==SC_SHOP&&wm.fur)) ? ROOM_FUR : ROOM_STORE); }
 static const char *town_speaker(void)
 {
     return wm.screen == SC_OFFICE || wm.screen == SC_HIRE || wm.screen == SC_RENAME ?
-           "Guildmaster" : wm.screen == SC_FUR ? "Fur Merchant" : "Shopkeeper";
+           "Guildmaster" : (wm.screen == SC_FUR || (wm.screen==SC_SHOP&&wm.fur)) ? "Fur Merchant" : "Shopkeeper";
 }
 static u8 fur_open(void)
-{ return (u8)(FUR_FLAG != 255 && flag(FUR_FLAG)); }
+{ return service_open(&save,service_gates,1)&&(wm.at==9||wm.at==12||wm.at==14); }
+static u8 fur_support(void)
+{
+    u8 i;if(!service_common)return 0;
+    for(i=0;i<WB_SLOTS;i++) {
+        const SaveUnit *u;
+        if(i<PARTY_MAX){if(i>=save.n||save_egg(&save,i))continue;u=&save.unit[i];}
+        else {if(!save_guest_id(&save,(u8)(i-PARTY_MAX)))continue;u=&save.guest[i-PARTY_MAX];}
+        if(cj_support(service_common,u->job,prop_word(u->support),471))return 1;
+    }
+    return 0;
+}
+
+static const u8 *rumor_record(u8 i) { return bar_text+8+(u16)i*14; }
+static const char *rumor_string(u8 i,u8 field)
+{ return (const char *)bar_text+b16(rumor_record(i)+field); }
+static u8 rumor_available(u8 i)
+{
+    const u8 *r=rumor_record(i);
+    return (u8)(wm.at<15 && (b16(r+4)&(0x4000U>>wm.at)) &&
+                (r[1]==255||flag(r[1])) && (r[2]==255||!flag(r[2])));
+}
+static u8 rumor_count(void)
+{ u8 i,n=0;if(bar_text)for(i=0;i<bar_text[6];i++)if(rumor_available(i))n++;return n; }
+static u8 rumor_nth(u8 row)
+{ u8 i;if(bar_text)for(i=0;i<bar_text[6];i++)if(rumor_available(i)&&!row--)return i;return 255; }
+static void rumor_open(void);
 
 // the story list's entry of location i (RT_NULL: none): location, flag + 1 that shows it,
 // battle door (u16, 0 none), flag + 1 its victory sets
@@ -190,11 +225,7 @@ static void arrive(void)
 // world stream. Idle frames, menu input and child reentry consume no draws.
 static u16 world_draw(void *context)
 {
-    u8 *p=((Save *)context)->world_rng;
-    u32 n=(u32)b16(p)<<16|b16(p+2);
-    n^=n<<13;n^=n>>17;n^=n<<5;
-    p[0]=(u8)(n>>24);p[1]=(u8)(n>>16);p[2]=(u8)(n>>8);p[3]=(u8)n;
-    return (u16)(n>>17);
+    return service_world_draw(context);
 }
 
 static void travel_step(void)            // a pixel a frame along the route's points
@@ -209,6 +240,7 @@ static void travel_step(void)            // a pixel a frame along the route's po
         u8 result=world_party_day(&save.world,&save,breed_rules,world_draw,&save);
         const u8 *rt=route(wm.path[wm.leg]&0x7f);
         if(result==WB_INVALID){wm.moving=0;wm.x=loc_x(wm.at);wm.y=loc_y(wm.at);wm.note=NOTE_UNAVAILABLE;return;}
+        prop_day(&save.missions.dispatches);
         wm.at=wm.path[wm.leg]&0x80?rt[0]:rt[1];save.loc=(u8)(wm.at+1);wm.changed=1;
     }
     wm.step = 0;
@@ -311,6 +343,7 @@ static u8 in_tab(u8 id)
 static u8 shop_has(u8 id)
 {
     if (!in_tab(id)) return 0;
+    if(wm.fur)return wm.buy?(u8)(id&&save.poach[id]&&item_price(id)):(u8)(save.inv[id]&&item_price(id));
     return wm.buy ? on_sale(id) : (u8)(save.inv[id] && item_price(id));
 }
 // The list as a 256-bit set rather than a rescan: walking the ids cost 1.3M cycles a frame on
@@ -413,6 +446,7 @@ static void fit_buy(void)
 {
     SaveUnit *u = &save.unit[wm.trow];
     u8 id = best_fit(u), slot;
+    if(prop_away(&save.missions.dispatches,wm.trow)){wm.note=NOTE_UNAVAILABLE;return;}
     u16 price;
     if (!id) { wm.note = NOTE_LATER; return; }
     slot = fit_slot(id);
@@ -432,6 +466,17 @@ static void shop_trade(void)
     u16 price;
     if (!id) return;
     price = item_price(id);
+    if(wm.fur) {
+        u8 money[4],owned=save.inv[id],stock=save.poach[id],result;
+        memcpy(money,save.money,4);result=fur_trade(&save,id,price,wm.buy);
+        if(result!=FUR_OK){wm.note=result==FUR_NO_GIL?NOTE_NOGIL:result==FUR_FULL?NOTE_STOCK:NOTE_UNAVAILABLE;return;}
+#ifdef __m68k__
+        wm.changed=1;rt_save(SAVE_NAME,&save,sizeof save);wm.result=4;
+#else
+        if(!story_choice_store_file(&save)){memcpy(save.money,money,4);save.inv[id]=owned;save.poach[id]=stock;wm.note=NOTE_UNAVAILABLE;return;}
+#endif
+        shop_refresh();if(wm.trow>=shop_n)wm.trow=shop_n?(u8)(shop_n-1):0;wm.changed=1;return;
+    }
     if (wm.buy) {
         if (save.inv[id] >= 99) { wm.note = NOTE_STOCK; return; }
         if (gil() < price) { wm.note = NOTE_NOGIL; return; }
@@ -493,7 +538,7 @@ static void office_take(u8 row)
     if (save.n >= PARTY_MAX) { wm.note = NOTE_PARTY; return; }
     if (gil() < office_price(row)) { wm.note = NOTE_NOGIL; return; }
     gil_set(gil() - office_price(row));
-    save.n++; wm.changed = 1;
+    save.n++;save_generic_source(&save,(u8)(save.n-1),0x4a); wm.changed = 1;
     wm.screen = SC_OFFICE; wm.trow = 0;
 }
 static const char *unit_label(const SaveUnit *u)
@@ -537,7 +582,7 @@ void game_init(void)
     release_map();
 #endif
     wmcache=idle_sprites=RT_NULL;
-    bank = mgb = shop = scene = help = identity = RT_NULL;   // (statics survive between runs)
+    bank = mgb = shop = scene = help = identity = bar_art = bar_text = RT_NULL;
     strip_decor=decor_ready=0;
     memset(&wm, 0, sizeof wm);
     bank = rt_file("ffwm", &size);
@@ -545,6 +590,8 @@ void game_init(void)
     mgb = rt_file("ffmg", &size);
     if (mgb && memcmp(mgb, "FMG5", 4)) mgb = RT_NULL;
     save_load(&save);
+    service_gates=rt_file("ffsv",&size);if(!service_bank_valid(service_gates,size))service_gates=RT_NULL;
+    service_common=rt_file("ffcj",&size);if(!cj_valid(service_common,size))service_common=RT_NULL;
     // A town without its services is still a map: ffsh only disables them.
     shop = rt_file("ffsh", &size);
     if (shop && !memcmp(shop, "FSH2", 4) && size > 6 && shop[4] == 255) {
@@ -563,6 +610,8 @@ void game_init(void)
     help = rt_file("ffid", &size);
     if (help && (memcmp(help, "FID2", 4) || b16(help + 4) != 256 || b16(help + 6) != 512))
         help = RT_NULL;
+    bar_art=rt_file("ffbr",&size);if(!bar_art_valid(bar_art,size))bar_art=RT_NULL;
+    bar_text=rt_file("ffru",&size);if(!bar_text_valid(bar_text,size))bar_text=RT_NULL;
     breed_rules=rt_file("ffwb",&size);
     if(!world_rules_valid(breed_rules,size)||!save_world_valid(&save))bank=RT_NULL;
     if (bank) {
@@ -589,7 +638,9 @@ void game_scenario(u16 n)                 // the save's location (n: test doors,
     wm.sel = wm.at; wm.moving = 0; wm.note = n==1?NOTE_SAVED:0; wm.result = 0;
     if (bank) { wm.x = loc_x(wm.at); wm.y = loc_y(wm.at); }
     wm.handx=wm.x;wm.handy=wm.y;wm.menu=wm.row=0;
-    wm.screen=n==2?SC_FUR:SC_MAP;wm.trow=wm.ttop=0;wm.buy=1;   // n==2: the Fur Shop door
+    wm.screen=n==2||n==100||n==101?SC_FUR:SC_MAP;wm.fur=(u8)(wm.screen==SC_FUR);
+    if(n==101)wm.note=NOTE_UNAVAILABLE;
+    wm.trow=wm.ttop=0;wm.buy=1;
     decor_ready=0;
 }
 
@@ -614,19 +665,52 @@ static u8 leave(u16 result)
 // cursor, menu and travel keep their meaning untouched.
 static u8 town_update(u32 key)
 {
+    if(wm.screen>=SC_BAR) {
+        if(key&(K_ESC|K_B)) {
+            if(wm.screen==SC_RUMOR){wm.screen=SC_RUMORS;wm.trow=wm.rrow;wm.ttop=wm.rtop;}
+            else {wm.screen=wm.screen==SC_RUMORS?SC_BAR:SC_TOWN;wm.trow=wm.ttop=0;}
+            return 1;
+        }
+        if(wm.screen==SC_BAR) {
+            u8 open=service_open(&save,service_gates,0);
+            wm.trow=choice_move(wm.trow,open?3:2,key);
+            if(key&(K_ENTER|K_A)) {
+                if(open&&wm.trow==1)return leave(3);
+                wm.screen=wm.trow?SC_TOWN:SC_RUMORS;wm.trow=wm.ttop=0;
+            }
+        } else if(wm.screen==SC_RUMORS) {
+            u8 n=rumor_count();
+            wm.trow=choice_move(wm.trow,n?n:1,key);
+            if(wm.trow<wm.ttop)wm.ttop=wm.trow;
+            if(wm.trow>=wm.ttop+RUMOR_ROWS)wm.ttop=(u8)(wm.trow-RUMOR_ROWS+1);
+            if(n&&(key&(K_ENTER|K_A)))rumor_open();
+        } else {
+            if(key&K_LEFT){if(wm.rpage)wm.rpage--;}
+            else if(key&(K_RIGHT|K_ENTER|K_A)) {
+                if(wm.rpage<wm.rlast)wm.rpage++;
+                else if(key&(K_ENTER|K_A)) {
+                    wm.screen=SC_RUMORS;wm.trow=wm.rrow;wm.ttop=wm.rtop;
+                }
+            }
+        }
+        return 1;
+    }
     if ((key & (K_ESC | K_B)) && !wm.detail) {
         if (wm.card) { wm.card = 0; return 1; }
         wm.screen = (u8)(wm.screen == SC_TOWN ? SC_MAP :
-                         wm.screen == SC_SHOP || wm.screen == SC_FIT ? SC_STORE :
+                         wm.screen == SC_SHOP || wm.screen == SC_FIT ? (wm.fur?SC_FUR:SC_STORE) :
                          wm.screen == SC_HIRE || wm.screen == SC_RENAME ? SC_OFFICE : SC_TOWN);
         wm.trow = wm.ttop = 0;
         return 1;
     }
     if (wm.screen == SC_TOWN) {
-        wm.trow = choice_move(wm.trow, 4, key);
+        wm.trow = choice_move(wm.trow, 5, key);
         if (key & (K_ENTER | K_A)) {
             if (wm.trow == 2 && !fur_open()) { wm.note = NOTE_LATER; return 1; }
-            wm.screen = (u8)(wm.trow == 3 ? SC_MAP : wm.trow == 2 ? SC_FUR :
+            if(wm.trow==2&&!fur_support()){wm.note=NOTE_HUNT;return 1;}
+            wm.fur=(u8)(wm.trow==2);
+            if(wm.trow==3&&(!bar_art||!bar_text)){wm.note=NOTE_UNAVAILABLE;return 1;}
+            wm.screen = (u8)(wm.trow == 4 ? SC_MAP : wm.trow == 3 ? SC_BAR : wm.trow == 2 ? SC_FUR :
                              wm.trow ? SC_OFFICE : SC_STORE);
             wm.trow = wm.ttop = 0; wm.buy = 1;
         }
@@ -635,7 +719,9 @@ static u8 town_update(u32 key)
     if (wm.screen == SC_FUR) {           // the poached hides are a system of their own
         wm.trow = choice_move(wm.trow, 3, key);
         if ((key & (K_ENTER | K_A)) && wm.trow == 2) { wm.screen = SC_TOWN; wm.trow = 0; }
-        else if (key & (K_ENTER | K_A)) wm.note = NOTE_LATER;
+        else if(key&(K_ENTER|K_A)){
+            wm.buy=(u8)(wm.trow==0);wm.screen=SC_SHOP;wm.fur=1;wm.trow=wm.ttop=wm.cat=0;shop_refresh();
+        }
         return 1;
     }
     if (wm.screen == SC_STORE) {       // Buy / Sell / Fitting room / Leave store
@@ -681,7 +767,7 @@ static u8 town_update(u32 key)
         if (save.n) {
             wm.trow = choice_move(wm.trow, save.n, key);
             if (key & (K_ENTER | K_A)) {
-                if (save.unit[wm.trow].type == 2) wm.note = NOTE_LATER;   // not Ramza
+                if (save.unit[wm.trow].type == 2 || prop_away(&save.missions.dispatches,wm.trow)) wm.note = NOTE_LATER;   // not Ramza
                 else { reroll_name(&save.unit[wm.trow]); wm.changed = 1; }
             }
         }
@@ -702,7 +788,7 @@ static u8 town_update(u32 key)
         n = shop_n;
         if (n) {
             wm.trow = choice_move(wm.trow, n, key);
-            if (key & (K_ENTER | K_A)) shop_trade();
+            if (key & (K_ENTER | K_A)) {shop_trade();if(wm.result==4)return leave(4);}
             n = shop_n;
         }
         if (!n) wm.trow = 0;
@@ -1014,14 +1100,7 @@ static void date_plate(void)
 }
 static void says(const char *name, const char *first, const char *second)
 {
-    s16 x = DLG_FACE_W + 4;
-    u8 w = (u8)(map_menu_width(first) + 10), k = (u8)(map_menu_width(second) + 10);
-    if (k > w) w = k;
-    dlg_name(x, 1, (u8)(map_menu_width(name) + 8), name, 0);
-    dlg_frame(x, 13, w, 20, 0);
-    text(x + 4, 17, first, C_WHITE, 156);
-    text(x + 4, 24, second, C_WHITE, 156);
-    dlg_face(scene_face(town_room()), 1, 1, 0);
+    dlg_town_says(wm.screen>=SC_BAR?bar_art+12:scene_face(town_room()),name,first,second);
 }
 // CHOICE_MENU.md: one renderer, a width fitted to the labels, the same five pixels above the
 // first row and below the last, the glove wholly on screen, the glove animated.
@@ -1121,11 +1200,59 @@ static void shop_tabs(void)
 // list runs past it. CHOICE_MENU.md rule 6.
 static void scroll_marks(const ChoiceLayout *p, u8 n, u8 shown)
 {
-    s16 x = (s16)(p->x + p->width - 7), r;
-    if (wm.ttop) for (r = 0; r < 3; r++) draw_rect((s16)(x + r), (s16)(p->y + 4 - r), (s16)(1 + 2 * r), 1, C_BLACK);
-    if (wm.ttop + shown < n)
-        for (r = 0; r < 3; r++)
-            draw_rect((s16)(x + r), (s16)(p->y + p->height - 5 + r), (s16)(5 - 2 * r), 1, C_BLACK);
+    choice_scroll_marks(p,(u8)(wm.ttop!=0),(u8)(wm.ttop+shown<n));
+}
+
+#include "../bar_reader.inc"
+static ChoiceLayout rumor_box={24,36,0,0,7,CHOICE_TAB,3,1,0,6,12,9,156,0,0};
+static void rumor_open(void)
+{
+    wm.rumor=rumor_nth(wm.trow);if(wm.rumor==255)return;
+    {
+        u16 at=b16(rumor_record(wm.rumor)+10);u8 n;
+        if(at)for(n=bar_text[at++];n;n--,at+=2)
+            if(save_profile_set(&save,bar_text[at],bar_text[at+1]))wm.changed=1;
+    }
+    wm.rlast=(u8)(rumor_record(wm.rumor)[3]-1);wm.rpage=0;
+    wm.rrow=wm.trow;wm.rtop=wm.ttop;wm.screen=SC_RUMOR;
+}
+static void bar_compose(void)
+{
+    static const char *const rows[]={"Rumor","Leave bar"};
+    if(wm.screen==SC_RUMOR) {
+        const u8 *r=rumor_record(wm.rumor);
+        u16 offset=b16(bar_text+b16(r+12)+2*(u16)wm.rpage);
+        bar_reader(bar_art+12,rumor_string(wm.rumor,6),rumor_string(wm.rumor,8)+offset,0);
+        return;
+    }
+    says("Bar owner",wm.screen==SC_BAR?"Welcome. Come in":"What would you",
+         wm.screen==SC_BAR?"and relax.":"like to hear?");
+    if(wm.screen==SC_BAR) {
+        // Same left menu geometry and shared animated glove as the accepted proposal.
+        u8 i;
+        u8 open=service_open(&save,service_gates,0);
+        rumor_box.width=(u8)(map_menu_width(open?"Propositions":"Leave bar")+12);rumor_box.height=open?40:31;
+        rumor_box.hand_x=CHOICE_HAND_X(rumor_box.text_x);
+        rumor_box.hand_y=CHOICE_HAND_Y(rumor_box.row_y);
+        choice_frame(&rumor_box,"Menu");
+        for(i=0;i<(open?3:2);i++)choice_row(&rumor_box,i,open&&i==1?"Propositions":rows[open&&i==2?1:i],C_BLACK);
+    } else {
+        u8 n=rumor_count(),shown=n>RUMOR_ROWS?RUMOR_ROWS:n,i,w=0;
+        if(!shown)shown=1;
+        for(i=0;i<n;i++) {
+            u8 width=map_menu_width(rumor_string(rumor_nth(i),6));if(width>w)w=width;
+        }
+        if(!n)w=map_menu_width("No rumors now");
+        rumor_box.width=(u8)(w+12);rumor_box.height=(u8)(13+9*shown);
+        rumor_box.hand_x=CHOICE_HAND_X(rumor_box.text_x);
+        rumor_box.hand_y=CHOICE_HAND_Y(rumor_box.row_y);
+        choice_frame(&rumor_box,"Rumor");
+        if(!n)choice_row(&rumor_box,0,"No rumors now",C_DGRAY);
+        for(i=0;i<shown&&wm.ttop+i<n;i++)
+            choice_row(&rumor_box,i,rumor_string(rumor_nth((u8)(wm.ttop+i)),6),C_BLACK);
+        if(n)scroll_marks(&rumor_box,n,shown);
+    }
+    war_funds(gil());
 }
 static ChoiceLayout shop_box =
     { 24, 14, 120, 0, 7, CHOICE_TAB_PLAIN, 3, 1, 0, 16, 12, 9, 158, -16, 9 };
@@ -1145,8 +1272,8 @@ static void shop_rows(void)
         s16 y = (s16)(p->y + p->row_y + (u16)r * p->pitch);
         item_icon((s16)(p->x + 5), (s16)(y - 1), id);
         black((s16)(p->x + p->text_x), y, item_name(id));
-        if (!wm.buy) number((s16)(p->x + 76), y, save.inv[id]);
-        right((s16)(p->x + p->width - 10), y, wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
+        if(wm.fur||!wm.buy)number((s16)(p->x+76),y,wm.fur&&wm.buy?save.poach[id]:save.inv[id]);
+        right((s16)(p->x + p->width - 10), y, wm.fur ? (u16)(item_price(id)>>1) : wm.buy ? item_price(id) : (u16)(item_price(id) >> 1));
     }
     if (shop_n) scroll_marks(p, shop_n, shown);
 }
@@ -1239,8 +1366,10 @@ static void town_compose(void)
     u8 office = (u8)(wm.screen == SC_OFFICE);
     void *l = rt_light, *d = rt_dark;
     rt_light = page; rt_dark = page + PAGE_PLANE;
-    zx0_unpack(scene_room(TOWN_ROOM(office)) + 1, page);   // the room, straight into the page
-    if (wm.screen == SC_SHOP) {          // a list screen keeps the room but takes its height
+    if(wm.screen>=SC_BAR)memcpy(page,bar_art+360,2*PAGE_PLANE);
+    else zx0_unpack(scene_room(TOWN_ROOM(office)) + 1, page);
+    if(wm.screen>=SC_BAR)bar_compose();
+    else if (wm.screen == SC_SHOP) {          // a list screen keeps the room but takes its height
         shop_rows();
         {
             s16 left = war_funds(gil());
@@ -1276,14 +1405,19 @@ static void town_compose(void)
     rt_light = l; rt_dark = d;
     p_screen = wm.screen; p_cat = wm.cat; p_buy = wm.buy; p_trow = wm.trow;
     p_ttop = wm.ttop; p_n = shop_n; p_gil = gil();
+    p_rpage=wm.rpage;
 }
 static void town_page(void)
 {
     if (p_screen != wm.screen || p_cat != wm.cat || p_buy != wm.buy || p_trow != wm.trow ||
-        p_ttop != wm.ttop || p_n != shop_n || p_gil != gil())
+        p_ttop != wm.ttop || p_n != shop_n || p_gil != gil() || p_rpage!=wm.rpage)
         town_compose();
     page_blit();
-    if (wm.screen == SC_SHOP) { if (shop_n) choice_cursor_animated(&shop_box, (u8)(wm.trow - wm.ttop), rt_frame); }
+    if(wm.screen==SC_RUMOR)dlg_continue(151,91,rt_frame,1);
+    else if(wm.screen==SC_BAR||wm.screen==SC_RUMORS) {
+        if(wm.screen==SC_BAR||rumor_count())choice_cursor_animated(&rumor_box,(u8)(wm.trow-wm.ttop),rt_frame);
+    }
+    else if (wm.screen == SC_SHOP) { if (shop_n) choice_cursor_animated(&shop_box, (u8)(wm.trow - wm.ttop), rt_frame); }
     else if (wm.screen == SC_FIT) { if (save.n) choice_cursor_animated(&fit_box, (u8)(wm.trow - wm.ttop), rt_frame); }
     else if (wm.screen == SC_RENAME) { if (save.n) choice_cursor_animated(&fit_box, (u8)(wm.trow - wm.ttop), rt_frame); }
     else choice_cursor_animated(wm.screen == SC_OFFICE || wm.screen == SC_HIRE ? &office_box : &store_box,
@@ -1292,14 +1426,14 @@ static void town_page(void)
 
 static void town_render(void)
 {
-    static const char *const town_rows[4] = { "Shop", "Soldier Office", "Fur Shop", "Leave" };
+    static const char *const town_rows[5] = { "Shop", "Soldier Office", "Fur Shop", "Bar", "Leave" };
     if (wm.screen == SC_TOWN) {
         s16 cx = (s16)(wm.x - 80), cy = (s16)(wm.y - 50);
         rt_clamp_cam(&map, &cx, &cy);
         map_background(cx, cy, 1);
         ramza((s16)(wm.x - cx), (s16)(wm.y - cy));
         place_plate(loc_name(wm.at));
-        action_menu("Town", town_rows, 4, (u8)(fur_open() ? 255 : 2), 1);
+        action_menu("Town", town_rows, 5, (u8)(fur_open() ? 255 : 2), 1);
         choice_cursor_animated(&store_box, wm.trow, rt_frame);
         war_funds(gil());
         p_screen = 255;                 // the map wrote over nothing of the page, but the
@@ -1337,7 +1471,7 @@ void game_render(void)
     }
     if (wm.note) {
         static const char *const notes[] = { "", "No road there yet", "Not ripped yet", "Not available yet",
-            "Campaign saved", "Not enough gil", "99 of those already", "The party is full" };
+            "Campaign saved", "Not enough gil", "99 of those already", "The party is full", "Equip Secret Hunt first" };
         panel(20, 36, 120, 22);
         black(26, 40, notes[wm.note]);
         black(26, 48, "ENTER or SHIFT");

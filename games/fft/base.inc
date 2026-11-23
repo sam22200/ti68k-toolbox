@@ -1,3 +1,5 @@
+#ifndef FFT_BASE_INC
+#define FFT_BASE_INC
 // Shared by the battle engine (fft.c) and the scene player (campaign/scene.c): plane words,
 // big-endian reads, ZX0.
 // LCD rows are 30 bytes: long accesses are only word-aligned on alternating rows.
@@ -74,4 +76,6 @@ static u8 *zx0_unpack(const u8 *s, u8 *d)
         }
     }
 }
+#endif
+
 #endif

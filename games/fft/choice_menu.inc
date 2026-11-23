@@ -37,6 +37,14 @@ static void choice_cursor_animated(const ChoiceLayout *p,u8 row,u16 frame)
     choice_hand_at(p->x+p->hand_x+sway[(frame>>2)&7],p->y+p->hand_y+(u16)row*p->pitch);
 }
 
+// Shared town-list continuation marks. Booleans are supplied by the list owner.
+static void choice_scroll_marks(const ChoiceLayout *p,u8 above,u8 below)
+{
+    s16 x=(s16)(p->x+p->width-7),r;
+    if(above)for(r=0;r<3;r++)draw_rect((s16)(x+r),(s16)(p->y+4-r),(s16)(1+2*r),1,C_BLACK);
+    if(below)for(r=0;r<3;r++)draw_rect((s16)(x+r),(s16)(p->y+p->height-5+r),(s16)(5-2*r),1,C_BLACK);
+}
+
 static void choice_list(const ChoiceLayout *p,const char *const *labels,u8 count,
                         u8 selected,u8 color,u8 other,u16 frame)
 {

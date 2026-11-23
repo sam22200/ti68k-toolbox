@@ -1,0 +1,323 @@
+{
+  "caveat": "Core interface freeze is not certification of unripped maps, all Chapter I content, installed16KiB RAM or real hardware.",
+  "chapter_policy": {
+    "data_only": true,
+    "matching_core_key": true,
+    "no_save_variables": true,
+    "palettes_one_per_physical_model": true,
+    "resources_pooled": true,
+    "service_events_explicit": true
+  },
+  "core_key": "ac1de6c7a4d71264d1bee76df06f489d",
+  "core_sha256": "9f687e9bce0faaaea75ff1fd938dee763509e6a1083924bc980f6c4107298fcb",
+  "envelope": {
+    "actor_banks": 6,
+    "actor_frames": 42,
+    "axis": 18,
+    "companion_bytes": 4128,
+    "depth_bytes": 18488,
+    "layers": 2,
+    "module_zone_bytes": 9114,
+    "scene_rows": 202,
+    "tiles": 256,
+    "units": 13,
+    "width_pixels": 320
+  },
+  "formats": {
+    "bar_art_format": "FBR1",
+    "body_art_format": "FMB1",
+    "breeding_format": "FWB1",
+    "egg_art_format": "FEG2",
+    "encounter_format": "FCD5",
+    "formation_art_format": "FMA1",
+    "guest_format": "FGP1",
+    "ko_actor_format": "FKO1",
+    "objective_format": "FGO1",
+    "proposition_format": "FPR1/FPE1/FPT1",
+    "rumor_format": "FRU1",
+    "service_format": "FSV1",
+    "story_choice_format": "FCX1",
+    "view_format": "R4",
+    "world_save_format": "FSV9"
+  },
+  "native_layout": {
+    "ACTOR_BANKS": 6,
+    "AC_N": 42,
+    "DEPTH_MAX": 18488,
+    "MOD_ABI": 97,
+    "MOD_SIG": 9097,
+    "ModCtx": 396,
+    "ORDER": 6,
+    "Save": 4684,
+    "Save__deploy": 3118,
+    "Save__flags": 4,
+    "Save__flow": 3114,
+    "Save__generic_identity": 4682,
+    "Save__missions": 4024,
+    "Save__money": 3110,
+    "Save__poach": 4426,
+    "Save__profiles": 3992,
+    "Save__unit": 294,
+    "Save__world": 3918,
+    "Save__world_rng": 3987,
+    "State": 2278,
+    "State__abil": 1834,
+    "State__act": 1800,
+    "State__acted": 1815,
+    "State__ai": 1859,
+    "State__ai_t": 1860,
+    "State__atk": 1822,
+    "State__auto_units": 1870,
+    "State__banner": 2147,
+    "State__banner_t": 2148,
+    "State__camx": 1540,
+    "State__camy": 1542,
+    "State__crit": 1826,
+    "State__cx": 6,
+    "State__cz": 7,
+    "State__dbg": 2149,
+    "State__dmg": 1830,
+    "State__end": 1858,
+    "State__hit": 1825,
+    "State__menu": 1811,
+    "State__mode": 9,
+    "State__moved": 1814,
+    "State__open_handoff": 2079,
+    "State__open_stage": 2065,
+    "State__reward_ready": 2109,
+    "State__rot": 0,
+    "State__rounds": 1874,
+    "State__sel": 10,
+    "State__tgt": 1823,
+    "State__tick": 12,
+    "State__turns": 1801,
+    "State__unit": 32,
+    "UNITS": 13,
+    "Unit": 116,
+    "Unit__cell": 53,
+    "Unit__ct": 65,
+    "Unit__dc": 68,
+    "Unit__exp": 70,
+    "Unit__face": 4,
+    "Unit__female": 11,
+    "Unit__gfx": 2,
+    "Unit__hp": 54,
+    "Unit__job": 5,
+    "Unit__kos": 71,
+    "Unit__level": 6,
+    "Unit__max_hp": 56,
+    "Unit__max_mp": 60,
+    "Unit__mp": 58,
+    "Unit__name": 10,
+    "Unit__slot": 113,
+    "Unit__status": 13,
+    "Unit__team": 3,
+    "Unit__x": 0,
+    "Unit__z": 1,
+    "Work": 37790
+  },
+  "public_header_sha256": {
+    "actors.h": "b3a303e134dbddfca55fcc01319b9c09e4959c117e2e516bea71f58e5473e7e1",
+    "campaign/pack_format.h": "e3bde280ab8a49edff226a45de6116c2fac616571a0fe8f4585f95596d5a0775",
+    "campaign/pack_story.h": "1093554204ad750c090cd1cf2221eeeffbdf04127795db9fc1b1e7ce404c147b",
+    "campaign/packages/core.json": "430579dd7715eac9a2e9aa77e2f45806393101f14eebff6b720343fe54aacdb2",
+    "campaign/proposition_types.h": "4c8c037064810900793c7b095a0c5a4d47ebe6d15b9c2a3e5c154c1a2c8bda29",
+    "campaign/save_types.h": "1ca5dd542804a2f5c11fb739fdf2d30e1454e80d23b887ab7c393cbdbc02fd78",
+    "campaign/world_types.h": "e1d2429438c2e8ab479a9f50db8cb3e9b7f082a91640996fd358e54767b7f802",
+    "chapter_validate.h": "e3eb9310ff45a8a329b3074492140f2130573a60cf32a83cbd93961662692827",
+    "chapters.h": "30a158645f16e6e369cabec2656cc418041f6b09fe67b4a6cf06697e58c728cd",
+    "common.h": "36cd11cc8c03a86ef9209f9830f4c1da0cc18a6dd7597d502d2297c51cacc506",
+    "core_limits.h": "7238f7e7059a581e06731900d93a790a2ad06e1b7226f49507c76f8aa7207697",
+    "fft.h": "5d07c7537630405614e7a02251ca909de0ac8e9278d9c490756580c952dbddcb",
+    "module.h": "7ea5d577f8464c8e032c45888c70d1b79e0064e382fffde7c8d7979869bbd2b5",
+    "view_format.h": "3fea9de712ea1063ea8decca1dd9ac5f8d523815cdd8225384174e9fb17a3556"
+  },
+  "schema": "FFT_CORE_CONTRACT_1",
+  "shared_variables": {
+    "ffbcore": {
+      "bytes": 45367,
+      "kind": 28,
+      "sha256": "ab06ffd0e0c582345c5c79af3c21290978fea502acabb6b05677fdc6d756080d"
+    },
+    "ffbm": {
+      "bytes": 51370,
+      "kind": 28,
+      "sha256": "c32097590413a3e4cb3cefc2fbba785ccddfad2df007d7efcbfd3c9a4f460849"
+    },
+    "ffbn": {
+      "bytes": 50812,
+      "kind": 28,
+      "sha256": "8900a530f74d56ae9ca6b9370f6a0435578c164edc510dc9e1f9bf5d54be4da6"
+    },
+    "ffbo": {
+      "bytes": 51316,
+      "kind": 28,
+      "sha256": "dea838cb0f32fe21ef7e78ae59b40d22bf19b18fb0cb7f6427f264d5964b3351"
+    },
+    "ffbp": {
+      "bytes": 49558,
+      "kind": 28,
+      "sha256": "bf73499a734ed69482cc0845b45e0e0257f0eedb8686681fbe05345f2faa52b9"
+    },
+    "ffbr": {
+      "bytes": 6366,
+      "kind": 28,
+      "sha256": "031a77208d5885f9c2e0d188afe3538b96ebf5b5a129eba006c5eaef87ad3942"
+    },
+    "ffcj": {
+      "bytes": 50336,
+      "kind": 28,
+      "sha256": "9bb0c155d8f1aacc3528cc0ad29074f2d4d3c19907cc78570d3759041e7e85d3"
+    },
+    "ffcore": {
+      "bytes": 452,
+      "kind": 28,
+      "sha256": "88115f1d72d0460e0f8fb416cd7afdca81cbfb7145963a840258092c69907946"
+    },
+    "ffcp": {
+      "bytes": 20669,
+      "kind": 28,
+      "sha256": "6b49fe65ac0e9d869cd9d2b5463abfd595805c600872a68d3ee390023ddb4045"
+    },
+    "ffcu": {
+      "bytes": 14824,
+      "kind": 28,
+      "sha256": "d26132d4966dcd699aa5d8abc1c246f12854fdd24457c9f0d82718ed1ef0a694"
+    },
+    "ffcw": {
+      "bytes": 3030,
+      "kind": 28,
+      "sha256": "0929c1ec02c7acf52120bbbec4d46b00410868aed4dd068481a3141a54d9e115"
+    },
+    "ffeg": {
+      "bytes": 646,
+      "kind": 28,
+      "sha256": "84bff3750890414edb45807b84e5f201a6be4eaeac73f7cb2adc1674c530bd84"
+    },
+    "ffid": {
+      "bytes": 34272,
+      "kind": 28,
+      "sha256": "4fe5d5509310a5f6e6499a4b7105122f503830f8e228bc39f846a145566b0192"
+    },
+    "ffma": {
+      "bytes": 13088,
+      "kind": 28,
+      "sha256": "143f25b601f70f7bb92426ac3fa5eeae153fbd5227ba6dcfbcb343e45293591b"
+    },
+    "ffmb": {
+      "bytes": 63792,
+      "kind": 28,
+      "sha256": "2a4d7364b8dd4f675769da6a094378a1b02e1051a6be3bb9ea6245fa86b15f7b"
+    },
+    "ffmc": {
+      "bytes": 60910,
+      "kind": 28,
+      "sha256": "728946249aa946224aba93ea46709885bdfd5d022a4c6fce465087383e8303f0"
+    },
+    "ffmd": {
+      "bytes": 10882,
+      "kind": 28,
+      "sha256": "42624a0b1d58c4ab23d98e3ee4dfcd03121c098d7d0a60040438288c9731eb16"
+    },
+    "ffmg": {
+      "bytes": 23617,
+      "kind": 28,
+      "sha256": "8737b49c95bee8eb26b02728debed3d402a7fef04c6cb7747281e454160d9728"
+    },
+    "ffmgcore": {
+      "bytes": 34030,
+      "kind": 28,
+      "sha256": "85a864abf95581d07493b91daf44eed1667f5c667a3cf1998159e3a628c431c4"
+    },
+    "ffpccore": {
+      "bytes": 15482,
+      "kind": 28,
+      "sha256": "ab8bd61139f3796e5d14a81acddee1e78f60dd14b218cf6ee3dd10b9379cff6b"
+    },
+    "ffpe": {
+      "bytes": 443,
+      "kind": 28,
+      "sha256": "e2b106c058dfc8d865219ae1b643b3641a101ff8390006d163caf3ea484c0231"
+    },
+    "ffpr": {
+      "bytes": 4085,
+      "kind": 28,
+      "sha256": "829a9f84d0c865b17732ebb731848950b01643769d2a852e3e74779e3369a559"
+    },
+    "ffpt": {
+      "bytes": 16154,
+      "kind": 28,
+      "sha256": "f93430f2dc8431af662b5b21643e1b20c4e5fd1076cbd4438f74a8359b04de78"
+    },
+    "ffscore": {
+      "bytes": 18096,
+      "kind": 28,
+      "sha256": "890b1fc3c1e667f897dc4f01b4ac10d44c24068db86315f8343227b53c6f4e7d"
+    },
+    "ffsh": {
+      "bytes": 1474,
+      "kind": 28,
+      "sha256": "f4c4b3e8aff2d49033d5f062a8ec9fc16e76b078fb385cbd73315f31c84c6ce5"
+    },
+    "ffsk": {
+      "bytes": 8374,
+      "kind": 28,
+      "sha256": "ad17031d736484f6f235abf3a3d980307122fc25a0c8a17ec796a3863b7809c1"
+    },
+    "fftbat": {
+      "bytes": 1005,
+      "kind": 33,
+      "sha256": "b39d1ada4846c37a1493e6f76618d65d66c50da61d2096ef1cff07f053deef39"
+    },
+    "fftdep": {
+      "bytes": 1005,
+      "kind": 33,
+      "sha256": "038a236d06935fbeb6ef7d13a4dbafbd026845bf3148b168ed22b473558a4a69"
+    },
+    "fftitle": {
+      "bytes": 2869,
+      "kind": 28,
+      "sha256": "4f936f608812bc15a765e14fe793333c195c24fd65458b1d3d42c3fb1855a302"
+    },
+    "fftmap": {
+      "bytes": 1005,
+      "kind": 33,
+      "sha256": "ae1531c8ad1853c1ded22e3963cc257285328525cc2fd92e76e85742b79bf4c8"
+    },
+    "fftmng": {
+      "bytes": 1005,
+      "kind": 33,
+      "sha256": "aa28074680aba5589334ca0d7526deebd8cbcd02e90cdb5755202a5e4ca629ce"
+    },
+    "fftscn": {
+      "bytes": 1005,
+      "kind": 33,
+      "sha256": "b38e0555313e07f74686f42062192d0433b60ae96b592b48e7af9483b307dac6"
+    },
+    "fftstory": {
+      "bytes": 5381,
+      "kind": 33,
+      "sha256": "0d505376a1d99a120c41417c5d3c3e66a7f913bee3abb1291e05b004e0d31ce8"
+    },
+    "ffttcore": {
+      "bytes": 9841,
+      "kind": 28,
+      "sha256": "362ce040b79676672fd0ea7a9e1223c5bd54c565d7c8a56a1a0aa8a2de62ef55"
+    },
+    "ffttitle": {
+      "bytes": 1005,
+      "kind": 33,
+      "sha256": "1d62f8f14b88983081e47c21fe4dc5da54ba71378d2b2ee2639c6d15587a2bc0"
+    },
+    "ffwb": {
+      "bytes": 291,
+      "kind": 28,
+      "sha256": "7f75d9e31414ded8e0dddc9acbb961ad17e636b21535465649fa78af9b360ae3"
+    },
+    "ffwmcore": {
+      "bytes": 25264,
+      "kind": 28,
+      "sha256": "e47e168787384eb700b67449dbd6a8f1df8fa3e43dd92152f91088c72e496326"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Pre-extraction requirements: breeding, Bars and poaching
 
-2026-11-13, status updated2026-11-22. The user requires these systems in the core readiness queue **before
+2026-11-13, status updated2026-11-23. The user requires these systems in the core readiness queue **before
 starting campaign extraction**. They extend CAMPAIGN_PREREQUISITES.md and build
 on the delivered objective/scene-choice/calendar/monster work. The guide survey
 below is orientation; current delivery status is in the table and linked notes,
@@ -79,9 +79,9 @@ percentages; neither should replace original conditions/tables.
 | System | Native state | Original routines identified for the bounded follow-up |
 |---|---|---|
 | Calendar/breeding | [FSV7 calendar/eggs](BREEDING.md), [adult Formation/Status](MONSTER_FORMATION.md), wide bodies and the real deployment/Save/battle/results loop are integrated; see [HANDOVER.md](HANDOVER.md). Eggs remain excluded from battle. | `world_unit_update_monster_breeding`, `main_party_create_monster_egg`, hatch progress/total helpers; one day at completed route-leg arrival. |
-| Bar/rumors | [Source portraits C/D/C/D are approved](TOWN_SERVICES_REVIEW.md); the active town bank/prototype use them. Bar readers share the campaign's graphical cue, with no numeric counter. No shipping Bar/rumor route or rumor-specific save state yet. | `wldcore_list_open_rumors`, `wldcore_bar_push_rumor_detail_level`, rumor input/close handlers and their script variables. |
-| Propositions | No worker dispatch, away-unit state, active job timers or return settlement in the native save/UI. | `wldcore_list_open_available_propositions`, dispatch candidate/confirmation handlers, proposition states, `main_job_add_proposition_jp`. |
-| Poaching | `nature_runtime.inc::nature_hit_commit` removes the victim and rolls source loot. Its explicit policy gives blue-party loot directly to capped inventory. There is no independent Fur Shop stock or purchase UI. | `battle_action_add_poached_item_to_fur_shop_inventory`, `world_shop_adjust_poached_item_quantity`, shop eligibility/price/transaction handlers. |
+| Bar/rumors | [Chapter I mechanism delivered](BAR_SERVICE.md): source lifetimes of all six topics, prefixes/effects, explicit event/flag bindings, accepted A/117D reader and3-row scroll. Four-stage PC/sanitizer flow and a selected native long title pass; the active pilot keeps only its three original topics. FSV8 persists profiles8/9. | `wldcore_list_open_rumors`, detail/input handlers, WORLD F5/F6 stores and original events00C/02D/03A/075. Later chapter quest effects are separate. |
+| Propositions | [Playable accepted A](PROPOSITIONS.md): actual management dispatch/day/recall/frozen report/one-shot collect, source descriptions, explicit generic identity/away restrictions, FSV9 migration and Save/Continue. PC/sanitizers and selected native pointer/render/layout checks pass. | All96 rules and181 original reward pipelines checked; safe preferred-job adaptation retained. Bind original075 when Chapter II content is authored; pilot remains locked. |
+| Poaching/Fur | Actual impact preserves one loot roll/removes victim and adds separate cap255 stock; real battle exit retains it. Shared Shop Buy/Sell at half source price with atomic transactions and migration. | Original trade cities/Secret Hunt and Chapter III0CB gate retained. Counter reaches the same post-impact owner; no full new retail animation replay claim. |
 
 **OBSERVED IN SOURCE (read, not a new executable oracle):** the original world
 routine decrements existing egg timers before attempting daily reproduction,
@@ -93,18 +93,22 @@ The original poach-stock writer saturates at255, independently of ordinary
 inventory limits. Its exact rare/common selector is already covered by the
 earlier discovery oracle; preserve it rather than rounded guide percentages.
 
-These are source leads, not complete retail flow certification. In particular,
-travel advances the date at completed route-leg arrival (source read, see
-BREEDING.md). Still identify which rumor interactions write story
-state, and how purchase access/prices depend on chapter and equipped support.
+These source leads are not complete retail flow certification. Travel advances
+the date at completed route-leg arrival (see BREEDING.md). The Chapter I rumor
+effects and Fur access/half-price rules are now bound as described above;
+later chapter quest effects remain a separate content scope.
 
-## Required work before campaign extraction
+## Acceptance contract (delivered2026-11-23)
+
+The implementation/evidence in the table above closes the reusable gates below.
+This list records their requirements, not another pending service queue. The
+remaining campaign steps are in CHAPTER1_READINESS.md.
 
 1. **Shared world clock and durable state.** Advance time by original travel
    rules once, not by animation frames, repeated ENTER, cancelled travel or
    reentry. Define compact persistent dates/egg/job/rumor/poach state with
-   migration from current FSV7 and older formats. Calendar/eggs are delivered;
-   job/rumor/poach state remains. Keep current saves, permanent raw stats, discovery,
+   migration from FSV2..8 into FSV9. Calendar/eggs, rumor profiles, job/poach
+   state are delivered. Keep current saves, permanent raw stats, discovery,
    roster compaction and unused party records intact. Measure RAM costs; the
    existing16KiB gate is unpassed and cache capacities must not be reduced.
 2. **Breeding and eggs.** Source-check generation/hatching order, offspring
@@ -116,6 +120,9 @@ state, and how purchase access/prices depend on chapter and equipped support.
    and paginate details with safe back/cancel. Preserve original passive lore
    versus quest effects; no generic "read any rumor = advance story" flag.
    Known dialogue speakers retain portraits. Author/archive shared text by ID.
+   The Chapter I mechanism above is delivered: bind later scenes' actual completion
+   flags during content authoring, rather than inventing those scenes now. The six
+   original Chapter I texts contain only the King's profile effects, already saved.
 4. **Propositions.** Source-check candidate restrictions, fees, duration,
    seasonal/progress eligibility and rewards. Away workers must be excluded
    from deployment and duplicate dispatch. Return/collect exactly once after

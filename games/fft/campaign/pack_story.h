@@ -57,6 +57,8 @@ title:
         if(!r)return FP_OK;
         if(r==1)call(FP_MANAGE,0);
         else if(r==2)saved=call(FP_TITLE,3)==3;
+        else if(r==3){unsigned short m,arg=100;do{m=call(FP_MANAGE,arg);arg=m==3?101:100;}while(m==2||m==3);}
+        else if(r==4||r==5)saved=r==4?100:101;
         else{
             p=read("ffpack",&n);
             if(!fp_size(p,n,0))return FP_BAD_PACK;

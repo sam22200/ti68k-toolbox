@@ -1,5 +1,22 @@
 # Shared campaign resources and shipping deduplication
 
+Service ownership update (2026-11-23): the reusable96-mission catalogue,
+universal reward tables and all mission descriptions/reward names belong once
+to core: ffpr/FPR14079, ffpe/FPE1437, ffpt/FPT116148 bytes. Prose/page offsets
+are pooled offline and borrowed from archive; reuse the real management sheet
+and town page, not a second renderer or page buffer. Chapter ffsv/FSV1 is8
+bytes of explicit source-event/native-flag bindings, missing=255/locked.
+The shared Fur room/portrait/shop/item UI is reused; its256 stock counters
+belong in FSV9 Save, not an extra artwork bank. Matching private ABI96 groups
+are in `x/town-complete/packages/`; old installed groups are unchanged.
+
+Bar update (2026-11-22): core ffbr/FBR1 owns the approved Bar room/portrait once;
+chapter ffru/FRU1 owns pooled rumor titles/prose/effects/page offsets. Both join
+packaging validation and the existing duplicate audit, with a shared-alias reuse
+fixture in `check_bar_service.py`. Direct archive reads reuse the town page,
+without an article buffer. FSV8/core keys require a matching release rebuild;
+previous installed groups remain intact. See [BAR_SERVICE.md](BAR_SERVICE.md).
+
 FMA1 update (2026-11-14): [actual monster Formation/Status](MONSTER_FORMATION.md)
 uses universal core `ffma`,13082 raw bytes:16 chosen body/portrait pairs and255
 pooled source names. Forty-eight job IDs alias the16 physical records. The bank

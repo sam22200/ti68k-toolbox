@@ -1,3 +1,4 @@
+#define RT_SAVE_ATOMIC
 // The scene player as a packed program: fftscn(k) plays ffs<k>, returns 1 once it is over.
 #define USE_TI89
 #define MIN_AMS 200

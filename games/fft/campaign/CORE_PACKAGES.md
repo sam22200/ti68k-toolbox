@@ -1,5 +1,56 @@
 # Shared core and replaceable chapter packages
 
+## Current ABI97 contract (2026-11-23)
+
+`packages/core-contract.json` records the exact core group SHA/key, every
+shared variable, native layouts and public interface hashes. Run
+`make core-contract-check PILOT_PACKAGE_DIR=x/chapter1-ready/packages`. A
+source/layout drift fails; explicitly rebuild, review and freeze a new core
+before distributing changed interfaces. Chapters remain data-only, matched
+by core key, resource-pooled and independent of saves/configuration. The
+packager rejects executable members in chapter specifications.
+
+Current groups: `x/chapter1-ready/packages/fft-core.89g`700091 and
+`chapter-01.89g`295145 transport bytes; core key
+`ac1de6c7a4d71264d1bee76df06f489d`. ABI97 has29 images; graphics27 (4128) and
+cold Save reader28 (3542) share one preallocated4128-byte block, reclaiming
+3136 RAM bytes. Replacing either owner invalidates the cached body entry.
+Zone9114, actor cache42 and depth18488 remain. Actual TTPack resident input
+64833 leaves103 bytes. FSV9/4684 is unchanged. PC route and selected native
+owner/save checks are in `x/chapter1-ready/`; installed evidence is in HANDOVER.
+This interface freeze does not certify unripped content or16KiB free RAM.
+
+Earlier sections retain historical packages and layout measurements.
+
+
+FSV9/ABI96 update (2026-11-23): playable Propositions and separate poach/Fur
+stock require all current frontends plus28 matching images. Save4684 appends
+missions402/stock256/identity2 after the old4024-byte prefix; FSV2..8 migrate.
+Core owns ffpr4079/ffpe437/ffpt16148; chapter owns ffsv8 service-event bindings.
+Packaging validates their formats, ownership and bindings before producing
+matching keys. The pilot leaves later chapter services locked.
+
+Prepared private groups: `x/town-complete/packages/fft-core.89g`699535 transport
+bytes and `chapter-01.89g`295145; key522698b3edc1e50102e6ef96b08662bf.
+The intermediate `package-source.89g` must not be installed. All28 image
+signatures2288 and shard CRC agree. Zone9114, pinned companion7264 (now also
+composes fitted cached choice windows without overlay churn), cache42/depth18488.
+Fixed requests +2966 against FSV8; save scratch adds256 transient stack bytes.
+Battle TTPack input64827 leaves109 bytes (packed header and decompressed size).
+No cache/capacity reduction. Current installed free/peak/contiguous RAM is
+unmeasured;16KiB remains unpassed. Old successful boots below are historical.
+No groups/saves were installed or replaced in the live emulator.
+
+Bar/FSV8 update (2026-11-22): [BAR_SERVICE.md](BAR_SERVICE.md) adds shared core
+ffbr/FBR1 and chapter ffru/FRU1; packaging validates ownership and formats.
+Save3992 ->4024 appends64 Brave Story profile nibbles; FSV2..7 migrate without
+moving old fields. ABI95 stays, MOD_SIG changes automatically with Save size.
+All frontends, battle and28 images must be rebuilt together for the next release,
+with matching core/chapter keys. Existing installation groups are preserved.
+The companion reader is5140 bytes, so its reserve5048 ->5140 (+92), with no
+cache reduction. The16KiB free/peak target remains unpassed; the earlier successful
+battle launch below is historical evidence, not FSV8 installed-RAM certification.
+
 ABI94 update (2026-11-22): the battle's Status screen became the shared unit sheet
 ([UNIT_SHEET.md](../UNIT_SHEET.md)) -- the campaign's plate, the sheet's tab bar and the
 source's slot pictograms -- so `MOD_ABI` is 94 and core and chapter must match. The battle
@@ -291,6 +342,13 @@ bit 0; the supervisor opens `ffttitle(3)` once the step completes, SHIFT/ESC dec
 Game starts a fresh session without choosing a slot; Continue copies a slot into the session;
 `ffslot` only remembers the last slot. A lost or quit battle returns to the title and the
 slots are as last saved.
+
+**PC / TI exchange (2026-11-23).** The same FSV payload can now be exported as
+a TI variable or extracted back to a PC slot using `../tools/save_transfer.py`.
+All slots/session and legacy FSV2..9 are preserved; existing destinations need
+explicit replacement. Real PC→native atomic save→PC reload matches all4684
+current bytes. This covers campaign checkpoints, not raw PC `.state` snapshots.
+Commands and verification: [SAVE_TRANSFER.md](SAVE_TRANSFER.md).
 
 **Skips and debug (fixed2026-11-13).** In standalone and battle-map scenes,
 ESC asks "Skip scene?" with No selected. No, ESC or SHIFT resumes; Yes via

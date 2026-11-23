@@ -316,7 +316,7 @@ typedef struct {
 #endif
     u16 win[2][WIN_ROWS * RT_PBYTES / 2];   // bottom-right menu / preview cache
 #endif
-    u16 win_k[3]; u8 win_w, win_h, win_n, win_m;   // mode, moved | acted << 1 (M_ACTS: no ability
+    u16 win_k[3]; u8 win_w, win_h, win_n, win_m;   // win_w: pixel width; mode, moved | acted << 1 (M_ACTS: no ability
                                         // known; M_ACT: the ability), unit;
                                         // its width in words, its rows; its part to draw next
                                         // its parts (the box, a line each; win_n == win_m: drawn)
@@ -3930,7 +3930,10 @@ u8 ai_frozen(void) { return W->frz; }
 // The zone is a heap block (mod_ready), not part of the program: HW3Patch is required
 // (campaign/CHAPTER1_READINESS.md § 4), an unpatched Titanium freezes running it.
 #include "module_bank.h"
-#include "campaign/data/modules.h"      // MOD_ZONE: the bank's largest image (ffbm)
+#ifndef FFT_MODULE_HEADER
+#define FFT_MODULE_HEADER "campaign/data/modules.h"
+#endif
+#include FFT_MODULE_HEADER             // private matching exports can override the generated header
 static u16 *mod_zone;
 static const u8 *mod_images[MOD_COUNT];
 static ModCtx *mod_context(u8 id)
@@ -4008,65 +4011,58 @@ static void mod_install(u8 id,u8 *dst)
         c->flow_ui=flow_ui;
     }
 }
-// The companion (MOD_COMPANION): installed once in its own heap block (HW3Patch), then called
-// directly from the resident or any zone image, never swapped. Its block is the
-// FFT_CORE_COMPANION_MAX envelope, reserved at battle start (companion_reserve, before the
-// battle's buffers; counted in BATTLE_RAM_BYTES); reinstalled when the bindings it holds
-// change (Work, map); freed on exit (final_release). No allocation during play.
+// One block, two mutually exclusive owners. Cold Save reads may replace the
+// graphics image only while no companion call is active. Rendering restores it
+// once, invalidating cached context/entry pointers; warm frames never switch.
 static u16 *comp_block;
-static ModCtx *comp_context(void){return (ModCtx *)((u8 *)comp_block+RD16(mod_images[MOD_COMPANION],4));}
+static u8 comp_id;
+static ModCtx *comp_ctx;
+static u16 (*comp_entry)(u8,u8);
+static ModCtx *comp_bind(u8 id)
+{
+    const u8 *m=mod_images[id];
+    ModCtx *c=(ModCtx *)((u8 *)comp_block+RD16(m,4));
+    if(comp_id!=id+1||c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){
+        mod_install(id,(u8 *)comp_block);comp_id=(u8)(id+1);comp_ctx=RT_NULL;
+    }
+    return c;
+}
 static u8 companion_reserve(void)
 {
-    const u8 *m=mod_images[MOD_COMPANION];
     if(comp_block)return 1;
-    if(!m||RD16(m,3)>FFT_CORE_COMPANION_MAX||!(comp_block=malloc(FFT_CORE_COMPANION_MAX)))return 0;
-    mod_install(MOD_COMPANION,(u8 *)comp_block);
-    return 1;
+    if(RD16(mod_images[MOD_COMPANION],3)>FFT_CORE_COMPANION_MAX||
+       RD16(mod_images[MOD_SAVE_READER],3)>FFT_CORE_COMPANION_MAX||
+       !(comp_block=malloc(FFT_CORE_COMPANION_MAX)))return 0;
+    comp_id=0;return 1;
 }
 static u16 special(u8 a,u8 t,AbId ab,u8 query)
 {
-    const u8 *m=mod_images[MOD_COMPANION];ModCtx *c;
-    if(!comp_block)return 0;                    // not reserved: the battle never started
-    c=comp_context();
-    if(c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){mod_install(MOD_COMPANION,(u8 *)comp_block);c=comp_context();}
-    c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;
-    return ((u16 (*)(u8,u8))((u8 *)comp_block+RD16(m,2)))(query,0);
+    ModCtx *c;if(!comp_block)return 0;
+    c=comp_bind(MOD_COMPANION);c->cast_actor=a;c->cast_ref=t;c->cast_ability=ab;
+    return ((u16 (*)(u8,u8))((u8 *)comp_block+RD16(mod_images[MOD_COMPANION],2)))(query,0);
 }
 #ifdef FFT_CHAPTER
-// The wide monster bodies: the renderer and its shifted-body slots live in the companion
-// image, which keeps them out of the resident. Its block is never swapped, so this costs
-// one indirect call per body, not a zone install. Thirteen bodies a frame make the
-// address arithmetic worth keeping: reading mod_images and the image header on every one
-// of them cost about 600 cycles a body.
-static ModCtx *comp_ctx;
-static u16 (*comp_entry)(u8,u8);
 static u8 companion_body(s16 sx,s16 sy,u8 rot,u8 i,const Cover *c)
 {
     ModCtx *x=comp_ctx;
     if(!comp_block)return 0;
     if(!x||x->w!=W||x->map_tiles!=map_tiles||x->unit_count!=encounter_units){
-        mod_install(MOD_COMPANION,(u8 *)comp_block);
-        comp_ctx=x=comp_context();
+        comp_ctx=x=comp_bind(MOD_COMPANION);
         comp_entry=(u16 (*)(u8,u8))((u8 *)comp_block+RD16(mod_images[MOD_COMPANION],2));
     }
     x->body_x=sx;x->body_y=sy;x->body_cover=c;x->body_rot=rot;
 #ifdef FFT_VIEW_SPLIT
-    // The scene buffer moves without the map or the roster moving, so the depth the
-    // bodies read is refreshed per call, not only when the image is reinstalled.
     x->ctx_vbuf=vbuf;x->ctx_vplane=vplane;
 #endif
     return (u8)comp_entry(253,i);
 }
 #endif
-static void companion_free(void){if(comp_block)free(comp_block);comp_block=RT_NULL;comp_ctx=RT_NULL;}
+static void companion_free(void){if(comp_block)free(comp_block);comp_block=RT_NULL;comp_ctx=RT_NULL;comp_id=0;}
 static u8 module_save_load(Save *out)
 {
-    const u8 *m=mod_images[MOD_COMPANION];ModCtx *c;
-    if(!comp_block||!out)return 0;
-    c=comp_context();
-    if(c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){mod_install(MOD_COMPANION,(u8 *)comp_block);c=comp_context();}
-    c->save_out=out;
-    return (u8)((u16 (*)(u8,u8))((u8 *)comp_block+RD16(m,2)))(254,0);
+    ModCtx *c;if(!comp_block||!out)return 0;
+    c=comp_bind(MOD_SAVE_READER);c->save_out=out;
+    return (u8)((u16 (*)(u8,u8))((u8 *)comp_block+RD16(mod_images[MOD_SAVE_READER],2)))(254,0);
 }
 static u16 mod_call(u8 id, u8 op, u8 a)
 {
@@ -6770,6 +6766,10 @@ static u8 area_paint(u8 who)
 }
 #endif
 
+#ifndef FFT_MODULES
+#include "window_blit.inc"
+#endif
+
 // The HUD's parts are made one a frame at least (more while the budget has room): a menu, then
 // the panels; the active unit (or the attacker) on the left, the unit under the cursor (or the
 // target) on the right, during moves and blows too
@@ -6872,21 +6872,19 @@ static const u8 forecast_mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 
     }
     if (!hidden && !pre && k[0] && W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m) {
         u8 y = k[0] == M_ACT ? PANEL_Y - W->win_h : RT_H - W->win_h;
-        u8 r;
-        u16 *l = (u16 *)rt_light + y * (RT_PBYTES / 2) + 6;
-        u16 *d = (u16 *)rt_dark + y * (RT_PBYTES / 2) + 6;
-        // Above the frame, copy only the title tab; the scenery fills the rest.
-        for (r = 0; r < 3; r++, l += RT_PBYTES / 2, d += RT_PBYTES / 2)
-            for (i = 0; i < W->win_w; i++) {
-                u16 keep = (u16)~W->win[0][i];
-                l[i] = (l[i] & keep) | W->win[0][r * (RT_PBYTES / 2) + i];
-                d[i] = (d[i] & keep) | W->win[1][r * (RT_PBYTES / 2) + i];
-            }
-        copy_box(W->win[0] + 3 * (RT_PBYTES / 2), W->win[1] + 3 * (RT_PBYTES / 2), 12, y + 3, W->win_w, W->win_h - 3);
+#ifdef FFT_MODULES
+        special(0,y,NO_ABIL,252);
+#else
+        window_blit(y);
+#endif
         if (k[0] == M_MENU || k[0] == M_AUTO || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT || k[0] == M_ORDER) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS || k[0] == M_AUTO ? st.sub : k[0] == M_SKILLS ? st.skill - W->win_k[1]
                 : k[0] == M_ORDER ? st.status_row : st.quit + 1;
-            draw_hand(80, y + 7 + 6 * e);
+#ifdef FFT_CHOICE_LEGACY_WIDTH
+            draw_hand(80,y+7+6*e); // historical visual control only
+#else
+            draw_hand((s16)(96+CHOICE_HAND_X(6)+(k[0]==M_MENU||k[0]==M_ACTS?64-W->win_w:0)), y + 7 + 6 * e);
+#endif
         }
     }
     W->hud_ok = (!pk[0] || panel_shown(0, pk[0])) && (!pk[1] || panel_shown(1, pk[1]))

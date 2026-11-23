@@ -11,7 +11,7 @@
  *   --max N           stop after N million cycles (default 2000)
  *   --trace-rom       log every ROM call
  *   --file F.89y      put the variable of F (any .89y/.89z) in the VAT, archived (repeatable)
- *   --save-dir D      at exit, write the variables the program created (SymAdd) as D/NAME.89y
+ *   --save-dir D      at exit, write created/re-bound variables as D/NAME.89y
  *   --keys F          input script for BENCH_KEYS, the PC format ("<frame> <keys...>" lines)
  *   --frames N        value read by BENCH_FRAMES (default -1: no limit)
  * Protocol (include tools/m68kbench/bench.h):  0xE00000..0xE000FF, word/long writes
@@ -78,6 +78,7 @@ static uint32_t pending_name_id;
 static int io_warn;
 static int nvars;
 static int var_new[NVAR];                    /* created by the program (SymAdd): --save-dir */
+static uint32_t var_initial_handle[NVAR];     /* also export atomic replacements of imported entries */
 static const char *save_dir;
 static long bench_frames = -1;
 static uint32_t key_frame;
@@ -215,10 +216,11 @@ static void load_var(const char *path)
     memcpy(name, buf + 0x40, 8); name[8] = 0;
     if (off + 6 + size > (uint32_t)n || nvars >= NVAR || !(h = halloc(2 + size))) { fprintf(stderr, "%s: cannot load\n", path); exit(2); }
     for (i = 0; i < 2 + size; i++) wr8(handles[h] + i, buf[off + 4 + i]);
-    wr16(VAT_ADDR + 14 * add_var(name, h) + 10, 0x0200);                     /* archived */
+    i = add_var(name, h); var_initial_handle[i] = h;
+    wr16(VAT_ADDR + 14 * i + 10, 0x0208);                                  /* AMS archived+locked */
 }
 
-/* the created variables, in the .89y layout of ttbin2oth (an OTH_TAG variable) */
+/* Created or re-bound variables, in ttbin2oth's .89y layout (an OTH_TAG variable). */
 static void save_vars(void)
 {
     int v;
@@ -227,7 +229,7 @@ static void save_vars(void)
         uint8_t hd[0x56] = { '*', '*', 'T', 'I', '8', '9', '*', '*', 1, 0, 'm', 'a', 'i', 'n' };
         char path[1024], name[9];
         FILE *f;
-        if (!var_new[v] || !h || h >= (uint32_t)nhandles) continue;
+        if ((!var_new[v] && h == var_initial_handle[v]) || !h || h >= (uint32_t)nhandles) continue;
         p = handles[h]; size = rd16(p);
         for (i = 0; i < 8; i++) name[i] = hd[0x40 + i] = rd8(e + i);
         name[8] = 0;
@@ -342,7 +344,9 @@ static long rom_call(int n)
         int v = find_var(arg32(0));
         if (v >= 0) {
             uint32_t f = VAT_ADDR + 14 * v + 10;
-            wr16(f, n == 0x162 ? rd16(f) | 0x0200 : rd16(f) & ~0x0200);
+            /* AMS3.10 archive sets0x0208; unarchive clears both bits.
+               Verified against the installed native writer/ROM2026-11-23. */
+            wr16(f, n == 0x162 ? rd16(f) | 0x0208 : rd16(f) & ~0x0208);
         }
         m68k_set_reg(M68K_REG_D0, v >= 0); return 20000; }                     /* a Flash write: slow */
     case 0x3fa: {                                                              /* OO_CondGetAttr(frame, attr, &p) */

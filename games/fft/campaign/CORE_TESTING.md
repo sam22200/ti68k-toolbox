@@ -1,5 +1,24 @@
 # Validation by affected dependency
 
+`make save-transfer-check` (2026-11-23) covers offline PC/TI save conversion and
+the real shared campaign reader/writer on PC and ASan/UBSan. Opt into one small
+native runtime I/O carrier with `SAVE_TRANSFER_FLAGS=--native`: PC slot1 → TI
+atomic replacement of imported slot2 → actual exported file → sanitized PC
+reload, with every4684 byte equal and an FSV8 migration control. No screenshot,
+TiEmu, gameplay/ABI change or full native sweep. Use `SAVE_TRANSFER_OUTPUT` to
+preserve accepted proofs (`x/save-transfer/final/`). [Usage/scope](SAVE_TRANSFER.md).
+
+`make pilot-e2e-check` (2026-11-23) is the actual ordinary-combat pilot plus
+same-session town/Formation/Save/Continue route on PC and ASan/UBSan. It writes
+logs, canonical CSVs, inputs and raw memory/save snapshots, no PNGs. Add
+`PILOT_E2E_FLAGS=--native` for one full68000 Gariland fight with state-driven
+menu input and exact4684-byte settlement comparison, not a native sweep.
+Use `PILOT_E2E_OUTPUT` to keep accepted proofs intact; current evidence is
+`x/pilot-e2e/final/`. Reuse existing hardware evidence unless a hardware path
+changes. Full scope, runner export fix and remaining RAM/content gates:
+[HANDOVER.md](HANDOVER.md).
+
+
 Monster Formation/Status (2026-11-14): `make campaign-monster-formation-check`
 runs PC/sanitizers on ten approved pictures, two actual input flows and FMA1
 rejection boundaries. `check_monster_formation.py --native` opts into only two

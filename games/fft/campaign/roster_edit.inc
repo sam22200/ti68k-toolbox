@@ -9,6 +9,9 @@ static void roster_slot_swap(Save *s, u8 a, u8 b)
     SaveUnit t;
     u8 i, ca, cb, ra, rb, e, d0, d1;
     if (a == b || a >= s->n || b >= s->n) return;
+    if(s->missions.report.ready)return;
+    {u8 x=save_generic(s,a),y=save_generic(s,b),j,k;save_generic_set(s,a,y);save_generic_set(s,b,x);
+     for(j=0;j<s->missions.dispatches.n;j++)for(k=0;k<s->missions.dispatches.job[j].n;k++){u8 *v=&s->missions.dispatches.job[j].unit[k];if(*v==a)*v=b;else if(*v==b)*v=a;}}
     t = s->unit[a]; s->unit[a] = s->unit[b]; s->unit[b] = t;
     ra = save_raw_current(s, a); rb = save_raw_current(s, b);
     save_raw_set(s, a, rb); save_raw_set(s, b, ra);
@@ -29,7 +32,7 @@ static void roster_slot_swap(Save *s, u8 a, u8 b)
 static u8 roster_remove(Save *s, u8 slot)
 {
     u8 i, k;
-    if (slot >= s->n || s->unit[slot].type == 2) return 0;      // never Ramza
+    if (slot >= s->n || s->unit[slot].type == 2 || s->missions.report.ready || prop_away(&s->missions.dispatches,slot)) return 0;      // never Ramza
     for (k = 0; k < 5; k++) {
         u8 id = s->unit[slot].eq[k];
         if (id && s->inv[id] < 99) s->inv[id]++;
@@ -38,7 +41,7 @@ static u8 roster_remove(Save *s, u8 slot)
     for (i = slot; i + 1 < s->n; i++) roster_slot_swap(s, i, (u8)(i + 1));
     i = (u8)(s->n - 1);
     memset(&s->unit[i], 0, sizeof s->unit[i]);
-    save_raw_set(s, i, 0);
+    save_raw_set(s, i, 0);save_generic_set(s,i,0);
     world_party_clear_slot(&s->world, i);
     for (k = 0; k < s->deploy_n && k < 5; k++) if (s->deploy[k][0] == i) {
         u8 j;

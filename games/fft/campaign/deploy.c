@@ -42,8 +42,14 @@ u8 game_update(void)
     if(key&K_RIGHT)deploy_move(0,-1);
     if(key&K_UP)deploy_move(1,0);
     if(key&K_DOWN)deploy_move(-1,0);
-    if(key&(K_A|K_ENTER))deploy_place();
-    if(key&K_B){u8 cell=(u8)(dp.row*5+dp.col);if(dp.placed[cell]!=255){dp.placed[cell]=255;dp.n--;}}
+    if(key&(K_A|K_ENTER)){
+        if(deploy_place()){
+            const u8 *cell=deploy_cell((u8)(dp.row*5+dp.col));
+            tilog("deploy slot %u tile %u,%u face %u count %u",dp.unit,cell[1],cell[2],deploy_rules()[3],dp.n);
+        }
+    }
+    if(key&K_B){u8 cell=(u8)(dp.row*5+dp.col);if(dp.placed[cell]!=255){
+        tilog("deploy remove slot %u cell %u",dp.placed[cell],cell);dp.placed[cell]=255;dp.n--;}}
     if(key&(K_C|K_D)){if(deploy_ready())dp.confirm=1;else dp.note=4;}
     return 1;
 }
@@ -182,7 +188,7 @@ void game_render(void)
         choice_row(&menu,0,"Start Battle",C_BLACK);choice_row(&menu,1,"Return",C_BLACK);
         choice_cursor_animated(&menu,dp.confirm-1,rt_frame);
     } else if(dp.note) {
-        static const char *const notes[]={"","Not a legal tile","Tile occupied","Squad full","Ramza must deploy","Save failed","An egg cannot fight"};
+        static const char *const notes[]={"","Not a legal tile","Tile occupied","Squad full","Ramza must deploy","Save failed","An egg cannot fight","Unit away on mission"};
         draw_rect(12,40,136,21,C_BLACK);draw_rect(13,41,134,19,C_WHITE);
         black(18,44,notes[dp.note]);
     }

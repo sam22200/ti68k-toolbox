@@ -590,6 +590,12 @@ GKeyFlush();                             // don't leave the game's keypresses in
   wrappers calling the core's through the context. AMS ROM calls (`memset`, ...) need
   nothing: they read the ROM table at a fixed address. Measured: reaching the core's state
   through a context pointer cost the FFT AI ~8 % cycles.
+  **Native compiler observation (FFT services,2026-11-23, not an emulator
+  claim):** a local byte array initializer such as `u8 active[12]={0}` can
+  synthesize a raw `memset` relocation even when source-level calls are routed
+  through a module context macro. Use an uninitialized array followed by the
+  explicit context-bound `memset(active,0,sizeof active)`. Re-export with the
+  normal relocation/undefined-symbol guard; never admit the implicit libcall.
   No single unpatched binary works on both: a DLL game needs HW3Patch on the Titanium, or two
   builds. Exports are called by **ordinal**: never reorder the export list. For big games, split the
   **data** into separate files (§10) instead: HW3-safe and simpler.
@@ -1172,3 +1178,24 @@ counting sort of at most256 nodes can use byte bucket starts and clamped byte
 keys. A sole256-node histogram bucket wraps to0 with the correct start0;
 placements still visit all256 slots. Otherwise every histogram fits. Test this
 edge explicitly, and never reuse the mutated final buckets as population counts.
+
+### Archived variables carry an automatic lock (verified, Titanium AMS3.10)
+
+`EM_moveSymToExtMem` sets both archived and locked (`0x0208`);
+`EM_moveSymFromExtMem` clears both. Reject a manual lock on an unarchived
+variable, then unarchive and re-fetch the symbol before requiring both flags
+to be clear. Testing `locked` before unarchiving rejects ordinary archived
+saves. Observed in private TiEmu and checked against the actual ROM's
+`ori.w #0x0208` / `andi.w #0xFDF7`; native VAT regression now models both bits.
+An atomic replacement allocates/fills the new handle first and keeps the old
+one until unarchive succeeds. This does not certify power-loss atomicity.
+
+### Variadic logging in whole-program PIC images (verified, GCC4TI/Titanium)
+
+With `-fwhole-program -mpcrel -mregparm=5`, GCC4TI inlined a static
+variadic `tilog` into `make_window`, discarded its two long arguments and
+made `va_start` read the caller frame. The resulting heap log was false.
+A local `__attribute__((noinline))` declaration retains the real stack call
+and both arguments. Keep the ROM formatter's output callback local C in PIC
+images, since external `strputchar` would leave a relocation. The ordinary
+frame path does not scan the heap; diagnostics are one-shot and opt-in.

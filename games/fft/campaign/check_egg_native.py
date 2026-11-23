@@ -13,7 +13,7 @@ def main():
     initial=bytearray(fixture()[:3918])   # the shared prefix; this check writes its own world tail
     initial[4]|=2;initial[36]=8;initial[37]=7
     parent=bytearray(initial[470:646]);parent[0:5]=bytes((95,255,3,250,42));initial[294+7*176:294+8*176]=parent
-    initial=b'FSV7'+bytes(initial[4:])+bytes((1,1,0,0))+bytes(65)+bytes((0,0,0,1,0))
+    initial=b'FSV8'+bytes(initial[4:])+bytes((1,1,0,0))+bytes(65)+bytes((0,0,0,1,0))+bytes(32)
     for label,flags,cases in [('manage',[],[(0,0x9c07),(1,0xaa1b),(2,0xe3df)]),('map',['-DEGG_MAP'],[(0,0xeaaa),(1,None)])]:
         common=[*flags,HERE/'check_egg_render.c',ROOT/'runtime/core/rt_core.c']
         (out/(label+'-build.log')).write_text(run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/label,*common,
@@ -31,7 +31,7 @@ def main():
                 (out/f'{label}-{scenario}.log').write_text(log)
                 assert re.search(r'checksum (\w+)',log)[1].lower()==match[1].lower(),log
                 values=[int(x,16) for x in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',log)]
-                assert values[-2:]==[int(match[2],16),3992],values
+                assert values[-2:]==[int(match[2],16),4684],values
                 if scenario==1 and label=='map':assert int(match[2],16)!=17
                 rows.append(dict(case=f'{label}-{scenario}',checksum=match[1],state_hash=match[2]))
     (out/'results.json').write_text(json.dumps(rows,indent=2)+'\n');print(json.dumps(rows,indent=2))

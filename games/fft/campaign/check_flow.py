@@ -21,7 +21,7 @@ def run(args,cwd=HERE):
 def fixture():
     q=(HERE/'data/ffflow.bin').read_bytes();a,d=struct.unpack_from('>2H',q,4)
     roster=q[a:a+1493];dep=q[d:d+79]
-    b=bytearray(b'FSV7'+bytes(32)+bytes((7,7))+roster[5:261]+roster[261:]+bytes(9*176))
+    b=bytearray(b'FSV8'+bytes(32)+bytes((7,7))+roster[5:261]+roster[261:]+bytes(9*176))
     assert len(b)==3110
     cells=[dep[4+3*i:7+3*i] for i in range(25) if dep[4+3*i]]
     placements=b''.join(bytes((slot,c[1],c[2],dep[3])) for slot,c in zip((0,2,3,4,6),cells))
@@ -31,7 +31,8 @@ def fixture():
     b+=bytes(714)                                   # FSV6: no guest (an all-zero block is valid)
     b+=bytes((1,1,0,0))+bytes(65)                   # FSV7: day one of year one, no egg
     b+=bytes((0x25,0x45,0xf4,0x91))+bytes(1)        # save_world_init's seed, even-size pad
-    assert len(b)==3992
+    b+=bytes(32)                                    # FSV8: no Brave Story profile yet
+    assert len(b)==4024
     return bytes(b)
 
 def data_links(folder,source=None):

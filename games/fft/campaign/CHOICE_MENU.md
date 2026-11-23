@@ -4,13 +4,19 @@
 
 Decided with the user on 2026-11-20, after the town menu shipped too wide, with
 its glove off the screen and no room under its last row. **Every new menu obeys
-these five rules, and a menu that cannot must say in a comment why.**
+these nine rules, and a menu that cannot must say in a comment why.**
 
 1. **One renderer.** `choice_frame` / `choice_row` / `choice_cursor_animated`
    from `../choice_menu.inc`. No menu draws its own frame, rows or hand.
-2. **Width fits the labels.** `width = widest label + 12`, measured with the
-   screen's own font, never a constant chosen by eye. A menu is as wide as it
-   needs and no wider.
+2. **Width fits the longest option, with small margins.** Measure the actual
+   options with the screen's own font: `width = widest label + 12` for the
+   shared six-pixel text inset. This leaves six pixels before and after the
+   longest label (including the border). Never reserve a broad empty area on
+   the right, size the body to a long title tab, or retain a fixed-width body
+   merely because its cache is wider. The animated glove protrudes outside
+   the left border; its size does not add interior padding. If a cache copies
+   aligned words, mask its unused pixels rather than widening the visible box.
+   User clarification2026-11-22 applies especially to battle Menu and Act.
 3. **The same air above the first row and below the last.** With the usual
    `body_y 7`, `row_y 12`, `pitch 9`, that is `height = 13 + 9 * rows`: five
    pixels over the first label and five under the last. The world map's own
@@ -19,8 +25,12 @@ these five rules, and a menu that cannot must say in a comment why.**
 4. **The glove is placed by the rule, not by eye.** The sprite is 32 wide and
    14 tall; its pointing finger ends at +16 on rows 4..6 and the sway adds up
    to three. So `hand_x = CHOICE_HAND_X(text_x)` (= `text_x - 21`): at its
-   rightmost frame the finger all but touches the label, and it leans out over
-   the frame's left border the way the source's own cursor does. Vertically
+   rightmost frame the finger ends at `text_x - 2`: there is **exactly one
+   empty pixel** at `text_x - 1` before the label begins. The finger **enters
+   the box** at maximum sway; the rest of the glove leans out over its left
+   border. Never keep the whole hand outside the body or add padding to make
+   room for it. This exact gap and mandatory animation were reconfirmed by the
+   user on2026-11-22. Vertically
    `hand_y = CHOICE_HAND_Y(row_y)` (= `row_y - 2`) puts the *finger*, not the
    fist, on the label's middle row; over a 12-pixel pictogram it is the
    pictogram's top row. Both macros live in `../choice_menu.h`.
@@ -80,9 +90,9 @@ text limit and hand offset. Font hooks select the existing battle or management
 font; callers supply labels and per-choice colors, including disabled entries.
 The tabbed battle style, world map's plain inset and management's panel style
 retain their existing pictures. `choice_cursor_animated(layout,row,frame)` offers
-the battle-style0..3-pixel sway on a32-frame cycle. Other callers retain their
-existing hand policy; deployment uses the shared animation with `rt_frame`,
-without growing state or save records.
+the battle-style0..3-pixel sway on a32-frame cycle. Every active choice menu
+uses this animation (the battle's shared tick or `rt_frame`), without growing
+state or save records.
 
 Battle retains its strided cached window, one-part-at-a-time construction,
 menu-state validation, ability pagination/scroll indicators and moving hand.
@@ -148,3 +158,15 @@ thin/sloped control for reproducibility, without changing the active renderer.
 User verdict2026-10-23: review-11 accepted. Its gallery decision marker is
 cleared; the selected thick arrow with horizontal bottom remains active.
 This does not establish a new full-package memory or hardware result.
+
+## Battle fitting check (2026-11-23)
+
+The accepted Menu/Act bodies fit their actual longest labels (reviewed52/34px)
+while retaining the existing four-word strided cache. `window_blit.inc` masks
+unused pixels instead of expanding the visible box. Native companion opcode252
+is pinned: no per-frame zone change or extra buffer. Actual13-actor static
+Menu/Act frames agree PC/TI, ordinary peaks319576/310952 cycles below360k;
+cold/turn peaks1639794/1641128 are separate. Other cached modes retain their
+reference planes (189 PC checks). The glove follows `CHOICE_HAND_X`, with eight
+poses/32-frame return and one blank pixel at maximum sway. See
+`x/town-complete/battle-width/glove-results.json` and `menu-frame/results.json`.

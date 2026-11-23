@@ -13,7 +13,7 @@ PACKAGE_COMBINED ?=
 PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffbp ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
-BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh ffsk ffid
+BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh ffsk ffid ffbr ffru ffpr ffpe ffpt ffsv
 TI_FILES := $(addprefix data/,$(BANKS:=.89y))
 .NOTPARALLEL:
 .PHONY: campaign-breeding-check
@@ -71,6 +71,16 @@ campaign-traps-check:
 TRAP_DATA_DIR ?= x/tile-traps/shipping-data
 campaign-traps-native-check:
 	$(PY) check_traps_native.py --data-dir $(TRAP_DATA_DIR)
+.PHONY: pilot-route-check pilot-e2e-check core-contract-check
+PILOT_PACKAGE_DIR ?= x/chapter1-ready/packages
+PILOT_E2E_OUTPUT ?= x/pilot-e2e/latest
+pilot-route-check:
+	$(PY) check_pilot.py --packages $(PILOT_PACKAGE_DIR) --out x/chapter1-ready/pilot-final
+pilot-e2e-check:
+	$(PY) check_pilot.py --packages $(PILOT_PACKAGE_DIR) --out $(PILOT_E2E_OUTPUT) --combat auto $(PILOT_E2E_FLAGS)
+core-contract-check:
+	$(PY) ../tools/core_contract.py --packages $(PILOT_PACKAGE_DIR)
+
 .PHONY: chapter1-archive-budget
 chapter1-archive-budget:
 	$(PY) ../tools/chapter1_budget.py --packages $(PACKAGE_OUTPUT)/packages.json
@@ -223,8 +233,8 @@ map-test: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin 
 manage-test: data/ffmg.bin data/ffcj.bin data/ffeg.bin data/ffid.bin data/slot_icons.h
 	$(CC) $(PC_CFLAGS) -o fftmng_test test_manage.c $(RT_CORE) $(RT_SW)
 	./fftmng_test
-fftmng_pc: manage.c pc_entry.c ../common.h data/slot_icons.h
-	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ manage.c $(RT_CORE) $(RT_SW) $(RT)platform-sdl/rt_sdl.c $(SDL_LIBS)
+fftmng_pc: manage.c pc_manage_entry.c ../common.h data/slot_icons.h
+	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ manage.c $(RT_CORE) $(RT_SW) pc_manage_entry.c $(SDL_LIBS)
 .PHONY: save-test
 save-test: data/ffcj.bin data/ffgd.bin
 	$(CC) $(PC_CFLAGS) -o fftgar_save_test test_save.c $(RT_CORE) $(RT_SW)
@@ -255,6 +265,8 @@ fftdep_pc: deploy.c manage.c deployment.inc save.h flow.h
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ deploy.c $(RT_CORE) $(RT_SW) pc_entry.c $(SDL_LIBS)
 fftmap_pc: worldmap.c save.h
 	$(CC) $(PC_CFLAGS) $(SDL_CFLAGS) -o $@ worldmap.c $(RT_CORE) $(RT_SW) pc_map_entry.c $(SDL_LIBS)
+fftmap_pc: bar_bank.h ../bar_reader.inc ../dialogue_box.inc ../choice_menu.inc ../item_detail.inc
+fftmap_pc: data/ffbr.bin data/ffru.bin
 fftbatflow_pc: $(wildcard ../*.inc *.inc *.h) ../opening/opening.inc
 fftdep_pc fftmng_pc: $(wildcard *.inc *.h)
 fftbatflow_pc fftdep_pc fftmng_pc fftgar_pc fftintro_pc fftmap_pc: ../unit_card.h ../unit_card.inc ../portrait32.inc ../choice_menu.h ../choice_menu.inc
@@ -336,7 +348,7 @@ data/ffgd.bin: ../tools/chapter_desc.py ../tools/surface_data.py ../core_limits.
 	$(PY) ../tools/chapter_desc.py campaign
 
 data/ffbm.bin data/ffbn.bin data/ffbo.bin data/ffbp.bin &: ../tools/module.py battle.c ../fft.c ../fft.h ../core_limits.h ../chapter.h ../module.h ../unit_card.h ../choice_menu.h ../action_effect.h ../status_rules.h ../status_policy.h ../status_unit.h ../status_lifetime.h ../status_control.h ../reflect_rules.h ../common.h $(wildcard ../*.inc ../*.h *.inc *.h) ../opening/opening.inc
-	$(PY) ../tools/module.py data/ffbm.bin battle.c 28 --second data/ffbn.bin --third data/ffbo.bin --fourth data/ffbp.bin --companion 27
+	$(PY) ../tools/module.py data/ffbm.bin battle.c 29 --second data/ffbn.bin --third data/ffbo.bin --fourth data/ffbp.bin --companion 27 --companion-peer 28
 	@touch data/ffbm.bin data/ffbn.bin data/ffbo.bin data/ffbp.bin data/modules.h
 
 data/ffcp.bin ../opening/data/ffcp.bin &: ../tools/common_portraits.py ../tools/identity_assets.py ../tools/management_data.py
@@ -362,6 +374,37 @@ data/ffid.bin: ../tools/item_help.py ../tools/management_data.py
 
 data/ffsk.bin: ../tools/shop_scene.py ../tools/town_service_assets.py ../tools/units.py ../tools/common_portraits.py
 	$(PY) ../tools/shop_scene.py "$(DISC)" $@
+
+data/bar-assets.stamp: ../tools/bar_assets.py ../tools/rumor_rules.py ../tools/town_service_assets.py ../tools/shop_scene.py packages/chapter-01.json data/ffmg.bin
+	$(PY) ../tools/bar_assets.py "$(DISC)" data --chapter-spec packages/chapter-01.json
+	@touch $@
+# A rule edit must not change dates of identical reviewed artwork/data variables.
+data/ffbr.bin data/ffru.bin: | data/bar-assets.stamp
+	@test -f $@ || $(PY) ../tools/bar_assets.py "$(DISC)" data --chapter-spec packages/chapter-01.json
+
+.PHONY: bar-test
+bar-test:
+	$(PY) check_bar_service.py
+.PHONY: rumor-rules-test
+rumor-rules-test:
+	$(PY) -m unittest discover -s ../tools -p test_rumor_rules.py
+	$(PY) check_rumor_rules.py
+
+.PHONY: proposition-rules-test
+proposition-rules-test:
+	$(PY) check_proposition_rules.py
+
+.PHONY: proposition-rewards-test
+proposition-rewards-test:
+	$(PY) check_proposition_rewards.py
+
+.PHONY: town-service-test town-service-native-test
+town-service-test:
+	$(PY) check_town_complete.py
+
+# Explicit opt-in: changed layout/pointers/supervisor/compositor, no emulator.
+town-service-native-test:
+	$(PY) check_town_native.py
 
 .PHONY: shop-review
 shop-review: data/ffwm.bin data/ffmg.bin data/ffwb.bin data/ffsh.bin data/ffsk.bin
@@ -982,3 +1025,18 @@ core-final-combat-check: x/core-final-combat/oracle/source.h x/core-final-combat
 .PHONY: core-identity-check
 core-identity-check: data/ffcp.89y
 	$(PY) check_identity.py
+
+.PHONY: save-transfer-check
+# Private artifacts only; set SAVE_TRANSFER_FLAGS=--native for one bounded68000 I/O check.
+SAVE_TRANSFER_OUTPUT ?= x/save-transfer/latest
+save-transfer-check:
+	$(PY) -m unittest discover -s ../tools -p test_save_transfer.py
+	$(PY) check_save_transfer.py --out $(SAVE_TRANSFER_OUTPUT) $(SAVE_TRANSFER_FLAGS)
+
+.PHONY: service-assets
+service-assets: data/service-assets.stamp
+data/service-assets.stamp: ../tools/service_assets.py ../tools/proposition_rules.py packages/chapter-01.json data/ffmg.bin
+	$(PY) ../tools/service_assets.py "$(DISC)" data --chapter-spec packages/chapter-01.json
+	@touch $@
+data/ffpr.bin data/ffpe.bin data/ffpt.bin data/ffsv.bin: | data/service-assets.stamp
+	@test -f $@ || $(PY) ../tools/service_assets.py "$(DISC)" data --chapter-spec packages/chapter-01.json

@@ -1,43 +1,64 @@
-# Chapter I readiness: next steps (2026-11-08, battle RAM updated 2026-11-22)
+# Chapter I readiness (2026-11-23)
 
-## The next three steps (2026-11-22, town-services follow-up)
+## Current release handoff
 
-Read this first. The battle itself now runs on the Titanium
-([CORE_PACKAGES.md](CORE_PACKAGES.md), § the heap at the refusal), the core
-executes 155 of 155 audited Chapter I actions (§ 4) and the archive projection
-holds (§ 2), so what is left for Chapter I is, in order:
+The playable town services, FSV9 migration and accepted visuals are delivered.
+The next work is **remaining Chapter I content**, followed by a complete chapter
+route and random encounters. The installed pilot contains Orbonne, the Academy
+bridge and Gariland; it is not the whole campaign.
 
-1. **Bar and rumors, with the correct town portraits.** The monster gate
-   described by the previous version of this list is already closed:
-   [the handover](HANDOVER.md) records adult placement and the real deployment
-   -> Save -> battle -> results flow. Continue with town services, as the user
-   requested. [Portraits C/D/C/D are accepted and applied](TOWN_SERVICES_REVIEW.md);
-   the user selected Bar reader A (black text on grey), checked with10 original
-   text pages on PC/sanitizers. It uses the existing campaign continuation cue
-   rather than page numbers, following the source's graphical paging. The source
-   room and all four speakers are identified. Town/story eligibility, actual rumor routes,
-   pagination/input and durable effects still need implementation.
-2. **Reusable Propositions and the poaching/Fur Shop loop.** These are required
-   before content extraction, with Propositions locked until Chapter II and
-   the Fur Shop until III. Add away-worker/calendar/return settlement and
-   separate poach stock/purchases with save migration and transactional checks.
-   See [CAMPAIGN_SIDE_SYSTEMS.md](CAMPAIGN_SIDE_SYSTEMS.md).
-3. **The chapter's own content, after the side-system gates.** Chapter I is about 20 battle maps and 20
-   scenes; the pilot ships 2 of each. The five Chapter I field doors are all 0,
-   so a field still answers "Not ripped yet" although the roll, the table and
-   the door return are in place ([TOWN_SERVICES.md](TOWN_SERVICES.md)). Pair it
-   with § 3 below, the one-command native chapter run: 20 battles cannot be
-   recetted by hand, and that script still needs a placement `tilog` in
-   `deploy.c` and one key script per step.
+1. **Repeatable pilot route: complete.** `make pilot-route-check` drives the
+   real supervisor and cold title/scene/deployment/battle/world programs from
+   matching groups. New Game, confirmed scene skips, five-unit deployment,
+   results, world Save, Continue and defeat/retry pass on PC and ASan/UBSan.
+   Battle completion uses the shipping DEBUG skip; this is a lifecycle check,
+   not certification of an ordinary full fight. The later `pilot-e2e-check`
+   now adds both ordinary fights, same-session town services/Formation and
+   Save/Continue on PC/sanitizers; one selected68000 Gariland fight saves
+   exactly the same4684 bytes. See HANDOVER for scope/evidence.
+2. **Installed Titanium lifecycle: see the current HANDOVER evidence.**
+   A private emulator preserves the user's live session and old profile.
+   Actual installation exposed and fixed the companion RAM allocation and
+   AMS's automatic archive lock. Keep RAM/free/max measurements explicit;
+   **16KiB free/peak is not certified.** Do not reopen difficult cache shrinking.
+3. **Core contract and archive plan: complete within stated content limits.**
+   `packages/core-contract.json` freezes actual ABI97,29 matching images,
+   State2278/Unit116/Work37790/ModCtx396/FSV9 Save4684, zone9114 and shared
+   companion4128 (cold reader3542). Actor cache42/depth18488 are unchanged.
+   Current groups: core700091 + pilot295145 transport bytes, key
+   `ac1de6c7a4d71264d1bee76df06f489d`. The dated full-chapter plan projects
+   1845016 bytes with24717 bytes of planning margin. This is not a build
+   of the full chapter or a Flash-fragmentation guarantee.
+
+## Remaining priorities
+
+The ordinary-combat pilot end-to-end gate is now delivered: no God/skip,
+no screenshots, canonical logs/raw states and exact durable-save comparisons.
+It does not certify unripped content, whole-chapter Flash or future-map RAM.
+
+1. Check/adapt the future maps against the fixed RAM/depth/width envelope.
+   Sweegy and Fovoham need depth adaptations (816/688 estimated excess bytes);
+   Zeklaus needs the336-to320 width crop. Review actual art/handedness. Keep
+   difficult RAM recovery deferred;16KiB is a target, not a hard threshold.
+2. Rip/author the remaining story scenes and battle maps, pooling resources
+   and using the reviewed portraits, menus and one physical-model palette.
+   Bind source choices, guests, events/rumors and battle chains explicitly.
+3. Populate the five Chapter I field formation doors (currently0: not ripped),
+   assemble and replay the complete chapter on PC including saves/retries,
+   then select only hardware/installation checks changed content needs.
+
+See [CHAPTER1_ARCHIVE_PLAN.md](CHAPTER1_ARCHIVE_PLAN.md),
+[CORE_PACKAGES.md](CORE_PACKAGES.md) and [HANDOVER.md](HANDOVER.md).
+Earlier figures below are historical and do not override this release handoff.
 
 ### Where the town's four services stand
 
-| Service | State | What is missing |
+| Service | State | Remaining scope |
 |---|---|---|
-| **Shop** | **Functional**, checked PC/68000: bank `ffsh` (FSH2, 1,468 bytes), source prices/stock/categories, shared details and fitting bench. Correct portrait114/C is accepted and active. Earlier measured steady frame: 306,638 cycles. | Rebuild the installation package at the next release for the corrected bank. Later stock gates stay separate. |
-| **Soldier Office** | **Functional**: two-step hire, source generator, birthday/zodiac, renaming, 16 cap. Correct portrait115/D is accepted and active. Earlier measured steady frame: 242,054 cycles. | The price (1,500/1,400 gil) remains an interpretation, not source-certified. |
-| **Bar** | **Reader A approved**: black text on grey, source `WLDBK` room, portrait117/D and campaign blink;10 original text pages pass on PC/sanitizers. | Actual town/story-filtered rumor route, original titles, input and durable effects remain. This is visual acceptance, not a finished Bar. Propositions must not appear early. |
-| **Fur Shop** | **The room only**, with approved portrait116/C active: `SC_FUR`, Buy/Sell/Leave and test door2; `FUR_FLAG`255 locks entry and transactions answer "later". | Secret Hunt still gives loot directly to the bag; implement separate saturating255 stock, migration, access and atomic transactions. Keep the Chapter III gate. |
+| Shop | Functional source prices/stock/categories, shared item details/fitting, approved114/C. | Author later stock progression; release installation check. |
+| Soldier Office | Functional source generator, birthday/zodiac, hire/rename/cap16, explicit generic identity, approved115/D. | Hire price1,500/1,400 remains an interpretation. |
+| Bar | Chapter I six-topic rumor mechanism delivered; accepted A/117D reader and campaign continuation cue. Propositions dispatch/day/recall/frozen report/collect are now playable and saved. | Bind later scene/event flags while authoring; later quest rumors are separate. Keep Propositions locked until II. |
+| Fur Shop | Separate cap255 stock from actual one-shot poach impact; real battle exit retains it. Source half-price Buy/Sell, atomic transactions, shared Shop UI and approved116/C. | Author III event0CB; only trade cities and Secret Hunt unlock access. Pilot stays locked. |
 
 ### Historical delivery notes
 
@@ -133,16 +154,13 @@ debug aids and logs" and "Native test loop").
 
 ## Before campaign extraction: world/party side systems
 
-Required by the user2026-11-13; [initial GameFAQs overview and native audit](CAMPAIGN_SIDE_SYSTEMS.md).
-Calendar/egg lifecycle, fixed offspring, full-roster handling and the actual
-grown-monster placement/battle/results flow are delivered. Bars need town/story-
-filtered rumors and later dispatch/return jobs.
-Poaching currently gives an item directly to the party: source-correct Fur Shop
-stock/access/purchases and save migration remain. These are explicit gates,
-not implicit completion under generic R/S/M coverage. Preserve later chapter
-unlocking while testing reusable machinery with PC injection doors. Named
-objectives, Save checkpoints and story choices are delivered; town services
-are now the active step in the prerequisite queue.
+The user-required reusable side-system gates are delivered: calendar/eggs,
+adult monster placement/battle/results, Chapter I rumors, playable Propositions
+and separate poach/Fur Shop stock/transactions with migration. The actual
+Chapter II/III unlock events remain content bindings. Do not interpret that
+as missing service machinery or enable them in Chapter I for convenience.
+Named objectives, Save checkpoints and choices are also delivered. Continue
+with the current three steps above; the dated notes below retain old metrics.
 
 ## 1. Battle RAM margin (target; further refactoring deferred)
 

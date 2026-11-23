@@ -155,9 +155,20 @@ def core_package(source, spec):
         raise ValueError('Core specification must declare persistent FGP1 guests')
     if spec.get('story_choice_format') != 'FCX1':
         raise ValueError('Core specification must declare FCX1 scene choices')
-    if (spec.get('world_save_format'),spec.get('breeding_format'),spec.get('egg_art_format'))!=('FSV7','FWB1','FEG2'):
-        raise ValueError('Core specification must declare FSV7 world state, FWB1 breeding and FEG2 eggs')
+    if (spec.get('world_save_format'),spec.get('breeding_format'),spec.get('egg_art_format'))!=('FSV9','FWB1','FEG2'):
+        raise ValueError('Core specification must declare FSV9 world state, FWB1 breeding and FEG2 eggs')
     variables = select(source, spec['variables'])
+    if (spec.get('proposition_format'),spec.get('service_format'),spec.get('poach_stock_max'))!=('FPR1/FPE1/FPT1','FSV1',255):
+        raise ValueError('Core requires FPR1/FPE1/FPT1, FSV1 services and255 Fur stock')
+    if not {'ffpr','ffpe','ffpt'}<=set(spec['variables']):
+        raise ValueError('Shared Proposition rules/rewards/prose must belong to core')
+    import service_assets
+    service_assets.validate(*(source[name].raw for name in ('ffpr','ffpe','ffpt')))
+    if 'ffbr' in spec['variables']:
+        import bar_assets
+        if spec.get('bar_art_format')!='FBR1' or spec.get('rumor_format')!='FRU1':
+            raise ValueError('Bar requires FBR1/FRU1 core declaration')
+        bar_assets.validate(source['ffbr'].raw,art=True)
     if spec.get('formation_art_format')!='FMA1' or 'ffma' not in source or 'ffma' not in spec['variables']:
         raise ValueError('Core specification must declare shared FMA1 formation art')
     import monster_formation_bank
@@ -197,6 +208,20 @@ def chapter_package(source, spec, core_spec, key):
     if spec['schema'] != 'FFT_CHAPTER_SPEC_1':
         raise ValueError('Unsupported chapter specification')
     variables = select(source, spec['variables'])
+    if core_spec.get('service_format')=='FSV1' and 'ffsv' not in spec['variables']:
+        raise ValueError('Every chapter must replace its FSV1 service-event bindings')
+    if any(v.kind!=0x1c or not v.payload.endswith(resources.TRAILER) for v in variables):
+        raise ValueError('Chapter packages contain data only; executable code belongs to core')
+    if 'ffsv' in spec['variables']:
+        import service_assets
+        if resources.resolve(source,'ffsv')!=service_assets.bindings(spec):raise ValueError('Service event bindings mismatch')
+    if 'ffru' in spec['variables']:
+        import bar_assets
+        if core_spec.get('rumor_format')!='FRU1' or 'ffbr' not in core_spec['variables']:
+            raise ValueError('Rumors require the matching Bar-capable core')
+        bar_assets.validate(resources.resolve(source,'ffru'))
+        import rumor_rules
+        rumor_rules.validate_bank(resources.resolve(source,'ffru'),spec.get('rumor_events',[]))
     for v in variables:
         if re.fullmatch('ffs[0-9]',v.name):
             parsed=resources.scene_parts(source,v.name,True)

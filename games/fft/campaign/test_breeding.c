@@ -50,7 +50,7 @@ static void unchanged(void)
 static void trials(void)
 {
     u8 i;u16 k;
-    CHECK(sizeof(Save),3992);CHECK(sizeof(WorldParty),69);
+    CHECK(sizeof(Save),4684);CHECK(sizeof(WorldParty),69);
     CHECK(world_rules_valid(rules,sizeof rules),1);
     memcpy(scratch+1,rules,sizeof rules);CHECK(world_rules_valid(scratch+1,sizeof rules),1);
     for(i=0;i<7;i++){

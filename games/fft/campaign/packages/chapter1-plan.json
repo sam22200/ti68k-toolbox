@@ -20,7 +20,9 @@
         11592,
         11160
       ],
-      "width_px": 288.0
+      "width_px": 288.0,
+      "source_content_rows": 292,
+      "scene_rows_upper": 202
     },
     {
       "map": 22,
@@ -32,7 +34,9 @@
         18288,
         17032
       ],
-      "width_px": 300.0
+      "width_px": 300.0,
+      "source_content_rows": 204,
+      "scene_rows_upper": 202
     },
     {
       "map": 85,
@@ -44,7 +48,9 @@
         15340,
         15620
       ],
-      "width_px": 312.0
+      "width_px": 312.0,
+      "source_content_rows": 171,
+      "scene_rows_upper": 179
     },
     {
       "map": 74,
@@ -56,7 +62,9 @@
         17432,
         19304
       ],
-      "width_px": 276.0
+      "width_px": 276.0,
+      "source_content_rows": 244,
+      "scene_rows_upper": 202
     },
     {
       "map": 31,
@@ -68,7 +76,9 @@
         17664,
         15264
       ],
-      "width_px": 240.0
+      "width_px": 240.0,
+      "source_content_rows": 234,
+      "scene_rows_upper": 202
     },
     {
       "map": 34,
@@ -80,7 +90,9 @@
         13460,
         12396
       ],
-      "width_px": 252.0
+      "width_px": 252.0,
+      "source_content_rows": 179,
+      "scene_rows_upper": 187
     },
     {
       "map": 76,
@@ -92,7 +104,9 @@
         16848,
         16880
       ],
-      "width_px": 336.0
+      "width_px": 336.0,
+      "source_content_rows": 180,
+      "scene_rows_upper": 188
     },
     {
       "map": 91,
@@ -104,7 +118,9 @@
         14136,
         13176
       ],
-      "width_px": 264.0
+      "width_px": 264.0,
+      "source_content_rows": 186,
+      "scene_rows_upper": 194
     },
     {
       "map": 77,
@@ -116,7 +132,9 @@
         15608,
         14112
       ],
-      "width_px": 264.0
+      "width_px": 264.0,
+      "source_content_rows": 180,
+      "scene_rows_upper": 188
     },
     {
       "map": 72,
@@ -128,7 +146,9 @@
         18968,
         19176
       ],
-      "width_px": 276.0
+      "width_px": 276.0,
+      "source_content_rows": 204,
+      "scene_rows_upper": 202
     },
     {
       "map": 73,
@@ -140,7 +160,9 @@
         13576,
         14648
       ],
-      "width_px": 204.0
+      "width_px": 204.0,
+      "source_content_rows": 198,
+      "scene_rows_upper": 202
     },
     {
       "map": 103,
@@ -152,7 +174,9 @@
         12048,
         13408
       ],
-      "width_px": 216.0
+      "width_px": 216.0,
+      "source_content_rows": 210,
+      "scene_rows_upper": 202
     },
     {
       "map": 49,
@@ -164,7 +188,9 @@
         12656,
         13312
       ],
-      "width_px": 264.0
+      "width_px": 264.0,
+      "source_content_rows": 192,
+      "scene_rows_upper": 200
     }
   ],
   "other_upper_estimates": {
@@ -174,5 +200,6 @@
     "scenes": 100000,
     "flow_dialogue_results": 100000,
     "world_map": 18000
-  }
+  },
+  "row_budget_policy": "Cached source content height plus8 authoring rows, capped at202; authoring must respect declared row budgets. Original all202 upper bound retained separately."
 }
