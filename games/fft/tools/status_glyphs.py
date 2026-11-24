@@ -42,7 +42,7 @@ NEGATIVE = {
     'DontAct':   ('.....', '#####', '#####', '.....', '.....'),      # a bar
     'Charm':     ('.#.#.', '#####', '#####', '.###.', '..#..'),      # the original's heart
     'Frog':      ('.#.#.', '#####', '#o#o#', '#####', '#####'),      # a frog head, eyes on top
-    'Chicken':   ('#.#.#', '.###.', '..#..', '..#..', '..#..'),      # a bird track
+    'Chicken':   ('..#..', '#.#.#', '.###.', '..#..', '..#..'),      # a bird track, leg over it
     'Undead':    ('.###.', '#o#o#', '#####', '#.#.#', '#.#.#'),      # a skull
     'Sentence':  ('#####', '..#..', '..#..', '..#..', '#####'),      # an hourglass frame
 }
@@ -224,15 +224,50 @@ def demo(out, units, scale):
     print('wrote', out, len(frames), 'frames')
 
 
+def charge_gif(out, units, scale, hold=200):
+    """The charge star twinkling above an ally and an enemy, two cycles.
+
+    Each state holds the same fraction of a second as in game, where the picture
+    advances on st.tick (about thirty frames a second).
+    """
+    body, body_a = unit_frame(units)
+    dia, dia_a = render(('..#..', '.###.', '#####', '.###.', '..#..'), 'k', 'w')
+    W, H = 60, 50
+    frames = []
+    for k in range(len(CHARGE) * 2):
+        canvas = np.full((H, W), 1, np.uint8)
+        g, a = charge_frame(k)
+        feet = H - 10
+        for half, enemy in ((0, False), (1, True)):
+            ux = 6 + half * 28
+            blit(canvas, body, body_a, ux, feet - UNIT_SH)
+            top = feet - UNIT_SH - 2
+            if enemy:
+                total = dia.shape[1] + g.shape[1] - 2
+                bx = ux + UNIT_W // 2 - total // 2
+                blit(canvas, dia, dia_a, bx, top - dia.shape[0])
+                blit(canvas, g, a, bx + dia.shape[1] - 1, top - g.shape[0])
+            else:
+                blit(canvas, g, a, ux + UNIT_W // 2 - g.shape[1] // 2, top - g.shape[0])
+        rgb = np.array(GREY, np.uint8)[canvas]
+        frames.append(Image.fromarray(rgb).resize((W * scale, H * scale), Image.NEAREST))
+    frames[0].save(out, save_all=True, append_images=frames[1:], duration=hold, loop=0)
+    print('wrote', out, len(frames), 'frames at %dms' % hold)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--sheet', action='store_true')
     ap.add_argument('--demo', action='store_true')
+    ap.add_argument('--charge', action='store_true')
     ap.add_argument('--units', type=Path, default=HERE / 'fftu.bin')
     ap.add_argument('--dir', type=Path, default=HERE / 'campaign/x/status-picto')
     ap.add_argument('--scale', type=int, default=6)
     args = ap.parse_args()
     args.dir.mkdir(parents=True, exist_ok=True)
+    if args.charge:
+        charge_gif(args.dir / 'charge.gif', args.units, args.scale)
+        return
     if args.sheet or not args.demo:
         sheet(args.dir / 'glyphs.png', args.scale)
     if args.demo or not args.sheet:
