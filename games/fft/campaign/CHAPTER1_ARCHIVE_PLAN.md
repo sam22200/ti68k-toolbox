@@ -1,5 +1,38 @@
 # Chapter I archive planning checkpoint (2026-11-24)
 
+## Current content-sizing proposal
+
+The latest [measured pack report](CAMPAIGN_PACK_REPORT.md) supersedes the
+costume-free figures below. Optional Ramza/Delita wardrobes measure47232 bytes
+including portrait/reference allowances; retain a hard50000-byte envelope.
+One-direction scene planning gives ChapterI an upper2.629MB including131072
+reserve; the prior conservative scene allowance gives2.689MB. Actual source
+poses/cameras/map framing and free Flash still need authoring/measurement.
+Lossless row-part sprites are not selected for the combat engine. No shipping
+bank, interface or core contract changes in this report-only study.
+
+The current user decision removes named-human costume variants and reduces
+the extra random-map pool. `x/pack-refinement/plan.json` supersedes the broad
+content estimates below for that new scope. It combines actual ABI99 stored
+bytes, prior sprite probes, a new retail dialogue census and six-room scene
+compression samples. ChapterI remains one recommended pack: ten story battle
+maps plus approved Zeklaus, nine scene-only locations; Fovoham random fights
+can reuse story terrain103. Estimated core+content2.05..2.51MB; upper with
+131072 reserve2.64MB. All late stable-human banks and ten optional FX are
+conservatively included even for this early pack. Scene views/extra poses,
+unextracted map framing/depth and actual Flash overhead still need authoring.
+No installed bank, core contract or art is changed.2700000 is a configurable
+planning budget, not a measurement of free Flash or a promise about installed
+third-party apps. The user has accepted the eight main-pack boundaries; see
+the latest HANDOVER. One orientation per scene is now the authoring default,
+with required exceptions/pans retained. Generic-body/head substitution remains
+an unapproved art candidate; retain full-body cost allowances.
+The older `chapter1-plan.json` and its check retain the old content assumptions
+and deliberately double-count compressed/raw colours; do not relabel their
+17623-byte margin as certification of this new scope.
+
+## Historical ABI99 thirteen-map control
+
 The promoted ABI99 core is701169 transport bytes,700273 stored payload/size
 bytes. The matching pilot is295145 transport bytes; key
 `10965478d3a2c348c22d2dea8e6ac51d`. Stored bytes exclude transfer headers; the

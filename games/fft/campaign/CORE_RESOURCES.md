@@ -1,5 +1,57 @@
 # Shared campaign resources and shipping deduplication
 
+Measured follow-up (2026-11-24): [the full pack report](CAMPAIGN_PACK_REPORT.md)
+supersedes the unmeasured part proposal below. Complete sprites remain the
+combat default: fixed-row two/three parts enlarge the native30 corpus and
+increase native preparation13..15%. No generic-body/head replacement has a
+visual verdict or counted saving. Actual scene-pose pruning remains authoring.
+The user allows optional wardrobes only below50KB total. Ramza+Delita measure
+45808 body bytes /47232 with portrait/reference allowances in the extended
+control; budget50000 and recheck final required poses. Other costumes remain
+canonical; all six outfit candidates exceed the cap. No installed bank changes.
+
+Accepted pack/scene policy (user2026-11-24): retain eight main packs (I whole,
+II split after Goug, III after Orbonne, IV after Bethla and after Igros).
+Use one orientation per scripted scene by default; extra directions are rare
+source-driven exceptions. Do not equate one direction with one crop per room:
+retain needed camera travel and reuse physical backdrops across scenes. The
+previous8..20KB/location scene allowance remains conservative pending the
+actual per-scene camera inventory; do not automatically halve it.
+
+Actor-parts candidate: the earlier estimate assumed complete human sprites,
+not separate head/torso/feet. The user now proposes sharing secondary bodies
+while retaining unique recruits and major story actors. Evaluate head + body
+including feet first; split legs separately only if actual pooled bytes and
+native preparation cost improve. Keep a complete unique appearance for every
+recruit and selected important actors (explicit examples include Ramza, Delita,
+Alma, Agrias, Gafgarion, Orlandu and Meliadoul). Candidate additional major
+actors include Ovelia, Wiegraf, Dycedarg, Zalbag and Elmdor. This is not a final
+exhaustive importance list or blanket approval to replace other named bodies.
+Named scene-only actors can keep their own silhouettes with only the poses
+actually referenced by scenes; they do not need a full combat animation bank.
+Retain source gestures, walking, kneeling, injuries and deaths when scripted.
+
+If adopted, physical parts must remain pooled in the shipped archive: baking
+every composed character back into a full shipping bank loses the sharing.
+Compose only at a bounded pose-cache miss/preparation, then draw one complete
+cached208-byte human pose through the existing fast renderer. Keep validated
+appearance+pose keys, eviction/reentry behavior,42 entries and preparation
+budget. Account for extra decode/composition work in complete native frames;
+existing CPU evidence does not certify a new preparation path. Preserve one
+coherent silhouette/white outline, internal hit mask and cover at part seams;
+separately outlined pieces cannot simply overpaint one another. No new cache,
+save identity or per-frame three-part draw is implied by this proposal.
+Do not claim a byte or CPU saving before a bounded part-bank prototype proves
+it. Current approved sprites/runtime and conservative full-body estimates stay.
+
+Named-human simplification (user2026-11-24): one selected human body per named
+person across costumes and source guest/enemy/chapter identities. This overrides
+the older instruction below to retain costume variants. Identity, job, stats,
+portrait/name and recruitment are preserved; major nonhuman forms are budgeted
+separately. Chapter-confined NPC bodies do not accumulate permanently. Keep
+recruited bodies even when they have no later scripted dialogue. No installed
+art/bank has been rebuilt by this sizing decision.
+
 Service ownership update (2026-11-23): the reusable96-mission catalogue,
 universal reward tables and all mission descriptions/reward names belong once
 to core: ffpr/FPR14079, ffpe/FPE1437, ffpt/FPT116148 bytes. Prose/page offsets
@@ -97,6 +149,24 @@ aliases and the mandatory exact sharing audit still apply; core spec/manifest
 keys require matching R4 core/chapter builds.
 
 ## Ownership rules for future content
+
+Planning clarification (user2026-11-24): split Chapter IV and
+retain only a few extra random terrains per pack, reusing active story fields
+where possible. Old field destinations need explicit encounter-terrain routing;
+this does not remove their travel nodes or silently discard their formations.
+Budget scene-only locations separately and share existing battle imagery.
+One/two selected scene compositions and a limit of ten common optional FX are
+the current sizing proposal, not completed extraction or camera/CPU/RAM gates.
+Audit temporary NPC/costume lifetimes before retaining them in later packs.
+Generic-body substitutions for rare named characters are under consideration,
+not blanket approved; retain required named portraits and gameplay identities.
+Read the current HANDOVER and `x/pack-refinement/plan.json` for current scope;
+the older `x/chapter-map-counts/revised.json` is superseded sizing evidence.
+The current scene player already decompresses all six picture planes with
+ZX0 at scene entry. The bounded six-room compression probe does not justify
+adding a new codec for its roughly4% row-XOR gain. Event text4KiB-chunk ZX0
+is a proposed cold-reader change, not an implemented format. The eight main
+boundaries are now accepted planning; no new packs/reader have been released.
 
 1. Classify a resource by reuse, not by its first consumer. Rules/catalogues,
    identities, interface artwork and engine lookup tables belong to the core.

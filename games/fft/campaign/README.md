@@ -1,5 +1,11 @@
 # Opening -> Academy -> Gariland
 
+Campaign storage plan (2026-11-24): [complete measured pack report](CAMPAIGN_PACK_REPORT.md).
+Eight main packs are accepted; full combat sprites remain after the part study.
+Optional Ramza/Delita wardrobes fit the measured50KB envelope. Scene/text,
+character lifetimes, detailed map lists, budgets and remaining gates are included.
+No full campaign or new wardrobe banks are installed by this planning study.
+
 Current reviewed core checkpoint (2026-11-24): ABI99, key
 `10965478d3a2c348c22d2dea8e6ac51d`, groups
 `x/core-abi99-release/packages/`. [Installed RAM and promotion](INSTALLED_RAM_ABI99.md)

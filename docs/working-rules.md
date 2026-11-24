@@ -13,6 +13,46 @@ Both apply to every agent working in this repository.
 
 ## Roadmap and order of work
 
+- **FFT measured actor/costume decision (user2026-11-24):** wardrobe variants
+  are optional only below50,000 incremental stored bytes across the campaign.
+  [CAMPAIGN_PACK_REPORT.md](../games/fft/campaign/CAMPAIGN_PACK_REPORT.md) records
+  the measurement: Ramza+Delita45,808 body bytes,47,232 with four portrait/
+  reference allowances; reserve the full50KB and recheck final required poses.
+  The complete six-outfit control58,973 exceeds the cap; other people stay
+  canonical by default. This is a planned extraction exception to the one-body
+  rule below, not new installed art. Lossless fixed-row parts increase native30
+  storage and cost13..15% more on native pose preparation; retain complete
+  combat sprites. Generic-body/head substitution remains a separate unapproved
+  art candidate; no hypothetical savings enter budgets. Eight pack boundaries
+  remain accepted; the report proposes only one extra random terrain inIV-C.
+
+- **FFT content packs and actor sharing (user decision2026-11-24):** the user
+  accepts eight main packs: I whole; II split after Goug; III after Orbonne;
+  IV after Bethla and after Igros. Keep this split; optional quests and Deep
+  Dungeon remain separately planned. Default to one orientation per scripted
+  scene, adding another only when source staging needs it. An orientation is
+  not a camera crop or one picture per physical location: preserve needed pans,
+  framing and reuse across scenes. The user proposes sharing head/body/feet
+  for secondary humans while keeping recruits and major story actors visually
+  unique. This is an asset-sharing candidate, not an implemented renderer or
+  a measured saving. Start with head + body-with-feet unless three parts earn
+  their complexity. Extract only actual scene poses for noncombatants; do not
+  omit a story injury/death/gesture because it is not a combat action. Named
+  portraits/identities remain. Compose any parts only on bounded pose-cache
+  preparation, then use the ordinary complete-sprite draw path; preserve cache
+  capacity, validated keys, outline/cover and the full native frame budget.
+
+- **FFT named-human costumes (user decision2026-11-24):** keep one selected
+  human body per named character, shared across that person's source costumes,
+  guest/enemy identities and chapter forms. Simplicity/storage take precedence
+  over clothing variants. This supersedes the older requirement to retain real
+  costume changes below. Preserve names, appropriate portraits, jobs, stats,
+  allegiance, recruitment and saved identity. Major nonhuman transformations
+  need a separate body decision/budget; they are not merely clothes. Audit
+  character lifetimes: chapter-confined NPC bodies belong to that pack, while
+  recruited bodies remain available after their last scripted appearance.
+  Do not regenerate historical approved banks/proofs for this planning change.
+
 - **FFT human palette variants (user decision2026-11-14):** apply the same
   storage rule to humans: choose one readable four-grey palette per distinct
   character/job sprite model, and do not rip or ship its palette-only color
