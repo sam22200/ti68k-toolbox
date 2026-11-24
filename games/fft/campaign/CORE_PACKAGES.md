@@ -216,11 +216,18 @@ see [shared resources and authoring rules](CORE_RESOURCES.md).
 | Existing saves/configuration | User-owned; present in neither package | Unchanged |
 
 Both groups have 23 variables. Their installed variable payloads plus size words
-total 605,207 bytes. Transport bytes include PC transfer headers; neither
-measurement includes all AMS VAT/archive metadata, fragmentation or other
-installed programs. The builder defaults to a **planning** budget of 2,700,000
-bytes with a separate 131,072-byte reserve. This is not a measurement of free
-Flash or proof that every future chapter fits. Runtime RAM is a separate limit.
+total 605,207 bytes. Transport bytes include PC transfer headers.
+
+The builder now gates on the **measured** archivable ceiling, 2,555,826 bytes on
+an empty Titanium, with the same separate 131,072-byte reserve. TI's "2.7 MB" is
+`allExceptBaseCode` (2,686,976) and is not archivable; `experiments/archfree/`
+reads the real figures through `EM_survey`. Each archived variable also costs a
+measured 23-byte archive header (`installed_archive_bytes`), and variables sent
+unarchived are charged to RAM instead (`unarchived_ram_bytes`), not to the
+archive. Fragmentation needs no term: AMS packs archived blocks contiguously.
+This is still not a measurement of the user's own free Flash, since other
+installed programs come off the same ceiling, nor proof that every future
+chapter fits. Runtime RAM is a separate limit.
 
 The first pack is explicitly an **incomplete Chapter I pilot**: Orbonne, Academy
 and Gariland. There is no newly authored Chapter II. The continuation-only pack

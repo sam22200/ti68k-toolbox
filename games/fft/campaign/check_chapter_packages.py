@@ -107,6 +107,20 @@ def main():
     roundtrip.write_bytes(before)
     again, _, _ = packages.build(source, core, [chapter], out/'again')
     verify(report == again)
+    # Archive accounting: only archived variables occupy Flash, and each costs the
+    # measured header. Unarchived ones are RAM. The two must partition the total.
+    row = report['chapters'][0]
+    narch = sum(1 for v in row['variables']+report['core']['variables'] if v['attr'])
+    verify(row['installed_archive_bytes']+row['unarchived_ram_bytes']
+           == row['installed_with_core_bytes']+packages.ARCHIVE_PER_VARIABLE*narch)
+    # Cross-check against the hardware measurement of the shipped ABI99 release
+    # (experiments/archfree in TiEmu: EM_survey inUse = 990,766 for core + Chapter I).
+    release = HERE/'x/core-abi99-release/packages/packages.json'
+    if release.exists():
+        man = json.loads(release.read_text())
+        archived = [v for v in man['chapters'][0]['variables']+man['core']['variables'] if v['attr']]
+        model = sum(v['bytes']+2+packages.ARCHIVE_PER_VARIABLE for v in archived)
+        verify(len(archived) == 62 and 0 <= model-990766 <= 100)
     for name in ('fft-core.89g', 'chapter-01.89g', 'packages.json'):
         verify((out/'delivery'/name).read_bytes() == (out/'again'/name).read_bytes())
     chapter_source={v.name:v for v in packs[0][1] if v.name!='ffpack'}

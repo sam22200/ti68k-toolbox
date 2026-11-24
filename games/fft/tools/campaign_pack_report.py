@@ -49,17 +49,33 @@ def main():
         cycles[int(mode)]['peak'] = int(peak)
     assert set(cycles) == {1, 2, 3}
 
-    #50KB is interpreted as a WHOLE-CAMPAIGN optional-wardrobe cap, not50KB
-    # for each character. Count four optional portrait records and references.
+    # The user dropped optional costume changes, Ramza and Delita included:
+    # one canonical body per person. These increments stay as the measurement
+    # that priced the choice; no wardrobe byte is credited to any budget.
     wardrobe_body = costumes['profiles']['extended_regular']['ramza_delita']['whole']['increment_bytes']
     wardrobe_portraits = 4*348
     wardrobe_refs = 4*8
     wardrobe_measured = wardrobe_body + wardrobe_portraits + wardrobe_refs
-    wardrobe_cap = 50000
-    assert wardrobe_measured < wardrobe_cap
     all_outfits = actors['increments']['extended_regular']['whole']['six_story_outfits']
     all_outfits_with_faces = all_outfits + 6*(348+8)
-    assert all_outfits_with_faces > wardrobe_cap
+
+    # Measured on the project's clean Titanium .sav through EM_survey
+    # (experiments/archfree, ti68k-c-patterns.md). inUse+free is constant; TI's
+    # "2.7 MB" is allExceptBaseCode and is NOT archivable. Replaces the former
+    # 2,700,000 planning assumption.
+    ARCHIVE_CEILING = 2555826
+    ARCHIVE_ALL_EXCEPT_BASE = 2686976
+    ARCHIVE_PER_VARIABLE = 23          # measured 22.39 / 22.34, rounded up
+    MEASURED_CORE_INSTALL = 695696     # 36 archived variables
+    MEASURED_CORE_PLUS_I = 990766      # 62 archived variables
+    # Each bank is one archive variable capped at 65,000 bytes (tools/common_actors.py
+    # split(); actors.h ACTOR_BANKS). Six slots: ffca..ffcf.
+    BANK_BYTES, BANK_SLOTS = 65000, 6
+    BANK_CEILING = BANK_BYTES*BANK_SLOTS
+    bank_profiles = {k: actors['cases'][k]['canonical_plus_jobs']['whole']['stream_banks']['banks']
+                     for k in ('native30', 'extended_regular')}
+    pack_banks = {k: max(v[k] for v in costumes['pack_whole_body_controls'].values())
+                  for k in ('native30', 'extended_regular')}
 
     phases = ['I', 'II-a', 'II-b', 'III-a', 'III-b', 'IV-1', 'IV-2', 'IV-3']
     labels = ['I', 'II-A', 'II-B', 'III-A', 'III-B', 'IV-A', 'IV-B', 'IV-C']
@@ -78,8 +94,7 @@ def main():
         if key == 'IV-3':
             fields.remove(86)  # Doguola320x200:64000 raw colors +8..18KB depth
             removal = [76000, 89000]  # include its4..7KB metadata allowance
-        conservative = [old['with_reserve'][i] + (wardrobe_measured if i == 0 else wardrobe_cap) - removal[i]
-                        for i in range(2)]
+        conservative = [old['with_reserve'][i] - removal[i] for i in range(2)]
         # A single direction still may have several camera crops. Keep30KB
         # per-pack upper allowance for additional scene pictures/framing.
         one_view = [5000*count, 10000*count+30000]
@@ -88,18 +103,42 @@ def main():
         projection[key] = dict(label=label, ending=end, story_maps=old['story_maps'],
             extra_random=fields, scene_maps=old['scene_only_maps'],
             full_map_count=len(old['story_maps'])+len(fields), scene_locations=count,
-            wardrobe_addition=[wardrobe_measured, wardrobe_cap],
             conservative_with_reserve=conservative, one_orientation_with_reserve=updated,
             reserve_bytes=prior['reserve'], one_orientation_picture_allowance=one_view,
             optional_field_removal=removal)
+    # PackI's human-body estimate in the earlier plan, against which 4.3's measured
+    # native30 cast is compared: core generic + core stable + this pack's temporary
+    # named bodies + its civilian/unseen pose allowance.
+    human_lo, human_hi = [prior['core_breakdown']['generic_combat_bodies'][i]
+                          + prior['core_breakdown']['stable_named_bodies'][i]
+                          + prior['packs']['I']['breakdown']['temporary_named_bodies'][i]
+                          + prior['packs']['I']['breakdown']['additional_civilian_and_unseen_pose_allowance'][i]
+                          for i in range(2)]
+    for key, pr in projection.items():
+        pr['one_orientation_margin'] = [ARCHIVE_CEILING-v for v in pr['one_orientation_with_reserve']]
+        pr['conservative_margin'] = [ARCHIVE_CEILING-v for v in pr['conservative_with_reserve']]
     peak = max(p['one_orientation_with_reserve'][1] for p in projection.values())
     conservative_peak = max(p['conservative_with_reserve'][1] for p in projection.values())
-    assert conservative_peak < 2700000 and peak < conservative_peak
+    low_peak = max(p['one_orientation_with_reserve'][0] for p in projection.values())
+    # Every pack's LOW forecast fits the measured ceiling; the unconstrained HIGH
+    # forecast does not, which is what choosing a pose profile has to settle.
+    assert low_peak < ARCHIVE_CEILING and peak < conservative_peak
+    over = {projection[k]['label']: ARCHIVE_CEILING-projection[k]['one_orientation_with_reserve'][1]
+            for k in phases if projection[k]['one_orientation_with_reserve'][1] > ARCHIVE_CEILING}
     summary = dict(schema='FFT_MEASURED_PACK_REPORT_1', date='2026-11-24',
-                   accepted_main_packs=8, threshold=wardrobe_cap,
-                   wardrobe=dict(body_increment=wardrobe_body, portrait_allowance=wardrobe_portraits,
-                                 reference_allowance=wardrobe_refs, total=wardrobe_measured,
-                                 cap=wardrobe_cap, all_six_outfits=all_outfits_with_faces),
+                   accepted_main_packs=8,
+                   wardrobe_dropped=dict(credited_bytes=0, measured_body_increment=wardrobe_body,
+                                 portrait_allowance=wardrobe_portraits, reference_allowance=wardrobe_refs,
+                                 measured_total=wardrobe_measured, all_six_outfits=all_outfits_with_faces),
+                   archive=dict(measured_ceiling=ARCHIVE_CEILING, all_except_base_code=ARCHIVE_ALL_EXCEPT_BASE,
+                                per_variable_overhead=ARCHIVE_PER_VARIABLE,
+                                measured_core_install=MEASURED_CORE_INSTALL,
+                                measured_core_plus_chapter1=MEASURED_CORE_PLUS_I),
+                   actor_banks=dict(bytes_per_bank=BANK_BYTES, slots=BANK_SLOTS, ceiling=BANK_CEILING,
+                                    corpus_banks=bank_profiles,
+                                    worst_pack_native30=pack_banks['native30'],
+                                    worst_pack_extended=pack_banks['extended_regular']),
+                   budget_basis='native30', packs_over_ceiling_at_high_forecast=over,
                    pc=pc, native_values=values, cycles=cycles, packs=projection,
                    conservative_peak=conservative_peak, one_orientation_peak=peak,
                    inputs={str(p.relative_to(ROOT)):sha(p) for p in
@@ -115,34 +154,56 @@ def main():
         'Date:2026-11-24. Target: TI-89 Titanium, retail PS1 US campaign.', '',
         '## Decisions', '',
         '- Keep the user-approved **eight main packs**: I whole; II split after Goug; III after Orbonne; IV after Bethla and after Igros.',
+        f'- **Budget against the measured archive ceiling of {number(ARCHIVE_CEILING)} bytes**, not TI\'s2.7MB. That figure is `allExceptBaseCode` ({number(ARCHIVE_ALL_EXCEPT_BASE)}) and is not archivable. Add {ARCHIVE_PER_VARIABLE} bytes per archived variable; the reserve absorbs it.',
+        '- **native30 is the official pose profile for every budget here.** It is the list the shipping renderer already uses. extended_regular stays a stress control and is now ruled out: it breaks the archive ceiling and the actor-bank ceiling at once.',
         '- Plan separate optional quest and Deep Dungeon packs. Content-pack phase never changes the original story chapter or town progression.',
         '- Use one orientation per scripted scene by default. Keep extra source-required directions, camera crops, pans and gestures.',
         '- Keep complete unique appearances for recruits and major story actors. Pool identical sprites, poses and mirrored frames physically.',
         '- Keep complete sprites in the combat renderer. Naive lossless two/three-part preparation is slower; it does not save space in the native30 corpus.',
-        f'- Provisionally retain **Ramza and Delita wardrobe changes**: {number(wardrobe_measured)} bytes including body probes and portrait/reference allowances, under the user\'s50,000-byte whole-campaign cap. Budget the full50,000. If final required poses exceed that cap, return to one normal body per person.',
-        f'- Do not retain the whole six-outfit set by default: {number(all_outfits_with_faces)} bytes with the same allowances exceeds the cap. Same-name wounded/guest/undead variants are not all ordinary clothes.',
+        f'- **One canonical body per person, Ramza and Delita included.** The user dropped optional costume changes. Their measured cost, {number(wardrobe_measured)} bytes for Ramza2/3 + Delita2/3 and {number(all_outfits_with_faces)} for the six-outfit set, is now free budget, not a reserved allowance.',
+        '- Costume variants share no sprite band: the measured two/three-part increments are the same size as the whole-sprite ones, so a second outfit always costs a second complete body.',
         '- Reduce scene-only actors to their actual scripted poses when authoring. No generic head/body replacement has been visually approved or integrated.',
         '',
         'This report measures archive encodings and a bounded pose-preparation prototype. '
         'It does not install new banks, rip the complete campaign, change the shipping renderer, '
         'or certify final Flash/RAM fit. ABI99 and all reviewed art remain unchanged.',
         '', '## 1. Available storage and measured release', '',
-        'TI specifies about2.7MB of user Flash shared by archived variables and apps. '
-        'This is a maximum capacity, not measured free space on the user\'s calculator. '
-        'Installed apps/files reduce it. '
+        'The ceiling is now measured, not assumed. `experiments/archfree/` calls '
+        '`EM_survey` and logs its six figures through tilog, so `ti-mem log` reads '
+        'them without a screenshot. On the project\'s clean Titanium `.sav`, '
+        '`inUse + free` is constant at '
+        f'**{number(ARCHIVE_CEILING)} bytes**: that is what archived variables may '
+        'actually occupy. The2.7MB TI quotes is `allExceptBaseCode` '
+        f'({number(ARCHIVE_ALL_EXCEPT_BASE)}), which also counts one permanently '
+        'unused65,536-byte sector and the archive\'s own bookkeeping. The former '
+        f'2,700,000 planning ceiling overstated capacity by {number(2700000-ARCHIVE_CEILING)} '
+        'bytes on an empty calculator, before any other app or file. '
         '[TI capacity table](https://education.ti.com/en/customer-support/knowledge-base/ti-83-84-plus-family/general-information/12174).', '',
+        'Archive overhead was measured too, and it is small and linear: 36 archived '
+        f'variables holding694,890 stored bytes occupied {number(MEASURED_CORE_INSTALL)} '
+        f'(+806,22.39 each);62 variables holding989,381 occupied {number(MEASURED_CORE_PLUS_I)} '
+        f'(+1,385,22.34 each). Budget {ARCHIVE_PER_VARIABLE} bytes per archived variable. '
+        'There is no sector-fragmentation term to model: AMS packs archived blocks '
+        'contiguously and only garbage collection works by sector. An installed set of '
+        f'150 variables therefore costs about3,450 bytes, which the {number(prior["reserve"])}-byte '
+        'reserve already absorbs; it is not budgeted again per pack. Variables sent '
+        'unarchived cost RAM instead, like the core\'s5,381-byte `fftstory`.', '',
         '| Item | Bytes | Status |', '|---|---:|---|',
         f'| Promoted ABI99 core, stored variables/size words | {number(packages["core"]["stored_variable_bytes"])} | Measured |',
         f'| Same core, transport file | {number(packages["core"]["bytes"])} | Measured; excluded from archive sums |',
-        '| Planning ceiling | 2,700,000 | Configurable assumption, not live free Flash |',
+        f'| Archivable ceiling, empty Titanium | {number(ARCHIVE_CEILING)} | **Measured**, EM_survey |',
+        f'| TI\'s quoted capacity (allExceptBaseCode) | {number(ARCHIVE_ALL_EXCEPT_BASE)} | Measured; NOT archivable |',
+        f'| Archive overhead per archived variable | {ARCHIVE_PER_VARIABLE} | Measured22.39/22.34, rounded up |',
+        f'| Core installed, 36 archived variables | {number(MEASURED_CORE_INSTALL)} | Measured in the archive |',
+        f'| Core + Chapter I pilot,62 variables | {number(MEASURED_CORE_PLUS_I)} | Measured in the archive |',
         '| Flash/VAT/save reserve | 131,072 | Retained;128KiB |',
-        f'| Wardrobe body increment, Ramza+Delita | {number(wardrobe_body)} | Extended converted-pose corpus |',
-        f'| Optional four portrait records + references | {number(wardrobe_portraits+wardrobe_refs)} | Conservative allowance |',
+        f'| Dropped wardrobe increment, Ramza+Delita | {number(wardrobe_measured)} | Measured; not retained, not budgeted |',
         '',
         'MB/KB in this report are decimal. KiB means1,024 bytes. Actor-study stored '
         'counts include compressed streams, u16 offsets, mirrored logical mappings, '
-        'recipe/part headers and bounded variable DAT/size overhead. AMS sector '
-        'fragmentation and other installed software are not measured.',
+        'recipe/part headers and bounded variable DAT/size overhead. Archive headers '
+        'are now measured and budgeted; other installed software on the user\'s own '
+        'calculator is still not, and comes off the same ceiling.',
         '', '## 2. Human bodies, parts and costume measurements', '',
         'The corpus reads52 named-human identity records (38 logical people) and38 generic '
         'job bodies from the local disc. Each pose uses the existing16x26,208-byte '
@@ -196,11 +257,11 @@ def main():
         'anchors, repair outline seams or approve altered silhouettes. No changed '
         'character picture was integrated or used in the CPU benchmark. '
         '**No head-substitution saving is credited to the pack budgets.**', '',
-        '### 2.4 Wardrobe cap', '',
-        'Interpret the user threshold as50,000 additional stored bytes across the '
-        'whole campaign, not50KB per person. Compare complete sprites; do not rely '
-        'on a new part format simply to cross the threshold.', '',
-        '| Optional set | native30 body increment | Extended body increment | Extended + portrait/reference allowance |',
+        '### 2.4 Costume variants: measured, then dropped', '',
+        'The user dropped optional costume changes. Every person keeps one canonical '
+        'body. The table prices what was given up; none of it is budgeted anywhere '
+        'else in this report.', '',
+        '| Dropped set | native30 body increment | Extended body increment | Extended + portrait/reference allowance |',
         '|---|---:|---:|---:|']
     for key, count in [('ramza_only',2), ('delita_only',2), ('ramza_delita',4), ('wiegraf_only',1)]:
         lo = costumes['profiles']['native30'][key]['whole']['increment_bytes']
@@ -212,11 +273,22 @@ def main():
         '(mapping records; retained pictures deduplicate). This does **not** price '
         'an independently authored hooded executioner: special scene-only shapes and '
         'attack/SP2 pages still require their actual source extraction.', '',
-        'Ramza2/3 and Delita2/3 fit provisionally. Reserve the full50KB, including '
-        'four optional portraits and lookup records. The final source-required pose '
-        'inventory must still stay under the cap. Keep Wiegraf and the other secondary '
-        'same-name variants canonical by default; do not accumulate every wounded or '
-        'guest identity as another complete wardrobe.', '',
+        'A second outfit cannot reuse the first one\'s legs and torso. The same '
+        'corpus measured with the row-band encodings gives the increments below: '
+        'splitting the sprite recovers nothing, because an alternate chapter sheet '
+        'redraws the whole figure, head band included.', '',
+        '| Dropped set, native30 | Whole | Two parts | Three parts |',
+        '|---|---:|---:|---:|']
+    for key in ('ramza_only', 'delita_only', 'ramza_delita'):
+        row = costumes['profiles']['native30'][key]
+        lines.append(f'| {key} | {number(row["whole"]["increment_bytes"])} | '
+                     f'{number(row["two"]["increment_bytes"])} | {number(row["three"]["increment_bytes"])} |')
+    lines += ['',
+        'Ramza2/3 costs8,761 bytes whole and8,729 split in two: the shared lower '
+        'band saves32 bytes,0.4%. Delita2/3 is worse split (+209). Head-only '
+        'substitution is measured in2.3 for *different people* sharing one generic '
+        'body, not for one person\'s wardrobe. Keep every same-name wounded, guest '
+        'or undead identity canonical as well.', '',
         '## 3. Native preparation cost and RAM', '',
         'The standalone C prototype reconstructs45 diverse poses, ordinary and '
         'mirrored, through all three encodings:270 cases. PC ASan/UBSan and the '
@@ -284,7 +356,7 @@ def main():
         'a proper name does not imply a dedicated physical sprite bank.', '',
         '### 4.2 Human-bank controls per active pack', '',
         'The following counts include38 generic job controls, all13 final stable '
-        'human banks, the active named NPCs and the optional four hero outfits. '
+        'human banks and the active named NPCs, one body per person. '
         'They are exact counts of these converted profiles, excluding portraits, '
         'nonhuman bosses and missing poses. Early packs need not front-load future '
         'recruits; doing so here is conservative.', '',
@@ -293,10 +365,45 @@ def main():
     for key, row in costumes.get('pack_whole_body_controls', {}).items():
         lines.append(f'| {key} | {number(row["native30"])} | {number(row["extended_regular"])} |')
     lines += ['',
-        'The current actor reader has six human-bank slots. A complete broad '
-        'profile can exceed that directory, even while the archive budget fits. '
-        'Keep pose pruning and explicit bank-directory extension as implementation '
-        'gates; file size alone does not make these banks loadable by ABI99.', '',
+        'Both columns are measured. The native30 column is the budget; the extended '
+        'column is the stress control that4.3 rules out.', '',
+        '### 4.3 Actor-bank ceiling, and why native30 is the budget', '',
+        'Actor frames live in `ffca..ffcf`. Each is one archive variable that '
+        f'`tools/common_actors.py` `split()` caps at {number(BANK_BYTES)} bytes '
+        '(header + u16 directory + ZX0 streams; the in-bank offsets are u16, so the '
+        f'cap is a format limit, not a preference). `actors.h` declares ACTOR_BANKS '
+        f'{BANK_SLOTS}, giving a hard ceiling of **{number(BANK_CEILING)} bytes of '
+        'actor frames resident at once** for any pack. The builder asserts rather '
+        'than truncating, so the limit cannot be crossed silently.', '',
+        '| Profile | Whole corpus | Banks needed | Worst pack | Fits 6 slots |',
+        '|---|---:|---:|---:|---|',
+        f'| native30 | {number(actors["cases"]["native30"]["canonical_plus_jobs"]["whole"]["stored_bytes"])} | '
+        f'{bank_profiles["native30"]} | {number(pack_banks["native30"])} | yes, {number(BANK_CEILING-pack_banks["native30"])} spare |',
+        f'| extended_regular | {number(actors["cases"]["extended_regular"]["canonical_plus_jobs"]["whole"]["stored_bytes"])} | '
+        f'{bank_profiles["extended_regular"]} | {number(pack_banks["extended_regular"])} | '
+        f'**no, {number(pack_banks["extended_regular"]-BANK_CEILING)} over** |',
+        '',
+        'Two independent limits therefore agree. extended_regular needs '
+        f'{bank_profiles["extended_regular"]} banks for the whole corpus against {BANK_SLOTS} slots, '
+        f'and its worst pack ({number(pack_banks["extended_regular"])}) exceeds the '
+        f'{number(BANK_CEILING)}-byte ceiling outright, while PackI at '
+        f'{number(costumes["pack_whole_body_controls"]["I"]["extended_regular"])} is also over. '
+        'The same profile is what pushes the high archive forecast past the measured '
+        'ceiling in6. **native30 is adopted as the budget basis.**', '',
+        'That choice buys a measurable gesture budget rather than closing the door. '
+        'A stored pose costs about141 bytes (303,628 stream bytes over2,216 frames, '
+        'plus about4 bytes of mapping per logical pose). The worst pack leaves '
+        f'{number(BANK_CEILING-pack_banks["native30"])} bank bytes free, roughly '
+        f'{(BANK_CEILING-pack_banks["native30"])//141:,} extra poses spread over that '
+        'pack\'s cast, before any bank-directory change is needed. Author the actual '
+        'scripted gestures against that budget.', '',
+        'Raising ACTOR_BANKS is cheap in itself: the banks are read in place from the '
+        'archive, the extra pointers cost four bytes each, the name is built as '
+        "`'a'+k` up to26 banks, and the miss-path bank walk is linear against a "
+        '26,804-cycle decode. It is not free in practice: ACTOR_BANKS is part of the '
+        'core/chapter contract (`contract_layout.c`), so changing it bumps the ABI and '
+        'forces matching core and chapter packages. Do it when an authored pose '
+        'inventory proves it necessary, not pre-emptively.', '',
         '## 5. Scene and text compression', '',
         'Scenes already decompress ZX0 pictures once at entry. Their low processing '
         'load permits cold decompression; it does not create a new entropy saving '
@@ -336,30 +443,61 @@ def main():
         'be added twice.', '',
         '## 6. Accepted eight-pack breakdown and budgets', '',
         'All amounts below include the shared core, one installed active pack, '
-        'characters/boss allowances, ten optional adapted effects, a50KB global '
-        'hero-wardrobe cap and the131,072-byte reserve. They are forecasts, '
+        'characters/boss allowances, ten optional adapted effects and the '
+        '131,072-byte reserve. No wardrobe allowance remains. They are forecasts, '
         'not ripped/installed pack sizes. No hypothetical head-substitution or '
         'unproven scene-pose pruning is credited.', '',
         'The eight boundaries stay accepted. One small terrain-list refinement '
         'is proposed: IV-C keeps Bed Desert as its sole additional random field '
         'instead of also shipping Doguola. After the final Orbonne entry there '
-        'is no world travel. This preserves more margin for wardrobes/late bosses. '
+        'is no world travel. This preserves more margin for late bosses and '
+        'scene framing. '
         'Earlier extra-field choices remain illustrative until formations are authored.', '',
-        '| Pack | End boundary | Story + extra full maps | Scene-only places | One-direction upper incl reserve | Conservative upper incl reserve |',
-        '|---|---|---:|---:|---:|---:|']
+        '| Pack | End boundary | Maps | Scenes | One-direction low..high | Margin at high | Conservative high | Margin |',
+        '|---|---|---:|---:|---:|---:|---:|---:|']
     for key in phases:
         p = projection[key]
-        lines.append(f'| {p["label"]} | {p["ending"]} | {len(p["story_maps"])} +{len(p["extra_random"])} | {p["scene_locations"]} | {p["one_orientation_with_reserve"][1]/1e6:.3f}MB | {p["conservative_with_reserve"][1]/1e6:.3f}MB |')
+        lo, hi = p['one_orientation_with_reserve']
+        lines.append(f'| {p["label"]} | {p["ending"]} | {len(p["story_maps"])} +{len(p["extra_random"])} | '
+                     f'{p["scene_locations"]} | {lo/1e6:.3f}..{hi/1e6:.3f}MB | '
+                     f'{number(p["one_orientation_margin"][1])} | '
+                     f'{p["conservative_with_reserve"][1]/1e6:.3f}MB | '
+                     f'{number(p["conservative_margin"][1])} |')
     lines += ['',
-        f'The one-direction forecast peaks at **{peak/1e6:.3f}MB including reserve**, '
-        f'or{(peak-prior["reserve"])/1e6:.3f}MB of FFT data. The retained conservative '
-        f'scene allowance peaks at **{conservative_peak/1e6:.3f}MB including reserve**, '
-        f'leaving{number(2700000-conservative_peak)} additional planning bytes. '
-        'This remaining margin is not a claim about actual free Flash.', '',
+        f'Margins are against the measured {number(ARCHIVE_CEILING)}-byte ceiling; a '
+        'negative margin is an overflow. **Every pack fits at its low forecast** '
+        f'(worst low: {low_peak/1e6:.3f}MB, {number(ARCHIVE_CEILING-low_peak)} spare). '
+        f'At the unconstrained high forecast the one-direction peak is {peak/1e6:.3f}MB '
+        f'and PackI is {number(-over["I"])} bytes over; the conservative high peak is '
+        f'{conservative_peak/1e6:.3f}MB, with PackI over by '
+        f'{number(-projection["I"]["conservative_margin"][1])} and PackIV-C by '
+        f'{number(-projection["IV-3"]["conservative_margin"][1])}.', '',
+        'The high column is the sum of every range\'s upper bound at once, so it is a '
+        'worst case, not a forecast. Adopting native30 (4.3) relieves it from below the '
+        'low column, not merely toward it: PackI\'s human bodies were estimated at '
+        f'{number(human_lo)}..{number(human_hi)} bytes, while the measured native30 cast '
+        f'for that pack is {number(costumes["pack_whole_body_controls"]["I"]["native30"])}, '
+        f'{number(human_lo-costumes["pack_whole_body_controls"]["I"]["native30"])} bytes '
+        f'under the low estimate. The measured extended cast ({number(costumes["pack_whole_body_controls"]["I"]["extended_regular"])}) '
+        f'sits inside the old range but over the {number(BANK_CEILING)}-byte actor-bank '
+        'ceiling, so the profile that would justify the high column cannot ship. '
+        '**PackI is the only pack with '
+        'no slack under either reading, and it is the one the user asked to keep '
+        'whole.** Author its actual map, scene and pose inventory before the others: if '
+        'the authored figures land above the low forecast, splitting PackI after Dorter '
+        'or the Sand Mouse cellar is the lever, since battle maps '
+        f'({number(prior["packs"]["I"]["breakdown"]["full_four_view_maps"][0])}..'
+        f'{number(prior["packs"]["I"]["breakdown"]["full_four_view_maps"][1])} bytes for11 '
+        'four-view maps) dominate every other item in the pack.', '',
+        'These margins assume nothing else is installed. The user\'s own calculator '
+        'carries HW3Patch, AMS files and any other software, so measure it with '
+        '`experiments/archfree/` before committing to a boundary.', '',
         '### 6.1 Core and content ownership', '',
-        '- Current measured core:700,273 bytes. The broader shared core projection, '
-        'including generic/stable humans, ten optional effects and the wardrobe cap, '
-        'is roughly1.09..1.24MB; late optional nonhuman recruits bring it to1.12..1.30MB.',
+        f'- Current measured core:700,273 stored bytes; installed, its36 archived '
+        f'variables occupy {number(MEASURED_CORE_INSTALL)} archive bytes and `fftstory` '
+        'stays in RAM. The broader shared core projection, including generic/stable '
+        'humans and ten optional effects, is roughly1.04..1.19MB; late optional '
+        'nonhuman recruits bring it to1.07..1.25MB.',
         '- Core: rules/catalogues, shared UI/portraits/names, ordinary monster families, '
         'generic job art, retained recruits/common actors and selected reusable effects.',
         '- Pack: battle maps/depth, scene backdrops, narrative text/choreography, '
@@ -408,11 +546,13 @@ def main():
         'is existing evidence; future pack-boundary/Continue flows still need their '
         'actual authored PC replay and selected native checks.', '',
         '## 7. Remaining gates and next work', '',
-        '1. Extract actual scene camera/pose references, defaulting to one orientation. '
-        'Keep every required story gesture and source staging; do not use this report '
-        'to certify unreviewed cropping or a generic head-swap appearance.',
-        '2. Keep hero wardrobe data under50KB after actual required poses/portraits '
-        'are packed. Retain canonical fallback; other outfits remain omitted by default.',
+        '1. Author PackI\'s actual map, scene and pose inventory first: it is the only '
+        'pack without slack. If the authored figures land above its low forecast, split '
+        'it. Extract scene camera/pose references defaulting to one orientation, keeping '
+        'every required story gesture and source staging; do not use this report to '
+        'certify unreviewed cropping or a generic head-swap appearance.',
+        '2. Keep one canonical body per person. Reopening any costume variant needs '
+        'a new measurement and a user decision, not this report\'s freed margin.',
         '3. Keep complete battle sprites. A future secondary-body or scene-only parts '
         'prototype needs a visual verdict if it changes pixels, and whole-frame/stack '
         'gates if integrated. Microbenchmarks are not those gates.',
@@ -420,12 +560,18 @@ def main():
         'geometry and source handedness. Current320/352px/row/depth ceilings are '
         'planning constraints, not proof of future full-map fit. Finath and BookStorage5 '
         'still need envelope work; the old Sweegy depth excess remains a ChapterI gate.',
-        '5. Extend/validate human-bank directories and cold text ownership before '
-        'shipping larger banks. Keep42 actor entries,18488 depth bytes, existing '
-        'allocation lifetimes and ordinary360k cycle gates.16KiB free remains deferred.',
+        f'5. Author poses against the native30 budget and its {number(BANK_CEILING-pack_banks["native30"])} '
+        'spare bank bytes (4.3). Raise ACTOR_BANKS only when an authored inventory '
+        'needs it, and then bump the ABI and rebuild matching core/chapter packages. '
+        'Cold text ownership still needs its own pass. Keep42 actor entries,18488 depth '
+        'bytes, existing allocation lifetimes and ordinary360k cycle gates.16KiB free '
+        'remains deferred.',
         '6. Build the actual eight data-only packs, pool resources, measure final '
         'stored bytes and available Flash, replay saves/Continue on PC, then use '
-        'selected native/hardware checks only where changed content requires them.', '',
+        'selected native/hardware checks only where changed content requires them.',
+        '7. Run `experiments/archfree/` on the target calculator before fixing any '
+        'boundary. Every margin here assumes an otherwise empty Titanium; HW3Patch, AMS '
+        'files and other installed software all come off the same ceiling.', '',
         '## 8. Evidence and reproduction', '',
         'Tracked measurement tools:', '',
         '- tools/actor_storage_study.py: local-disc conversion, exact split/join, '
@@ -434,7 +580,9 @@ def main():
         'and per-pack whole-human controls, reusing the measured corpus.',
         '- tools/actor_parts_bench.c: PC/native byte reconstruction and existing '
         'ZX0/mirror preparation costs; no game changes.',
-        '- tools/campaign_pack_report.py: this report and pack-projection.json.', '',
+        '- tools/campaign_pack_report.py: this report and pack-projection.json.',
+        '- experiments/archfree/archfree.c: the EM_survey archive measurement, run in '
+        'TiEmu on the clean Titanium `.sav` and read back with `ti-mem log`, no screenshot.', '',
         'Private local evidence (art/fixtures stay ignored): '
         'x/actor-storage/results.json, costume-choices.json, pc.json, native.log, '
         'pack-projection.json and verification.json. Existing pack/text/scene '
@@ -464,7 +612,7 @@ def main():
         'ti-commit for these measurement tools and documentation; extracted art '
         'and private proof files are excluded from Git.', '']
     args.output.write_text('\n'.join(lines))
-    print(json.dumps(dict(report=str(args.output), wardrobe_total=wardrobe_measured,
+    print(json.dumps(dict(report=str(args.output), dropped_wardrobe_bytes=wardrobe_measured,
                          conservative_peak=conservative_peak, one_orientation_peak=peak,
                          native=cycles), indent=2))
 

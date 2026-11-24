@@ -5,30 +5,37 @@ Date:2026-11-24. Target: TI-89 Titanium, retail PS1 US campaign.
 ## Decisions
 
 - Keep the user-approved **eight main packs**: I whole; II split after Goug; III after Orbonne; IV after Bethla and after Igros.
+- **Budget against the measured archive ceiling of 2,555,826 bytes**, not TI's2.7MB. That figure is `allExceptBaseCode` (2,686,976) and is not archivable. Add 23 bytes per archived variable; the reserve absorbs it.
+- **native30 is the official pose profile for every budget here.** It is the list the shipping renderer already uses. extended_regular stays a stress control and is now ruled out: it breaks the archive ceiling and the actor-bank ceiling at once.
 - Plan separate optional quest and Deep Dungeon packs. Content-pack phase never changes the original story chapter or town progression.
 - Use one orientation per scripted scene by default. Keep extra source-required directions, camera crops, pans and gestures.
 - Keep complete unique appearances for recruits and major story actors. Pool identical sprites, poses and mirrored frames physically.
 - Keep complete sprites in the combat renderer. Naive lossless two/three-part preparation is slower; it does not save space in the native30 corpus.
-- Provisionally retain **Ramza and Delita wardrobe changes**: 47,232 bytes including body probes and portrait/reference allowances, under the user's50,000-byte whole-campaign cap. Budget the full50,000. If final required poses exceed that cap, return to one normal body per person.
-- Do not retain the whole six-outfit set by default: 58,973 bytes with the same allowances exceeds the cap. Same-name wounded/guest/undead variants are not all ordinary clothes.
+- **One canonical body per person, Ramza and Delita included.** The user dropped optional costume changes. Their measured cost, 47,232 bytes for Ramza2/3 + Delita2/3 and 58,973 for the six-outfit set, is now free budget, not a reserved allowance.
+- Costume variants share no sprite band: the measured two/three-part increments are the same size as the whole-sprite ones, so a second outfit always costs a second complete body.
 - Reduce scene-only actors to their actual scripted poses when authoring. No generic head/body replacement has been visually approved or integrated.
 
 This report measures archive encodings and a bounded pose-preparation prototype. It does not install new banks, rip the complete campaign, change the shipping renderer, or certify final Flash/RAM fit. ABI99 and all reviewed art remain unchanged.
 
 ## 1. Available storage and measured release
 
-TI specifies about2.7MB of user Flash shared by archived variables and apps. This is a maximum capacity, not measured free space on the user's calculator. Installed apps/files reduce it. [TI capacity table](https://education.ti.com/en/customer-support/knowledge-base/ti-83-84-plus-family/general-information/12174).
+The ceiling is now measured, not assumed. `experiments/archfree/` calls `EM_survey` and logs its six figures through tilog, so `ti-mem log` reads them without a screenshot. On the project's clean Titanium `.sav`, `inUse + free` is constant at **2,555,826 bytes**: that is what archived variables may actually occupy. The2.7MB TI quotes is `allExceptBaseCode` (2,686,976), which also counts one permanently unused65,536-byte sector and the archive's own bookkeeping. The former 2,700,000 planning ceiling overstated capacity by 144,174 bytes on an empty calculator, before any other app or file. [TI capacity table](https://education.ti.com/en/customer-support/knowledge-base/ti-83-84-plus-family/general-information/12174).
+
+Archive overhead was measured too, and it is small and linear: 36 archived variables holding694,890 stored bytes occupied 695,696 (+806,22.39 each);62 variables holding989,381 occupied 990,766 (+1,385,22.34 each). Budget 23 bytes per archived variable. There is no sector-fragmentation term to model: AMS packs archived blocks contiguously and only garbage collection works by sector. An installed set of 150 variables therefore costs about3,450 bytes, which the 131,072-byte reserve already absorbs; it is not budgeted again per pack. Variables sent unarchived cost RAM instead, like the core's5,381-byte `fftstory`.
 
 | Item | Bytes | Status |
 |---|---:|---|
 | Promoted ABI99 core, stored variables/size words | 700,273 | Measured |
 | Same core, transport file | 701,169 | Measured; excluded from archive sums |
-| Planning ceiling | 2,700,000 | Configurable assumption, not live free Flash |
+| Archivable ceiling, empty Titanium | 2,555,826 | **Measured**, EM_survey |
+| TI's quoted capacity (allExceptBaseCode) | 2,686,976 | Measured; NOT archivable |
+| Archive overhead per archived variable | 23 | Measured22.39/22.34, rounded up |
+| Core installed, 36 archived variables | 695,696 | Measured in the archive |
+| Core + Chapter I pilot,62 variables | 990,766 | Measured in the archive |
 | Flash/VAT/save reserve | 131,072 | Retained;128KiB |
-| Wardrobe body increment, Ramza+Delita | 45,808 | Extended converted-pose corpus |
-| Optional four portrait records + references | 1,424 | Conservative allowance |
+| Dropped wardrobe increment, Ramza+Delita | 47,232 | Measured; not retained, not budgeted |
 
-MB/KB in this report are decimal. KiB means1,024 bytes. Actor-study stored counts include compressed streams, u16 offsets, mirrored logical mappings, recipe/part headers and bounded variable DAT/size overhead. AMS sector fragmentation and other installed software are not measured.
+MB/KB in this report are decimal. KiB means1,024 bytes. Actor-study stored counts include compressed streams, u16 offsets, mirrored logical mappings, recipe/part headers and bounded variable DAT/size overhead. Archive headers are now measured and budgeted; other installed software on the user's own calculator is still not, and comes off the same ceiling.
 
 ## 2. Human bodies, parts and costume measurements
 
@@ -74,11 +81,11 @@ Negative savings mean a larger bank. Hybrid counts include separate whole/part d
 
 This counterfactual keeps18 important/recruitable people fully unique and counts unique upper bands for20 secondary people against an already required generic body catalogue. It does not select compatible body templates, rig head anchors, repair outline seams or approve altered silhouettes. No changed character picture was integrated or used in the CPU benchmark. **No head-substitution saving is credited to the pack budgets.**
 
-### 2.4 Wardrobe cap
+### 2.4 Costume variants: measured, then dropped
 
-Interpret the user threshold as50,000 additional stored bytes across the whole campaign, not50KB per person. Compare complete sprites; do not rely on a new part format simply to cross the threshold.
+The user dropped optional costume changes. Every person keeps one canonical body. The table prices what was given up; none of it is budgeted anywhere else in this report.
 
-| Optional set | native30 body increment | Extended body increment | Extended + portrait/reference allowance |
+| Dropped set | native30 body increment | Extended body increment | Extended + portrait/reference allowance |
 |---|---:|---:|---:|
 | ramza_only | 8,761 | 22,745 | 23,457 |
 | delita_only | 8,673 | 23,063 | 23,775 |
@@ -89,7 +96,15 @@ Interpret the user threshold as50,000 additional stored bytes across the whole c
 
 The optional source identity17 control adds only324 bytes in extended_regular (mapping records; retained pictures deduplicate). This does **not** price an independently authored hooded executioner: special scene-only shapes and attack/SP2 pages still require their actual source extraction.
 
-Ramza2/3 and Delita2/3 fit provisionally. Reserve the full50KB, including four optional portraits and lookup records. The final source-required pose inventory must still stay under the cap. Keep Wiegraf and the other secondary same-name variants canonical by default; do not accumulate every wounded or guest identity as another complete wardrobe.
+A second outfit cannot reuse the first one's legs and torso. The same corpus measured with the row-band encodings gives the increments below: splitting the sprite recovers nothing, because an alternate chapter sheet redraws the whole figure, head band included.
+
+| Dropped set, native30 | Whole | Two parts | Three parts |
+|---|---:|---:|---:|
+| ramza_only | 8,761 | 8,729 | 8,982 |
+| delita_only | 8,673 | 8,882 | 8,963 |
+| ramza_delita | 17,434 | 17,621 | 17,935 |
+
+Ramza2/3 costs8,761 bytes whole and8,729 split in two: the shared lower band saves32 bytes,0.4%. Delita2/3 is worse split (+209). Head-only substitution is measured in2.3 for *different people* sharing one generic body, not for one person's wardrobe. Keep every same-name wounded, guest or undead identity canonical as well.
 
 ## 3. Native preparation cost and RAM
 
@@ -169,20 +184,35 @@ Clear chapter-confined non-recruits include Algus/Teta(I), Draclau/Rudvich(II), 
 
 ### 4.2 Human-bank controls per active pack
 
-The following counts include38 generic job controls, all13 final stable human banks, the active named NPCs and the optional four hero outfits. They are exact counts of these converted profiles, excluding portraits, nonhuman bosses and missing poses. Early packs need not front-load future recruits; doing so here is conservative.
+The following counts include38 generic job controls, all13 final stable human banks and the active named NPCs, one body per person. They are exact counts of these converted profiles, excluding portraits, nonhuman bosses and missing poses. Early packs need not front-load future recruits; doing so here is conservative.
 
 | Pack | native30 | Extended named bodies / native30 jobs |
 |---|---:|---:|
-| I | 271,257 | 440,419 |
-| II-a | 257,457 | 404,252 |
-| II-b | 253,416 | 394,831 |
-| III-a | 267,234 | 431,374 |
-| III-b | 265,691 | 428,101 |
-| IV-1 | 268,023 | 432,657 |
-| IV-2 | 271,481 | 442,947 |
-| IV-3 | 267,348 | 433,008 |
+| I | 253,813 | 394,601 |
+| II-a | 240,023 | 358,434 |
+| II-b | 235,982 | 349,023 |
+| III-a | 249,800 | 385,556 |
+| III-b | 248,257 | 382,283 |
+| IV-1 | 250,579 | 386,839 |
+| IV-2 | 254,037 | 397,129 |
+| IV-3 | 249,914 | 387,190 |
 
-The current actor reader has six human-bank slots. A complete broad profile can exceed that directory, even while the archive budget fits. Keep pose pruning and explicit bank-directory extension as implementation gates; file size alone does not make these banks loadable by ABI99.
+Both columns are measured. The native30 column is the budget; the extended column is the stress control that4.3 rules out.
+
+### 4.3 Actor-bank ceiling, and why native30 is the budget
+
+Actor frames live in `ffca..ffcf`. Each is one archive variable that `tools/common_actors.py` `split()` caps at 65,000 bytes (header + u16 directory + ZX0 streams; the in-bank offsets are u16, so the cap is a format limit, not a preference). `actors.h` declares ACTOR_BANKS 6, giving a hard ceiling of **390,000 bytes of actor frames resident at once** for any pack. The builder asserts rather than truncating, so the limit cannot be crossed silently.
+
+| Profile | Whole corpus | Banks needed | Worst pack | Fits 6 slots |
+|---|---:|---:|---:|---|
+| native30 | 312,656 | 5 | 254,037 | yes, 135,963 spare |
+| extended_regular | 539,728 | 9 | 397,129 | **no, 7,129 over** |
+
+Two independent limits therefore agree. extended_regular needs 9 banks for the whole corpus against 6 slots, and its worst pack (397,129) exceeds the 390,000-byte ceiling outright, while PackI at 394,601 is also over. The same profile is what pushes the high archive forecast past the measured ceiling in6. **native30 is adopted as the budget basis.**
+
+That choice buys a measurable gesture budget rather than closing the door. A stored pose costs about141 bytes (303,628 stream bytes over2,216 frames, plus about4 bytes of mapping per logical pose). The worst pack leaves 135,963 bank bytes free, roughly 964 extra poses spread over that pack's cast, before any bank-directory change is needed. Author the actual scripted gestures against that budget.
+
+Raising ACTOR_BANKS is cheap in itself: the banks are read in place from the archive, the extra pointers cost four bytes each, the name is built as `'a'+k` up to26 banks, and the miss-path bank walk is linear against a 26,804-cycle decode. It is not free in practice: ACTOR_BANKS is part of the core/chapter contract (`contract_layout.c`), so changing it bumps the ABI and forces matching core and chapter packages. Do it when an authored pose inventory proves it necessary, not pre-emptively.
 
 ## 5. Scene and text compression
 
@@ -215,26 +245,30 @@ Decode only a bounded text block at a scene/dialogue boundary; do not expand the
 
 ## 6. Accepted eight-pack breakdown and budgets
 
-All amounts below include the shared core, one installed active pack, characters/boss allowances, ten optional adapted effects, a50KB global hero-wardrobe cap and the131,072-byte reserve. They are forecasts, not ripped/installed pack sizes. No hypothetical head-substitution or unproven scene-pose pruning is credited.
+All amounts below include the shared core, one installed active pack, characters/boss allowances, ten optional adapted effects and the 131,072-byte reserve. No wardrobe allowance remains. They are forecasts, not ripped/installed pack sizes. No hypothetical head-substitution or unproven scene-pose pruning is credited.
 
-The eight boundaries stay accepted. One small terrain-list refinement is proposed: IV-C keeps Bed Desert as its sole additional random field instead of also shipping Doguola. After the final Orbonne entry there is no world travel. This preserves more margin for wardrobes/late bosses. Earlier extra-field choices remain illustrative until formations are authored.
+The eight boundaries stay accepted. One small terrain-list refinement is proposed: IV-C keeps Bed Desert as its sole additional random field instead of also shipping Doguola. After the final Orbonne entry there is no world travel. This preserves more margin for late bosses and scene framing. Earlier extra-field choices remain illustrative until formations are authored.
 
-| Pack | End boundary | Story + extra full maps | Scene-only places | One-direction upper incl reserve | Conservative upper incl reserve |
-|---|---|---:|---:|---:|---:|
-| I | Zeakden complete | 10 +1 | 9 | 2.629MB | 2.689MB |
-| II-A | Goug rescue complete, before Warjilis | 7 +2 | 9 | 2.417MB | 2.477MB |
-| II-B | Lionel complete | 4 +2 | 4 | 2.147MB | 2.157MB |
-| III-A | Orbonne sequence complete, before Grog Hill | 5 +2 | 3 | 2.209MB | 2.209MB |
-| III-B | Riovanes complete | 6 +2 | 5 | 2.363MB | 2.383MB |
-| IV-A | Bethla sluice/rescue/aftermath complete | 8 +2 | 6 | 2.559MB | 2.589MB |
-| IV-B | Igros complete | 6 +2 | 6 | 2.483MB | 2.513MB |
-| IV-C | St. Murond through the ending | 8 +1 | 4 | 2.603MB | 2.613MB |
+| Pack | End boundary | Maps | Scenes | One-direction low..high | Margin at high | Conservative high | Margin |
+|---|---|---:|---:|---:|---:|---:|---:|
+| I | Zeakden complete | 10 +1 | 9 | 2.155..2.579MB | -22,918 | 2.639MB | -82,918 |
+| II-A | Goug rescue complete, before Warjilis | 7 +2 | 9 | 1.976..2.367MB | 188,764 | 2.427MB | 128,764 |
+| II-B | Lionel complete | 4 +2 | 4 | 1.742..2.097MB | 458,729 | 2.107MB | 448,729 |
+| III-A | Orbonne sequence complete, before Grog Hill | 5 +2 | 3 | 1.819..2.159MB | 396,530 | 2.159MB | 396,530 |
+| III-B | Riovanes complete | 6 +2 | 5 | 1.920..2.313MB | 243,209 | 2.333MB | 223,209 |
+| IV-A | Bethla sluice/rescue/aftermath complete | 8 +2 | 6 | 2.085..2.509MB | 47,016 | 2.539MB | 17,016 |
+| IV-B | Igros complete | 6 +2 | 6 | 1.973..2.433MB | 122,523 | 2.463MB | 92,523 |
+| IV-C | St. Murond through the ending | 8 +1 | 4 | 2.061..2.553MB | 3,002 | 2.563MB | -6,998 |
 
-The one-direction forecast peaks at **2.629MB including reserve**, or2.498MB of FFT data. The retained conservative scene allowance peaks at **2.689MB including reserve**, leaving11,256 additional planning bytes. This remaining margin is not a claim about actual free Flash.
+Margins are against the measured 2,555,826-byte ceiling; a negative margin is an overflow. **Every pack fits at its low forecast** (worst low: 2.155MB, 400,952 spare). At the unconstrained high forecast the one-direction peak is 2.579MB and PackI is 22,918 bytes over; the conservative high peak is 2.639MB, with PackI over by 82,918 and PackIV-C by 6,998.
+
+The high column is the sum of every range's upper bound at once, so it is a worst case, not a forecast. Adopting native30 (4.3) relieves it from below the low column, not merely toward it: PackI's human bodies were estimated at 345,361..476,231 bytes, while the measured native30 cast for that pack is 253,813, 91,548 bytes under the low estimate. The measured extended cast (394,601) sits inside the old range but over the 390,000-byte actor-bank ceiling, so the profile that would justify the high column cannot ship. **PackI is the only pack with no slack under either reading, and it is the one the user asked to keep whole.** Author its actual map, scene and pose inventory before the others: if the authored figures land above the low forecast, splitting PackI after Dorter or the Sand Mouse cellar is the lever, since battle maps (780,736..890,736 bytes for11 four-view maps) dominate every other item in the pack.
+
+These margins assume nothing else is installed. The user's own calculator carries HW3Patch, AMS files and any other software, so measure it with `experiments/archfree/` before committing to a boundary.
 
 ### 6.1 Core and content ownership
 
-- Current measured core:700,273 bytes. The broader shared core projection, including generic/stable humans, ten optional effects and the wardrobe cap, is roughly1.09..1.24MB; late optional nonhuman recruits bring it to1.12..1.30MB.
+- Current measured core:700,273 stored bytes; installed, its36 archived variables occupy 695,696 archive bytes and `fftstory` stays in RAM. The broader shared core projection, including generic/stable humans and ten optional effects, is roughly1.04..1.19MB; late optional nonhuman recruits bring it to1.07..1.25MB.
 - Core: rules/catalogues, shared UI/portraits/names, ordinary monster families, generic job art, retained recruits/common actors and selected reusable effects.
 - Pack: battle maps/depth, scene backdrops, narrative text/choreography, encounters/objectives/deployment, local NPC body poses, local large boss forms and source progression bindings. Pool every resource across that pack's consumers.
 - Moving an active bank between core and pack saves zero combined installed bytes. Dropping an expired NPC bank from later packs is a real installed-content reduction.
@@ -307,12 +341,13 @@ Content phase must be distinct from original chapter: II-A/II-B share ChapterII 
 
 ## 7. Remaining gates and next work
 
-1. Extract actual scene camera/pose references, defaulting to one orientation. Keep every required story gesture and source staging; do not use this report to certify unreviewed cropping or a generic head-swap appearance.
-2. Keep hero wardrobe data under50KB after actual required poses/portraits are packed. Retain canonical fallback; other outfits remain omitted by default.
+1. Author PackI's actual map, scene and pose inventory first: it is the only pack without slack. If the authored figures land above its low forecast, split it. Extract scene camera/pose references defaulting to one orientation, keeping every required story gesture and source staging; do not use this report to certify unreviewed cropping or a generic head-swap appearance.
+2. Keep one canonical body per person. Reopening any costume variant needs a new measurement and a user decision, not this report's freed margin.
 3. Keep complete battle sprites. A future secondary-body or scene-only parts prototype needs a visual verdict if it changes pixels, and whole-frame/stack gates if integrated. Microbenchmarks are not those gates.
 4. Author remaining battle/scene maps using approved C2 treatment, full geometry and source handedness. Current320/352px/row/depth ceilings are planning constraints, not proof of future full-map fit. Finath and BookStorage5 still need envelope work; the old Sweegy depth excess remains a ChapterI gate.
-5. Extend/validate human-bank directories and cold text ownership before shipping larger banks. Keep42 actor entries,18488 depth bytes, existing allocation lifetimes and ordinary360k cycle gates.16KiB free remains deferred.
+5. Author poses against the native30 budget and its 135,963 spare bank bytes (4.3). Raise ACTOR_BANKS only when an authored inventory needs it, and then bump the ABI and rebuild matching core/chapter packages. Cold text ownership still needs its own pass. Keep42 actor entries,18488 depth bytes, existing allocation lifetimes and ordinary360k cycle gates.16KiB free remains deferred.
 6. Build the actual eight data-only packs, pool resources, measure final stored bytes and available Flash, replay saves/Continue on PC, then use selected native/hardware checks only where changed content requires them.
+7. Run `experiments/archfree/` on the target calculator before fixing any boundary. Every margin here assumes an otherwise empty Titanium; HW3Patch, AMS files and other installed software all come off the same ceiling.
 
 ## 8. Evidence and reproduction
 
@@ -322,6 +357,7 @@ Tracked measurement tools:
 - tools/actor_costume_increment_study.py: wardrobe subsets, hybrid scopes and per-pack whole-human controls, reusing the measured corpus.
 - tools/actor_parts_bench.c: PC/native byte reconstruction and existing ZX0/mirror preparation costs; no game changes.
 - tools/campaign_pack_report.py: this report and pack-projection.json.
+- experiments/archfree/archfree.c: the EM_survey archive measurement, run in TiEmu on the clean Titanium `.sav` and read back with `ti-mem log`, no screenshot.
 
 Private local evidence (art/fixtures stay ignored): x/actor-storage/results.json, costume-choices.json, pc.json, native.log, pack-projection.json and verification.json. Existing pack/text/scene baseline: x/pack-refinement/{plan.json,text-cast.json,scenes.json}. The report contains the scope/IDs/assumptions needed to review these estimates even when the private extracted art is not distributed.
 

@@ -1022,6 +1022,37 @@ The eight-bank opening fixture in `games/fft/opening/` checks actual VAT loading
 Archive attributes are set in the TI file header at 0x49, outside the payload
 checksum. This packaging check is headless; it does not validate a Flash transfer.
 
+### Real free archive Flash, and what TI's "2.7 MB" means (verified, Titanium AMS3.10, 2026-11-24)
+
+**Do not plan archived data against the 2.7 MB TI quotes.** `EM_survey`
+(`flash.h`, ROM call 0x165) reports the archive truthfully; `experiments/archfree/`
+prints its six figures and logs them through `tilog`, so `ti-mem log` reads them
+with no screenshot. Measured in TiEmu on the project's clean Titanium `.sav`:
+
+| EM_survey field | Empty calculator | Core installed | Core + Chapter I |
+|---|---:|---:|---:|
+| `inUse` | 0 | 695,696 | 990,766 |
+| `free` (archivable) | 2,555,826 | 1,860,130 | 1,565,060 |
+| `unusedSectors` | 65,536 | 65,536 | 65,536 |
+| `allExceptBaseCode` | 2,686,976 | 2,686,976 | 2,686,976 |
+
+`inUse + free` is constant at **2,555,826 bytes**: that is the real ceiling for
+archived variables on an empty Titanium. TI's "2.7 MB" is `allExceptBaseCode`
+(2,686,976), which also counts one permanently unused 65,536-byte sector and the
+archive's own bookkeeping. Planning against it overstates capacity by 131,150
+bytes before any app or file is installed.
+
+**Archive overhead is ~22.3 bytes per archived variable, and nothing else.**
+36 archived variables holding 694,890 stored bytes (payload + AMS size word)
+occupied 695,696 of Flash: +806, or 22.39 per variable. 62 variables holding
+989,381 occupied 990,766: +1,385, or 22.34 per variable. Budget 23 bytes per
+variable; there is no sector-fragmentation penalty to model, since AMS packs
+archived blocks contiguously and only garbage collection works by sector.
+
+Variables sent **unarchived** (TI file header attribute 0 at 0x49) cost RAM, not
+Flash: the core's `fftstory` keeps 5,381 bytes out of the archive and `HeapAvail`
+falls accordingly. Count them against RAM, never against the archive budget.
+
 ### Headless PNG comparisons: viewport and palette (FFT,2026-10-25)
 
 **Verified headless PC/68000, not a TiEmu hardware observation:** FFT software
