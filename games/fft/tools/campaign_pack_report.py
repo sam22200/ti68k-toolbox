@@ -546,9 +546,11 @@ def main():
         'is existing evidence; future pack-boundary/Continue flows still need their '
         'actual authored PC replay and selected native checks.', '',
         '## 7. Remaining gates and next work', '',
-        '1. Author PackI\'s actual map, scene and pose inventory first: it is the only '
-        'pack without slack. If the authored figures land above its low forecast, split '
-        'it. Extract scene camera/pose references defaulting to one orientation, keeping '
+        '1. **Done for storage** ([PACK1_INVENTORY.md](PACK1_INVENTORY.md)): PackI\'s '
+        'eleven maps and nine rooms measured from the disc total1,894,549 bytes with '
+        'today\'s core,530,205 inside the budget, so PackI stays whole and needs no '
+        'split. Two depth overruns remain (Sweegy19,304, Slums in Dorter18,776 against '
+        '18,488). Still extract scene camera/pose references defaulting to one orientation, keeping '
         'every required story gesture and source staging; do not use this report to '
         'certify unreviewed cropping or a generic head-swap appearance.',
         '2. Keep one canonical body per person. Reopening any costume variant needs '
