@@ -401,7 +401,14 @@ def chapter_files(directories, specs):
     return source
 
 
-def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, allow_unused=False):
+# The archivable ceiling measured on a clean Titanium through EM_survey
+# (experiments/archfree, ti68k-c-patterns.md), and the measured per-variable
+# archive header. TI's 2.7 MB is allExceptBaseCode and is not archivable.
+ARCHIVE_CEILING = 2555826
+ARCHIVE_PER_VARIABLE = 23
+
+
+def build(source, core_spec, chapters, out, budget=ARCHIVE_CEILING, reserve=128*1024, allow_unused=False):
     original=source
     source=resources.shared_contours(source)
     core, key = core_package(source, core_spec)
@@ -427,13 +434,19 @@ def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, al
         raise ValueError('Input group contains save/configuration or package metadata')
     report = dict(schema='FFT_CHAPTER_PACKAGES_1', core_key=key.hex(),
                   planning_budget_bytes=budget, reserved_bytes=reserve,
-                  caveat='Serialized bytes plus size words; AMS VAT/archive headers, Flash fragmentation and other installed programs are not measured. RAM is a separate constraint.',
+                  caveat=f'Serialized bytes plus size words plus the measured {ARCHIVE_PER_VARIABLE}-byte archive header per archived variable. The budget is the measured empty-Titanium ceiling; other installed programs are not measured. Unarchived variables cost RAM, not archive. RAM is a separate constraint.',
                   envelope=core_spec['envelope'], core=details(core, 'fft-core.89g'), chapters=[])
     for spec, variables in packs:
         row = details(variables, f"chapter-{spec['id']:02d}.89g")
         row.update(id=spec['id'], title=spec['title'], complete=spec.get('complete', False))
         row['installed_with_core_bytes'] = row['stored_variable_bytes']+report['core']['stored_variable_bytes']
-        row['budget_headroom_after_reserve'] = budget-reserve-row['installed_with_core_bytes']
+        # What the ARCHIVE actually holds: unarchived variables (attr 0) live in RAM.
+        # Measured on hardware: payload + AMS size word + a 22.3-byte header each.
+        archived = [v for v in row['variables']+report['core']['variables'] if v['attr']]
+        row['installed_archive_bytes'] = sum(v['bytes']+2+ARCHIVE_PER_VARIABLE for v in archived)
+        row['unarchived_ram_bytes'] = sum(
+            v['bytes']+2 for v in row['variables']+report['core']['variables'] if not v['attr'])
+        row['budget_headroom_after_reserve'] = budget-reserve-row['installed_archive_bytes']
         if row['budget_headroom_after_reserve'] < 0:
             raise ValueError(f"Chapter {spec['id']} exceeds the selected installation budget")
         report['chapters'].append(row)
@@ -463,7 +476,9 @@ def build(source, core_spec, chapters, out, budget=2700000, reserve=128*1024, al
         'Install a core and chapters with the same core key from `packages.json`. '
         '`source.89g` is a build intermediate, not an installation group. '
         'The supplied Chapter I pack is the existing Orbonne/Academy/Gariland pilot, not a complete chapter.\n\n'
-        'Storage figures are planning estimates with a reserve, not a measurement of free Flash or RAM.\n')
+        'Storage figures include the measured archive header per variable and a reserve. '
+        'The budget is the archivable ceiling measured on an empty Titanium; run '
+        '`experiments/archfree/` on the target calculator for its actual free archive.\n')
     (out/'packages.json').write_text(json.dumps(report, indent=2)+'\n')
     (out/'resources.json').write_text(json.dumps(resource_report,indent=2)+'\n')
     return report, core, packs
@@ -478,7 +493,7 @@ def main():
     ap.add_argument('--chapter', type=Path, action='append', help='repeat for each authored chapter')
     ap.add_argument('--out', type=Path, default=HERE/'campaign/x/packages')
     ap.add_argument('--combined', type=Path, help='optional legacy all-in-one output for the first chapter')
-    ap.add_argument('--budget', type=int, default=2700000)
+    ap.add_argument('--budget', type=int, default=ARCHIVE_CEILING)
     ap.add_argument('--reserve', type=int, default=128*1024)
     args = ap.parse_args()
     if args.reserve < 0 or args.budget <= args.reserve:
