@@ -69,20 +69,22 @@ Each map is read from the local disc, rastered in the four orientations and pack
 with the production R4 view codec (`map_budget.archive()` → `extract.pack_view`), so
 the figure already contains the colour, depth and cover planes.
 
-| Map | Name | Four views | Depth max | Rows | Width |
-|---:|---|---:|---:|---:|---:|
-| 022 | Magic City Gariland | 70,801 | 18,288 | 204 | 300 |
-| 032 | Slums in Dorter | 77,878 | **18,776** | 258 | 312 |
-| 034 | Cellar of Sand Mouse | 60,105 | 13,460 | 179 | 252 |
-| 049 | Fort Zeakden | 72,778 | 15,872 | 192 | 264 |
-| 056 | Orbonne Monastery | 77,978 | 11,592 | 292 | 288 |
-| 074 | Sweegy Woods | 80,274 | **19,304** | 244 | 276 |
-| 077 | Lenalia Plateau | 65,408 | 15,608 | 180 | 264 |
-| 085 | Mandalia Plains | 60,932 | 15,620 | 171 | 312 |
-| 091 | Thieves Fort | 68,837 | 15,672 | 186 | 264 |
-| 103 | Windmill Shed | 72,810 | 13,408 | 210 | 216 |
-| 076 | Zeklaus Desert (random) | 62,547 | 17,040 | 180 | 336 |
-| | **Total** | **770,348** | | | |
+| Map | Name | Four views | Width |
+|---:|---|---:|---:|
+| 022 | Magic City Gariland | 70,801 | 300 |
+| 032 | Slums in Dorter | 77,878 | 312 |
+| 034 | Cellar of Sand Mouse | 60,105 | 252 |
+| 049 | Fort Zeakden | 72,778 | 264 |
+| 056 | Orbonne Monastery | 77,978 | 288 |
+| 074 | Sweegy Woods | 80,274 | 276 |
+| 077 | Lenalia Plateau | 65,408 | 264 |
+| 085 | Mandalia Plains | 60,932 | 264 |
+| 091 | Thieves Fort | 68,837 | 264 |
+| 103 | Windmill Shed | 72,810 | 216 |
+| 076 | Zeklaus Desert (random) | 62,547 | 336 |
+| | **Total** | **770,348** | |
+
+Depth is a separate, runtime constraint and has its own measurement in section 3.
 
 70,031 bytes a map on average. The earlier estimate was 780,736..890,736 for these
 eleven maps, so the measurement lands 10,388 bytes **below** its low end.
@@ -98,23 +100,77 @@ figures by 112%. Measured against those same maps, production R4 costs 2.00× (m
 using the 112% calibration understates map storage by roughly half. This inventory
 supersedes it for Chapter I.
 
-## 3. The real blocker: two depth overruns
+## 3. The real blocker: two maps need a shorter scene
 
-`FFT_CORE_DEPTH_MAX` is 18,488 bytes of ragged depth. Two Chapter I maps exceed it:
+`FFT_CORE_DEPTH_MAX` is 18,488 bytes: `fft.c` unpacks one view's ragged depth into
+`vbuf` and that buffer is the cap. The stream is
 
-| Map | Depth per orientation | Max | Over |
+    4 * sc_h          one DepthRow per scene row
+  + 4 * sum(span)     four planes over each row's even byte span
+
+so a map's cost splits into a term the authoring pass sets (`sc_h`, which
+`chapter_files.inc` already reads per map) and a term the source geometry sets.
+Measured with the production encoder, worst view per map, each at its own `sc_h`:
+
+| Map | sc_h | Worst view | Margin |
 |---:|---|---:|---:|
-| 074 Sweegy Woods | 16,960 / 18,608 / 17,432 / 19,304 | 19,304 | +816 |
-| 032 Slums in Dorter | 13,224 / 15,784 / 18,776 / 17,800 | 18,776 | +288 |
+| 034 Cellar of Sand Mouse | 178 | 13,448 | 5,040 |
+| 103 Windmill Shed | 178 | 12,728 | 5,760 |
+| 085 Mandalia Plains | 145 | 15,164 | 3,324 |
+| 091 Thieves Fort | 186 | 15,608 | 2,880 |
+| 076 Zeklaus Desert | 148 | 15,616 | 2,872 |
+| 077 Lenalia Plateau | 180 | 15,808 | 2,680 |
+| 049 Fort Zeakden | 192 | 16,400 | 2,088 |
+| 022 Magic City Gariland | 202 | 18,304 | 184 |
+| 056 Orbonne Monastery | 190 | 18,480 | 8 |
+| **032 Slums in Dorter** | 202 | **21,152** | **−2,664** |
+| **074 Sweegy Woods** | 202 | **21,640** | **−3,152** |
 
-Sweegy was already a known Chapter I gate. **Slums in Dorter is new**: it is not in the
-thirteen-map census `chapter1-plan.json` caches, which covers map 031 Dorter Trade City
-instead, so nobody had measured it. Both are runtime buffer limits, not Flash, so they
-do not move the verdict in section 1 — but neither map is playable until its depth is
-adapted or the buffer grows, and that adaptation is art-adjacent work for the
-supervised extractor.
+**Orbonne is not an overrun: it is where the cap came from.** 4 × 192 + 17,720 =
+18,488 exactly, its worst view at its shipped 192-row scene. Gariland's measurement
+is confirmed against the shipped bank, whose R4 header stores depth = 18,304.
 
-Every other map fits with at least 466 bytes to spare (077 Lenalia, 18,022).
+**Two maps have to lose rows, and the measurement says how many and from which end.**
+Sliding a full-height window never helps — Sweegy's seven legal windows all give
+21,640 — so the scene itself must be shorter. The tallest scene that fits, over every
+window of that height with the worst view counted:
+
+| Map | Scene now | Tallest that fits | Rows lost | Cut from | Worst view | Spare |
+|---|---:|---:|---:|---|---:|---:|
+| 074 Sweegy Woods | 202 | **165** | 37 | 43 rows off the **top** | 18,380 | 108 |
+| 032 Slums in Dorter | 202 | **172** | 30 | 54 rows off the **bottom** | 18,440 | 48 |
+
+The two cut from opposite ends because their costs sit in different places. Sweegy's
+rows cost 41 bytes at the top, 136 in the middle, 44 at the bottom: its canopy is
+cheap, so the sky goes. Slums' rows cost 4 at the top, 151 in the middle, 81 at the
+bottom: its sky is nearly empty and cutting it buys nothing, so the foreground goes.
+
+Where exactly to cut is a picture decision and belongs to the supervised extractor.
+`games/fft/tools/depth_budget.py` writes the per-row cost of every map so the cut is
+priced before it is made, not guessed.
+
+### What was ruled out
+
+Compressing the height axis looks like the obvious fix and is not: 96% of the stream
+is span bytes (20,832 against 808 of row headers on Sweegy), and the rows a shorter
+height axis removes are the cheap ones at the top.
+
+Three pixel-exact re-encodings were measured and rejected. A span per depth/mask pair
+instead of their union, exact byte bounds instead of bounds rounded out to even, and
+two runs per row instead of one span, give 19,264 / 20,736 / 18,326 on Sweegy and
+19,822 / 20,292 / 19,286 on Slums. Even all three together clear Sweegy by 162 bytes
+and still leave Slums over. Three runs is worse than two: the header grows faster than
+the recovered gaps. Spans are 67–70% useful, so the holes are real but small.
+
+They also are not free. Exact bounds lose the word alignment `depth_rows()` relies on
+— `x0`, `w` and every derived offset are even today, and that XOR loop runs on each
+view change, so it would drop to byte operations during animated rotations. Per-pair
+spans and runs add a test to the per-actor-row cover path in `seen()` and the sprite
+blend, against a measured 13-unit Zeklaus peak of 356,832 cycles on a 360,000 budget.
+Spending 3,168 cycles of margin to gain 162 bytes on one map of two is a bad trade.
+
+Raising the cap is also closed: `INSTALLED_RAM_ABI99.md` measures 436 free bytes on
+that same 13-unit case, against the 3,152 Sweegy would need.
 
 ## 4. Narrative rooms
 
@@ -149,6 +205,7 @@ tools/pyenv/bin/python games/fft/tools/map_budget.py \
 tools/pyenv/bin/python games/fft/tools/pack1_inventory.py \
   --maps-json games/fft/campaign/x/pack1-inventory/pack1-maps.json \
   --out games/fft/campaign/x/pack1-inventory/inventory.json
+tools/pyenv/bin/python games/fft/tools/depth_budget.py
 ```
 
 The map pass takes about four minutes, the scene pass about ten; `--scenes-json`
@@ -163,5 +220,12 @@ save and no shipping asset is touched.
 - The pack report's Chapter I high forecast (−22,918 one-direction, −82,918
   conservative against the measured ceiling) was driven by allowance ranges, not by
   content: measured content is 530,205 bytes inside the budget.
-- Two depth adaptations are now the Chapter I blocker, Slums in Dorter being new.
+- Two maps need a shorter scene, and the numbers say which rows: Sweegy Woods to 165
+  rows by losing 43 of sky, Slums in Dorter to 172 by losing 54 of foreground. Slums
+  in Dorter is a new finding; the cached thirteen-map census covers map 031 instead.
+- Orbonne is not an overrun. `FFT_CORE_DEPTH_MAX` was sized on it, so the earlier
+  reading that it exceeded the cap was an artefact of assuming a 202-row scene.
+- The previously quoted depth figures came from `map_budget.ragged()`, a second
+  implementation of the format that keeps different rows. Section 3 uses the
+  production encoder and is confirmed against the shipped Gariland bank.
 - `chapter1-plan.json`'s 112% scenery calibration is superseded for Chapter I.
