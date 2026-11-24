@@ -1,5 +1,14 @@
 # Opening -> Academy -> Gariland
 
+Current reviewed core checkpoint (2026-11-24): ABI99, key
+`10965478d3a2c348c22d2dea8e6ac51d`, groups
+`x/core-abi99-release/packages/`. [Installed RAM and promotion](INSTALLED_RAM_ABI99.md)
+records the cold fragmentation fix and actual Titanium free/max measurements.
+`make core-contract-check` uses this release; new package builds default to
+`x/build-packages`, preserving old proof groups. The pilot is not full Chapter I;
+16KiB free remains unpassed and Zeklaus13 has only436 free bytes.
+
+
 Current delivery (2026-11-23): the ordinary-combat pilot passes end to end on
 PC and sanitizers, with one complete matching68000 Gariland fight. Matching
 ABI97 groups use a shared graphics/Save-reader block; real private Titanium

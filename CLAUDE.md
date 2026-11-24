@@ -278,6 +278,9 @@ that kind of task.
   masks from that depth (`games/fft/`).
 - `ti-art-refs`: sprite banks to draw from (scenery, characters, UI/HUD/menus/dialogue, portraits),
   the pick per category for 160×100 in 4 greys; references only, redrawn, never committed.
+- `fft-map-extraction`: extract FFT battle maps with the approved C2 four-grey
+  treatment, source material boundaries and prop silhouettes; preserve full
+  geometry/cover and validate shared framing on PC before selected TI checks.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
   per task, push to `github.com/sam22200/ti68k-toolbox`, merge into `main` once the tests pass.
 - When you learn something new and verified about the platform, add it to

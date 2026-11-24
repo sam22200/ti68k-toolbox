@@ -1,4 +1,18 @@
-# Chapter I readiness (2026-11-23)
+# Chapter I readiness (2026-11-24)
+
+Current map-authoring probe: [approved C2 Zeklaus](ZEKLAUS_REVIEW.md), now loaded
+by the [promoted wide-scene core](WIDE_SCENES.md). C2's light tones,
+ledges, white prop outlines and material borders are recorded in the extraction
+skill. Per-map320/352px views preserve all180 source cells,176 stoppable;
+colors/depth/cursor/movement/rotation/cover and allocation retry pass PC/ASan.
+R5 depth peaks17280/18488. The [ABI99 rendering/HUD follow-up](RENDER_OPTIMIZATION.md)
+passes the selected ordinary360k gates: Zeklaus peaks331842/327594 at12 units
+and339962/356832 at13. Gariland13 peaks281086/325234.
+The [installed-RAM follow-up](INSTALLED_RAM_ABI99.md) fixes cold fragmentation
+and promotes ABI99: Orbonne2420/2414, Gariland1420/1414 and Zeklaus13
+436/430 free/max bytes.16KiB remains unpassed. Old ABI97 proofs remain intact.
+State/Save/Work and cache capacities are unchanged; diagnostic actors are not
+an authored source battle.
 
 ## Current release handoff
 
@@ -22,13 +36,13 @@ bridge and Gariland; it is not the whole campaign.
    AMS's automatic archive lock. Keep RAM/free/max measurements explicit;
    **16KiB free/peak is not certified.** Do not reopen difficult cache shrinking.
 3. **Core contract and archive plan: complete within stated content limits.**
-   `packages/core-contract.json` freezes actual ABI97,29 matching images,
-   State2278/Unit116/Work37790/ModCtx396/FSV9 Save4684, zone9114 and shared
-   companion4128 (cold reader3542). Actor cache42/depth18488 are unchanged.
-   Current groups: core700091 + pilot295145 transport bytes, key
-   `ac1de6c7a4d71264d1bee76df06f489d`. The dated full-chapter plan projects
-   1845016 bytes with24717 bytes of planning margin. This is not a build
-   of the full chapter or a Flash-fragmentation guarantee.
+   `packages/core-contract.json` freezes actual ABI99,29 matching images,
+   State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684, zone9118 and shared
+   companion4132 (cold reader3546). Actor cache42/depth18488 are unchanged.
+   Current groups: core701169 + pilot295145 transport bytes, key
+   `10965478d3a2c348c22d2dea8e6ac51d`, in `x/core-abi99-release/packages/`.
+   The dated full-chapter plan projects1851032 bytes with17623 bytes of planning
+   margin. This is not a full chapter build or a Flash-fragmentation guarantee.
 
 ## Remaining priorities
 
@@ -38,8 +52,11 @@ It does not certify unripped content, whole-chapter Flash or future-map RAM.
 
 1. Check/adapt the future maps against the fixed RAM/depth/width envelope.
    Sweegy and Fovoham need depth adaptations (816/688 estimated excess bytes);
-   Zeklaus needs the336-to320 width crop. Review actual art/handedness. Keep
-   difficult RAM recovery deferred;16KiB is a target, not a hard threshold.
+   Zeklaus wide support and selected12/13-unit CPU gates now pass in ABI99,
+   with PC/native picture equality. Retain the old failing CPU references.
+   Installed RAM now passes the selected milestone; Zeklaus has only436 free bytes.
+   Preserve full geometry. Keep difficult RAM recovery deferred;16KiB is a
+   target, not a hard threshold.
 2. Rip/author the remaining story scenes and battle maps, pooling resources
    and using the reviewed portraits, menus and one physical-model palette.
    Bind source choices, guests, events/rumors and battle chains explicitly.
