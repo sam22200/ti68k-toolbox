@@ -27,7 +27,7 @@ def main():
         'wiegraf_only': {40},
     }
     pack = Packer(folder)
-    report = dict(schema='FFT_COSTUME_INCREMENT_CHOICES_1', threshold_bytes=50000,
+    report = dict(schema='FFT_COSTUME_INCREMENT_CHOICES_1', retained=False,
                   source_code_hash=study['code_hash'], profiles={})
     for profile in ('native30', 'extended_regular'):
         report['profiles'][profile] = {}
@@ -38,7 +38,7 @@ def main():
             for scheme, cuts in [('whole', [26]), ('two', [8, 26]), ('three', [8, 18, 26])]:
                 result = measure(rows, cuts, pack)
                 delta = result['stored_bytes']-study['cases'][profile]['canonical_plus_jobs'][scheme]['stored_bytes']
-                choices[scheme] = dict(increment_bytes=delta, under_50k=delta < 50000)
+                choices[scheme] = dict(increment_bytes=delta)
             report['profiles'][profile][name] = choices
             print(profile, name, json.dumps(choices), flush=True)
     report['hybrid_parts'] = {}
@@ -71,7 +71,7 @@ def main():
         report['pack_whole_body_controls'] = {}
         for key in ('I', 'II-a', 'II-b', 'III-a', 'III-b', 'IV-1', 'IV-2', 'IV-3'):
             people = stable | set(cast['packs'][key]['cast'])
-            ids = {study['canonical_ids'][n] for n in people} | jobs | {2, 3, 5, 6}
+            ids = {study['canonical_ids'][n] for n in people} | jobs
             values = {}
             for profile in ('native30', 'extended_regular'):
                 rows = [(i, f, raw) for i in sorted(ids) for f, raw in frames[i].items()
@@ -80,8 +80,8 @@ def main():
             report['pack_whole_body_controls'][key] = values
             print('pack human control', key, json.dumps(values), flush=True)
     report['decision'] = (
-        'Compare complete whole-body extended profile, not a small subset or an unimplemented part format. '
-        'Retain only a wardrobe set under50000 total incremental bytes; actual source-required pose extraction remains separate.')
+        'No costume variant is retained: one canonical body per person, Ramza and Delita included. '
+        'These increments price the dropped sets; the row-band columns show a second outfit shares no band.')
     (folder/'costume-choices.json').write_text(json.dumps(report, indent=2)+'\n')
 
 
