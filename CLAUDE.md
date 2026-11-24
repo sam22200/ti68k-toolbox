@@ -346,7 +346,8 @@ that kind of task.
   `zx0pack.py` (ZX0 packer on the PC; recipe in `ti68k-c-patterns.md` §10), archived proportional
   bitmap fonts (`bitmap_font.c`/`.h`/`.py`, `BITMAP_FONT.md`) and the offline SVG outline
   converter (`svgfont.py`, `SVGFONT.md`).
-- `experiments/`: small verified tests (`hwinfo/`: HW version, AMS, timer values; `bench/`:
+- `experiments/`: small verified tests (`hwinfo/`: HW version, AMS, timer values; `archfree/`: the real free archive Flash via
+  `EM_survey` (TI's 2.7 MB is not archivable) and the per-variable archive overhead; `bench/`:
   micro-benchmark harness, `bench7.c` PRNGs and bit-sliced CA; `codegen/`: what C compiles to; `tables/`: table-driven rotation and
   atan2 demo; `timers/`: int-5 rate per start value; `gray/`: GrayDBuf; `keys/`: keyboard latch;
   `files/`: save-file round trips, manual and stdio; `dll/`: DLL loading per model; `errors/`: TRY/FINALLY

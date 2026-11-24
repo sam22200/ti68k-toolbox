@@ -113,11 +113,15 @@ Flash/scenes/text/character lifetimes and recommend a practical pack split,
 including half-chapters if useful. The one-body decision is accepted; the
 boundaries below are an agent recommendation, not a user-approved release.
 
-TI officially specifies about2.7MB user Flash shared by archive/apps. Our
-2700000-byte package budget is configurable planning, NOT measured free Flash
-on the user's calculator. Other installed apps/files subtract from it;131072
-reserve remains. No live emulator read/input/installation was done here.
-Official source: TI support solution12174. Current stored core remains700273.
+Superseded2026-11-24: the ceiling is now measured, not assumed. `EM_survey`
+on the clean Titanium `.sav` reports2,555,826 archivable bytes
+(`experiments/archfree/`); TI's2.7MB is `allExceptBaseCode` (2,686,976) and is
+not archivable, so the former2700000 budget overstated capacity by144,174
+bytes. The package builder now defaults to the measured ceiling and charges a
+measured23-byte archive header per archived variable. Other installed apps/files
+still subtract from it;131072 reserve remains. Official source: TI support
+solution12174. Current stored core remains700273; installed, its36 archived
+variables occupy695,696 archive bytes with `fftstory` held in RAM.
 
 New read-only evidence: `x/pack-refinement/{summary.txt,plan.json,text-cast.json,
 scenes.json}` and three reproducible Python scripts. Previous broad scene/cast
