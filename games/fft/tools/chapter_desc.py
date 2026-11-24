@@ -168,13 +168,13 @@ def build(chapter):
     fields['UNIT_COUNT']=unit_count
     values['SC_TOP'] = SC_TOP[chapter]
     view = (folder / (VIEW[chapter] + '.bin')).read_bytes()
-    if view[:2] != b'R4':
+    if view[:2] not in (b'R4',b'R5'):
         raise ValueError(f'{chapter}: {VIEW[chapter]} is not a ragged view (tools/view_split.py)')
-    values['SC_H'] = int.from_bytes(view[2:4], 'big') // (2 * 40)
+    values['SC_H'] = int.from_bytes(view[2:4], 'big') // (88 if view[:2]==b'R5' else 80)
     depth_max=int(re.search(r'^#define FFT_CORE_DEPTH_MAX (\d+)',(HERE/'core_limits.h').read_text(),re.M)[1])
     for rot in range(4):
         v=(folder / (VIEW[chapter][:-1] + str(rot) + '.bin')).read_bytes()
-        if v[:2]!=b'R4' or int.from_bytes(v[6:8],'big')>depth_max:
+        if v[:2]!=view[:2] or int.from_bytes(v[6:8],'big')>depth_max:
             raise ValueError(f'{chapter}: view {rot} depth {int.from_bytes(v[6:8],"big")} exceeds the core\'s {depth_max} bytes')
     for f, name in NUMBERS:
         fields[f] = values[name or f]

@@ -46,7 +46,7 @@ def synthetic(core, chapter):
                            'anims':{a:([picture],[8])for a in range(mbb.ANIMS)}}])[0]
         if re.fullmatch(r'ff[a-z0-9]v[0-3]',name):
             import extract
-            raw=extract.view_bank(b'R4',(name.encode()*16)[:80],b'',bytes(4))
+            raw=extract.view_bank(b'R4',(name.encode()*1600)[:8000],b'',bytes(400))
         if name in ('ffgd', 'ffod'):
             words = [0]*53
             words[9], words[10], words[13], words[50] = 10, 10, 100, 11

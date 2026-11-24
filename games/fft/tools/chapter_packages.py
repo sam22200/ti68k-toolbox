@@ -141,8 +141,8 @@ def select(source, names):
 def core_package(source, spec):
     if spec['schema'] != 'FFT_CORE_SPEC_1':
         raise ValueError('Unsupported core specification')
-    if spec.get('view_format')!='R4':
-        raise ValueError('Core specification must declare R4 archive colours')
+    if spec.get('view_format')!='R4/R5':
+        raise ValueError('Core specification must declare R4/R5 archive colours')
     if spec.get('encounter_format')!='FCD5':
         raise ValueError('Core specification must declare FCD5 encounter source maps')
     if spec.get('ko_actor_format')!='FKO1':
@@ -191,6 +191,8 @@ def core_package(source, spec):
                       ('axis', 'FFT_CORE_AXIS_MAX'), ('layers', 'FFT_CORE_LAYER_MAX')]:
         expected[key] = int(re.search(r'#define\s+'+name+r'\s+(\d+)', (HERE/'core_limits.h').read_text())[1])
     expected['scene_rows'] = int(re.search(r'#define SC_HMAX (\d+)', (HERE/'chapters.h').read_text())[1])
+    expected['scene_widths'] = [320,352]
+    expected['scene_colors'] = int(re.search(r'#define FFT_CORE_SCENE_MAX (\d+)', (HERE/'core_limits.h').read_text())[1])
     if envelope != expected:
         raise ValueError('Core envelope differs from the compiled headers')
     key = hashlib.sha256(json.dumps(spec, sort_keys=True).encode() + b''.join(
@@ -256,8 +258,8 @@ def chapter_package(source, spec, core_spec, key):
     for v in variables:
         if re.fullmatch(r'ff[a-z0-9]v[0-3]',v.name):
             raw=resources.resolve(source,v.name)
-            if raw[:2]!=b'R4':
-                raise ValueError(f'{v.name}: R4 archive colours required; rebuild chapter views')
+            import extract
+            extract.view_info(raw,core_spec['envelope']['scene_rows'],core_spec['envelope']['scene_colors'])
     if set(spec['variables']) & set(core_spec['variables']):
         raise ValueError('Chapter duplicates shared core variables')
     if any(v.kind != 0x1c or v.name.endswith('core') for v in variables):
@@ -301,6 +303,9 @@ def chapter_package(source, spec, core_spec, key):
                 1 <= words[10] <= e['axis'] and words[9]*words[10] <= e['tiles'] and
                 1 <= words[13] <= e['scene_rows']):
             raise ValueError('Encounter exceeds the core envelope; regenerate/adapt content')
+        views=[extract.view_info(resources.resolve(source,'ff'+prefix+'v'+str(r)),e['scene_rows'],e['scene_colors']) for r in range(4)]
+        if any(v['rows']!=words[13] or v['row_bytes']!=views[0]['row_bytes'] for v in views):
+            raise ValueError('Encounter views disagree on rows/stride or descriptor height')
     steps = bytearray()
     for step in spec['steps']:
         op = PROGRAMS[step['program']]

@@ -8,20 +8,25 @@
     "resources_pooled": true,
     "service_events_explicit": true
   },
-  "core_key": "ac1de6c7a4d71264d1bee76df06f489d",
-  "core_sha256": "9f687e9bce0faaaea75ff1fd938dee763509e6a1083924bc980f6c4107298fcb",
+  "core_key": "10965478d3a2c348c22d2dea8e6ac51d",
+  "core_sha256": "8a1f3f01991c91c1222fb6b34d960e46839ac8deff8244cb9012a1bcd76543dd",
   "envelope": {
     "actor_banks": 6,
     "actor_frames": 42,
     "axis": 18,
-    "companion_bytes": 4128,
+    "companion_bytes": 4132,
     "depth_bytes": 18488,
     "layers": 2,
-    "module_zone_bytes": 9114,
+    "module_zone_bytes": 9118,
+    "scene_colors": 16544,
     "scene_rows": 202,
+    "scene_widths": [
+      320,
+      352
+    ],
     "tiles": 256,
     "units": 13,
-    "width_pixels": 320
+    "width_pixels": 352
   },
   "formats": {
     "bar_art_format": "FBR1",
@@ -37,16 +42,16 @@
     "rumor_format": "FRU1",
     "service_format": "FSV1",
     "story_choice_format": "FCX1",
-    "view_format": "R4",
+    "view_format": "R4/R5",
     "world_save_format": "FSV9"
   },
   "native_layout": {
     "ACTOR_BANKS": 6,
     "AC_N": 42,
     "DEPTH_MAX": 18488,
-    "MOD_ABI": 97,
-    "MOD_SIG": 9097,
-    "ModCtx": 396,
+    "MOD_ABI": 99,
+    "MOD_SIG": 9615,
+    "ModCtx": 400,
     "ORDER": 6,
     "Save": 4684,
     "Save__deploy": 3118,
@@ -120,44 +125,45 @@
     "actors.h": "b3a303e134dbddfca55fcc01319b9c09e4959c117e2e516bea71f58e5473e7e1",
     "campaign/pack_format.h": "e3bde280ab8a49edff226a45de6116c2fac616571a0fe8f4585f95596d5a0775",
     "campaign/pack_story.h": "1093554204ad750c090cd1cf2221eeeffbdf04127795db9fc1b1e7ce404c147b",
-    "campaign/packages/core.json": "430579dd7715eac9a2e9aa77e2f45806393101f14eebff6b720343fe54aacdb2",
+    "campaign/packages/core.json": "b8a8a1835c1d97cbd2795e3ba4cbbb0690cd75d1384ad391366906f95de202e5",
     "campaign/proposition_types.h": "4c8c037064810900793c7b095a0c5a4d47ebe6d15b9c2a3e5c154c1a2c8bda29",
     "campaign/save_types.h": "1ca5dd542804a2f5c11fb739fdf2d30e1454e80d23b887ab7c393cbdbc02fd78",
     "campaign/world_types.h": "e1d2429438c2e8ab479a9f50db8cb3e9b7f082a91640996fd358e54767b7f802",
     "chapter_validate.h": "e3eb9310ff45a8a329b3074492140f2130573a60cf32a83cbd93961662692827",
     "chapters.h": "30a158645f16e6e369cabec2656cc418041f6b09fe67b4a6cf06697e58c728cd",
     "common.h": "36cd11cc8c03a86ef9209f9830f4c1da0cc18a6dd7597d502d2297c51cacc506",
-    "core_limits.h": "7238f7e7059a581e06731900d93a790a2ad06e1b7226f49507c76f8aa7207697",
-    "fft.h": "5d07c7537630405614e7a02251ca909de0ac8e9278d9c490756580c952dbddcb",
-    "module.h": "7ea5d577f8464c8e032c45888c70d1b79e0064e382fffde7c8d7979869bbd2b5",
-    "view_format.h": "3fea9de712ea1063ea8decca1dd9ac5f8d523815cdd8225384174e9fb17a3556"
+    "core_limits.h": "fa5d187b0dce3acf5a0cab8da5b1f33b2b160dfbd7a643c1b67426fd1db4e0b6",
+    "fft.h": "a448d714608a526cbc4a4a8a801f52afd74ffdfa7e6e90bf208cf9a491683da8",
+    "module.h": "8d82e3a442a522ebd911e8d7f4a72688ed70705b941ea1b48f90b274484c381e",
+    "scene_buffer.h": "2d035399f11be7221bf2ca22dbe685ac81f73737aa00bfb6df2c34193c6a851b",
+    "view_format.h": "d3f61f31d49d7e4306b45b2d317a2f2f2d0eda90ec6c7fc4807155a56546da55"
   },
   "schema": "FFT_CORE_CONTRACT_1",
   "shared_variables": {
     "ffbcore": {
-      "bytes": 45367,
+      "bytes": 45353,
       "kind": 28,
-      "sha256": "ab06ffd0e0c582345c5c79af3c21290978fea502acabb6b05677fdc6d756080d"
+      "sha256": "e01bb38845262551f198e3b793c4219cb639b00d91a0e291b2fcda98b4997394"
     },
     "ffbm": {
-      "bytes": 51370,
+      "bytes": 51376,
       "kind": 28,
-      "sha256": "c32097590413a3e4cb3cefc2fbba785ccddfad2df007d7efcbfd3c9a4f460849"
+      "sha256": "47c064877c67d3542bd1465b21b5585f3d6f08bf8280b5e625af072ea4c5b804"
     },
     "ffbn": {
       "bytes": 50812,
       "kind": 28,
-      "sha256": "8900a530f74d56ae9ca6b9370f6a0435578c164edc510dc9e1f9bf5d54be4da6"
+      "sha256": "68c3debc94867250e9d7af12ad10f4e26ffa99a05d912aa3cbbf7031010e14e8"
     },
     "ffbo": {
-      "bytes": 51316,
+      "bytes": 52308,
       "kind": 28,
-      "sha256": "dea838cb0f32fe21ef7e78ae59b40d22bf19b18fb0cb7f6427f264d5964b3351"
+      "sha256": "0cef3b4d2faed4b9c9fe241f49130a1e55edb0cd2bed48221c78ff3305067208"
     },
     "ffbp": {
-      "bytes": 49558,
+      "bytes": 49652,
       "kind": 28,
-      "sha256": "bf73499a734ed69482cc0845b45e0e0257f0eedb8686681fbe05345f2faa52b9"
+      "sha256": "965b07469a58a64944452309256b3f4ae0f2d9b81626302af526fa5c95481e04"
     },
     "ffbr": {
       "bytes": 6366,
@@ -172,7 +178,7 @@
     "ffcore": {
       "bytes": 452,
       "kind": 28,
-      "sha256": "88115f1d72d0460e0f8fb416cd7afdca81cbfb7145963a840258092c69907946"
+      "sha256": "44dc1217f3a25c1c0df59f0425ae5be628f1a33e367e2e6e9844647441c3459f"
     },
     "ffcp": {
       "bytes": 20669,

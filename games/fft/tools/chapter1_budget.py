@@ -27,8 +27,8 @@ def project(plan, manifest, spec):
     if (plan['schema'] != 'FFT_CHAPTER1_ARCHIVE_PLAN_1' or
         manifest['schema'] != 'FFT_CHAPTER_PACKAGES_1' or
         plan['baseline_view_format'] != 'R2' or plan['target_view_format'] != 'R4' or
-        spec.get('view_format') != 'R4' or plan['production_width_mask']):
-        raise ValueError('Expected the dated R2 baseline and an R4 core without width masks')
+        spec.get('view_format') not in ('R4','R4/R5') or plan['production_width_mask']):
+        raise ValueError('Expected the dated R2 baseline and an R4/R5 core without width masks')
     envelope = spec['envelope']
     if manifest['envelope'] != envelope:
         raise ValueError('Package and core envelopes differ')
@@ -44,7 +44,13 @@ def project(plan, manifest, spec):
     row_limits=[r.get('scene_rows_upper',envelope['scene_rows']) for r in rows]
     if any(type(n) is not int or not 1<=n<=envelope['scene_rows'] for n in row_limits):
         raise ValueError('Invalid per-map authoring row budget')
-    raw = sum(row_limits) * 4 * 40 * 2
+    widths=[r.get('scene_width_pixels',320) for r in rows]
+    supported=envelope.get('scene_widths',[320])
+    if any(type(w) is not int or w not in supported for w in widths):
+        raise ValueError('Invalid per-map authoring width')
+    if any(n*(w//8)*2>envelope.get('scene_colors',202*80) for n,w in zip(row_limits,widths)):
+        raise ValueError('Per-map colours exceed the core allocation envelope')
+    raw = sum(n*(w//8)*2*4 for n,w in zip(row_limits,widths))
     all_max_raw=len(rows) * 4 * envelope['scene_rows'] * 40 * 2
     other = sum(plan['other_upper_estimates'].values())
     projected = calibrated + raw + other
@@ -61,14 +67,14 @@ def project(plan, manifest, spec):
                 chapter_allowance_bytes=allowance, legacy_view_estimate_bytes=legacy,
                 calibrated_legacy_views_bytes=calibrated, raw_colour_upper_bytes=raw,
                 original_all_max_raw_colour_bytes=all_max_raw,
-                per_map_rows=[dict(map=r['map'],rows=n) for r,n in zip(rows,row_limits)],
+                per_map_rows=[dict(map=r['map'],rows=n,width_pixels=w) for r,n,w in zip(rows,row_limits,widths)],
                 other_upper_estimates=plan['other_upper_estimates'],
                 projected_chapter_bytes=projected, planning_margin_bytes=allowance-projected,
                 fits_planning_allowance=projected<=allowance,
                 cropped_depth_envelope_ok=all(len(r['cropped_depth_bytes'])==4 and
                     all(0<n<=depth_max for n in r['cropped_depth_bytes']) for r in rows),
                 depth_adaptations_required=depth_adaptations,
-                width_crop_maps=[r['map'] for r in rows if r['width_px']>320],
+                width_crop_maps=[r['map'] for r,w in zip(rows,widths) if r['width_px']>w],
                 remaining=['Assemble and audit all actual chapter banks',
                            'Review per-map crops/placement; width flags are not artwork validation',
                            'Measure installed Flash/VAT overhead and fragmentation'],

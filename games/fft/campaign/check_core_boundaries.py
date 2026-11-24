@@ -9,30 +9,31 @@ from pathlib import Path
 from check_flow import HERE, ROOT, run, data_links
 
 
-def descriptor13():
+def descriptor13(descriptor=None,interface=None,actors=13):
     from surface_data import detach_descriptor,attach_descriptor
-    original,surface=detach_descriptor((HERE/'data/ffgd.bin').read_bytes())
+    original,surface=detach_descriptor(descriptor if descriptor is not None else (HERE/'data/ffgd.bin').read_bytes())
     data=bytearray(original)
     assert data[:4]==b'FCD5'
     unit_field,count_field=17,50
     original=struct.unpack_from('>H',data,2*unit_field)[0]
     count=struct.unpack_from('>H',data,2*count_field)[0]
     assert count==11
+    assert 11<=actors<=13
     definitions=bytearray(data[original:original+count*28])
     occupied={(definitions[i*28+8],definitions[i*28+9])for i in range(count)}
-    interface=(HERE/'data/ffgi.bin').read_bytes()
+    if interface is None:interface=(HERE/'data/ffgi.bin').read_bytes()
     tile_offset=struct.unpack_from('>H',data,2*21)[0]
-    width,height=(struct.unpack_from('>H',data,2*field)[0]for field in (10,9))
+    width,height=(struct.unpack_from('>H',data,2*field)[0]for field in (9,10))
     candidates=[(i%width,i//width)for i in range(width*height)
                 if interface[tile_offset+i*12+9]==1 and (i%width,i//width)not in occupied]
-    for x,z in candidates[:2]:
+    for x,z in candidates[:actors-count]:
         clone=bytearray(definitions[28:56]);clone[8]=x;clone[9]=z;clone[11]=1
         definitions.extend(clone)
-    assert len(definitions)==13*28
+    assert len(definitions)==actors*28
     if len(data)&1:data.append(0)
     struct.pack_into('>H',data,2*unit_field,len(data));data.extend(definitions)
-    struct.pack_into('>H',data,2*count_field,13)
-    struct.pack_into('>H',data,2*51,len(data));data.extend(bytes(22)+bytes((2,17,3,25)))
+    struct.pack_into('>H',data,2*count_field,actors)
+    struct.pack_into('>H',data,2*51,len(data));data.extend((bytes(22)+bytes((2,17,3,25)))[:actors*2])
     return attach_descriptor(data,surface)
 
 

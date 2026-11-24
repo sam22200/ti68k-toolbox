@@ -382,6 +382,7 @@ u16 mod_entry(u8 op, u8 a)
     if(op==4)return chapter_surface_offset(cdesc,M.desc_size,M.interface_size);
     if (op == 0) save_campaign();
 #else
+    if(op==16)return monster_body_valid(M.art_bank,M.art_size);
     if (op == 15) guests_restore();
     else if (op == 1) party_load();
     else if (op == 2) battle_units();

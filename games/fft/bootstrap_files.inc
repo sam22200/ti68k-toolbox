@@ -30,10 +30,11 @@ static u8 bootstrap_files(void)
     *p->p_sl_l=(const PlaneWord *)(*p->p_cgfx+UIC_SLOPES);
     *p->p_sl_m=*p->p_sl_l+SLOPE_ROWS;*p->p_sc_l=*p->p_sl_m+SLOPE_ROWS;*p->p_sc_m=*p->p_sc_l+SLOPE_ROWS;
     *p->p_vbuf=malloc(FFT_CORE_DEPTH_MAX);
-    *p->p_sbuf=*p->p_vbuf?malloc(2UL*SC_BYTES*SC_HMAX+sizeof(Work)):RT_NULL;
-    *p->p_acache=*p->p_sbuf?malloc(AC_N*(UNIT_FB+4)):RT_NULL;
-    if(!*p->p_acache&&*p->p_sbuf){free(*p->p_sbuf);*p->p_sbuf=RT_NULL;}
-    if(!*p->p_sbuf){if(*p->p_vbuf)free(*p->p_vbuf);*p->p_vbuf=RT_NULL;return 0;}
+    // The first descriptor selects the scene size. Reserving a narrow scene here
+    // and then pinning actors beside it leaves a hole too small for a wide map.
+    *p->p_sbuf=RT_NULL;
+    *p->p_acache=*p->p_vbuf?malloc(AC_N*(UNIT_FB+4)):RT_NULL;
+    if(!*p->p_acache){if(*p->p_vbuf)free(*p->p_vbuf);*p->p_vbuf=RT_NULL;return 0;}
     *p->p_ac_key=(u16 *)(*p->p_acache)[AC_N];*p->p_ac_age=*p->p_ac_key+AC_N;
     // The map envelope is NOT reserved here any more: nav_reserve(MAP_N, 2) takes exactly
     // what the loaded map needs, and grows it if a later one needs more. Reserving the

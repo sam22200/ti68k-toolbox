@@ -5,12 +5,12 @@ PY := ../../../tools/pyenv/bin/python
 BUNDLE_OUTPUT ?= x/fftcampaign.89g
 BUNDLE_BUDGET ?= x/core-audit/budget.json
 BUNDLE_NATIVE_BUDGET ?= x/core-audit/native-budget.json
-PACKAGE_OUTPUT ?= x/packages
+PACKAGE_OUTPUT ?= x/build-packages
 PACKAGE_CHAPTERS ?= packages/chapter-01.json
 PACKAGE_BUDGET ?= 2700000
 PACKAGE_RESERVE ?= 131072
 PACKAGE_COMBINED ?=
-PACKAGE_CORE ?= $(PACKAGE_OUTPUT)/fft-core.89g
+PACKAGE_CORE ?= $(PILOT_PACKAGE_DIR)/fft-core.89g
 DISC := $(ROOT)/roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue
 BANKS := ffs1 ffs2 ffflow fftitle ffbm ffbn ffbo ffbp ffmg ffwm ffcj ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb
 BANKS += ffwb ffeg ffma ffmb ffmc ffmd ffsh ffsk ffid ffbr ffru ffpr ffpe ffpt ffsv
@@ -72,14 +72,22 @@ TRAP_DATA_DIR ?= x/tile-traps/shipping-data
 campaign-traps-native-check:
 	$(PY) check_traps_native.py --data-dir $(TRAP_DATA_DIR)
 .PHONY: pilot-route-check pilot-e2e-check core-contract-check
-PILOT_PACKAGE_DIR ?= x/chapter1-ready/packages
+PILOT_PACKAGE_DIR ?= x/core-abi99-release/packages
+PILOT_ROUTE_OUTPUT ?= x/pilot-route/latest
 PILOT_E2E_OUTPUT ?= x/pilot-e2e/latest
 pilot-route-check:
-	$(PY) check_pilot.py --packages $(PILOT_PACKAGE_DIR) --out x/chapter1-ready/pilot-final
+	$(PY) check_pilot.py --packages $(PILOT_PACKAGE_DIR) --out $(PILOT_ROUTE_OUTPUT)
 pilot-e2e-check:
 	$(PY) check_pilot.py --packages $(PILOT_PACKAGE_DIR) --out $(PILOT_E2E_OUTPUT) --combat auto $(PILOT_E2E_FLAGS)
 core-contract-check:
 	$(PY) ../tools/core_contract.py --packages $(PILOT_PACKAGE_DIR)
+
+.PHONY: zeklaus-check wide-core-candidate
+ZEKLAUS_OUTPUT ?= x/wide-core/latest
+zeklaus-check:
+	$(PY) check_zeklaus.py --out $(ZEKLAUS_OUTPUT) $(ZEKLAUS_FLAGS)
+wide-core-candidate:
+	$(PY) build_wide_core.py
 
 .PHONY: chapter1-archive-budget
 chapter1-archive-budget:
@@ -187,6 +195,12 @@ test: map-test
 test: dialogue-test
 test: scene-test
 test: actor-cache-test
+test: unit-blit-test
+.PHONY: unit-blit-test
+unit-blit-test:
+	@mkdir -p x/qa
+	$(CC) $(PC_CFLAGS) -DRT_DRAW_ROWS=100 -o x/qa/unit-blit-test check_unit_blit.c
+	./x/qa/unit-blit-test
 .PHONY: secondary-test
 secondary-test: data/ffcj.bin data/ffgd.bin
 	$(CC) $(PC_CFLAGS) -w -o x/qa/secondary-test check_secondary.c $(RT_CORE) $(RT_SW)
