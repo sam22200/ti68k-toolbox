@@ -54,9 +54,9 @@ POSITIVE = {
     'Reflect':   ('#...#', '##.##', '#####', '##.##', '#...#'),      # a mirror
     'Float':     ('..#..', '.###.', '#####', '.....', '#####'),      # above a line
     'Faith':     ('..#..', '.###.', '..#..', '..#..', '.###.'),
-    'Innocent':  ('.###.', '#...#', '#...#', '#...#', '.###.'),
+    'Innocent':  ('.###.', '#ooo#', '.###.'),                        # a halo, a flat ring
     'Transparent': ('#...#', '.....', '#...#', '.....', '#...#'),
-    'Defend':    ('#####', '#ooo#', '#ooo#', '#ooo#', '#####'),
+    'Defend':    ('#####', '#ooo#', '#####', '.###.', '..#..'),      # a shield with a band
     'Reraise':   ('..#..', '.###.', '#####', '.###.', '..#..'),
 }
 # The original's five fill states, read off FRAME.BIN's star row.
