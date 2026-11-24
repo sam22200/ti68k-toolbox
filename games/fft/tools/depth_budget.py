@@ -159,82 +159,92 @@ def main():
     report = dict(schema='FFT_DEPTH_BUDGET_1', limit=LIMIT, sc_hmax=ROWS, maps={})
 
     for m in args.maps:
-        views, maxh = map_views(disc, files, m)
-        lit = np.array([v[:2].any((0, 2)) | v[3].any(1) | v[5].any(1) for v in views]).any(0)
-        used = np.nonzero(lit)[0]
-        lo, hi = int(used[0]), int(used[-1]) + 1
-        content = hi - lo
-        # One window for all four views, as the chapter keeps one sc_h/sc_top per map.
-        # Per-row span cost of each view, once; a window is then a slice of these.
-        span = [row_spans(v, lo, content) for v in views]
+        # One unusable map must not take the whole census down: some records draw
+        # nothing and the quantiser has no pixels to work from.
+        try:
+            views, maxh = map_views(disc, files, m)
+            lit = np.array([v[:2].any((0, 2)) | v[3].any(1) | v[5].any(1) for v in views]).any(0)
+            used = np.nonzero(lit)[0]
+            lo, hi = int(used[0]), int(used[-1]) + 1
+            content = hi - lo
+            # One window for all four views, as the chapter keeps one sc_h/sc_top per map.
+            # Per-row span cost of each view, once; a window is then a slice of these.
+            span = [row_spans(v, lo, content) for v in views]
 
-        def cost(y0, rows):
-            return max(4 * rows + 4 * sum(sp[y0:y0 + rows]) for sp in span)
+            def cost(y0, rows):
+                return max(4 * rows + 4 * sum(sp[y0:y0 + rows]) for sp in span)
 
-        sc_h = min(ROWS, content)
-        best = min(((cost(o, sc_h), o) for o in range(0, content - sc_h + 1)), key=lambda t: t[0])
-        worst, y0 = best
-        rows = sc_h
-        per_view = [4 * rows + 4 * sum(sp[y0:y0 + rows]) for sp in span]
-        entry = dict(name=names[str(m)], maxh=maxh, content_rows=content, sc_h=rows,
-                     window_offset=y0 - lo, per_view=per_view, worst=worst,
-                     span_bytes=[t - 4 * rows for t in per_view], over=worst - LIMIT,
-                     fits=worst <= LIMIT)
-        if worst > LIMIT:
-            # Why is it over? FFT flags a decorative prop as a tile that may be crossed
-            # but never stopped on, and gives that tile the prop's own height. Remove
-            # every polygon standing over such a tile and re-measure: if that clears the
-            # cap the map is cosmetic, otherwise its height is terrain and only a
-            # shorter scene works.
-            mesh, nx, nz, _ = map_budget.load(disc, files, m)
-            tex, pal = texture_palette(disc, files, m, mesh)
-            polys = extract.polygons(mesh)
-            _, tops, props = terrain(mesh, nx, nz)
-            dec = set(prop_polygons(polys, tops, props, nx, nz))
-            sc_h_full = 6 * (nx + nz) + 6 * maxh + 8
-            bare = (depth_of([q for i, q in enumerate(polys) if i not in dec],
-                             tex, pal, nx, nz, sc_h_full)[0] if dec else worst)
-            entry.update(cause='cosmetic' if bare <= LIMIT else 'structural',
-                         prop_tiles=[dict(x=x, z=z, height=h) for x, z, h in props],
-                         prop_polygons=len(dec), total_polygons=len(polys),
-                         depth_without_props=bare, saved_by_props=worst - bare)
-            # The actionable number: the tallest scene that fits, over every window of
-            # that height, worst view counted. Shrinking is what a row cut really does;
-            # sliding a full-height window is not enough.
-            fit = None
-            for h in range(sc_h - 1, 0, -1):
-                cand = min(((cost(o, h), o) for o in range(0, content - h + 1)), key=lambda t: t[0])
-                if cand[0] <= LIMIT:
-                    fit = (h, cand[1], cand[0])
-                    break
-            w = int(np.argmax(per_view))
-            rc = [4 + 4 * s for s in span[w][y0:y0 + rows]]
-            entry.update(dearest_view=w, need_bytes=worst - LIMIT,
-                         max_fitting_sc_h=fit and fit[0], fitting_window_offset=fit and fit[1],
-                         fitting_worst=fit and fit[2], rows_to_lose=fit and (sc_h - fit[0]),
-                         rows_lost_above=fit and fit[1], rows_lost_below=fit and (content - fit[1] - fit[0]),
-                         row_cost_top20=round(float(np.mean(rc[:20]))),
-                         row_cost_middle20=round(float(np.mean(rc[rows // 2 - 10:rows // 2 + 10]))),
-                         row_cost_bottom20=round(float(np.mean(rc[-20:]))),
-                         row_cost=rc)
-        report['maps'][str(m)] = entry
-        tail = ('' if entry['fits'] else
-                '  %s: %d prop tiles, %d polygons -> %d (%+d). Tallest fitting scene %s rows '
-                '(lose %s: %s above, %s below) -> %s'
-                % (entry['cause'].upper(), len(entry['prop_tiles']), entry['prop_polygons'],
-                   entry['depth_without_props'], LIMIT - entry['depth_without_props'],
-                   entry['max_fitting_sc_h'], entry['rows_to_lose'],
-                   entry['rows_lost_above'], entry['rows_lost_below'], entry['fitting_worst']))
-        print('map %3d %-24s sc_h %3d worst %5d %s%s' % (
-            m, entry['name'][:24], rows, worst,
-            'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'], tail),
-            flush=True)
+            sc_h = min(ROWS, content)
+            best = min(((cost(o, sc_h), o) for o in range(0, content - sc_h + 1)), key=lambda t: t[0])
+            worst, y0 = best
+            rows = sc_h
+            per_view = [4 * rows + 4 * sum(sp[y0:y0 + rows]) for sp in span]
+            entry = dict(name=names[str(m)], maxh=maxh, content_rows=content, sc_h=rows,
+                         window_offset=y0 - lo, per_view=per_view, worst=worst,
+                         span_bytes=[t - 4 * rows for t in per_view], over=worst - LIMIT,
+                         fits=worst <= LIMIT)
+            if worst > LIMIT:
+                # Why is it over? FFT flags a decorative prop as a tile that may be crossed
+                # but never stopped on, and gives that tile the prop's own height. Remove
+                # every polygon standing over such a tile and re-measure: if that clears the
+                # cap the map is cosmetic, otherwise its height is terrain and only a
+                # shorter scene works.
+                mesh, nx, nz, _ = map_budget.load(disc, files, m)
+                tex, pal = texture_palette(disc, files, m, mesh)
+                polys = extract.polygons(mesh)
+                _, tops, props = terrain(mesh, nx, nz)
+                dec = set(prop_polygons(polys, tops, props, nx, nz))
+                sc_h_full = 6 * (nx + nz) + 6 * maxh + 8
+                bare = (depth_of([q for i, q in enumerate(polys) if i not in dec],
+                                 tex, pal, nx, nz, sc_h_full)[0] if dec else worst)
+                entry.update(cause='cosmetic' if bare <= LIMIT else 'structural',
+                             prop_tiles=[dict(x=x, z=z, height=h) for x, z, h in props],
+                             prop_polygons=len(dec), total_polygons=len(polys),
+                             depth_without_props=bare, saved_by_props=worst - bare)
+                # The actionable number: the tallest scene that fits, over every window of
+                # that height, worst view counted. Shrinking is what a row cut really does;
+                # sliding a full-height window is not enough.
+                fit = None
+                for h in range(sc_h - 1, 0, -1):
+                    cand = min(((cost(o, h), o) for o in range(0, content - h + 1)), key=lambda t: t[0])
+                    if cand[0] <= LIMIT:
+                        fit = (h, cand[1], cand[0])
+                        break
+                w = int(np.argmax(per_view))
+                rc = [4 + 4 * s for s in span[w][y0:y0 + rows]]
+                entry.update(dearest_view=w, need_bytes=worst - LIMIT,
+                             max_fitting_sc_h=fit and fit[0], fitting_window_offset=fit and fit[1],
+                             fitting_worst=fit and fit[2], rows_to_lose=fit and (sc_h - fit[0]),
+                             rows_lost_above=fit and fit[1], rows_lost_below=fit and (content - fit[1] - fit[0]),
+                             row_cost_top20=round(float(np.mean(rc[:20]))),
+                             row_cost_middle20=round(float(np.mean(rc[rows // 2 - 10:rows // 2 + 10]))),
+                             row_cost_bottom20=round(float(np.mean(rc[-20:]))),
+                             row_cost=rc)
+            report['maps'][str(m)] = entry
+            tail = ('' if entry['fits'] else
+                    '  %s: %d prop tiles, %d polygons -> %d (%+d). Tallest fitting scene %s rows '
+                    '(lose %s: %s above, %s below) -> %s'
+                    % (entry['cause'].upper(), len(entry['prop_tiles']), entry['prop_polygons'],
+                       entry['depth_without_props'], LIMIT - entry['depth_without_props'],
+                       entry['max_fitting_sc_h'], entry['rows_to_lose'],
+                       entry['rows_lost_above'], entry['rows_lost_below'], entry['fitting_worst']))
+            print('map %3d %-24s sc_h %3d worst %5d %s%s' % (
+                m, entry['name'][:24], rows, worst,
+                'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'], tail),
+                flush=True)
+        except Exception as exc:
+            report['maps'][str(m)] = dict(error='%s: %s' % (type(exc).__name__, exc))
+            print('map %3d SKIPPED (%s)' % (m, type(exc).__name__), flush=True)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(report, indent=2) + '\n')   # resumable
 
-    over = [k for k, v in report['maps'].items() if not v['fits']]
+    ok = {k: v for k, v in report['maps'].items() if 'error' not in v}
+    over = [k for k, v in ok.items() if not v['fits']]
     report['over_limit'] = over
-    report['categories'] = {c: [k for k, v in report['maps'].items()
+    report['categories'] = {c: [k for k, v in ok.items()
                                 if (v.get('cause') or 'fits') == c]
                             for c in ('fits', 'cosmetic', 'structural')}
+    report['categories']['unreadable'] = [k for k, v in report['maps'].items() if 'error' in v]
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2) + '\n')
     print()
