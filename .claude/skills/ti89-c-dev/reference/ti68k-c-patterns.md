@@ -811,6 +811,16 @@ while (running) {
   last critical allocation cannot fail even when RAM is nearly full.
 - Free-memory check before big allocations: `HeapCompress(); HeapAvail()`, `FreeHandles()`,
   `EM_survey()` for the archive (TICT-Explorer info screen).
+- **A temporary smaller scene can prevent its later growth** (**verified**, isolated
+  Titanium AMS3.10, FFT ABI99,2026-11-24): allocating a narrow scene/Work before
+  the locked actor cache left58376 total free but only53948 allocatable after
+  freeing that scene; its54334-byte wide replacement failed. Bootstrap now
+  allocates depth/actors first and waits for the actual descriptor to reserve
+  scene/Work once. The same wide13-unit case runs, rotates and exits with436
+  free/max430 bytes, returning every battle allocation. Host malloc and the
+  cycle runner did not reproduce this AMS fragmentation. Validate both total
+  and largest free block; do not infer successful cold replacement from totals.
+  Evidence: `games/fft/campaign/INSTALLED_RAM_ABI99.md` and `x/wide-ram/`.
 - **Cleanup that always runs**: wrap the game in `TRY … FINALLY … ENDFINAL` (`error.h`, with `#define ENABLE_ERROR_RETURN`) so
   `GrayOff()`, vector and timer restores run even when a ROM call throws (memory error…).
   **Verified** (`experiments/errors/tryfin.c`, HW3): an AMS error thrown while grayscale is on runs

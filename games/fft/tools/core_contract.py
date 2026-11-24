@@ -20,6 +20,7 @@ import chapter_packages as packages
 
 FFT=Path(__file__).resolve().parents[1];ROOT=FFT.parents[1]
 PUBLIC=['fft.h','module.h','core_limits.h','chapters.h','view_format.h','common.h','chapter_validate.h',
+        'scene_buffer.h',
         'campaign/save_types.h','campaign/world_types.h','campaign/proposition_types.h',
         'actors.h','campaign/pack_format.h','campaign/pack_story.h','campaign/packages/core.json']
 
@@ -45,7 +46,7 @@ def capture(folder,layout):
     assert len(set(tokens))==1 and tokens[0]==zlib.crc32(b''.join(records))
     assert set(signatures)=={layout['MOD_SIG']}
     return dict(schema='FFT_CORE_CONTRACT_1',core_key=key.hex(),core_sha256=sha(group),native_layout=layout,
-        envelope={**spec['envelope'],'width_pixels':320,'depth_bytes':layout['DEPTH_MAX'],'actor_frames':layout['AC_N'],'actor_banks':layout['ACTOR_BANKS'],
+        envelope={**spec['envelope'],'width_pixels':352,'depth_bytes':layout['DEPTH_MAX'],'actor_frames':layout['AC_N'],'actor_banks':layout['ACTOR_BANKS'],
                   'module_zone_bytes':max(struct.unpack_from('>H',m,6)[0] for i,m in enumerate(records) if i!=27),
                   'companion_bytes':struct.unpack_from('>H',records[27],6)[0]},
         formats={n:v for n,v in spec.items() if n.endswith('_format')},
@@ -66,14 +67,14 @@ def native_layout(out):
     (out/'layout-build.log').write_text(p.stdout);p.check_returncode();s=asm.read_text()
     result={k:int(v)&65535 for k,v in re.findall(r'^layout_(\w+):\s*\n\s*\.word\s+(-?\d+)',s,re.M)}
     result.update({k:0 for k in re.findall(r'^layout_(\w+):\s*\n\s*\.skip\s+2',s,re.M)})
-    assert result['Save']==4684 and result['Save__missions']==4024 and result['MOD_ABI']==97
+    assert result['Save']==4684 and result['Save__missions']==4024 and result['MOD_ABI']==99
     return result
 
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--packages',type=Path,required=True)
     ap.add_argument('--contract',type=Path,default=FFT/'campaign/packages/core-contract.json')
-    ap.add_argument('--out',type=Path,default=FFT/'campaign/x/chapter1-ready/contract')
+    ap.add_argument('--out',type=Path,default=FFT/'campaign/x/core-contract-check')
     ap.add_argument('--freeze',action='store_true',help='explicitly replace the reviewed core contract')
     args=ap.parse_args();args.out.mkdir(parents=True,exist_ok=True)
     actual=capture(args.packages.resolve(),native_layout(args.out.resolve()))

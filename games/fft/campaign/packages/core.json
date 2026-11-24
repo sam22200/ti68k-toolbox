@@ -1,6 +1,6 @@
 {
   "schema": "FFT_CORE_SPEC_1",
-  "view_format": "R4",
+  "view_format": "R4/R5",
   "encounter_format": "FCD5",
   "ko_actor_format": "FKO1",
   "objective_format": "FGO1",
@@ -19,7 +19,9 @@
     "tiles": 256,
     "axis": 18,
     "layers": 2,
-    "scene_rows": 202
+    "scene_rows": 202,
+    "scene_widths": [320, 352],
+    "scene_colors": 16544
   },
   "variables": [
     "fftstory",

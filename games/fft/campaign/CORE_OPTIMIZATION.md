@@ -1,5 +1,25 @@
 # Final core/campaign optimization pass
 
+Installed-width follow-up (2026-11-24): ABI99 is promoted; see
+[INSTALLED_RAM_ABI99.md](INSTALLED_RAM_ABI99.md). Bootstrap must not allocate a
+narrow scene before pinning actors: actual AMS left58376 total free but only
+53948 allocatable, refusing a54334-byte wide scene/Work block. Keep the first
+scene allocation descriptor-sized in RESOURCES10, after depth/actor setup.
+Keep shrink/failure/retry cleanup and the portable lifetime in agreement.
+The corrected wide13-unit run has436 free bytes; do not claim16KiB or shrink
+actor42/depth18488. Hot rendering and its selected CPU proofs are unchanged.
+
+
+Current follow-up (2026-11-23): [RENDER_OPTIMIZATION.md](RENDER_OPTIMIZATION.md)
+records ABI99 human-row reuse and HUD scheduling. It passes selected Zeklaus
+12/13-unit ordinary360k gates while retaining Work37790, actor42 and depth18488.
+The48-frame/ABI80 measurements below remain historical. Human `Cover.bc` owner3
+must be invalidated when scenery cover changes or a monster claims the scratch.
+Prepared-pose reuse lives only within one render, validates the entry's current
+key and excludes decode-budget deferral. Charge row misses before optional
+HUD work; keep preload/label chunks separate and Math feedback immediate.
+No new heap block, installed RAM claim, emulator run or global contract promotion.
+
 2026-11-07, after the shared-resource delivery. Combat coverage remains closed
 at201 actions/78 RSM. This pass changes the shared actor cache and scene heap
 reservation; it does not change artwork, rules, archive formats or saves.

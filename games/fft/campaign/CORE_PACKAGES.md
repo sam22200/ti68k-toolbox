@@ -1,6 +1,35 @@
 # Shared core and replaceable chapter packages
 
-## Current ABI97 contract (2026-11-23)
+## Current ABI99 contract (2026-11-24)
+
+The user requested promotion after actual installed-RAM measurement. Current
+reviewed groups: `x/core-abi99-release/packages/fft-core.89g`701169 and
+`chapter-01.89g`295145 transport bytes; key
+`10965478d3a2c348c22d2dea8e6ac51d`. `packages/core-contract.json` freezes ABI99,
+29 matching images, State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684,
+zone9118 and companion4132 (cold reader3546). Actor42/depth18488 remain.
+Actual TTPack input64725 leaves211 bytes. Chapters stay data-only and match
+this exact key; saves and configuration remain outside both groups.
+
+Run `make core-contract-check` with its new default groups. Pilot checks also
+use these groups; new builds go to `x/build-packages` and chapter-only builds
+reuse the promoted core by default. Override `PACKAGE_CORE` for another
+explicitly reviewed release. Preserve old `x/packages`/`x/chapter1-ready`
+proofs. See [INSTALLED_RAM_ABI99.md](INSTALLED_RAM_ABI99.md) for the cold
+fragmentation fix, source/package evidence and promotion scope.
+
+Actual private Titanium free/max: Orbonne2420/2414, Gariland1420/1414 and
+Zeklaus13 diagnostic436/430 bytes, including logging storage. These are
+settled snapshots;16KiB and all-action/future-map minima are not certified.
+The user deferred difficult RAM recovery. Keep cache capacities and full C2
+geometry. The pilot hardware lifecycle/Save/Continue, wide state/rotations/exit,
+PC/sanitizer ordinary fights, selected native CPU gates and package checks pass.
+The user's live emulator and all historical groups remain untouched.
+
+The following sections retain historical packages and measurements.
+
+
+## Historical ABI97 contract (2026-11-23)
 
 `packages/core-contract.json` records the exact core group SHA/key, every
 shared variable, native layouts and public interface hashes. Run

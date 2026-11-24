@@ -8,6 +8,8 @@
 #define FFT_CORE_TILE_MAX 256U
 #define FFT_CORE_AXIS_MAX 18
 #define FFT_CORE_LAYER_MAX 2
+// Validated color storage: 320x202 or 352x188, never the product352x202.
+#define FFT_CORE_SCENE_MAX 16544U
 // RAM of one view's unpacked ragged depth (extract.ragged_depth, fft.c vbuf), 2026-11-10:
 // Orbonne 16,400..18,488, Gariland 16,968..18,304; a bigger view is refused when packaged
 // (chapter_desc.py) and loaded (chapter_files.inc). Full planes would take 32,320.
@@ -30,7 +32,8 @@
 // ABI97: graphics4128 and cold Save reader3542 share one4128-byte block.
 // Saves3136 bytes versus7264; no play-time allocation or warm-frame switch.
 // Preserve42 actor frames/depth18488.
-#define FFT_CORE_COMPANION_MAX 4128U
+// ABI98 adds four context bytes to each image: graphics4132, cold reader3546.
+#define FFT_CORE_COMPANION_MAX 4132U
 typedef u8 CoreTileId;                  // compact node0..255, includes both floors
 typedef u16 CoreTileCount;              // can represent count256 and loop endpoint
 typedef struct { u8 x, z_layer; } CoreTilePosition; // z in bits0..4; layer in bit5

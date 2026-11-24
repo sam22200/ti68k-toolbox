@@ -92,7 +92,7 @@ static void trials(void)
         edge_key(0);press(K_MODE);CHECK(!st.config&&(st.scenery&1));
     }
     for(rot=0;rot<4;rot++)for(wide=0;wide<2;wide++) {
-        u32 depth;static u8 full[4*SC_BYTES*SC_HMAX];
+        u32 depth;static u8 full[4*SC_BYTES_MAX*SC_HMAX];
         game_scenario(61);st.ai=0;st.banner=0;st.rot=rot;st.mode=M_MENU;st.tick=0;
         st.scenery=wide;rt_frame=0;scene_rot=vbuf_rot=255;cam_target(&st.camx,&st.camy);
         unpack_view(rot);

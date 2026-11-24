@@ -55,6 +55,12 @@ camera alignment must include every active rendering/input path. Check an
 asymmetric source view before accepting placement or matching PC/TI checksums;
 mirroring only the backdrop leaves sprites, depth masks and controls inconsistent.
 
+For FFT map extraction and four-grey scenery, use
+[`fft-map-extraction`](../fft-map-extraction/SKILL.md): the user approved C2
+(light terrain,1px material/height boundaries and white prop silhouettes).
+Keep its recipe/material identities distinct from map framing and native RAM
+certification; reuse the approved style when preparing subsequent arenas.
+
 References (read when the step says so):
 - `reference/ps1-facts.md`: the machine as a study sees it (memory map, frame and logic rates,
   pad, disc layout, overlays, MIPS decompilation pitfalls), the tools and their traps.

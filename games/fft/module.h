@@ -6,7 +6,7 @@
 // Included by fft.c after the Work type, with FFT_MODULES (core: the loader) or FFT_MODULE
 // (a module's own build: the core's names become the context's).
 // Include shared rule/data expectations, so an older AI cannot bypass new rules.
-#define MOD_ABI 97U   // 97: cold Save reader and warm graphics share the companion block
+#define MOD_ABI 99U   // PARTY16 owns cold body validation; context/save sizes unchanged
 #define MOD_SIG ((u16)(sizeof(State) * 3 + sizeof(Work) + sizeof(ModCtx) + sizeof(Save) + 257U*MOD_ABI))
 // Cold bootstrap allocates existing blocks and binds resident archive/cache pointers.
 typedef struct {
@@ -23,6 +23,8 @@ typedef struct {
         struct {u16 cast_ability;u8 cast_actor,cast_ref;};
         u8 *chapter_story_after;         // RESOURCES20 cold script flags
         const CoreBoot *boot;          // RESOURCES13: cold pointer bindings, no gameplay state
+        const SceneBuffer *scene_request; // RESOURCES10: validated cold map/scene replacement
+        struct {u16 art_size;const u8 *art_bank;}; // PARTY16: cold FMB1 validation
         Unit *stats_unit;                // resident -> PARTY9 only
         char *window_out;               // resident -> RESULTS1 only
         s16 *camera_out;                 // BEATS4: two camera target coordinates
@@ -38,6 +40,7 @@ typedef struct {
     u16 map_n;                         // the chapter's sizes, as they are at load (fft.h)
     u8 unit_count;                      // validated encounter count, storage remains13 slots
     s16 sc_h, sc_top;
+    u16 sc_bytes, sc_plane;
     State *state;
     Work *w;
     const Ability *abilities;
@@ -142,6 +145,8 @@ ModCtx M = { MOD_SIG };                 // in the image (tools/module.py: one se
 #define encounter_units (M.unit_count)
 #define sc_h (M.sc_h)
 #define sc_top (M.sc_top)
+#define sc_bytes (M.sc_bytes)
+#define sc_plane (M.sc_plane)
 #undef st
 #define st (*M.state)
 #define W (M.w)

@@ -46,8 +46,9 @@ static u16 chapter_files(char letter)
     if(!i)return 0;
     encounter_units = (u8)CD(UNIT_COUNT);
     map_w = (u8)CD(MAP_W); map_h = (u8)CD(MAP_H); map_n = (u16)map_w * map_h; sc_h = (s16)CD(SC_H); sc_top = (s16)CD(SC_TOP);
+    sc_bytes=views[0][1]=='5'?44U:40U;sc_plane=(u16)(sc_bytes*(u16)sc_h);
 #ifndef FFT_LEGACY_REACH_BACKUPS
-    {u16 rot;for(rot=0;rot<4;rot++)if(RD16(views[rot],1)!=2U*SC_BYTES*(u16)sc_h)return 0;}
+    {u16 rot;for(rot=0;rot<4;rot++)if(views[rot][1]!=views[0][1]||RD16(views[rot],1)!=2U*sc_plane)return 0;}
 #endif
     unit_defs = (const UnitDef *)(cdesc + CD(UNIT_DEFS));
     map_tiles = (const Tile *)(igfx + UI_TILES);

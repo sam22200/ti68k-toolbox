@@ -1,5 +1,315 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Installed RAM measured; corrected ABI99 core promoted (2026-11-24)
+
+Latest instruction: measure RAM and promote, then continue. This is delivered.
+[INSTALLED_RAM_ABI99.md](INSTALLED_RAM_ABI99.md) supersedes the candidate-only
+status below. Current groups: `x/core-abi99-release/packages/`, key
+`10965478d3a2c348c22d2dea8e6ac51d`, core701169 + pilot295145 transport bytes.
+The global `packages/core-contract.json` now freezes ABI99/ModCtx400,
+State2278/Unit116/Work37790/FSV9 Save4684,29 images, zone9118/companion4132.
+Actual TTPack64725 leaves211 bytes. Actor42/depth18488 and C2 remain.
+
+Actual installed Titanium free/max: Orbonne2420/2414, Gariland1420/1414,
+Zeklaus13 diagnostic436/430 bytes, including530 bytes of logging storage.
+These are settled snapshots, not all-action/future-map minima.16KiB remains
+unpassed and difficult cache shrinking stays deferred. All battle allocations
+are returned to the supervisor. Pilot Save/Continue and wide13-unit state,
+rotations and exit pass without screenshots. Live user PID662887 is untouched;
+private sessions/displays are stopped.1267 manifest checks/1256 distinct
+protected files retain hashes and mtimes. No commit/push was requested.
+
+The first candidate failed an actual wide allocation despite58376 total free:
+its largest block53948 could not hold scene/Work54334 plus overhead. A narrow
+bootstrap scene was pinned beside the actor cache. Bootstrap now defers the
+scene allocation until the first descriptor is known. Only RESOURCES26 changes
+among the images; cold resident setup changes too. No extra retained allocation,
+new ABI/layout or cache cut. PC/sanitizers rerun13403 map/allocation checks and
+ordinary pilot flows; durable saves match. Package checks42/1023 pass. Repeated
+native Zeklaus13 CPU peaks remain339962/356832 exactly; unchanged hot-path and
+complete8852-frame native fight evidence is reused. Evidence: `x/wide-ram/`,
+particularly `verification.json`, fixed builds/checks and both `*-fixed/ti/`.
+
+`make core-contract-check` and pilot targets default to the promoted groups;
+new packaging defaults to `x/build-packages`, preserving old `x/packages`.
+Chapter-only packaging reuses this promoted core. The updated archive plan
+counts352px Zeklaus and has17623 bytes of dated planning margin, with the two
+depth adaptations still open. Next: Sweegy/Fovoham depth fixes, source Chapter I
+encounters/scenes and five field formation doors. The pilot is not full Chapter I;
+Zeklaus still uses borrowed Gariland actors. Do not promote the earlier
+`x/wide-opt/final` groups or overwrite any historical proof tree.
+
+
+## Human rendering and HUD priorities1/2 delivered (2026-11-23)
+
+Latest instruction: "go1 puis2". [RENDER_OPTIMIZATION.md](RENDER_OPTIMIZATION.md)
+supersedes the failing CPU status below. Zeklaus ordinary hard gates now pass:
+12 units board/rotation replay peaks331842/327594;13 units339962/356832.
+Gariland13 peaks281086/325234. These exclude the existing cold-load/animated
+turn classification; thresholds/classification were not relaxed. The tightest
+selected margin is3168 cycles, not certification of every future formation.
+
+Humans bypass monster dispatch and reuse their unused monster-cover scratch
+for composed rows (`unit_blit.inc`, owner3, word-aligned after its odd start).
+Cover regeneration/monster transitions invalidate it; oversized poses, flashes,
+water, loot and side clipping retain a fallback. Warm rows blit in pairs. One
+render's prepared-pose mask avoids repeating resolved queries, validates the
+remembered actor-entry key and never marks a decode-budget-deferred target.
+The mask is cleared around the draw pass and at chapter init. No cache shrink,
+new heap block or Work growth; two resident bytes hold this transient mask.
+
+Menu/Act camera centring stays resident, avoiding BEATS/RESULTS image churn.
+Cold window preload is a separate portable HUD quantum; Math keeps immediate
+feedback. Enemy/Guest labels are made separately (`tag_ok`:0/2/1). Actual
+human row misses are budgeted before HUD work; warm discount is conservative.
+Settled artwork is unchanged; HUD/cursor preparation may finish earlier.
+
+Cold FMB1 validation moved from resident to PARTY16 to fit the program. ABI99
+reuses the context union (400 bytes); signature9615. State2278/Unit116/
+Work37790/FSV9 Save4684, actor42, depth18488, zone9118 and companion4132
+remain. All29 images are rebuilt. Final private groups: `x/wide-opt/final/`,
+key `2eea5b271e52aee7272fc26f65b6faa0`, core701247 + pilot295145 transport;
+TTPack64727/64936 leaves209 bytes. The candidate contract is a snapshot only;
+accepted ABI97 groups/global contract and all old proofs remain untouched.
+
+Verification:1362 row-oracle checks PC/sanitizers/68000;57 actor-cache checks;
+24 baseline/current-sanitized replays with8640 equal states and4756 equal
+settled pictures;13403 map/allocation checks reused where unchanged. Selected
+12/13 native replays pass CPU/picture/identity gates. Full pilot ordinary
+fights/towns/Formation/save/continue/defeat/retry pass PC/sanitizers, with the
+same Gariland4684-byte save SHA c37b0544... . One native Gariland fight completes
+8852 frames without God/skip, saves the same bytes and releases every buffer.
+The three final pilot saves also equal the prior pilot. Package checks42
+host/1023 C pass.25 module images match ABI98 after signature normalization;
+AI0/TARGETS12/PLANNER24 have compiler changes and PARTY16 gains validation.
+Evidence under `x/wide-opt/`: `final-render12/`, `final-render13/`, `gariland13/`,
+`pc-final/`, `map-check/`, `pilot/`, `package-check/`, `final/contract/`.
+Earlier rejected experiments are retained; no new emulator run or commit.
+
+Next: selected installed-RAM milestone for the wider candidate, then remaining
+map depth fixes and source Chapter I encounters/scenes. Do not reopen the
+difficult16KiB/cache-shrinking hunt. Preserve the live emulator and1267 old
+proof/unrelated hashes and mtimes. Only two story battles need13 units per
+the user; keep support13 and exercise12 as the common population.
+
+## Twelve-unit CPU comparison (2026-11-23)
+
+The user asks for the top three360k optimization opportunities and notes that
+only two story battles need13 units; most need12. Capacity remains13.
+Measured12-unit Zeklaus: board mean349628/peak459576; rotation replay ordinary
+mean346978/peak432130. Gariland12 peaks368002. All PC/native final pictures
+and actor identities agree. Fewer actors alter deferred HUD scheduling, so
+peak cost does not decrease monotonically. Candidate CPU gate still fails.
+Component profiles prioritize unit rendering (~231k mean at12), then splitting
+HUD/menu construction (~78k menu chunks, ~133k HUD-zone peak), then the smaller
+scenery-transfer path (~34k mean). These are measured targets, not implemented
+gains. See `WIDE_SCENES.md` and `x/wide-core/units-profile/`. No production
+engine/package change or TiEmu run in this follow-up.
+
+## Shared wide-scene core candidate; functional pass, CPU gate fails (2026-11-23)
+
+Latest user steering: continue shared-core integration, still PC first. New
+[WIDE_SCENES.md](WIDE_SCENES.md) supersedes the previous private-width-only
+next step. The actual shared engine now supports per-map320/352px stride and
+an independent16544-byte color cap, accepting old R4 and new R5 views. All four
+views must agree;352x202 and mixed-width metadata are rejected at packaging
+and cold load. Saved approved C2 pixels are unchanged. No new style vote.
+
+Source candidate ABI98/ModCtx400 propagates stride/plane; State2278, Unit116,
+Work37790, FSV9 Save4684, actors42 and depth18488 remain. RESOURCES10 handles
+the validated scene/Work grow/shrink before resident Work binding, freeing
+the old block first; failed growth clears the slot/capacity and supports retry.
+Gariland retains53950 scene+Work bytes; Zeklaus uses54334, plus600 navigation.
+Zone9118, graphics4132/cold reader3546 share one4132-byte companion block.
+`mod_context` is deliberately out of line to fit the packer; cache capacities
+are not reduced. Copy rows snapshot the fixed stride to avoid global reloads.
+
+PC/ASan/UBSan pass13403 map/renderer/transition/failure/retry/reentry checks.
+Four real-engine C2 pictures exactly match the approved static-width carrier.
+Actual pilot ordinary fights/towns/Formation/save/continue/retry pass PC and
+sanitizers; a complete native Gariland fight (8736 frames, no God/skip) writes
+the same4684 bytes. A final PC route validates the final candidate groups.
+Metadata/supervisor checks:42 host/1023 C, PC/sanitizers. R5 package accepted
+with an explicit diagnostic continuation; a mixed-width view is rejected.
+No source Zeklaus encounter has been authored: diagnostic actors are borrowed.
+
+**CPU is not accepted.** Real68000 Zeklaus13-actor board/rotation replays match
+PC checksums905C/1B90 but peak453064/459644 ordinary cycles, over360000.
+Even later board frames peak432282. Gariland's source-matched HEAD reference
+already peaks371372 (current372140); do not reuse older348k/353k reports as
+current acceptance. `check_capacity_render.py --measure-only` records these
+failures and still checks pixels/identity; the default assertion remains hard.
+Do not promote/freeze/install this candidate until its ordinary CPU gate is
+resolved. Installed RAM/free16KiB is also unmeasured. No new TiEmu work.
+
+Private exact build: `x/wide-core/build.json`, core key
+`bc4207f51d0d28695a6e587af826bd20`, core700342 + unchanged pilot295145 transport
+bytes; actual TTPack64873/64936 leaves63 bytes. All29 images are rebuilt;
+unchanged cold programs/art are reused from the preserved source group.
+`build_wide_core.py` reproduces this candidate without touching the ABI97
+release or global frozen contract. `contract/candidate-contract.json` is a
+snapshot only. Core spec/headers describe source ABI98; accepted installed
+ABI97/keyac1de6... and its exact saved groups remain in `x/chapter1-ready/`.
+
+Evidence: `x/wide-core/accepted/` (final map PC/sanitizers), `pilot/` (PC/san
+and native fight), `final-pilot/` (final groups PC), `wide-measure/`,
+`narrow-measure/`, `reference-render100/`, `final-package-check/`, packages
+and contract. Earlier failed native logs are retained. The synthetic default
+package fixture has pre-existing stale service headers; use actual source
+input as the final-package check does, rather than waiving validation.
+
+Next: profile/fix actual dense rendering/update/cache CPU work, retaining C2,
+all cells, actors42 and depth18488; then measure installed RAM for this width.
+Keep the difficult16KiB hunt deferred. Sweegy/Fovoham depth fixes and remaining
+source encounters/scenes are still separate. Preserve all1267 protected and
+unrelated files' bytes/dates, the live user emulator and old proofs. No commit
+or merge was requested for this candidate.
+
+## C2 approved; full-width Zeklaus PC integration probe passes (2026-11-23)
+
+The user approved **C2** and requested a reusable map-extraction skill plus
+continued integration. This supersedes all pending-style notes below.
+Canonical skill: `.claude/skills/fft-map-extraction/SKILL.md`, with the exact
+recipe/evidence in `references/c2-pipeline.md`. CLAUDE's catalogue and the PS1
+skill link to it; a local Codex discovery symlink points to this same directory.
+Keep C2's light C tones, geometric ledges, thin white prop silhouettes and
+source-material borders. Do not reopen A..E/F choices or generalize MAP076's
+palette IDs to other maps. The skill validator passes.
+
+`check_zeklaus.py` / `check_zeklaus.c` now test the actual battle engine in a
+private352px/44-byte-row,188-row carrier. Generated include overlays leave the
+shipping C headers, ABI97 and packages untouched. Saved approved C2 planes
+are reused exactly; source terrain keeps its fixed256-cell layer stride.
+Legacy fixture contour tables are hoisted once into private ffcu. This dry
+arena needs a real empty WATER table: zero is an invalid descriptor pointer,
+as the initial ASan run exposed and the fixture now fixes.
+
+PC and ASan/UBSan (existing signed-shift exclusions) give identical logs:
+all180 source cells in four rotations,176 stoppable, exact archive color/depth
+decoding, camera/actor bounds and covers,16 directional inputs,8 animated
+rotation endpoints, a real4-cell/30-frame movement and two full allocation
+lifecycles.13,387 assertions, zero failures. No ordinary fight or source Zeklaus
+formation is asserted: the11 Gariland actors are a labelled diagnostic roster.
+
+Actual full-width depth:16880/17280/17088/17056 bytes, within18488. Four R4
+raw banks:20737/20891/20981/20733 =83342 bytes, not group transport size.
+One68000 compile of the actual native entry through the same private overlays
+confirms State2278, Save4684, Work37790, scene colors16544, stride44, rows188.
+Relative to Gariland's320x202 scene and150-node navigation: colors+384,
+navigation+600 =984 bytes of buffer growth. This is not total installed RAM.
+Twenty existing320px candidates still match the HEAD decoder exactly; a
+serializer/row-span control is byte-identical. FSV9 and public ABI97 remain.
+
+Evidence: `x/zeklaus-integration/latest/results.json`, `pc.log`, `san.log`,
+`source/native-layout.s`, `arena/`, `C2-engine-four-views.png`. That sheet shows
+actual PC battle output with diagnostic actors, unlike the earlier illustrative
+Python sprite previews. Reproduce: `make zeklaus-check`; add
+`ZEKLAUS_FLAGS=--native-layout` for the one layout compilation, no emulator.
+
+Next: production support for coherent per-map width/stride/allocation across
+all active maps, followed by bounded native CPU/RAM checks and matching package
+rebuild if that interface changes. The private188-row build cannot replace a
+core that must also load202-row maps. Blindly widening that global maximum to
+352x202 would cost1616 scene bytes instead of384; do not claim it fits the
+pilot's1504 free bytes. Preserve actor42/depth18488 caches, existing scene
+allocation gains, FSV9 and old proof bytes/dates. No new installed/free16KiB
+certification or TiEmu run. The user's live emulator and1267 protected/unrelated
+files retain bytes/dates. Sweegy/Fovoham depth gates and encounter authoring
+remain separate. No commit was requested for this lot.
+
+## Sand/stone material boundaries added to pending review (2026-11-23)
+
+The user additionally asked to mark the stone/sand border. New offline
+`tools/map_material_review.py` derives52 top/top material interfaces from the
+actual hash-checked mesh (sand palettes0/1, rock tops2/3/4), reusing the existing
+visibility-tested1px ledge renderer. It excludes same-material seams, prop
+cards, sky and existing cactus rings. No tile grid or runtime shader is added.
+
+Private `x/zeklaus-materials/` holds `material-comparison.png`
+(reference/C/C2/F1/F2 across four cameras), `C2-four-views.png` and
+`F2-four-views.png`, all pinned in ti-view. C2 is the user's preferred C base
+plus white cactus rings and material borders; F2 applies those borders to the
+assistant's F1 mix. The assistant favors C2; this is not user approval yet.
+Material masks change711/707/696/747 pixels by view, none outside their mask.
+Same source geometry/terrain/depth/cameras/actors; both old review directories
+retain bytes/dates. Shared comparison/full-sheet helpers gain optional
+labels/titles; their default PNG output still matches the prior review exactly.
+Results: `x/zeklaus-materials/results.json`; details in ZEKLAUS_REVIEW.md.
+Await visual verdict before integration; the336px framing problem stays open.
+
+## C/A preference and cactus-contour proposal pending (2026-11-23)
+
+The user prefers C, then A, and requested the assistant's own render plus
+outlines on protruding props (cacti). This does not approve a final new style.
+`tools/map_preferred_review.py` reuses the exact mesh/raster/actor/camera data
+and writes only `x/zeklaus-preferred/`: F0 retains a little more texture than C
+(14/42/73 source-luminance percentiles), F1 adds a1px external white cactus ring.
+The64 original palette9/page2 vertical-card triangles identify the four cactus
+objects; no vegetation is invented or inferred from noisy four-grey textures.
+Original depth clips hidden prop pixels and prevents rings over nearer surfaces.
+
+Three sheets are pinned in the running gallery: `C-A-my-proposal.png`
+(reference/A/C/F0/F1 across four160x100 cuts), `cactus-before-after.png`
+(same64x64 patches at4x), and `F1-four-views.png` (complete map at2x).
+The ring changes181/171/134/190 pixels by view, none outside its mask.132
+previous review files preserve bytes/dates. No source geometry/terrain/depth,
+camera/scale, original candidates, shipping banks or live TiEmu are changed.
+There is no runtime contour shader or new native/CPU/RAM certification.
+Results/hashes: `x/zeklaus-preferred/results.json`; details: ZEKLAUS_REVIEW.md.
+Await the visual choice; the336px width problem documented below stays open.
+
+## Zeklaus extraction / five-style review pending (2026-11-23)
+
+After the prior delivery was committed/merged as10bb409, the user requested the
+largest Chapter I map and five graphical proposals in all four orientations.
+Work continues on `feat/fft-zeklaus-review`; unrelated Tenchu/root files and
+the live user TiEmu remain untouched. No commit is requested for this new lot.
+
+MAP076 Zeklaus is widest336px and has the highest dated13-map R2 estimate;
+this is not a claim that it is worst in every final-R4/RAM metric. Only its
+primary mesh/texture was read. Actual geometry:10x18/180 lower nodes,176 stop
+cells, no unblocked upper,716 triangles. Full-width352px review art preserves
+the entire mesh; all five proposals reuse the accepted source-camera convention,
+same cameras and borrowed approved human sprites as illustrative scale fixtures.
+Source textures, contrast+ledges, light sand, softened relief and ink are A..E.
+
+The20 proposals are in `x/zeklaus-review/choose-A-E.png`; individual full maps
+are `A-four-views.png` through `E-four-views.png`. All six are pinned in the
+existing ti-view gallery for the user's choice. No style is accepted/integrated.
+`tools/map_art_review.py` writes private output only, reusing matching hash-keyed
+rasters; the only shared helper edit makes `isometric_style.project` use
+`extract.SC_W`, preserving its320px result while supporting the352px review.
+
+Follow-up: the user asked for the original as reference and supplied
+adamrt/fft-software-renderer. New `tools/map_color_reference.py` adds
+`with-reference-A-E.png` (color row plus the unchanged20 proposals),
+`reference-four-views.png` and `reference/` images. Explicitly original disc
+palette colors reconstructed without lighting, **not a PS1 screenshot**. Same
+mesh/UV/projection/cameras and illustrative grey actor fixtures. Three channel
+passes reuse `extract.render`; all four views retain exact geometry/depth and
+recover the existing unquantized source luminance.46 previous verdict sheets/
+R4 banks retain bytes/dates; `reference.json` records checks. Pin the new
+comparison/reference instead of the old atlas; A..E full views stay pinned.
+Upstream inspected at537d5718c4481b198ef26019df1e98d82250d5ac, not installed or
+copied: useful independent PC parser/palette/light/camera reference, but its
+own painter-sorting/lighting caveats prevent treating it as a PS1 oracle.
+Details and source links are in ZEKLAUS_REVIEW.md. Style choice remains pending.
+
+Actual candidates fit188/202 rows and16656/17056/16864/16848 ragged-depth bytes
+against18488. All20 pass actual PC `core_view_rows` and exact color/depth decode.
+Their four R4 banks total77056 bytes per style. **Current320px crop excludes one
+stoppable corner center per view:**(9,0)/(0,0)/(0,17)/(9,17). This disproves the
+earlier suggestion that a simple16px crop was already safe. Keep all terrain
+and full art; adapt shared framing/projection after the art choice. Do not
+silently shift individual actors, drop cells or resize fixed core capacities.
+
+[ZEKLAUS_REVIEW.md](ZEKLAUS_REVIEW.md) records candidates, measurements and scope.
+This is offline extraction/review, not actual battle/CPU/installed-RAM proof.
+Await the requested user's A..E choice before further integration/benchmarking.
+Next is actual PC framing/cursor/actors/navigation/cover integration of the
+chosen treatment; only then decide the minimal native/hardware checks needed.
+Sweegy/Fovoham depth and16KiB remain open. Preserve old proof bytes AND dates.
+
 ## Repository snapshot committed through ti-commit (2026-11-23)
 
 The user requested committing the accumulated FFT delivery on

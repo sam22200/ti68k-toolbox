@@ -37,6 +37,7 @@ static void expected_context(void)
     ModCtx *c=&expected;memset(c,0,sizeof *c);c->sig=MOD_SIG;
         c->map_w = map_w; c->map_h = map_h; c->map_n = map_n; c->unit_count = encounter_units;
         c->sc_h = sc_h; c->sc_top = sc_top;
+        c->sc_bytes=sc_bytes;c->sc_plane=sc_plane;
         c->state = &st; c->w = W; c->abilities = abilities; c->map_tiles = map_tiles;
         c->contour_gfx = contour_gfx; c->cdesc = cdesc;
         c->views=views;c->highlight_seq=&hl_seq;

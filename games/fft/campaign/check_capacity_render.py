@@ -43,6 +43,11 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,default=HERE/'x/core-capacity/render')
     ap.add_argument('--module-dir',type=Path,help='private matching modules.h and four FMB3 .bin shards; active banks remain untouched')
+    ap.add_argument('--arena-dir',type=Path,help='private ffg*/ffcu .bin overrides for another source map')
+    ap.add_argument('--source',type=Path,default=HERE/'check_capacity_render.c',help='isolated reference carrier; default is the actual current engine')
+    ap.add_argument('--measure-only',action='store_true',help='retain CPU overruns for profiling; framebuffer/state equality still required, not performance acceptance')
+    ap.add_argument('--actors',type=int,choices=(11,12,13),default=13,help='keep the original eleven and add up to two identical diagnostic actors')
+    ap.add_argument('--profile-zones',action='store_true',help='enable renderer component zones in the private carrier; instrumented timings are diagnostic')
     ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition','monster-body','battle-menu','battle-act'),
                     help='select affected cases; default is the original four-case certification')
     ap.add_argument('--ko-bank',type=Path,help='private FKO1 bank for the monster-ko case')
@@ -58,7 +63,7 @@ def main():
     if args.case and 'monster-body'in args.case:
         body=None if args.body_chapter else \
             args.body_bank.read_bytes()if args.body_bank else synthetic_body_bank(out,args.body_scale)
-    common=[HERE/'check_capacity_render.c',ROOT/'runtime/core/rt_core.c']
+    common=['-DRT_DRAW_ROWS=100',args.source.resolve(),ROOT/'runtime/core/rt_core.c']
     # The whole battle plus every scenario no longer fits one 68000 variable, so each
     # group of scenarios is its own build: the certified four (CAP_STATUS), the monster
     # KO boards (CAP_KO) and the wide bodies (CAP_BODY). Only the requested one is built.
@@ -74,7 +79,8 @@ def main():
     # The zone markers do not fit beside thirteen bodies and two banks; the per-frame
     # values the gate reads come from FRAME_END, not from them.
     module_flags=['-DFFT_MODULE_HEADER="'+str(args.module_dir.resolve()/'modules.h')+'"'] if args.module_dir else []
-    run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-DFFT_CHECK_NO_ZONES',*module_flags,*groups,'-o',out/'renderc',*common,
+    zone_flags=[] if args.profile_zones else ['-DFFT_CHECK_NO_ZONES']
+    run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES',*zone_flags,*module_flags,*groups,'-o',out/'renderc',*common,
          ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     results=[]
     files={p.stem:p for folder in (HERE.parent/'opening/data',HERE/'data')for p in folder.glob('*.89y')}
@@ -84,8 +90,15 @@ def main():
             var=chapter_packages.Variable(name,0x1c,3,(args.module_dir/(name+'.bin')).read_bytes()+b'\0dat\0\xf8')
             path=out/(name+'.89y');path.write_bytes(chapter_packages.group_bytes([var],single=True));files[name]=path
     with tempfile.TemporaryDirectory(prefix='fft-render13-')as name:
-        data=Path(name);data_links(data);(data/'ffgd.bin').unlink()
-        (data/'ffgd.bin').write_bytes(descriptor13())
+        data=Path(name);data_links(data)
+        if args.arena_dir:
+            for src in args.arena_dir.resolve().glob('*.bin'):
+                target=data/src.name;target.unlink(missing_ok=True);target.write_bytes(src.read_bytes())
+                run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',target.name,target.stem],data)
+                files[target.stem]=target.with_suffix('.89y')
+        dense=descriptor13((data/'ffgd.bin').read_bytes(),(data/'ffgi.bin').read_bytes(),args.actors)
+        (data/'ffgd.bin').unlink()
+        (data/'ffgd.bin').write_bytes(dense)
         run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat','ffgd.bin','ffgd'],data)
         files['ffgd']=data/'ffgd.89y'
         if args.ko_bank:
@@ -114,20 +127,23 @@ def main():
             match=re.search(r'capacity checksum (\w+) identity (\w+)',pc);assert match,pc
             assert re.search(r'checksum (\w+)',native)[1].lower()==match[1].lower()
             values=[int(v,16)for v in re.findall(r'value: .*?\(0x([0-9a-f]+)\)',native)]
-            assert values[-1]==int(match[2],16)and values[-1]>>24==13,(label,pc,native[-1000:])
+            assert values[-1]==int(match[2],16)and values[-1]>>24==args.actors,(label,pc,native[-1000:])
             assert values[-2]==frames and len(values[:-2])==2*frames,(label,len(values))
             frame_costs=values[:-2]
             ordinary=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if not mode>>31]
             cold=[cost for mode,cost in zip(frame_costs[::2],frame_costs[1::2])if mode>>31]
-            if label in ('status-last','equipment-last'):assert(values[-1]>>16)&255==12
-            results.append(dict(case=label,checksum=match[1],identity=match[2],actors=13,
+            if label in ('status-last','equipment-last'):assert(values[-1]>>16)&255==args.actors-1
+            results.append(dict(case=label,checksum=match[1],identity=match[2],actors=args.actors,
                                 bodies=args.bodies if label=='monster-body' else 0,
                                 ordinary_average_cycles=sum(ordinary)//len(ordinary),
-                                ordinary_peak_cycles=max(ordinary),cold_or_turn_peak_cycles=max(cold,default=0)))
+                                ordinary_peak_cycles=max(ordinary),ordinary_budget_passed=max(ordinary)<360000,
+                                cold_or_turn_peak_cycles=max(cold,default=0)))
             (out/'results.json').write_text(json.dumps(results,indent=2)+'\n')  # numbers kept, gate after
-            assert max(ordinary)<360000,(label,max(ordinary),'over the 360k ordinary budget',
-                                         frame_costs[1::2].index(max(ordinary)))
-            print(label+': '+pc.strip(),flush=True)
+            if not args.measure_only:
+                assert max(ordinary)<360000,(label,max(ordinary),'over the 360k ordinary budget',
+                                             frame_costs[1::2].index(max(ordinary)))
+            print(label+': '+pc.strip()+'; ordinary peak '+str(max(ordinary))+
+                  '/360000 '+('PASS' if max(ordinary)<360000 else 'FAIL (measurement only)'),flush=True)
     (out/'results.json').write_text(json.dumps(results,indent=2)+'\n')
 
 

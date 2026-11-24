@@ -37,7 +37,7 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 #if MOD_CORE
 #include "monster_ko.h"
 #endif
-#if MOD_CORE || MOD_PART(MOD_COMPANION)
+#if MOD_CORE || MOD_PART(MOD_COMPANION) || MOD_PART(MOD_PARTY)
 #include "monster_body.h"               // the companion draws the wide bodies
 #endif
 #endif
@@ -103,6 +103,7 @@ static void __attribute__((noinline)) frame_end(void)
 u8 map_w, map_h, encounter_units;
 u16 map_n; // validated chapter sizes and actor count
 s16 sc_h, sc_top;
+u16 sc_bytes=40,sc_plane;
 #endif
 #ifdef FFT_CHAPTER
 State *battle_state;                    // State lives in RAM, not the near-limit packed image
@@ -505,7 +506,7 @@ typedef struct {
     // Native rotation scratch; the historical control aliases its row pool here.
     #ifndef FFT_ARCHIVE_COLOURS
     union {
-    u8 bk[BK_N][2][SC_BYTES] __attribute__((aligned(2)));
+    u8 bk[BK_N][2][SC_BYTES_MAX] __attribute__((aligned(2)));
     #endif
         struct {
 #ifdef FFT_TURN_LOWPOLY_NATIVE
@@ -527,7 +528,7 @@ typedef struct {
     };
     #endif
 #else
-    u8 bk[BK_N][2][SC_BYTES] __attribute__((aligned(2)));
+    u8 bk[BK_N][2][SC_BYTES_MAX] __attribute__((aligned(2)));
 #endif
 #endif
 #ifdef FFT_CHAPTER
@@ -557,7 +558,7 @@ typedef struct {
 } Work;
 #if defined(__m68k__) && defined(FFT_CHAPTER) && MOD_CORE
 // malloc's hidden handle also belongs to the maximum AMS heap block.
-typedef char SceneWorkFitsAmsBlock[(2UL*SC_BYTES*SC_HMAX+sizeof(Work)+2UL<=65520UL)?1:-1];
+typedef char SceneWorkFitsAmsBlock[(SC_BUFFER_BYTES+sizeof(Work)+2UL<=65520UL)?1:-1];
 #endif
 #ifdef FFT_CHAPTER
 // What nav_reserve(MAP_N, 2) takes for the map that is loaded: 16 + 4 bytes a node. It is
@@ -566,13 +567,16 @@ typedef char SceneWorkFitsAmsBlock[(2UL*SC_BYTES*SC_HMAX+sizeof(Work)+2UL<=65520
 #define NAV_ENVELOPE ((u32)MAP_N * 20U)
 // What a battle allocates beyond its program (game_init, bootstrap_files.inc): State and Save,
 // the depth envelope, the scene and Work, the actor cache, the map envelope, AMS's headers
-#define BATTLE_RAM_BYTES (BATTLE_STORAGE_BYTES + FFT_CORE_DEPTH_MAX + 2UL * SC_BYTES * SC_HMAX \
+#define BATTLE_RAM_BYTES (BATTLE_STORAGE_BYTES + FFT_CORE_DEPTH_MAX + SC_BUFFER_BYTES \
     + sizeof(Work) + AC_N * (UNIT_FB + 4UL) + NAV_ENVELOPE + COMPANION_RAM + 5 * 4)
 #define COMPANION_RAM (FFT_CORE_COMPANION_MAX + 4U)  // its block and AMS's header (preloaded)
 #endif
 #if MOD_CORE
 static Work *W;
 static u8 hl_seq;
+#ifdef FFT_ACTOR_BANK
+static u16 render_poses;               // only live between actor_animate and the last unit blit
+#endif
 #ifdef FFT_MODULES
 static u8 mod_id;                       // invalidate whenever a tactical binding changes
 static u16 mod_call(u8 id,u8 op,u8 a);
@@ -665,6 +669,8 @@ static u16 status_set_id(u8 i, u8 row)
                                         // from the budget, the other optional work waits
 #define ROW_K 2                         // a scene row put back (rings going), and on the screen's copy
 #define HUD_K 60                        // a part of the HUD made
+#define HUMAN_CACHE_K 5                 // conservative warm-human saving versus UNIT_K
+#define HUMAN_MISS_K 16                 // composing new rows: charged before optional HUD work
 #define DK_K 80                         // a banner's shade (ti-cycles: up to 80k, its edge rows)
 #define DK_SPEED 8                     // the shade's diagonal edge (x + y), pixels a frame
 #define DK_N ((RT_W + RT_H) / DK_SPEED + 1)   // its frames, coming then leaving
@@ -1761,7 +1767,7 @@ static u8 bk_save(s16 y)
 // R4 colors and optional width mask are read in place; only depth is unpacked.
 // The explicit historical control uses R2/R3 and its obsolete row-pool scratch.
 #ifndef FFT_ARCHIVE_COLOURS
-typedef char EdgeMaskFitsBackups[sizeof(W->bk) >= SC_BYTES*SC_HMAX ? 1 : -1];
+typedef char EdgeMaskFitsBackups[sizeof(W->bk) >= SC_BYTES_MAX*SC_HMAX ? 1 : -1];
 #endif
 static const u8 *unpack_colours(u8 rot)
 {
@@ -3936,7 +3942,9 @@ u8 ai_frozen(void) { return W->frz; }
 #include FFT_MODULE_HEADER             // private matching exports can override the generated header
 static u16 *mod_zone;
 static const u8 *mod_images[MOD_COUNT];
-static ModCtx *mod_context(u8 id)
+// One address calculation across cold call sites; keeps the real packed core
+// below TTPack's64936-byte input ceiling without another overlay crossing.
+static ModCtx *__attribute__((noinline)) mod_context(u8 id)
 {
     const u8 *m=mod_images[id];
     return (ModCtx *)((u8 *)mod_zone+RD16(m,4));
@@ -3994,6 +4002,7 @@ static void mod_install(u8 id,u8 *dst)
         c->unit_count=encounter_units;
         c->sc_h=sc_h;
         c->sc_top=sc_top;
+        c->sc_bytes=sc_bytes;c->sc_plane=sc_plane;
         c->state=&st;
         c->w=W;
         c->abilities=abilities;
@@ -4428,10 +4437,14 @@ static u8 monster_body_active(u8 i);
 // undrawn rather than given a human frame.
 static void actor_show(const u8 *visible,u8 k)
 {
+    u8 budget=W->actor_budget;
 #ifdef FFT_CHAPTER
-    if(visible[k]&&(DC_OBJ(st.unit[k].dc)||!unit_monster(&st.unit[k])))unit_frame(st.rot,k);
+    if(visible[k]&&(DC_OBJ(st.unit[k].dc)||!unit_monster(&st.unit[k]))){
+        unit_frame(st.rot,k);
+        if(budget&&!DC_OBJ(st.unit[k].dc))render_poses|=(u16)(1U<<k);
+    }
 #else
-    if(visible[k])unit_frame(st.rot,k);
+    if(visible[k]){unit_frame(st.rot,k);if(budget&&!DC_OBJ(st.unit[k].dc))render_poses|=(u16)(1U<<k);}
 #endif
 }
 
@@ -4510,6 +4523,14 @@ static const u8 *morph_frame(const u8 *old, const u8 *obj)
 // mirrored frames are stored after the others)
 static const u8 *unit_frame(u8 rot, u8 i)
 {
+#ifdef FFT_ACTOR_BANK
+    // actor_animate already resolved this pose during the current render.
+    // Revalidate ownership: another actor may have evicted its decoded entry.
+    if(render_poses&((u16)1U<<i)){
+        u8 e=W->actor_ent[i];
+        if(ac_key[e]==W->actor_key[i]){ac_age[e]=W->ac_now;return (const u8 *)acache[e];}
+    }
+#endif
     const Unit *un = &st.unit[i];
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
     if (DC_OBJ(un->dc)) {
@@ -4572,7 +4593,7 @@ static const u8 *unit_frame(u8 rot, u8 i)
 // the others copied first.
 // Depth-1 shader: a short, constant-height pass. The ordinary dry shader
 // stays unchanged; standing units reuse their cached terrain classification.
-static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
+static void __attribute__((noinline)) draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
     RtSprite s;
     u16 mk[WATER_ROWS], ml[WATER_ROWS], md[WATER_ROWS], l, d = 0, m;
@@ -4608,78 +4629,55 @@ static void draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
     }
 }
 
+#if defined(FFT_CHAPTER) && defined(FFT_ACTOR_BANK)
+#include "unit_blit.inc"
+#endif
 static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
 #ifdef FFT_CHAPTER
     if(unit_airborne(&st.unit[i]))return;
 #endif
     RtSprite s;
-    u16 mk[COVER_H], ml[COVER_H], md[COVER_H], h[COVER_H];
-    u8 r, h0 = UNIT_SH, h1 = 0, flash = unit_flash(i);
+    u16 mk[COVER_H], ml[COVER_H], md[COVER_H];
+    u8 r, flash = unit_flash(i);
     const u8 *g;
     s.w = 16;
 #ifdef FFT_CHAPTER
-    if(ko_gfx&&draw_monster_ko(sx,sy,rot,i,c?c->depth:255)){sy-=UNIT_FOOT;goto markers;}
-    if((r=MONSTER_BODY_DRAW(sx,sy,rot,i,c))!=0){  // markers above a body taller than a human
-        if(r>=UNIT_FOOT)sy-=r-UNIT_FOOT+1;
-        sy-=UNIT_FOOT;goto markers;}
-    // No bank of this chapter draws this monster: its markers only, never a human frame.
-    if(unit_monster(&st.unit[i])&&!DC_OBJ(st.unit[i].dc)){sy-=UNIT_FOOT;goto markers;}
+    if(unit_monster(&st.unit[i])) {
+        if(c&&c->bvalid==3)((Cover *)c)->bvalid=0;
+        if(ko_gfx&&draw_monster_ko(sx,sy,rot,i,c?c->depth:255)){sy-=UNIT_FOOT;goto markers;}
+        if((r=MONSTER_BODY_DRAW(sx,sy,rot,i,c))!=0){  // markers above a body taller than a human
+            if(r>=UNIT_FOOT)sy-=r-UNIT_FOOT+1;
+            sy-=UNIT_FOOT;goto markers;}
+        // No bank draws this monster: its markers only, never a human frame.
+        if(!DC_OBJ(st.unit[i].dc)){sy-=UNIT_FOOT;goto markers;}
+    }
 #endif
     if ((c ? c->wet : unit_in_water(i)) && !DC_OBJ(st.unit[i].dc)) {
         draw_unit_water(sx, sy, rot, i, c); return;
     }
     g = unit_frame(rot, i);
-    if (c) {
-        const u16 *cm = c->cm;
-        for (r = c->r0; r <= c->r1; r++)
-            if ((h[r] = cm[r] & RD16(g, 3 * UNIT_SH + r)) != 0) { if (r < h0) h0 = r; h1 = r; }
+#if defined(FFT_CHAPTER) && defined(FFT_ACTOR_BANK)
+    if(!flash&&!DC_OBJ(st.unit[i].dc)) {
+        u8 blit=unit_blit_covered(sx-8,sy-UNIT_FOOT,g,(Cover *)c,W->actor_key[i]);
+        if(blit!=1)W->left-=HUMAN_MISS_K;
+        if(blit){sy-=UNIT_FOOT;goto markers;}
     }
-    sy -= UNIT_FOOT;
-    if (flash) {
-        for (r = 0; r < UNIT_SH; r++) {
-            u16 k = c ? c->cm[r] & RD16(g, 3 * UNIT_SH + r) : 0;
-            u16 in = r < UNIT_FOOT - 1 ? RD16(g, 3 * UNIT_SH + r) : 0;   // leave the shadow dark
-            mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
-            ml[r] = ((RD16(g, r) & ~in) | (flash == 1 ? in : 0)) & ~k;
-            md[r] = RD16(g, UNIT_SH + r) & ~(in | k);
-        }
-        s.h = UNIT_SH; s.light = ml; s.dark = md; s.mask = mk;
-        draw_sprite(sx - 8, sy, &s);
-        goto markers;
-    }
-#ifdef __m68k__                                // native big-endian rows: drawn in place
-    if (h0) {
-        s.h = h0;
-        s.light = g; s.dark = g + 2 * UNIT_SH; s.mask = g + 4 * UNIT_SH;
-        draw_sprite(sx - 8, sy, &s);
-    }
-    if (h0 < UNIT_SH) {
-        u8 e = h1 + 1;
-        for (r = h0; r < e; r++) {
-            u16 k = h[r];
-            mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
-            ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
-        }
-        s.h = e - h0;
-        s.light = ml + h0; s.dark = md + h0; s.mask = mk + h0;
-        draw_sprite(sx - 8, sy + h0, &s);
-        if (e < UNIT_SH) {
-            s.h = UNIT_SH - e;
-            s.light = g + 2 * e; s.dark = g + 2 * (UNIT_SH + e); s.mask = g + 2 * (2 * UNIT_SH + e);
-            draw_sprite(sx - 8, sy + e, &s);
-        }
-    }
-#else                                          // the PC copies every row (byte order)
-    for (r = 0; r < UNIT_SH; r++) {
-        u16 k = r >= h0 && r <= h1 ? h[r] : 0;
-        mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
-        ml[r] = RD16(g, r) & ~k; md[r] = RD16(g, UNIT_SH + r) & ~k;
-    }
-    s.h = UNIT_SH;
-    s.light = ml; s.dark = md; s.mask = mk;
-    draw_sprite(sx - 8, sy, &s);
 #endif
+    sy -= UNIT_FOOT;
+    // The cached path handles ordinary human rows. Rare oversized/object poses
+    // and flashes share one full compositor and one ExtGraph call.
+    for (r = 0; r < UNIT_SH; r++) {
+        u16 k = c && (flash || (r >= c->r0 && r <= c->r1))
+            ? c->cm[r] & RD16(g, 3 * UNIT_SH + r) : 0;
+        u16 in = flash && r < UNIT_FOOT - 1 ? RD16(g, 3 * UNIT_SH + r) : 0;
+        mk[r] = RD16(g, 2 * UNIT_SH + r) | (r >= UNIT_FOOT ? k : 0);
+        ml[r] = ((RD16(g, r) & ~in) | (flash == 1 ? in : 0)) & ~k;
+        md[r] = RD16(g, UNIT_SH + r) & ~(in | k);
+    }
+    s.h = UNIT_SH; s.light = ml; s.dark = md; s.mask = mk;
+    draw_sprite(sx - 8, sy, &s);
+
 markers:
     sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
@@ -5009,6 +5007,14 @@ u16 mod_entry(u8 op, u8 a) { if(op==4)return aim_ok(a);if(op==5)return pickable(
 #ifdef FFT_MODULES
 static void cam_target(s16 *tx,s16 *ty)
 {
+    // Common command windows only centre the cursor. Keep this case resident:
+    // otherwise every HUD part swaps RESULTS out for BEATS and back.
+    if(!st.banner&&!st.morph_mask&&(st.mode==M_MENU||st.mode==M_ACTS)) {
+        s16 u,v;view_of(st.rot,st.cx,st.cz,&u,&v);
+        *tx=scene_x(st.rot,u,v)-RT_W/2;
+        *ty=scene_y(u,v)+HH-map_tiles[CURSOR_CELL].stand*(HU/2)-RT_H/2-6;
+        cam_clamp(tx,ty);return;
+    }
     s16 target[2];mod_call(MOD_BEATS,255,0);mod_context(MOD_BEATS)->camera_out=target;
     mod_call(MOD_BEATS,4,0);*tx=target[0];*ty=target[1];
 }
@@ -5025,6 +5031,12 @@ static s16 ease(s16 c, s16 t)
 
 // ---------------------------------------------------------------- game
 static u8 *sbuf;
+#ifdef FFT_CHAPTER
+static u16 scene_capacity;
+#ifndef FFT_MODULES
+#include "scene_buffer.inc"
+#endif
+#endif
 
 
 static void
@@ -5047,6 +5059,9 @@ release(void)
     if (sbuf) free(sbuf);
     if (vbuf) free(vbuf);
     sbuf = vbuf = RT_NULL;
+#ifdef FFT_CHAPTER
+    scene_capacity=0;
+#endif
     scene_l = scene_d = RT_NULL;
 }
 
@@ -5075,15 +5090,20 @@ static u8 story_after;                          // its script plays beats after 
 
 void game_init(void)
 {
+#ifdef FFT_ACTOR_BANK
+    render_poses=0;
+#endif
 #ifndef __m68k__
     if(battle_state)free(battle_state);
 #endif
     battle_state=RT_NULL;rt_state=RT_NULL;rt_state_size=0;
     chapter_now = 0; encounter_units = 0; W = RT_NULL; igfx = RT_NULL;ko_gfx=RT_NULL;memset(body_gfx,0,sizeof body_gfx);
+    sc_bytes=40;sc_plane=0;
     flow_bank=flow_ui=RT_NULL;
 #ifdef __m68k__
     navbuf=RT_NULL;nav_capacity=0;
     sbuf=vbuf=RT_NULL;acache=RT_NULL; // reset before any allocation can fail
+    scene_capacity=0;
 #endif
 #ifdef FFT_MODULES
     mod_zone=RT_NULL;comp_block=RT_NULL;
@@ -5111,6 +5131,7 @@ void game_init(void)
         if(!mod_ready()||!companion_reserve())return;   // the companion first: no play-time malloc
         mod_call(MOD_RESOURCES,255,0);mod_context(MOD_RESOURCES)->boot=&boot;
         if(!mod_call(MOD_RESOURCES,13,0))return;
+        scene_capacity=0; // RESOURCES10 reserves the first descriptor's exact size
         mod_id=0;
     }
 #else
@@ -5146,10 +5167,9 @@ void game_init(void)
 #ifndef FFT_MODULES
     if (!sbuf) {                               // two blocks: AMS allocates at most ~64 KB; the
         vbuf = malloc(VIEW_BYTES);              // the core's depth envelope
-        sbuf = vbuf ? malloc(2UL * SC_BYTES * SC_HMAX + sizeof(Work)) : RT_NULL;
-        acache = sbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
-        if (!acache && sbuf) { free(sbuf); sbuf = RT_NULL; }
-        if (!sbuf) {                           // not enough memory: a message, ESC quits
+        sbuf = RT_NULL; scene_capacity=0;       // descriptor owns the first scene allocation
+        acache = vbuf ? malloc(AC_N * (UNIT_FB + 4)) : RT_NULL;
+        if (!acache) {                         // not enough memory: a message, ESC quits
             if (vbuf) free(vbuf);
             vbuf = RT_NULL;
             return;
@@ -5173,20 +5193,25 @@ static u8 chapter_load(u8 c)
 {
     u16 i;
     const u8 *surface;
+    SceneBuffer request;request.slot=&sbuf;request.capacity=&scene_capacity;
     W = RT_NULL; igfx = RT_NULL; chapter_now = 0; encounter_units = 0; contour_gfx = RT_NULL;ko_gfx=RT_NULL;memset(body_gfx,0,sizeof body_gfx);
-    if (!sbuf || !cgfx) return 0;
+    scene_l=scene_d=RT_NULL;
+    if (!vbuf || !acache || !cgfx) return 0;
 #ifdef FFT_MODULES
     // A cold load resets transient inputs; the image adopts the reset names above.
     mod_id=0; // cdesc/igfx change; never reuse the previous chapter's binding
+    mod_call(MOD_RESOURCES,255,0);mod_context(MOD_RESOURCES)->scene_request=&request;
     i=mod_call(MOD_RESOURCES,10,c);
     {
         const ModCtx *m=mod_context(MOD_RESOURCES);
         contour_gfx=m->contour_gfx; ugfx=m->chapter_ugfx; cdesc=m->cdesc; igfx=m->igfx;
         encounter_units=m->unit_count; map_w=m->map_w; map_h=m->map_h; map_n=m->map_n;
-        sc_h=m->sc_h; sc_top=m->sc_top; unit_defs=m->unit_defs; map_tiles=m->map_tiles;
+        sc_h=m->sc_h; sc_top=m->sc_top; sc_bytes=m->sc_bytes;sc_plane=m->sc_plane;
+        unit_defs=m->unit_defs; map_tiles=m->map_tiles;
     }
 #else
-    {char letter=chapter_route(c);i=letter?chapter_files(letter):0;}
+    {char letter=chapter_route(c);i=letter?chapter_files(letter):0;
+     if(i&&!scene_replace(&request,2U*SC_PLANE))i=0;}
 #endif
     if(!i){igfx=RT_NULL;return 0;}
     {u16 size;ko_gfx=resource_file("ffko",&size);
@@ -5196,7 +5221,14 @@ static u8 chapter_load(u8 c)
       for(b=0;b<MB_BANKS;b++){
           name[3]=(char)('b'+b);
           body_gfx[b]=resource_file(name,&size);
-          if(body_gfx[b]&&!monster_body_valid(body_gfx[b],size)){
+          if(body_gfx[b]){
+#ifdef FFT_MODULES
+              ModCtx *ctx;mod_call(MOD_PARTY,255,0);ctx=mod_context(MOD_PARTY);
+              ctx->art_bank=body_gfx[b];ctx->art_size=size;
+              if(mod_call(MOD_PARTY,16,0))continue;
+#else
+              if(monster_body_valid(body_gfx[b],size))continue;
+#endif
               memset(body_gfx,0,sizeof body_gfx);ko_gfx=RT_NULL;igfx=RT_NULL;return 0;}}}}
 #ifdef FFT_ACTOR_BANK
     if(ko_gfx){u16 k;u32 total=0;
@@ -5217,7 +5249,7 @@ static u8 chapter_load(u8 c)
 #endif
     sl_m = sl_l + SLOPE_ROWS; sc_l = sl_m + SLOPE_ROWS; sc_m = sc_l + SLOPE_ROWS;
 #endif
-    W = (Work *)(sbuf + 2UL * SC_BYTES * SC_HMAX);
+    W = (Work *)(sbuf + scene_capacity);
     memset(W, 0, sizeof(Work));
     if(!nav_reserve(MAP_N,2)){W=RT_NULL;igfx=RT_NULL;encounter_units=0;return 0;}
     W->surface=surface+SURFACE_HEADER;
@@ -6267,9 +6299,10 @@ static u8 battle_update(void)
 static void __attribute__((noinline)) copy_view(void)   // its own registers (inlined: spilled)
 {
     s16 y = st.camy < 0 ? -st.camy : 0, sh = st.camx & 15, rs = 16 - sh;
+    const s16 stride=(s16)SC_BYTES; // fixed for this copy; avoid alias-driven reloads each row
     s16 source_y = st.camy < 0 ? 0 : st.camy;
-    const u8 *sl = scene_l + source_y * SC_BYTES + ((st.camx >> 4) << 1);
-    const u8 *sd = scene_d + source_y * SC_BYTES + ((st.camx >> 4) << 1);
+    const u8 *sl = scene_l + source_y * stride + ((st.camx >> 4) << 1);
+    const u8 *sd = scene_d + source_y * stride + ((st.camx >> 4) << 1);
     u8 *dl = rt_light, *dd = rt_dark;
     if (y) {
         u16 bytes = (u16)y * RT_PBYTES;
@@ -6277,7 +6310,7 @@ static void __attribute__((noinline)) copy_view(void)   // its own registers (in
         dl += bytes; dd += bytes;
     }
 #ifdef __m68k__                                 // a row: 5 longs, each a long and the next word
-    for (; y < RT_H; y++, sl += SC_BYTES, sd += SC_BYTES, dl += RT_PBYTES, dd += RT_PBYTES) {
+    for (; y < RT_H; y++, sl += stride, sd += stride, dl += RT_PBYTES, dd += RT_PBYTES) {
         const u16 *a = (const u16 *)sl, *b = (const u16 *)sd;
         PlaneWord *p = (PlaneWord *)dl, *q = (PlaneWord *)dd;
         if (!sh) {
@@ -6293,7 +6326,7 @@ static void __attribute__((noinline)) copy_view(void)   // its own registers (in
     }
 #else
     s16 i;
-    for (; y < RT_H; y++, sl += SC_BYTES, sd += SC_BYTES, dl += RT_PBYTES, dd += RT_PBYTES) {
+    for (; y < RT_H; y++, sl += stride, sd += stride, dl += RT_PBYTES, dd += RT_PBYTES) {
         if (!sh) {
             for (i = 0; i < RT_W / 16; i += 2) { WR32(dl, i, RD32(sl, i)); WR32(dd, i, RD32(sd, i)); }
         } else {
@@ -6693,13 +6726,11 @@ static void make_tags(void)
 static const char *const team_names[2] = { "Enemy", "Guest" };
 #endif
 
-    u8 t;
-    memset(W->tag, 0, sizeof W->tag);
-    for (t = 0; t < 2; t++) {
-        outlined_text((u8 *)TAG_CACHE(t,0), (u8 *)TAG_CACHE(t,1), (u8 *)TAG_CACHE(t,2), 1, 1, team_names[t], 31);
-        W->tag_w[t] = ui_width(team_names[t]);
-    }
-    W->tag_ok = 1;
+    u8 t=W->tag_ok==2?1:0;             // 0 empty,2 Enemy ready,1 both ready
+    memset(W->tag[t],0,sizeof W->tag[t]);
+    outlined_text((u8 *)TAG_CACHE(t,0), (u8 *)TAG_CACHE(t,1), (u8 *)TAG_CACHE(t,2), 1, 1, team_names[t], 31);
+    W->tag_w[t] = ui_width(team_names[t]);
+    W->tag_ok = t?1:2;                 // one outlined label per HUD quantum
 }
 
 // the tag over the outer edge of a side's portrait: left-aligned on the left, right on the right
@@ -6755,7 +6786,7 @@ static u8 panel_shown(u8 side, u8 who)
 static u8 area_paint(u8 who)
 {
     u8 pk[2],side;pk[0]=st.act+1;pk[1]=who;
-    if(!W->tag_ok)make_tags();else panel_part(pk);
+    if(W->tag_ok!=1)make_tags();else panel_part(pk);
     for(side=0;side<2;side++)if(pk[side]&&panel_shown(side,pk[side])){
         u8 team=st.unit[pk[side]-1].team;draw_panel(side);
         if(team!=TEAM_PLAYER)draw_tag(side,team==TEAM_GUEST);
@@ -6832,10 +6863,18 @@ static void draw_hud(void)
         if (win && (!pre || ahead)) {              // a menu first; one made ahead after the panels
             if (k[0] != W->win_k[0] || k[1] != W->win_k[1] || k[2] != W->win_k[2]) {
                 for (i = 0; i < 3; i++) W->win_k[i] = k[i];
-                W->win_n = 0;
+                W->win_n = 0; W->win_m = 1;
+                // Separate a cold image load from its first drawing chunk. The
+                // portable schedule matches; Math retains immediate feedback.
+                if(!(k[0]==M_SKILLS&&(st.sub&128))) {
+#ifdef FFT_MODULES
+                    mod_call(MOD_RESULTS,255,0);
+#endif
+                    W->left-=HUD_K;break;
+                }
             }
             ZB(11); make_window(); ZE(11);
-        } else if (!W->tag_ok) make_tags();
+        } else if (W->tag_ok!=1) make_tags();
         else if (panel_part(pk)) ;
         else if (forecast && W->fc_key != forecast_key) {   // its own part
             ZB(13); make_forecast(pk[0] - 1, forecast - 1, (AbId)((forecast_key >> 4) - 1)); ZE(13);
@@ -6887,7 +6926,7 @@ static const u8 forecast_mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 
 #endif
         }
     }
-    W->hud_ok = (!pk[0] || panel_shown(0, pk[0])) && (!pk[1] || panel_shown(1, pk[1]))
+    W->hud_ok = W->tag_ok==1 && (!pk[0] || panel_shown(0, pk[0])) && (!pk[1] || panel_shown(1, pk[1]))
         && (!forecast || W->fc_key == forecast_key)
         && (hidden || pre || !k[0] || (W->win_k[0] == k[0] && W->win_k[1] == k[1] && W->win_k[2] == k[2] && W->win_n == W->win_m));
 #ifdef FFT_CHAPTER
@@ -7504,6 +7543,9 @@ void game_render(void)
         if (vis[i]) {
             const Cover *c = &W->cover[i];
             n += UNIT_K;
+#ifdef FFT_CHAPTER
+            if(c->bvalid==3)n-=HUMAN_CACHE_K;
+#endif
             if (unit_flash(i)) n += 7;
             if (st.mode == M_ACT) {
                 if (i == st.atk && armed_pose(i) >= 2) n += 45;
@@ -7528,6 +7570,7 @@ void game_render(void)
     ZE(3);
     ZB(4);
 #ifdef FFT_ACTOR_BANK
+    render_poses=0;
     actor_animate(vis);
 #endif
     for (i = 0; i < NUNIT; i++) {
@@ -7539,6 +7582,9 @@ void game_render(void)
             ||((c->r0&128)&&(!ko_gfx||!monster_ko_active(k)))
 #endif
         ) {
+#ifdef FFT_CHAPTER
+            if(c->bvalid==3)c->bvalid=0;        // the human's composed rows used the old cover
+#endif
             c->x = f[k].x; c->y = f[k].y; c->depth = f[k].depth; c->rot = st.rot;
             cover(c->cm, f[k].x, f[k].y, f[k].depth);
             c->wet = unit_in_water(k);
@@ -7553,6 +7599,7 @@ void game_render(void)
         draw_unit_covered(f[tg].x - st.camx, f[tg].y - st.camy, st.rot, tg, &W->cover[tg]);
     }
 #ifdef FFT_ACTOR_BANK
+    render_poses=0;
     W->left-=(s16)W->actor_misses*32;
 #endif
     ZE(4); ZB(5);
@@ -7733,6 +7780,7 @@ u16 mod_entry(u8 op,u8 a)
 #include "chapter_files.inc"
 #undef ugfx
 #include "bootstrap_files.inc"
+#include "scene_buffer.inc"
 #include "objective_load.inc"
 #include "guest_load.inc"
 #include "reward_prepare.inc"
@@ -7774,7 +7822,9 @@ u16 mod_entry(u8 op,u8 a)
     if(op==16)return guest_load(a);
     if(op==15)return objective_load(a);
     if(op==11)return (u8)chapter_route(a);
-    if(op==10){char letter=chapter_route(a);return letter?chapter_files(letter):0;}
+    if(op==10){const SceneBuffer *request=M.scene_request;char letter=chapter_route(a);
+        u16 offset=letter?chapter_files(letter):0;
+        return offset&&scene_replace(request,2U*SC_PLANE)?offset:0;}
     return 0;
 }
 #endif

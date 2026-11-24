@@ -168,9 +168,11 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // The map's and its views' sizes are the chapter's (descriptor MAP_W, MAP_H, SC_H, SC_TOP), read
 // at load; buffers take the largest of every chapter (chapters.h, tools/chapter_desc.py)
 #include "chapters.h"
+#include "scene_buffer.h"
 extern u8 map_w, map_h, encounter_units;
 extern u16 map_n;
 extern s16 sc_h, sc_top;
+extern u16 sc_bytes, sc_plane;
 #define MAP_W map_w
 #define MAP_H map_h
 #define MAP_N map_n                           // count/endpoints include256; IDs remain bytes
@@ -261,7 +263,19 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define HU 6                           // pixels per height unit
 #define MAXH 10                        // highest corner of the map (checked by the tests)
 // Scene: the whole map for one orientation (fftv0..3 and the buffer the current one is copied to)
-#define SC_BYTES 40                    // 320 px
+#ifdef FFT_CHAPTER
+#define SC_BYTES sc_bytes              // validated once at load:40 (R4),44 (R5)
+#ifdef FFT_LEGACY_REACH_BACKUPS
+#define SC_BYTES_MAX 40                // the historical R2/R3 row-pool control
+#else
+#define SC_BYTES_MAX 44
+#endif
+#define SC_BUFFER_BYTES FFT_CORE_SCENE_MAX
+#else
+#define SC_BYTES 40                    // historical standalone320px controls
+#define SC_BYTES_MAX SC_BYTES
+#define SC_BUFFER_BYTES (2UL*SC_BYTES*SC_HMAX)
+#endif
 #define SC_W (SC_BYTES * 8)
 // Per map: its views' rows (SC_H) once the rows above every view's scenery (SC_TOP) are cut.
 #ifdef FFT_CHAPTER
@@ -288,7 +302,11 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #define GFX_CHEMIST(g) ((g) >= UG_CHEMIST_M)   // the demo's sprites (units.h)
 #endif
 #define SC_OY (HU * MAXH + 4 - SC_TOP) // scene y of the top vertex of view tile (0, 0) at h 0
-#define SC_PLANE (SC_BYTES * SC_H)     // one plane
+#ifdef FFT_CHAPTER
+#define SC_PLANE sc_plane              // one validated color plane, computed at load
+#else
+#define SC_PLANE (SC_BYTES * SC_H)
+#endif
 
 // Fixed inspection uses direct cuts. FFT_CAMERA_MOTION explicitly opts into the
 // rejected smooth/cinematic research paths; it is never implied by FFT_CINEMA alone.

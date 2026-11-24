@@ -33,7 +33,7 @@ static void ko_cache_draw(u8 a,u8 b,s16 x,s16 y,u8 rows)
     sp.light=g;sp.dark=g+UNIT_SH;sp.mask=g+2*UNIT_SH;draw_sprite(x+16,y,&sp);
 }
 #endif
-static u8 draw_monster_ko(s16 sx,s16 sy,u8 rot,u8 i,u8 depth)
+static u8 __attribute__((noinline)) draw_monster_ko(s16 sx,s16 sy,u8 rot,u8 i,u8 depth)
 {
     const u8 *frame,*g,*obj=RT_NULL;
     u8 mirror,h,r,rows,morph=0,wet;
