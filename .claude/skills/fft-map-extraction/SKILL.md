@@ -15,7 +15,9 @@ Read [the C2 recipe and integration gates](references/c2-pipeline.md) when
 extracting or adapting a map. Its depth-budget section decides whether a map fits
 `FFT_CORE_DEPTH_MAX` at all, sorts an overrunning map into cosmetic or structural,
 and gives the arbitration order: remove whole decorative props first, shrink them
-only if drastic, shorten the scene last. A half-removed prop saves nothing. Current scripts live in `games/fft/tools/`;
+only if drastic, shorten the scene last. A half-removed prop saves nothing.
+`depth_budget.py` does the sorting itself, from FFT's crossed-but-not-stopped-on
+tile flag. Current scripts live in `games/fft/tools/`;
 resource ownership rules are `games/fft/campaign/CORE_RESOURCES.md`.
 
 ## Extract and adapt

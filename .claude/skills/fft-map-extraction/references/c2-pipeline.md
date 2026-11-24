@@ -186,12 +186,23 @@ next door, whose standable top is higher than the leaves — so a test that comp
 a polygon against the tile its centre falls on calls them terrain. Compare against
 the prop's own tile.
 
-### Classifying a map automatically: not solved
+### Classifying a map automatically
 
-An automatic cosmetic/structural classifier is **not working yet** and must not be
-trusted. Seeding on geometry that floats above the standable surface, growing to
-whole props and re-measuring still labels Sweegy structural, because the seed
-tiles are themselves found by centre attribution and so miss the canopies. Reading
-both terrain levels is necessary but not sufficient. Until this is fixed, classify
-by hand: measure with `depth_budget.py`, then test removing the candidate props
-and re-measure.
+`depth_budget.py` sorts every map into fits / cosmetic / structural on its own.
+The signal is FFT's own terrain flag, not geometry analysis: a decorative prop is
+a tile that may be **crossed but never stopped on** (`flags & 0x02`), and that tile
+carries the PROP's height rather than the ground's. Sweegy's four trees are tiles
+of height 17-18 standing over ground near 4; Slums in Dorter has no such tile at
+all. Read both terrain levels, remove every polygon over a prop tile, re-measure:
+clearing the cap means cosmetic, still over means structural.
+
+Chapter I classifies 9 fits, 1 cosmetic (Sweegy, 5 prop tiles, 258 polygons,
+21,640 -> 15,288) and 1 structural (Slums in Dorter, no prop tile), matching every
+figure established by hand.
+
+**Why a geometric rule does not work.** Five variants were tried and all failed:
+asking whether a polygon floats above the standable top of its tile, or rises more
+than a margin above it, or seeding on floating polygons and growing the cluster.
+They fail because a prop tile's standable top *is the prop*, so nothing floats
+above it, and because 96 of Sweegy's 144 tree polygons have their centre over a
+neighbouring hill whose top is higher than the leaves. Use the flag.
