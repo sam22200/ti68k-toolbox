@@ -1,5 +1,15 @@
 # Chapter I readiness (2026-11-24)
 
+Current storage study: [CAMPAIGN_PACK_REPORT.md](CAMPAIGN_PACK_REPORT.md) keeps
+the accepted eight pack boundaries and measures complete/part sprites and
+wardrobes. Keep whole combat sprites; the part prototype is13..15% slower at
+pose preparation and does not reduce native30 bytes. Provisionally retain only
+Ramza/Delita wardrobe variants under the user's50KB total cap (47232-byte
+extended control incl portrait/references), pending final source pose coverage.
+No runtime/art/package change. The report's wardrobe-inclusive ChapterI upper
+is2.629MB for one-direction scene planning,2.689MB with the conservative scene
+allowance, both including131072 reserve. Older estimates below are dated.
+
 Current map-authoring probe: [approved C2 Zeklaus](ZEKLAUS_REVIEW.md), now loaded
 by the [promoted wide-scene core](WIDE_SCENES.md). C2's light tones,
 ledges, white prop outlines and material borders are recorded in the extraction
@@ -13,6 +23,32 @@ and promotes ABI99: Orbonne2420/2414, Gariland1420/1414 and Zeklaus13
 436/430 free/max bytes.16KiB remains unpassed. Old ABI97 proofs remain intact.
 State/Save/Work and cache capacities are unchanged; diagnostic actors are not
 an authored source battle.
+
+Storage scope clarification (2026-11-24): older13-map/full-chapter totals are
+dated controls, not an exhaustive narrative-location census. Current working
+recommendation keeps ChapterI whole: ten story battle terrains, approved
+Zeklaus as one extra terrain, nine scene-only locations. Fovoham randoms reuse
+story terrain103 rather than requiring extra field72. This is a routing/art
+proposal, not implemented content.31KB event text compresses to18KB with4KiB
+chunks; six sampled scene rooms refine the scene-only picture allowance to
+8..20KB/location. No needed source camera is authorized for omission.
+The user now drops named-human costume variants: one body per person, without
+changing identity/portrait/job/stats. The accepted eight-pack plan
+splitsII/III in two andIV in three; it keeps ten optional FX and gives ChapterI
+2.05..2.51MB core+content (2.64MB upper including131072 reserve). These include
+explicit actor/pose/boss allowances, not final extracted-bank sizes. Native text
+reader/actor-directory extensions, future map art/depth and actual free Flash
+remain separate. See HANDOVER and `x/pack-refinement/plan.json`; no release gate
+is passed by a sizing estimate.2700000 is a planning budget, not measured free
+Flash on the user's calculator.
+
+Scene authoring now defaults to one orientation per scene, with only necessary
+source-driven exceptions. This does not remove camera framing/pans or imply
+one picture per physical room. Keep the conservative scene allowance until
+cuts are inventoried. Generic-body/head substitution still lacks a compatible
+rig and visual verdict; recruits/major actors keep unique appearances. Scene-only actors
+need only their actual scripted poses, including gestures/injuries/deaths,
+not a whole combat bank. No current renderer/art or byte estimate changed.
 
 ## Current release handoff
 

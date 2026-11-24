@@ -1,5 +1,209 @@
 # Handover: FFT core milestone (for Codex or any agent taking over)
 
+## Git delivery of the storage study (2026-11-24)
+
+The user invoked ti-commit after the completed measurement/report. Commit only
+the four measurement/report tools, CAMPAIGN_PACK_REPORT.md and their related
+FFT/working-rule documentation on docs/fft-campaign-pack-study, then push and
+merge into main after focused checks. Native/PC evidence is reused by exact
+source/artifact hashes; no game/runtime change warrants a new whole-game or
+emulator sweep. Preserve all private evidence, commercial art, saves, unrelated
+Tenchu/personal changes and their mtimes. Delivery audit lives under
+`x/ti-commit-pack-study/`; earlier no-commit statements below describe the
+measurement turns before this request.
+
+## Actor/wardrobe measurements and complete pack report delivered (2026-11-24)
+
+Latest user requested measurements and a full Markdown report, allowing costume
+variants only below50KB. [CAMPAIGN_PACK_REPORT.md](CAMPAIGN_PACK_REPORT.md) is
+the current complete report: accepted eight boundaries, map/scene lists, all38
+named-human lifetimes, ownership, text/scenes, bodies/costumes, CPU/RAM scope,
+save/pack replacement and remaining authoring gates. Project prose is English.
+
+New tracked tools: `../tools/actor_storage_study.py`,
+`actor_costume_increment_study.py`, `actor_parts_bench.c`,
+`campaign_pack_report.py`. Private evidence is `x/actor-storage/`: results.json,
+costume-choices.json, pc.json/native.log, pack-projection.json, verification.json
+and ignored raw/packed fixtures.52 named identity records/38 people plus38
+generic job bodies yield5085 converted model/pose pairs.685 source shapes are
+empty; two additional converter failures (Rudvich24/SummonerM86) remain explicit.
+The extended sample covers regular SHP shapes plus the existing native30 proxy,
+not complete source SEQ/attack/SP2 fidelity. Do not treat it as shipped art.
+
+Exact native30 bank controls (38 named+38 jobs): whole312656; two parts333032;
+three340824. Extended named coverage: whole539728; two552522; three530595.
+These include offset/mirror/recipe/part/bounded-variable overheads. Hybrid
+scene-only parts also fail to save bytes. Fixed row bands are not anatomical
+heads/legs, especially in attacks/KO. Count-only generic-body substitution
+suggests55.7..140.8KB potential but has no rig, selected templates or visual
+verdict; no such saving is credited. Keep full sprites in combat.
+
+Forty-five source-converted poses, two directions and three preparations pass
+270 PC ASan/UBSan and68000 byte checks, signature7199. Datasheet means:
+whole26804, two30335, three30705 cycles; independent maxima42336/45976/46408.
+The extra3.5..3.9K mean cache-miss work is not a whole-frame pass (tightest old
+margin3168). The simple part workspace needs144 extra transient bytes for two
+parts,80 if specialized for three. No actor/cache/ABI/runtime change or new ASM.
+No TiEmu operation/screenshot; old native integration evidence remains valid.
+
+User threshold is interpreted as50,000 bytes TOTAL extra wardrobe, not per
+person. Whole extended Ramza2/3+Delita2/3 add45808; four portrait/reference
+allowances add1424 =>47232, so retain provisionally with a hard50KB envelope.
+The six-outfit comparison58973 exceeds it; other clothing stays canonical.
+All14 same-name variants include wounded/guest/undead forms too. Existing
+converter/source coverage still needs final source-required pose checks; if
+hero wardrobes exceed50KB then, revert them to one normal body each. No new
+sprite/portrait was installed or granted a visual verdict by this size study.
+
+The report keeps eight boundaries. It proposes one illustrative extra field
+inIV-C (Bed Desert, dropping Doguola) to reserve wardrobe margin. One-direction
+scene planning is5..10KB/location plus30KB/pack upper camera reserve; the old
+8..20KB/location remains a separate conservative control. With50KB wardrobes,
+ten optional FX, late nonhuman/boss allowances and131072 reserve, peaks are
+2.629MB (one-direction forecast) /2.689MB (conservative scene control). Actual
+free Flash/full future maps/poses remain unmeasured; this is not installation
+certification. Current ABI99 core remains700273 stored bytes/key10965478... .
+No saves/packages changed, no commit/push. Preserve the live emulator and all
+historical protected file bytes AND mtimes. See verification.json for the final
+hash/mtime audit; difficult16KiB/cache-shrinking work remains deferred.
+
+## Eight packs accepted; scene orientation and actor parts clarified (2026-11-24)
+
+Latest user explicitly accepts the proposed eight main packs. Keep I whole,
+II split after Goug, III after Orbonne, IV after Bethla and after Igros; optional
+quests/Deep Dungeon remain separately planned. The proposal below is now an
+accepted content boundary plan, not a shipped/replayed set of eight packs.
+
+Default to one orientation per scripted scene. Add rare extra orientations only
+when source staging needs them. One direction may still need a panorama,
+several crops or camera travel; several scenes in one room may need different
+framing. Keep existing conservative8..20KB/location allowances until that
+inventory is authored. The two-direction measurement sample below is only a
+compression probe, not a requirement to ship both views in every scene.
+
+Clarification: the previous estimate used complete sprites, one normal human
+body per person without costume variants; it did NOT propose separate feet,
+torso and head. The user now suggests pooled secondary bodies with unique
+heads, keeping fully unique recruits and major story actors. Explicit examples:
+Ramza, Delita, Alma, Agrias, Gafgarion, Orlandu, Meliadoul; retain all recruits'
+distinct appearances too. Ovelia/Wiegraf/Dycedarg/Zalbag/Elmdor are sensible
+additional candidates, not an exhaustive reviewed importance list.
+
+Recommended first prototype: head + body including feet for a compatible
+secondary archetype. Three separate pieces need a measured gain; fixed row
+cuts alone are not anatomical extraction, especially for KO/attack poses.
+Compose only on bounded pose-cache preparation, then reuse the current single
+complete-sprite blit. Keep appearance+pose cache keys, eviction validation,
+42 entries, outline/internal mask/cover and complete-frame CPU gates. Parts
+must remain physically pooled in shipping data; offline rebaking every variant
+would remove the storage saving. No part renderer/cache change is implemented.
+
+Actors who never fight need only their actual scene animations, including any
+scripted walk/gesture/injury/death. A small unique scene-only bank may be simpler
+than a modular full combat bank. Preserve named portraits and source identity.
+Do not extrapolate a complete combat bank for every story speaker. No measured
+part-bank saving or new byte reduction is claimed; existing full-body archive
+estimates remain the conservative baseline. No runtime/art/package/save change,
+new TI check, screenshot or commit. Approved ABI99 and historical proofs remain.
+
+## Refined pack recommendation; one named-human body (2026-11-24)
+
+Latest user instruction: ignore costume changes, keep it simple; refine actual
+Flash/scenes/text/character lifetimes and recommend a practical pack split,
+including half-chapters if useful. The one-body decision is accepted; the
+boundaries below are an agent recommendation, not a user-approved release.
+
+TI officially specifies about2.7MB user Flash shared by archive/apps. Our
+2700000-byte package budget is configurable planning, NOT measured free Flash
+on the user's calculator. Other installed apps/files subtract from it;131072
+reserve remains. No live emulator read/input/installation was done here.
+Official source: TI support solution12174. Current stored core remains700273.
+
+New read-only evidence: `x/pack-refinement/{summary.txt,plan.json,text-cast.json,
+scenes.json}` and three reproducible Python scripts. Previous broad scene/cast
+estimates below are superseded by these assumptions/measurements.2230 linear
+message references decode with no cursor/instruction failures; unknown glyphs
+remain explicit sizing placeholders, not faithful final text. I/II/III event
+text is30995/31833/34852 raw bytes,18432/18535/20567 in <=4KiB ZX0 chunks
+including directories. Native cold text decompression is NOT implemented.
+
+Six sampled narrative rooms/two orientations/three widths retain all six
+picture planes with PC ZX0 roundtrips.320x100 raw24000 bytes compresses to
+3360..8942 (mean5870); row XOR mean5641 saves only~4%, so retain the existing
+scene codec. These are source-texture sizing crops, not authored C2 material/
+prop/camera approvals.8..20KB per scene-only location allows one/two pictures;
+extra required source cuts/pans must still be counted, never silently omitted.
+
+Retail names merge52 human identity IDs to38 people. Select one normal body;
+the prior54-sheet candidates also included alternate/unreferenced sheets. The
+canonical30-pose sum153034 vs218361 summed source-sheet bytes is a sizing
+comparison, not a measured shipping saving (cross-sheet exact pooling differs).
+Actual15-model pilot84455 /30-pose proxy64723 =1.305 calibrates extra poses.
+Named projections allow1.3..1.8, plus missing/civilian pose allowance. Major
+boss forms20..50KB each and late optional nonhuman recruits30..60KB are
+explicit unmeasured allowances. Shared generic/stable-human core+ten FX is
+estimated1.04..1.19MB, up to1.25MB with late nonhuman recruits. Required native
+actor-bank directory/format/code and art/RAM/CPU gates remain open.
+
+Working lifetimes: Algus/Teta onlyI; Draclau/Rudvich onlyII; Barinten/Izlude
+onlyIII. Generic-named enemies can already reuse job bodies. Do not discard
+Agrias/Mustadio/other recruits because their narrative appearances stop.
+Script-only actors/graphics changes still require authored lifetime checks;
+anonymous priests are not all Simon. Keep named portraits in shared identity.
+
+Best bet: EIGHT main packs: I whole; II-A ends after Goug/II-B after Lionel;
+III-A after Orbonne/III-B after Riovanes; IV-1 after Bethla, IV-2 after Igros,
+IV-3 through ending. Story chapter/stock/progression must stay independent of
+content-pack phase. Full four-view map counts11/9/6/7/8/10/8/10 include only
+one extra terrain inI (approved Zeklaus; Fovoham randoms reuse story103), two
+illustrative extras elsewhere. Narrative-only location counts9/9/4/3/5/6/6/4.
+Upper core+pack estimates2.51/2.30/1.98/2.03/2.20/2.41/2.33/2.52MB exclude
+the131072 reserve; including it the largest is2.652MB. Six packs with lean
+random pools can theoretically reach2.699MB including reserve but leave only
+1149 additional planning bytes. SplittingI too adds a swap without reducing
+the late-pack peak. Quests and Deep Dungeon should be separate optional packs.
+
+These are estimates, not a Flash installation certificate. Future full map
+framing/depth, unextracted boss shapes/cameras, actual package metadata and
+on-device free Flash remain open. No runtime/art/save/package changes, no TI
+test/screenshot, no commit. ABI99 remains the promoted core. Preserve the
+user's live emulator and all old proof/save bytes AND dates.
+
+## Campaign storage planning: reduced random pools and ten optional FX (2026-11-24)
+
+User accepts splitting IV in two and retaining only a few additional random
+terrains per pack, rather than all earlier-world fields. Count narrative-only
+locations as well as battle maps. Prefer at most ten common optional visual
+effects; no full FX bank requirement. Their actual popularity is not measured.
+User is considering generic bodies for rare named actors, not approving a
+blanket replacement. Portrait/name, identity, stats, recruitment and rules stay.
+
+Read-only sizing evidence: `x/chapter-map-counts/revised-summary.txt` and
+`revised.json`, reproduced by `revised_plan.py`. With TWO illustrative extra
+random terrains, working main-story counts are II11 battle +10 scene-only,
+III11+8, IV-A10+8, IV-B12+8. IV split is after Poeskas/before Limberry.
+One/two scene compositions are proposed, not four whole views per narrative
+location; no needed scene/camera is authorized for omission. Pure campaign
+projections are1.27–1.70/1.24–1.63/1.16–1.54/1.32–1.72MB respectively,
+excluding actor art/FX and optional quest/dungeon packs. These are planning
+ranges, not extracted packages or complete event/camera reachability proofs.
+
+Forty prior FX samples imply31,245 bytes for ten effect data proxies; allow
+40–80KB including an unimplemented shared player. No "most used" ranking or
+RAM/CPU gate is certified. A one-ENTD occurrence is not one appearance:
+recruitable units and alternate forms occur among the eight low-count identity
+IDs. Do not treat them as disposable sprites. Prefer a lifetime audit and
+chapter ownership for temporary NPCs/costumes before replacing named bodies.
+Retiring expired earlier banks is provisionally100–250KB; moving an active
+bank between core and chapter saves zero combined installed bytes.
+
+Keeping the previously estimated full accumulated cast core still puts the
+main packs around2.60–3.53MB including ten FX and131072 reserve:2.70MB is
+not certified. Reduced scene compositions, character lifetimes and actual
+ripped bytes remain to resolve. Core remains promoted ABI99; no runtime/art,
+save, package or emulator change. The prior ti-commit completed and is merged
+at04f244e; these later sizing notes have not been committed.
+
 ## Installed RAM measured; corrected ABI99 core promoted (2026-11-24)
 
 Latest instruction: measure RAM and promote, then continue. This is delivered.
