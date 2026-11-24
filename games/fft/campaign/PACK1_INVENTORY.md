@@ -42,6 +42,27 @@ The earlier report put those at roughly 134,000..242,000 bytes together, so the
 margin covers them about twice over. It assumes an otherwise empty calculator: run
 `experiments/archfree/` on the target machine before treating 530,205 as real.
 
+## 1b. What the actor figure covers
+
+The 253,813 bytes are **60 complete bodies**, one per person, 30 poses each: the 38
+generic job bodies plus 22 named humans. Chapter I's own cast is Agrias, Algus, Alma,
+Delita, Dycedarg, Elmdor, Gafgarion, Larg, Ovelia, Ramza, Simon, Teta, Wiegraf and
+Zalbag — every unique appearance the chapter needs, each with its own physical sprites.
+
+It is deliberately conservative: it also front-loads eight recruits who only appear
+later (Beowulf, Cloud, Malak, Meliadoul, Mustadio, Orlandu, Rafa, Reis). Chapter I's
+cast alone measures **220,903 bytes**, so 32,910 of the total is future chapters paid
+early. Keeping it is the safe reading; dropping it would put the margin at 563,115.
+
+Monster families are already in today's core and are not double counted: `ffmb`,
+`ffmc` and `ffmd` hold 135,584 bytes of monster bodies inside the 694,818. Chapter I
+has no large unique boss form. Named generic-job enemies such as Gustav, Miluda and
+Golagros reuse the job bodies; a proper name does not imply a dedicated bank.
+
+Portraits are the one cast item **not** covered: `ffcp` carries 20,669 bytes of shared
+portraits in the core, but the chapter portraits still missing from that bank stay in
+the not-counted list of section 1.
+
 ## 2. Battle maps
 
 Each map is read from the local disc, rastered in the four orientations and packed
