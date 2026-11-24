@@ -243,14 +243,14 @@ def unrowxor_masks(raw):
     return p.tobytes()
 
 
-def ragged_depth(raw):
+def ragged_depth(raw, row_bytes=40):
     """The depth/mask planes of a 6-plane view as a chapter view's depth stream, unpacked by
     fft.c depth_rows(): a 4-byte record per scene row (u16 0, filled with the row's offset by
     the decoder; u8 x0, u8 w: the even byte span holding the row's mask bits), then each of the
     four planes as its rows' spans one after the other, every mask byte XORed with the byte
     above where both rows' spans cover it (~6 KB less than XORed full rows after ZX0). Bytes
     outside the span are never read (their masks are zero): about half of a full view's RAM."""
-    p = np.frombuffer(raw, np.uint8).reshape(6, -1, 40)[2:]
+    p = np.frombuffer(raw, np.uint8).reshape(6, -1, row_bytes)[2:]
     spans = []
     for y in range(p.shape[1]):
         nz = np.nonzero(p[1, y] | p[3, y])[0]
@@ -269,9 +269,9 @@ def ragged_depth(raw):
     return b''.join(bytes((0, 0, x0, w)) for x0, w in spans) + b''.join(out)
 
 
-def unragged_depth(stream, rows):
+def unragged_depth(stream, rows, row_bytes=40):
     """ragged_depth() back to four full planes (zero outside each row's span)."""
-    p = np.zeros((4, rows, 40), np.uint8)
+    p = np.zeros((4, rows, row_bytes), np.uint8)
     spans = [(stream[4 * y + 2], stream[4 * y + 3]) for y in range(rows)]
     plane = sum(w for _, w in spans)
     assert len(stream) == 4 * rows + 4 * plane, 'ragged depth stream size'
@@ -288,14 +288,15 @@ def unragged_depth(stream, rows):
     return p.tobytes()
 
 
-def view_bank(tag, colours, stroke, depth):
-    """R4: raw immutable colours/mask, compressed ragged depth. Legacy callers
+def view_bank(tag, colours, stroke, depth, row_bytes=40):
+    """R4(40-byte rows)/R5(44): raw colors/mask, compressed ragged depth. Legacy callers
     supply R2/R3 ZX0 colour streams; normalize them before serialization."""
     if tag in (b'R2', b'R3'):
         colours = unzx0(colours)
         stroke = unzx0(stroke) if stroke else b''
-    assert len(colours) % 80 == 0 and (not stroke or 2*len(stroke) == len(colours))
-    return (b'R4' + len(colours).to_bytes(2, 'big') + len(stroke).to_bytes(2, 'big')
+    assert row_bytes in (40,44)
+    assert len(colours) % (2*row_bytes) == 0 and (not stroke or 2*len(stroke) == len(colours))
+    return ((b'R5' if row_bytes==44 else b'R4') + len(colours).to_bytes(2, 'big') + len(stroke).to_bytes(2, 'big')
             + len(depth).to_bytes(2, 'big') + colours + stroke + zx0pack.pack(depth))
 
 
@@ -313,7 +314,7 @@ def archive_view(bank):
     if bank[-10:-6] in (b'FC01',b'FC02'):
         original,offset,count=struct.unpack('>3H',bank[-6:])
         tail=bank[offset:offset+count];bank=bank[:original]
-    if bank[:2] == b'R4':
+    if bank[:2] in (b'R4',b'R5'):
         out=bank
     else:
         assert bank[:2] in (b'R2',b'R3'), 'not a ragged view'
@@ -338,17 +339,32 @@ def unzx0(stream):
         return open(dst, 'rb').read()
 
 
-def read_view(bank):
+def read_view(bank, row_bytes=None):
     """A chapter view bank -> (tag, colours, mask, four full depth/mask planes).
     Colours/mask are raw for R4 and ZX0 streams for legacy R2/R3. Ignore the contour tail."""
     if bank[-10:-6] in (b'FC01', b'FC02'):
         bank = bank[:int.from_bytes(bank[-6:-4], 'big')]
-    assert bank[:2] in (b'R2', b'R3', b'R4'), 'not a ragged chapter view'
+    assert bank[:2] in (b'R2', b'R3', b'R4', b'R5'), 'not a ragged chapter view'
     a, b, n = (int.from_bytes(bank[i:i + 2], 'big') for i in (2, 4, 6))
+    if row_bytes is None:row_bytes=44 if bank[:2]==b'R5' else 40
     depth = unzx0(bank[8 + a + b:])
     assert len(depth) == n, 'depth size field'
-    rows = (a if bank[:2]==b'R4' else len(unzx0(bank[8:8 + a]))) // 80
-    return bank[:2], bank[8:8 + a], bank[8 + a:8 + a + b], unragged_depth(depth, rows)
+    rows = (a if bank[:2] in (b'R4',b'R5') else len(unzx0(bank[8:8 + a]))) // (2 * row_bytes)
+    return bank[:2], bank[8:8 + a], bank[8 + a:8 + a + b], unragged_depth(depth, rows, row_bytes)
+
+
+def view_info(bank, max_rows=202, color_max=16544, depth_max=18488):
+    """Cold packaging counterpart of core_view_rows; no decompression required."""
+    if len(bank)<9 or bank[:2] not in (b'R4',b'R5'):
+        raise ValueError('R4/R5 archive colors required')
+    colors,mask,depth=struct.unpack_from('>3H',bank,2)
+    stride=44 if bank[:2]==b'R5' else 40
+    rows,remainder=divmod(colors,2*stride)
+    if (not rows or rows>max_rows or remainder or colors>color_max or
+        (mask and mask!=colors//2) or depth<4*rows or depth>depth_max or depth&3 or
+        8+colors+mask>=len(bank)):
+        raise ValueError('View exceeds color/row/depth bounds or is truncated')
+    return dict(rows=rows,row_bytes=stride,color_bytes=colors,depth_bytes=depth)
 
 
 def main():
