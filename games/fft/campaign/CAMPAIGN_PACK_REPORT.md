@@ -341,7 +341,7 @@ Content phase must be distinct from original chapter: II-A/II-B share ChapterII 
 
 ## 7. Remaining gates and next work
 
-1. Author PackI's actual map, scene and pose inventory first: it is the only pack without slack. If the authored figures land above its low forecast, split it. Extract scene camera/pose references defaulting to one orientation, keeping every required story gesture and source staging; do not use this report to certify unreviewed cropping or a generic head-swap appearance.
+1. **Done for storage** ([PACK1_INVENTORY.md](PACK1_INVENTORY.md)): PackI's eleven maps and nine rooms measured from the disc total1,894,549 bytes with today's core,530,205 inside the budget, so PackI stays whole and needs no split. Two depth overruns remain (Sweegy19,304, Slums in Dorter18,776 against 18,488). Still extract scene camera/pose references defaulting to one orientation, keeping every required story gesture and source staging; do not use this report to certify unreviewed cropping or a generic head-swap appearance.
 2. Keep one canonical body per person. Reopening any costume variant needs a new measurement and a user decision, not this report's freed margin.
 3. Keep complete battle sprites. A future secondary-body or scene-only parts prototype needs a visual verdict if it changes pixels, and whole-frame/stack gates if integrated. Microbenchmarks are not those gates.
 4. Author remaining battle/scene maps using approved C2 treatment, full geometry and source handedness. Current320/352px/row/depth ceilings are planning constraints, not proof of future full-map fit. Finath and BookStorage5 still need envelope work; the old Sweegy depth excess remains a ChapterI gate.
