@@ -189,12 +189,30 @@ the prop's own tile.
 ### Classifying a map automatically
 
 `depth_budget.py` sorts every map into fits / cosmetic / structural on its own.
-The signal is FFT's own terrain flag, not geometry analysis: a decorative prop is
-a tile that may be **crossed but never stopped on** (`flags & 0x02`), and that tile
-carries the PROP's height rather than the ground's. Sweegy's four trees are tiles
-of height 17-18 standing over ground near 4; Slums in Dorter has no such tile at
-all. Read both terrain levels, remove every polygon over a prop tile, re-measure:
-clearing the cap means cosmetic, still over means structural.
+It starts from FFT's own terrain flag, not geometry analysis: the tile a unit may
+**cross but never stop on** (`flags & 0x02`) carries the standing geometry's height
+rather than the ground's. Sweegy's four trees are tiles of height 17-18 standing
+over ground near 4; Slums in Dorter has no such tile at all.
+
+**That flag alone is not enough, and taking it for "decoration" was wrong.** It
+says *you cannot stop here*, and you cannot stop on a wall either, so a cathedral
+wall carries it exactly like a tree. Two further conditions make a prop:
+
+- **it rises.** Its height must exceed every ordinary neighbour's standable top. A
+  flagged tile level with the ground carries nothing; Araguay flags two such tiles
+  beside a trunk.
+- **it stands alone.** Among the rising flagged tiles, its 4-connected component is
+  one tile. A prop occupies a tile; a wall is a *run* of them. Chapel of Orbonne's
+  47 flagged tiles are 46 in a single run — the perimeter — plus one; Sweegy's five
+  are five components of one.
+
+A third fault sat underneath both: **a tile with no second terrain level carries
+eight zero bytes**, and reading that as an ordinary tile of height 0 collapsed the
+ground under everything. Map 3 has 117 absent level-1 entries of 117, Chapel of
+Orbonne 116 of 140. Skip an all-zero entry.
+
+Then remove every polygon over a prop tile and re-measure: clearing the cap means
+cosmetic, still over means structural.
 
 Chapter I classifies 9 fits, 1 cosmetic (Sweegy, 5 prop tiles, 258 polygons,
 21,640 -> 15,288) and 1 structural (Slums in Dorter, no prop tile), matching every
@@ -209,21 +227,24 @@ and nowhere else, so nothing but the side quest reaches them. **Zarghidas Trade
 City is not among them** although Cloud's battle is listed as optional, because
 the same area also takes random battles. Pass `--include-optional` to count them.
 
-Of the **94 that remain: 63 fit, 8 cosmetic, 23 structural, none unreadable.**
+Of the **94 that remain: 63 fit, 3 cosmetic, 28 structural, none unreadable.**
 Every over-budget map has a workable remedy, which is the point of the census:
 
-- the 8 cosmetic all fit once their props are gone, from +184 spare (END) to
-  +5,520 (Chapel of Orbonne) -- but see below: that verdict is arithmetic, and
-  the picture refuses it on six of the eight;
-- the 23 structural all keep at least 69% of their rows, the worst being Public
-  Cemetery at 159 of 228. None is unsalvageable.
+- the 3 cosmetic — St. Murond Temple (50), Sweegy Woods (74), Araguay Woods (80) —
+  fit once their props are gone;
+- the 28 structural need an authored crop, and all keep at least 69% of their
+  rows, the worst being Public Cemetery at 159 of 228. None is unsalvageable.
+
+These counts are the **corrected** ones. A first pass read 8 cosmetic and 23
+structural, because the prop rule took walls for decoration; the section below
+has the three faults and the pictures that found them.
 
 One caution. The fitting group is **not** comfortable: Orbonne Monastery fits by
 **8 bytes**, Beoulve residence and Poeskas Lake by 16, and 15 maps sit under 1 KB
 of margin, which is expected since `FFT_CORE_DEPTH_MAX` was derived from Orbonne
 in the first place.
 
-### The cosmetic verdict is arithmetic, not visual
+### Reviewing the prop removal by eye, and the three faults it found
 
 `tools/cosmetic_prop_review.py` renders each cosmetic map's dearest view three
 times side by side -- the source in its own colours, the same with every prop
@@ -232,40 +253,35 @@ by eye. Colour comes from the proven rasterizer run once per RGB555 field, never
 a second renderer; the tinted pixels are exactly where the two depth buffers
 differ, so a prop hidden behind geometry is not counted as a loss.
 
-Reviewed 2026-11-25, the eight:
+**The first run was a demolition**, and that is how the three faults above were
+found. Chapel of Orbonne lost its walls, pillars and stained glass -- 73.6% of
+the scene, leaving a floating slab; Roof of Riovanes lost the tower that is the
+map's subject; the Book Storage lost its back wall. Run the review before
+trusting any arithmetic verdict about geometry.
 
-| map | name | prop polys | lost px | share | verdict |
-|----:|------|-----------:|--------:|------:|---------|
-|  74 | Sweegy Woods | 258 | 6,543 | 22.1% | **tolerable** -- the five trees, terrain untouched |
-|  80 | Araguay Woods | 468 | 7,494 | 24.1% | **tolerable** -- the five trunks, terrain untouched |
-|  50 | St. Murond Temple | 195 | 5,339 | 16.7% | refused -- both bell towers and the spire, the roof opens |
-|  58 | Underground Book Storage 2 | 333 | 10,052 | 26.7% | refused -- the shelves *and* the whole back wall |
-|  51 | St. Murond Temple | 355 | 10,592 | 31.2% | refused -- the back and side walls, the room loses its box |
-|   5 | Roof of Riovanes Castle | 305 | 11,049 | 34.3% | refused -- the tower, which is the map's subject |
-|   3 | Hall of St. Murond Temple | 508 | 15,646 | 46.7% | refused -- the near walls and a whole block |
-|  62 | Chapel of Orbonne Monastery | 964 | 29,803 | 73.6% | refused -- demolition: walls, pillars, stained glass; a floating slab remains |
+With the rule corrected (rises, stands alone, no phantom level), 2026-11-25:
 
-**Why.** FFT's prop flag is walk 2, *crossed but never stopped on*, and a wall's
-footprint tile is exactly that: you cannot stop on a wall either. The rule cannot
-tell a tree on a walkable-through tile from a cathedral wall on an impassable one.
-It holds outdoors, where the flag really does mean decoration, and collapses
-indoors, where it means architecture.
+| map | name | props | removed | lost px | share | verdict |
+|----:|------|------:|--------:|--------:|------:|---------|
+|  74 | Sweegy Woods | 5 | 252 | 6,122 | 20.6% | the five trees, terrain untouched |
+|  80 | Araguay Woods | 5 | 452 | 6,334 | 20.3% | the five trunks, terrain untouched |
+|  50 | St. Murond Temple | 4 | 130 | 3,878 | 12.1% | **the judgement call**: both bell towers and the spire, and a hole opens in the roof |
+|  51 | St. Murond Temple | 6 | 189 | 3,311 | 9.8% | now structural — the removal no longer clears the cap |
+|   3 | Hall of St. Murond | 2 | 118 | 242 | 0.7% | now structural |
+|   5 | Roof of Riovanes | 1 | 38 | 947 | 2.9% | now structural |
+|  58 | Underground Book Storage 2 | 0 | 0 | 0 | 0% | now structural — it has no prop at all |
+|  62 | Chapel of Orbonne | 0 | 0 | 0 | 0% | now structural — it has no prop at all |
 
-**So the cosmetic group is not a free win.** Six of the eight join the structural
-group and need an authored crop like the other 23; the two woods lose the thing
-they are named for, which is a call to make per map, not a default. The honest
-reading of the census is **63 fit and 31 maps needing authored work**.
+Only **three** maps are still cosmetic. Two lose their trees, which is the thing
+they are named for; St. Murond's "props" are isolated single-tile *towers*,
+geometrically indistinguishable from a tree and visually not one. Each is a call
+to make per map, not a default.
 
-Two further cautions for whoever takes the woods:
-
-- removing a prop can leave a **white hole in the floor**. On Sweegy and Araguay
-  the tile under a trunk has no ground polygon of its own -- the prop's own base
-  drew it -- so the floor opens where the trunk stood. `prop_polygons()` already
-  keeps everything below the lowest standable neighbour; the hole is in the
-  source, not in the rule.
-- there is no "keep it drawn, drop it from the depth" middle road. The stream's
-  span term is measured on the **rendered view**, not on the depth, so a prop
-  still in the picture still costs its bytes.
+One caution for whoever takes them: removing a prop can leave a **white hole in
+the floor**, because the tile under a trunk has no ground polygon of its own --
+the prop's own base drew it. And there is no "keep it drawn, drop it from the
+depth" middle road: the stream's span term is measured on the **rendered view**,
+not on the depth, so a prop still in the picture still costs its bytes.
 
 ### One mesh, several records (map 53)
 
