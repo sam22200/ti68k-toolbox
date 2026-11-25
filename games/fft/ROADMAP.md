@@ -561,13 +561,25 @@ The native supervisor's heap-lifetime check is documented separately in
   65518 - 64936 = **582 bytes**. That is enough for both features, with 459 to
   spare instead of today's 335, but it is a one-off and the wall behind it is the
   platform's.
-- [ ] Resident room beyond that has to come from splitting code, since the two
-  usual levers are spent. Data: 117 bytes of small tables are all that is left in
-  `fft.c`. Modules: `MOD_ZONE` is 8932 and equals the largest of the 28 images, but
-  the ten largest sit between 8116 and 8932, so splitting the biggest buys 34
-  bytes. The zone is a tunable, though: re-split the ten largest images in half and
-  it falls to about 4.5 KB, which is about **4.4 KB of resident room**, paid for in
-  extra module swapping during play. That is the lever that keeps giving.
+- [x] **The module zone is not the lever, and re-splitting the images would free no
+  resident room at all.** `mod_zone` is a `malloc(MOD_ZONE)`, so the zone costs RAM,
+  not program: built with `MOD_ZONE` cut from 8932 to 4000 the battle executable is
+  64601 bytes either way, byte for byte. An earlier note here said the opposite.
+- [ ] The lever is moving more *code* out of the core, which frees its bytes one
+  for one and leaves the zone alone. Resident map of the battle build (214
+  functions, 61976 bytes of `.text`): `game_render` 7038 and `update` 5680 are the
+  frame loop and cannot move; `magic_hit` 2102, `magic_heal` 1940, `charge_query`
+  980, `weapon_amount` 878 and `knockback` 876 are shared formulas the modules call
+  back into through `ModCtx`, so they are resident by design. **`game_scenario` is
+  1992 bytes and runs once per battle** - the clearest candidate, sixteen times what
+  the two features need. Behind it, `ensure_scene` 1398, `ring_into_scene` 828 and
+  `copy_view` 464 run only when the camera changes.
+- [x] Swapping measured (`experiments/heapbig/modcopy.c`, ti-cycles): a load is the
+  `memcpy` of the image into the zone at about **6 cycles a byte**, so the largest
+  image costs about **54k cycles, a sixth of one 30 fps frame**, once; all 28 loaded
+  once over a battle is 1.5M cycles. ti-cycles estimates AMS ROM calls rather than
+  emulating them and sees flat memory where the real copy reads Flash, so treat it
+  as a floor. Either way a one-shot module loaded at battle start is free.
 - [ ] The CATALOG switch that turns the pictograms off. A new `State` field would move
   the ABI, so it needs a spare bit or another mechanism.
 - [ ] Decide where the art lives for a chapter package: `status_art.h` (about 1.1 KB)
