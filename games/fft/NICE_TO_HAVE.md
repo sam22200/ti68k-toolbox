@@ -64,28 +64,31 @@ plays every battle, it reuses the ability-learning path we already have, and it
 is a *menu* rather than an engine change. Recommend taking it before anything
 else here.
 
-## 3. Equip Change (Reequip) in battle
+## 3. Equip Change (Reequip) in battle -- RESOLVED, it was already there
 
-The Chemist's support ability that lets a unit change equipment during a fight.
-It consumes the unit's action for the turn — move, then re-equip, but no attack.
-Useful to replace a broken or stolen weapon, swap an accessory against a status,
-match an elemental weakness, or put on Excalibur mid-fight for Auto-Haste. An
-item that grants an *initial* status, such as the Angel Ring's Reraise, does
-**not** trigger it when equipped during battle.
+**This entry was wrong and is kept as a warning about how.** The first audit
+grepped for `EQUIP_CHANGE`, found only the chapter descriptor's `EQUIP_CHANGE_ID
+0x1E0` and `EQUIP_CHANGE_POS 19`, and concluded there was no in-battle command.
+There is. The turn menu adds its row from the support ability's **source id**:
 
-**Partly there.** The ability's identity is carried by the chapter descriptor
-(`EQUIP_CHANGE_ID 0x1E0`, `EQUIP_CHANGE_POS 19`) so a unit can learn it and the
-save records it. What does not exist is the **in-battle command**: no menu entry,
-no action that spends the turn, no equipment screen reachable from a battle.
+```c
+u8 m = (u8)(2 + st.unit[st.act].defend + cj_support(common,job,st.support[st.act],480));
+...
+else if(st.sub==2+st.unit[st.act].defend){equipment_control(1);}
+```
 
-**Cost**: the battle would need the management equipment screen, or a reduced
-version of it, callable from the turn menu — the shared `unit_sheet.inc` plate
-makes that cheaper than it sounds — plus the rule that it consumes the action and
-the exception on initial-status items.
+and 480 is 0x1E0. Searching for the constant's *name* missed the one place that
+uses its *value*.
 
-**Worth it?** The original's own community rates it poorly, because it occupies
-the single Support slot. Low priority, but cheap enough to be worth it if the
-battle ever gains an equipment screen for another reason.
+It is complete, too. `equipment_runtime.inc` gates it on `who==st.act &&
+!st.acted`, so it cannot follow an action, and ends with
+`equipment_rebuild(who); st.acted=1; st.mode=M_MENU; st.menu=st.moved?MN_WAIT:MN_MOVE;`
+-- it spends the turn's action and leaves movement alone, which is the source's
+rule. The exception for items granting an initial status (the Angel Ring's
+Reraise) holds by construction: `equipment_rebuild()` recomputes stats and
+clamps HP and MP without re-seeding statuses.
+
+**Lesson for the next audit in this file: grep the value as well as the name.**
 
 ## 4. Optimum Equipment's per-slot ordering
 
