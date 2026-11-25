@@ -29,9 +29,18 @@ HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE / 'tools'))
 import core_audit   # noqa: E402
 import extract      # noqa: E402
+import units        # noqa: E402
 
 GREY = [216, 152, 88, 24]           # the project's software-capture palette
 BG = 1
+
+
+# OTHER.SPR is the one sheet with 512 colours, not 256: thirty-two palettes of
+# sixteen, five for each of the chicken, the frog, the chest and the crystal. Its
+# pixels therefore start at 0x400, not at the 0x200 every unit sheet uses. Read it
+# at 0x200 and the whole sheet slides up four rows: the creatures lose their feet
+# and gain two rows of palette bytes read as pixels.
+SHEET_BASE = 0x400
 
 
 def sheet(disc, files):
@@ -39,7 +48,7 @@ def sheet(disc, files):
     raw = disc.read(*files['BATTLE/OTHER.SPR'])
     pal = np.array(struct.unpack_from('<256H', raw, 0)).reshape(16, 16)
     lum = ((pal & 31) * 8 * .299 + (pal >> 5 & 31) * 8 * .587 + (pal >> 10 & 31) * 8 * .114)
-    a = np.frombuffer(raw[512:], np.uint8)
+    a = np.frombuffer(raw[SHEET_BASE:], np.uint8)
     px = np.empty(len(a) * 2, np.uint8)
     px[0::2] = a & 15
     px[1::2] = a >> 4
@@ -55,7 +64,7 @@ def assemble(spr, tiles):
     looks for hair, a face, eyes and skin, which a chicken does not have. Only the
     tile compositing is shared, and the treatment below is the generic one.
     """
-    px = np.frombuffer(spr[512:512 + 128 * 256], np.uint8).reshape(256, 128)
+    px = np.frombuffer(spr[SHEET_BASE:SHEET_BASE + 128 * 256], np.uint8).reshape(256, 128)
     sheet = np.empty((256, 256), np.uint8)
     sheet[:, 0::2] = px & 15
     sheet[:, 1::2] = px >> 4
@@ -197,10 +206,19 @@ def frame_bytes(img, a):
     return bytes(out)
 
 
-# One shape table serves both creatures: the sheet-Y offset picks which. The
-# sheet's drawn row bands fall exactly on 0, 24, 48 and 72, and rendering the
-# same fourteen frames at each offset gives chicken, chicken again, frog, frog
-# again. The engine only needs the first strip of each.
+# One shape table serves every object on the sheet: the sheet-Y offset picks
+# which. The sheet is a grid of slot by drawing mode. The slot is the object,
+# y = 0 chicken, y = 48 frog, y = 96 crystal, and the chest at x = 224 takes the
+# first two slots for its two sides (frames 15 and 16 name y = 0 and y = 48
+# themselves). The mode is a further +24, and it is never named by OTHER.SHP, so
+# the engine applies it: the +24 drawing is the same object with its vertical
+# extent gone - the chest keeps its lid and its base outline and loses the eight
+# rows of wall between them, the creatures lose the legs that reach down. That is
+# the game's second, higher camera pitch, which the PS1 cannot produce by scaling
+# because a sprite quad takes the camera's X and Z zoom but not its Y. The
+# crystal, a floating diamond with no vertical face and no ground contact, is the
+# one object with no +24 twin. Our camera has a single pitch, so we rip the +0
+# drawings.
 SHEET_Y = {'chicken': 0, 'frog': 48}
 # Facing is NOT the strip: OTHER.SEQ pairs every sequence with a copy five frames
 # later (1 2 3 against 6 7 8, over and over), and rendering 1-5 beside 6-10 shows
@@ -251,11 +269,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out', type=Path, default=HERE / 'campaign/x/status-picto/others.png')
     ap.add_argument('--scale', type=int, default=7)
+    ap.add_argument('--header', type=Path,
+                    help='write the engine header there instead of the preview')
     args = ap.parse_args()
     disc, files = extract.disc_files(str(core_audit.DEFAULT_DISC))
+    if args.header:
+        raw = disc.read(*files['BATTLE/OTHER.SPR'])
+        pal = np.array(struct.unpack_from('<256H', raw, 0)).reshape(16, 16)
+        plum = ((pal & 31) * 8 * .299 + (pal >> 5 & 31) * 8 * .587
+                + (pal >> 10 & 31) * 8 * .114)[0]
+        header(args.header, raw, units.shp_frames(disc.read(*files['BATTLE/OTHER.SHP'])), plum)
+        return
     lum, opaque = sheet(disc, files)
-    chick = frames(opaque, 10, 34)
-    frog = frames(opaque, 58, 84)
+    chick = frames(opaque, 6, 30)
+    frog = frames(opaque, 54, 78)
     print('chicken frames', len(chick), 'frog frames', len(frog))
     if len(chick) < 4 or len(frog) < 4:
         raise SystemExit('frame bands did not split; adjust the row ranges')
