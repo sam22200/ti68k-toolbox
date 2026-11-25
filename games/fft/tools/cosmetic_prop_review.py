@@ -14,7 +14,7 @@ masked to that field (map_color_reference.py's technique), never a second render
 The prop pixels are exactly where the two depth buffers differ, so a prop hidden
 behind geometry is not claimed as a loss.
 
-usage: cosmetic_prop_review.py [MAP...] [--budget J] [--out campaign/x/cosmetic-props]
+usage: cosmetic_prop_review.py [MAP...] [--minimal|--shrink S|--skirt] [--out DIR]
 """
 import argparse
 import json
@@ -84,7 +84,7 @@ def shrink_props(polys, tops, props, nx, nz, scale):
     return out
 
 
-def review(disc, files, m, name, rot, out, minimal=False, scale=None):
+def review(disc, files, m, name, rot, out, minimal=False, scale=None, skirt=False):
     mesh, nx, nz, maxh = map_budget.load(disc, files, m)
     tex, pal = depth_budget.texture_palette(disc, files, m, mesh)
     polys = extract.polygons(mesh)
@@ -93,7 +93,12 @@ def review(disc, files, m, name, rot, out, minimal=False, scale=None):
         sc = 6 * (nx + nz) + 6 * maxh + 8
         keep, _ = depth_budget.minimal_props(polys, tops, props, tex, pal, nx, nz, sc)
         props = keep or props
-    dec = set(extract.prop_polygons(polys, tops, props, nx, nz))
+    if skirt:
+        # The map's own underside: FFT leaves it untextured, and the engine draws
+        # an untextured polygon black. The original's camera never shows it.
+        dec = {i for i, q in enumerate(polys) if q[1] is None}
+    else:
+        dec = set(extract.prop_polygons(polys, tops, props, nx, nz))
     bare = (shrink_props(polys, tops, props, nx, nz, scale) if scale
             else [q for i, q in enumerate(polys) if i not in dec])
     sc_h = 6 * (nx + nz) + 6 * maxh + 8
@@ -113,8 +118,11 @@ def review(disc, files, m, name, rot, out, minimal=False, scale=None):
                          '%d of %d props, %d polygons, %d px'
                          % (len(props), len(extract.terrain(mesh, nx, nz)[2]),
                             len(dec), int(lost.sum())) if minimal else
+                         '%d untextured polygons, %d px' % (len(dec), int(lost.sum()))
+                         if skirt else
                          '%d prop polygons, %d px' % (len(dec), int(lost.sum())),
-                         'every prop at %d%%' % (100 * scale) if scale else 'without them'])
+                         'every prop at %d%%' % (100 * scale) if scale else
+                         'without the underside' if skirt else 'without them'])
     path = out / ('map-%03d-%s.png' % (m, name.lower().replace(' ', '-').replace(',', '')[:28]))
     img.save(path)
     return dict(map=m, name=name, view=rot, prop_tiles=len(props), prop_polygons=len(dec),
@@ -131,6 +139,8 @@ def main():
     ap.add_argument('--out', type=Path, default=HERE / 'campaign/x/cosmetic-props')
     ap.add_argument('--minimal', action='store_true',
                     help='remove only the fewest props that clear the cap')
+    ap.add_argument('--skirt', action='store_true',
+                    help="review the map's own untextured underside instead of its props")
     ap.add_argument('--shrink', type=float, metavar='S',
                     help='keep every prop, scaled to S (0.6 = 60%%), instead of removing it')
     args = ap.parse_args()
@@ -142,7 +152,7 @@ def main():
     for m in args.maps:
         e = budget['maps'][str(m)]
         r = review(disc, files, m, e['name'], e.get('dearest_view', 0), args.out,
-                   minimal=args.minimal, scale=args.shrink)
+                   minimal=args.minimal, scale=args.shrink, skirt=args.skirt)
         report.append(r)
         print('map %3d %-30s view %d  %4d prop polygons  %6d px (%.1f%% of the scene)  %s'
               % (m, r['name'][:30], r['view'], r['prop_polygons'], r['lost_pixels'],

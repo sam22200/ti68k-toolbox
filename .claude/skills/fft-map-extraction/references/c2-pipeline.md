@@ -409,6 +409,41 @@ framing rather than visibility". Chapel of Orbonne and map 51 are the two scenes
 to try it on. Do not fold this into the classifier before the extractor has shown
 it on several maps.
 
+### The map's own underside is the biggest saving of all
+
+FFT leaves the skirt under a map's terrain **untextured**, and `extract.polygons()`
+draws an untextured polygon black. On the PS1 the camera never shows it. With four
+orientations we do: on Zirekile Falls, views 0 and 1 look at the cliff from the low
+side and the black skirt fills the screen, 13,410 pixels of it, with the waterfall
+and its bridge a sliver at the top. It was read as a broken extraction; it is the
+geometry.
+
+Dropping every untextured polygon, measured 2026-11-25:
+
+| map | before | after | |
+|----:|-------:|------:|---|
+|  87 Bariaus Valley | 22,776 (+4,288) | **15,904** | 2,584 spare |
+|  83 Zirekile Falls | 19,688 (+1,200) | **13,712** | 4,776 spare |
+|  12 Gate of Lionel | 19,952 (+1,464) | **15,704** | 2,784 spare |
+|  32 Slums in Dorter | 21,152 (+2,664) | 18,896 | still +408 |
+|  22 Gariland (fits already) | 18,304 | 16,168 | 2,136 freed |
+
+**20 of the 27 structural maps fit once the underside goes**, with no crop at all:
+no head clipped, no ground lost, every row kept. Seven remain, and four of those
+are small: North Wall of Bethla +32, Finath River +200, Slums in Dorter +408,
+Weapon storage of Yardow +536. Then Inside of Limberry +1,056, Chapel of Orbonne
++2,488, Public Cemetery +3,344.
+
+It also helps the *second* constraint, which the depth budget does not measure: a
+large black mass on a 160x100 four-grey LCD is dead weight, and the maps read
+better without it. The playable surface is untouched in every case.
+
+What it changes is the map's silhouette: it no longer sits on a solid block, it
+is cut out against the background. That is a real art decision and it applies to
+every map including the ones that already fit, so it belongs in the same place
+the prop drops do -- reviewed on the picture, then recorded as data.
+`cosmetic_prop_review.py --skirt` renders it.
+
 ### What a crop costs a unit, calibrated on Gariland
 
 A structural map can only give up scene rows, and the two ends are **not**
