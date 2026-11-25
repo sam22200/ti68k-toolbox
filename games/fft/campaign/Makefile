@@ -339,9 +339,14 @@ packages-routing-check: packages
 	$(PY) check_package_routing.py --input $(PACKAGE_OUTPUT)/source.89g --out $(PACKAGE_OUTPUT)/routing
 
 .PHONY: contour-assets
+# The tail is shared: ffov0 must match ffcu's, so the opening's copy is attached
+# with ours. Without it a change to contour.h leaves the opening banks on the old
+# size, archive_art_tail rejects them, and the scene player loads nothing at all -
+# which surfaces as a null scene set rather than as a missing picture.
 contour-assets:
 	$(PY) ../tools/view_split.py campaign
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
+	$(MAKE) -C ../opening contour-assets
 # Ripped artwork, generated like units.h and never committed. Every chapter build
 # needs it, because fft.h includes it for FFT_BATTLE.
 ../creature_art.h: ../tools/other_actors.py
