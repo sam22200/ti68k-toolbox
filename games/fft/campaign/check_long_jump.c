@@ -40,6 +40,21 @@ static void trials(void)
     }
     {u8 columns[8]={0},masks[3]={255,255,255};long_jump_masks(columns,1,1,0,0,0,4,7,0,masks);
      equal(masks[0]|masks[1]|masks[2],0);}
+    // The link byte movement_edges.inc packs for a jump of j intervening cells.
+    // j rides in bit 0 as "this link crosses something" and the cells beyond the
+    // first in bits 3-4, which tactical_search.inc already adds to the cost. The
+    // risk is a collision: bit 1 is water, bit 2 "presence is explicit".
+    {
+        u8 j,water;
+        for(water=0;water<=2;water+=2)for(j=0;j<4;j++) {
+            u8 kind=(u8)((j?1:0)|water|((j>1?j-1:0)<<3));
+            equal(kind&1,j?1:0);              // crossing, for any distance
+            equal(kind&2,water);              // water survives every j
+            equal((kind>>3)&3,j>1?j-1:0);     // the extra cost the search charges
+            equal(kind&4,0);                  // set later, only for j>1
+            equal(kind&0xA0,0);               // nothing strays into 5 or 7
+        }
+    }
 }
 void game_init(void){}
 void game_scenario(u16 n){(void)n;}

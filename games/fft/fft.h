@@ -391,6 +391,7 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 enum { M_BROWSE, M_TARGET, M_WALK, M_MENU, M_FACE, M_STATUS, M_AIM, M_ACT, M_ACTS, M_SKILLS, M_PICK, M_END,
        M_ORDER, M_QUIT, M_AUTO, M_CAST_RANGE, M_AREA, M_CLOCK, M_EQUIP };
 enum { CT_DUE = 254, CT_WAIT = 255 }; // clock results, never unit indices
+#define PICK_TAUGHT 253   // st.pick: a crystal that also taught its abilities (loot.inc)
 enum { END_NONE, END_VICTORY, END_DEFEAT };
 // an AI unit's turn (st.ai): thinking (a few frames), its move range shown, its target shown,
 // its facing shown; between them the walk and the act run as a player's (M_WALK, M_ACT)

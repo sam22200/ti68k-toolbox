@@ -52,7 +52,9 @@ u8 forecast_text(u8 a, u8 t, AbId ab, char *s)
 #ifdef FFT_CHAPTER
             effect_damage(kind);
 #else
-            !b || b->effect_damage(kind);
+            1;    // the demo forecasts an attack, which always damages; the arm
+                  // that used to stand here read a member Ability does not have
+                  // and a `kind` out of scope, so it had never compiled
 #endif
         u16 v = b ? skill_amount(a,t,ab,(b->flags&AF_CHARGE)?FORMULA_FORECAST:0) : attack_prediction(a,t);
 #ifdef FFT_CHAPTER

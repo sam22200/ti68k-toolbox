@@ -164,6 +164,31 @@ int main(void)
     check_permanent_stats();
     check_away_compaction();
     remove("ffsave.sav");
+    // A crystal teaches EVERY ability it lists, not only the one picked, and only
+    // for a skill set the taker has held: a set it never unlocked is the job FFT
+    // refuses to teach from. It restores HP and MP either way (loot.inc).
+    {
+        Unit *a,*b;LearnBits had;u8 set0;
+        sw_init(61);assert(sw_step(0));
+        a=&st.unit[U_RAMZA];b=&st.unit[1];
+        set0=a->set;
+        b->hp=0;b->dc=DC_CRYSTAL;b->set=set0;b->learned=(LearnBits)~a->learned;
+        had=a->learned;a->hp=1;a->mp=0;
+        pick_up(U_RAMZA,1);
+        assert(st.pick==PICK_TAUGHT);
+        assert(a->learned==(LearnBits)(had|(LearnBits)~had));   // all of them at once
+        assert(a->hp==a->max_hp&&a->mp==a->max_mp);
+        b->hp=0;b->dc=DC_CRYSTAL;b->set=(u8)(set0+1);           // a set never held
+        b->learned=(LearnBits)~a->learned;had=a->learned;a->hp=1;
+        pick_up(U_RAMZA,1);
+        assert(st.pick==0xFF&&a->learned==had&&a->hp==a->max_hp);
+        // "only humans can transfer abilities via crystal" (guide [6.1])
+        b->hp=0;b->dc=DC_CRYSTAL;b->set=set0;b->job=94;          // the first monster job
+        b->learned=(LearnBits)~a->learned;had=a->learned;a->hp=1;
+        pick_up(U_RAMZA,1);
+        assert(st.pick==0xFF&&a->learned==had&&a->hp==a->max_hp);
+    }
+    remove("ffsave.sav");
     sw_init(61);assert(sw_step(0));
     st.unit[1].hp=0;st.unit[1].dc=DC_CHEST;
     pick_up(U_RAMZA,1);id=items[st.pick].id;assert(st.nfound==1);
@@ -206,6 +231,6 @@ int main(void)
          assert(s2.n==s1.n&&s2.unit[0].level==s1.unit[0].level+1&&!memcmp(s2.unit[1].jp,s1.unit[1].jp,sizeof s1.unit[1].jp));}
     }
     remove("ffsave.sav");
-    puts("Gariland: KO counters 3..0 survive both save paths; crystals/chests/gone leave; undeployed records and stats survive");
+    puts("Gariland: KO counters 3..0 survive both save paths; crystals teach their abilities;\n          crystals/chests/gone leave; undeployed records and stats survive");
     return 0;
 }

@@ -54,7 +54,12 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
             u->team==TEAM_PLAYER
 #endif
         ) {
-            s[n++] = ' '; n = put_n(s, n, ab>=512?battle_save.inv[abilities[ab].bag]:st.bag[abilities[ab].bag]);
+            s[n++] = ' ';
+#ifdef FFT_CHAPTER
+            n = put_n(s, n, ab>=512?battle_save.inv[abilities[ab].bag]:st.bag[abilities[ab].bag]);
+#else
+            n = put_n(s, n, st.bag[abilities[ab].bag]);
+#endif
         }
         if (abilities[ab].kind!=AB_MATH_SELECTOR&&!can_use(W->win_k[2], ab)) c = C_DGRAY;
     } else if (m == M_ACT) {
@@ -67,7 +72,8 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
         }else if(st.pick==254&&(u16)(st.abil-493)<4U){n=put_s(s,0,st.abil==493?"HP+":st.abil==494?"MP+":st.abil==495?"EXP+":"JP+");n=put_n(s,n,st.dmg);}
         else
 #endif
-        if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");
+        if (st.pick == PICK_TAUGHT) n = put_s(s, 0, "HP MP full, learned");
+        else if (st.pick == 0xFF) n = put_s(s, 0, "HP MP full");
         else { n = put_s(s, 0, "Got "); n = put_s(s, n, items[st.pick].name); }
     }
     s[n] = 0;

@@ -168,6 +168,30 @@ int main(void)
         remove_all_equipment(unit(0));
         for (k = 0; k < SLOTS; k++) assert(!unit(0)->eq[k]);
     }
+    // Optimum Equipment follows the source's per-slot criterion, not one aggregate:
+    // with the whole item table in the bag -- where the two rules really diverge,
+    // a bag of a few Gariland items cannot tell them apart -- nothing the unit
+    // could wear in a ranked slot beats what it ended up wearing there.
+    {
+        static const u8 ranked[4] = { EQ_WEAPON, EQ_SHIELD, EQ_HEAD, EQ_BODY };
+        u8 kept[256], i, id, seen = 0;
+        SaveUnit *u = unit(0);
+        memcpy(kept, save.inv, sizeof kept);
+        for (id = 1; id; id++) if (!save.inv[id]) save.inv[id] = 1;
+        remove_all_equipment(u);
+        best_fit_unit(u);
+        for (i = 0; i < 4; i++) {
+            u8 slot = ranked[i];
+            u16 worn = u->eq[slot] ? slot_rank(slot, u->eq[slot]) : 0;
+            for (id = 1; id; id++) {
+                if (!save.inv[id] || !can_equip(u, slot, id)) continue;
+                assert(slot_rank(slot, id) <= worn);
+                if (slot == EQ_SHIELD && slot_rank(slot, id)) seen = 1;
+            }
+        }
+        assert(seen);          // the shield slot really had ranked candidates
+        memcpy(save.inv, kept, sizeof kept);
+    }
     // The Remove Unit screens: the check, the unit's own answer, then the party is shorter.
     {
         u8 n0;

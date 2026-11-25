@@ -733,19 +733,40 @@ static u16 mg_fit(const SaveUnit *u)
     for (k = 0; k < SLOTS; k++) if (u->eq[k]) v = (u16)(v + 8U * item_rec(u->eq[k])[I_WP]);
     return v;
 }
+// FFT ranks "Optimum Equipment" by a criterion of the slot's own, not by one
+// aggregate: a weapon by the attack power it adds, a shield by the evade rate,
+// a helmet and armour by the HP they give (the game says so itself, in the
+// rumours its taverns sell). Evade is not in mg_fit() at all, so ranking a
+// shield by the aggregate chose a different shield from the source's.
+// The accessory has no stated order, so it keeps the aggregate.
+static u16 slot_rank(u8 slot, u8 id)
+{
+    const u8 *r = item_rec(id);
+    switch (slot) {
+    case EQ_WEAPON: return r[I_WP];
+    case EQ_SHIELD: return (r[I_FLAGS] & 0x40) ? r[I_PEV] : 0;    // as mg_evade reads it
+    case EQ_HEAD:
+    case EQ_BODY:   return r[I_HP];
+    default:        return 0;
+    }
+}
 // "Equip to the maximum": the best owned item per slot, weapon first so the hand it frees
 // (or the two hands it takes) is settled before the shield is chosen. Two passes.
+// A slot with a criterion ranks by it and breaks ties on the aggregate; the
+// accessory ranks on the aggregate alone.
 static void best_fit_unit(SaveUnit *u)
 {
     u8 pass, k, id, moved = 1;
     if (u->type == 3) return;
     for (pass = 0; pass < 2 && moved; pass++) for (moved = 0, k = 0; k < SLOTS; k++) {
         u8 slot = slot_order[k], best = u->eq[slot], old = u->eq[slot];
-        u16 score = mg_fit(u), s2;
+        u16 rank = best ? slot_rank(slot, best) : 0, score = mg_fit(u), r2, s2;
         for (id = 1; id; id++) {
             if (!save.inv[id] || !can_equip(u, slot, id)) continue;
+            r2 = slot_rank(slot, id);
+            if (r2 < rank) continue;
             u->eq[slot] = id; s2 = mg_fit(u); u->eq[slot] = old;
-            if (s2 > score) { score = s2; best = id; }
+            if (r2 > rank || s2 > score) { rank = r2; score = s2; best = id; }
         }
         if (best != old) { equip(u, slot, best); moved = 1; }
     }

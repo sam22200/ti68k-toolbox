@@ -31,7 +31,7 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
     if(magic_formula(b->formula)||(b->formula==0x31&&b->element))return magic_applicable(t,ab)&&skill_kind(a,t,ab)!=AB_NULL&&
         (!magic_status_formula(b->formula)||magic_heal(a,t,ab,0))?magic_hit(a,t,ab,0):0;
 #endif
-#if !defined(FFT_MODULE) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_NUMBERS)   // forecasts only
+#if defined(FFT_BATTLE) && (!defined(FFT_MODULE) || MOD_PART(MOD_FORMULA) || MOD_PART(MOD_NUMBERS))   // forecasts only
     if ((u8)(b->formula - 0x25) <= 1) { // equipment: nothing to break, the Attack's (nothing to
         u16 c, h = magic_hit(a,t,ab,0);     // steal: 0); Maintenance: 0
         if (equip_break_slot(ut, ab) == 255) return b->formula == 0x25 ? (u8)h : 0;
@@ -40,7 +40,7 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
         return (u8)(c >= 100 ? h : h * c / 100);
     }
 #endif
-#if !defined(FFT_MODULE) || !(MOD_PART(MOD_AI) || MOD_PART(MOD_COMMAND)) // AI rejects; COMMAND handles before skill_effect_hit
+#if defined(FFT_BATTLE) && (!defined(FFT_MODULE) || !(MOD_PART(MOD_AI) || MOD_PART(MOD_COMMAND))) // AI rejects; COMMAND handles before skill_effect_hit
     if ((u8)(b->formula - 0x27) <= 1 || (u8)(b->formula - 0x2b) <= 1) {   // resources, breaks: evasion x the percent;
         u16 c = charge_query(a, t, ab, 0, 0), h = magic_hit(a,t,ab,0);   // nothing left to steal: no hit
         return (u8)(b->formula-0x27)<=1 && !skill_amount(a,t,ab,0) ? 0 : (u8)(c >= 100 ? h : h * c / 100);
@@ -48,7 +48,11 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
 #endif
     if (b->kind == AB_CURE) return status_curable(ut,b->y) ? 100 : 0;
     if (b->kind == AB_REVIVE) return ut->hp ? 0 : 100;
+#ifdef FFT_CHAPTER
     return b->flags & AF_EVADE ? magic_hit(a,t,ab,0) : 100;
+#else
+    return 100;        // magic evasion is the chapter's; the demo always lands
+#endif
 }
 FFT_FORMULA_FN u8 skill_hit(u8 a,u8 t,AbId ab)
 {
