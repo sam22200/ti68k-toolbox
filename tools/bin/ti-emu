@@ -38,7 +38,9 @@ case "$1" in
     docker run -d --rm --name tiemu --network host -u "$(id -u):$(id -g)" \
       -e DISPLAY="$DISPLAY" -e XAUTHORITY=/xauth -v "$XAUTHORITY:/xauth:ro" \
       -e HOME="$H" $NOFIX -v "$W:$W" -w "$W" tiemu-jammy tiemu $SEND >/dev/null
-    timeout 30 xdotool search --sync --name '^TiEmu \(' >/dev/null || { echo "ti-emu: no window after 30 s ('Set ROM version' dialog?)" >&2; exit 1; }
+    # A boot transfer of a large group (the campaign packages are 300-700 KB)
+    # keeps TiEmu busy before it maps its window: raise TI_WINDOW_WAIT for those.
+    timeout "${TI_WINDOW_WAIT:-30}" xdotool search --sync --name '^TiEmu \(' >/dev/null || { echo "ti-emu: no window after ${TI_WINDOW_WAIT:-30} s ('Set ROM version' dialog?)" >&2; exit 1; }
     if [ -n "$SENT" ] && [ "$TI_WAIT" != 0 ]; then   # until the last variable is in the VAT
       sleep 2; "$T/bin/ti-mem" wait "$SENT" || exit 1
     else sleep $((2 + 3 * ($# > 0))); fi
