@@ -41,117 +41,6 @@ def row_spans(view, y0, rows):
     return out
 
 
-def terrain(mesh, nx, nz):
-    """Per tile and level: walkability and standable top, over BOTH terrain levels.
-
-    walk 0 blocked, 1 ordinary, 2 crossed but never stopped on. FFT gives a walk-2
-    tile the standing geometry's own height, not the ground's: Sweegy's trees are
-    tiles of height 17-18 over ground near 4.
-
-    Two things that flag does NOT say, both learned the hard way (c2-pipeline.md):
-
-    - a tile with no second level carries eight zero bytes, and reading that as an
-      ordinary tile of height 0 collapses the ground under everything. Map 3 has
-      117 absent level-1 entries of 117, Chapel of Orbonne 116 of 140.
-    - walk 2 is not decoration, it is "you cannot stop here", and you cannot stop
-      on a WALL either. So a flagged tile is decoration when it RISES above the
-      ordinary ground around it -- one level with the ground carries nothing, and
-      Araguay flags two such tiles beside a trunk -- and when its 4-connected
-      component among the rising ones is FREE-STANDING: a wall is the room's
-      enclosure and runs along the map's edge, furniture stands in the middle.
-      A single tile is always free-standing, since three of Araguay's five trees
-      grow at the very edge of the map.
-
-      That splits the Chapel of Orbonne's one 33-tile component spanning 13x10 on
-      the border, and the Book Storage's 10x2 back wall, from the Book Storage's
-      three 2x1 bookcases in the middle of the room and Sweegy's five lone trees.
-    """
-    p0 = struct.unpack('<I', mesh[0x68:0x6C])[0]
-    n = nx * nz
-    walk = [0] * n
-    top = [None] * n
-    flagged = {}
-    for level in (0, 1):
-        base = p0 + 2 + 8 * n * level
-        for i in range(n):
-            b = mesh[base + 8 * i:base + 8 * i + 8]
-            if not any(b):            # this tile has no such level
-                continue
-            w = 0 if b[6] & 0x01 else 2 if b[6] & 0x02 else 1
-            h = max(extract.corners(b[2], b[3] & 0x1F, b[4] if (b[3] & 0x1F) else 0))
-            if w == 2:
-                flagged[(i % nx, i // nx)] = h
-            elif w == 1 and (top[i] is None or h > top[i]):
-                top[i] = h
-                walk[i] = 1
-    rising = {}
-    for (x, z), h in flagged.items():
-        near = [top[(z + dz) * nx + x + dx]
-                for dz in (-1, 0, 1) for dx in (-1, 0, 1)
-                if 0 <= x + dx < nx and 0 <= z + dz < nz
-                and top[(z + dz) * nx + x + dx] is not None]
-        if near and h > max(near):
-            rising[(x, z)] = h
-    props = []
-    for comp in components(rising):
-        edge = any(x in (0, nx - 1) or z in (0, nz - 1) for x, z in comp)
-        if len(comp) > 1 and edge:
-            continue                  # the room's own enclosure, not furniture
-        props += [(x, z, rising[(x, z)]) for x, z in comp]
-    return walk, top, props
-
-
-def components(cells):
-    """The 4-connected components of a set of (x, z) tiles."""
-    seen, out = set(), []
-    for c in cells:
-        if c in seen:
-            continue
-        stack, comp = [c], []
-        seen.add(c)
-        while stack:
-            x, z = stack.pop()
-            comp.append((x, z))
-            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                q = (x + dx, z + dz)
-                if q in cells and q not in seen:
-                    seen.add(q)
-                    stack.append(q)
-        out.append(comp)
-    return out
-
-
-def prop_polygons(polys, top, props, nx, nz, grow=0.75):
-    """Every polygon standing over a decorative tile, trunk and overhanging canopy.
-
-    Removing part of a prop saves nothing: the rest draws the same silhouette and no
-    span moves (measured on Sweegy, 48 of 144 tree polygons removed changed the stream
-    by zero bytes).
-
-    The ground under the prop is kept: only geometry above the HIGHEST standable
-    neighbour goes. FFT gives the prop tile the prop's own height, so the ground
-    under it has to be guessed from around it, and the lowest neighbour guesses too
-    low -- it took the ground out from under Sweegy's and Araguay's trees and left
-    white holes in the floor. The highest neighbour leaves no stump on either. A
-    hole that survives this is in the source: the Book Storage's floor under a
-    bookcase has no polygon of its own, the object's base draws it.
-    """
-    out = []
-    for x0, z0, _ in props:
-        ground = [top[(z0 + dz) * nx + x0 + dx]
-                  for dz in (-1, 0, 1) for dx in (-1, 0, 1)
-                  if 0 <= x0 + dx < nx and 0 <= z0 + dz < nz
-                  and top[(z0 + dz) * nx + x0 + dx] is not None]
-        floor = max(ground) if ground else 0
-        cx, cz = x0 + .5, z0 + .5
-        for i, q in enumerate(polys):
-            v = q[0]
-            x, z = v[:, 0].mean() / 28, v[:, 2].mean() / 28
-            if abs(x - cx) <= grow and abs(z - cz) <= grow and (-v[:, 1] / 12).max() > floor:
-                out.append(i)
-    return sorted(set(out))
-
-
 def minimal_props(polys, tops, props, tex, pal, nx, nz, sc_h, limit=None):
     """The fewest props whose removal clears the cap, biggest saver first.
 
@@ -171,7 +60,7 @@ def minimal_props(polys, tops, props, tex, pal, nx, nz, sc_h, limit=None):
     def without(chosen):
         dec = set()
         for p in chosen:
-            dec |= set(prop_polygons(polys, tops, [p], nx, nz))
+            dec |= set(extract.prop_polygons(polys, tops, [p], nx, nz))
         return depth_of([q for i, q in enumerate(polys) if i not in dec],
                         tex, pal, nx, nz, sc_h)[0], dec
 
@@ -299,6 +188,10 @@ def main():
                          window_offset=y0 - lo, per_view=per_view, worst=worst,
                          span_bytes=[t - 4 * rows for t in per_view], over=worst - LIMIT,
                          fits=worst <= LIMIT)
+            # extract.views() already dropped this map's approved props, so `worst` is
+            # what ships. Say so, or the census would read as if the map fitted by itself.
+            if m in extract.PROPS_DROPPED:
+                entry['props_dropped'] = [list(t) for t in extract.PROPS_DROPPED[m]]
             if worst > LIMIT:
                 # Why is it over? FFT flags a decorative prop as a tile that may be crossed
                 # but never stopped on, and gives that tile the prop's own height. Remove
@@ -308,8 +201,8 @@ def main():
                 mesh, nx, nz, _ = map_budget.load(disc, files, m)
                 tex, pal = texture_palette(disc, files, m, mesh)
                 polys = extract.polygons(mesh)
-                _, tops, props = terrain(mesh, nx, nz)
-                dec = set(prop_polygons(polys, tops, props, nx, nz))
+                _, tops, props = extract.terrain(mesh, nx, nz)
+                dec = set(extract.prop_polygons(polys, tops, props, nx, nz))
                 sc_h_full = 6 * (nx + nz) + 6 * maxh + 8
                 bare = (depth_of([q for i, q in enumerate(polys) if i not in dec],
                                  tex, pal, nx, nz, sc_h_full)[0] if dec else worst)
@@ -344,9 +237,11 @@ def main():
                        entry['depth_without_props'], LIMIT - entry['depth_without_props'],
                        entry['max_fitting_sc_h'], entry['rows_to_lose'],
                        entry['rows_lost_above'], entry['rows_lost_below'], entry['fitting_worst']))
-            print('map %3d %-24s sc_h %3d worst %5d %s%s' % (
+            print('map %3d %-24s sc_h %3d worst %5d %s%s%s' % (
                 m, entry['name'][:24], rows, worst,
-                'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'], tail),
+                'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'],
+                '  (after dropping %d approved prop(s))' % len(entry['props_dropped'])
+                if 'props_dropped' in entry else '', tail),
                 flush=True)
         except Exception as exc:
             report['maps'][str(m)] = dict(error='%s: %s' % (type(exc).__name__, exc))

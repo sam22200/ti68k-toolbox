@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""depth_budget.terrain(): which walk-2 tile is decoration, on synthetic terrain.
+"""extract.terrain(): which walk-2 tile is decoration, on synthetic terrain.
 
 FFT's walk-2 flag says "you cannot stop here", not "this is decoration": you cannot
 stop on a wall either, and reading the flag alone took the Chapel of Orbonne's whole
@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import depth_budget   # noqa: E402
+import extract   # noqa: E402
 
 TERR = 0x68
 HEAD = 0xC0
@@ -46,7 +46,7 @@ def ground(nx, nz, h=3):
 
 class PropRule(unittest.TestCase):
     def props(self, m, nx, nz):
-        return sorted((x, z) for x, z, _ in depth_budget.terrain(m, nx, nz)[2])
+        return sorted((x, z) for x, z, _ in extract.terrain(m, nx, nz)[2])
 
     def test_a_lone_rising_flagged_tile_is_a_prop(self):
         """Sweegy's tree: one tile of height 18 over ground near 3."""
@@ -112,22 +112,57 @@ class PropRule(unittest.TestCase):
         """Map 3 carries 117 all-zero level-1 entries of 117."""
         g = ground(5, 5, h=6)
         g[(2, 2)] = (18, FLAGGED)
-        walk, top, props = depth_budget.terrain(mesh(5, 5, g, None), 5, 5)
+        walk, top, props = extract.terrain(mesh(5, 5, g, None), 5, 5)
         self.assertEqual([t for t in top if t is not None], [6] * 24)
         self.assertEqual(sorted((x, z) for x, z, _ in props), [(2, 2)])
 
     def test_a_real_second_level_still_raises_the_standable_top(self):
         g = ground(5, 5, h=3)
         up = {(1, 1): (9, ORDINARY)}
-        walk, top, props = depth_budget.terrain(mesh(5, 5, g, up), 5, 5)
+        walk, top, props = extract.terrain(mesh(5, 5, g, up), 5, 5)
         self.assertEqual(top[1 * 5 + 1], 9)
 
     def test_a_blocked_tile_is_neither_ground_nor_prop(self):
         g = ground(5, 5)
         g[(2, 2)] = (19, BLOCKED | FLAGGED)
-        walk, top, props = depth_budget.terrain(mesh(5, 5, g), 5, 5)
+        walk, top, props = extract.terrain(mesh(5, 5, g), 5, 5)
         self.assertEqual(props, [])
         self.assertIsNone(top[2 * 5 + 2])
+
+
+class ApprovedDrops(unittest.TestCase):
+    """extract.PROPS_DROPPED: the authoring decision, applied by extract.views()."""
+
+    def test_a_map_with_no_approved_drop_is_untouched(self):
+        g = ground(5, 5)
+        g[(2, 2)] = (18, FLAGGED)
+        self.assertEqual(extract.dropped_props(mesh(5, 5, g), 5, 5, m=22), [])
+
+    def test_an_approved_tile_drops_the_polygons_over_it(self):
+        g = ground(5, 5)
+        g[(2, 2)] = (18, FLAGGED)
+        m = mesh(5, 5, g)
+        _, top, props = extract.terrain(m, 5, 5)
+        want = extract.prop_polygons(extract.polygons(m), top, props, 5, 5)
+        try:
+            extract.PROPS_DROPPED[999] = [(2, 2)]
+            self.assertEqual(extract.dropped_props(m, 5, 5, m=999), want)
+        finally:
+            del extract.PROPS_DROPPED[999]
+
+    def test_a_tile_that_carries_no_prop_is_refused(self):
+        """A drop that silently matched nothing would ship the map over budget."""
+        g = ground(5, 5)
+        g[(2, 2)] = (18, FLAGGED)
+        try:
+            extract.PROPS_DROPPED[999] = [(4, 4)]
+            with self.assertRaises(ValueError):
+                extract.dropped_props(mesh(5, 5, g), 5, 5, m=999)
+        finally:
+            del extract.PROPS_DROPPED[999]
+
+    def test_every_approved_map_is_one_the_census_knows(self):
+        self.assertEqual(sorted(extract.PROPS_DROPPED), [5, 50, 74, 80])
 
 
 if __name__ == '__main__':
