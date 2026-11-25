@@ -1,0 +1,41 @@
+--- a/tigcc/tools/ttpack.c
++++ b/tigcc/tools/ttpack.c
+@@ -2130,8 +2130,16 @@
+     if (infp != stdin) fclose(infp);
+ 
+ 
+-    if (startAddr + inlen -1 > 0xffff) {
+-        fprintf(stderr,"ERROR: File is too large to handle (>64936 Bytes)");
++    /* The TI output format ((type & FIXF_MACHMASK) == 0) writes the 16-byte
++       PackedHeader and nothing else: no load address, no end address, and
++       PackLz77 leaves endAddr/memEnd alone on that path. Its only size limit is
++       the header's 16-bit original-size field, so bounding it by pucrunch's C64
++       load address of 0x258 cost 600 bytes for nothing. The other machine types
++       keep their own bound. See games/fft/campaign/RESIDENT_BUDGET.md. */
++    if (((type & FIXF_MACHMASK) == 0) ? (inlen > 0xffff)
++                                      : (startAddr + inlen - 1 > 0xffff)) {
++        fprintf(stderr,"ERROR: File is too large to handle (>%d Bytes)",
++                ((type & FIXF_MACHMASK) == 0) ? 0xffff : 0xffff - startAddr + 1);
+         if (indata) free(indata);
+         return 1;
+     }
+--- a/tigcc/ld-tigcc/export/pucrunch.c
++++ b/tigcc/ld-tigcc/export/pucrunch.c
+@@ -1599,8 +1599,15 @@
+     indata = in_data;
+ 
+ 
+-    if (startAddr + inlen -1 > 0xffff) {
+-        Error(NULL, "File is too large to handle (>64936 Bytes)");
++    /* startAddr is pucrunch's C64 load address. The TI decompressor never sees
++       it: it is handed a source and a destination and bounds its output with
++       the 16-bit original-size field of the packed header (tools/packhead.h),
++       while every LZ reference it follows is relative to the output pointer.
++       So the only real limit is that field, and adding 0x258 to the check cost
++       600 bytes of a 64 KB executable for nothing. See
++       games/fft/campaign/RESIDENT_BUDGET.md. */
++    if (inlen > 0xffff) {
++        Error(NULL, "File is too large to handle (>65535 Bytes)");
+         if (indata) free(indata);
+         return 1;
+     }
