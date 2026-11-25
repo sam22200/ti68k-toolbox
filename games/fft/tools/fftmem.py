@@ -131,7 +131,14 @@ class Battle:
                     ai=AI[b('ai')] if b('ai') < len(AI) else str(b('ai')), end=END[b('end')] if b('end') < 3 else b('end'),
                     rounds=b('rounds'), moved=b('moved'), acted=b('acted'), rot=b('rot'),
                     cursor=(b('cx'), b('cz')), turns=list(d[s + L['State__turns']:s + L['State__turns'] + 6]),
-                    dmg=w('dmg'), units=units)
+                    dmg=w('dmg'), units=units,
+                    # The battle's opening sequence, so a scripted run can tell a
+                    # pre-battle dialogue from a hung battle without a screenshot:
+                    # ti89-emulator says to add the decoder field rather than look.
+                    opening={k: d[s + L['State__open_' + k]]
+                             for k in ('stage', 'beat', 'clock', 'handoff')
+                             if 'State__open_' + k in L},
+                    banner=b('banner'))
 
 
 def unit_line(u):
@@ -140,8 +147,11 @@ def unit_line(u):
 
 
 def snapshot(st):
+    o = st['opening']
     print(f"mode {st['mode']} act u{st['act']} ai {st['ai']} end {st['end'] or '-'} round {st['rounds']} "
-          f"rot {st['rot']} cursor {st['cursor']} next {st['turns']}")
+          f"rot {st['rot']} cursor {st['cursor']} next {st['turns']}"
+          + (' | OPENING ' + ' '.join('%s %d' % kv for kv in o.items()) if any(o.values()) else '')
+          + (f" | banner {st['banner']}" if st['banner'] else ""))
     for u in st['units']:
         print(('> ' if u['i'] == st['act'] else '  ') + unit_line(u))
 
