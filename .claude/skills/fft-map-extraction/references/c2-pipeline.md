@@ -253,7 +253,9 @@ and nowhere else, so nothing but the side quest reaches them. **Zarghidas Trade
 City is not among them** although Cloud's battle is listed as optional, because
 the same area also takes random battles. Pass `--include-optional` to count them.
 
-Of the **94 that remain: 63 fit, 4 cosmetic, 27 structural, none unreadable.**
+Of the **94 that remain: all 94 fit**, after one prop drop, six approved crops
+and a 32-byte cap raise. The groups below are what the arbitration started from
+(63 fit, 4 cosmetic, 27 structural) and how each was closed.
 Every over-budget map has a workable remedy, which is the point of the census:
 
 - the 4 cosmetic fit once their props are gone: Roof of Riovanes Castle (5, two
@@ -551,9 +553,22 @@ also the map that is over by only **32 bytes**. Raising `FFT_CORE_DEPTH_MAX` by
 diagnostic (INSTALLED_RAM_ABI99.md). That is the one place where the RAM lever is
 worth pulling; at +408 for Dorter it would leave 28 bytes and is not.
 
-So the census closes: **87 of 94 fit as extracted, 6 need an authored crop that
-costs at most some head rows, and 1 is a 32-byte trade.** Nothing is
-unsalvageable and nothing needs geometry removed beyond the underside.
+**Approved and applied, 2026-11-25.** The six crops are
+`extract.MAP_CROP`, as (rows, offset) measured from the view's **first lit row**
+-- the same reference `depth_budget` and `crop_review` use, not row 0 of the
+canvas -- and `crop_window()` refuses one that runs past the content rather than
+shipping a window of rows the view does not have. North Wall of Bethla is
+deliberately absent: `FFT_CORE_DEPTH_MAX` went 18,488 -> **18,520** for it, a
+core change the constant's own comment prescribes.
+
+**The census is closed: 94 of 94 fit.** No cosmetic map, no structural map, none
+unreadable. One prop drop in the whole game (Sweegy's tallest tree), six crops,
+one 32-byte cap raise.
+
+It is not comfortable, and the thin end is worth stating: North Wall of Bethla
+fits by **0 bytes** -- it is the map the cap was raised for, so it lands exactly
+on it, the same footing as Orbonne's 8 before. Then Inside of Limberry and Slums
+in Dorter at 40, Public Cemetery at 48, Roof of Riovanes and Finath River at 56.
 
 ### One mesh, several records (map 53)
 
