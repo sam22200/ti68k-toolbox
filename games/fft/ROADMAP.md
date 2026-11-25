@@ -545,8 +545,22 @@ The native supervisor's heap-lifetime check is documented separately in
   the enemy diamond, one glyph at a time, alternating about once a second.
 - [x] Both verified on screen in the PC battle, which found and fixed the actor-cache
   collision that painted a transformed unit as a solid white block.
-- [ ] **Neither feature is enabled in any build**: `FFT_STATUS_PICTO` and
-  `FFT_CREATURE_BODY` appear in no Makefile, only on hand-written command lines.
+- [x] Both pictures moved to the archive tail (`tools/contour_assets.py`), which is
+  where they belong: 4.8 KB that the resident executable cannot hold. The tail
+  follows the switches in `fft.h`, so turning a feature on carries its art along
+  and turning it off costs a chapter nothing.
+- [ ] **Neither feature is enabled, and the reason is the resident budget, not the
+  wiring.** Measured 2026-11-24 on the battle executable against TTPack's 64936-byte
+  input ceiling: 64601 today, so 335 free, already under `core_budget.py`'s 512-byte
+  alert. With their art archived the creatures cost 114 bytes and the pictograms 324.
+  Either fits alone; the two together miss by 123.
+- [ ] Resident room has to come from somewhere before both can ship, and the two
+  usual levers are spent. Data: 117 bytes of small tables are all that is left in
+  `fft.c`. Modules: `MOD_ZONE` is 8932 and equals the largest of the 28 images, but
+  the ten largest sit between 8116 and 8932, so splitting the biggest buys 34 bytes.
+  What remains is raising the ceiling - our own ZX0 self-extractor in place of
+  TTPack - which first needs a measurement nobody has taken: whether a heap block
+  above 64 KB can be allocated and executed on a Titanium with HW3Patch.
 - [ ] The CATALOG switch that turns the pictograms off. A new `State` field would move
   the ABI, so it needs a spare bit or another mechanism.
 - [ ] Decide where the art lives for a chapter package: `status_art.h` (about 1.1 KB)
