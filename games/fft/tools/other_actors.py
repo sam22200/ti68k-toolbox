@@ -48,6 +48,43 @@ def sheet(disc, files):
     return lum[0][idx], idx != 0          # index 0 is transparent
 
 
+def assemble(spr, tiles):
+    """One OTHER frame from its SHP tile list: palette indices, -1 transparent.
+
+    units.sprite() cannot be reused here: it is specialised for human bodies and
+    looks for hair, a face, eyes and skin, which a chicken does not have. Only the
+    tile compositing is shared, and the treatment below is the generic one.
+    """
+    px = np.frombuffer(spr[512:512 + 128 * 256], np.uint8).reshape(256, 128)
+    sheet = np.empty((256, 256), np.uint8)
+    sheet[:, 0::2] = px & 15
+    sheet[:, 1::2] = px >> 4
+    cv = np.zeros((128, 128), np.uint8)
+    ox, oy = 64, 96
+    for sx, sy, x, y, w, h, fx, fy in reversed(tiles):
+        t = sheet[y:y + h, x:x + w]
+        if fx:
+            t = t[:, ::-1]
+        if fy:
+            t = t[::-1]
+        r = cv[oy + sy:oy + sy + h, ox + sx:ox + sx + w]
+        r[t > 0] = t[t > 0]
+    return cv
+
+
+def creature(spr, tiles, lum):
+    """An OTHER frame at the TI's four greys with the project's white outline."""
+    cv = assemble(spr, tiles)
+    m = cv > 0
+    if not m.any():
+        return None, None
+    ys, xs = np.nonzero(m)
+    cv = cv[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    m = cv > 0
+    g = quantise(np.where(m, lum[np.clip(cv, 0, 15)], 0.0), m)
+    return outline(np.where(m, g, 0).astype(np.uint8), m)
+
+
 def frames(opaque, y0, y1, least=6):
     """Bounding boxes of the sprites on one row band, split on empty columns."""
     band = opaque[y0:y1]
