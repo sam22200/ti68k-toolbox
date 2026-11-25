@@ -257,6 +257,40 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
 DROP_UNDERSIDE = True
 
 
+# Scene crops the authoring pass has approved, as (rows, offset): keep `rows`
+# scene rows starting `offset` rows below the view's FIRST LIT ROW -- the same
+# reference `depth_budget` and `crop_review` use, not row 0 of the canvas.
+#
+# A map whose excess is terrain can only give up scene rows, and the two ends are
+# not symmetric: above the scene the camera has CAM_MT = 39 virtual blank rows
+# (camera_clamp.h), below it has none, so a row cut off the bottom takes ground a
+# unit stands on. Each of these was reviewed on the picture
+# (cosmetic_prop_review.py's sibling, crop_review.py) and approved 2026-11-25.
+# Three cost nothing at all; three cost head rows and no ground. North Wall of
+# Bethla is deliberately absent: it was the only one that would have lost ground,
+# and FFT_CORE_DEPTH_MAX was raised 32 bytes for it instead.
+MAP_CROP = {
+    16:  (176, 20),   # Inside of Limberry Castle: 18,480, nothing lost
+    26:  (195, 10),   # Weapon storage of Yardow: 18,404, nothing lost
+    32:  (194, 26),   # Slums in Dorter: 18,480, 26 head rows, no ground
+    62:  (180, 22),   # Chapel of Orbonne: 18,432, the empty vault above the room
+    88:  (198, 28),   # Finath River: 18,464, 6 head rows
+    100: (164, 58),   # Public Cemetery: 18,472, 16 head rows
+}
+
+
+def crop_window(m, lo, content):
+    """(first row, rows) of this map's approved scene window, or the full content."""
+    c = MAP_CROP.get(m)
+    if not c:
+        return lo, content
+    rows, offset = c
+    if offset + rows > content:
+        raise ValueError('map %d: approved crop %d rows at +%d exceeds %d content rows'
+                         % (m, rows, offset, content))
+    return lo + offset, rows
+
+
 # Props the authoring pass has approved dropping, as the tiles they stand on.
 # A map over FFT_CORE_DEPTH_MAX whose excess is carried by free-standing scenery
 # gives up the FEWEST props that clear it, never all of them: what a prop costs

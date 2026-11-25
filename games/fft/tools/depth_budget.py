@@ -179,10 +179,16 @@ def main():
             def cost(y0, rows):
                 return max(4 * rows + 4 * sum(sp[y0:y0 + rows]) for sp in span)
 
-            sc_h = min(ROWS, content)
-            best = min(((cost(o, sc_h), o) for o in range(0, content - sc_h + 1)), key=lambda t: t[0])
-            worst, y0 = best
-            rows = sc_h
+            # An approved crop is what ships, so measure that window and not the
+            # cheapest one the arithmetic would pick (extract.MAP_CROP).
+            if m in extract.MAP_CROP:
+                rows, off = extract.MAP_CROP[m]
+                y0, worst = lo + off, cost(off, rows)
+            else:
+                sc_h = min(ROWS, content)
+                best = min(((cost(o, sc_h), o) for o in range(0, content - sc_h + 1)), key=lambda t: t[0])
+                worst, y0 = best
+                rows = sc_h
             per_view = [4 * rows + 4 * sum(sp[y0:y0 + rows]) for sp in span]
             entry = dict(name=names[str(m)], maxh=maxh, content_rows=content, sc_h=rows,
                          window_offset=y0 - lo, per_view=per_view, worst=worst,
@@ -192,6 +198,8 @@ def main():
             # what ships. Say so, or the census would read as if the map fitted by itself.
             if m in extract.PROPS_DROPPED:
                 entry['props_dropped'] = [list(t) for t in extract.PROPS_DROPPED[m]]
+            if m in extract.MAP_CROP:
+                entry['crop'] = list(extract.MAP_CROP[m])
             if worst > LIMIT:
                 # Why is it over? FFT flags a decorative prop as a tile that may be crossed
                 # but never stopped on, and gives that tile the prop's own height. Remove
@@ -240,8 +248,10 @@ def main():
             print('map %3d %-24s sc_h %3d worst %5d %s%s%s' % (
                 m, entry['name'][:24], rows, worst,
                 'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'],
-                '  (after dropping %d approved prop(s))' % len(entry['props_dropped'])
-                if 'props_dropped' in entry else '', tail),
+                ''.join(('  (after dropping %d approved prop(s))' % len(entry['props_dropped'])
+                         if 'props_dropped' in entry else '',
+                         '  (approved crop: %d rows at +%d)' % tuple(entry['crop'])
+                         if 'crop' in entry else '')), tail),
                 flush=True)
         except Exception as exc:
             report['maps'][str(m)] = dict(error='%s: %s' % (type(exc).__name__, exc))
