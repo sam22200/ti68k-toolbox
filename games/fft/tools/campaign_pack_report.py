@@ -549,8 +549,10 @@ def main():
         '1. **Done for storage** ([PACK1_INVENTORY.md](PACK1_INVENTORY.md)): PackI\'s '
         'eleven maps and nine rooms measured from the disc total1,894,549 bytes with '
         'today\'s core,530,205 inside the budget, so PackI stays whole and needs no '
-        'split. Two maps need a shorter scene: Sweegy Woods202->165 rows losing43 of '
-        'sky, Slums in Dorter202->172 losing54 of foreground. Orbonne is not an '
+        'split. Sweegy Woods no longer needs a shorter scene: dropping three of its five '
+        'trees (extract.PROPS_DROPPED) takes it to17,472, 1,016 under the cap, with '
+        'all202 rows kept. Slums in Dorter still needs202->172, losing54 rows of '
+        'foreground, because it carries no prop at all. Orbonne is not an '
         'overrun; the18,488 cap was sized on it. Still extract scene camera/pose references defaulting to one orientation, keeping '
         'every required story gesture and source staging; do not use this report to '
         'certify unreviewed cropping or a generic head-swap appearance.',
@@ -562,7 +564,8 @@ def main():
         '4. Author remaining battle/scene maps using approved C2 treatment, full '
         'geometry and source handedness. Current320/352px/row/depth ceilings are '
         'planning constraints, not proof of future full-map fit. Finath and BookStorage5 '
-        'still need envelope work; the old Sweegy depth excess remains a ChapterI gate.',
+        'still need envelope work; the Sweegy depth excess is cleared by its approved '
+        'prop drop and no longer gates ChapterI.',
         f'5. Author poses against the native30 budget and its {number(BANK_CEILING-pack_banks["native30"])} '
         'spare bank bytes (4.3). Raise ACTOR_BANKS only when an authored inventory '
         'needs it, and then bump the ABI and rebuild matching core/chapter packages. '

@@ -344,6 +344,23 @@ all eight disfigured the building for 976 bytes when 480 were wanted.
 `cosmetic_prop_review.py --minimal` renders this version, and `--shrink S` the
 one that keeps every prop at scale S.
 
+**The four decisions are applied.** `extract.PROPS_DROPPED` carries them as the
+tiles the props stand on, and `extract.views()` — the one place a mesh becomes
+four views — drops their polygons before rendering, so every reader downstream
+sees the shipped geometry:
+
+| map | dropped | ships at | spare |
+|----:|---------|---------:|------:|
+|   5 | (9,4) (9,5) (9,6) | 17,976 | 512 |
+|  50 | (0,11) | 18,056 | 432 |
+|  74 | (9,10) (1,1) (9,2) | 17,472 | 1,016 |
+|  80 | (0,0) (10,8) (0,7) (5,6) | 18,304 | 184 |
+
+**Sweegy Woods no longer gates chapter I.** Gariland's `map.h`, `tiles.bin` and
+`fftv*.bin` re-extract byte for byte, because no map outside the table is touched.
+A tile in the table that carries no prop raises rather than silently shipping the
+map over budget, and `test_prop_rule.py` guards that.
+
 ### Which maps are fought on, and which are only scenes
 
 The arbitration differs completely. On a **battle** map the camera is tactical and
@@ -379,10 +396,18 @@ join has to be on an id and not on a name.
 
 **The interiors are the open problem.** A room's four walls are exactly what the
 enclosure rule protects, and on a battle map they are also what hides the field
-from a tactical camera. Chapel of Orbonne (a scene) may keep all of its; map 51 (a
-scene) likewise; but the Book Storage, St. Murond's hall and the Limberry
+from a tactical camera. The Book Storage, St. Murond's hall and the Limberry
 interiors are fought in, and there the authored pass has to choose which walls to
-drop per camera orientation rather than per map. No rule for that yet.
+drop **per camera orientation**, not per map: a wall behind the camera hides
+nothing, the same wall in front hides everything. No rule for that yet, and it is
+work for the semi-supervised extractor, not for a heuristic.
+
+**A hypothesis to test there** (observed, not measured): the game appears to box a
+scene in with walls too, and those almost always have to go as well — so "scene"
+may not mean "keep the enclosure" in practice, only "the reason to drop it is
+framing rather than visibility". Chapel of Orbonne and map 51 are the two scenes
+to try it on. Do not fold this into the classifier before the extractor has shown
+it on several maps.
 
 ### One mesh, several records (map 53)
 
