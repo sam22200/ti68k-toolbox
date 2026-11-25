@@ -68,11 +68,21 @@ apply the portrait rules. Run on a chicken it produces floating bars above the
 body. Share only the tile compositing: `other_actors.assemble()` repeats that
 loop and applies the generic treatment.
 
+**Check the pixel base before you believe a cut sprite.** Unit sheets start their
+pixels at 0x200, but `OTHER.SPR` carries 512 colours and starts at **0x400**. Four
+rows out, the chickens came out footless with two rows of palette bytes floating
+above them, and the blame went to the quantiser for a while. The test is
+geometric: sprite sheets bottom-align their art, so with the right base every
+object sits flush on the last row of its cell.
+
 **A shape table can describe more than it seems to.** `OTHER.SHP` has seventeen
-frames for four strips of artwork: one frame list is reused and the **sheet-Y
-offset picks the creature**, 0 and 24 for the chicken, 48 and 72 for the frog.
-Before concluding that a sheet is unaddressed, compare the drawn row bands
-against the tile Y values the frames use.
+frames for nine strips of artwork. One frame list is reused and the engine adds a
+sheet-Y offset that the SHP never names: the offset picks the **object** (0
+chicken, 48 frog, 96 crystal) and a further **+24 picks the game's second camera
+pitch**, the same object redrawn with its vertical extent gone. Before concluding
+that a sheet is unaddressed, compare the drawn row bands against the tile Y values
+the frames use - and when a band turns out to be a near-copy of its neighbour, ask
+what engine-wide state selects it, not what the unit is doing.
 
 **Frames are grouped front then back.** FFT draws two directions, front
 (down-left) and back (up-left), and mirrors them for the other two. The engine's
@@ -111,7 +121,7 @@ needs, and what already exists:
 | Battle maps, views, depth | `MAP/MAPxxx.GNS` | `extract.py`, `map_budget.py` | works; see `fft-map-extraction` |
 | Human bodies | `BATTLE/*.SPR` + `TYPE1/2.SHP` | `units.py` | works |
 | Monsters | `BATTLE/*.SPR` + `MON.SHP/SEQ` | `monster_body_assets.py` | works |
-| Creatures (chicken, frog) | `BATTLE/OTHER.SPR/SHP` | `other_actors.py` | works |
+| Creatures (chicken, frog) | `BATTLE/OTHER.SPR/SHP` | `other_actors.py --header` | works |
 | Weapons | `BATTLE/WEP.SPR` + `WEP1/2` | `weapons.py` | works |
 | Portraits | unit sheets | `management_assets.py` | works |
 | UI, status icons, numbers | `EVENT/FRAME.BIN` | none yet | read by hand so far |

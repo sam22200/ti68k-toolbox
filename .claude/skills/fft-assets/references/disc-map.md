@@ -24,6 +24,13 @@ raw = disc.read(*files['BATTLE/OTHER.SPR'])
 - then the sheet: 256 pixels wide, 4 bits per pixel, low nibble = left pixel.
   `spr[512:512 + 128*256]` reshaped (256, 128) gives the packed rows.
 
+**`OTHER.SPR` is the exception: its pixels start at 0x400.** It is the one sheet
+with 512 colours, thirty-two palettes of sixteen, five each for the chicken, the
+frog, the chest and the crystal. Read it at 0x200 like every other sheet and the
+whole image slides up four rows: the creatures lose their feet and the palette
+bytes come back as two rows of noise above them. The giveaway is geometric - with
+the right base every object sits flush on the bottom row of its 24-row cell.
+
 Luminance for the TI, as `units.py` fixes it: over a colour's 0..31 components,
 `<= 7` black, `<= 16` dark, `<= 22` light, else white; **colour 1 is FFT's own
 line colour and is always black**.
@@ -54,14 +61,21 @@ from `BATTLE.BIN` (below). `OTHER.SHP` has 17 frames only.
 
 `TYPE1..4`, `MON`, `OTHER`, `WEP1/2`, `ARUTE`, `CYOKO`, `KANZEN`, `RUKA`,
 `EFF1/2`. No parser in the project yet, but the layout is known from `OTHER.SEQ`:
-a four-byte header, then **128 little-endian u32 pointers**, then the sequence
-data. Those pointers are relative to the data, which in `OTHER.SEQ` starts at
+a four-byte header, then **128 little-endian u32 pointers** starting at offset 4,
+then the sequence data. `TYPE1.SEQ` and `MON.SEQ` have the same shape. Those pointers are relative to the data, which in `OTHER.SEQ` starts at
 **0x408** and not right after the table: 0x220 to 0x400 is `FF` padding, so find
 the data by scanning for the first filled region rather than trusting
 `4 + 4*count`. A sequence is a run of `(frame, duration)` byte pairs with `FF xx`
 opcodes between them; the opcodes take arguments of differing length, so a fixed
 two-byte stride drifts and invents frame ids. Reading only the pair distribution
 is enough to tell which frames an animation uses.
+
+The pointer table alone says a lot without decoding anything. In `OTHER.SEQ`,
+slots 6-23 and 24-41 have **identical pointer deltas** - eighteen sequences of the
+same byte lengths, twice over: the chicken's animations and the frog's, built from
+the same fourteen frames with different timings. Further on, a run of two-byte
+sequences holds the static poses, among them `0f 00` and `10 00`, the treasure
+chest's two sides.
 
 The human sequences were read by hand and are recorded in `units.py`:
 
@@ -88,27 +102,42 @@ Identities 1..52 are the named humans, 96..133 the generic job bodies
 
 ## `BATTLE/OTHER.SPR` and `OTHER.SHP`
 
-What a transformed or dead unit wears. The sheet holds, top to bottom: two rows
-of **chicken**, two rows of **frog**, a row of **crystals**, and the **treasure
-chest** down the right edge.
+What a transformed or dead unit wears, and what it leaves behind. Pixels start at
+**0x400** here, not 0x200 (above).
 
-`OTHER.SHP` has **17 frames**: 0 a small marker, 1-14 the creature, 15-16 the
-chest. Every creature frame is a single 16x24 tile at sheet x = 0, 16, 32 ... 208
-and **sheet y = 0**.
+`OTHER.SHP` has **17 frames**: 0 a small marker, 1-14 a creature, 15-16 the
+treasure chest. Every creature frame is a single 16x24 tile at sheet
+x = 0, 16, 32 ... 208 and **sheet y = 0**; the chest's two frames are 24x24 at
+x = 224, y = 0 and y = 48.
 
-**One frame list serves both creatures: the sheet-Y offset picks which.** The
-drawn row bands fall exactly on 0, 24, 48 and 72, and rendering the same fourteen
-frames at each offset gives, in order, chicken strip A, chicken strip B, frog
-strip A, frog strip B. Frame 16, the chest at y = 48, is the hint that other tile
-rows are addressed the same way.
+**The sheet is a grid of object slot by drawing mode, and the shape table names
+neither.** The slot is a sheet-Y offset the engine adds: **0 chicken, 48 frog,
+96 crystal**. Frames 15 and 16 spend the first two slots on the chest's two sides
+instead, and `OTHER.SEQ` holds each as a static two-byte sequence, `0f 00` and
+`10 00`. The crystal has no frame of its own at all: it is frames 1-8 at +96.
 
-**Facing is not the strip.** `OTHER.SEQ` settles it: every sequence has a twin
-five frames later, `01 06 / 03 08 / 01 04 / 02 04` against `06 06 / 08 08 /
-06 04 / 07 04`, over and over, and frames 1-5 rendered beside 6-10 show the same
-creature turned. So **frames 1-5 face the camera and 6-10 face away**, the same
-convention `units.py` records for the human bodies, with the engine's mirror bit
-giving left from right. The engine only needs the first strip of each creature;
-what the second one is for is still open.
+**The mode is a further +24, and it is the second camera pitch.** Nothing in the
+SHP or the SEQ ever names y = 24 or y = 72, so the engine applies it, and it
+applies to the treasure chest exactly as to the creatures - which rules out any
+per-unit state, since a chest has none. What the +24 drawing changes is only the
+vertical extent: the chest keeps its lid and its base outline and loses the eight
+rows of wall between them, the chicken and the frog lose the legs that reach down,
+and every drawing is pixel-identical to its twin for the ten rows above the cut.
+The game has two battle camera pitches, about 26.5 degrees and an upper view, and
+the PS1 cannot foreshorten a sprite to match: a sprite quad takes the camera's X
+and Z zoom but not its Y, so the second pitch has to be drawn by hand. The
+crystal, a floating diamond with no vertical face and no ground contact, is the
+one object with no +24 twin. *Not yet watched happening in the original; the
+evidence above is the sheet's own structure.*
+
+Our camera has one pitch, so a rip takes the +0 drawings and ignores the rest.
+
+**Facing is not the strip either.** Every sequence in `OTHER.SEQ` has a twin five
+frames later, `01 06 / 03 08 / 01 04 / 02 04` against `06 06 / 08 08 / 06 04 /
+07 04`, over and over, and frames 1-5 rendered beside 6-10 show the same creature
+turned. So **frames 1-5 face the camera and 6-10 face away**, the same convention
+`units.py` records for the human bodies, with the engine's mirror bit giving left
+from right.
 
 `other_actors.py --header` writes both creatures from this.
 
