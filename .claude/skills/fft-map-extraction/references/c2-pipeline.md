@@ -253,7 +253,9 @@ and nowhere else, so nothing but the side quest reaches them. **Zarghidas Trade
 City is not among them** although Cloud's battle is listed as optional, because
 the same area also takes random battles. Pass `--include-optional` to count them.
 
-Of the **94 that remain: 63 fit, 4 cosmetic, 27 structural, none unreadable.**
+Of the **94 that remain: all 94 fit**, after one prop drop, six approved crops
+and a 32-byte cap raise. The groups below are what the arbitration started from
+(63 fit, 4 cosmetic, 27 structural) and how each was closed.
 Every over-budget map has a workable remedy, which is the point of the census:
 
 - the 4 cosmetic fit once their props are gone: Roof of Riovanes Castle (5, two
@@ -518,6 +520,55 @@ Two things this exposes.
 
 None of the three has a free answer. Each is a trade between heads clipped above
 and ground lost below, and that is a decision for a person on the picture.
+
+### The last seven, and the census closed
+
+With the underside gone, the seven maps still over the cap were reviewed with
+`crop_review.py` (2026-11-25). Every one has an answer, and the crops are far
+cheaper than they were before the skirt removal -- Slums in Dorter used to give
+up 35 rows of foreground ground and now gives up none.
+
+| map | over | crop | spare | what it costs |
+|----:|-----:|------|------:|---------------|
+|  26 Weapon storage of Yardow | +536 | sc_h 195 at +10 | 84 | **nothing** |
+|  62 Chapel of Orbonne | +2,488 | sc_h 180 at +22 | 56 | **nothing** -- empty vault above the room |
+|  16 Inside of Limberry Castle | +1,056 | sc_h 176 at +20 | 8 | **nothing** |
+|  88 Finath River | +200 | sc_h 198 at +28 | 24 | 6 rows of head |
+| 100 Public Cemetery | +3,344 | sc_h 164 at +58 | 16 | 16 rows of head |
+|  32 Slums in Dorter | +408 | sc_h 194 at +26 | 8 | 26 rows of head added (14 are inherent) |
+|  67 North Wall of Bethla | +32 | sc_h 199 at +0 | 12 | 14 rows of head and **2 rows of ground** |
+
+**Three crop with nothing lost at all**: no head clipped, no ground gone, the
+whole unit band inside the window. Chapel of Orbonne is the one to note, since it
+is a scene and the enclosure question was expected to bite there: it does not.
+The 22 rows it gives up are the empty vault above the room, and not one wall has
+to go.
+
+**Three lose only head rows**, which the camera's 39 virtual rows normally cover
+and which cost the top of a sprite, never a unit's position.
+
+**North Wall of Bethla is the only one that loses ground**, two rows -- and it is
+also the map that is over by only **32 bytes**. Raising `FFT_CORE_DEPTH_MAX` by
+32 removes the crop entirely and still leaves 404 bytes on the Zeklaus 13-unit
+diagnostic (INSTALLED_RAM_ABI99.md). That is the one place where the RAM lever is
+worth pulling; at +408 for Dorter it would leave 28 bytes and is not.
+
+**Approved and applied, 2026-11-25.** The six crops are
+`extract.MAP_CROP`, as (rows, offset) measured from the view's **first lit row**
+-- the same reference `depth_budget` and `crop_review` use, not row 0 of the
+canvas -- and `crop_window()` refuses one that runs past the content rather than
+shipping a window of rows the view does not have. North Wall of Bethla is
+deliberately absent: `FFT_CORE_DEPTH_MAX` went 18,488 -> **18,520** for it, a
+core change the constant's own comment prescribes.
+
+**The census is closed: 94 of 94 fit.** No cosmetic map, no structural map, none
+unreadable. One prop drop in the whole game (Sweegy's tallest tree), six crops,
+one 32-byte cap raise.
+
+It is not comfortable, and the thin end is worth stating: North Wall of Bethla
+fits by **0 bytes** -- it is the map the cap was raised for, so it lands exactly
+on it, the same footing as Orbonne's 8 before. Then Inside of Limberry and Slums
+in Dorter at 40, Public Cemetery at 48, Roof of Riovanes and Finath River at 56.
 
 ### One mesh, several records (map 53)
 

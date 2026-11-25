@@ -19,7 +19,15 @@
 // it is now the measured maximum itself. The contract is unchanged -- a bigger view is
 // still refused, at packaging and at load -- it simply has no slack: raise this with the
 // view that needs it, as a core change.
-#define FFT_CORE_DEPTH_MAX 18488U
+//
+// 2026-11-25: raised 18,488 -> 18,520 for North Wall of Bethla Garrison (map 67), the one
+// map of the census whose crop would have taken ground a unit stands on -- two rows of it,
+// to save 32 bytes. The map measures 18,520 at its full 202 rows, so it now fits exactly,
+// with no slack, which is the same footing as Orbonne's 8 bytes. The cost is 32 bytes of
+// the battle's RAM, measured live against the worst case: the Zeklaus 13-unit diagnostic
+// has 436 free (campaign/INSTALLED_RAM_ABI99.md), so 404 remain. Slums in Dorter, over by
+// 408, was refused the same trade: it would have left 28.
+#define FFT_CORE_DEPTH_MAX 18520U
 // The companion image's block (campaign/COMPANION.md), reserved at battle start whatever its
 // current size: tools/module.py refuses a bigger image, fft.c a bigger loaded one. Raise it
 // with the image (a core change); the battle's RAM requirement counts it.

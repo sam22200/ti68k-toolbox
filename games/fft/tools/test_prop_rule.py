@@ -165,6 +165,36 @@ class ApprovedDrops(unittest.TestCase):
         self.assertEqual(sorted(extract.PROPS_DROPPED), [74])
 
 
+class ApprovedCrops(unittest.TestCase):
+    """extract.MAP_CROP: the authoring decision, measured off the first LIT row."""
+
+    def test_a_map_with_no_approved_crop_keeps_its_whole_content(self):
+        self.assertEqual(extract.crop_window(22, 16, 202), (16, 202))
+
+    def test_an_approved_crop_is_offset_from_the_first_lit_row(self):
+        try:
+            extract.MAP_CROP[999] = (180, 22)
+            self.assertEqual(extract.crop_window(999, 16, 202), (38, 180))
+        finally:
+            del extract.MAP_CROP[999]
+
+    def test_a_crop_that_runs_past_the_content_is_refused(self):
+        """A silent overrun would ship a window of rows the view does not have."""
+        try:
+            extract.MAP_CROP[999] = (180, 40)
+            with self.assertRaises(ValueError):
+                extract.crop_window(999, 16, 202)
+        finally:
+            del extract.MAP_CROP[999]
+
+    def test_every_approved_crop_is_a_map_the_census_knows(self):
+        self.assertEqual(sorted(extract.MAP_CROP), [16, 26, 32, 62, 88, 100])
+
+    def test_north_wall_of_bethla_is_not_cropped(self):
+        """It was the only crop that took ground; the depth cap was raised instead."""
+        self.assertNotIn(67, extract.MAP_CROP)
+
+
 class ReviewTool(unittest.TestCase):
     """cosmetic_prop_review calls into the rule; moving it must not break it silently."""
 
