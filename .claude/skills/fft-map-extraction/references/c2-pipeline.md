@@ -519,6 +519,42 @@ Two things this exposes.
 None of the three has a free answer. Each is a trade between heads clipped above
 and ground lost below, and that is a decision for a person on the picture.
 
+### The last seven, and the census closed
+
+With the underside gone, the seven maps still over the cap were reviewed with
+`crop_review.py` (2026-11-25). Every one has an answer, and the crops are far
+cheaper than they were before the skirt removal -- Slums in Dorter used to give
+up 35 rows of foreground ground and now gives up none.
+
+| map | over | crop | spare | what it costs |
+|----:|-----:|------|------:|---------------|
+|  26 Weapon storage of Yardow | +536 | sc_h 195 at +10 | 84 | **nothing** |
+|  62 Chapel of Orbonne | +2,488 | sc_h 180 at +22 | 56 | **nothing** -- empty vault above the room |
+|  16 Inside of Limberry Castle | +1,056 | sc_h 176 at +20 | 8 | **nothing** |
+|  88 Finath River | +200 | sc_h 198 at +28 | 24 | 6 rows of head |
+| 100 Public Cemetery | +3,344 | sc_h 164 at +58 | 16 | 16 rows of head |
+|  32 Slums in Dorter | +408 | sc_h 194 at +26 | 8 | 26 rows of head added (14 are inherent) |
+|  67 North Wall of Bethla | +32 | sc_h 199 at +0 | 12 | 14 rows of head and **2 rows of ground** |
+
+**Three crop with nothing lost at all**: no head clipped, no ground gone, the
+whole unit band inside the window. Chapel of Orbonne is the one to note, since it
+is a scene and the enclosure question was expected to bite there: it does not.
+The 22 rows it gives up are the empty vault above the room, and not one wall has
+to go.
+
+**Three lose only head rows**, which the camera's 39 virtual rows normally cover
+and which cost the top of a sprite, never a unit's position.
+
+**North Wall of Bethla is the only one that loses ground**, two rows -- and it is
+also the map that is over by only **32 bytes**. Raising `FFT_CORE_DEPTH_MAX` by
+32 removes the crop entirely and still leaves 404 bytes on the Zeklaus 13-unit
+diagnostic (INSTALLED_RAM_ABI99.md). That is the one place where the RAM lever is
+worth pulling; at +408 for Dorter it would leave 28 bytes and is not.
+
+So the census closes: **87 of 94 fit as extracted, 6 need an authored crop that
+costs at most some head rows, and 1 is a 32-byte trade.** Nothing is
+unsalvageable and nothing needs geometry removed beyond the underside.
+
 ### One mesh, several records (map 53)
 
 Map 53, **Entrance to Death City**, used to read as nothing at all (`IndexError`,
