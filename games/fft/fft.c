@@ -4014,6 +4014,11 @@ static u8 unit_pose(u8 i);              // rest of the drawing
 static void mod_install(u8 id,u8 *dst)
 {
     const u8 *m = mod_images[id];
+    // An absent image used to be read anyway: RD16(m,4) off a null pointer takes
+    // its offset from the exception vectors, and the ModCtx written at dst+that
+    // lands wherever -- an odd one faults the 68000 on the first u16 field, which
+    // is how three TI checks died (ti68k-c-patterns.md). Refuse instead.
+    if(!m)return;
     {
         u16 offset=RD16(m,4);
         ModCtx *c=(ModCtx *)(dst+offset);
@@ -4054,7 +4059,9 @@ static u16 (*comp_entry)(u8,u8);
 static ModCtx *comp_bind(u8 id)
 {
     const u8 *m=mod_images[id];
-    ModCtx *c=(ModCtx *)((u8 *)comp_block+RD16(m,4));
+    ModCtx *c;
+    if(!m)return RT_NULL;
+    c=(ModCtx *)((u8 *)comp_block+RD16(m,4));
     if(comp_id!=id+1||c->w!=W||c->map_tiles!=map_tiles||c->unit_count!=encounter_units){
         mod_install(id,(u8 *)comp_block);comp_id=(u8)(id+1);comp_ctx=RT_NULL;
     }

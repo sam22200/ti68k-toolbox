@@ -1331,9 +1331,32 @@ the offset from it.
 
 Found this way, 2026-11-25: FFT's `core-actions-check`, `core-jump-check` and
 `core-compact-check` all die the same way on their TI leg, at program offsets
-0x6c32, 0x5c24 and 0x5c2a, on `ir 357a` -- `move.w <source>,(d16,A2)`. The
-pointer is even and inside the heap; the displacement is odd. So a `u16` is
-being stored through a pointer the compiler was told nothing about, which the PC
-build and the sanitizers let through and a 68000 does not. Look for a `u8 *`
-cast to `u16 *`, or a struct field read with an arithmetic offset, rather than
-for a corrupt pointer.
+0x6c32, 0x5c24 and 0x5c2a, on `ir 357a` -- `move.w <source>,(d16,A2)`.
+
+**Traced to the end**, and the lesson is that the odd side was the pointer, not
+the displacement. The faulting store is `move.w sc_h,18(%a2)` inside
+`mod_install()`, one of a run filling a `ModCtx` at displacements 12, 13, 14,
+16, 18, 20 -- all even. So `A2` itself is odd, and it comes from
+
+```c
+const u8 *m = mod_images[id];
+ModCtx *c = (ModCtx *)(dst + RD16(m, 4));
+```
+
+with `mod_images[id]` **null**: `RD16(NULL,4)` reads the exception vectors and
+returns whatever is there, so the context lands at an arbitrary offset and an
+odd one faults on its first `u16`. `mod_install()` and `comp_bind()` now refuse
+a missing image instead.
+
+That is as far as it goes: with the refusal in place the three checks run ten
+times further and then call through a null entry pointer (`pc 000006`), because
+the images were never installed at all -- `mod_ready()` returns false under
+`ti-cycles`, and with `--frames 0` the runtime does not even reach `W`. Guarding
+the trials on `W` the way `check_banks.c` does makes them pass while running
+nothing, which is worse than the crash, so it was not done. **The three checks
+remain red, and what they need is for `mod_ready()` to succeed under ti-cycles.**
+
+The general lesson: when an address error names an odd address, decide which
+side is odd before hunting. A pointer with even displacements means the pointer
+is wrong; an even pointer with an odd displacement means a `u16` is stored
+through a cast the compiler never saw.
