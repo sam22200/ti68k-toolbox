@@ -409,6 +409,56 @@ framing rather than visibility". Chapel of Orbonne and map 51 are the two scenes
 to try it on. Do not fold this into the classifier before the extractor has shown
 it on several maps.
 
+### What a crop costs a unit, calibrated on Gariland
+
+A structural map can only give up scene rows, and the two ends are **not**
+symmetric. `camera_clamp.h` says why:
+
+```c
+#define CAM_MT 39                   // body, smaller round pointer and six pixels of headroom
+if (*y < -CAM_MT) *y = -CAM_MT;     // virtual blank rows preserve actor/number headroom
+if (*y > SC_H - RT_H) *y = SC_H - RT_H;
+```
+
+A unit is drawn on the **screen**, not into the scene —
+`draw_unit_covered(f.x - st.camx, f.y - st.camy, ...)` — so the scene only bounds
+the scenery and what bounds the unit is how far the camera may scroll. **Above the
+scene there are 39 virtual blank rows**, which is exactly `UNIT_SH 26 + FOE_H 7 +
+6`. **Below the scene there are none.**
+
+So: a row cut off the top is free until those 39 are spent; a row cut off the
+bottom takes ground a unit stands on, and that unit is drawn off the scene with
+no way to scroll to it. Never trade a bottom row for a top one.
+
+**Gariland calibrates the rule.** Its band runs 21 rows above its own scene —
+inside the 39 — and nothing below, so it is clean, and any rule that calls it
+clipped is wrong. An earlier version of `crop_review.py` did exactly that, having
+measured the band without reading the clamp.
+
+`crop_review.py` computes the band over all four views and every walkable tile,
+then two windows: the tallest that fits the cap, and the one that loses nothing
+below whatever it costs. Chapters I and II, 2026-11-25:
+
+| map | band | budget crop | nothing lost below |
+|----:|------|-------------|--------------------|
+|  22 Gariland | -21..184 | sc_h 202, **clean** | same |
+|  32 Slums in Dorter | -53..206 | sc_h 172, clips 14 above **35 below** | sc_h 202, over by **2,904** |
+|  12 Gate of Lionel | -41..206 | sc_h 177, clips 2 above **30 below** | sc_h 202, over by **1,576** |
+|  83 Zirekile Falls | -83..170 | sc_h 178, clips 56 above, 0 below | sc_h 190, over by **1,200** |
+|  87 Bariaus Valley | -47..176 | sc_h 156, clips 66 above, 0 below | — |
+
+Two things this exposes.
+
+- **Some of the loss is inherent, not caused by the crop.** Dorter already stands
+  units 53 rows above its own scene at full height, 14 past the 39 it is allowed;
+  Zirekile 83, which is 44 past. Those rows are gone before any arbitration.
+- **For Dorter and Lionel the binding constant is `SC_HMAX` 202, not
+  `FFT_CORE_DEPTH_MAX`.** Both need a window reaching row 206, so 207 rows, and
+  the engine's scene cannot be that tall whatever the depth budget says.
+
+None of the three has a free answer. Each is a trade between heads clipped above
+and ground lost below, and that is a decision for a person on the picture.
+
 ### One mesh, several records (map 53)
 
 Map 53, **Entrance to Death City**, used to read as nothing at all (`IndexError`,

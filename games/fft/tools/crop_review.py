@@ -12,13 +12,23 @@ This measures that band, compares it with the tallest window the budget allows,
 and renders the dearest view with the lost rows shaded and the band outlined, so
 the crop is approved on the picture and not on the arithmetic alone.
 
-**The band is not a gate, it is a measurement, and the reason is Gariland.** That
-map ships and is played, and it already breaks the rule: one of its walkable
-roofs at height 10, seen from view 1, puts a unit's feet on the very first lit
-row, so 21 of that unit's rows are above everything the bank holds. Whatever the
-engine does about it, it is what shipping already tolerates. So this tool reports
-how far a window clips the band and leaves the verdict to a person, and the
-calibration it still needs is a runtime look at a unit standing on that roof.
+**The two ends are not symmetric, and camera_clamp.h says why.** A unit is drawn
+on the SCREEN, not into the scene: `draw_unit_covered(f.x - st.camx, f.y -
+st.camy, ...)`. So the scene only bounds the scenery, and what bounds the unit is
+how far the camera may scroll:
+
+    if (*y < -CAM_MT) *y = -CAM_MT;       // CAM_MT 39, virtual blank rows
+    if (*y > SC_H - RT_H) *y = SC_H - RT_H;
+
+**Above the scene there are 39 virtual blank rows** -- "body, smaller round
+pointer and six pixels of headroom", which is exactly UNIT_SH 26 + FOE_H 7 + 6 --
+so a head up to 39 rows above the first scene row is drawn in full. **Below the
+scene there is nothing.** A row cut off the top is free until the 39 are spent; a
+row cut off the bottom takes ground a unit stands on, and that unit is then drawn
+off the scene with no way to scroll to it.
+
+Gariland calibrates it: its band runs 21 rows above its scene, inside the 39, and
+nothing below. That is a clean map, and the rule reproduces it.
 
 usage: crop_review.py [MAP...] [--out campaign/x/crop-review]
 """
@@ -38,6 +48,7 @@ import extract         # noqa: E402
 import map_budget      # noqa: E402
 
 UNIT_SH, UNIT_FOOT = 26, 21        # units.h
+CAM_MT = 39                        # camera_clamp.h: virtual blank rows above the scene
 LOST = np.array([255, 70, 70])     # rows the crop drops
 BAND = (40, 120, 255)              # the rows a unit needs
 
@@ -107,15 +118,38 @@ def main():
                                                max(0, t[0] - need_lo), t[1]))
             best = (h, o, c)
             break
-        clip_above = max(0, best[1] - need_lo) if best else None
+        # above, the first CAM_MT rows are free; below, none are
+        clip_above = max(0, (best[1] - need_lo) - CAM_MT) if best else None
         clip_below = max(0, need_hi - (best[1] + best[0] - 1)) if best else None
+
+        # What the map already loses at full height, before any crop: several of
+        # these maps stand units more than CAM_MT above their own scene.
+        inherent = max(0, -need_lo - CAM_MT)
+        # The window that loses NOTHING BELOW, whatever it costs: its bottom must
+        # hold the band, and among those the one clipping least above. Reported
+        # even when it is over the cap, because that number is the ask. SC_HMAX
+        # alone can make it impossible: Slums in Dorter needs 207 rows of 202.
+        keep_all = None
+        for h in range(min(depth_budget.ROWS, content), 0, -1):
+            cands = [(max(0, (o - need_lo) - CAM_MT), cost(o, h), o)
+                     for o in range(0, content - h + 1) if o + h > need_hi]
+            if cands:
+                ca, c, o = min(cands)
+                keep_all = (h, o, c, ca)
+                break
 
         row = dict(map=m, name=e['name'], worst=e['worst'], over=e['over'],
                    content_rows=content, unit_band=[need_lo, need_hi], unit_rows=need_rows,
                    sc_h=best and best[0], offset=best and best[1],
                    worst_after=best and best[2],
                    clipped_above=clip_above, clipped_below=clip_below,
-                   clean=best is not None and not clip_above and not clip_below)
+                   inherent_above=inherent,
+                   clean=best is not None and not clip_above and not clip_below,
+                   lossless_sc_h=keep_all and keep_all[0],
+                   lossless_offset=keep_all and keep_all[1],
+                   lossless_worst=keep_all and keep_all[2],
+                   lossless_clipped_above=keep_all and keep_all[3],
+                   lossless_over=keep_all and keep_all[2] - depth_budget.LIMIT)
         report.append(row)
         print('map %3d %-24s content %3d  unit band %3d..%3d (%3d rows)  '
               'crop sc_h %s at +%s -> %s (%s spare)  clips %s above, %s below'
@@ -123,23 +157,57 @@ def main():
                  best and best[0], best and best[1], best and best[2],
                  best and depth_budget.LIMIT - best[2], clip_above, clip_below),
               flush=True)
+        print('        %d row(s) already lost above at full height; adding nothing needs %s'
+              % (inherent,
+                 'sc_h %d at +%d -> %d, %d more clipped above, %s' % (
+                     keep_all[0], keep_all[1], keep_all[2], keep_all[3],
+                     'FITS with %d spare' % (depth_budget.LIMIT - keep_all[2])
+                     if keep_all[2] <= depth_budget.LIMIT
+                     else 'OVER THE CAP BY %d' % (keep_all[2] - depth_budget.LIMIT))
+                 if keep_all else 'no window at all (SC_HMAX %d)' % depth_budget.ROWS),
+              flush=True)
 
-        # the picture: the dearest view, lost rows shaded, the unit band outlined
+        # the picture: the source and the two windows, side by side
         rot = e.get('dearest_view', 0)
         v = views[rot]
-        g = np.frombuffer(np.packbits(np.unpackbits(v[0]).reshape(-1, 320)), np.uint8)
         light = np.unpackbits(v[0], axis=1)[:, :extract.SC_W]
         dark = np.unpackbits(v[1], axis=1)[:, :extract.SC_W]
         grey = (255 - 85 * (light + 2 * dark)).astype(np.uint8)
-        img = np.repeat(grey[lo:hi, :, None], 3, 2).copy()
-        if best:
-            keep = slice(best[1], best[1] + best[0])
-            mask = np.ones(content, bool)
-            mask[keep] = False
-            img[mask] = (.45 * img[mask] + .55 * LOST).astype(np.uint8)
-        pic = Image.fromarray(img)
+        base = np.repeat(grey[lo:hi, :, None], 3, 2).copy()
+
+        def shaded(win):
+            img = base.copy()
+            if win:
+                drop = np.ones(content, bool)
+                drop[win[1]:win[1] + win[0]] = False
+                img[drop] = (.45 * img[drop] + .55 * LOST).astype(np.uint8)
+            return img
+
+        labels = ['source (view %d), blue = the rows a unit needs' % rot,
+                  'the budget crop: sc_h %s, clips %s above %s below'
+                  % (best and best[0], clip_above, clip_below),
+                  'nothing lost below: sc_h %s, %s'
+                  % (keep_all and keep_all[0],
+                     ('fits, %d spare' % (depth_budget.LIMIT - keep_all[2]))
+                     if keep_all and keep_all[2] <= depth_budget.LIMIT else
+                     ('over by %d' % (keep_all[2] - depth_budget.LIMIT)) if keep_all
+                     else 'impossible, SC_HMAX %d' % depth_budget.ROWS)]
+        panels = [base, shaded(best), shaded(keep_all)]
+        PAD = 10
+        w = sum(pp.shape[1] for pp in panels) + PAD * (len(panels) + 1)
+        sheet = np.full((content + 2 * PAD + 14, w, 3), 255, np.uint8)
+        x = PAD
+        for pp in panels:
+            sheet[PAD + 14:PAD + 14 + content, x:x + pp.shape[1]] = pp
+            x += pp.shape[1] + PAD
+        pic = Image.fromarray(sheet)
         d = ImageDraw.Draw(pic)
-        d.rectangle([0, need_lo, extract.SC_W - 1, need_hi], outline=BAND)
+        x = PAD
+        for pp, text in zip(panels, labels):
+            d.text((x, 2), text, fill=(0, 0, 0))
+            d.rectangle([x, PAD + 14 + max(0, need_lo), x + extract.SC_W - 1,
+                         PAD + 14 + min(content - 1, need_hi)], outline=BAND)
+            x += pp.shape[1] + PAD
         pic.save(args.out / ('map-%03d-crop.png' % m))
 
     (args.out / 'crop.json').write_text(json.dumps(report, indent=2) + '\n')
