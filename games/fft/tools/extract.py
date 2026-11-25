@@ -134,6 +134,146 @@ def polygons(mesh):
     return out
 
 
+
+def terrain(mesh, nx, nz):
+    """Per tile and level: walkability and standable top, over BOTH terrain levels.
+
+    walk 0 blocked, 1 ordinary, 2 crossed but never stopped on. FFT gives a walk-2
+    tile the standing geometry's own height, not the ground's: Sweegy's trees are
+    tiles of height 17-18 over ground near 4.
+
+    Two things that flag does NOT say, both learned the hard way (c2-pipeline.md):
+
+    - a tile with no second level carries eight zero bytes, and reading that as an
+      ordinary tile of height 0 collapses the ground under everything. Map 3 has
+      117 absent level-1 entries of 117, Chapel of Orbonne 116 of 140.
+    - walk 2 is not decoration, it is "you cannot stop here", and you cannot stop
+      on a WALL either. So a flagged tile is decoration when it RISES above the
+      ordinary ground around it -- one level with the ground carries nothing, and
+      Araguay flags two such tiles beside a trunk -- and when its 4-connected
+      component among the rising ones is FREE-STANDING: a wall is the room's
+      enclosure and runs along the map's edge, furniture stands in the middle.
+      A single tile is always free-standing, since three of Araguay's five trees
+      grow at the very edge of the map.
+
+      That splits the Chapel of Orbonne's one 33-tile component spanning 13x10 on
+      the border, and the Book Storage's 10x2 back wall, from the Book Storage's
+      three 2x1 bookcases in the middle of the room and Sweegy's five lone trees.
+    """
+    p0 = struct.unpack('<I', mesh[0x68:0x6C])[0]
+    n = nx * nz
+    walk = [0] * n
+    top = [None] * n
+    flagged = {}
+    for level in (0, 1):
+        base = p0 + 2 + 8 * n * level
+        for i in range(n):
+            b = mesh[base + 8 * i:base + 8 * i + 8]
+            if not any(b):            # this tile has no such level
+                continue
+            w = 0 if b[6] & 0x01 else 2 if b[6] & 0x02 else 1
+            h = max(corners(b[2], b[3] & 0x1F, b[4] if (b[3] & 0x1F) else 0))
+            if w == 2:
+                flagged[(i % nx, i // nx)] = h
+            elif w == 1 and (top[i] is None or h > top[i]):
+                top[i] = h
+                walk[i] = 1
+    rising = {}
+    for (x, z), h in flagged.items():
+        near = [top[(z + dz) * nx + x + dx]
+                for dz in (-1, 0, 1) for dx in (-1, 0, 1)
+                if 0 <= x + dx < nx and 0 <= z + dz < nz
+                and top[(z + dz) * nx + x + dx] is not None]
+        if near and h > max(near):
+            rising[(x, z)] = h
+    props = []
+    for comp in components(rising):
+        edge = any(x in (0, nx - 1) or z in (0, nz - 1) for x, z in comp)
+        if len(comp) > 1 and edge:
+            continue                  # the room's own enclosure, not furniture
+        props += [(x, z, rising[(x, z)]) for x, z in comp]
+    return walk, top, props
+
+
+def components(cells):
+    """The 4-connected components of a set of (x, z) tiles."""
+    seen, out = set(), []
+    for c in cells:
+        if c in seen:
+            continue
+        stack, comp = [c], []
+        seen.add(c)
+        while stack:
+            x, z = stack.pop()
+            comp.append((x, z))
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                q = (x + dx, z + dz)
+                if q in cells and q not in seen:
+                    seen.add(q)
+                    stack.append(q)
+        out.append(comp)
+    return out
+
+
+def prop_polygons(polys, top, props, nx, nz, grow=0.75):
+    """Every polygon standing over a decorative tile, trunk and overhanging canopy.
+
+    Removing part of a prop saves nothing: the rest draws the same silhouette and no
+    span moves (measured on Sweegy, 48 of 144 tree polygons removed changed the stream
+    by zero bytes).
+
+    The ground under the prop is kept: only geometry above the HIGHEST standable
+    neighbour goes. FFT gives the prop tile the prop's own height, so the ground
+    under it has to be guessed from around it, and the lowest neighbour guesses too
+    low -- it took the ground out from under Sweegy's and Araguay's trees and left
+    white holes in the floor. The highest neighbour leaves no stump on either. A
+    hole that survives this is in the source: the Book Storage's floor under a
+    bookcase has no polygon of its own, the object's base draws it.
+    """
+    out = []
+    for x0, z0, _ in props:
+        ground = [top[(z0 + dz) * nx + x0 + dx]
+                  for dz in (-1, 0, 1) for dx in (-1, 0, 1)
+                  if 0 <= x0 + dx < nx and 0 <= z0 + dz < nz
+                  and top[(z0 + dz) * nx + x0 + dx] is not None]
+        floor = max(ground) if ground else 0
+        cx, cz = x0 + .5, z0 + .5
+        for i, q in enumerate(polys):
+            v = q[0]
+            x, z = v[:, 0].mean() / 28, v[:, 2].mean() / 28
+            if abs(x - cx) <= grow and abs(z - cz) <= grow and (-v[:, 1] / 12).max() > floor:
+                out.append(i)
+    return sorted(set(out))
+
+
+# Props the authoring pass has approved dropping, as the tiles they stand on.
+# A map over FFT_CORE_DEPTH_MAX whose excess is carried by free-standing scenery
+# gives up the FEWEST props that clear it, never all of them: what a prop costs
+# is whether it widens a row's span, so one inside the silhouette is free.
+# Each line is a decision reviewed on the picture (cosmetic_prop_review.py
+# --minimal) and measured by depth_budget.minimal_props(). Dropping these tiles'
+# geometry is the only thing this does; no other map is touched.
+PROPS_DROPPED = {
+    5:  [(9, 4), (9, 5), (9, 6)],      # Roof of Riovanes: 3 of 5 roof turrets, 18,888 -> 17,976
+    50: [(0, 11)],                     # Murond Holy Place: 1 of 8, a corner turret, 18,536 -> 18,056
+    74: [(9, 10), (1, 1), (9, 2)],     # Sweegy Woods: 3 of 5 trees, 21,640 -> 17,472
+    80: [(0, 0), (10, 8), (0, 7), (5, 6)],   # Araguay Woods: 4 of 5 trunks, 21,232 -> 18,304
+}
+
+
+def dropped_props(mesh, nx, nz, m=None):
+    """Polygon indices this map's approved prop drops remove, [] for every other map."""
+    tiles = PROPS_DROPPED.get(MAP if m is None else m)
+    if not tiles:
+        return []
+    _, top, props = terrain(mesh, nx, nz)
+    by_tile = {(x, z): (x, z, h) for x, z, h in props}
+    missing = [t for t in tiles if t not in by_tile]
+    if missing:
+        raise ValueError('map %d: no prop on tile(s) %s' % (MAP if m is None else m, missing))
+    return prop_polygons(polygons(mesh), top, [by_tile[t] for t in tiles], nx, nz)
+
+
 K = 4                                           # supersampling
 SC_W, SC_OY, BG = 320, 64, 40.0                 # fft.h: SC_BYTES * 8, SC_OY; background marker
 SOURCE_CAMERA = False                          # historical controls retain their archived views
@@ -213,6 +353,9 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
     mesh = mesh_blob(disc, files)
     pal = np.array(struct.unpack_from('<256H', mesh, struct.unpack_from('<I', mesh, 0x44)[0])).reshape(16, 16)
     polys = polygons(mesh)
+    drop = set(dropped_props(mesh, nx, nz))
+    if drop:
+        polys = [q for i, q in enumerate(polys) if i not in drop]
     sc_h = 6 * (nx + nz) + 6 * maxh + 8                            # fft.h SC_H
     out, q = [], None
     gsum, gcnt = np.zeros(nx * nz * 5), np.zeros(nx * nz * 5)

@@ -41,55 +41,37 @@ def row_spans(view, y0, rows):
     return out
 
 
-def terrain(mesh, nx, nz):
-    """Per tile and level: walkability and standable top, over BOTH terrain levels.
+def minimal_props(polys, tops, props, tex, pal, nx, nz, sc_h, limit=None):
+    """The fewest props whose removal clears the cap, biggest saver first.
 
-    walk 0 blocked, 1 ordinary, 2 crossed but never stopped on. FFT marks a purely
-    decorative prop with walk 2 and gives the tile the PROP's own height, not the
-    ground's: Sweegy's four trees are tiles of height 17-18 over ground near 4.
-    That flag, not geometry analysis, is what identifies decoration.
+    Removing every prop is the classifier's TEST, not the remedy. What a prop
+    costs is not its pixels but whether it widens a row's span, so props inside
+    the silhouette are free and the ones on its edge carry everything. Measured:
+    St. Murond Temple is 48 bytes over and ONE of its eight props -- a corner bell
+    tower worth 480 -- clears it, so the other tower, the spire and the small
+    trees all stay. Sweegy keeps two of its five trees, Roof of Riovanes keeps the
+    turret that reads as part of the roofline.
+
+    Returns (props to remove, resulting depth), or (None, best depth) if removing
+    them all is still not enough.
     """
-    p0 = struct.unpack('<I', mesh[0x68:0x6C])[0]
-    n = nx * nz
-    walk = [0] * n
-    top = [None] * n
-    props = []
-    for level in (0, 1):
-        base = p0 + 2 + 8 * n * level
-        for i in range(n):
-            b = mesh[base + 8 * i:base + 8 * i + 8]
-            w = 0 if b[6] & 0x01 else 2 if b[6] & 0x02 else 1
-            h = max(extract.corners(b[2], b[3] & 0x1F, b[4] if (b[3] & 0x1F) else 0))
-            if w == 2:
-                props.append((i % nx, i // nx, h))
-            elif w == 1 and (top[i] is None or h > top[i]):
-                top[i] = h
-                walk[i] = 1
-    return walk, top, props
+    limit = LIMIT if limit is None else limit
 
+    def without(chosen):
+        dec = set()
+        for p in chosen:
+            dec |= set(extract.prop_polygons(polys, tops, [p], nx, nz))
+        return depth_of([q for i, q in enumerate(polys) if i not in dec],
+                        tex, pal, nx, nz, sc_h)[0], dec
 
-def prop_polygons(polys, top, props, nx, nz, grow=0.75):
-    """Every polygon standing over a decorative tile, trunk and overhanging canopy.
-
-    Removing part of a prop saves nothing: the rest draws the same silhouette and no
-    span moves (measured on Sweegy, 48 of 144 tree polygons removed changed the stream
-    by zero bytes). The ground under the prop is kept: only geometry above the lowest
-    standable neighbour goes.
-    """
-    out = []
-    for x0, z0, _ in props:
-        ground = [top[(z0 + dz) * nx + x0 + dx]
-                  for dz in (-1, 0, 1) for dx in (-1, 0, 1)
-                  if 0 <= x0 + dx < nx and 0 <= z0 + dz < nz
-                  and top[(z0 + dz) * nx + x0 + dx] is not None]
-        floor = min(ground) if ground else 0
-        cx, cz = x0 + .5, z0 + .5
-        for i, q in enumerate(polys):
-            v = q[0]
-            x, z = v[:, 0].mean() / 28, v[:, 2].mean() / 28
-            if abs(x - cx) <= grow and abs(z - cz) <= grow and (-v[:, 1] / 12).max() > floor:
-                out.append(i)
-    return sorted(set(out))
+    alone = sorted(((without([p])[0], p) for p in props), key=lambda t: t[0])
+    taken = []
+    for _, p in alone:
+        taken.append(p)
+        got, _ = without(taken)
+        if got <= limit:
+            return taken, got
+    return None, (without(props)[0] if props else None)
 
 
 def map_views(disc, files, m):
@@ -206,6 +188,10 @@ def main():
                          window_offset=y0 - lo, per_view=per_view, worst=worst,
                          span_bytes=[t - 4 * rows for t in per_view], over=worst - LIMIT,
                          fits=worst <= LIMIT)
+            # extract.views() already dropped this map's approved props, so `worst` is
+            # what ships. Say so, or the census would read as if the map fitted by itself.
+            if m in extract.PROPS_DROPPED:
+                entry['props_dropped'] = [list(t) for t in extract.PROPS_DROPPED[m]]
             if worst > LIMIT:
                 # Why is it over? FFT flags a decorative prop as a tile that may be crossed
                 # but never stopped on, and gives that tile the prop's own height. Remove
@@ -215,8 +201,8 @@ def main():
                 mesh, nx, nz, _ = map_budget.load(disc, files, m)
                 tex, pal = texture_palette(disc, files, m, mesh)
                 polys = extract.polygons(mesh)
-                _, tops, props = terrain(mesh, nx, nz)
-                dec = set(prop_polygons(polys, tops, props, nx, nz))
+                _, tops, props = extract.terrain(mesh, nx, nz)
+                dec = set(extract.prop_polygons(polys, tops, props, nx, nz))
                 sc_h_full = 6 * (nx + nz) + 6 * maxh + 8
                 bare = (depth_of([q for i, q in enumerate(polys) if i not in dec],
                                  tex, pal, nx, nz, sc_h_full)[0] if dec else worst)
@@ -251,9 +237,11 @@ def main():
                        entry['depth_without_props'], LIMIT - entry['depth_without_props'],
                        entry['max_fitting_sc_h'], entry['rows_to_lose'],
                        entry['rows_lost_above'], entry['rows_lost_below'], entry['fitting_worst']))
-            print('map %3d %-24s sc_h %3d worst %5d %s%s' % (
+            print('map %3d %-24s sc_h %3d worst %5d %s%s%s' % (
                 m, entry['name'][:24], rows, worst,
-                'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'], tail),
+                'ok, %d spare' % (LIMIT - worst) if entry['fits'] else 'OVER +%d' % entry['over'],
+                '  (after dropping %d approved prop(s))' % len(entry['props_dropped'])
+                if 'props_dropped' in entry else '', tail),
                 flush=True)
         except Exception as exc:
             report['maps'][str(m)] = dict(error='%s: %s' % (type(exc).__name__, exc))
