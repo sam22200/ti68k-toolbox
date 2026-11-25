@@ -44,27 +44,52 @@ def row_spans(view, y0, rows):
 def terrain(mesh, nx, nz):
     """Per tile and level: walkability and standable top, over BOTH terrain levels.
 
-    walk 0 blocked, 1 ordinary, 2 crossed but never stopped on. FFT marks a purely
-    decorative prop with walk 2 and gives the tile the PROP's own height, not the
-    ground's: Sweegy's four trees are tiles of height 17-18 over ground near 4.
-    That flag, not geometry analysis, is what identifies decoration.
+    walk 0 blocked, 1 ordinary, 2 crossed but never stopped on. FFT gives a walk-2
+    tile the standing geometry's own height, not the ground's: Sweegy's trees are
+    tiles of height 17-18 over ground near 4.
+
+    Two things that flag does NOT say, both learned the hard way (c2-pipeline.md):
+
+    - a tile with no second level carries eight zero bytes, and reading that as an
+      ordinary tile of height 0 collapses the ground under everything. Map 3 has
+      117 absent level-1 entries of 117, Chapel of Orbonne 116 of 140.
+    - walk 2 is not decoration, it is "you cannot stop here", and you cannot stop
+      on a WALL either. A prop stands on one tile; a wall is a run of them. So
+      decoration is a walk-2 tile that RISES above the ordinary ground around it
+      and stands ALONE among the other rising ones: that splits Sweegy's five
+      isolated trees from the Chapel's single 46-tile perimeter. A walk-2 tile
+      level with the ground carries nothing and is never a prop (Araguay flags
+      two such tiles beside a trunk, which used to hide the trunk in a run).
     """
     p0 = struct.unpack('<I', mesh[0x68:0x6C])[0]
     n = nx * nz
     walk = [0] * n
     top = [None] * n
-    props = []
+    flagged = {}
     for level in (0, 1):
         base = p0 + 2 + 8 * n * level
         for i in range(n):
             b = mesh[base + 8 * i:base + 8 * i + 8]
+            if not any(b):            # this tile has no such level
+                continue
             w = 0 if b[6] & 0x01 else 2 if b[6] & 0x02 else 1
             h = max(extract.corners(b[2], b[3] & 0x1F, b[4] if (b[3] & 0x1F) else 0))
             if w == 2:
-                props.append((i % nx, i // nx, h))
+                flagged[(i % nx, i // nx)] = h
             elif w == 1 and (top[i] is None or h > top[i]):
                 top[i] = h
                 walk[i] = 1
+    rising = {}
+    for (x, z), h in flagged.items():
+        near = [top[(z + dz) * nx + x + dx]
+                for dz in (-1, 0, 1) for dx in (-1, 0, 1)
+                if 0 <= x + dx < nx and 0 <= z + dz < nz
+                and top[(z + dz) * nx + x + dx] is not None]
+        if near and h > max(near):
+            rising[(x, z)] = h
+    props = [(x, z, h) for (x, z), h in rising.items()
+             if not any((x + dx, z + dz) in rising
+                        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
     return walk, top, props
 
 
