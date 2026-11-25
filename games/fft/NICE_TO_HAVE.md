@@ -114,55 +114,50 @@ the auto-equip chooses the same item the original would. It changes no save
 format and no ABI. Note it would also need the shop's Best fit to follow, since
 both read the same measure.
 
-## 5. Jump's horizontal reach -- a gap of one already works; the blocker is one byte
+## 5. Jump's horizontal reach -- DONE, and it needed no ABI change
 
-Jump does not only set the height a unit can climb: it also sets how wide a gap
-it can cross, at **floor(Jump / 2)** empty tiles, with retail clamping ordinary
-Jump to 7 first. So Jump 2-3 crosses 1 tile, 4-5 crosses 2, 6-7 crosses 3.
+Jump sets how wide a gap a unit crosses as well as how high it climbs:
+**floor(Jump / 2)** intervening cells, retail clamping Jump to 7 first. Jump 2-3
+crosses 1 tile, 4-5 crosses 2, 6-7 crosses 3.
 
-**A gap of one is already implemented.** `movement_edges.inc` builds links at
-`for(j=0;j<=(jump>=2)&&j<room;j++)`: j is the number of intervening cells, so
-j=1 is a one-tile gap, exactly `long_jump_limit(2..3)`. It checks the span with
-`surface_jump_layers()` and remembers the cell jumped over in `W->via[t][k]`, so
-a unit standing there still blocks it. The earlier note in this file, that the
-movement graph was the obstacle, was wrong.
+**A gap of one was already built.** `movement_edges.inc` loops
+`for(j=0;j<=(jump>=2)&&j<room;j++)`, j being the count of intervening cells, so
+j=1 was exactly `long_jump_limit(2..3)`.
 
-**Space is not the obstacle either.** A node's edge row is `1 << W->edge_shift`
-= 64 bytes at two bytes a link, so 32 links; the builder emits at most 4
-directions x 2 distances x 2 layers = 16. **Half of every row is unused**, which
-is room for exactly the 4 x 4 x 2 = 32 a gap of three would need. And the nodes
-that want a long jump are the ones beside a gap, whose blocked directions emit
-nothing at all.
+**Two earlier readings of this entry were wrong.** The movement graph was never
+the obstacle, and neither was the `kind` byte. Bits 3-4 of `kind` are *never
+written* by this builder -- it sets bit 0 (j), bit 1 (water), bit 2 (no
+intermediate) and bits 6-7 (direction) -- while `tactical_search.inc` already
+computes `costs_here[kind&3] + ((kind>>3)&3)`. So the extra distance had a free
+field waiting, and the search charges it with no reader changed, no format
+changed and no ABI moved.
 
-**The obstacle is the `kind` byte, and it is full.** Every bit is spoken for:
+What the change does:
 
-| bit | meaning | read at |
-|---|---|---|
-| 0 | j, the intervening cell | `kind&1`, `kind&3` |
-| 1 | water | `kind&2`, `kind&3` |
-| 2 | no intermediate node on this floor | `kind&4` |
-| 3-4 | step cost | `(kind>>3)&3` |
-| 5 | the wide/custom cost family | `kind&32` |
-| 6-7 | the direction, for j links | written `k<<6` |
+- `j` now runs to `long_jump_limit(jump)` where the surface columns exist, and
+  stays at 1 elsewhere, since only those columns can check a longer span;
+- every crossed cell is tested with `surface_jump_layers()`, not just the first;
+- j in bit 0 keeps meaning "this link crosses something", and the cells beyond
+  the first go in bits 3-4;
+- a link of j>1 sets bit 2, "presence is explicit": a real gap holds no unit, so
+  there is no single intermediate cell to watch;
+- the emission stops at the row's `1 << edge_shift` bytes. The rows are 64 bytes
+  at two bytes a link, 32 links, and the old builder emitted at most 16; a gap of
+  three needs 4 x 4 x 2 = 32, which fits exactly. **No RAM is added.** If a row
+  ever filled, j rises last, so the longest jumps are dropped and every step is
+  kept.
 
-`kind = j | (hw[next]&2)` puts j in bit 0, so j=2 would set the water bit. A gap
-of two or three therefore needs a wider field, and `kind` is read by
-`tactical_search.inc`, by the AI through the same links, and across the module
-ABI -- a format change, not a loop bound.
+**What is proved and what is not.** `core-long-jump-check` is green at 318
+checks and now asserts the bit packing directly -- that water survives every j,
+that the extra cost reads back, and that nothing strays into the neighbouring
+bits -- which is where the risk was. The chapter build is clean and `save-test`
+and `manage-test` are unchanged. **No test crosses an actual two- or three-cell
+gap end to end**: that needs a synthetic terrain bound through
+`battle_bind_grid()`/`battle_bind_surface()` inside a check whose runner works,
+and `core-jump-check` and `core-compact-check` both fail on their TI leg on main,
+with this change and without it.
 
-**What it would take**, in order: widen the link record from two bytes to three
-(the rows have the space, the stride does not change, but every reader and the
-ABI version move with it), carry j in its own nibble, and check every
-intervening cell rather than the first -- `long_jump_masks()` in
-`long_jump_geometry.h` already does that part, and its clamp matches retail.
-
-Via is not a problem beyond j=1: a true gap cannot hold a unit, which is what
-`kind&4` ("presence is explicit") already says.
-
-**Worth it?** Only on maps with ravines or separated platforms, and it widens
-every unit's reach, so the AI has to understand it too. The formula and the
-geometry are done; what is left is an ABI change, which belongs with the next
-one that happens for another reason rather than on its own.
+The AI reads the same links, so it sees the new reach for free.
 
 ---
 
