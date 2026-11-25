@@ -200,6 +200,30 @@ Chapter I classifies 9 fits, 1 cosmetic (Sweegy, 5 prop tiles, 258 polygons,
 21,640 -> 15,288) and 1 structural (Slums in Dorter, no prop tile), matching every
 figure established by hand.
 
+**The whole game, 2026-11-24.** 109 maps read; **15 are left out as side quests**
+and `optional_map()` names them: the ten Deep Dungeon floors (NOGIAS, TERMINATE,
+DELTA, VALKYRIES, MLAPAN, TIGER, BRIDGE, VOYAGE, HORROR, END), the three Colliery
+Underground floors with the Underground Passage in Goland, and Nelveska Temple.
+Those three groups appear in the battle compendium under "5) Optional Battles"
+and nowhere else, so nothing but the side quest reaches them. **Zarghidas Trade
+City is not among them** although Cloud's battle is listed as optional, because
+the same area also takes random battles. Pass `--include-optional` to count them.
+
+Of the **94 that remain: 62 fit, 8 cosmetic, 23 structural, 1 unreadable.** Every
+over-budget map has a workable remedy, which is the point of the census:
+
+- the 8 cosmetic all fit once their props are gone, from +184 spare (END) to
+  +5,520 (Chapel of Orbonne);
+- the 23 structural all keep at least 69% of their rows, the worst being Public
+  Cemetery at 159 of 228. None is unsalvageable.
+
+Two cautions. The fitting group is **not** comfortable: Orbonne Monastery fits by
+**8 bytes**, Beoulve residence and Poeskas Lake by 16, and 15 maps sit under 1 KB
+of margin, which is expected since `FFT_CORE_DEPTH_MAX` was derived from Orbonne
+in the first place. And map 53, **Entrance to Death City**, still reads as nothing
+at all (`IndexError`, no lit row); the compendium lists Murond Death City twice
+under Chapter IV, so the map is a story battle and the fault is ours.
+
 **Why a geometric rule does not work.** Five variants were tried and all failed:
 asking whether a polygon floats above the standable top of its tile, or rises more
 than a margin above it, or seeding on floating polygons and growing the cluster.
