@@ -4431,6 +4431,25 @@ static u8 monster_ko_active(u8 i);
 static u8 monster_body_active(u8 i);
 #endif
 #include "actors.inc"
+#ifdef FFT_CREATURE_BODY
+// A transformed unit wears the original's own creature instead of its body.
+// OTHER.SHP holds one frame list and a sheet-Y offset picks the creature; frames
+// 1-5 face the camera and 6-10 face away, and the engine's mirror bit would give
+// left from right. The frames come straight from the program, never from the
+// actor bank, so actor_show below must not mark such a unit resolved in
+// render_poses: unit_frame would then answer from a cache entry nobody filled
+// and the unit would paint as a solid white block.
+static const u8 *unit_creature(const Unit *un)
+{
+    if(DC_OBJ(un->dc))return RT_NULL;
+    if(core_status_current(&un->statuses,SID_CHICKEN>>3)&(u8)(0x80>>(SID_CHICKEN&7)))return chicken_gfx;
+    if(core_status_current(&un->statuses,SID_FROG>>3)&(u8)(0x80>>(SID_FROG&7)))return frog_gfx;
+    return RT_NULL;
+}
+#define CREATURE_WORN(k) (unit_creature(&st.unit[k])!=RT_NULL)
+#else
+#define CREATURE_WORN(k) 0
+#endif
 // One copy for its four callers: the expanded test cost more than the call on a
 // path that decodes a frame. A monster never reaches the human 16-column lookup:
 // its own banks draw it, and if a chapter ships without its family it is left
@@ -4441,10 +4460,10 @@ static void actor_show(const u8 *visible,u8 k)
 #ifdef FFT_CHAPTER
     if(visible[k]&&(DC_OBJ(st.unit[k].dc)||!unit_monster(&st.unit[k]))){
         unit_frame(st.rot,k);
-        if(budget&&!DC_OBJ(st.unit[k].dc))render_poses|=(u16)(1U<<k);
+        if(budget&&!DC_OBJ(st.unit[k].dc)&&!CREATURE_WORN(k))render_poses|=(u16)(1U<<k);
     }
 #else
-    if(visible[k]){unit_frame(st.rot,k);if(budget&&!DC_OBJ(st.unit[k].dc))render_poses|=(u16)(1U<<k);}
+    if(visible[k]){unit_frame(st.rot,k);if(budget&&!DC_OBJ(st.unit[k].dc)&&!CREATURE_WORN(k))render_poses|=(u16)(1U<<k);}
 #endif
 }
 
@@ -4534,16 +4553,8 @@ static const u8 *unit_frame(u8 rot, u8 i)
     const Unit *un = &st.unit[i];
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
 #ifdef FFT_CREATURE_BODY
-    // A transformed unit wears the original's own creature instead of its body.
-    // OTHER.SHP holds one frame list and the creature is picked by a sheet-Y
-    // offset, two strips each, which the rip takes as facing the camera and
-    // facing away; the engine's mirror bit would give left from right.
-    if (!DC_OBJ(un->dc)) {
-        const u8 *cg = RT_NULL;
-        if (core_status_current(&un->statuses, SID_CHICKEN >> 3) & (u8)(0x80 >> (SID_CHICKEN & 7)))
-            cg = chicken_gfx;
-        else if (core_status_current(&un->statuses, SID_FROG >> 3) & (u8)(0x80 >> (SID_FROG & 7)))
-            cg = frog_gfx;
+    {
+        const u8 *cg = unit_creature(un);
         if (cg)
             return cg + (u16)((dir & 1 ? CREATURE_BACK : 0)
                               + ((t >> 3) & (CREATURE_IDLE - 1))) * UNIT_FB;
