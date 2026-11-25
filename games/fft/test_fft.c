@@ -911,11 +911,28 @@ static void test_end(void)
         CHECKV(st.mode, M_PICK); CHECKV(u->dc, DC_GONE);
         if (k) CHECK(st.pick == u->eq[EQ_HEAD] || st.pick == u->eq[EQ_BODY] || st.pick == u->eq[EQ_ACC]
                      || st.pick == u->eq[EQ_WEAPON] || st.pick == u->eq[EQ_SHIELD]);
-        else CHECK(st.pick == 0xFF && ra->hp == ra->max_hp);
+        else CHECK((st.pick == 0xFF || st.pick == PICK_TAUGHT) && ra->hp == ra->max_hp);
         steps(0, PICK_FRAMES);
         CHECKV(st.mode, M_MENU);
         press(K_B);
         CHECK(ra->x == 4 && ra->z == 9 && st.mode == M_BROWSE);
+    }
+    // A crystal teaches every ability it lists, for a set the taker has held: FFT
+    // gives them all, not only the one picked, and refuses a job never unlocked.
+    {
+        Unit *a = &st.unit[0], *b = &st.unit[1];
+        LearnBits had;
+        u8 set0 = a->set;
+        b->dc = DC_CRYSTAL; b->hp = 0;
+        b->set = set0; b->learned = (LearnBits)~a->learned;   // everything the taker lacks
+        had = a->learned;
+        CHECK(crystal_abilities(a, b) == 1);
+        CHECK(a->learned == (LearnBits)(had | b->learned));   // all of them, not one
+        CHECK(crystal_abilities(a, b) == 0);                  // nothing left to teach
+        b->set = (u8)(set0 + 1);                              // a set the taker never held
+        b->learned = (LearnBits)~a->learned;
+        had = a->learned;
+        CHECK(crystal_abilities(a, b) == 0 && a->learned == had);
     }
     // won by keys (fft(14): the last enemy at 1 HP): the results, then a new battle
     sw_init(14);

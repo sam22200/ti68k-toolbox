@@ -169,7 +169,29 @@ static void extra_effects(void)
         for(i=0;i<NUNIT;i++)digest=(digest<<1|digest>>31)^st.unit[i].hp;
     }
 }
-static void trials(void){source_effects();boundaries();ai_predictions();forecasts();extra_effects();}
+// A crystal teaches EVERY ability it lists, not only the one picked, and only
+// for a skill set the taker has held -- a set it never unlocked is the job FFT
+// refuses to teach from. loot.inc, crystal_abilities(). Only the build that
+// compiles loot.inc can call it: with FFT_MODULES the pickup is a mod_call into
+// PARTY, and the rule lives on the other side of it.
+#ifdef FFT_MODULES
+static void crystal_teaching(void){}
+#else
+static void crystal_teaching(void)
+{
+    Unit *a,*b;LearnBits had;u8 set0;
+    reset();a=&st.unit[U_RAMZA];b=&st.unit[10];
+    set0=a->set;
+    b->set=set0;b->learned=(LearnBits)~a->learned;had=a->learned;
+    CHECK(crystal_abilities(a,b),1);
+    CHECK(a->learned,(LearnBits)(had|b->learned));      // all of them at once
+    CHECK(crystal_abilities(a,b),0);                    // nothing left to teach
+    b->set=(u8)(set0+1);b->learned=(LearnBits)~a->learned;had=a->learned;
+    CHECK(crystal_abilities(a,b),0);                    // a set never held
+    CHECK(a->learned,had);
+}
+#endif
+static void trials(void){source_effects();boundaries();ai_predictions();forecasts();extra_effects();crystal_teaching();}
 #ifndef __m68k__
 int main(void)
 {
