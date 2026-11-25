@@ -148,11 +148,39 @@ def depth_of(polys, tex, pal, nx, nz, sc_h):
                for o in range(content - h + 1)), content
 
 
+# The game's optional content, from the guide's own grouping (fft_guides: the
+# battle compendium's "5) Optional Battles", and the walkthrough's Move-Find
+# Item tables, which separate Deep Dungeon [17.tad], Colliery [17.tac] and
+# Nelveska [17.tan] from the story chapters). A chapter package never ships
+# these, so they do not belong in a budget census until the story fits.
+OPTIONAL_DEEP = ('nogias', 'terminate', 'delta', 'valkyries', 'mlapan',
+                 'tiger', 'bridge', 'voyage', 'horror', 'end')
+
+
+def optional_map(name):
+    """The side quest a map belongs to, or None for story and random battles."""
+    n = name.strip().lower()
+    if n in OPTIONAL_DEEP:
+        return 'deep dungeon'
+    if n.startswith('colliery underground') or 'passage in goland' in n:
+        return 'colliery'
+    if 'nelveska' in n or 'nevelska' in n:
+        return 'nelveska temple'
+    # Zarghidas is NOT here: the compendium lists Cloud's battle under the
+    # optional ones, but the same area also takes random battles, so the map is
+    # reached without the side quest. Only maps that exist for nothing else are
+    # left out, which is why each of the three above appears in the compendium
+    # under "5) Optional Battles" and nowhere else.
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('maps', nargs='*', type=int, default=PACK1)
     ap.add_argument('disc', nargs='?', type=Path, default=core_audit.DEFAULT_DISC)
     ap.add_argument('--out', type=Path, default=HERE / 'campaign/x/depth-budget/budget.json')
+    ap.add_argument('--include-optional', action='store_true',
+                    help='count the Deep Dungeon, Colliery, Nelveska and Zarghidas maps too')
     args = ap.parse_args()
     names = json.loads((HERE / 'campaign/x/core-audit/map-viewer-names.json').read_text())
     disc, files = extract.disc_files(str(args.disc))
@@ -239,6 +267,12 @@ def main():
         args.out.write_text(json.dumps(report, indent=2) + '\n')   # resumable
 
     ok = {k: v for k, v in report['maps'].items() if 'error' not in v}
+    if not args.include_optional:
+        skipped = {k: optional_map(v['name']) for k, v in ok.items() if optional_map(v['name'])}
+        report['optional_skipped'] = skipped
+        ok = {k: v for k, v in ok.items() if k not in skipped}
+        print('\nside quests left out of the counts (%d): %s'
+              % (len(skipped), ', '.join(sorted(set(skipped.values())))))
     over = [k for k, v in ok.items() if not v['fits']]
     report['over_limit'] = over
     report['categories'] = {c: [k for k, v in ok.items()
