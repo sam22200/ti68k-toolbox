@@ -4533,6 +4533,16 @@ static const u8 *unit_frame(u8 rot, u8 i)
 #endif
     const Unit *un = &st.unit[i];
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
+#ifdef FFT_CHICKEN_BODY
+    // A chickened unit wears the original's bird instead of its own body. The
+    // frames follow the human convention units.py records, a block facing the
+    // camera then a block facing away, so `dir & 1` picks the block and the
+    // engine's own mirror bit would give left from right.
+    if (!DC_OBJ(un->dc) && (core_status_current(&un->statuses, SID_CHICKEN >> 3)
+                            & (u8)(0x80 >> (SID_CHICKEN & 7))))
+        return chicken_gfx + (u16)((dir & 1 ? CHICKEN_BACK : CHICKEN_FRONT)
+                                   + (t >> 3) % (CHICKEN_FRAMES / 2)) * UNIT_FB;
+#endif
     if (DC_OBJ(un->dc)) {
         if (st.morph_mask & (u16)(1U << i)) {
             if (un->gfx == 255) return object_frame(i);   // a monster: no human Dead frame
@@ -4593,6 +4603,79 @@ static const u8 *unit_frame(u8 rot, u8 i)
 // the others copied first.
 // Depth-1 shader: a short, constant-height pass. The ordinary dry shader
 // stays unchanged; standing units reuse their cached terrain classification.
+#ifdef FFT_STATUS_PICTO
+// The pictogram above unit i this second, or NULL. A unit carrying several
+// statuses shows them one at a time, about a second each, because there is no
+// room to stack them sideways: the unit is sixteen pixels wide and the enemy
+// diamond already takes five of them. st.tick is the ~30 Hz animation clock, so
+// >> 5 holds each picture for about a second and >> 3 twinkles the charge star.
+#define PICTO_PAIR_SHIFT 3              // half the diamond and glyph pair
+#define PICTO_RAISE 1                   // clear of the diamond's own outline
+static const u8 charge_cycle[16] = { 0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0 };
+static const u16 *const *unit_picto(u8 i, u8 *h)
+{
+    const CoreStatus *cs = &st.unit[i].statuses;
+    u8 list[8], n = 0, b, j, g, k, v;
+
+    if (!st.unit[i].hp) return RT_NULL;             // a KO unit shows its counter instead
+    for (b = 0; b < 5 && n < 8; b++) {
+        v = core_status_current(cs, b);
+        while (v) {                                 // a clear byte costs one test, the usual case
+            for (j = 0; !(v & (u8)(0x80 >> j)); j++) ;
+            v &= (u8)~(0x80 >> j);
+            g = picto_of_sid[(b << 3) + j];
+            if (g != 0xFF && n < 8) list[n++] = g;
+        }
+    }
+    if (!n) return RT_NULL;
+    k = (u8)((st.tick >> 5) & 7);                   // no division: n is at most eight
+    while (k >= n) k -= n;
+    g = list[k];
+    if (g == PICTO_COUNT) g = (u8)(PICTO_COUNT + charge_cycle[(st.tick >> 3) & 15]);
+    *h = picto_h[g];
+    return picto_gfx[g];
+}
+#endif
+
+// The team diamond, the status pictogram and a KO unit's death counter, drawn
+// above the head. Shared by the water and ordinary unit paths, which carried the
+// same block twice.
+static void draw_unit_markers(s16 sx, s16 sy, u8 i)
+{
+    RtSprite s;
+    s16 bx = sx - 8;
+#ifdef FFT_STATUS_PICTO
+    u8 ph = 0;
+    const u16 *const *pic = unit_picto(i, &ph);
+#endif
+
+    s.w = 16;
+    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
+        if (st.unit[i].hp) {                    // never covered (it shows a hidden one too); a
+            s.h = FOE_H;                        // small one above a KO enemy
+            s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
+        } else { s.h = FOE_KO_H; s.light = foe_ko_gfx[0]; s.dark = foe_ko_gfx[1]; s.mask = foe_ko_gfx[2]; }
+#ifdef FFT_STATUS_PICTO
+        // With a pictogram beside it the diamond steps left by half the pair, so
+        // the two stay centred on the unit and their outlines share a column.
+        draw_sprite(pic ? (s16)(bx - PICTO_PAIR_SHIFT) : bx, sy - UNIT_FOOT - s.h + 1, &s);
+#else
+        draw_sprite(bx, sy - UNIT_FOOT - s.h + 1, &s);
+#endif
+    }
+#ifdef FFT_STATUS_PICTO
+    if (pic) {
+        s.h = ph; s.light = pic[0]; s.dark = pic[1]; s.mask = pic[2];
+        draw_sprite(st.unit[i].team == TEAM_ENEMY ? (s16)(bx + PICTO_PAIR_SHIFT) : bx,
+                    sy - UNIT_FOOT - s.h + 1 - PICTO_RAISE, &s);
+    }
+#endif
+    if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
+        s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
+        draw_sprite(sx - 3, sy - DC_Y, &s);
+    }
+}
+
 static void __attribute__((noinline)) draw_unit_water(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 {
     RtSprite s;
@@ -4616,17 +4699,7 @@ static void __attribute__((noinline)) draw_unit_water(s16 sx, s16 sy, u8 rot, u8
     draw_sprite(sx - 8, sy + WATER_ROWS - 1, &s);
     sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
-    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
-        if (st.unit[i].hp) {                    // never covered (it shows a hidden one too); a
-            s.h = FOE_H;                        // small one above a KO enemy
-            s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
-        } else { s.h = FOE_KO_H; s.light = foe_ko_gfx[0]; s.dark = foe_ko_gfx[1]; s.mask = foe_ko_gfx[2]; }
-        draw_sprite(sx - 8, sy - UNIT_FOOT - s.h + 1, &s);
-    }
-    if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
-        s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
-        draw_sprite(sx - 3, sy - DC_Y, &s);
-    }
+    draw_unit_markers(sx, sy, i);
 }
 
 #if defined(FFT_CHAPTER) && defined(FFT_ACTOR_BANK)
@@ -4681,17 +4754,7 @@ static void draw_unit_covered(s16 sx, s16 sy, u8 rot, u8 i, const Cover *c)
 markers:
     sy += UNIT_FOOT;
     if (DC_OBJ(st.unit[i].dc)) return;
-    if (st.unit[i].team == TEAM_ENEMY) {        // the team at a glance: a diamond above enemies,
-        if (st.unit[i].hp) {                    // never covered (it shows a hidden one too); a
-            s.h = FOE_H;                        // small one above a KO enemy
-            s.light = foe_gfx[0]; s.dark = foe_gfx[1]; s.mask = foe_gfx[2];
-        } else { s.h = FOE_KO_H; s.light = foe_ko_gfx[0]; s.dark = foe_ko_gfx[1]; s.mask = foe_ko_gfx[2]; }
-        draw_sprite(sx - 8, sy - UNIT_FOOT - s.h + 1, &s);
-    }
-    if (!st.unit[i].hp && st.unit[i].team != TEAM_GUEST) {   // a KO unit's death counter above it
-        s.w = 8; s.h = 7; s.light = s.dark = W->dcg[st.unit[i].dc][0]; s.mask = W->dcg[st.unit[i].dc][1];
-        draw_sprite(sx - 3, sy - DC_Y, &s);
-    }
+    draw_unit_markers(sx, sy, i);
 }
 
 #ifndef FFT_COMPACT_UI
