@@ -209,20 +209,41 @@ and nowhere else, so nothing but the side quest reaches them. **Zarghidas Trade
 City is not among them** although Cloud's battle is listed as optional, because
 the same area also takes random battles. Pass `--include-optional` to count them.
 
-Of the **94 that remain: 62 fit, 8 cosmetic, 23 structural, 1 unreadable.** Every
-over-budget map has a workable remedy, which is the point of the census:
+Of the **94 that remain: 63 fit, 8 cosmetic, 23 structural, none unreadable.**
+Every over-budget map has a workable remedy, which is the point of the census:
 
 - the 8 cosmetic all fit once their props are gone, from +184 spare (END) to
   +5,520 (Chapel of Orbonne);
 - the 23 structural all keep at least 69% of their rows, the worst being Public
   Cemetery at 159 of 228. None is unsalvageable.
 
-Two cautions. The fitting group is **not** comfortable: Orbonne Monastery fits by
+One caution. The fitting group is **not** comfortable: Orbonne Monastery fits by
 **8 bytes**, Beoulve residence and Poeskas Lake by 16, and 15 maps sit under 1 KB
 of margin, which is expected since `FFT_CORE_DEPTH_MAX` was derived from Orbonne
-in the first place. And map 53, **Entrance to Death City**, still reads as nothing
-at all (`IndexError`, no lit row); the compendium lists Murond Death City twice
-under Chapter IV, so the map is a story battle and the fault is ours.
+in the first place.
+
+### One mesh, several records (map 53)
+
+Map 53, **Entrance to Death City**, used to read as nothing at all (`IndexError`,
+no lit row). The cause was ours, not the disc's: **a map's mesh is spread over its
+GNS records.** The primary record (0x2E01, or the first 0x2F01 for the 16 maps that
+carry no 0x2E01) holds the day/clear state, and each later state record fills only
+the header pointers it overrides, inheriting the rest. Map 53 is the only one of the
+121 that uses this for its geometry: it keeps the texture palettes (0x44) and the
+terrain (0x68) on the primary but leaves the polygon pointer (0x40) at 0, and its
+1,062 polygons live in the following 0x2F01. Decoding the primary alone therefore
+drew an empty scene.
+
+`extract.mesh_blob()` is now the single place that decides what a map's mesh is: it
+appends each donor record and rebases the pointer, so every reader keeps working on
+one blob. For the 120 other maps it returns the primary record's bytes unchanged,
+byte for byte — Gariland's shipped `map.h`, `tiles.bin` and `fftv*.bin` were
+re-extracted and are identical. Map 53 measures 17,328 worst over 164 rows and
+**fits with 1,160 bytes to spare**. `tools/test_mesh_blob.py` guards the assembly
+on synthetic records.
+
+Never select a mesh record by type alone. `core_audit.py` was already right
+(`MESH_TYPES` reads all three); the renderer was not.
 
 **Why a geometric rule does not work.** Five variants were tried and all failed:
 asking whether a polygon floats above the standable top of its tile, or rises more

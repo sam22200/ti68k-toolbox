@@ -4,7 +4,8 @@ fftv0.bin .. fftv3.bin, ZX0-packed (lib/zx0pack.py: ~10 KB each from 52 KB), nev
 
 usage: extract.py DISC.cue [preview.png]       (writes map.h, tiles.bin and fftv*.bin here)
 map.h and tiles.bin (the Tile array, 12 bytes a tile, read from ffti: interface.py):
-Reads MAP/MAP022.GNS (the map's resource records), takes the primary mesh (type 0x2E01) and
+Reads MAP/MAP022.GNS (the map's resource records), assembles the mesh (mesh_blob: the
+primary record, type 0x2E01, plus any chunk it leaves to a state record) and
 decodes its terrain block (pointer at 0x68): x and z counts, then 2 levels x z x x tiles of
 8 bytes (byte 0 & 0x3F surface, 2 height, 3 slope height & 0x1F | depth << 5, 4 slope type,
 6 flags: bit 0 blocked). Only level 0 is used (Gariland's level 1 is empty). Format: the
@@ -69,6 +70,39 @@ def gns_records(disc, files):
             break
         out.append((t,) + struct.unpack('<II', gns[i + 8:i + 16]))
     return out
+
+
+def mesh_blob(disc, files):
+    """The map's mesh, with every chunk its primary record leaves empty filled in.
+
+    FFT spreads one mesh over the map's GNS records: the primary (type 0x2E01, or the
+    first 0x2F01 for the many maps that carry no 0x2E01) holds the day/clear state, and
+    each later state record (0x2F01/0x3001, one per time and weather) fills only the
+    header pointers it overrides, inheriting the rest. Entrance to Death City (map 53)
+    is the one map that leans on this for its geometry: its primary mesh gives the
+    texture palettes (0x44) and the terrain (0x68) but leaves the polygon pointer
+    (0x40) at 0, and its 1062 polygons live in the next record. Read alone, that
+    primary draws nothing at all and the whole map measures as empty.
+
+    The donor record is appended whole and the pointer rebased onto the copy, so every
+    reader downstream still works on a single blob. For the 93 other maps the primary
+    carries all three chunks and the blob is that record's bytes, byte for byte.
+    """
+    recs = [r for r in gns_records(disc, files) if r[0] in (0x2E01, 0x2F01, 0x3001)]
+    want = [t for t in (0x2E01, 0x2F01, 0x3001) if any(r[0] == t for r in recs)][0]
+    first = next(i for i, r in enumerate(recs) if r[0] == want)
+    mesh = bytearray(disc.read(*recs[first][1:]))
+    for off in (0x40, 0x44, 0x68):                   # geometry, texture palettes, terrain
+        if struct.unpack_from('<I', mesh, off)[0]:
+            continue
+        for r in recs[first + 1:]:
+            donor = disc.read(*r[1:])
+            p = struct.unpack_from('<I', donor, off)[0]
+            if p:
+                struct.pack_into('<I', mesh, off, len(mesh) + p)
+                mesh += donor
+                break
+    return bytes(mesh)
 
 
 def polygons(mesh):
@@ -173,11 +207,10 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
     """
     recs = gns_records(disc, files)
     tex_rec = next(r for r in recs if r[0] == 0x1701)              # the first: day, no weather
-    mesh_rec = next(r for r in recs if r[0] == 0x2E01)
     t = np.frombuffer(disc.read(tex_rec[1], tex_rec[2]), np.uint8)
     tex = np.empty((1024, 256), np.uint8)
     tex[:, 0::2] = (t & 15).reshape(1024, 128); tex[:, 1::2] = (t >> 4).reshape(1024, 128)
-    mesh = disc.read(mesh_rec[1], mesh_rec[2])
+    mesh = mesh_blob(disc, files)
     pal = np.array(struct.unpack_from('<256H', mesh, struct.unpack_from('<I', mesh, 0x44)[0])).reshape(16, 16)
     polys = polygons(mesh)
     sc_h = 6 * (nx + nz) + 6 * maxh + 8                            # fft.h SC_H
@@ -369,8 +402,7 @@ def view_info(bank, max_rows=202, color_max=16544, depth_max=18488):
 
 def main():
     disc, files = disc_files(sys.argv[1])
-    _, sector, size = [r for r in gns_records(disc, files) if r[0] == 0x2E01][-1]
-    mesh = disc.read(sector, size)
+    mesh = mesh_blob(disc, files)
     p = struct.unpack('<I', mesh[0x68:0x6C])[0]
     nx, nz = mesh[p], mesh[p + 1]
     tiles = []

@@ -93,13 +93,8 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
 
 
 def map_views(disc, files, m):
-    rec, records = map_budget.mesh_record(disc, files, m), extract.gns_records
     _, nx, nz, maxh = map_budget.load(disc, files, m)
-    extract.gns_records = lambda d, f: [(0x2E01,) + rec[1:]] + [r for r in records(d, f) if r[0] != 0x2E01]
-    try:
-        raw, _ = extract.views(disc, files, nx, nz, maxh)
-    finally:
-        extract.gns_records = records
+    raw, _ = extract.views(disc, files, nx, nz, maxh)
     return [np.frombuffer(v, np.uint8).reshape(6, -1, 40) for v in raw], maxh
 
 

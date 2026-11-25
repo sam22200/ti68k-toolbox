@@ -21,9 +21,10 @@ from review_files import save_image, write_changed
 CROSS = np.array([[0,1,0],[1,1,1],[0,1,0]],bool)
 
 
-def source_data(disc, info):
+def source_data(disc, files, info):
     source = info['source']
-    mesh = disc.read(*source['mesh_record'][1:])
+    extract.MAP = source['map']
+    mesh = extract.mesh_blob(disc, files)
     texture_bytes = disc.read(*source['texture_record'][1:])
     assert review.sha(mesh) == source['mesh_sha256']
     assert review.sha(texture_bytes) == source['texture_sha256']
@@ -137,8 +138,8 @@ def main():
     info = json.loads((root/'results.json').read_text())
     preserved = {str(p):[review.sha(p.read_bytes()),p.stat().st_mtime_ns] for p in root.rglob('*')
                  if p.is_file() and p.suffix != '.ti-view-decision'}
-    disc,_ = extract.disc_files(str(args.disc))
-    polygons,props,texture,palette,indices = source_data(disc,info)
+    disc,files = extract.disc_files(str(args.disc))
+    polygons,props,texture,palette,indices = source_data(disc,files,info)
     source = info['source']
     extract.SC_W = source['canvas_width']
     extract.SC_OY = 64
