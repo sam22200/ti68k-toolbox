@@ -78,7 +78,7 @@ def shrink_props(polys, tops, props, nx, nz, scale):
              if 0 <= x0 + dx < nx and 0 <= z0 + dz < nz
              and tops[(z0 + dz) * nx + x0 + dx] is not None]
         c = np.array([(x0 + .5) * 28, -12.0 * (max(g) if g else 0), (z0 + .5) * 28])
-        for i in depth_budget.prop_polygons(polys, tops, [(x0, z0, 0)], nx, nz):
+        for i in extract.prop_polygons(polys, tops, [(x0, z0, 0)], nx, nz):
             v, uv, pal, page = out[i]
             out[i] = (c + (v - c) * scale, uv, pal, page)
     return out
@@ -88,12 +88,12 @@ def review(disc, files, m, name, rot, out, minimal=False, scale=None):
     mesh, nx, nz, maxh = map_budget.load(disc, files, m)
     tex, pal = depth_budget.texture_palette(disc, files, m, mesh)
     polys = extract.polygons(mesh)
-    _, tops, props = depth_budget.terrain(mesh, nx, nz)
+    _, tops, props = extract.terrain(mesh, nx, nz)
     if minimal:
         sc = 6 * (nx + nz) + 6 * maxh + 8
         keep, _ = depth_budget.minimal_props(polys, tops, props, tex, pal, nx, nz, sc)
         props = keep or props
-    dec = set(depth_budget.prop_polygons(polys, tops, props, nx, nz))
+    dec = set(extract.prop_polygons(polys, tops, props, nx, nz))
     bare = (shrink_props(polys, tops, props, nx, nz, scale) if scale
             else [q for i, q in enumerate(polys) if i not in dec])
     sc_h = 6 * (nx + nz) + 6 * maxh + 8
@@ -111,7 +111,7 @@ def review(disc, files, m, name, rot, out, minimal=False, scale=None):
     panels = [full_rgb[box], marked[box], bare_rgb[box]]
     img = sheet(panels, ['source (view %d)' % rot,
                          '%d of %d props, %d polygons, %d px'
-                         % (len(props), len(depth_budget.terrain(mesh, nx, nz)[2]),
+                         % (len(props), len(extract.terrain(mesh, nx, nz)[2]),
                             len(dec), int(lost.sum())) if minimal else
                          '%d prop polygons, %d px' % (len(dec), int(lost.sum())),
                          'every prop at %d%%' % (100 * scale) if scale else 'without them'])

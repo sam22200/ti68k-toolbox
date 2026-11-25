@@ -165,5 +165,18 @@ class ApprovedDrops(unittest.TestCase):
         self.assertEqual(sorted(extract.PROPS_DROPPED), [5, 50, 74, 80])
 
 
+class ReviewTool(unittest.TestCase):
+    """cosmetic_prop_review calls into the rule; moving it must not break it silently."""
+
+    def test_shrink_props_scales_a_prop_about_its_tile(self):
+        import cosmetic_prop_review as review
+        g = ground(5, 5)
+        g[(2, 2)] = (18, FLAGGED)
+        m = mesh(5, 5, g)
+        polys = extract.polygons(m)
+        _, top, props = extract.terrain(m, 5, 5)
+        self.assertEqual(len(review.shrink_props(polys, top, props, 5, 5, 0.5)), len(polys))
+
+
 if __name__ == '__main__':
     unittest.main()
