@@ -44,6 +44,21 @@ static const u8 *contour_gfx;            // masks appended to the existing first
 
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #include "contour_art.inc"
+#if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
+// The chapter executable is at TTPack's size limit, so the status pictograms and
+// the two creatures are read in place from the same archive tail as the tables
+// above instead of being compiled in. fft.h still declares the arrays; unused,
+// they are dropped. The PC build keeps them, where size is free.
+#ifdef FFT_STATUS_PICTO
+#define picto_blob CONTOUR_REF_picto_blob
+#define picto_of_sid CONTOUR_REF_picto_of_sid
+#define charge_cycle CONTOUR_REF_charge_cycle
+#endif
+#ifdef FFT_CREATURE_BODY
+#define chicken_gfx CONTOUR_REF_chicken_gfx
+#define frog_gfx CONTOUR_REF_frog_gfx
+#endif
+#endif
 #define ct_recip CONTOUR_REF_ct_recip           // archived; the headers' copies go unused
 #define weapon_x CONTOUR_REF_weapon_x
 #endif
@@ -4628,8 +4643,10 @@ static const u8 *unit_frame(u8 rot, u8 i)
 // >> 5 holds each picture for about a second and >> 3 twinkles the charge star.
 #define PICTO_PAIR_SHIFT 3              // half the diamond and glyph pair
 #define PICTO_RAISE 1                   // clear of the diamond's own outline
+#ifndef charge_cycle                    // archived on the native chapter, see above
 static const u8 charge_cycle[16] = { 0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,0 };
-static const u16 *const *unit_picto(u8 i, u8 *h)
+#endif
+static const u16 *unit_picto(u8 i)
 {
     const CoreStatus *cs = &st.unit[i].statuses;
     u8 list[8], n = 0, b, j, g, k, v;
@@ -4649,8 +4666,7 @@ static const u16 *const *unit_picto(u8 i, u8 *h)
     while (k >= n) k -= n;
     g = list[k];
     if (g == PICTO_COUNT) g = (u8)(PICTO_COUNT + charge_cycle[(st.tick >> 3) & 15]);
-    *h = picto_h[g];
-    return picto_gfx[g];
+    return picto_blob + (u16)g * PICTO_STRIDE;
 }
 #endif
 
@@ -4662,8 +4678,7 @@ static void draw_unit_markers(s16 sx, s16 sy, u8 i)
     RtSprite s;
     s16 bx = sx - 8;
 #ifdef FFT_STATUS_PICTO
-    u8 ph = 0;
-    const u16 *const *pic = unit_picto(i, &ph);
+    const u16 *pic = unit_picto(i);
 #endif
 
     s.w = 16;
@@ -4682,7 +4697,7 @@ static void draw_unit_markers(s16 sx, s16 sy, u8 i)
     }
 #ifdef FFT_STATUS_PICTO
     if (pic) {
-        s.h = ph; s.light = pic[0]; s.dark = pic[1]; s.mask = pic[2];
+        s.h = PICTO_H; s.light = pic; s.dark = pic + PICTO_H; s.mask = pic + 2 * PICTO_H;
         draw_sprite(st.unit[i].team == TEAM_ENEMY ? (s16)(bx + PICTO_PAIR_SHIFT) : bx,
                     sy - UNIT_FOOT - s.h + 1 - PICTO_RAISE, &s);
     }

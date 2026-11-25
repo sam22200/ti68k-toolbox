@@ -103,6 +103,29 @@ def main():
     table('ct_recip','u16',[int(body[1])],[int(n) for n in re.findall(r'\d+',body[2])])
     body=re.search(r'weapon_x\[(\d+)\] = \{(.*?)\};',(HERE/'weapons.h').read_text(),re.S)
     table('weapon_x','s8',[int(body[1])],[int(n) for n in re.findall(r'-?\d+',body[2])])
+    # The status pictograms and the two transformation creatures, when fft.h turns
+    # them on: the resident battle executable has no room for 4.8 KB of pictures,
+    # so they ship here and fft.c reads them in place. Off, they would be dead
+    # weight in a bank every chapter carries, so the switch is read from fft.h.
+    on=(HERE/'fft.h').read_text()
+    picto_on=re.search(r'^#define FFT_STATUS_PICTO\b',on,re.M)
+    creature_on=re.search(r'^#define FFT_CREATURE_BODY\b',on,re.M)
+    if picto_on:
+      body=re.search(r'static const u16 picto_blob\[(\d+)\] = \{(.*?)\};',(HERE/'status_art.h').read_text(),re.S)
+      table('picto_blob','u16',[int(body[1])],[int(n,0) for n in re.findall(r'0x[0-9A-F]{4}',body[2])])
+      body=re.search(r'static const u8 picto_of_sid\[40\] = \{(.*?)\};',(HERE/'status_art.h').read_text(),re.S)[1]
+      table('picto_of_sid','u8',[40],[int(n,0) if n.startswith('0x') else (int(n) if n.isdigit() else 27) for n in re.findall(r'0x[0-9A-F]+|\d+|PICTO_COUNT',body)])
+      body=re.search(r'static const u8 charge_cycle\[16\] = \{(.*?)\};',(HERE/'fft.c').read_text(),re.S)[1]
+      table('charge_cycle','u8',[16],[int(n) for n in re.findall(r'\d+',body)])
+    if creature_on:
+      creatures=HERE/'creature_art.h'
+      if not creatures.exists():
+          raise SystemExit('%s is missing: run tools/other_actors.py --header first' % creatures)
+      source_c=creatures.read_text()
+      for name in ('chicken_gfx','frog_gfx'):
+          body=re.search(r'static const u8 '+name+r'\[[^]]*\] = \{(.*?)\};',source_c,re.S)[1]
+          values=[int(n,0) for n in re.findall(r'0x[0-9A-F]{2}',body)]
+          table(name,'u8',[len(values)],values)
     for name,width in [('st_names',8),('signs',12),('equip_labels',12),('effects',32),('entries',16),('automatic',16),('team_names',8),('help_lines',34),('chapter_ui',24)]:
         pattern=r'static const char \*const '+name+r'\[[^]]*\]\s*=\s*\{(.*?)\};'
         body=re.search(pattern,source,re.S)[1] if name!='chapter_ui' else re.search(r'static const char chapter_ui\[\d+\]\[24\]=\{(.*?)\};',(HERE/'config.inc').read_text(),re.S)[1]

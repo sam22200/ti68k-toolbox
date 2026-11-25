@@ -94,6 +94,15 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // Chapter packages: the per-chapter numbers, tables and offsets come from the chapter's
 // descriptor (tools/chapter_desc.py, campaign/ENGINE.md), read at load, not from headers.
 #define FFT_CHAPTER
+// Both are written, drawn and checked on screen, and both are off because the
+// resident battle executable has no room for the pair. Measured 2026-11-24, with
+// their pictures already moved to the archive tail (tools/contour_assets.py):
+// 64601 bytes today against TTPack's 64936 ceiling, which is 335 free and already
+// under core_budget.py's 512-byte alert; the creatures cost 114 and the
+// pictograms 324, so either one fits alone and the two together miss by 123.
+// Turning one on here also puts its pictures in the bank, nothing else to do.
+//#define FFT_STATUS_PICTO              // one glyph per status above the head, one at a time
+//#define FFT_CREATURE_BODY             // Chicken and Frog wear the original's own creature
 #endif
 // Both need the chapter's full forty-bit status bitmap: the standalone build
 // carries only the four-flag compact cache, which has no Chicken and no room for
