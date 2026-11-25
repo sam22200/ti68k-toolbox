@@ -154,11 +154,29 @@ A map over the cap is over for one of two reasons, and they need opposite fixes.
 
 ### Arbitration order, measured on Sweegy
 
-1. **Remove whole decorative props.** 17,216, 1,272 spare, every row kept.
-2. **Shrink them instead.** Only works if drastic: uniformly at 35% gives 18,312
-   (176 spare); 50% still fails at 19,312. Height alone is worse — even at 35% of
-   their height the trees leave 18,736, over by 248. Both axes matter roughly
-   equally; it is the canvas area the prop covers, not its height as such.
+1. **Remove the fewest props that clear the cap**, not all of them —
+   `minimal_props()`, and see below. Sweegy needs three of its five trees, which
+   leaves 17,472 with 1,016 spare.
+2. **Shrink them instead and keep every one.** Re-measured 2026-11-25 with the
+   corrected prop set, scaling each prop about its own tile centre at ground level:
+
+   | scale | Sweegy | Araguay |
+   |------:|-------:|--------:|
+   | 75% | 19,352 (over +864) | 18,920 (over +432) |
+   | **60%** | **17,720 (768 spare)** | **18,240 (248 spare)** |
+   | 50% | 16,760 (1,728 spare) | 17,480 (1,008 spare) |
+   | 35% | 15,840 (2,648 spare) | 16,748 (1,740 spare) |
+
+   **60% fits both woods with every tree kept**, and reads as a wood still. Height
+   alone is nearly as good (Sweegy 60% of height: 17,928), so either axis buys
+   something, but uniform is better per unit of ugliness. `--shrink` on the review
+   tool renders it.
+
+   **A flat 2D tree buys nothing.** What the stream pays for is the silhouette: the
+   span is the lit byte range of each row of the *rendered view*, and the budget
+   takes the worst of the four camera orientations. A billboard that still reads as
+   a tree covers the same rows over the same columns in the view that costs most.
+   Only making the prop *smaller* moves a span.
 3. **Shorten the scene.** The last resort, and the only route for a structural map.
    `sc_h` 202 -> 165 for Sweegy (43 rows off the top), 202 -> 172 for Slums in
    Dorter (54 rows off the bottom). They cut from opposite ends because their row
@@ -303,6 +321,68 @@ under a bookcase has no polygon of its own, the object's base draws it.
 There is no "keep it drawn, drop it from the depth" middle road either: the
 stream's span term is measured on the **rendered view**, not on the depth, so a
 prop still in the picture still costs its bytes.
+
+### Removing every prop is the test, not the remedy
+
+The classifier removes them all to ask "would that clear the cap?". The authoring
+pass should remove the **fewest** that do, and `depth_budget.minimal_props()`
+measures it. What a prop costs is not its pixels but whether it widens a row's
+span, so props inside the silhouette are free and the ones on its edge carry
+everything:
+
+| map | over by | props | fewest that clear it | result |
+|----:|--------:|------:|---------------------:|--------|
+|  50 | +48 | 8 | **1** — one corner turret, worth 480 alone | 18,056, 432 spare. The other tower, the spire and the small trees stay |
+|   5 | +400 | 5 | 3 of 5 | 17,976, 512 spare. The big tower stays |
+|  74 | +3,152 | 5 | 3 of 5 | 17,472, 1,016 spare. **Two trees stay** |
+|  80 | +2,744 | 5 | 4 of 5 | 18,304, 184 spare |
+
+St. Murond Temple is the lesson: the map is 48 bytes over and four of its eight
+props save **nothing at all** — they stand inside the roof's silhouette. Removing
+all eight disfigured the building for 976 bytes when 480 were wanted.
+
+`cosmetic_prop_review.py --minimal` renders this version, and `--shrink S` the
+one that keeps every prop at scale S.
+
+### Which maps are fought on, and which are only scenes
+
+The arbitration differs completely. On a **battle** map the camera is tactical and
+every unit must stay visible, so a wall that hides the field is itself a candidate
+for removal. On a **scene** map nothing is played: the framing is the author's, and
+geometry that costs nothing on the dearest view can stay as it is.
+
+`tools/battle_maps.py` answers it from the disc. The join is on an id both sides
+agree about: the GameFAQs compendium's "Debug Number" is the **ENTD**, not the
+event — checked against this project's own extraction, where Orbonne Monastery is
+387 and Gariland is 0x184 = 388 — and `EVENT/ATTACK.OUT`'s scenario table gives
+every event its map and its ENTD. 57 maps host a battle the compendium details.
+
+**The positive list is sound, the negative one is not.** This compendium prints no
+Debug Number at all for Sweegy Woods (ENTD 384), and the entry it labels "Mandalia
+Plains / 388" is really Gariland. So a map's absence means "no battle confirmed",
+never "this is a scene". For one map, read the ENTDs its scenarios use.
+
+Settled that way, for the maps the prop review raised:
+
+| map | scenarios | ENTD | verdict |
+|----:|-----------|-----:|---------|
+|   3 | Hall of St. Murond Temple | 461 | battle (two Divine Knights and a Sorcerer) |
+|   5 | Roof of Riovanes Castle | 433, 434 | battle (Riovanes Rooftop) |
+|  50 | St. Murond Temple | 460 | battle (Murond Holy Place) |
+|  51 | St. Murond Temple | 326, 327 | **scene** — no battle claims those ENTDs |
+|  52 | Chapel of St. Murond Temple | 462 | battle (Arc Knight and two Archaic Demons) |
+|  58 | Underground Book Storage 2F | 422 | battle |
+|  62 | Chapel of Orbonne Monastery | 256 | **scene** — events 1 and 2, the opening |
+
+Two maps are named "St. Murond Temple"; only map 50 is fought on. That is why the
+join has to be on an id and not on a name.
+
+**The interiors are the open problem.** A room's four walls are exactly what the
+enclosure rule protects, and on a battle map they are also what hides the field
+from a tactical camera. Chapel of Orbonne (a scene) may keep all of its; map 51 (a
+scene) likewise; but the Book Storage, St. Murond's hall and the Limberry
+interiors are fought in, and there the authored pass has to choose which walls to
+drop per camera orientation rather than per map. No rule for that yet.
 
 ### One mesh, several records (map 53)
 
