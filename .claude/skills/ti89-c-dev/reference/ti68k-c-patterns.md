@@ -1313,3 +1313,27 @@ chooser.
 `fftmem.py set heap on`) makes `window_cache.inc` log `HeapAvail()`/`HeapMax()`
 once, on the next cached command window. `%lu` prints correctly there, contrary
 to an earlier note about `tilog` and long values.
+
+## A word store at an odd offset is an address error (verified)
+
+The 68000 faults on a 16- or 32-bit access at an odd address. `ti-cycles` now
+decodes the group 0 exception frame rather than printing seven raw words:
+
+```
+ti-cycles:   address error at ODD address 1288b5, writing, pc 046c34, ir 357a, sr 2714
+```
+
+Read it as: the access address, whether it was a read or a write, and the PC.
+The PC is absolute, so the offset inside the program is `pc - 0x40002`
+(`LOAD_ADDR` plus the size word). The emulated heap starts at `0x100000`, so an
+address there is a real allocation and **not** a wild pointer -- what is wrong is
+the offset from it.
+
+Found this way, 2026-11-25: FFT's `core-actions-check`, `core-jump-check` and
+`core-compact-check` all die the same way on their TI leg, at program offsets
+0x6c32, 0x5c24 and 0x5c2a, on `ir 357a` -- `move.w <source>,(d16,A2)`. The
+pointer is even and inside the heap; the displacement is odd. So a `u16` is
+being stored through a pointer the compiler was told nothing about, which the PC
+build and the sanitizers let through and a 68000 does not. Look for a `u8 *`
+cast to `u16 *`, or a struct field read with an arithmetic offset, rather than
+for a corrupt pointer.
