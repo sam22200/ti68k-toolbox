@@ -281,6 +281,15 @@ that kind of task.
 - `fft-map-extraction`: extract FFT battle maps with the approved C2 four-grey
   treatment, source material boundaries and prop silhouettes; preserve full
   geometry/cover and validate shared framing on PC before selected TI checks.
+  Its depth-budget section sorts a map into fits / cosmetic / structural and
+  gives the arbitration order when one is over `FFT_CORE_DEPTH_MAX`.
+- `fft-assets`: where every FFT asset lives on the disc and how to turn it into
+  the TI's four greys: unit and creature sprites, portraits, UI and status icons
+  from `EVENT/FRAME.BIN`, weapons, fonts, item and event text. Holds the disc
+  catalogue with offsets and formats (`references/disc-map.md`), the 208-byte
+  actor frame record, the quantisation and white-outline rules, and the traps
+  (`units.sprite()` is human-only; a shape table can be shorter than its sheet).
+  Read it before ripping new art or extending the asset builder.
 - `ti-commit`: commit (Conventional Commits, one concern per commit, docs delta check) on a branch
   per task, push to `github.com/sam22200/ti68k-toolbox`, merge into `main` once the tests pass.
 - When you learn something new and verified about the platform, add it to
