@@ -246,6 +246,17 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
     return sorted(set(out))
 
 
+# FFT leaves the skirt under a map's terrain untextured, and polygons() draws an
+# untextured polygon black. The PS1's camera never shows it; our four orientations
+# do, and on a cliff map it fills the screen -- Zirekile Falls reads as 13,410
+# pixels of black with its waterfall a sliver at the top. Dropping it is approved
+# art direction (2026-11-25): it frees more depth than every crop put together
+# (20 of 27 structural maps fit on it alone), and a large black mass is dead
+# weight on a 160x100 four-grey LCD. The playable surface is untouched; what
+# changes is that a map no longer sits on a solid block.
+DROP_UNDERSIDE = True
+
+
 # Props the authoring pass has approved dropping, as the tiles they stand on.
 # A map over FFT_CORE_DEPTH_MAX whose excess is carried by free-standing scenery
 # gives up the FEWEST props that clear it, never all of them: what a prop costs
@@ -253,11 +264,11 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
 # Each line is a decision reviewed on the picture (cosmetic_prop_review.py
 # --minimal) and measured by depth_budget.minimal_props(). Dropping these tiles'
 # geometry is the only thing this does; no other map is touched.
+# Once the underside goes, almost nothing else has to. Roof of Riovanes (24
+# spare), Murond Holy Place (1,272) and Araguay Woods (2,160) keep every prop
+# they had, so their entries are gone: the bell towers and all five trunks stay.
 PROPS_DROPPED = {
-    5:  [(9, 4), (9, 5), (9, 6)],      # Roof of Riovanes: 3 of 5 roof turrets, 18,888 -> 17,976
-    50: [(0, 11)],                     # Murond Holy Place: 1 of 8, a corner turret, 18,536 -> 18,056
-    74: [(9, 10), (1, 1), (9, 2)],     # Sweegy Woods: 3 of 5 trees, 21,640 -> 17,472
-    80: [(0, 0), (10, 8), (0, 7), (5, 6)],   # Araguay Woods: 4 of 5 trunks, 21,232 -> 18,304
+    74: [(9, 10)],     # Sweegy Woods: its tallest tree alone, 19,000 -> 16,272 (2,216 spare)
 }
 
 
@@ -353,7 +364,11 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
     mesh = mesh_blob(disc, files)
     pal = np.array(struct.unpack_from('<256H', mesh, struct.unpack_from('<I', mesh, 0x44)[0])).reshape(16, 16)
     polys = polygons(mesh)
+    # Both index sets are taken against the same unfiltered list.
     drop = set(dropped_props(mesh, nx, nz))
+    if DROP_UNDERSIDE:
+        drop |= {i for i, q in enumerate(polys) if q[1] is None}
+    quant_polys = polys                      # see the percentiles below
     if drop:
         polys = [q for i, q in enumerate(polys) if i not in drop]
     sc_h = 6 * (nx + nz) + 6 * maxh + 8                            # fft.h SC_H
@@ -366,7 +381,16 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
         bg = (lum == BG).reshape(sc_h, K, SC_W, K).mean((1, 3)) > .5
         if quantize is None:
             if q is None:                                          # the whole map, view 0
-                q = np.percentile(small[~bg], [25, 55, 82])
+                # The thresholds are percentiles of the view's own pixels, so
+                # removing the underside would re-quantise the WHOLE map: on
+                # Gariland the roofs went black. Measure them on the geometry
+                # the approved C2 treatment was reviewed against, and let the
+                # removal change only what is drawn.
+                ql = render(quant_polys, tex, pal, rot, nx, nz, sc_h)[0] \
+                    if quant_polys is not polys else lum
+                qs = ql.reshape(sc_h, K, SC_W, K).mean((1, 3))
+                qbg = (ql == BG).reshape(sc_h, K, SC_W, K).mean((1, 3)) > .5
+                q = np.percentile(qs[~qbg], [25, 55, 82])
             g = np.where(small > q[2], 0, np.where(small > q[1], 1, np.where(small > q[0], 2, 3)))
         else:
             g = quantize(small, bg)

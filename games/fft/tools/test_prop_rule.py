@@ -162,7 +162,7 @@ class ApprovedDrops(unittest.TestCase):
             del extract.PROPS_DROPPED[999]
 
     def test_every_approved_map_is_one_the_census_knows(self):
-        self.assertEqual(sorted(extract.PROPS_DROPPED), [5, 50, 74, 80])
+        self.assertEqual(sorted(extract.PROPS_DROPPED), [74])
 
 
 class ReviewTool(unittest.TestCase):

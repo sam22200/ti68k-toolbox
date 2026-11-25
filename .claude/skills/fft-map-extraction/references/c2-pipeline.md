@@ -429,20 +429,45 @@ Dropping every untextured polygon, measured 2026-11-25:
 |  22 Gariland (fits already) | 18,304 | 16,168 | 2,136 freed |
 
 **20 of the 27 structural maps fit once the underside goes**, with no crop at all:
-no head clipped, no ground lost, every row kept. Seven remain, and four of those
-are small: North Wall of Bethla +32, Finath River +200, Slums in Dorter +408,
-Weapon storage of Yardow +536. Then Inside of Limberry +1,056, Chapel of Orbonne
-+2,488, Public Cemetery +3,344.
+no head clipped, no ground lost, every row kept.
+
+**Approved and applied, 2026-11-25** (`extract.DROP_UNDERSIDE`). The census now
+reads **87 of 94 fitting, no cosmetic map left, 7 structural**:
+
+| map | over by | crop that would fit |
+|----:|--------:|--------------------:|
+| 100 Public Cemetery | +3,344 | 164 rows |
+|  62 Chapel of Orbonne | +2,488 | 180 |
+|  16 Inside of Limberry Castle | +1,056 | 176 |
+|  26 Weapon storage of Yardow | +536 | 195 |
+|  32 Slums in Dorter | +408 | 194 |
+|  88 Finath River | +200 | 198 |
+|  67 North Wall of Bethla | +32 | 199 |
+
+**It also emptied the prop table.** With the underside gone, Murond Holy Place
+keeps its bell towers (1,272 spare), Araguay Woods all five trunks (2,160) and
+Roof of Riovanes every turret (24). `PROPS_DROPPED` is down to **one entry in the
+whole game**: Sweegy Woods gives up its tallest tree alone, and keeps four.
+
+The tightest fits are now Roof of Riovanes at 24 bytes spare and St. Murond
+Temple at 160, so the group is still not comfortable.
 
 It also helps the *second* constraint, which the depth budget does not measure: a
 large black mass on a 160x100 four-grey LCD is dead weight, and the maps read
 better without it. The playable surface is untouched in every case.
 
 What it changes is the map's silhouette: it no longer sits on a solid block, it
-is cut out against the background. That is a real art decision and it applies to
-every map including the ones that already fit, so it belongs in the same place
-the prop drops do -- reviewed on the picture, then recorded as data.
-`cosmetic_prop_review.py --skirt` renders it.
+is cut out against the background. `cosmetic_prop_review.py --skirt` renders it.
+
+**The trap it hides, and it is not the silhouette.** The four-grey thresholds are
+percentiles of the view's own pixels, so removing a large black mass re-quantises
+the WHOLE map: Gariland's roofs went black and 68 walkable tiles changed their
+top shade. Measure the percentiles on the geometry the approved C2 treatment was
+reviewed against, and let the removal change only what is drawn. With that,
+Gariland re-extracts with `map.h`, every corner, every walkability flag, every
+height, the water and **every top-face shade byte identical**; only the 95 wall
+shades of the faces that were the underside differ, and the four view banks lose
+1,707 bytes. Never let a geometry change pass through the quantiser unpinned.
 
 ### What a crop costs a unit, calibrated on Gariland
 
