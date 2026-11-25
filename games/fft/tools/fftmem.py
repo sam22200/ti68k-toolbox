@@ -5,7 +5,9 @@
                               CT, tile, death counter)
   fftmem.py watch [SECONDS]   events as they happen (turns, modes, moves, HP/MP changes, KOs,
                               outcome), polling RAM every 50 ms until the battle ends
-  fftmem.py set god|fast on|off   the battle's debug flags (st.dbg, debug_battle.inc), live
+  fftmem.py set god|fast|heap on|off  the battle's debug flags (st.dbg, debug_battle.inc),
+                                  live; heap logs HeapAvail/HeapMax once, on the next
+                                  cached command window (window_cache.inc)
 
 State/Unit offsets come from the TI compiler itself (state_layout.c compiled with tigcc -S,
 cached in campaign/x/state_layout.json and rebuilt when fft.h changes). The battle's State is
@@ -187,7 +189,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 2 or sys.argv[1] not in ('battle', 'watch', 'set'):
         sys.exit(__doc__)
     if sys.argv[1] == 'set':
-        bits = {'god': 1, 'fast': 2}
+        bits = {'god': 1, 'fast': 2, 'heap': 4}   # DBG_HEAP: one battle heap log
         if len(sys.argv) != 4 or sys.argv[2] not in bits or sys.argv[3] not in ('on', 'off'):
             sys.exit(__doc__)
         print('dbg =', Battle().write_dbg(bits[sys.argv[2]], sys.argv[3] == 'on'))

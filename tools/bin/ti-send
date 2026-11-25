@@ -9,7 +9,13 @@ for f in "$@"; do
   p=$(cd "$(dirname "$f")" && pwd)/$(basename "$f")
   W=$(xdotool search --name '^TiEmu \(' | head -1)
   [ -n "$W" ] || { echo "ti-send: TiEmu window not found (ti-emu start)" >&2; exit 1; }
-  xdotool windowactivate --sync "$W"; sleep 0.3
+  # A headless Xvfb has no window manager, so _NET_ACTIVE_WINDOW activation is
+  # refused (and xdotool still exits 0). Set the input focus directly, which is
+  # all XTEST needs, and only then try to raise the window.
+  xdotool windowmap "$W" 2>/dev/null || true
+  xdotool windowfocus "$W" 2>/dev/null || true
+  xdotool windowactivate --sync "$W" >/dev/null 2>&1 || true
+  sleep 0.3
   xdotool key F10
   D=$(timeout 10 xdotool search --sync --name '^Open File$' | head -1)
   [ -n "$D" ] || { echo "ti-send: the file chooser did not open" >&2; exit 1; }
