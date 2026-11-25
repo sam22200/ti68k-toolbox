@@ -554,13 +554,20 @@ The native supervisor's heap-lifetime check is documented separately in
   input ceiling: 64601 today, so 335 free, already under `core_budget.py`'s 512-byte
   alert. With their art archived the creatures cost 114 bytes and the pictograms 324.
   Either fits alone; the two together miss by 123.
-- [ ] Resident room has to come from somewhere before both can ship, and the two
+- [x] Measured the ceiling itself (`experiments/heapbig/`, TiEmu Titanium with
+  HW3Patch): **a single heap block stops at 65518 bytes** with 188982 free, and it
+  executes. So one contiguous code image can never pass 65518, whatever the heap
+  says, and dropping TTPack for our own ZX0 self-extractor is worth exactly
+  65518 - 64936 = **582 bytes**. That is enough for both features, with 459 to
+  spare instead of today's 335, but it is a one-off and the wall behind it is the
+  platform's.
+- [ ] Resident room beyond that has to come from splitting code, since the two
   usual levers are spent. Data: 117 bytes of small tables are all that is left in
   `fft.c`. Modules: `MOD_ZONE` is 8932 and equals the largest of the 28 images, but
-  the ten largest sit between 8116 and 8932, so splitting the biggest buys 34 bytes.
-  What remains is raising the ceiling - our own ZX0 self-extractor in place of
-  TTPack - which first needs a measurement nobody has taken: whether a heap block
-  above 64 KB can be allocated and executed on a Titanium with HW3Patch.
+  the ten largest sit between 8116 and 8932, so splitting the biggest buys 34
+  bytes. The zone is a tunable, though: re-split the ten largest images in half and
+  it falls to about 4.5 KB, which is about **4.4 KB of resident room**, paid for in
+  extra module swapping during play. That is the lever that keeps giving.
 - [ ] The CATALOG switch that turns the pictograms off. A new `State` field would move
   the ABI, so it needs a spare bit or another mechanism.
 - [ ] Decide where the art lives for a chapter package: `status_art.h` (about 1.1 KB)

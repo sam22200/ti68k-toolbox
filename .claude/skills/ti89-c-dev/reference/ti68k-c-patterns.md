@@ -626,6 +626,16 @@ GKeyFlush();                             // don't leave the game's keypresses in
   word 92 bytes into `EX_stoBCD` (ROM table entry 0xC0) is 0 (patch in Flash) or the long at
   0xAC is 0x100 (patch in RAM); FFT's `launcher.c` refuses to start otherwise. So self-generated code (dynamic recompilers, code in data files) is not
   portable unpatched; keep code in the program itself.
+- **A single heap block stops at 65,518 bytes** (**verified**, TiEmu Titanium AMS 3.10 with
+  HW3Patch, `experiments/heapbig/`): with 188,982 bytes of heap free, `HeapAllocPtr` grants
+  65,000 and refuses 65,520; a binary search between them lands on **65,518**, the same figure
+  as the per-variable limit, and the refusal is a hard ceiling rather than fragmentation. The
+  block it does grant executes (the `moveq #42,d0; rts` stub returns 42 at its base). So any
+  one contiguous code image - a packed executable unpacked into RAM, a generated routine, an
+  overlay - is capped there whatever the free heap says. TIGCC's `-pack` uses TTPack, whose own
+  input ceiling is 64,936, so writing your own self-extractor around `lib/unpack68k.s` buys
+  **582 bytes and no more**. Past that a program has to be split into several images, which is
+  what FFT's module zone does (`games/fft/module.h`).
 - ON key as a "boss key" (gb68k): an auto-int 6 handler that only sets a flag, polled by the game to
   quick-save and quit (not tested here).
 
