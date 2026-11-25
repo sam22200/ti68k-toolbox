@@ -785,6 +785,15 @@ From the user's play in TiEmu; the milestones themselves are in `ROADMAP.md`.
 - OBSERVED IN FFT: `MAP022.GNS` is a list of 20-byte records (type at +4: 0x1701 texture,
   0x2E01 primary mesh, 0x3001 alternative mesh, 0x3101 end; sector at +8, length at +12) per
   time of day and weather; the primary mesh is `MAP022.9` (35,984 bytes).
+- OBSERVED (2026-11-24, every retail map): **one mesh is spread over several records.** The
+  primary record (0x2E01, or the first 0x2F01 for the 16 maps that carry no 0x2E01) holds the
+  day/clear state, and each later state record fills only the header pointers it overrides,
+  inheriting the rest. Of the 121 maps exactly one leans on that for its geometry: **map 53,
+  Entrance to Death City**, leaves the primary's polygon pointer (0x40) at 0 while keeping the
+  texture palettes (0x44) and the terrain (0x68) there, and puts its 1,062 polygons in the
+  following 0x2F01. Reading the primary record alone draws nothing at all, which is what made
+  the map measure as empty. `extract.mesh_blob()` assembles the chunks; for the 120 other maps
+  it returns the primary record's bytes unchanged, byte for byte.
 - OBSERVED: the mesh's u32 at 0x68 points to the terrain: x count (10), z count (15), then
   2 levels x 15 x 10 tiles of 8 bytes: byte 0 & 0x3F surface, byte 2 height, byte 3 slope height
   (& 0x1F) and depth (>> 5), byte 4 slope type, byte 5 ceiling depth and the transient marks
