@@ -8,7 +8,12 @@ static void monster_refresh(void)
  u8 i;W->nature_units=0;
  for(i=0;i<NUNIT;i++)if(unit_monster(&st.unit[i]))W->nature_units|=(u16)1<<i;
 }
-#else
+// The rest reads the campaign's own scratch (W->surface, W->grid_row), its
+// movement table and the 40-bit status sets, none of which the standalone demo
+// build has -- and that build defines MOD_PART(k) as 1, so without this guard it
+// compiles the chapter branch and fails. Every caller of monster_refresh() is
+// already inside #ifdef FFT_CHAPTER, so there is nothing to stub out.
+#elif defined(FFT_CHAPTER)
 static s16 monster_height(u8 who)
 {
  const Unit *u=&st.unit[who];u8 j,f[3],offset=0,source=who;const u8 *p;s16 h;u8 depth;

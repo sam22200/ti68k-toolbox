@@ -5,7 +5,9 @@ static void attack_roll(u8 a,u8 t)
     (void)a;(void)t;W->nature_pending|=4;
 #elif defined(FFT_MODULES)
     st.atk=a;st.tgt=t;mod_call(MOD_PLANNER,1,0);
-#else
+#elif defined(FFT_CHAPTER)
     weapon_prepare(a,t);
+#else
+    (void)a;(void)t;   // the demo has no weapon abilities to prepare
 #endif
 }

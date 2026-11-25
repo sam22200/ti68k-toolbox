@@ -9,6 +9,10 @@
 #include <string.h>
 #include "../../runtime/platform-sw/rt_sw.h"
 #include "fft.h"
+// status_unit.h defines unit_status_seed() and status_curable() as static
+// inline, and fft.c is a translation unit of its own: without this the test
+// links against nothing.
+#include "status_unit.h"
 #include "oracle.h"
 
 static int fails;
@@ -925,14 +929,15 @@ static void test_end(void)
         u8 set0 = a->set;
         b->dc = DC_CRYSTAL; b->hp = 0;
         b->set = set0; b->learned = (LearnBits)~a->learned;   // everything the taker lacks
-        had = a->learned;
-        CHECK(crystal_abilities(a, b) == 1);
-        CHECK(a->learned == (LearnBits)(had | b->learned));   // all of them, not one
-        CHECK(crystal_abilities(a, b) == 0);                  // nothing left to teach
-        b->set = (u8)(set0 + 1);                              // a set the taker never held
-        b->learned = (LearnBits)~a->learned;
-        had = a->learned;
-        CHECK(crystal_abilities(a, b) == 0 && a->learned == had);
+        had = a->learned; a->hp = 1;
+        pick_up(0, 1);
+        CHECK(st.pick == PICK_TAUGHT);
+        CHECK(a->learned == (LearnBits)(had | (LearnBits)~had));   // all of them, not one
+        CHECK(a->hp == a->max_hp);                            // and the HP and MP as before
+        b->dc = DC_CRYSTAL; b->set = (u8)(set0 + 1);          // a set the taker never held
+        b->learned = (LearnBits)~a->learned; had = a->learned;
+        pick_up(0, 1);
+        CHECK(st.pick == 0xFF && a->learned == had);
     }
     // won by keys (fft(14): the last enemy at 1 HP): the results, then a new battle
     sw_init(14);

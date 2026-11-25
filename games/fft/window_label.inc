@@ -54,7 +54,12 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
             u->team==TEAM_PLAYER
 #endif
         ) {
-            s[n++] = ' '; n = put_n(s, n, ab>=512?battle_save.inv[abilities[ab].bag]:st.bag[abilities[ab].bag]);
+            s[n++] = ' ';
+#ifdef FFT_CHAPTER
+            n = put_n(s, n, ab>=512?battle_save.inv[abilities[ab].bag]:st.bag[abilities[ab].bag]);
+#else
+            n = put_n(s, n, st.bag[abilities[ab].bag]);
+#endif
         }
         if (abilities[ab].kind!=AB_MATH_SELECTOR&&!can_use(W->win_k[2], ab)) c = C_DGRAY;
     } else if (m == M_ACT) {

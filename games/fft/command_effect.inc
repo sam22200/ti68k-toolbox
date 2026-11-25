@@ -1,7 +1,9 @@
 static u8 command_effect(u8 a,u8 t,AbId ab)
 {
     const Ability *b=&abilities[ab];
-    if(hamedo_begin(a,t,ab))return 1;
+#ifdef FFT_CHAPTER
+    if(hamedo_begin(a,t,ab))return 1;   // hamedo.inc is included only by the chapter build
+#endif
 #ifdef FFT_CHAPTER
     mime_record(a,UNIT_CELL(&st.unit[t]),ab,0,0);
     // Deferred callers reach this point only when resolving; arming costs no MP.
@@ -73,7 +75,9 @@ static u8 command_effect(u8 a,u8 t,AbId ab)
     }
 #endif
     st.hit = skill_effect_hit(a, t, ab) == 100;
-    if (b->flags & AF_EVADE) st.hit = magic_hit(a, t, ab, 1);
+#ifdef FFT_CHAPTER
+    if (b->flags & AF_EVADE) st.hit = magic_hit(a, t, ab, 1);   // magic_evasion.inc, likewise
+#endif
     if (!st.hit) return 1;
     st.dmg = skill_amount(a, t, ab,
 #ifdef FFT_CHAPTER

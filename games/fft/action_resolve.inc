@@ -60,7 +60,9 @@ static u8 action_commit(void)
     if(unit_petrified(&st.unit[st.tgt])||unit_airborne(&st.unit[st.tgt])){st.hit=st.push=0;st.dmg=st.self=0;return 0;}
     reaction_before(st.tgt,1);
 #endif
+#ifdef FFT_BATTLE
     if(core_status_current(&st.unit[st.tgt].statuses,3)&1)st.hit=0;
+#endif
     if(!st.hit){
 #ifdef FFT_CHAPTER
         if(st.effect_kind==AB_REFLECT)core_action_queue(&st.action,st.tgt,REACTION_REFLECT,NUNIT);
@@ -134,8 +136,12 @@ static u8 action_commit(void)
         st.effect_kind=AB_GOLEM;st.push=0;return 0;   // whole hit absorbed: no HP, status or push
     }
 #endif
+#ifdef FFT_BATTLE
     u8 redirected=reaction_resources(st.tgt,kind==AB_WISH?AB_HEAL:kind,st.dmg);
     if(redirected)st.effect_kind=AB_MP_DAMAGE;
+#else
+    const u8 redirected=0;
+#endif
     if (kind == AB_DAMAGE) {
         if(!redirected)ut->hp = action_hp(kind,ut->hp,ut->max_hp,st.dmg);
         if (st.push) {
@@ -171,6 +177,7 @@ static u8 action_commit(void)
     if(kind==AB_DAMAGE&&!redirected)reaction_damage(st.tgt,st.dmg);
 #endif
     action_rewards(kind==AB_DAMAGE&&!ut->hp);
+#ifdef FFT_BATTLE
     if(W->nature_units&&kind==AB_DAMAGE&&!redirected&&(st.abil==NO_ABIL||MONSTER_ATTACK(st.abil))){
 #if MOD_CORE
         nature_hit_commit();
@@ -178,6 +185,7 @@ static u8 action_commit(void)
         W->nature_pending|=2;
 #endif
     }
+#endif
     if(st.abil==REACTION_SPLIT)ua->hp=action_hp(AB_HEAL,ua->hp,ua->max_hp,st.dmg);
     else if (st.self) {
         u16 hp=ua->hp;ua->hp=st.self>=hp?0:hp-st.self;

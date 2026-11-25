@@ -856,6 +856,15 @@ static u16 special(u8 a,u8 t,AbId ab,u8 query);
 #include "cast_rules.h"
 #include "jump_rules.h"
 #endif
+#ifndef FFT_CHAPTER
+// The demo has no weapon abilities and no Jump order: their rules live in
+// headers only the chapter includes, while the AI below asks about them in five
+// places. Answer "no such ability", which is what the demo offers, rather than
+// guarding each call.
+#define weapon_order(ab)    0
+#define weapon_kind(a,t,ab) 0
+#define jump_ability(ab)    0
+#endif
 #if MOD_PART(MOD_AI) || MOD_PART(MOD_AI_SETUP) || MOD_PART(MOD_AREA_AI) || MOD_PART(MOD_AI_PREP)
 #if MOD_CORE
 static u8 ranged_reach(u8 a,u8 o,u8 c);

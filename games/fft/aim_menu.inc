@@ -14,7 +14,11 @@ static u8 aim(AbId ab)
     if(ab<512&&cast_area_supported(&abilities[ab],cj_range(common,ab))&&!st.ai)st.mode=M_CAST_RANGE;
 #endif
     if (W) W->win_k[0] = 0;
-    if (ab == NO_ABIL || (abilities[ab].flags&AF_CHARGE) || (u8)(abilities[ab].formula - 0x2b) <= 1 || abilities[ab].formula == 0x25){
+    if (ab == NO_ABIL || (abilities[ab].flags&AF_CHARGE)
+#ifdef FFT_BATTLE
+        || (u8)(abilities[ab].formula - 0x2b) <= 1 || abilities[ab].formula == 0x25
+#endif
+       ){
 #if !MOD_CORE
         return 2; // resident resumes in TURN2 after MOVEMENT has returned
 #else
