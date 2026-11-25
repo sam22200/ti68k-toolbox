@@ -279,6 +279,20 @@ MAP_CROP = {
 }
 
 
+def shipped_polygons(mesh, nx, nz, m=None):
+    """The polygon set the views are built from: the source's, less this map's
+    approved prop drops and, when DROP_UNDERSIDE, its untextured skirt.
+
+    Every consumer must use this. isometric_style.prepare_iso() built its own set
+    straight from polygons() and so kept the skirt after views() stopped drawing
+    it, which made campaign_scenery.py's "depth/mask changed" assertion fire."""
+    polys = polygons(mesh)
+    drop = set(dropped_props(mesh, nx, nz, m))
+    if DROP_UNDERSIDE:
+        drop |= {i for i, q in enumerate(polys) if q[1] is None}
+    return [q for i, q in enumerate(polys) if i not in drop] if drop else polys
+
+
 def crop_window(m, lo, content):
     """(first row, rows) of this map's approved scene window, or the full content."""
     c = MAP_CROP.get(m)
@@ -397,14 +411,8 @@ def views(disc, files, nx, nz, maxh, preview=None, quantize=None, decorate=None)
     tex[:, 0::2] = (t & 15).reshape(1024, 128); tex[:, 1::2] = (t >> 4).reshape(1024, 128)
     mesh = mesh_blob(disc, files)
     pal = np.array(struct.unpack_from('<256H', mesh, struct.unpack_from('<I', mesh, 0x44)[0])).reshape(16, 16)
-    polys = polygons(mesh)
-    # Both index sets are taken against the same unfiltered list.
-    drop = set(dropped_props(mesh, nx, nz))
-    if DROP_UNDERSIDE:
-        drop |= {i for i, q in enumerate(polys) if q[1] is None}
-    quant_polys = polys                      # see the percentiles below
-    if drop:
-        polys = [q for i, q in enumerate(polys) if i not in drop]
+    quant_polys = polygons(mesh)             # see the percentiles below
+    polys = shipped_polygons(mesh, nx, nz)
     sc_h = 6 * (nx + nz) + 6 * maxh + 8                            # fft.h SC_H
     out, q = [], None
     gsum, gcnt = np.zeros(nx * nz * 5), np.zeros(nx * nz * 5)
