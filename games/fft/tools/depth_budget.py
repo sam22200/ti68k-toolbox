@@ -152,6 +152,39 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
     return sorted(set(out))
 
 
+def minimal_props(polys, tops, props, tex, pal, nx, nz, sc_h, limit=None):
+    """The fewest props whose removal clears the cap, biggest saver first.
+
+    Removing every prop is the classifier's TEST, not the remedy. What a prop
+    costs is not its pixels but whether it widens a row's span, so props inside
+    the silhouette are free and the ones on its edge carry everything. Measured:
+    St. Murond Temple is 48 bytes over and ONE of its eight props -- a corner bell
+    tower worth 480 -- clears it, so the other tower, the spire and the small
+    trees all stay. Sweegy keeps two of its five trees, Roof of Riovanes keeps the
+    turret that reads as part of the roofline.
+
+    Returns (props to remove, resulting depth), or (None, best depth) if removing
+    them all is still not enough.
+    """
+    limit = LIMIT if limit is None else limit
+
+    def without(chosen):
+        dec = set()
+        for p in chosen:
+            dec |= set(prop_polygons(polys, tops, [p], nx, nz))
+        return depth_of([q for i, q in enumerate(polys) if i not in dec],
+                        tex, pal, nx, nz, sc_h)[0], dec
+
+    alone = sorted(((without([p])[0], p) for p in props), key=lambda t: t[0])
+    taken = []
+    for _, p in alone:
+        taken.append(p)
+        got, _ = without(taken)
+        if got <= limit:
+            return taken, got
+    return None, (without(props)[0] if props else None)
+
+
 def map_views(disc, files, m):
     _, nx, nz, maxh = map_budget.load(disc, files, m)
     raw, _ = extract.views(disc, files, nx, nz, maxh)

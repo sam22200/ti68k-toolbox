@@ -67,13 +67,35 @@ def sheet(panels, labels):
     return img
 
 
-def review(disc, files, m, name, rot, out):
+def shrink_props(polys, tops, props, nx, nz, scale):
+    """Every prop scaled about its own tile centre, at ground level. The budget
+    pays for the canvas a prop covers, so a smaller tree is a cheaper tree -- and
+    a flat 2D one is not, since it keeps the silhouette we are paying for."""
+    out = list(polys)
+    for x0, z0, _ in props:
+        g = [tops[(z0 + dz) * nx + x0 + dx]
+             for dz in (-1, 0, 1) for dx in (-1, 0, 1)
+             if 0 <= x0 + dx < nx and 0 <= z0 + dz < nz
+             and tops[(z0 + dz) * nx + x0 + dx] is not None]
+        c = np.array([(x0 + .5) * 28, -12.0 * (max(g) if g else 0), (z0 + .5) * 28])
+        for i in depth_budget.prop_polygons(polys, tops, [(x0, z0, 0)], nx, nz):
+            v, uv, pal, page = out[i]
+            out[i] = (c + (v - c) * scale, uv, pal, page)
+    return out
+
+
+def review(disc, files, m, name, rot, out, minimal=False, scale=None):
     mesh, nx, nz, maxh = map_budget.load(disc, files, m)
     tex, pal = depth_budget.texture_palette(disc, files, m, mesh)
     polys = extract.polygons(mesh)
     _, tops, props = depth_budget.terrain(mesh, nx, nz)
+    if minimal:
+        sc = 6 * (nx + nz) + 6 * maxh + 8
+        keep, _ = depth_budget.minimal_props(polys, tops, props, tex, pal, nx, nz, sc)
+        props = keep or props
     dec = set(depth_budget.prop_polygons(polys, tops, props, nx, nz))
-    bare = [q for i, q in enumerate(polys) if i not in dec]
+    bare = (shrink_props(polys, tops, props, nx, nz, scale) if scale
+            else [q for i, q in enumerate(polys) if i not in dec])
     sc_h = 6 * (nx + nz) + 6 * maxh + 8
 
     full_rgb, full_z, full_vis = colour_view(polys, tex, pal, rot, nx, nz, sc_h)
@@ -88,8 +110,11 @@ def review(disc, files, m, name, rot, out):
     box = (slice(rows[0], rows[-1] + 1), slice(cols[0], cols[-1] + 1))
     panels = [full_rgb[box], marked[box], bare_rgb[box]]
     img = sheet(panels, ['source (view %d)' % rot,
+                         '%d of %d props, %d polygons, %d px'
+                         % (len(props), len(depth_budget.terrain(mesh, nx, nz)[2]),
+                            len(dec), int(lost.sum())) if minimal else
                          '%d prop polygons, %d px' % (len(dec), int(lost.sum())),
-                         'without the props'])
+                         'every prop at %d%%' % (100 * scale) if scale else 'without them'])
     path = out / ('map-%03d-%s.png' % (m, name.lower().replace(' ', '-').replace(',', '')[:28]))
     img.save(path)
     return dict(map=m, name=name, view=rot, prop_tiles=len(props), prop_polygons=len(dec),
@@ -104,6 +129,10 @@ def main():
     ap.add_argument('--budget', type=Path,
                     default=HERE / 'campaign/x/depth-budget/all-maps.json')
     ap.add_argument('--out', type=Path, default=HERE / 'campaign/x/cosmetic-props')
+    ap.add_argument('--minimal', action='store_true',
+                    help='remove only the fewest props that clear the cap')
+    ap.add_argument('--shrink', type=float, metavar='S',
+                    help='keep every prop, scaled to S (0.6 = 60%%), instead of removing it')
     args = ap.parse_args()
     budget = json.loads(args.budget.read_text())
     args.maps = args.maps or [int(k) for k in budget['categories']['cosmetic']]
@@ -112,7 +141,8 @@ def main():
     report = []
     for m in args.maps:
         e = budget['maps'][str(m)]
-        r = review(disc, files, m, e['name'], e.get('dearest_view', 0), args.out)
+        r = review(disc, files, m, e['name'], e.get('dearest_view', 0), args.out,
+                   minimal=args.minimal, scale=args.shrink)
         report.append(r)
         print('map %3d %-30s view %d  %4d prop polygons  %6d px (%.1f%% of the scene)  %s'
               % (m, r['name'][:30], r['view'], r['prop_polygons'], r['lost_pixels'],
