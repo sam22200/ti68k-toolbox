@@ -2,6 +2,11 @@
 
 **Active campaign2026-10-24:** user selected1px scenery only. MODE/CATALOG now
 offers Move full-tiles/contour and Tiles covered/over-scenery; no width toggle.
+**2026-11-24:** a third row, Status icons shown/hidden, for the pictogram drawn
+above a unit carrying a status. Its state is `SCENERY_NO_PICTO`, a spare bit of
+`st.scenery` - that byte's own meaning belongs to a review build that is no
+longer compiled, and a new `State` field would have cost four bytes and moved
+`MOD_SIG` for one bit.
 Old1px/2px and perspective sections below are historical. Perspective stays
 in experiments. See [current QA](campaign/QA_FOLLOWUP_2026-10-24.md).
 

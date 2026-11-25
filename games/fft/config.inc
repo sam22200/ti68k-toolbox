@@ -15,6 +15,9 @@ enum {
     CONFIG_EDGE,
 #endif
     CONFIG_OVER,
+#ifdef FFT_STATUS_PICTO
+    CONFIG_PICTO,
+#endif
 #endif
 #ifdef FFT_CONFIG
     CONFIG_ZOOM, CONFIG_MESH,
@@ -62,6 +65,9 @@ static u8 config_update(void)
             }else
 #endif
             if(st.config_row==CONFIG_OVER){st.over^=1;hl_seq++;}
+#ifdef FFT_STATUS_PICTO
+            if(st.config_row==CONFIG_PICTO){st.scenery^=SCENERY_NO_PICTO;hl_seq++;}
+#endif
 #endif
 #ifdef FFT_REACH_CONTOUR
             if(st.config_row==CONFIG_MOVE){
@@ -114,8 +120,9 @@ static void config_draw(void)
 #if defined(__m68k__) && defined(FFT_REACH_CONTOUR)
 #define chapter_ui CONTOUR_REF_chapter_ui
 #else
-    static const char chapter_ui[9][24]={"SETTINGS","Move: full tiles","Move: contour","ENTER:toggle  ESC:back",
-        "Edges: 1px","Edges: 2px","Edges: unavailable","Tiles: covered","Tiles: over scenery"};
+    static const char chapter_ui[11][24]={"SETTINGS","Move: full tiles","Move: contour","ENTER:toggle  ESC:back",
+        "Edges: 1px","Edges: 2px","Edges: unavailable","Tiles: covered","Tiles: over scenery",
+        "Status icons: shown","Status icons: hidden"};
 #endif
     draw_rect(0,0,RT_W,RT_H,C_WHITE);
     draw_text(4,1,chapter_ui[0],F_MEDIUM,C_BLACK);
@@ -127,6 +134,9 @@ static void config_draw(void)
             if(row==CONFIG_EDGE)label=(st.scenery&2) ? 4+(st.scenery&1) : 6;
 #endif
             if(row==CONFIG_OVER)label=7+st.over;
+#ifdef FFT_STATUS_PICTO
+            if(row==CONFIG_PICTO)label=(st.scenery&SCENERY_NO_PICTO) ? 10 : 9;
+#endif
             if(row==st.config_row){draw_rect(3,y-3,154,12,C_BLACK);draw_rect(4,y-2,152,10,C_LGRAY);}
             draw_text(8,y,chapter_ui[label],F_SMALL,C_BLACK);
         }

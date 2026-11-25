@@ -571,7 +571,12 @@ typedef struct {
     u8 party_in;                       // the player's units came from the campaign save (save.inc)
     u8 reward_ready,reward_page,reward_n,reward_scroll,story_done;
     u8 reward_items[UNIT_CAPACITY];
-    u8 scenery;                       // bit0:2px edges, bit1:width choice available in this view bank
+    u8 scenery;                       // historical edge-width review (FFT_EDGE_WIDTH_REVIEW, defined
+                                      // nowhere now): bit0 2px edges, bit1 the choice offered by this
+                                      // view bank. A chapter build leaves those clear and keeps the
+                                      // status pictograms' CATALOG switch here, rather than grow
+                                      // State by four bytes and move MOD_SIG for one bit.
+#define SCENERY_NO_PICTO 4            // CATALOG: draw no status pictogram above a unit
     u8 weather;                       // effective source weather0..7; adds2 native State bytes with alignment
     u16 golem[2];                     // source g_battle_team_golem: allies, enemies (battle-only)
     u32 reward_base,reward_bonus;

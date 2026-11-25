@@ -4651,6 +4651,7 @@ static const u16 *unit_picto(u8 i)
     const CoreStatus *cs = &st.unit[i].statuses;
     u8 list[8], n = 0, b, j, g, k, v;
 
+    if (st.scenery & SCENERY_NO_PICTO) return RT_NULL;   // turned off in CATALOG
     if (!st.unit[i].hp) return RT_NULL;             // a KO unit shows its counter instead
     for (b = 0; b < 5 && n < 8; b++) {
         v = core_status_current(cs, b);
