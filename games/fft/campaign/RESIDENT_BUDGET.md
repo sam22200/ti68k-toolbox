@@ -3,11 +3,14 @@
 Measured 2026-11-24. Everything here was built and weighed, not estimated; where
 a figure is an estimate it says so.
 
-The chapter's battle program `fftbat` is the one at its ceiling, and it is the
-reason the status pictograms and the transformation creatures are written,
-checked on screen and still switched off in `fft.h`. This records what the
-ceiling is, what was tried, and the two routes that remain, so none of it has to
-be rediscovered.
+The chapter's battle program `fftbat` is the one at its ceiling. The status
+pictograms and the transformation creatures now ship, because the ceiling was
+raised; what follows is where it was, what was tried, and what is left for the
+next thing that needs room.
+
+**Resolved 2026-11-24:** TTPack stopped 582 bytes below the platform's own wall
+for no reason, and both features fit once that was corrected. See *Raising the
+ceiling* below and `tools/gcc4ti-patches/`.
 
 ## The numbers
 
@@ -19,10 +22,12 @@ be rediscovered.
 | `core_budget.py` alert threshold | 512 |
 | status pictograms, art already archived | 324 |
 | transformation creatures, art already archived | 114 |
-| both | 458, so **123 over** |
+| both | 458, so **123 over** the old ceiling |
+| ceiling after the packer fix | **65535** |
+| free with both features shipping | 476 |
 
 The program was already under the project's own alert line before either feature
-existed. Either one fits alone; the pair does not.
+existed.
 
 ## What is already out
 
@@ -127,11 +132,15 @@ if (startAddr + inlen - 1 > 0xffff) {                    /* line 1602 */
 
 600 + 64936 - 1 = 65535 exactly. The 600 is pucrunch's C64 load address and means
 nothing on a TI. Lowering it, or testing `inlen` alone, would raise the ceiling to
-about 65535 - enough for both features with room over. The risk is that the
-on-calc decompressor may assume the same 16-bit window including that offset, and
-getting it wrong corrupts a program silently rather than failing. GCC4TI is
-vendored and rebuilt by `tools/build-gcc4ti.sh`, so the patch would have to live
-with that script. **Not attempted.**
+about 65535. **Done**, and checked three ways before it shipped: the packed
+output is byte for byte identical below the old limit; a real 65059-byte image
+round-trips exactly through `ttpack` then `ttunpack`; and a deliberately
+oversized program - 65265 bytes unpacked, 329 above the old ceiling - decompresses
+and runs on a Titanium with its 64200-byte payload summing to the value the
+generator computed on the PC (`experiments/heapbig/bigpack.c`). The patch lives in
+`tools/gcc4ti-patches/` and `tools/build-gcc4ti.sh` applies it, since GCC4TI
+itself is not in git. The same line exists in `ld-tigcc`'s own copy of pucrunch
+and is corrected there too, though `-pack` calls the standalone `ttpack`.
 
 **Our own ZX0 self-extractor cannot replace it.** The idea was a small stub that
 reads the compressed image from an archived variable, decompresses it into a heap
@@ -155,9 +164,10 @@ chapter. On a machine where RAM is the scarcest resource that is the wrong trade
 
 In increasing order of what they cost and what they buy:
 
-1. **Patch pucrunch's start address.** One line, about 600 bytes, unblocks both
-   features. Needs someone to read the on-calc decompressor first.
+1. ~~Patch pucrunch's start address.~~ **Done**: 582 bytes, both features ship,
+   476 free.
 2. **Move `game_scenario` to the companion block.** About 2500 bytes, room for
    several features and for the monsters still missing. One ABI bump, about 25
-   exports, and a day that goes well or not at all.
-3. Anything that adds resident drawing code from here needs one of the two first.
+   exports, and a day that goes well or not at all. This is the next lever, and
+   after it there is no third: 65535 is the platform's wall for one image.
+3. Anything that adds resident drawing code from here eats into the 476.
