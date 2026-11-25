@@ -53,8 +53,17 @@ from `BATTLE.BIN` (below). `OTHER.SHP` has 17 frames only.
 ## Animation: `BATTLE/*.SEQ`
 
 `TYPE1..4`, `MON`, `OTHER`, `WEP1/2`, `ARUTE`, `CYOKO`, `KANZEN`, `RUKA`,
-`EFF1/2`. No parser in the project yet; the human sequences were read by hand and
-are recorded in `units.py`:
+`EFF1/2`. No parser in the project yet, but the layout is known from `OTHER.SEQ`:
+a four-byte header, then **128 little-endian u32 pointers**, then the sequence
+data. Those pointers are relative to the data, which in `OTHER.SEQ` starts at
+**0x408** and not right after the table: 0x220 to 0x400 is `FF` padding, so find
+the data by scanning for the first filled region rather than trusting
+`4 + 4*count`. A sequence is a run of `(frame, duration)` byte pairs with `FF xx`
+opcodes between them; the opcodes take arguments of differing length, so a fixed
+two-byte stride drifts and invents frame ids. Reading only the pair distribution
+is enough to tell which frames an animation uses.
+
+The human sequences were read by hand and are recorded in `units.py`:
 
 - battle idle, facing the camera: frames 11 10 9 10 11 12 13 12, at 6 8 10 8
   ticks of 60 Hz; facing away: 16 15 14 15 16 17 18 17.
@@ -93,9 +102,14 @@ frames at each offset gives, in order, chicken strip A, chicken strip B, frog
 strip A, frog strip B. Frame 16, the chest at y = 48, is the hint that other tile
 rows are addressed the same way.
 
-FFT draws two directions and mirrors for the other two, so the two strips of a
-creature are taken as facing the camera and facing away. `OTHER.SEQ` would
-confirm which is which and how many of the fourteen an idle really cycles.
+**Facing is not the strip.** `OTHER.SEQ` settles it: every sequence has a twin
+five frames later, `01 06 / 03 08 / 01 04 / 02 04` against `06 06 / 08 08 /
+06 04 / 07 04`, over and over, and frames 1-5 rendered beside 6-10 show the same
+creature turned. So **frames 1-5 face the camera and 6-10 face away**, the same
+convention `units.py` records for the human bodies, with the engine's mirror bit
+giving left from right. The engine only needs the first strip of each creature;
+what the second one is for is still open.
+
 `other_actors.py --header` writes both creatures from this.
 
 ## Weapons: `BATTLE/WEP.SPR`, `WEP1.SHP/SEQ`, `WEP2.SHP/SEQ`
