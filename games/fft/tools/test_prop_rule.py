@@ -69,6 +69,26 @@ class PropRule(unittest.TestCase):
             g[(x, 0)] = (19, FLAGGED)
         self.assertEqual(self.props(mesh(5, 5, g), 5, 5), [])
 
+    def test_a_short_run_in_the_middle_of_the_room_is_furniture(self):
+        """Book Storage: three 2x1 bookcases away from the walls."""
+        g = ground(6, 6)
+        g[(2, 2)] = (18, FLAGGED)
+        g[(3, 2)] = (18, FLAGGED)
+        self.assertEqual(self.props(mesh(6, 6, g), 6, 6), [(2, 2), (3, 2)])
+
+    def test_a_lone_tile_at_the_map_edge_is_still_a_prop(self):
+        """Araguay: three of its five trees grow at the very edge of the map."""
+        g = ground(5, 5)
+        g[(0, 0)] = (17, FLAGGED)
+        self.assertEqual(self.props(mesh(5, 5, g), 5, 5), [(0, 0)])
+
+    def test_a_run_reaching_the_edge_is_the_enclosure(self):
+        """Book Storage's back wall spans the full width of the map."""
+        g = ground(6, 6)
+        for x in range(6):
+            g[(x, 0)] = (18, FLAGGED)
+        self.assertEqual(self.props(mesh(6, 6, g), 6, 6), [])
+
     def test_two_props_apart_are_both_props(self):
         g = ground(5, 5)
         g[(1, 1)] = (18, FLAGGED)

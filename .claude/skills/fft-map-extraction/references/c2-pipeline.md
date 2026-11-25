@@ -200,11 +200,19 @@ wall carries it exactly like a tree. Two further conditions make a prop:
 
 - **it rises.** Its height must exceed every ordinary neighbour's standable top. A
   flagged tile level with the ground carries nothing; Araguay flags two such tiles
-  beside a trunk.
-- **it stands alone.** Among the rising flagged tiles, its 4-connected component is
-  one tile. A prop occupies a tile; a wall is a *run* of them. Chapel of Orbonne's
-  47 flagged tiles are 46 in a single run — the perimeter — plus one; Sweegy's five
-  are five components of one.
+  beside a trunk, and they used to hide the trunk inside a run.
+- **it is free-standing.** A wall is the room's own *enclosure*: its 4-connected
+  component among the rising flagged tiles runs along the map's edge. Furniture
+  stands in the middle of the room. A single tile is always free-standing, because
+  three of Araguay's five trees grow at the very edge of the map.
+
+Measured on the maps that taught the rule: Chapel of Orbonne is one component of
+33 tiles spanning 13x10 of a 14x10 map, on the border — the perimeter wall, and
+the map has no prop at all. Underground Book Storage has a 10x2 component across
+the full width — the back wall — and **three 2x1 components in the middle of the
+room**, which are its two free-standing bookcases and a table. Sweegy's five trees
+are five components of one tile. Roof of Riovanes keeps its tower (a 3x3 component
+on the border, and the map's subject) and gives up two small roof turrets.
 
 A third fault sat underneath both: **a tile with no second terrain level carries
 eight zero bytes**, and reading that as an ordinary tile of height 0 collapsed the
@@ -214,7 +222,7 @@ Orbonne 116 of 140. Skip an all-zero entry.
 Then remove every polygon over a prop tile and re-measure: clearing the cap means
 cosmetic, still over means structural.
 
-Chapter I classifies 9 fits, 1 cosmetic (Sweegy, 5 prop tiles, 258 polygons,
+Chapter I classifies 9 fits, 1 cosmetic (Sweegy, 5 prop tiles, 240 polygons,
 21,640 -> 15,288) and 1 structural (Slums in Dorter, no prop tile), matching every
 figure established by hand.
 
@@ -227,17 +235,18 @@ and nowhere else, so nothing but the side quest reaches them. **Zarghidas Trade
 City is not among them** although Cloud's battle is listed as optional, because
 the same area also takes random battles. Pass `--include-optional` to count them.
 
-Of the **94 that remain: 63 fit, 3 cosmetic, 28 structural, none unreadable.**
+Of the **94 that remain: 63 fit, 4 cosmetic, 27 structural, none unreadable.**
 Every over-budget map has a workable remedy, which is the point of the census:
 
-- the 3 cosmetic — St. Murond Temple (50), Sweegy Woods (74), Araguay Woods (80) —
-  fit once their props are gone;
-- the 28 structural need an authored crop, and all keep at least 69% of their
+- the 4 cosmetic fit once their props are gone: Roof of Riovanes Castle (5, two
+  small roof turrets, +400 -> -1,096), St. Murond Temple (50, +48), Sweegy Woods
+  (74, five trees, +3,152 -> -3,200) and Araguay Woods (80, five trunks);
+- the 27 structural need an authored crop, and all keep at least 69% of their
   rows, the worst being Public Cemetery at 159 of 228. None is unsalvageable.
 
 These counts are the **corrected** ones. A first pass read 8 cosmetic and 23
 structural, because the prop rule took walls for decoration; the section below
-has the three faults and the pictures that found them.
+has the faults and the pictures that found them.
 
 One caution. The fitting group is **not** comfortable: Orbonne Monastery fits by
 **8 bytes**, Beoulve residence and Poeskas Lake by 16, and 15 maps sit under 1 KB
@@ -259,29 +268,41 @@ the scene, leaving a floating slab; Roof of Riovanes lost the tower that is the
 map's subject; the Book Storage lost its back wall. Run the review before
 trusting any arithmetic verdict about geometry.
 
-With the rule corrected (rises, stands alone, no phantom level), 2026-11-25:
+With the rule corrected (rises, free-standing, no phantom level), 2026-11-25:
 
-| map | name | props | removed | lost px | share | verdict |
-|----:|------|------:|--------:|--------:|------:|---------|
-|  74 | Sweegy Woods | 5 | 252 | 6,122 | 20.6% | the five trees, terrain untouched |
-|  80 | Araguay Woods | 5 | 452 | 6,334 | 20.3% | the five trunks, terrain untouched |
-|  50 | St. Murond Temple | 4 | 130 | 3,878 | 12.1% | **the judgement call**: both bell towers and the spire, and a hole opens in the roof |
-|  51 | St. Murond Temple | 6 | 189 | 3,311 | 9.8% | now structural — the removal no longer clears the cap |
-|   3 | Hall of St. Murond | 2 | 118 | 242 | 0.7% | now structural |
-|   5 | Roof of Riovanes | 1 | 38 | 947 | 2.9% | now structural |
-|  58 | Underground Book Storage 2 | 0 | 0 | 0 | 0% | now structural — it has no prop at all |
-|  62 | Chapel of Orbonne | 0 | 0 | 0 | 0% | now structural — it has no prop at all |
+| map | name | props | removed | lost px | share | result |
+|----:|------|------:|--------:|--------:|------:|--------|
+|  74 | Sweegy Woods | 5 | 240 | 5,952 | 20.1% | cosmetic — the five trees, terrain untouched |
+|  80 | Araguay Woods | 5 | 441 | 6,111 | 19.6% | cosmetic — the five trunks, terrain untouched |
+|   5 | Roof of Riovanes Castle | 5 | 96 | 3,198 | 9.9% | cosmetic — two small roof turrets; the tower stays |
+|  50 | St. Murond Temple | 8 | 148 | 4,862 | 15.2% | cosmetic, but **a judgement call**: both bell towers and the spire, and a hole opens in the roof |
+|  58 | Underground Book Storage 2 | 6 | 136 | 3,448 | 9.1% | structural — see below |
+|  51 | St. Murond Temple | 6 | 136 | — | — | structural |
+|   3 | Hall of St. Murond | 2 | 82 | 242 | 0.7% | structural |
+|  62 | Chapel of Orbonne | 0 | 0 | 0 | 0% | structural — it has no prop at all |
 
-Only **three** maps are still cosmetic. Two lose their trees, which is the thing
-they are named for; St. Murond's "props" are isolated single-tile *towers*,
+**Underground Book Storage is the trap seen from the other side.** Its two
+bookcases and its table are correctly found and removing them is visually clean,
+and it saves **zero bytes**: 20,952 before, 20,952 after. They stand entirely
+inside the room's silhouette, so no row span moves. Finding a prop is not the
+same as saving anything, and the budget, not the prop count, decides.
+
+Of the four that are cosmetic, Sweegy and Araguay lose the trees they are named
+for, and St. Murond's "props" are free-standing single-tile *towers* that are
 geometrically indistinguishable from a tree and visually not one. Each is a call
-to make per map, not a default.
+to make per map, not a default. Roof of Riovanes is the one clean win: two small
+turrets for 1,496 bytes, the tower untouched.
 
-One caution for whoever takes them: removing a prop can leave a **white hole in
-the floor**, because the tile under a trunk has no ground polygon of its own --
-the prop's own base drew it. And there is no "keep it drawn, drop it from the
-depth" middle road: the stream's span term is measured on the **rendered view**,
-not on the depth, so a prop still in the picture still costs its bytes.
+**The ground under a prop.** FFT gives the prop tile the prop's own height, so
+the ground under it has to be guessed from around it, and the *lowest* neighbour
+guesses too low: it took the floor out from under Sweegy's and Araguay's trees
+and left white holes. Use the **highest** standable neighbour; it leaves no stump
+on either. A hole that survives that is in the source — the Book Storage's floor
+under a bookcase has no polygon of its own, the object's base draws it.
+
+There is no "keep it drawn, drop it from the depth" middle road either: the
+stream's span term is measured on the **rendered view**, not on the depth, so a
+prop still in the picture still costs its bytes.
 
 ### One mesh, several records (map 53)
 

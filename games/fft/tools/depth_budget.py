@@ -54,12 +54,17 @@ def terrain(mesh, nx, nz):
       ordinary tile of height 0 collapses the ground under everything. Map 3 has
       117 absent level-1 entries of 117, Chapel of Orbonne 116 of 140.
     - walk 2 is not decoration, it is "you cannot stop here", and you cannot stop
-      on a WALL either. A prop stands on one tile; a wall is a run of them. So
-      decoration is a walk-2 tile that RISES above the ordinary ground around it
-      and stands ALONE among the other rising ones: that splits Sweegy's five
-      isolated trees from the Chapel's single 46-tile perimeter. A walk-2 tile
-      level with the ground carries nothing and is never a prop (Araguay flags
-      two such tiles beside a trunk, which used to hide the trunk in a run).
+      on a WALL either. So a flagged tile is decoration when it RISES above the
+      ordinary ground around it -- one level with the ground carries nothing, and
+      Araguay flags two such tiles beside a trunk -- and when its 4-connected
+      component among the rising ones is FREE-STANDING: a wall is the room's
+      enclosure and runs along the map's edge, furniture stands in the middle.
+      A single tile is always free-standing, since three of Araguay's five trees
+      grow at the very edge of the map.
+
+      That splits the Chapel of Orbonne's one 33-tile component spanning 13x10 on
+      the border, and the Book Storage's 10x2 back wall, from the Book Storage's
+      three 2x1 bookcases in the middle of the room and Sweegy's five lone trees.
     """
     p0 = struct.unpack('<I', mesh[0x68:0x6C])[0]
     n = nx * nz
@@ -87,10 +92,33 @@ def terrain(mesh, nx, nz):
                 and top[(z + dz) * nx + x + dx] is not None]
         if near and h > max(near):
             rising[(x, z)] = h
-    props = [(x, z, h) for (x, z), h in rising.items()
-             if not any((x + dx, z + dz) in rising
-                        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+    props = []
+    for comp in components(rising):
+        edge = any(x in (0, nx - 1) or z in (0, nz - 1) for x, z in comp)
+        if len(comp) > 1 and edge:
+            continue                  # the room's own enclosure, not furniture
+        props += [(x, z, rising[(x, z)]) for x, z in comp]
     return walk, top, props
+
+
+def components(cells):
+    """The 4-connected components of a set of (x, z) tiles."""
+    seen, out = set(), []
+    for c in cells:
+        if c in seen:
+            continue
+        stack, comp = [c], []
+        seen.add(c)
+        while stack:
+            x, z = stack.pop()
+            comp.append((x, z))
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                q = (x + dx, z + dz)
+                if q in cells and q not in seen:
+                    seen.add(q)
+                    stack.append(q)
+        out.append(comp)
+    return out
 
 
 def prop_polygons(polys, top, props, nx, nz, grow=0.75):
@@ -98,8 +126,15 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
 
     Removing part of a prop saves nothing: the rest draws the same silhouette and no
     span moves (measured on Sweegy, 48 of 144 tree polygons removed changed the stream
-    by zero bytes). The ground under the prop is kept: only geometry above the lowest
-    standable neighbour goes.
+    by zero bytes).
+
+    The ground under the prop is kept: only geometry above the HIGHEST standable
+    neighbour goes. FFT gives the prop tile the prop's own height, so the ground
+    under it has to be guessed from around it, and the lowest neighbour guesses too
+    low -- it took the ground out from under Sweegy's and Araguay's trees and left
+    white holes in the floor. The highest neighbour leaves no stump on either. A
+    hole that survives this is in the source: the Book Storage's floor under a
+    bookcase has no polygon of its own, the object's base draws it.
     """
     out = []
     for x0, z0, _ in props:
@@ -107,7 +142,7 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
                   for dz in (-1, 0, 1) for dx in (-1, 0, 1)
                   if 0 <= x0 + dx < nx and 0 <= z0 + dz < nz
                   and top[(z0 + dz) * nx + x0 + dx] is not None]
-        floor = min(ground) if ground else 0
+        floor = max(ground) if ground else 0
         cx, cz = x0 + .5, z0 + .5
         for i, q in enumerate(polys):
             v = q[0]
