@@ -545,8 +545,44 @@ The native supervisor's heap-lifetime check is documented separately in
   the enemy diamond, one glyph at a time, alternating about once a second.
 - [x] Both verified on screen in the PC battle, which found and fixed the actor-cache
   collision that painted a transformed unit as a solid white block.
-- [ ] **Neither feature is enabled in any build**: `FFT_STATUS_PICTO` and
-  `FFT_CREATURE_BODY` appear in no Makefile, only on hand-written command lines.
+- [x] Both pictures moved to the archive tail (`tools/contour_assets.py`), which is
+  where they belong: 4.8 KB that the resident executable cannot hold. The tail
+  follows the switches in `fft.h`, so turning a feature on carries its art along
+  and turning it off costs a chapter nothing.
+- [ ] **Neither feature is enabled, and the reason is the resident budget, not the
+  wiring.** Measured 2026-11-24 on the battle executable against TTPack's 64936-byte
+  input ceiling: 64601 today, so 335 free, already under `core_budget.py`'s 512-byte
+  alert. With their art archived the creatures cost 114 bytes and the pictograms 324.
+  Either fits alone; the two together miss by 123.
+- [x] Measured the ceiling itself (`experiments/heapbig/`, TiEmu Titanium with
+  HW3Patch): **a single heap block stops at 65518 bytes** with 188982 free, and it
+  executes. So one contiguous code image can never pass 65518, whatever the heap
+  says, and dropping TTPack for our own ZX0 self-extractor is worth exactly
+  65518 - 64936 = **582 bytes**. That is enough for both features, with 459 to
+  spare instead of today's 335, but it is a one-off and the wall behind it is the
+  platform's.
+- [x] **The module zone is not the lever, and re-splitting the images would free no
+  resident room at all.** `mod_zone` is a `malloc(MOD_ZONE)`, so the zone costs RAM,
+  not program: built with `MOD_ZONE` cut from 8932 to 4000 the battle executable is
+  64601 bytes either way, byte for byte. An earlier note here said the opposite.
+- [x] The whole budget, the resident map, the `game_scenario` split and the two
+  ways to raise the ceiling are written up once in
+  [campaign/RESIDENT_BUDGET.md](campaign/RESIDENT_BUDGET.md).
+- [ ] The lever is moving more *code* out of the core, which frees its bytes one
+  for one and leaves the zone alone. Resident map of the battle build (214
+  functions, 61976 bytes of `.text`): `game_render` 7038 and `update` 5680 are the
+  frame loop and cannot move; `magic_hit` 2102, `magic_heal` 1940, `charge_query`
+  980, `weapon_amount` 878 and `knockback` 876 are shared formulas the modules call
+  back into through `ModCtx`, so they are resident by design. **`game_scenario` is
+  1992 bytes and runs once per battle** - the clearest candidate, sixteen times what
+  the two features need. Behind it, `ensure_scene` 1398, `ring_into_scene` 828 and
+  `copy_view` 464 run only when the camera changes.
+- [x] Swapping measured (`experiments/heapbig/modcopy.c`, ti-cycles): a load is the
+  `memcpy` of the image into the zone at about **6 cycles a byte**, so the largest
+  image costs about **54k cycles, a sixth of one 30 fps frame**, once; all 28 loaded
+  once over a battle is 1.5M cycles. ti-cycles estimates AMS ROM calls rather than
+  emulating them and sees flat memory where the real copy reads Flash, so treat it
+  as a floor. Either way a one-shot module loaded at battle start is free.
 - [ ] The CATALOG switch that turns the pictograms off. A new `State` field would move
   the ABI, so it needs a spare bit or another mechanism.
 - [ ] Decide where the art lives for a chapter package: `status_art.h` (about 1.1 KB)

@@ -609,6 +609,10 @@ GKeyFlush();                             // don't leave the game's keypresses in
   "half speed" is `start' = 257 − 2 × (257 − start)`, not `start / 2` (0xCC/2 made it 2.9× slower).
 - **Replacing int 5 breaks AMS timers** (**verified**): `LIO_RecvData`'s timeout never expires
   (blocks until ON; `ti68k-game-techniques.md` §7), nor does `OSTimerExpired(APD_TIMER)`.
+- **`tilog` does not understand `%lu`** (**verified**, TiEmu): a 32-bit argument makes it print
+  two unrelated numbers rather than failing, which looks exactly like corrupted data. The
+  project debugs from the log ring rather than screenshots, so this one wastes real time: log
+  32-bit values as two 16-bit halves, or read them from the screen for that one check.
 - **Running code you generated or copied into RAM** (**verified**, `experiments/heapcode/`): a heap
   block containing `moveq #42,d0; rts`:
 
@@ -626,6 +630,26 @@ GKeyFlush();                             // don't leave the game's keypresses in
   word 92 bytes into `EX_stoBCD` (ROM table entry 0xC0) is 0 (patch in Flash) or the long at
   0xAC is 0x100 (patch in RAM); FFT's `launcher.c` refuses to start otherwise. So self-generated code (dynamic recompilers, code in data files) is not
   portable unpatched; keep code in the program itself.
+- **A single heap block stops at 65,518 bytes** (**verified**, TiEmu Titanium AMS 3.10 with
+  HW3Patch, `experiments/heapbig/`): with 188,982 bytes of heap free, `HeapAllocPtr` grants
+  65,000 and refuses 65,520; a binary search between them lands on **65,518**, the same figure
+  as the per-variable limit, and the refusal is a hard ceiling rather than fragmentation. The
+  block it does grant executes (the `moveq #42,d0; rts` stub returns 42 at its base). So any
+  one contiguous code image - a packed executable unpacked into RAM, a generated routine, an
+  overlay - is capped there whatever the free heap says. Past that a program has to be split
+  into several images, which is what FFT's module zone does (`games/fft/module.h`); writing
+  your own self-extractor does not help, because an image that size has to be relocated and
+  `-mpcrel` is limited to a 32 KB displacement.
+- **TIGCC's `-pack` used to stop 582 bytes early, and no longer does** (**verified**,
+  `tools/gcc4ti-patches/`): TTPack refused any input over 64,936 bytes, which is
+  `0xffff - 0x258 + 1`, because pucrunch checked `startAddr + inlen - 1 > 0xffff` with
+  `startAddr` set to the **C64 load address** `0x258`. The TI output path uses that address
+  nowhere - `SavePack` writes only the sixteen-byte `PackedHeader`, and the decompressor bounds
+  its output with that header's 16-bit original-size field while every LZ reference is relative
+  to the output pointer - so the real limit is 65,535. Checked three ways before shipping: the
+  packed output is byte for byte identical below the old limit, a real 65,059-byte image
+  round-trips exactly through `ttpack` then `ttunpack`, and a 65,265-byte packed program runs
+  on a Titanium with its payload intact (`experiments/heapbig/bigpack.c`).
 - ON key as a "boss key" (gb68k): an auto-int 6 handler that only sets a flag, polled by the game to
   quick-save and quit (not tested here).
 

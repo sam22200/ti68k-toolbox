@@ -342,7 +342,13 @@ packages-routing-check: packages
 contour-assets:
 	$(PY) ../tools/view_split.py campaign
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
-pc test cycles ti packed regression-check visual-check: | contour-assets
+# Ripped artwork, generated like units.h and never committed. Every chapter build
+# needs it, because fft.h includes it for FFT_BATTLE.
+../creature_art.h: ../tools/other_actors.py
+	@test -f "$(DISC)" || { echo "missing the local disc roms/ps1/Final Fantasy Tactics (USA) (not in git)"; exit 1; }
+	$(PY) ../tools/other_actors.py --header $@
+fftgar_pc fftintro_pc fftbatflow_pc: ../creature_art.h ../status_art.h
+pc test cycles ti packed regression-check visual-check: | contour-assets ../creature_art.h
 fftgar_pc: ../config.inc ../contour.h ../contour_art.inc
 
 ../contour.h ../contour_art.inc: ../tools/contour_assets.py ../art.h ../setup_glyphs.inc ../fft.c ../config.inc
