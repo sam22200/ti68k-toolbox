@@ -98,14 +98,14 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // Both need the chapter's full forty-bit status bitmap: the standalone build
 // carries only the four-flag compact cache, which has no Chicken and no room for
 // a pictogram table.
-#if (defined(FFT_STATUS_PICTO) || defined(FFT_CHICKEN_BODY)) && !defined(FFT_CHAPTER)
-#error FFT_STATUS_PICTO and FFT_CHICKEN_BODY require FFT_CHAPTER.
+#if (defined(FFT_STATUS_PICTO) || defined(FFT_CREATURE_BODY)) && !defined(FFT_CHAPTER)
+#error FFT_STATUS_PICTO and FFT_CREATURE_BODY require FFT_CHAPTER.
 #endif
 #ifdef FFT_STATUS_PICTO
 #include "status_art.h"
 #endif
-#ifdef FFT_CHICKEN_BODY
-#include "chicken_art.h"
+#ifdef FFT_CREATURE_BODY
+#include "creature_art.h"
 #endif
 // The Status screen's body: the rows of its equipment, abilities and ailments pages, on one
 // grid, so the core's pictograms and the screens module's text line up.

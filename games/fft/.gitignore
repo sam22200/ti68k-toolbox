@@ -19,4 +19,4 @@ fftcont.bin
 contour.h
 contour_art.inc
 ui_common.h
-chicken_art.h
+creature_art.h

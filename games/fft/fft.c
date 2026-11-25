@@ -4533,15 +4533,21 @@ static const u8 *unit_frame(u8 rot, u8 i)
 #endif
     const Unit *un = &st.unit[i];
     u8 t = (u8)(st.tick + 11 * i), k, dir = unit_direction(rot, i), armed;
-#ifdef FFT_CHICKEN_BODY
-    // A chickened unit wears the original's bird instead of its own body. The
-    // frames follow the human convention units.py records, a block facing the
-    // camera then a block facing away, so `dir & 1` picks the block and the
-    // engine's own mirror bit would give left from right.
-    if (!DC_OBJ(un->dc) && (core_status_current(&un->statuses, SID_CHICKEN >> 3)
-                            & (u8)(0x80 >> (SID_CHICKEN & 7))))
-        return chicken_gfx + (u16)((dir & 1 ? CHICKEN_BACK : CHICKEN_FRONT)
-                                   + (t >> 3) % (CHICKEN_FRAMES / 2)) * UNIT_FB;
+#ifdef FFT_CREATURE_BODY
+    // A transformed unit wears the original's own creature instead of its body.
+    // OTHER.SHP holds one frame list and the creature is picked by a sheet-Y
+    // offset, two strips each, which the rip takes as facing the camera and
+    // facing away; the engine's mirror bit would give left from right.
+    if (!DC_OBJ(un->dc)) {
+        const u8 *cg = RT_NULL;
+        if (core_status_current(&un->statuses, SID_CHICKEN >> 3) & (u8)(0x80 >> (SID_CHICKEN & 7)))
+            cg = chicken_gfx;
+        else if (core_status_current(&un->statuses, SID_FROG >> 3) & (u8)(0x80 >> (SID_FROG & 7)))
+            cg = frog_gfx;
+        if (cg)
+            return cg + (u16)((dir & 1 ? CREATURE_BACK : 0)
+                              + ((t >> 3) & (CREATURE_IDLE - 1))) * UNIT_FB;
+    }
 #endif
     if (DC_OBJ(un->dc)) {
         if (st.morph_mask & (u16)(1U << i)) {

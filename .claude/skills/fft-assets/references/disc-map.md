@@ -83,9 +83,20 @@ What a transformed or dead unit wears. The sheet holds, top to bottom: two rows
 of **chicken**, two rows of **frog**, a row of **crystals**, and the **treasure
 chest** down the right edge.
 
-`OTHER.SHP` has **17 frames**: 0 a small marker, **1-14 the chicken**, 15-16 the
-chest. **No frame addresses the frog** — its tiles are in the sheet but another
-table or a page offset must reach them. `MON.SEQ` is the first lead.
+`OTHER.SHP` has **17 frames**: 0 a small marker, 1-14 the creature, 15-16 the
+chest. Every creature frame is a single 16x24 tile at sheet x = 0, 16, 32 ... 208
+and **sheet y = 0**.
+
+**One frame list serves both creatures: the sheet-Y offset picks which.** The
+drawn row bands fall exactly on 0, 24, 48 and 72, and rendering the same fourteen
+frames at each offset gives, in order, chicken strip A, chicken strip B, frog
+strip A, frog strip B. Frame 16, the chest at y = 48, is the hint that other tile
+rows are addressed the same way.
+
+FFT draws two directions and mirrors for the other two, so the two strips of a
+creature are taken as facing the camera and facing away. `OTHER.SEQ` would
+confirm which is which and how many of the fourteen an idle really cycles.
+`other_actors.py --header` writes both creatures from this.
 
 ## Weapons: `BATTLE/WEP.SPR`, `WEP1.SHP/SEQ`, `WEP2.SHP/SEQ`
 

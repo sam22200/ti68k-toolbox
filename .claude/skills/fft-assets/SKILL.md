@@ -68,11 +68,11 @@ apply the portrait rules. Run on a chicken it produces floating bars above the
 body. Share only the tile compositing: `other_actors.assemble()` repeats that
 loop and applies the generic treatment.
 
-**A shape table can be shorter than its sheet.** `OTHER.SPR` carries the chicken,
-the frog, the crystal and the chest, but `OTHER.SHP` addresses only seventeen
-frames: a marker, the chicken's fourteen and two for the chest. The frog's
-layout is still unknown. Check the pointer table before assuming a sheet is
-fully described.
+**A shape table can describe more than it seems to.** `OTHER.SHP` has seventeen
+frames for four strips of artwork: one frame list is reused and the **sheet-Y
+offset picks the creature**, 0 and 24 for the chicken, 48 and 72 for the frog.
+Before concluding that a sheet is unaddressed, compare the drawn row bands
+against the tile Y values the frames use.
 
 **Frames are grouped front then back.** FFT draws two directions, front
 (down-left) and back (up-left), and mirrors them for the other two. The engine's
@@ -111,7 +111,7 @@ needs, and what already exists:
 | Battle maps, views, depth | `MAP/MAPxxx.GNS` | `extract.py`, `map_budget.py` | works; see `fft-map-extraction` |
 | Human bodies | `BATTLE/*.SPR` + `TYPE1/2.SHP` | `units.py` | works |
 | Monsters | `BATTLE/*.SPR` + `MON.SHP/SEQ` | `monster_body_assets.py` | works |
-| Creatures (chicken) | `BATTLE/OTHER.SPR/SHP` | `other_actors.py` | chicken works, frog unresolved |
+| Creatures (chicken, frog) | `BATTLE/OTHER.SPR/SHP` | `other_actors.py` | works |
 | Weapons | `BATTLE/WEP.SPR` + `WEP1/2` | `weapons.py` | works |
 | Portraits | unit sheets | `management_assets.py` | works |
 | UI, status icons, numbers | `EVENT/FRAME.BIN` | none yet | read by hand so far |
