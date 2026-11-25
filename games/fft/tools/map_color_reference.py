@@ -17,9 +17,10 @@ import map_art_review as review
 from review_files import save_image, write_changed
 
 
-def color_views(disc, report, directory):
+def color_views(disc, files, report, directory):
     source = report['source']
-    mesh = disc.read(*source['mesh_record'][1:])
+    extract.MAP = source['map']
+    mesh = extract.mesh_blob(disc, files)
     texture_bytes = disc.read(*source['texture_record'][1:])
     assert review.sha(mesh) == source['mesh_sha256']
     assert review.sha(texture_bytes) == source['texture_sha256']
@@ -121,8 +122,8 @@ def main():
     pending = [directory/'choose-A-E.png',*[directory/(letter+'-four-views.png') for letter,_ in review.PROFILES],
                *directory.glob('?/ffzv*.bin'),*directory.glob('?/ffzv*.89y')]
     before = {str(p):[review.sha(p.read_bytes()),p.stat().st_mtime_ns] for p in pending}
-    disc,_ = extract.disc_files(str(args.disc))
-    images,crops,checks = color_views(disc,report,directory)
+    disc,files = extract.disc_files(str(args.disc))
+    images,crops,checks = color_views(disc,files,report,directory)
     sheets(directory,images,crops,report)
     assert all([review.sha(Path(p).read_bytes()),Path(p).stat().st_mtime_ns] == record for p,record in before.items())
     evidence = dict(scope=__doc__,views=checks,pending_candidates_preserved=len(before),

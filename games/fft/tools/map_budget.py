@@ -35,7 +35,11 @@ DEPTH_MAX = define('core_limits.h', 'FFT_CORE_DEPTH_MAX')
 
 
 def mesh_record(disc, files, m):
-    """The map's primary mesh: the first 0x2E01/0x2F01 record whose polygons are present."""
+    """The map's primary mesh: the first 0x2E01/0x2F01 record whose polygons are present.
+
+    Provenance only: what a reader must decode is extract.mesh_blob(), which fills in the
+    chunks a primary leaves to a state record (map 53).
+    """
     extract.MAP = m
     for r in extract.gns_records(disc, files):
         if r[0] in (0x2E01, 0x2F01) and struct.unpack_from('<I', disc.read(r[1], r[2]), 0x40)[0]:
@@ -46,8 +50,8 @@ def mesh_record(disc, files, m):
 
 
 def load(disc, files, m):
-    mesh_rec = mesh_record(disc, files, m)
-    mesh = disc.read(mesh_rec[1], mesh_rec[2])
+    extract.MAP = m
+    mesh = extract.mesh_blob(disc, files)
     p = struct.unpack('<I', mesh[0x68:0x6C])[0]
     nx, nz = mesh[p], mesh[p + 1]
     maxh = 0
@@ -87,11 +91,10 @@ def ragged(disc, files, m, nx, nz, b):
     try:
         recs = extract.gns_records(disc, files)
         tex_rec = next(r for r in recs if r[0] == 0x1701)
-        mesh_rec = next(r for r in recs if r[0] in (0x2E01, 0x2F01))
         t = np.frombuffer(disc.read(tex_rec[1], tex_rec[2]), np.uint8)
         tex = np.empty((1024, 256), np.uint8)
         tex[:, 0::2] = (t & 15).reshape(1024, 128); tex[:, 1::2] = (t >> 4).reshape(1024, 128)
-        mesh = disc.read(mesh_rec[1], mesh_rec[2])
+        mesh = extract.mesh_blob(disc, files)
         pal = np.array(struct.unpack_from('<256H', mesh, struct.unpack_from('<I', mesh, 0x44)[0])).reshape(16, 16)
         polys = extract.polygons(mesh)
         views, used = [], []
@@ -137,13 +140,7 @@ def archive(disc, files, m):
     rows cropped to the first SC_HMAX content rows, extract.pack_view): ZX0 is slow, about 10 s
     a map."""
     mesh, nx, nz, maxh = load(disc, files, m)
-    rec, records = mesh_record(disc, files, m), extract.gns_records
-    # extract.views() reads the first 0x2E01 record: hand it this map's primary mesh
-    extract.gns_records = lambda d, f: [(0x2E01,) + rec[1:]] + [r for r in records(d, f) if r[0] != 0x2E01]
-    try:
-        raw, _ = extract.views(disc, files, nx, nz, maxh)
-    finally:
-        extract.gns_records = records
+    raw, _ = extract.views(disc, files, nx, nz, maxh)
     total = []
     for v in raw:
         p = np.frombuffer(v, np.uint8).reshape(6, -1, 40)
