@@ -24,12 +24,28 @@ raw = disc.read(*files['BATTLE/OTHER.SPR'])
 - then the sheet: 256 pixels wide, 4 bits per pixel, low nibble = left pixel.
   `spr[512:512 + 128*256]` reshaped (256, 128) gives the packed rows.
 
-**`OTHER.SPR` is the exception: its pixels start at 0x400.** It is the one sheet
+**`OTHER.SPR` is the only exception: its pixels start at 0x400.** It is the one sheet
 with 512 colours, thirty-two palettes of sixteen, five each for the chicken, the
 frog, the chest and the crystal. Read it at 0x200 like every other sheet and the
 whole image slides up four rows: the creatures lose their feet and the palette
 bytes come back as two rows of noise above them. The giveaway is geometric - with
 the right base every object sits flush on the bottom row of its 24-row cell.
+
+Checked across the whole disc, because a base this quiet is worth not guessing
+twice. `BATTLE.BIN` pairs every sheet with its shape table (shape id 0 `TYPE1`,
+1 `TYPE2`, 2 `CYOKO`, 3 `MON`, 6 `ARUTE`, 7 `KANZEN`); one sheet of each family
+rendered at both bases settles it by eye, and at 0x400 every family breaks, heads
+sliced and feet adrift. **137 sheets of 138 are at 0x200; `OTHER.SPR` alone is at
+0x400.** `WEP.SPR` is at 0x200 as well, confirmed by drawing `WEP1.SHP`'s own
+rectangles over it: at 0x400 the blades stop sitting in their boxes. Measuring how
+much art falls outside the rectangles is *not* a usable test on a unit sheet - it
+carries a portrait and unused poses that no frame ever names, so both bases leak
+about the same and the difference is noise.
+
+`units.py`'s `CRYSTAL` and `CHEST` boxes read `OTHER.SPR` from 0x200 and are
+measured on that reading, so the two errors cancel and the chest and crystal come
+out whole; the constants carry a note saying so. `EVENT/FRAME.BIN` has no header:
+read from 0x40 instead of 0, every row splits across its middle.
 
 Luminance for the TI, as `units.py` fixes it: over a colour's 0..31 components,
 `<= 7` black, `<= 16` dark, `<= 22` light, else white; **colour 1 is FFT's own
