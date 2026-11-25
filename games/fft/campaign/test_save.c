@@ -182,6 +182,11 @@ int main(void)
         b->learned=(LearnBits)~a->learned;had=a->learned;a->hp=1;
         pick_up(U_RAMZA,1);
         assert(st.pick==0xFF&&a->learned==had&&a->hp==a->max_hp);
+        // "only humans can transfer abilities via crystal" (guide [6.1])
+        b->hp=0;b->dc=DC_CRYSTAL;b->set=set0;b->job=94;          // the first monster job
+        b->learned=(LearnBits)~a->learned;had=a->learned;a->hp=1;
+        pick_up(U_RAMZA,1);
+        assert(st.pick==0xFF&&a->learned==had&&a->hp==a->max_hp);
     }
     remove("ffsave.sav");
     sw_init(61);assert(sw_step(0));
