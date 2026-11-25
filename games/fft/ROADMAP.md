@@ -565,6 +565,9 @@ The native supervisor's heap-lifetime check is documented separately in
   resident room at all.** `mod_zone` is a `malloc(MOD_ZONE)`, so the zone costs RAM,
   not program: built with `MOD_ZONE` cut from 8932 to 4000 the battle executable is
   64601 bytes either way, byte for byte. An earlier note here said the opposite.
+- [x] The whole budget, the resident map, the `game_scenario` split and the two
+  ways to raise the ceiling are written up once in
+  [campaign/RESIDENT_BUDGET.md](campaign/RESIDENT_BUDGET.md).
 - [ ] The lever is moving more *code* out of the core, which frees its bytes one
   for one and leaves the zone alone. Resident map of the battle build (214
   functions, 61976 bytes of `.text`): `game_render` 7038 and `update` 5680 are the

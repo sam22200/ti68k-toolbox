@@ -101,6 +101,7 @@ typedef struct { char name[12]; u8 abil[SET_N]; } SkillSet;   // abilities[] ind
 // under core_budget.py's 512-byte alert; the creatures cost 114 and the
 // pictograms 324, so either one fits alone and the two together miss by 123.
 // Turning one on here also puts its pictures in the bank, nothing else to do.
+// Where the room would come from: campaign/RESIDENT_BUDGET.md.
 //#define FFT_STATUS_PICTO              // one glyph per status above the head, one at a time
 //#define FFT_CREATURE_BODY             // Chicken and Frog wear the original's own creature
 #endif
