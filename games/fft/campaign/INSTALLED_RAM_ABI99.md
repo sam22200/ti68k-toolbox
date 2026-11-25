@@ -35,6 +35,39 @@ The supervisor regains the same185562 free bytes after each battle, with no
 battle allocations retained. Eight installed payloads, including the packed
 entry and all four module shards, equal the reviewed files and are archived.
 
+## Reproducing the Zeklaus 13 figure (2026-11-25)
+
+Re-measured live on the promoted core, unchanged: **436 free / 430 contiguous**.
+The diagnostic is `x/wide-ram/zeklaus13-fixed/` (`fixture.json`: core key
+`10965478...`, `actors` 13, `source_map` 76, `core_byte_identical`), and its own
+`ti/keys.log` is the recipe. Two steps are not optional and cost an hour to
+rediscover:
+
+1. **`DelVar heaplow` first.** That leftover program in the shared `hw3` state
+   holds **886 bytes**: with it, `story start` reports 184,676 instead of the
+   185,562 the reference run shows, and the battle never initialises.
+2. **`F5` then `F1` then `ESC` at the title**, which is what arms the battle's
+   debug flags. The heap line is then logged by the first cached command window,
+   right after `story call fftbat(201)`.
+
+Arming `DBG_HEAP` later with `fftmem.py set heap on` works too, but only if
+something then **rebuilds** that cached window -- `window_cache.inc` logs on a
+rebuild, not on a redraw. One camera rotation (`F5`) is enough; opening a unit's
+Status is not.
+
+Measured the same day on the Chapter I pilot for comparison: Orbonne, 11 units,
+at the command window, **1,534 free / 1,528**. The documented 2,420 is a settled
+snapshot taken at a lighter moment, so 1,534 is the more conservative number.
+
+The envelope accounts for most of the Orbonne/Zeklaus gap: `NAV_ENVELOPE` is
+180 tiles against 140 (**+800**) and the wide R5 scene buffer 2x44x188 against
+2x40x202 (**+384**), so **+1,184** of the difference is the map, not the units.
+
+**What this settles**: raising `FFT_CORE_DEPTH_MAX` to admit a map that is over
+by 408 (Slums in Dorter) would leave **28 bytes** on Zeklaus. Not viable. The
+two small ones, North Wall of Bethla (+32) and Finath River (+200), would leave
+404 and 236.
+
 ## Fragmentation found and fixed before promotion
 
 The previous candidate `2eea5b...` runs the pilot but fails the wide cold load:
