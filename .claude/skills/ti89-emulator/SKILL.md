@@ -76,7 +76,10 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
   and nothing else" -- which looks exactly like a transfer dying mid-group, and is not.
   **Wait on the file, not on a name.** With the right form, a headless TiEmu took 6.3 s for
   a 95 KB group, 21.1 s for 288 KB and 57.5 s for the whole 684 KB core: there is no
-  large-group failure. An older note about a ~690 KB boot transfer killing TiEmu should be
+  large-group failure. A **boot** transfer works too -- `ti-emu restart core.89g
+  chapter.89g` sent 980 KB in 57.7 s -- but the window is mapped only afterwards, so
+  `TI_WINDOW_WAIT` has to exceed the transfer (400 for that one; the default 30 and even
+  120 time out and look like a failure). An older note about a ~690 KB boot transfer killing TiEmu should be
   re-tested this way before it is trusted.
 
 - **Saving a state** (`ti-emu save`, 2026-11-08): a path typed into the GTK chooser was mangled by
