@@ -9,6 +9,9 @@ F(State,rot) F(State,cx) F(State,cz) F(State,mode) F(State,sel) F(State,tick) F(
 F(State,act) F(State,turns) F(State,moved) F(State,acted) F(State,atk) F(State,tgt) F(State,hit)
 F(State,crit) F(State,dmg) F(State,abil) F(State,end) F(State,ai) F(State,ai_t) F(State,auto_units)
 F(State,rounds) F(State,banner) F(State,open_handoff) F(State,open_stage) F(State,reward_ready)
+/* the opening beat and its clock: a scripted run tells a pre-battle dialogue
+   from a hung battle without a screenshot (ti89-emulator) */
+F(State,open_beat) F(State,open_clock)
 F(State,camx) F(State,camy) F(State,menu) F(State,dbg) F(State,banner_t)
 F(Unit,x) F(Unit,z) F(Unit,gfx) F(Unit,team) F(Unit,face) F(Unit,job) F(Unit,level) F(Unit,name)
 F(Unit,female) F(Unit,status) F(Unit,hp) F(Unit,max_hp) F(Unit,mp) F(Unit,max_mp) F(Unit,ct)

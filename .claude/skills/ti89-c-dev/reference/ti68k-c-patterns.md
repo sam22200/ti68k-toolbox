@@ -1264,3 +1264,52 @@ A local `__attribute__((noinline))` declaration retains the real stack call
 and both arguments. Keep the ROM formatter's output callback local C in PIC
 images, since external `strputchar` would leave a relocation. The ordinary
 frame path does not scan the heap; diagnostics are one-shot and opt-in.
+
+## `ti-mem wait NAME` only finds an UNARCHIVED variable (verified)
+
+This cost a whole wrong diagnosis, so it is worth stating plainly. `ti-mem wait`
+has two forms and they do not check the same thing:
+
+- `ti-mem wait FILE.89y|.89g` reads the file's last variable **and its archive
+  flag**, then waits for a VAT entry that matches both. This is the correct form.
+- `ti-mem wait NAME` assumes **unarchived** unless `--archived` is passed, so it
+  reports an archived variable as absent forever.
+
+FFT's content banks are archived `.89y`, its programs are unarchived `.89z`.
+Checking banks by name therefore showed "the group's first variable arrived and
+nothing else" -- `fftstory` is a program, every bank after it is archived -- and
+that looked exactly like a transfer dying mid-group. It was not. **Always wait on
+the file, not on a name.**
+
+With the correct check, measured on a headless TiEmu (TI-89 Titanium, AMS 3.10,
+HW3Patch), sending through the file dialog while the calculator sits at HOME:
+
+| group | size | time |
+|---|---:|---:|
+| `fft-core-01.89g`, 10 variables | 95 KB | 6.3 s |
+| `fft-core.89g`, 37 variables | 684 KB | 57.5 s |
+| `chapter-01.89g`, 26 variables | 288 KB | 21.1 s |
+
+**There is no large-group transfer failure.** An earlier note in this project
+about TiEmu dying on a ~690 KB boot transfer should be re-tested with the file
+form before it is trusted; it may be the same mis-detection. What does remain
+true is that a boot transfer (`-send=`) keeps TiEmu busy before it maps its
+window, so `TI_WINDOW_WAIT` has to be raised for one -- and sending through the
+dialog once the emulator is up avoids that entirely.
+
+**Driving TiEmu on a headless Xvfb**: there is no window manager, so
+`_NET_ACTIVE_WINDOW` activation is refused and **`xdotool` still exits 0**, which
+makes a `||` fallback useless -- and under `set -e` an unguarded
+`xdotool windowactivate` simply ends the script, leaving the file chooser open
+with nothing sent. Set the input focus directly (`windowmap` then `windowfocus`);
+that is all XTEST needs. `tools/bin/ti-key` and `ti-send` do this now. The
+container also needs a display it can reach: `--network host` plus
+`DISPLAY=127.0.0.1:<n>` against an `Xvfb -listen tcp -ac`, since a bare `:<n>`
+is a Unix socket the container cannot see. And it only sees paths **inside the
+mounted working directory**, so a file in a scratch directory is rejected by the
+chooser.
+
+**Reading a battle's free RAM without a screenshot**: `st.dbg` bit 4 (`DBG_HEAP`,
+`fftmem.py set heap on`) makes `window_cache.inc` log `HeapAvail()`/`HeapMax()`
+once, on the next cached command window. `%lu` prints correctly there, contrary
+to an earlier note about `tilog` and long values.

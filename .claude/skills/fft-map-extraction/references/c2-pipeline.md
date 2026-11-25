@@ -409,6 +409,116 @@ framing rather than visibility". Chapel of Orbonne and map 51 are the two scenes
 to try it on. Do not fold this into the classifier before the extractor has shown
 it on several maps.
 
+### The map's own underside is the biggest saving of all
+
+FFT leaves the skirt under a map's terrain **untextured**, and `extract.polygons()`
+draws an untextured polygon black. On the PS1 the camera never shows it. With four
+orientations we do: on Zirekile Falls, views 0 and 1 look at the cliff from the low
+side and the black skirt fills the screen, 13,410 pixels of it, with the waterfall
+and its bridge a sliver at the top. It was read as a broken extraction; it is the
+geometry.
+
+Dropping every untextured polygon, measured 2026-11-25:
+
+| map | before | after | |
+|----:|-------:|------:|---|
+|  87 Bariaus Valley | 22,776 (+4,288) | **15,904** | 2,584 spare |
+|  83 Zirekile Falls | 19,688 (+1,200) | **13,712** | 4,776 spare |
+|  12 Gate of Lionel | 19,952 (+1,464) | **15,704** | 2,784 spare |
+|  32 Slums in Dorter | 21,152 (+2,664) | 18,896 | still +408 |
+|  22 Gariland (fits already) | 18,304 | 16,168 | 2,136 freed |
+
+**20 of the 27 structural maps fit once the underside goes**, with no crop at all:
+no head clipped, no ground lost, every row kept.
+
+**Approved and applied, 2026-11-25** (`extract.DROP_UNDERSIDE`). The census now
+reads **87 of 94 fitting, no cosmetic map left, 7 structural**:
+
+| map | over by | crop that would fit |
+|----:|--------:|--------------------:|
+| 100 Public Cemetery | +3,344 | 164 rows |
+|  62 Chapel of Orbonne | +2,488 | 180 |
+|  16 Inside of Limberry Castle | +1,056 | 176 |
+|  26 Weapon storage of Yardow | +536 | 195 |
+|  32 Slums in Dorter | +408 | 194 |
+|  88 Finath River | +200 | 198 |
+|  67 North Wall of Bethla | +32 | 199 |
+
+**It also emptied the prop table.** With the underside gone, Murond Holy Place
+keeps its bell towers (1,272 spare), Araguay Woods all five trunks (2,160) and
+Roof of Riovanes every turret (24). `PROPS_DROPPED` is down to **one entry in the
+whole game**: Sweegy Woods gives up its tallest tree alone, and keeps four.
+
+The tightest fits are now Roof of Riovanes at 24 bytes spare and St. Murond
+Temple at 160, so the group is still not comfortable.
+
+It also helps the *second* constraint, which the depth budget does not measure: a
+large black mass on a 160x100 four-grey LCD is dead weight, and the maps read
+better without it. The playable surface is untouched in every case.
+
+What it changes is the map's silhouette: it no longer sits on a solid block, it
+is cut out against the background. `cosmetic_prop_review.py --skirt` renders it.
+
+**The trap it hides, and it is not the silhouette.** The four-grey thresholds are
+percentiles of the view's own pixels, so removing a large black mass re-quantises
+the WHOLE map: Gariland's roofs went black and 68 walkable tiles changed their
+top shade. Measure the percentiles on the geometry the approved C2 treatment was
+reviewed against, and let the removal change only what is drawn. With that,
+Gariland re-extracts with `map.h`, every corner, every walkability flag, every
+height, the water and **every top-face shade byte identical**; only the 95 wall
+shades of the faces that were the underside differ, and the four view banks lose
+1,707 bytes. Never let a geometry change pass through the quantiser unpinned.
+
+### What a crop costs a unit, calibrated on Gariland
+
+A structural map can only give up scene rows, and the two ends are **not**
+symmetric. `camera_clamp.h` says why:
+
+```c
+#define CAM_MT 39                   // body, smaller round pointer and six pixels of headroom
+if (*y < -CAM_MT) *y = -CAM_MT;     // virtual blank rows preserve actor/number headroom
+if (*y > SC_H - RT_H) *y = SC_H - RT_H;
+```
+
+A unit is drawn on the **screen**, not into the scene —
+`draw_unit_covered(f.x - st.camx, f.y - st.camy, ...)` — so the scene only bounds
+the scenery and what bounds the unit is how far the camera may scroll. **Above the
+scene there are 39 virtual blank rows**, which is exactly `UNIT_SH 26 + FOE_H 7 +
+6`. **Below the scene there are none.**
+
+So: a row cut off the top is free until those 39 are spent; a row cut off the
+bottom takes ground a unit stands on, and that unit is drawn off the scene with
+no way to scroll to it. Never trade a bottom row for a top one.
+
+**Gariland calibrates the rule.** Its band runs 21 rows above its own scene —
+inside the 39 — and nothing below, so it is clean, and any rule that calls it
+clipped is wrong. An earlier version of `crop_review.py` did exactly that, having
+measured the band without reading the clamp.
+
+`crop_review.py` computes the band over all four views and every walkable tile,
+then two windows: the tallest that fits the cap, and the one that loses nothing
+below whatever it costs. Chapters I and II, 2026-11-25:
+
+| map | band | budget crop | nothing lost below |
+|----:|------|-------------|--------------------|
+|  22 Gariland | -21..184 | sc_h 202, **clean** | same |
+|  32 Slums in Dorter | -53..206 | sc_h 172, clips 14 above **35 below** | sc_h 202, over by **2,904** |
+|  12 Gate of Lionel | -41..206 | sc_h 177, clips 2 above **30 below** | sc_h 202, over by **1,576** |
+|  83 Zirekile Falls | -83..170 | sc_h 178, clips 56 above, 0 below | sc_h 190, over by **1,200** |
+|  87 Bariaus Valley | -47..176 | sc_h 156, clips 66 above, 0 below | — |
+
+Two things this exposes.
+
+- **Some of the loss is inherent, not caused by the crop.** Dorter already stands
+  units 53 rows above its own scene at full height, 14 past the 39 it is allowed;
+  Zirekile 83, which is 44 past. Those rows are gone before any arbitration.
+- **For Dorter and Lionel the binding constant is `SC_HMAX` 202, not
+  `FFT_CORE_DEPTH_MAX`.** Both need a window reaching row 206, so 207 rows, and
+  the engine's scene cannot be that tall whatever the depth budget says.
+
+None of the three has a free answer. Each is a trade between heads clipped above
+and ground lost below, and that is a decision for a person on the picture.
+
 ### One mesh, several records (map 53)
 
 Map 53, **Entrance to Death City**, used to read as nothing at all (`IndexError`,

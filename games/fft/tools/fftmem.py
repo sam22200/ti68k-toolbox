@@ -5,7 +5,9 @@
                               CT, tile, death counter)
   fftmem.py watch [SECONDS]   events as they happen (turns, modes, moves, HP/MP changes, KOs,
                               outcome), polling RAM every 50 ms until the battle ends
-  fftmem.py set god|fast on|off   the battle's debug flags (st.dbg, debug_battle.inc), live
+  fftmem.py set god|fast|heap on|off  the battle's debug flags (st.dbg, debug_battle.inc),
+                                  live; heap logs HeapAvail/HeapMax once, on the next
+                                  cached command window (window_cache.inc)
 
 State/Unit offsets come from the TI compiler itself (state_layout.c compiled with tigcc -S,
 cached in campaign/x/state_layout.json and rebuilt when fft.h changes). The battle's State is
@@ -129,7 +131,14 @@ class Battle:
                     ai=AI[b('ai')] if b('ai') < len(AI) else str(b('ai')), end=END[b('end')] if b('end') < 3 else b('end'),
                     rounds=b('rounds'), moved=b('moved'), acted=b('acted'), rot=b('rot'),
                     cursor=(b('cx'), b('cz')), turns=list(d[s + L['State__turns']:s + L['State__turns'] + 6]),
-                    dmg=w('dmg'), units=units)
+                    dmg=w('dmg'), units=units,
+                    # The battle's opening sequence, so a scripted run can tell a
+                    # pre-battle dialogue from a hung battle without a screenshot:
+                    # ti89-emulator says to add the decoder field rather than look.
+                    opening={k: d[s + L['State__open_' + k]]
+                             for k in ('stage', 'beat', 'clock', 'handoff')
+                             if 'State__open_' + k in L},
+                    banner=b('banner'))
 
 
 def unit_line(u):
@@ -138,8 +147,11 @@ def unit_line(u):
 
 
 def snapshot(st):
+    o = st['opening']
     print(f"mode {st['mode']} act u{st['act']} ai {st['ai']} end {st['end'] or '-'} round {st['rounds']} "
-          f"rot {st['rot']} cursor {st['cursor']} next {st['turns']}")
+          f"rot {st['rot']} cursor {st['cursor']} next {st['turns']}"
+          + (' | OPENING ' + ' '.join('%s %d' % kv for kv in o.items()) if any(o.values()) else '')
+          + (f" | banner {st['banner']}" if st['banner'] else ""))
     for u in st['units']:
         print(('> ' if u['i'] == st['act'] else '  ') + unit_line(u))
 
@@ -187,7 +199,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 2 or sys.argv[1] not in ('battle', 'watch', 'set'):
         sys.exit(__doc__)
     if sys.argv[1] == 'set':
-        bits = {'god': 1, 'fast': 2}
+        bits = {'god': 1, 'fast': 2, 'heap': 4}   # DBG_HEAP: one battle heap log
         if len(sys.argv) != 4 or sys.argv[2] not in bits or sys.argv[3] not in ('on', 'off'):
             sys.exit(__doc__)
         print('dbg =', Battle().write_dbg(bits[sys.argv[2]], sys.argv[3] == 'on'))

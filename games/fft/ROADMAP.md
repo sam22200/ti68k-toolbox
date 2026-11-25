@@ -588,3 +588,38 @@ The native supervisor's heap-lifetime check is documented separately in
 - [ ] Decide where the art lives for a chapter package: `status_art.h` (about 1.1 KB)
   and `creature_art.h` (about 3.3 KB) compile into the program today, while `foe_gfx`
   already comes from an archived bank.
+
+## A public FFT asset extractor from the ISO
+
+Everything the map and sprite work has produced is, in the end, one tool somebody
+else could run on their own disc: give it the ISO, get TI-89 assets out. Sprites
+and maps both, in the formats the engine reads.
+
+The pieces already exist and are measured; what is missing is the packaging.
+
+- **Maps**: `tools/extract.py` reads the mesh (`mesh_blob()` assembles the records,
+  map 53 needs it), renders the four views with their ragged depth, and writes
+  `map.h`, `tiles.bin` and `fftv*.bin`. `depth_budget.py` says whether a map fits
+  `FFT_CORE_DEPTH_MAX` and what it has to give up; `extract.PROPS_DROPPED` holds
+  the approved prop drops; `cosmetic_prop_review.py` and `crop_review.py` are the
+  human-supervised review passes.
+- **Sprites**: the `fft-assets` skill holds the disc catalogue, the 208-byte actor
+  frame record, the quantisation and white-outline rules. `other_actors.py` rips
+  the creatures, `status_glyphs.py` the status icons.
+- **Which map is which**: `battle_maps.py` joins the ENTD to `ATTACK.OUT`.
+
+What a public tool still needs:
+
+- [ ] One entry point and one output layout, instead of a dozen scripts each with
+  its own defaults and its own `campaign/x/...` scratch directory.
+- [ ] No commercial data in the repository, which is already the rule here: the
+  disc stays the user's, every byte is read at run time.
+- [ ] The supervised steps have to degrade gracefully. A prop drop or a crop is a
+  judgement call; the tool should ship the decisions already taken as data (the
+  way `PROPS_DROPPED` does) and ask only for the maps nobody has reviewed.
+- [ ] A map the user picks that nobody has ever reviewed must still produce
+  something, even if it is the uncropped view with a warning that it is over
+  budget.
+
+Not scheduled. Written down so the map pass is built in that direction rather
+than being rewritten for it later.

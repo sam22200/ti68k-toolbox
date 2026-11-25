@@ -68,6 +68,17 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 
 ## Known pitfalls
 
+- **`ti-mem wait NAME` only finds an UNARCHIVED variable** (FFT, 2026-11-25). This cost a
+  whole wrong diagnosis, so check the form you are using. `ti-mem wait FILE` reads the
+  file's last variable **and its archive flag**; `ti-mem wait NAME` assumes unarchived
+  unless `--archived` follows. FFT's content banks are archived `.89y` and its programs
+  unarchived `.89z`, so waiting on bank names showed "the group's first variable arrived
+  and nothing else" -- which looks exactly like a transfer dying mid-group, and is not.
+  **Wait on the file, not on a name.** With the right form, a headless TiEmu took 6.3 s for
+  a 95 KB group, 21.1 s for 288 KB and 57.5 s for the whole 684 KB core: there is no
+  large-group failure. An older note about a ~690 KB boot transfer killing TiEmu should be
+  re-tested this way before it is trusted.
+
 - **Saving a state** (`ti-emu save`, 2026-11-08): a path typed into the GTK chooser was mangled by
   autocompletion (a folder duplicated, a leading `=` kept): the script types a bare file name and
   moves the saved file. A state holds the RAM and the archive, so a core installed once survives
@@ -76,10 +87,17 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 - **Session without a desktop `DISPLAY`** (Minish, Titanium, 2026-10-08): do not drive the
   user's live KDE display `:1` (TiEmu opens over their windows, `ti-play` keys follow the
   focus, and its `fr` layout scrambled typed text: `minish(256)` arrived as `596938brmnc`).
-  Use `Xvfb :99 -ac` (layout `us`, typing exact), an empty file as `XAUTHORITY`, and, with no
-  window manager, an `xdotool` shim first on the PATH that turns `windowactivate` into
-  `windowfocus`. Never start a KDE window manager there (it broke the desktop's Alt+Tab).
-  Stop Xvfb by its PID.
+  Use `Xvfb :99 -ac` (layout `us`, typing exact) and an empty file as `XAUTHORITY`. The
+  `xdotool` shim this used to need is no longer one: `ti-key` and `ti-send` set the input
+  focus directly, which is all XTEST wants (FFT, 2026-11-25). Without that, a headless
+  display has no window manager, `_NET_ACTIVE_WINDOW` activation is refused, **`xdotool`
+  still exits 0** so a `||` fallback never fires, and under `set -e` an unguarded
+  `windowactivate` simply ended `ti-send`, leaving the chooser open with nothing sent.
+  The container reaches the display over TCP: `--network host` and
+  `DISPLAY=127.0.0.1:99`, since a bare `:99` is a Unix socket it cannot see. It also only
+  sees paths **inside the mounted working directory**, so a file in a scratch directory is
+  rejected by the chooser. Never start a KDE window manager there (it broke the desktop's
+  Alt+Tab). Stop Xvfb by its PID.
 - **Large data banks must be archived** before the run: ~150 KB of banks left in RAM made
   the TileMap and GrayDBuf allocations fail (no scenery, HOME showing through every other
   frame). `Archive a,b,c` at HOME after the boot transfer (wait ~20 s for it), then run.

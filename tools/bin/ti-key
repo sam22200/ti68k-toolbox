@@ -80,7 +80,14 @@ def main(argv):
     ref_w, ref_h, click = SKINS[xdo("getwindowname", w).strip()[len("TiEmu ("):-1]]
     geo = dict(l.split("=") for l in xdo("getwindowgeometry", "--shell", w).split())
     width, height = int(geo["WIDTH"]), int(geo["HEIGHT"])
-    xdo("windowactivate", "--sync", w)
+    # A headless Xvfb has no window manager, so _NET_ACTIVE_WINDOW activation is
+    # refused (and xdotool still exits 0). Set the input focus directly, which is
+    # all XTEST needs, and only then try to raise the window.
+    for cmd in (("windowmap", w), ("windowfocus", w), ("windowactivate", "--sync", w)):
+        try:
+            xdo(*cmd)
+        except subprocess.CalledProcessError:
+            pass
     time.sleep(0.3)  # otherwise the first key is lost while the focus changes
     for kind, arg in actions:
         if kind == "click":
