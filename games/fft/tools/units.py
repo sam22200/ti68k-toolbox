@@ -133,7 +133,13 @@ def sprite(spr, tiles, lift=0):
 
 
 # the battle's objects (BATTLE/OTHER.SPR, palette 0), boxes of the sheet (x, y, w, h): a crystal (one
-# of its eight turning images; no OTHER.SHP frame composes it) and a closed chest
+# of its eight turning images; no OTHER.SHP frame composes it) and a closed chest.
+# These y values are measured on the sheet unpacked from 0x200, as obj_sprite and
+# chest_sprite below do. OTHER.SPR is the one sheet whose pixels really start at
+# 0x400 - it carries 512 colours, not 256 - so each box sits four rows below the
+# coordinate OTHER.SHP would name, and the two errors cancel. Verified: every box
+# here extracts exactly what it extracts from a correctly based sheet at y - 4.
+# Re-measure them if the unpacking is ever moved to 0x400.
 CRYSTAL = (98, 97, 13, 26)
 # Complete closed-chest artwork, excluding the stray rows above it. The former
 # y=5,h=19 crop lost the front bottom corner (the source extends through row 27).

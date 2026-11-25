@@ -115,3 +115,94 @@ Work placement and cleanup must stay coherent across map reentry and failure.
 The optional `adamrt/fft-software-renderer` is a second PC reference for mesh,
 palettes, lights and camera. It is not an exact PS1 oracle; its own lighting and
 painter-sorting caveats are documented in `campaign/ZEKLAUS_REVIEW.md`.
+
+## Depth budget: deciding whether a map fits, and what to give up
+
+Measured 2026-11-24 on Chapter I's eleven maps with the production encoder
+(`games/fft/tools/depth_budget.py`), confirmed against the shipped Gariland bank
+whose R4 header stores depth 18,304. Full figures: `campaign/PACK1_INVENTORY.md`.
+
+`fft.c` unpacks one view's ragged depth into `vbuf`, capped at
+`FFT_CORE_DEPTH_MAX` = 18,488. The stream is
+
+    4 * sc_h          one DepthRow per scene row
+  + 4 * sum(span)     four planes over each row's even byte span
+
+Only the worst of the four views matters, and `sc_h` is per map
+(`chapter_files.inc` reads it from the descriptor). Nine of eleven Chapter I maps
+fit with 184 to 5,760 bytes to spare. Orbonne is not an overrun: 4 * 192 + 17,720
+= 18,488 exactly, so the cap was sized on it.
+
+**Do not use `map_budget.ragged()` for this gate.** It is a second implementation
+that keeps different rows; it agrees with the encoder only where a map has no
+framing freedom. It understated Sweegy by a factor of four (19,304 against the
+real 21,640).
+
+### Three categories
+
+A map over the cap is over for one of two reasons, and they need opposite fixes.
+
+- **Fits.** Nothing to do.
+- **Cosmetic.** A few decorative props carry the excess. Sweegy Woods: four trees,
+  36 polygons each on one tile apiece, rising from height 6 to 17-18, plus a fifth
+  24-polygon cluster reaching 20. Removing the four trees takes 21,640 to 17,216
+  and **keeps all 208 content rows** — the ground framing is untouched.
+- **Structural.** The height is terrain. Slums in Dorter: 104 of its 144 tall
+  polygons form one mass over x 7-10, z 10-16, from -1 to 17, and its level 1
+  carries real rooftops up to height 15. Removing geometry down to height 7 — 295
+  polygons, 37% of the mesh — is what it would take. Only a shorter scene works.
+
+### Arbitration order, measured on Sweegy
+
+1. **Remove whole decorative props.** 17,216, 1,272 spare, every row kept.
+2. **Shrink them instead.** Only works if drastic: uniformly at 35% gives 18,312
+   (176 spare); 50% still fails at 19,312. Height alone is worse — even at 35% of
+   their height the trees leave 18,736, over by 248. Both axes matter roughly
+   equally; it is the canvas area the prop covers, not its height as such.
+3. **Shorten the scene.** The last resort, and the only route for a structural map.
+   `sc_h` 202 -> 165 for Sweegy (43 rows off the top), 202 -> 172 for Slums in
+   Dorter (54 rows off the bottom). They cut from opposite ends because their row
+   costs differ: Sweegy 41/136/44 bytes top/middle/bottom, Slums 4/151/81.
+   Cropping changes no tile, no tactical rule and no camera orientation — only how
+   many pixel rows the view bank stores. Check that a unit standing on the highest
+   tile still has its 26 sprite rows inside the kept window.
+4. **Nothing else is available.** Raising the cap is closed: 436 free bytes
+   measured on the installed 13-unit Zeklaus. Three pixel-exact re-encodings (a
+   span per depth/mask pair, exact byte bounds, two runs per row) give at best
+   18,326 on Sweegy and still fail on Slums, and each costs either the word
+   alignment `depth_rows()` needs or a test in the per-actor-row cover path,
+   against 3,168 cycles of frame margin.
+
+### The trap: a half-removed prop is worth zero bytes
+
+Removing part of a prop does not shrink a single span, because what is left draws
+the same silhouette. Measured on Sweegy: dropping the 48 polygons that float clear
+of the ground changed the stream by **zero bytes**; dropping all 144 of the four
+trees took it from 21,640 to 17,216. Always remove a prop whole.
+
+The reason a naive rule gets this wrong is attribution. 96 of those 144 polygons
+have their centre over a *neighbouring* tile — a wide canopy overhangs the hill
+next door, whose standable top is higher than the leaves — so a test that compares
+a polygon against the tile its centre falls on calls them terrain. Compare against
+the prop's own tile.
+
+### Classifying a map automatically
+
+`depth_budget.py` sorts every map into fits / cosmetic / structural on its own.
+The signal is FFT's own terrain flag, not geometry analysis: a decorative prop is
+a tile that may be **crossed but never stopped on** (`flags & 0x02`), and that tile
+carries the PROP's height rather than the ground's. Sweegy's four trees are tiles
+of height 17-18 standing over ground near 4; Slums in Dorter has no such tile at
+all. Read both terrain levels, remove every polygon over a prop tile, re-measure:
+clearing the cap means cosmetic, still over means structural.
+
+Chapter I classifies 9 fits, 1 cosmetic (Sweegy, 5 prop tiles, 258 polygons,
+21,640 -> 15,288) and 1 structural (Slums in Dorter, no prop tile), matching every
+figure established by hand.
+
+**Why a geometric rule does not work.** Five variants were tried and all failed:
+asking whether a polygon floats above the standable top of its tile, or rises more
+than a margin above it, or seeding on floating polygons and growing the cluster.
+They fail because a prop tile's standable top *is the prop*, so nothing floats
+above it, and because 96 of Sweegy's 144 tree polygons have their centre over a
+neighbouring hill whose top is higher than the leaves. Use the flag.

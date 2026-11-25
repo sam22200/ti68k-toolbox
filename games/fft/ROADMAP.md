@@ -534,3 +534,21 @@ preserved in `.claude/skills/ti-port-ps1/reference/fft-job-actions.md`.
 
 The native supervisor's heap-lifetime check is documented separately in
 `campaign/README.md`; this milestone is not a full campaign or PS1 movie port.
+
+### Status pictograms and the transformation creatures (2026-11-24)
+
+- [x] One 5x5 glyph per status plus the charge twinkle, drawn rather than downscaled
+  from `EVENT/FRAME.BIN`; `tools/status_glyphs.py`, `status_art.h` committed.
+- [x] Chicken and frog ripped from `BATTLE/OTHER.SPR`; `tools/other_actors.py --header`,
+  `creature_art.h` generated, never committed.
+- [x] `unit_frame` wears the creature, `draw_unit_markers` places the pictogram beside
+  the enemy diamond, one glyph at a time, alternating about once a second.
+- [x] Both verified on screen in the PC battle, which found and fixed the actor-cache
+  collision that painted a transformed unit as a solid white block.
+- [ ] **Neither feature is enabled in any build**: `FFT_STATUS_PICTO` and
+  `FFT_CREATURE_BODY` appear in no Makefile, only on hand-written command lines.
+- [ ] The CATALOG switch that turns the pictograms off. A new `State` field would move
+  the ABI, so it needs a spare bit or another mechanism.
+- [ ] Decide where the art lives for a chapter package: `status_art.h` (about 1.1 KB)
+  and `creature_art.h` (about 3.3 KB) compile into the program today, while `foe_gfx`
+  already comes from an archived bank.
