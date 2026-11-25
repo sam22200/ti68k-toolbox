@@ -19,7 +19,12 @@ for f in "$@"; do
   xdotool key F10
   D=$(timeout 10 xdotool search --sync --name '^Open File$' | head -1)
   [ -n "$D" ] || { echo "ti-send: the file chooser did not open" >&2; exit 1; }
-  sleep 0.5; xdotool windowactivate --sync "$D"; sleep 0.3
+  sleep 0.5
+  # Same as above: no window manager on a headless Xvfb, and `set -e` would stop
+  # the script here, leaving the chooser open with nothing sent.
+  xdotool windowfocus "$D" 2>/dev/null || true
+  xdotool windowactivate --sync "$D" >/dev/null 2>&1 || true
+  sleep 0.3
   # '/' always opens the Location field (Ctrl+L toggles it). GTK's inline completion corrupts a
   # path typed at the end of the field, so we type it before a '=' sentinel removed afterwards.
   xdotool type --delay 30 '/'; sleep 0.3
