@@ -1264,3 +1264,30 @@ A local `__attribute__((noinline))` declaration retains the real stack call
 and both arguments. Keep the ROM formatter's output callback local C in PIC
 images, since external `strputchar` would leave a relocation. The ordinary
 frame path does not scan the heap; diagnostics are one-shot and opt-in.
+
+## TiEmu drops a large group after its first variable (verified)
+
+Sending FFT's 684 KB `fft-core.89g` through TiEmu's file dialog lands **only the
+first variable of the group** and then stalls: `fftstory` (5 KB) arrives,
+`ffttcore`, `ffbm` and `ffcw` never do, and 840 s later nothing more has moved.
+TiEmu itself stays alive and responsive, so it is the link transfer that dies,
+not the emulator. The same failure was seen earlier on a 690 KB boot transfer
+(`-send=`), so it is the group size, not the route.
+
+Consequence for a package that has to be installed in the emulator: ship it as
+several smaller groups, or send the variables one at a time. Do not wait on a
+large transfer -- check the second variable of the group after a few seconds and
+give up at once if it has not arrived.
+
+**Driving TiEmu on a headless Xvfb**: there is no window manager, so
+`_NET_ACTIVE_WINDOW` activation is refused and **`xdotool` still exits 0**, which
+makes a `||` fallback useless. Set the input focus directly (`windowmap` then
+`windowfocus`); that is all XTEST needs. `tools/bin/ti-key` and `ti-send` do this.
+The container also needs a display it can reach: `--network host` plus
+`DISPLAY=127.0.0.1:<n>` against an `Xvfb -listen tcp -ac`, since a bare `:<n>`
+is a Unix socket the container cannot see.
+
+**Reading a battle's free RAM without a screenshot**: `st.dbg` bit 4 (`DBG_HEAP`,
+`fftmem.py set heap on`) makes `window_cache.inc` log `HeapAvail()`/`HeapMax()`
+once, on the next cached command window. `%lu` prints correctly there, contrary
+to an earlier note about `tilog` and long values.
