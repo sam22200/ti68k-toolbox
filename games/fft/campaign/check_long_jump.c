@@ -40,6 +40,49 @@ static void trials(void)
     }
     {u8 columns[8]={0},masks[3]={255,255,255};long_jump_masks(columns,1,1,0,0,0,4,7,0,masks);
      equal(masks[0]|masks[1]|masks[2],0);}
+    // movement_edges.inc does not call long_jump_masks(): it walks the same span
+    // itself, one surface_jump_layers() per crossed cell. The risk of that change
+    // is the two disagreeing, so cross them on every fixture and direction -- if
+    // the geometry reports a landing at distance g, the builder's loop must
+    // accept all g cells, or a legal jump is silently dropped.
+    {
+        static const u8 sides[4]={0,2,6,4};
+        u16 bytes2,n2,i2,deep2=0,deep3=0;const u8 *row2=rt_file("flj00",&bytes2);
+        if(row2) {
+            n2=(u16)((u16)row2[4]<<8|row2[5]);row2+=6;
+            for(i2=0;i2<n2;i2++,row2+=48) {
+                u8 masks[3],direction,reversed2[40],k2,g,m;
+                u8 flags=surface_profile(row2+2,row2[45]);
+                u8 layers=(flags&SURFACE_MOVE_UPPER)?2:1;
+                for(k2=0;k2<row2[45];k2++)memcpy(reversed2+8*(row2[45]-1-k2),row2+2+8*k2,8);
+                for(direction=0;direction<4;direction++) {
+                    u8 width=direction<2?row2[45]:1,height=direction<2?1:row2[45];
+                    const u8 *columns=direction&1?reversed2:row2+2;
+                    u8 sx=direction==1?width-1:0,sz=direction==3?height-1:0;
+                    const u8 *src=columns+((u16)((u16)sz*width+sx)<<3);
+                    u8 exit=surface_edge(src+4*row2[1],sides[direction]);
+                    s8 dx=direction==0?1:direction==1?-1:0,dz=direction==2?1:direction==3?-1:0;
+                    long_jump_masks(columns,width,height,sx,sz,row2[1],direction,row2[0],flags,masks);
+                    if(masks[1])deep2++;
+                    if(masks[2])deep3++;
+                    for(g=1;g<=3;g++) {
+                        u8 span=1;
+                        if(!masks[g-1])continue;          // nothing lands there anyway
+                        for(m=1;m<=g;m++) {
+                            s16 mx=(s16)sx+dx*m,mz=(s16)sz+dz*m;
+                            if((u16)mx>=width||(u16)mz>=height){span=0;break;}
+                            if(!surface_jump_layers(columns+((u16)((u16)mz*width+mx)<<3),
+                                                    sides[direction],exit,6,layers)){span=0;break;}
+                        }
+                        equal(span,1);                    // the builder accepts what lands
+                    }
+                }
+            }
+            // and the fixture really reaches that far, or the cross-check above
+            // would be comparing nothing at the distances this change added
+            equal(deep2>0,1);equal(deep3>0,1);
+        }
+    }
     // The link byte movement_edges.inc packs for a jump of j intervening cells.
     // j rides in bit 0 as "this link crosses something" and the cells beyond the
     // first in bits 3-4, which tactical_search.inc already adds to the cost. The
