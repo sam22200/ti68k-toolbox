@@ -96,7 +96,10 @@ def ragged(disc, files, m, nx, nz, b):
         tex[:, 0::2] = (t & 15).reshape(1024, 128); tex[:, 1::2] = (t >> 4).reshape(1024, 128)
         mesh = extract.mesh_blob(disc, files)
         pal = np.array(struct.unpack_from('<256H', mesh, struct.unpack_from('<I', mesh, 0x44)[0])).reshape(16, 16)
-        polys = extract.polygons(mesh)
+        # What ships, not what the mesh holds: the untextured underside and the
+        # approved prop drops are out (extract.DROP_UNDERSIDE / PROPS_DROPPED), so
+        # this agrees with depth_budget.py's census instead of the pre-census figure.
+        polys = extract.shipped_polygons(mesh, nx, nz, m)
         views, used = [], []
         K, W = extract.K, extract.SC_W
         for rot in range(4):
