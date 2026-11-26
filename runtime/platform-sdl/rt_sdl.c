@@ -33,6 +33,8 @@ static u32 read_keyboard(void)
     if (k[SDL_SCANCODE_F1]) keys |= K_F1;
     if (k[SDL_SCANCODE_F5]) keys |= K_F5;
     if (k[SDL_SCANCODE_F4]) keys |= K_CATALOG | K_APPS;
+    if (k[SDL_SCANCODE_PAGEUP]) keys |= K_F2;     // F2 and F3 are the harness's save/load
+    if (k[SDL_SCANCODE_PAGEDOWN]) keys |= K_F4;   // state, F4 is CATALOG: a layout-free pair
     if (k[SDL_SCANCODE_A] || k[SDL_SCANCODE_Q]) keys |= K_APPS;   // A, on QWERTY or AZERTY
     if (k[SDL_SCANCODE_M] || k[SDL_SCANCODE_SEMICOLON]) keys |= K_MODE;   // M, likewise
     for (d = 1; d <= 9; d++)             // keypad, or the number row (AZERTY: same scancodes)

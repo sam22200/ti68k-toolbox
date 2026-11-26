@@ -23,10 +23,11 @@ static const char *const automatic[3] = { "Manual", "This unit", "All allies" };
     const Unit *u = &st.unit[W->win_k[2]];
     if (m == M_QUIT) {
         n = put_s(s, 0, k == 0 ? "Quit?" : k == 1 ? "Yes" : "No");
-    } else if (m == M_ORDER) {                     // the next turns, the active unit first;
-        const Unit *t = &st.unit[st.turns[k]];     // enemies in dark grey
-        s[0] = (char)('1' + k); s[1] = ' ';
-        n = put_s(s, 2, unit_name(st.turns[k]));
+    } else if (m == M_ORDER) {                     // the next turns, the active unit first,
+        u8 e = (u8)(k + (u8)W->win_k[1]);          // numbered as the source numbers them;
+        const Unit *t = &st.unit[st.turns[k]];     // enemies in dark grey, and marked
+        s[0] = (char)('0' + (e + 1) / 10); s[1] = (char)('0' + (e + 1) % 10); s[2] = ' ';
+        n = put_s(s, 3, unit_name(st.turns[k]));
         if (t->team == TEAM_ENEMY) c = C_DGRAY;
     } else if (m == M_AUTO) {
         n = put_s(s, 0, automatic[k]);

@@ -230,6 +230,7 @@ static u16 vplane;                      // bytes of one plane of the unpacked ra
 #define WIN_ROWS 47                     // bottom-right menu / preview: tab plus six lines
 #define SKILL_ROWS ((WIN_ROWS - 15) / 6) // framed action lists fit five rows, then scroll
 #define SKILL_TOP (st.skill < SKILL_ROWS ? 0 : st.skill - SKILL_ROWS + 1)
+#define ORDER_TOP ((u8)(st.status_row < ORDER_N ? 0 : st.status_row - ORDER_N + 1))
 #ifdef FFT_CHAPTER
 #include "mime_state.h"
 #endif
@@ -973,6 +974,7 @@ u16 mod_entry(u8 op,u8 a)
     }
     if(op==14)return status_dead_turn(a);
     if(op==15){Unit *u=&st.unit[a];u->ct=core_status_end_ct(&u->statuses,u->ct,st.formula.roll&1,st.formula.roll&2);if(st.formula.roll&2)status_turn_action(a);return status_upkeep(a);}
+    if(op==3)return turn_page(a);
     if(op==4){status_tick();return 0;}
     if(op==5)return status_upkeep(a);
     turn_order();return 0;
@@ -1283,6 +1285,34 @@ u8 unit_at_cell(u8 cell)
     return 0;
 }
 
+// [F2] / [F4]: the cursor steps to the previous or next unit, FFT's START button
+// (manual p.9, battlefield: "Cursor will point to units not associated with
+// friendly/enemy forces"; with a menu open it does nothing, as there it points at
+// no unit). The source's own unit list groups the player's units before the enemy's
+// rather than following the encounter's order, so the walk is ranked the same way:
+// the enemy's side after every other, each side in unit order, and it closes on
+// itself. The original walks it one way, we walk it both.
+#define CYCLE_RANK(i) ((s16)((st.unit[i].team == TEAM_ENEMY ? NUNIT : 0) + (i)))
+void cursor_unit_step(s8 dir)
+{
+    u8 i, n = unit_at_cell(CURSOR_CELL), best = 0xFF, wrap = 0xFF;
+    s16 here = n ? CYCLE_RANK(n - 1) : dir > 0 ? -1 : (s16)(2 * NUNIT);
+    for (i = 0; i < NUNIT; i++) {
+        s16 r;
+        if (st.unit[i].x >= MAP_W || st.unit[i].z >= MAP_H || DC_OBJ(st.unit[i].dc)) continue;
+        r = CYCLE_RANK(i);
+        if (dir > 0) {
+            if (r > here && (best == 0xFF || r < CYCLE_RANK(best))) best = i;
+            if (wrap == 0xFF || r < CYCLE_RANK(wrap)) wrap = i;
+        } else {
+            if (r < here && (best == 0xFF || r > CYCLE_RANK(best))) best = i;
+            if (wrap == 0xFF || r > CYCLE_RANK(wrap)) wrap = i;
+        }
+    }
+    if (best == 0xFF) best = wrap;
+    if (best != 0xFF) cursor_place(UNIT_CELL(&st.unit[best]));
+}
+
 // view corner c of a tile is world corner (c - rot) & 3 (both numbered (0,0) (1,0) (1,1) (0,1))
 #ifndef FFT_PRODUCTION_CORE   // test/tool entry, absent from fftbat
 #ifndef FFT_PRODUCTION_CORE // resident test/tool adapter
@@ -1397,9 +1427,25 @@ u8 ct_end(u8 who, u8 moved, u8 acted)
 // Cold turn-list construction belongs to ORDER; impact callers have returned
 // from that image before reaching this wrapper. No executing image is evicted.
 void turn_order(void){mod_call(MOD_ORDER,0,0);}
+// One page of the deeper list the Turn window scrolls: the same cold image.
+static u8 turn_page_make(u8 top){return (u8)mod_call(MOD_ORDER,3,top);}
 #else
 #include "turn_order.inc"
+static u8 turn_page_make(u8 top){return turn_page(top);}
 #endif
+// The Turn window's page follows the selection: the deeper list is made again only
+// when the page moves (its rows are other units then), and the cursor goes to the
+// entry picked, as the source's Turn list does (its manual, p.19).
+static void order_page(void)
+{
+    u8 top = ORDER_TOP;
+
+    if ((u8)W->win_k[1] != top) {
+        W->win_k[1] = (u16)(turn_page_make(top) << 8 | top);
+        W->win_k[0] = 0;
+    }
+    cursor_place(UNIT_CELL(&st.unit[st.turns[st.status_row - top]]));
+}
 
 static void end_battle(u8 e);
 static void bn_start(u8 kind);
@@ -5691,7 +5737,8 @@ void game_scenario(u16 n)
         if (n == 35) { st.mode = M_BROWSE; st.cx = st.unit[7].x; st.cz = st.unit[7].z; }
         if (n == 36 && make_path(U_RAMZA, 4, 8)) { st.mode = M_WALK; st.path_i = 0; st.walk_t = 0; }
         if (n == 37) { st.unit[1].x = 4; st.unit[1].z = 10; do attack(U_RAMZA, 1); while (!st.hit); }
-        if (n == 38) { st.mode = M_ORDER; st.back = M_MENU; }
+        if (n == 38) { st.mode = M_ORDER; st.back = M_MENU;   // its first page, as the key opens it
+            st.status_row = 0; W->win_k[1] = (u16)(turn_page_make(0) << 8); W->win_k[0] = 0; }
         if (n == 39) { st.mode = M_QUIT; st.quit = 1; }
         if (n == 40) { st.act = U_CHEMIST; st.mode = M_STATUS; st.sel = U_CHEMIST; st.back = M_MENU; st.page = 1; }
     }
@@ -6235,8 +6282,13 @@ static u8 update(u8 fast)
         if (input_pressed(K_APPS) && (st.mode == M_BROWSE || st.mode == M_MENU || st.mode == M_TARGET
             || st.mode == M_AIM || st.mode == M_CAST_RANGE || st.mode == M_ACTS || st.mode == M_SKILLS)) {
             st.back = st.mode; st.mode = M_ORDER;  // the turn order (modal_input.inc)
+            st.status_row = 0;                     // its first page, and how deep it goes
+            W->win_k[1] = (u16)(turn_page_make(0) << 8); W->win_k[0] = 0;
         } else if ((u8)(st.mode - M_ORDER) < 3) {  // turn order, Quit?, Auto-battle (modal_input.inc)
+            u8 row = st.status_row, was = st.mode;
             if (modal_keys()) return 0;
+            if (st.mode == M_ORDER) { if (st.status_row != row) order_page(); }
+            else if (was == M_ORDER) turn_order();  // the six the scrolled window borrowed
         } else if (st.mode == M_MENU) {
             menu_keys();
         } else if (st.mode == M_ACTS || st.mode == M_SKILLS) {
@@ -6261,6 +6313,7 @@ static u8 update(u8 fast)
                 if (arrows & K_RIGHT) move_cursor(1, 0);
             }
             st.rep = arrows ? (u8)(st.rep < 255 ? st.rep + 1 : st.rep) : 0;
+            if (input_pressed(K_F2 | K_F4)) cursor_unit_step(input_pressed(K_F4) ? 1 : -1);
             if (input_pressed(K_A | K_ENTER)) {
                 u8 o, c = (u8)(CURSOR_CELL);
                 if (
@@ -6940,7 +6993,7 @@ static void draw_hud(void)
         || st.mode == M_PICK || st.mode == M_ORDER || st.mode == M_QUIT ? st.mode : 0;
     if (pre) k[0] = M_MENU;
     k[1] = k[0] == M_MENU ? (u8)(pre | st.moved | st.acted << 1) : k[0] == M_ACTS ? known(st.act, 0) == NO_ABIL
-        : k[0] == M_PICK ? st.pick : k[0] == M_ORDER ? st.turns[1] : k[0] == M_SKILLS ? SKILL_TOP : 0;
+        : k[0] == M_PICK ? st.pick : k[0] == M_ORDER ? (u16)(ORDER_TOP | (W->win_k[1] & 0xFF00)) : k[0] == M_SKILLS ? SKILL_TOP : 0;
 #ifdef FFT_CHAPTER
     // The two commands list different abilities under the same mode, scroll and unit, so the
     // cached window has to tell them apart: the Secondary rides the key's top bit.
@@ -7030,11 +7083,14 @@ static const u8 forecast_mask[11] = { 0x0F, 0x07, 0x03, 0x81, 0xC0, 0xE0, 0xC0, 
 #endif
         if (k[0] == M_MENU || k[0] == M_AUTO || k[0] == M_ACTS || k[0] == M_SKILLS || k[0] == M_QUIT || k[0] == M_ORDER) {
             u8 e = k[0] == M_MENU ? st.menu : k[0] == M_ACTS || k[0] == M_AUTO ? st.sub : k[0] == M_SKILLS ? st.skill - W->win_k[1]
-                : k[0] == M_ORDER ? st.status_row : st.quit + 1;
+                : k[0] == M_ORDER ? (u8)(st.status_row - (u8)W->win_k[1]) : st.quit + 1;
 #ifdef FFT_CHOICE_LEGACY_WIDTH
             draw_hand(80,y+7+6*e); // historical visual control only
 #else
-            draw_hand((s16)(96+CHOICE_HAND_X(6)+(k[0]==M_MENU||k[0]==M_ACTS?64-W->win_w:0)), y + 7 + 6 * e);
+            // The glove follows its own list's text_x (make_window gives the turn list 3,
+            // the framed lists 6), so at full sway the finger keeps the one empty pixel
+            // CHOICE_MENU.md asks for, whichever list it points at.
+            draw_hand((s16)(96+CHOICE_HAND_X(k[0]==M_ORDER?3:6)+(k[0]==M_MENU||k[0]==M_ACTS?64-W->win_w:0)), y + 7 + 6 * e);
 #endif
         }
     }

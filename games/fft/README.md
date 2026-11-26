@@ -185,7 +185,8 @@ shadow, with a light surface edge, including wading and wet blows (milestone 27,
 | [F5] / [F1] | rotate the camera 90 degrees clockwise / counter-clockwise |
 | [2nd] or [ENTER] | pick the menu's or the list's entry; on a reachable tile: walk there; on a unit in the weapon's or the ability's reach: use it (a tile that cannot be picked: the tile drawn on the same pixels, when that one can, else the cursor blinks); at Wait: end the turn; looking around: a unit's numbers, or back to the menu; held through an AI turn: up to three times as fast |
 | [shift] or [ESC] | back: from the targets to the list they came from, from a list a level up, from the reach or the facing to the menu; in the menu, undo the move (before acting) or look around; [ESC] while looking around asks "Quit?" (No first; [ESC] again: No) |
-| [APPS] or [CATALOG] | the turn order (PC: A), closed by any key |
+| [APPS] or [CATALOG] | the turn order (PC: A): UP/DOWN scroll its 39 turns six at a time and send the cursor to each, any other key closes it |
+| [F2] / [F4] | the cursor to the previous / next unit, the player's then the enemy's, cyclic (PC: PageUp / PageDown) |
 | [MODE] | the reach tiles drawn over the scenery in front of them, or hidden by it but for dashes (PC: M) |
 | Auto-battle (turn menu) | Manual / This unit / All allies; Shift/ESC during AI turns stops player automation |
 | results | [2nd] / [ENTER] the battle again (new draws), [ESC] quits |
@@ -231,7 +232,13 @@ only). The battle ends when every enemy is KO (`Victory!`) or when Ramza becomes
 a chest or the whole party, Delita included, is KO (`Game Over`): the results list each of
 the player's units with its level, the EXP and JP it earned. The terrain height/depth
 readout is removed from the HUD. [APPS] shows
-FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey).
+FFT's AT list in a bottom-right window (active unit then five turns, enemies in dark grey with
+the same diamond the map puts above their head). The list itself goes 39 turns deep, as the
+original's does, and the arrows scroll the window through it with the continuation marks of
+every other list; each entry sends the cursor and the camera to that unit. [F2] and [F4] step
+the cursor from unit to unit without the list, the original's START button (its manual, p.9:
+"Cursor will point to units not associated with friendly/enemy forces"), one cyclic list in
+unit order, which is the player's units and then the enemy's.
 The cursor is dashed behind the scenery. Transparent character details sit at the bottom:
 active unit left, hovered or aimed-at unit right, with the cutout 19x29 original portraits
 at the outer edges, using one shared portrait facing. The small level overlays the portrait's lower corner;

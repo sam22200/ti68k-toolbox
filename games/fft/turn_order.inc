@@ -2,12 +2,12 @@
 // (no bonus at their end), sorted by tick then by the CT reached (the higher first), a tie in
 // unit order. At each turn change only; reciprocal products skip constant-speed
 // segments. Haste/Slow need at most three segments, never a per-tick simulation.
-void turn_order(void)
+u8 turn_forecast(u8 *out, u8 depth)
 {
-    u16 tk[ORDER_N];
+    u16 tk[ORDER_DEEP];
     u8 i, j, n = 1, t;
     Unit *u;
-    st.turns[0] = st.act; tk[0] = 0;
+    out[0] = st.act; tk[0] = 0;
     for (i = 0, u = st.unit; i < NUNIT; i++, u++) {
         u16 tick = 0, ct = u->ct;
         u16 haste=0,slow=0;
@@ -27,7 +27,7 @@ void turn_order(void)
             if(rate&4){slow=innate&4?512:u->status_ct[SID_SLOW-SID_POISON];slow=slow>tick?slow-tick:0;}
         }
 #endif
-        for (t = 0; t < ORDER_N - 1; t++) {
+        for (t = 0; t + 1 < depth; t++) {
             u16 k;
             while (ct < 100) {
                 u16 gain=speed,span=0,k2;
@@ -45,13 +45,28 @@ void turn_order(void)
             ct = ct >= 200 ? ct - 200 : ct - 100; // source AT keeps Quick255's55 remainder
             k = (u16)(tick << 8 | (100 - ct));
             for (j = n; j > 1 && tk[j - 1] > k; j--)
-                if (j < ORDER_N) { tk[j] = tk[j - 1]; st.turns[j] = st.turns[j - 1]; }
-            if (j >= ORDER_N) break;               // later than every turn kept
-            tk[j] = k; st.turns[j] = i;
-            if (n < ORDER_N) n++;
+                if (j < depth) { tk[j] = tk[j - 1]; out[j] = out[j - 1]; }
+            if (j >= depth) break;                 // later than every turn kept
+            tk[j] = k; out[j] = i;
+            if (n < depth) n++;
         }
     }
-    for (; n < ORDER_N; n++) st.turns[n] = 0xFF;
+    for (j = n; j < depth; j++) out[j] = 0xFF;
+    return n;
+}
+
+// The six an ordinary turn change forecasts.
+void turn_order(void) { turn_forecast(st.turns, ORDER_N); }
+
+// One page of the deeper list the Turn window scrolls (fft.c, M_ORDER). The whole
+// list is made here, on the stack, and only the six shown are kept, so the battle
+// carries no second list and Work keeps its measured size. Returns the whole length.
+u8 turn_page(u8 top)
+{
+    u8 deep[ORDER_DEEP], n, i;
+    n = turn_forecast(deep, ORDER_DEEP);
+    for (i = 0; i < ORDER_N; i++) st.turns[i] = (u8)(top + i) < n ? deep[top + i] : 0xFF;
+    return n;
 }
 
 // ORDER's mod_entry follows the status runtime in fft.c.

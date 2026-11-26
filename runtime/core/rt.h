@@ -87,6 +87,8 @@ extern u16 rt_state_size;
 #define K_CATALOG 0x4000UL             // [CATALOG]  PC: F4; also sets legacy K_APPS
 #define K_DIGIT(n) (0x8000UL << (n))   // [1]..[9] = bits 16..24, keypad grid for gestures
 #define K_DIGITS 0x01FF0000UL          //            PC: keypad or number row 1..9
+#define K_F2     0x02000000UL          // [F2]       PC: PageUp   (F2 saves a state)
+#define K_F4     0x04000000UL          // [F4]       PC: PageDown (F3 loads one, F4 is CATALOG)
 extern u32 rt_keys, rt_prev;           // this frame, previous frame
 #define input_held(k)    (rt_keys & (k))
 #define input_pressed(k) (rt_keys & ~rt_prev & (k))

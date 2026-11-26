@@ -1461,7 +1461,8 @@ static void test_water(void)
 // every supported Speed and crossings just short of the 100 CT threshold.
 static void test_turn_prediction(void)
 {
-    u8 speed, i, predicted[ORDER_N];
+    u8 speed, i, predicted[ORDER_DEEP], n;
+    u16 entries = 0;
     for (speed = 1; speed <= 50; speed++) {
         sw_init(10);
         for (i = 0; i < NUNIT; i++) {
@@ -1469,14 +1470,19 @@ static void test_turn_prediction(void)
             st.unit[i].ct = (u8)((17 * speed + 29 * i) % 100);
         }
         st.act = ct_next();
-        turn_order(); memcpy(predicted, st.turns, sizeof predicted);
-        CHECKV(predicted[0], st.act);
-        for (i = 1; i < ORDER_N; i++) {
+        n = turn_forecast(predicted, ORDER_DEEP);   // the whole list the window scrolls,
+        CHECKV(predicted[0], st.act);               // not only the six it shows
+        CHECK(n > ORDER_N);
+        turn_order();                               // whose first six are the HUD's own six
+        for (i = 0; i < ORDER_N; i++) CHECKV(st.turns[i], predicted[i]);
+        for (i = 1; i < n; i++) {                   // then the clock itself, entry by entry
             ct_end(st.act, 1, 1);
             st.act = ct_next(); CHECKV(predicted[i], st.act);
         }
+        entries = (u16)(entries + n);
     }
-    printf("turn prediction: 300 displayed entries equal complete CT clock advances, Speed 1..50\n");
+    printf("turn prediction: %u scrolled entries equal complete CT clock advances, Speed 1..50\n",
+           entries);
 }
 
 static void shots(void)
@@ -1599,12 +1605,80 @@ static void test_play(void)
     CHECK(!strncmp(s, "+5HP ", 5));
 }
 
+// ------------------------------------------- the unit list ([F2]/[F4]) and the Turn window
+// FFT's START button steps the cursor over the units "not associated with friendly/enemy
+// forces" (manual p.9): one cyclic list, the player's units then the enemy's. Its Turn window
+// lists 39 turns ten at a time and puts the cursor on the name picked (manual p.19); ours
+// walks the list both ways, and scrolls the same depth six at a time.
+static void test_unit_cycle(void)
+{
+    u8 deep[ORDER_DEEP], seen[NUNIT], order[NUNIT];
+    u8 i, k, n = 0, enemies = 0;
+    sw_init(10);
+    steps(0, 20);
+    for (i = 0; i < NUNIT; i++) seen[i] = 0;
+    cursor_place(UNIT_CELL(&st.unit[U_RAMZA]));
+    CHECKV(unit_at_cell(CURSOR_CELL), U_RAMZA + 1);
+    for (i = 0; i < NUNIT; i++) {                 // forward: each unit once, Ramza last
+        cursor_unit_step(1);
+        k = unit_at_cell(CURSOR_CELL);
+        CHECK(k != 0);
+        if (!k) return;
+        order[n++] = (u8)(k - 1); seen[k - 1]++;
+    }
+    CHECKV(order[NUNIT - 1], U_RAMZA);            // the list closes on itself
+    for (i = 0; i < NUNIT; i++) CHECKV(seen[i], 1);
+    {   // the walk is the source's unit-list order -- the player's units then the
+        u8 sorted[NUNIT], j, t;                   // enemy's -- not the encounter's, where
+#define RANKOF(u) ((u8)((st.unit[u].team == TEAM_ENEMY ? NUNIT : 0) + (u)))
+        for (i = 0; i < NUNIT; i++) sorted[i] = i;     // Delita is 0 and Ramza 6
+        for (i = 0; i < NUNIT; i++) for (j = (u8)(i + 1); j < NUNIT; j++)
+            if (RANKOF(sorted[j]) < RANKOF(sorted[i])) { t = sorted[i]; sorted[i] = sorted[j]; sorted[j] = t; }
+        for (i = 0; i < NUNIT && sorted[i] != U_RAMZA; i++) ;
+        for (j = 0; j < NUNIT; j++) CHECKV(order[j], sorted[(i + 1 + j) % NUNIT]);
+        enemies = 0;
+#undef RANKOF
+    }
+    cursor_place(UNIT_CELL(&st.unit[U_RAMZA]));   // backward: the same list the other way
+    cursor_unit_step(-1);
+    CHECKV(unit_at_cell(CURSOR_CELL), order[NUNIT - 2] + 1);
+    cursor_unit_step(1);
+    CHECKV(unit_at_cell(CURSOR_CELL), U_RAMZA + 1);
+
+    k = turn_forecast(deep, ORDER_DEEP);          // the window's list (test_turn_prediction
+    CHECK(k > ORDER_N);                           // checks it against the clock itself)
+    CHECKV(deep[0], st.act);
+
+    press(K_APPS);                                // and scrolled by the arrows, the cursor
+    CHECKV(st.mode, M_ORDER);                     // following every entry, page by page
+    CHECKV(st.status_row, 0);
+    for (i = 0; i < ORDER_N; i++) {
+        press(K_DOWN);
+        CHECKV(st.status_row, i + 1);
+        CHECKV(unit_at_cell(CURSOR_CELL), deep[i + 1] + 1);
+    }
+    CHECKV((u8)(st.turns[ORDER_N - 1]), deep[ORDER_N]);   // the window turned its page
+    press(K_UP);
+    CHECKV(st.status_row, ORDER_N - 1);
+    press(K_APPS);
+    CHECKV(st.mode, M_MENU);
+    turn_order();                                 // and the six are the list's own again
+    for (i = 0; i < ORDER_N; i++) CHECKV(st.turns[i], deep[i]);
+}
+
 int main(int argc, char **argv)
 {
     sw_init(0);                                           // the map's tiles are read from ffti
     if (argc > 1 && !strcmp(argv[1], "--find")) { find_spots(); return 0; }
     if (argc > 1 && !strcmp(argv[1], "--latency")) { test_latency(); return fails != 0; }
     if (argc > 1 && !strcmp(argv[1], "--hides")) { verbose_hides = 1; test_hides(); return 0; }
+    // The turn list and the unit cycle alone: the whole suite stalls after test_pace,
+    // on main as well as here, so these two are also runnable on their own.
+    if (argc > 1 && !strcmp(argv[1], "--order")) {
+        test_turn_prediction(); test_unit_cycle();
+        printf(fails ? "%d FAILED\n" : "turn list and unit cycle: all tests passed\n", fails);
+        return fails != 0;
+    }
     ai_diff = argc > 1 && !strcmp(argv[1], "--ai");
     test_rotations();
     test_heights();
@@ -1633,6 +1707,7 @@ int main(int argc, char **argv)
     test_latency();
     test_water();
     test_turn_prediction();
+    test_unit_cycle();
     test_play();
     shots();
     printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
