@@ -1,13 +1,30 @@
 # Shared core and replaceable chapter packages
 
-## Current ABI99 contract (2026-11-24)
+## Current ABI99 contract (2026-11-25)
 
-The user requested promotion after actual installed-RAM measurement. Current
-reviewed groups: `x/core-abi99-release/packages/fft-core.89g`701169 and
-`chapter-01.89g`295145 transport bytes; key
-`10965478d3a2c348c22d2dea8e6ac51d`. `packages/core-contract.json` freezes ABI99,
+The user requested the freeze after the demo was repaired on a rebuilt core.
+Current reviewed groups: `x/core-abi99-1125/packages/fft-core.89g`706459 and
+`chapter-01.89g`295209 transport bytes; key
+`785d5a96d378b836b1bb79c847ebf040`. `packages/core-contract.json` freezes ABI99,
 29 matching images, State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684,
-zone9118 and companion4132 (cold reader3546). Actor42/depth18488 remain.
+zone9142 and companion4132 (cold reader3546). Actor42 remains; depth is18520.
+
+What moved from the2026-11-24 checkpoint
+(`x/core-abi99-release/packages/`, key `10965478d3a2c348c22d2dea8e6ac51d`,
+core701169 + pilot295145, zone9118, depth18488), and why:
+
+- the shared archive tail took the status pictograms and the creature art,
+  `CONTOUR_BYTES`6892 ->11668. **A chapter group carries its own `ffcu`, so a
+  group built before this one cannot be read by this core**: `archive_art_tail`
+  refuses the shorter tail, `contour_gfx` stays null and the scene player loads
+  nothing. Rebuild chapters with `make packages`, never mix the two.
+- `FFT_CORE_DEPTH_MAX`18488 ->18520, the32 bytes North Wall of Bethla needs.
+- a crystal now teaches the dead unit's abilities (`loot.inc`).
+
+ABI99, the image count, ModCtx and the save format are untouched, so this is a
+content move, not an interface move. The earlier group is kept whole because
+the installed Titanium RAM figures quoted across these documents were measured
+on it, and `MOD_ZONE` has since grown24 bytes.
 Actual TTPack input64725 leaves211 bytes. Chapters stay data-only and match
 this exact key; saves and configuration remain outside both groups.
 

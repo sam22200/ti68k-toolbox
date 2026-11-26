@@ -73,10 +73,12 @@ bridge and Gariland; it is not the whole campaign.
    **16KiB free/peak is not certified.** Do not reopen difficult cache shrinking.
 3. **Core contract and archive plan: complete within stated content limits.**
    `packages/core-contract.json` freezes actual ABI99,29 matching images,
-   State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684, zone9118 and shared
-   companion4132 (cold reader3546). Actor cache42/depth18488 are unchanged.
-   Current groups: core701169 + pilot295145 transport bytes, key
-   `10965478d3a2c348c22d2dea8e6ac51d`, in `x/core-abi99-release/packages/`.
+   State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684, zone9142 and shared
+   companion4132 (cold reader3546). Actor cache42 is unchanged; depth is18520.
+   Current groups: core706459 + pilot295209 transport bytes, key
+   `785d5a96d378b836b1bb79c847ebf040`, in `x/core-abi99-1125/packages/`
+   (2026-11-25; the2026-11-24 groups stay in `x/core-abi99-release/packages/`,
+   see [CORE_PACKAGES.md](CORE_PACKAGES.md) for what moved).
    The dated full-chapter plan projects1851032 bytes with17623 bytes of planning
    margin. This is not a full chapter build or a Flash-fragmentation guarantee.
 

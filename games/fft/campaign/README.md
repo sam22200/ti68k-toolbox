@@ -6,13 +6,26 @@ Optional Ramza/Delita wardrobes fit the measured50KB envelope. Scene/text,
 character lifetimes, detailed map lists, budgets and remaining gates are included.
 No full campaign or new wardrobe banks are installed by this planning study.
 
-Current reviewed core checkpoint (2026-11-24): ABI99, key
-`10965478d3a2c348c22d2dea8e6ac51d`, groups
-`x/core-abi99-release/packages/`. [Installed RAM and promotion](INSTALLED_RAM_ABI99.md)
-records the cold fragmentation fix and actual Titanium free/max measurements.
+Current reviewed core checkpoint (2026-11-25): ABI99, key
+`785d5a96d378b836b1bb79c847ebf040`, groups `x/core-abi99-1125/packages/`,
+core706459 + pilot295209 transport bytes. It moves the2026-11-24 checkpoint
+forward over three accepted changes -- the shared archive tail now carries the
+status pictograms and the creature art (`CONTOUR_BYTES`6892 ->11668),
+`FFT_CORE_DEPTH_MAX` rises18488 ->18520 for North Wall of Bethla, and a crystal
+teaches its abilities -- which together take `MOD_ZONE`9118 ->9142. ABI99,29
+images, ModCtx400 and FSV9 Save4684 are unchanged, so chapters stay compatible
+in shape and must simply be rebuilt against the new key.
+`x/core-abi99-release/packages/` is kept whole: its Titanium RAM and route
+measurements are quoted throughout these documents and were taken on that core,
+so the24 extra zone bytes are not reflected in them. The full pilot route and
+`--combat auto` pass on the new groups, PC and sanitizers.
+[Installed RAM and promotion](INSTALLED_RAM_ABI99.md) records the cold
+fragmentation fix and actual Titanium free/max measurements.
 `make core-contract-check` uses this release; new package builds default to
 `x/build-packages`, preserving old proof groups. The pilot is not full Chapter I;
-16KiB free remains unpassed and Zeklaus13 has only436 free bytes.
+16KiB free remains unpassed and Zeklaus13 had only436 free bytes -- measured on
+the2026-11-24 core, so the24-byte zone growth comes straight off it and the
+figure wants re-measuring before anything is budgeted against it.
 
 
 Current delivery (2026-11-23): the ordinary-combat pilot passes end to end on

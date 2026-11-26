@@ -1,8 +1,10 @@
 // Unit adapter: source bitmap state is authoritative; status is its four-bit cache.
 #ifndef FFT_STATUS_UNIT_H
 #define FFT_STATUS_UNIT_H
-#ifdef FFT_CHAPTER
+// The monster test reads only the job index, which both builds carry: the crystal
+// rule in loot.inc needs it outside the chapter (fft.h, Unit).
 static inline u8 unit_monster(const Unit *u){return (u8)(u->job-94)<48U;}
+#ifdef FFT_CHAPTER
 static inline u8 unit_transparent(const Unit *u){return core_status_current(&u->statuses,2)&16;}
 static inline u8 unit_hidden_enemy(const Unit *a,const Unit *t)
 {

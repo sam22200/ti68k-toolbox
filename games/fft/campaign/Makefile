@@ -72,7 +72,9 @@ TRAP_DATA_DIR ?= x/tile-traps/shipping-data
 campaign-traps-native-check:
 	$(PY) check_traps_native.py --data-dir $(TRAP_DATA_DIR)
 .PHONY: pilot-route-check pilot-e2e-check core-contract-check
-PILOT_PACKAGE_DIR ?= x/core-abi99-release/packages
+# The reviewed group the contract is frozen on. x/core-abi99-release holds the
+# 2026-11-23 one, kept whole because its RAM and route measurements are quoted.
+PILOT_PACKAGE_DIR ?= x/core-abi99-1125/packages
 PILOT_ROUTE_OUTPUT ?= x/pilot-route/latest
 PILOT_E2E_OUTPUT ?= x/pilot-e2e/latest
 pilot-route-check:
@@ -344,6 +346,10 @@ packages-routing-check: packages
 # with ours. Without it a change to contour.h leaves the opening banks on the old
 # size, archive_art_tail rejects them, and the scene player loads nothing at all -
 # which surfaces as a null scene set rather than as a missing picture.
+# A frozen package group ages the same way: PILOT_PACKAGE_DIR carries its own
+# ffcu, so once contour.h grows, pilot-route-check compiles today's engine
+# against yesterday's tail and dies on that same null set at scene(0). Rebuild
+# the group (make packages) before reading the failure as a route bug.
 contour-assets:
 	$(PY) ../tools/view_split.py campaign
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
