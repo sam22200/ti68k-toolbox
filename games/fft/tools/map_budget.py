@@ -132,6 +132,12 @@ def ragged(disc, files, m, nx, nz, b):
         full = [size(range(r0, r1), lambda y: mk[y]) for mk in views]
         # the TI canvas: x in [0, 320) as extract.views() places it, the top content row first,
         # at most SC_HMAX rows (the chapter crops the rest)
+        # The top-aligned window: one legal choice, not the one that ships.
+        # depth_budget.py's census picks the window per map -- the approved crop
+        # where extract.MAP_CROP has one, otherwise the cheapest of that height --
+        # and its row origin is its own, so MAP_CROP's offsets do not transfer
+        # here. A map over the cap in this file may well fit in the census, which
+        # is the shipping verdict; this figure is an upper bound.
         shipped = [size(range(r0, min(r1, r0 + SC_HMAX)), lambda y: mk[y][lb:lb + 40]) for mk in views]
         return full, shipped, r1 - r0, extract.SC_W
     finally:
