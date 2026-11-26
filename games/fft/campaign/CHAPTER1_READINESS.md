@@ -93,9 +93,13 @@ It does not certify unripped content, whole-chapter Flash or future-map RAM.
    The depth gate is closed: the census over every non-optional map reports
    `over_limit: []` against18520, Sweegy at16272 and Fovoham at16384, so the
    816/688 excess those two were estimated at no longer exists. It closed on
-   four measures, not one -- the untextured underside is dropped everywhere, the
-   tallest tree of Sweegy is the one prop dropped in the whole game, six maps
-   take an approved crop, and the cap took32 bytes for North Wall of Bethla.
+   four measures, not one -- the untextured underside is dropped where a map
+   needs it dropped, the tallest tree of Sweegy is the one prop dropped in the
+   whole game, six maps take an approved crop, and the cap took32 bytes for
+   North Wall of Bethla. The skirt is back on the nine Chapter I maps that stay
+   under the cap with it (`extract.KEEP_UNDERSIDE`, `tools/underside_census.py`,
+   PACK1_INVENTORY.md section 8): +4,077 archive bytes, no depth overrun, and
+   Orbonne Monastery clears the cap by 40 bytes.
    The15 optional maps (Colliery, Nelveska, Deep Dungeon) stay out of the
    census; `--include-optional` reopens them and three Colliery floors, VOYAGE
    and END are structural overruns when it does.

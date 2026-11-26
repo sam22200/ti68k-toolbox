@@ -454,12 +454,29 @@ whole game**: Sweegy Woods gives up its tallest tree alone, and keeps four.
 The tightest fits are now Roof of Riovanes at 24 bytes spare and St. Murond
 Temple at 160, so the group is still not comfortable.
 
-It also helps the *second* constraint, which the depth budget does not measure: a
-large black mass on a 160x100 four-grey LCD is dead weight, and the maps read
-better without it. The playable surface is untouched in every case.
-
 What it changes is the map's silhouette: it no longer sits on a solid block, it
 is cut out against the background. `cosmetic_prop_review.py --skirt` renders it.
+
+**Revised 2026-11-26: a depth remedy, applied where the depth needs it.** The
+*second* constraint was read the wrong way round here. The claim was that a large
+black mass on a 160x100 four-grey LCD is dead weight; reviewed on the actual four
+greys, against the game's **white** background, the opposite holds -- the skirt is
+the map's base, and without it the terrain floats with its lower edge dissolving
+into the page. The user asked for it back wherever it fits (2026-11-26).
+
+`underside_census.py` measures every map both ways on its shipping window and
+`extract.KEEP_UNDERSIDE` is the verdict; `DROP_UNDERSIDE` still applies to every
+map outside that set. Nine of the twelve Chapter I maps keep their skirt. It is
+nearly free in archive bytes -- an R4 bank's colour planes are raw and a fixed row
+count, so only the ZX0 depth grows: **4,077 bytes over the nine**, the dearest
+being Orbonne Monastery at 1,439. Depth is the real price, and it is RAM: Gariland
+clears the cap by 216 bytes with the skirt, Orbonne Monastery by **40**.
+Slums in Dorter (21,792), Fovoham Plains (19,480) and Sweegy Woods (19,104) stay
+without it.
+
+The trap below is why this costs nothing in quantisation: the percentiles are
+already pinned to the full geometry, so putting the skirt back reproduces the
+same three thresholds (29.267, 53.427, 80.617) the manifest froze.
 
 **The trap it hides, and it is not the silhouette.** The four-grey thresholds are
 percentiles of the view's own pixels, so removing a large black mass re-quantises

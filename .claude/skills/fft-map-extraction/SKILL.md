@@ -37,6 +37,15 @@ a rework:
   not — the compendium is incomplete.
 - **Approved drops are data, not edits.** `extract.PROPS_DROPPED` holds them per
   map and `extract.views()` applies them; a tile carrying no prop raises.
+- **The untextured underside is a depth remedy, not a style.** Dropping the skirt
+  under a map's terrain is what brings most structural maps under the cap, but a
+  map that fits with it keeps it: without the skirt the terrain floats and its
+  lower edge dissolves into the white background. `underside_census.py` measures
+  every map both ways on its shipping window and `extract.KEEP_UNDERSIDE` is the
+  verdict. It is nearly free in archive bytes -- R4 colour planes are raw and a
+  fixed row count, so only the ZX0 depth grows (4,077 bytes over nine Chapter I
+  maps) -- and the grey percentiles never move, being measured on the full
+  geometry. Re-run the census after changing a map's crop, its props or the cap.
 
 Current scripts live in `games/fft/tools/`;
 resource ownership rules are `games/fft/campaign/CORE_RESOURCES.md`.
