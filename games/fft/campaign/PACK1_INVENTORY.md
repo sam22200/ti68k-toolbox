@@ -3,7 +3,8 @@
 **It fits.** Chapter I's whole content, measured from the local disc through the
 production codecs, plus today's core, comes to **1,981,372 archive bytes against a
 2,424,754 budget**: 443,382 bytes of margin after the 131,072 reserve, on an empty
-Titanium.
+Titanium. **Section 7 ripped it** on 2026-11-26 and the figure barely moved:
+1,982,457 and 442,297 of margin, with the missing portraits now counted.
 
 Two corrections since the first pass, both enlarging the total:
 
@@ -246,3 +247,53 @@ save and no shipping asset is touched.
   implementation of the format that keeps different rows. Section 3 uses the
   production encoder and is confirmed against the shipped Gariland bank.
 - `chapter1-plan.json`'s 112% scenery calibration is superseded for Chapter I.
+
+## 7. The rip, 2026-11-26
+
+Sections 1 to 5 size Chapter I from the disc through the production codecs. This pass
+**ripped** what can be ripped mechanically and weighed the files, so three lines stop
+being carried. Outputs: `x/pack1-rip/` (ignored, like the rest of the extracted
+commercial material); `tools/` is unchanged, the rip ran from a scratch script.
+
+| Line | Section 1 | Ripped | |
+|---|---:|---:|---|
+| Core, 36 archived variables | 700,491 | **701,874** | `make packages`, after the turn-list merge |
+| 12 battle maps, four views | 843,544 | **837,954** | 48 banks written and weighed |
+| 9 narrative rooms, 320px | 46,761 | **46,761** | reproduces to the byte |
+| Map geometry and descriptors | 94,344 | **96,852** | 8,071 a map, from today's pilot package |
+| Chapter portraits missing from `ffcp` | not counted | **2,784** | 8 faces extracted, 348 bytes each |
+| **Total** | 1,981,372 | **1,982,457** | |
+| **Margin** | 443,382 | **442,297** | |
+
+Per map, views then collision columns: 022 70,444/1,208; 032 77,649/1,288;
+034 59,773/888; 049 72,389/944; 056 76,539/1,128; 074 78,990/1,064; 077 65,220/976;
+085 60,547/1,360; 091 68,682/968; 103 72,439/648; 076 62,086/1,448; 072 73,196/1,016.
+
+**The collision columns are not a new line.** 12,936 bytes over the twelve maps, against
+7,862 a map carried from the pilot -- but the shipped chapter group carries no terrain
+bank at all: its per-map bytes are the actor directory (`ffga` 748), the encounter
+interface (`ffgi` 1,806) and the descriptor (`ffgd` 4,024), with Orbonne's four adding
+`ffost`. Measured on today's package that is 8,071 a map, which is what section 1's line
+should have been; the collision data lives inside those.
+
+**Edges cost nothing on a battle map.** An R4 view bank is `tag + three lengths +
+colours + stroke + ZX0(depth)`, and the colour planes are **raw**: map 022 view 0 is
+16,925 bytes = 8 + 13,760 (172 rows x 40 x 2) + 0 + 3,157. Their size follows the row
+count, never the picture, so the relief edges drawn into them offline
+(`isometric_style.outline()`) add no byte. A narrative room is a ZX0 picture instead,
+where a drawn line does cost: that is why the rooms keep none.
+
+**Scene poses are already paid.** The 253,813 are 60 bodies of 30 poses, the chapter's
+named cast included, and the scene actors are those same bodies. The pilot ships its own
+cast at 84,455 (`ffca` + `ffcb`).
+
+**What a rip cannot produce.** Choreography stays authored: the pilot pays 9,742 bytes
+(`ffflow`) for three events, and Chapter I has about twenty. Encounters, objectives and
+deployment for eleven battles, the cold text reader and its indexes, the ten optional
+effects and the C2 fidelity delta are all still outside the total. Against the 442,297
+margin that leaves roughly 300,000 to 350,000 bytes genuinely free.
+
+**One tool limit found.** `surface_data.terrain()` accepts only a `0x2E01` primary GNS
+record, and many maps carry none -- `extract.mesh_blob()` documents the fallback and the
+rip uses it. Map 034 is the first Chapter I map that trips it; the shipped `ffgt`/`ffot`
+are unaffected, both being maps that have one.
