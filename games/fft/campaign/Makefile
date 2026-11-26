@@ -84,6 +84,15 @@ pilot-e2e-check:
 core-contract-check:
 	$(PY) ../tools/core_contract.py --packages $(PILOT_PACKAGE_DIR)
 
+# The chapter handover, through the real fp_story: it needs a group holding both the
+# Chapter I pack and the Chapter II skeleton, which PACKAGE_CHAPTERS builds.
+.PHONY: handoff-check chapter2-packages
+CHAPTER2_OUTPUT ?= x/build-packages2
+chapter2-packages:
+	$(MAKE) packages PACKAGE_CHAPTERS="packages/chapter-01.json packages/chapter-02.json" PACKAGE_OUTPUT=$(CHAPTER2_OUTPUT)
+handoff-check:
+	$(PY) check_handoff.py --packages $(CHAPTER2_OUTPUT)
+
 .PHONY: zeklaus-check wide-core-candidate
 ZEKLAUS_OUTPUT ?= x/wide-core/latest
 zeklaus-check:
