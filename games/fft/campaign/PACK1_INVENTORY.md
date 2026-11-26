@@ -1,8 +1,8 @@
 # Chapter I as one pack: the measured inventory (2026-11-25)
 
 **It fits.** Chapter I's whole content, measured from the local disc through the
-production codecs, plus today's core, comes to **1,980,989 archive bytes against a
-2,424,754 budget**: 443,765 bytes of margin after the 131,072 reserve, on an empty
+production codecs, plus today's core, comes to **1,981,372 archive bytes against a
+2,424,754 budget**: 443,382 bytes of margin after the 131,072 reserve, on an empty
 Titanium.
 
 Two corrections since the first pass, both enlarging the total:
@@ -29,7 +29,7 @@ Reproduce with `games/fft/tools/pack1_inventory.py`; see section 5.
 
 | Component | Bytes | How |
 |---|---:|---|
-| Core, 36 archived variables | 700,108 | Measured, 2026-11-25 checkpoint |
+| Core, 36 archived variables | 700,491 | Measured, 2026-11-25 checkpoint |
 | 12 battle maps, four views each | 843,544 | **Measured** this pass |
 | 9 narrative rooms, one direction, 320px | 46,761 | **Measured** this pass |
 | Actor frames, Chapter I cast, native30 | 253,813 | Measured, actor-storage study |
@@ -38,9 +38,9 @@ Reproduce with `games/fft/tools/pack1_inventory.py`; see section 5.
 | World map | 17,674 | Carried from the pilot (`ffwm`) |
 | Rumors, pack, save, guest records | 3,714 | Carried from the pilot |
 | Archive headers, ~113 variables | 2,599 | Measured rate, 23 bytes each |
-| **Total** | **1,980,989** | |
+| **Total** | **1,981,372** | |
 | Budget: 2,555,826 ceiling − 131,072 reserve | 2,424,754 | Measured, `experiments/archfree` |
-| **Margin** | **443,765** | |
+| **Margin** | **443,382** | |
 
 The margin still has to absorb, and nothing below is in the total:
 

@@ -8,8 +8,8 @@
     "resources_pooled": true,
     "service_events_explicit": true
   },
-  "core_key": "785d5a96d378b836b1bb79c847ebf040",
-  "core_sha256": "49829b69f70fdffa68ac8a757f461994f14145e48317b21a71d3d778e739b4c8",
+  "core_key": "0a050e5dc87fea8619c2fbb12b2efca3",
+  "core_sha256": "fbfee93dfa714c9929ac80aed7c73b17b3ccee8bce695227b92f3b7497bbf6b9",
   "envelope": {
     "actor_banks": 6,
     "actor_frames": 42,
@@ -125,8 +125,8 @@
   },
   "public_header_sha256": {
     "actors.h": "b3a303e134dbddfca55fcc01319b9c09e4959c117e2e516bea71f58e5473e7e1",
-    "campaign/pack_format.h": "e3bde280ab8a49edff226a45de6116c2fac616571a0fe8f4585f95596d5a0775",
-    "campaign/pack_story.h": "1093554204ad750c090cd1cf2221eeeffbdf04127795db9fc1b1e7ce404c147b",
+    "campaign/pack_format.h": "a8095198d2444b282947b487310e918566cf66e13adaeeef41014f9eeec3c042",
+    "campaign/pack_story.h": "c438c7554fc147e86ca1c1b65b57885f51babe701426c51ac258d29e16765463",
     "campaign/packages/core.json": "b8a8a1835c1d97cbd2795e3ba4cbbb0690cd75d1384ad391366906f95de202e5",
     "campaign/proposition_types.h": "4c8c037064810900793c7b095a0c5a4d47ebe6d15b9c2a3e5c154c1a2c8bda29",
     "campaign/save_types.h": "1ca5dd542804a2f5c11fb739fdf2d30e1454e80d23b887ab7c393cbdbc02fd78",
@@ -180,7 +180,7 @@
     "ffcore": {
       "bytes": 452,
       "kind": 28,
-      "sha256": "b840654926adea55fb1c93b72a436e3ddc1a93a41139336ed4c085ee84905bd3"
+      "sha256": "fef6b3d5f8a54869397b5c1b146b42656e11c69ffa2f5b869f409ef3e01e1200"
     },
     "ffcp": {
       "bytes": 20669,
@@ -303,9 +303,9 @@
       "sha256": "b38e0555313e07f74686f42062192d0433b60ae96b592b48e7af9483b307dac6"
     },
     "fftstory": {
-      "bytes": 5381,
+      "bytes": 5475,
       "kind": 33,
-      "sha256": "0d505376a1d99a120c41417c5d3c3e66a7f913bee3abb1291e05b004e0d31ce8"
+      "sha256": "a71b184d0aadbbf5f1a278e0fcec3ebeb117c570d412d21ee1832af441fb6aba"
     },
     "ffttcore": {
       "bytes": 9841,
@@ -323,9 +323,9 @@
       "sha256": "7f75d9e31414ded8e0dddc9acbb961ad17e636b21535465649fa78af9b360ae3"
     },
     "ffwmcore": {
-      "bytes": 25264,
+      "bytes": 25647,
       "kind": 28,
-      "sha256": "e47e168787384eb700b67449dbd6a8f1df8fa3e43dd92152f91088c72e496326"
+      "sha256": "2f984c70ccadbb99e59369cdbdce1adbd834df7f374385c1ef501582d91538a1"
     }
   }
 }

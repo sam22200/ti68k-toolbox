@@ -76,8 +76,8 @@ bridge and Gariland; it is not the whole campaign.
    `packages/core-contract.json` freezes actual ABI99,29 matching images,
    State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684, zone9142 and shared
    companion4132 (cold reader3546). Actor cache42 is unchanged; depth is18520.
-   Current groups: core706459 + pilot295209 transport bytes, key
-   `785d5a96d378b836b1bb79c847ebf040`, in `x/core-abi99-1125/packages/`
+   Current groups: core706936 + pilot295209 transport bytes, key
+   `0a050e5dc87fea8619c2fbb12b2efca3`, in `x/core-abi99-1125/packages/`
    (2026-11-25; the2026-11-24 groups stay in `x/core-abi99-release/packages/`,
    see [CORE_PACKAGES.md](CORE_PACKAGES.md) for what moved).
    The dated full-chapter plan projects1851032 bytes with17623 bytes of planning

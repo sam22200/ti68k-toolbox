@@ -45,10 +45,10 @@ SCENE_MAPS = [9, 11, 23, 24, 62, 73, 93, 94, 104]
 ARCHIVE_CEILING = 2555826        # experiments/archfree, EM_survey on a clean Titanium
 ARCHIVE_PER_VARIABLE = 23        # measured 22.39 / 22.34
 RESERVE = 131072
-CORE_STORED = 705563             # promoted ABI99 core, stored payload + size words
+CORE_STORED = 706040             # promoted ABI99 core, stored payload + size words
 PACK1_TEXT_CHUNKED = 18432       # referenced event text, 4 KiB ZX0 chunks + directory
 PACK1_ACTORS_NATIVE30 = 253813   # x/actor-storage costume-choices.json, pack I, one body each
-CORE_ARCHIVED = 700108           # the 36 archived core variables; fftstory is RAM, not archive
+CORE_ARCHIVED = 700491           # the 36 archived core variables; fftstory is RAM, not archive
 CORE_ARCHIVED_VARIABLES = 36
 # Shipped Chapter I pilot, packages.json: chapter bytes that are neither the eight map
 # views nor the two actor banks, split into what scales per map and what does not.
