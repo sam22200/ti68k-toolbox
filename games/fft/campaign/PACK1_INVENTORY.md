@@ -287,13 +287,65 @@ where a drawn line does cost: that is why the rooms keep none.
 named cast included, and the scene actors are those same bodies. The pilot ships its own
 cast at 84,455 (`ffca` + `ffcb`).
 
-**What a rip cannot produce.** Choreography stays authored: the pilot pays 9,742 bytes
-(`ffflow`) for three events, and Chapter I has about twenty. Encounters, objectives and
-deployment for eleven battles, the cold text reader and its indexes, the ten optional
-effects and the C2 fidelity delta are all still outside the total. Against the 442,297
-margin that leaves roughly 300,000 to 350,000 bytes genuinely free.
+**What a rip cannot produce.** Choreography stays authored. Section 8 measures it;
+the 9,742 bytes of `ffflow` quoted here first are the whole bank, 6,556 of which are the
+shared serif font. The cold text reader and its indexes, the ten optional effects and the
+C2 fidelity delta are the lines still outside the total; encounters, objectives and
+deployment are **not**, being part of the 8,071 a map above.
 
 **One tool limit found.** `surface_data.terrain()` accepts only a `0x2E01` primary GNS
 record, and many maps carry none -- `extract.mesh_blob()` documents the fallback and the
 rip uses it. Map 034 is the first Chapter I map that trips it; the shipped `ffgt`/`ffot`
 are unaffected, both being maps that have one.
+
+## 8. The underside, put back where it fits (2026-11-26)
+
+FFT leaves the skirt under a map's terrain untextured, and `extract.DROP_UNDERSIDE`
+dropped it on every map because it was the one lever that brought 20 of 27 structural
+maps under `FFT_CORE_DEPTH_MAX`. A map that never needed that lever was paying for one:
+without the skirt the terrain floats, its lower edge dissolving into the white
+background; with it the map sits on a block and reads as one object. The user asked for
+it back wherever it fits (2026-11-26), so `tools/underside_census.py` measured every map
+both ways on its shipping window (`MAP_CROP`, `PROPS_DROPPED`) and
+`extract.KEEP_UNDERSIDE` is that census's verdict.
+
+**Nine of the twelve Chapter I maps keep it.** Depth is the gate, and it is a RAM gate:
+
+| Map | Depth dropped | Depth kept | Spare | Archive dropped | Archive kept | Δ |
+|---:|---:|---:|---:|---:|---:|---:|
+| 022 Magic City Gariland | 16,168 | 18,304 | 216 | 70,444 | 70,801 | +357 |
+| 034 Cellar of Sand Mouse | 12,056 | 13,448 | 5,072 | 59,773 | 60,105 | +332 |
+| 049 Fort Zeakden | 15,560 | 16,400 | 2,120 | 72,389 | 72,778 | +389 |
+| 056 Orbonne Monastery | 16,312 | 18,480 | **40** | 76,539 | 77,978 | +1,439 |
+| 076 Zeklaus Desert | 14,560 | 15,616 | 2,904 | 62,086 | 62,547 | +461 |
+| 077 Lenalia Plateau | 14,672 | 15,808 | 2,712 | 65,220 | 65,408 | +188 |
+| 085 Mandalia Plains | 13,972 | 15,164 | 3,356 | 60,547 | 60,932 | +385 |
+| 091 Thieves Fort | 14,624 | 15,608 | 2,912 | 68,682 | 68,837 | +155 |
+| 103 Windmill Shed | 11,104 | 12,728 | 5,792 | 72,439 | 72,810 | +371 |
+| | | | | **608,119** | **612,196** | **+4,077** |
+
+**It costs 4,077 bytes, not 4,077 a map.** The colour planes of an R4 bank are raw and
+always `SC_HMAX` rows, so a taller silhouette adds no colour byte; only the ZX0 depth
+grows, and a flat black skirt compresses to almost nothing. Orbonne Monastery's 1,439 is
+the dearest, and it is also the tightest on depth: **40 bytes under the cap**. Re-run the
+census before touching its window or its props.
+
+**Three refuse it**, all over 18,520 with the skirt: Slums in Dorter 21,792 (+3,272),
+Fovoham Plains 19,480 (+960), Sweegy Woods 19,104 (+584). Sweegy already gives up its
+tallest tree, so the skirt would cost it a second prop or a shorter scene.
+
+**Quantisation does not move.** `extract.views()` already measures its grey percentiles
+on the full geometry (`quant_polys`), precisely so that dropping the skirt could not
+re-quantise the map -- the Gariland roofs went black the one time it did. The percentiles
+measured with the skirt back are the same three numbers the manifest froze
+(29.267, 53.427, 80.617), so the C2 treatment is reviewed against the picture it was
+always reviewed against.
+
+**The census covers the whole game**, not just this chapter: 72 of the 109 maps keep
+their skirt, 37 cannot, the nearest misses being St. Murond Temple at +16 and +224 and
+Roof of Riovanes at +368. `KEEP_UNDERSIDE` carries all 72, so a later chapter inherits
+the measurement -- but a map outside Chapter I was measured on the cheapest `SC_HMAX`
+window, not on an approved crop it does not have yet, and must be re-measured when it is
+actually extracted.
+
+The 442,297 margin absorbs the 4,077 without moving the verdict.
