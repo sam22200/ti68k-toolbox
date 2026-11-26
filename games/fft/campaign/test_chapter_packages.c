@@ -83,13 +83,21 @@ static unsigned short child(unsigned char program,unsigned short arg)
     if(program==FP_MAP){
         if(map_returns==1)return 1;
         if(map_returns==2)return 2;
-        if(map_returns==3)return 999;
+        if(map_returns==3){map_returns=0;return 999;}   /* a band this pack does not carry */
         if(map_returns)map_returns--;
         return 0;
     }
     if(program==FP_MANAGE)map_returns=0;
     if(program==FP_TITLE&&arg==3){map_returns=0;return 3;}
     return 1;
+}
+/* What the handover puts in the map's argument: the code, plus the chapter the
+   player should install next once this one is over (FP_MAP_LAST: none follows). */
+static unsigned short map_arg(const unsigned char *flags,unsigned short code)
+{
+    unsigned short n=fp_word(pack+28);
+    return (unsigned short)(code+FP_MAP_CHAPTER*(fp_flag(flags,fp_word(pack+26))
+        ?(n!=FP_NONE&&n<FP_MAP_LAST?n:FP_MAP_LAST):0));
 }
 static void prepare(unsigned char flags,unsigned char flow)
 {
@@ -150,6 +158,8 @@ static void trials(void)
     CHECK(programs[0]==FP_TITLE&&programs[1]==FP_BATTLE&&arguments[1]==200);
     CHECK(programs[2]==FP_TITLE&&programs[3]==FP_BATTLE&&arguments[3]==200);
     CHECK(programs[4]==FP_MAP);CHECK(saved[4]==3);
+    /* The chapter ended during the run, so its map is told on the very first call. */
+    CHECK(arguments[4]==map_arg(saved+4,FP_MAP_HANDOFF));
     /* A step marked save_prompt offers the Save screen once it completes. */
     prepare(1,3);start=fp_word(pack+38)+5*FP_STEP_BYTES;original=pack[start+1];pack[start+1]=FP_SAVE_PROMPT;repair(pack);
     CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);
@@ -160,8 +170,15 @@ static void trials(void)
     CHECK(calls==1);
     prepare(3,4);map_returns=1;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);CHECK(programs[1]==FP_MANAGE);
     prepare(3,4);map_returns=2;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);
-    CHECK(programs[1]==FP_TITLE&&arguments[1]==3);CHECK(programs[2]==FP_MAP&&arguments[2]==1);
-    prepare(3,4);map_returns=3;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_NEXT);CHECK(notice.requested==2);
+    CHECK(programs[1]==FP_TITLE&&arguments[1]==3);
+    /* Already complete when it opened, so no announcement -- but the chapter number
+       still rides the call, for the marker the map keeps. */
+    CHECK(programs[2]==FP_MAP&&arguments[2]==map_arg(saved+4,1));
+    CHECK(arguments[0]==map_arg(saved+4,0));
+    /* A destination whose band this pack does not carry reopens the map with the
+       panel instead of ending the program: the player keeps their session. */
+    prepare(3,4);map_returns=3;CHECK(fp_story(read_file,child,progress,reset,2,&notice)==FP_OK);
+    CHECK(calls==2&&programs[1]==FP_MAP&&arguments[1]==map_arg(saved+4,FP_MAP_HANDOFF));
     prepare(0,0);hidden="ffpack";CHECK(fp_story(read_file,child,progress,reset,1,&notice)==FP_MISSING_PACK);
     CHECK(!calls&&!reset_count&&saved[1000]==0x5a);
     prepare(0,0);pack[25]=1;pack[44]=0;pack[45]=7;repair(pack);
