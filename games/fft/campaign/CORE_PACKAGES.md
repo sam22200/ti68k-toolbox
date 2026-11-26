@@ -3,9 +3,9 @@
 ## Current ABI99 contract (2026-11-25)
 
 The user requested the freeze after the demo was repaired on a rebuilt core.
-Current reviewed groups: `x/core-abi99-1125/packages/fft-core.89g`706459 and
+Current reviewed groups: `x/core-abi99-1125/packages/fft-core.89g`706936 and
 `chapter-01.89g`295209 transport bytes; key
-`785d5a96d378b836b1bb79c847ebf040`. `packages/core-contract.json` freezes ABI99,
+`0a050e5dc87fea8619c2fbb12b2efca3`. `packages/core-contract.json` freezes ABI99,
 29 matching images, State2278/Unit116/Work37790/ModCtx400/FSV9 Save4684,
 zone9142 and companion4132 (cold reader3546). Actor42 remains; depth is18520.
 
@@ -27,6 +27,50 @@ the installed Titanium RAM figures quoted across these documents were measured
 on it, and `MOD_ZONE` has since grown24 bytes.
 Actual TTPack input64725 leaves211 bytes. Chapters stay data-only and match
 this exact key; saves and configuration remain outside both groups.
+
+## Finishing a chapter, and starting the next (2026-11-25)
+
+A chapter does not end the game. FFT lets the player keep travelling, hiring,
+shopping and taking random fights after the story runs out, and so does this:
+`fp_story` only leaves its world-map loop when the player quits it.
+
+What the pack already carried, and what the driver now does with it:
+
+| header field | offset | meaning |
+|---|---:|---|
+| `requires_flag` | 24 | the flag the previous chapter sets; without it, `FP_PREVIOUS` names the pack to install first |
+| `completion_flag` | 26 | the flag this chapter's end sets, in the save |
+| `next` | 28 | the chapter to install after it |
+| `previous` | 44 | the chapter to install before it |
+| `world_map` | 42 | whether the pack keeps playing after its steps |
+
+**The handover is announced once**, when the completion flag goes from unset to
+set -- a transition tested in memory, so nothing new is stored and reloading a
+finished save does not announce it again. The map is told on every call, through
+its own argument: `code + FP_MAP_CHAPTER * chapter`, where `chapter` is 0 while
+the chapter is unfinished, the next chapter's number once it is, and
+`FP_MAP_LAST` when none follows. `FP_MAP_HANDOFF` as the code opens the panel.
+
+**The map says what to do and stays open.** A plate at the top right marks the
+finished chapter, [F1] reopens the panel, and the panel says the save is marked
+and kept, that the core and the saves stay, and which `chapter-NN.89g` to send.
+Choosing a destination whose band this pack does not carry no longer ends the
+program: the panel explains and the player is back on the map.
+
+`make handoff-check` drives the real `fp_story` over the Chapter I pack and the
+Chapter II skeleton (`packages/chapter-02.json`, built by `make
+chapter2-packages`): the prerequisite refusal and the chapter it names, the
+announcement on the chapter that ends, its absence on one already finished, and
+the uninstalled destination returning to the map. `make pilot-route-check` covers
+the same handover through the real `worldmap.c`.
+
+**What the skeleton is not.** It carries one scene and reuses Chapter I's
+Gariland band, so it proves the handover, not Chapter II. Two packager limits
+surfaced while building it and are worth knowing before a real pack is written:
+`guest_bank.validate` rejects a directory of zero rows, so a pack cannot declare
+no persistent guest; and a battle step's `skip_flag` must equal its descriptor's
+`WON` field, which `tools/chapter_desc.py` fixes per data set (campaign: 2), so a
+new chapter's battles need their own descriptor before they can set a new flag.
 
 Run `make core-contract-check` with its new default groups. Pilot checks also
 use these groups; new builds go to `x/build-packages` and chapter-only builds
