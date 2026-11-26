@@ -348,4 +348,10 @@ the measurement -- but a map outside Chapter I was measured on the cheapest `SC_
 window, not on an approved crop it does not have yet, and must be re-measured when it is
 actually extracted.
 
+**Packaging checked.** `make -C games/fft/campaign packages` builds clean, the only
+build that sees the resident's hard limit: core 708,319 transport bytes, Chapter I
+295,145, 1,001,914 stored together. The skirt is view data and 95 wall-shade bytes in
+`art.h`, so nothing moved in the resident -- but the check is cheap and the limit is the
+one that bit the turn-list merge.
+
 The 442,297 margin absorbs the 4,077 without moving the verdict.
