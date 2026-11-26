@@ -251,7 +251,7 @@ The eight boundaries stay accepted. One small terrain-list refinement is propose
 
 | Pack | End boundary | Maps | Scenes | One-direction low..high | Margin at high | Conservative high | Margin |
 |---|---|---:|---:|---:|---:|---:|---:|
-| I | Zeakden complete | 10 +1 | 9 | 2.155..2.579MB | -22,918 | 2.639MB | -82,918 |
+| I | Zeakden complete | 10 +2 | 9 | 2.236..2.660MB | -104,068 | 2.720MB | -164,068 |
 | II-A | Goug rescue complete, before Warjilis | 7 +2 | 9 | 1.976..2.367MB | 188,764 | 2.427MB | 128,764 |
 | II-B | Lionel complete | 4 +2 | 4 | 1.742..2.097MB | 458,729 | 2.107MB | 448,729 |
 | III-A | Orbonne sequence complete, before Grog Hill | 5 +2 | 3 | 1.819..2.159MB | 396,530 | 2.159MB | 396,530 |
@@ -259,6 +259,8 @@ The eight boundaries stay accepted. One small terrain-list refinement is propose
 | IV-A | Bethla sluice/rescue/aftermath complete | 8 +2 | 6 | 2.085..2.509MB | 47,016 | 2.539MB | 17,016 |
 | IV-B | Igros complete | 6 +2 | 6 | 1.973..2.433MB | 122,523 | 2.463MB | 92,523 |
 | IV-C | St. Murond through the ending | 8 +1 | 4 | 2.061..2.553MB | 3,002 | 2.563MB | -6,998 |
+
+**Pack I's row was revised on2026-11-25**: Fovoham Plains (072) ships as its own terrain instead of its random fights reusing the story windmill (103), so the pack carries twelve four-view maps. The same forecast plus the measured map is +81,150 bytes (73,196 of views, 7,862 of per-map geometry, 92 of archive headers); every figure in that row moved by exactly that. The measured inventory is the better answer for this pack either way: [PACK1_INVENTORY.md](PACK1_INVENTORY.md) puts the whole chapter at1,980,989 bytes with443,765 of margin, well inside even the low forecast.
 
 Margins are against the measured 2,555,826-byte ceiling; a negative margin is an overflow. **Every pack fits at its low forecast** (worst low: 2.155MB, 400,952 spare). At the unconstrained high forecast the one-direction peak is 2.579MB and PackI is 22,918 bytes over; the conservative high peak is 2.639MB, with PackI over by 82,918 and PackIV-C by 6,998.
 

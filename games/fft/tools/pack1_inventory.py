@@ -33,17 +33,22 @@ import map_budget   # noqa: E402
 
 # campaign/CAMPAIGN_PACK_REPORT.md section 6.2, pack I.
 BATTLE_MAPS = [22, 32, 34, 49, 56, 74, 77, 85, 91, 103]
-EXTRA_RANDOM = [76]
+# Fovoham Plains is one world location with two source terrains: the story battle
+# is fought on the Windmill Shed (103) and its random fights on the open plain
+# (72, WLDCORE's route rows). An earlier plan proposed dropping 72 and rolling the
+# randoms onto 103; the user rejected it -- a field ambush does not take place
+# inside a windmill -- so both ship.
+EXTRA_RANDOM = [76, 72]
 SCENE_MAPS = [9, 11, 23, 24, 62, 73, 93, 94, 104]
 
 # Measured elsewhere, reused rather than re-derived.
 ARCHIVE_CEILING = 2555826        # experiments/archfree, EM_survey on a clean Titanium
 ARCHIVE_PER_VARIABLE = 23        # measured 22.39 / 22.34
 RESERVE = 131072
-CORE_STORED = 700273             # promoted ABI99 core, stored payload + size words
+CORE_STORED = 705563             # promoted ABI99 core, stored payload + size words
 PACK1_TEXT_CHUNKED = 18432       # referenced event text, 4 KiB ZX0 chunks + directory
 PACK1_ACTORS_NATIVE30 = 253813   # x/actor-storage costume-choices.json, pack I, one body each
-CORE_ARCHIVED = 694818           # the 36 archived core variables; fftstory is RAM, not archive
+CORE_ARCHIVED = 700108           # the 36 archived core variables; fftstory is RAM, not archive
 CORE_ARCHIVED_VARIABLES = 36
 # Shipped Chapter I pilot, packages.json: chapter bytes that are neither the eight map
 # views nor the two actor banks, split into what scales per map and what does not.
@@ -207,7 +212,7 @@ def main():
         estimated_archive_headers=ARCHIVE_PER_VARIABLE * variables,
         total=total, margin=budget - total, fits=total <= budget,
         not_counted=['flow and dialogue choreography beyond the raw event text',
-                     'encounters, objectives and deployment for the eleven battles',
+                     'encounters, objectives and deployment for the chapter\'s battles',
                      'chapter portraits still missing from the shared bank',
                      'the cold text reader and its indexes',
                      'the ten optional adapted effects',

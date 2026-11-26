@@ -27,9 +27,10 @@ an authored source battle.
 Storage scope clarification (2026-11-24): older13-map/full-chapter totals are
 dated controls, not an exhaustive narrative-location census. Current working
 recommendation keeps ChapterI whole: ten story battle terrains, approved
-Zeklaus as one extra terrain, nine scene-only locations. Fovoham randoms reuse
-story terrain103 rather than requiring extra field72. This is a routing/art
-proposal, not implemented content.31KB event text compresses to18KB with4KiB
+Zeklaus as one extra terrain, nine scene-only locations, **and Fovoham Plains
+(072) as a second extra terrain**: its story battle is on the windmill (103) and
+its random fights on the open plain, so both ship. The earlier proposal to reuse
+103 for the randoms is withdrawn.31KB event text compresses to18KB with4KiB
 chunks; six sampled scene rooms refine the scene-only picture allowance to
 8..20KB/location. No needed source camera is authorized for omission.
 The user now drops named-human costume variants: one body per person, without

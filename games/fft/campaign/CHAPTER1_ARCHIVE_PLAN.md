@@ -16,8 +16,11 @@ the extra random-map pool. `x/pack-refinement/plan.json` supersedes the broad
 content estimates below for that new scope. It combines actual ABI99 stored
 bytes, prior sprite probes, a new retail dialogue census and six-room scene
 compression samples. ChapterI remains one recommended pack: ten story battle
-maps plus approved Zeklaus, nine scene-only locations; Fovoham random fights
-can reuse story terrain103. Estimated core+content2.05..2.51MB; upper with
+maps plus approved Zeklaus, nine scene-only locations; **Fovoham Plains (072)
+ships as its own terrain**. The proposal to roll its random fights onto the story
+windmill (103) was rejected: they are two places in the source, and a field
+ambush does not take place inside a windmill. Twelve four-view maps, not eleven
+-- see [PACK1_INVENTORY.md](PACK1_INVENTORY.md) for the measured total. Estimated core+content2.05..2.51MB; upper with
 131072 reserve2.64MB. All late stable-human banks and ten optional FX are
 conservatively included even for this early pack. Scene views/extra poses,
 unextracted map framing/depth and actual Flash overhead still need authoring.

@@ -1,14 +1,27 @@
-# Chapter I as one pack: the measured inventory (2026-11-24)
+# Chapter I as one pack: the measured inventory (2026-11-25)
 
 **It fits.** Chapter I's whole content, measured from the local disc through the
-production codecs, plus today's core, comes to **1,894,549 archive bytes against a
-2,424,754 budget**: 530,205 bytes of margin after the 131,072 reserve, on an empty
+production codecs, plus today's core, comes to **1,980,989 archive bytes against a
+2,424,754 budget**: 443,765 bytes of margin after the 131,072 reserve, on an empty
 Titanium.
+
+Two corrections since the first pass, both enlarging the total:
+
+- **Fovoham Plains (072) ships.** It is one world location with two source
+  terrains -- the story battle is fought on the Windmill Shed (103), its random
+  fights on the open plain (072, WLDCORE's route rows). An earlier plan proposed
+  dropping 072 and rolling the randoms onto 103; that was rejected, because a
+  field ambush does not take place inside a windmill. Twelve battle maps, not
+  eleven: +73,196 view bytes and +7,862 of per-map geometry.
+- **The core moved to the 2026-11-25 checkpoint**, +5,290 archived bytes.
 
 This is sizing only. Nothing here authors art, picks a camera, approves a crop or
 touches a shipping bank: the final game gets a human-supervised map/scene extractor.
 The figures answer one question — does Chapter I have to be split? — and the answer
-is no, on storage. It does have two runtime depth overruns to resolve.
+is no, on storage. The depth overruns this pass first reported are gone: they were
+`map_budget.ragged()` reading `extract.polygons()`, the raw mesh, where the census
+reads `extract.shipped_polygons()` and drops the untextured underside. With the
+tool corrected, all twelve maps fit 18,520 and `over_depth` is empty.
 
 Reproduce with `games/fft/tools/pack1_inventory.py`; see section 5.
 
@@ -16,18 +29,18 @@ Reproduce with `games/fft/tools/pack1_inventory.py`; see section 5.
 
 | Component | Bytes | How |
 |---|---:|---|
-| Core, 36 archived variables | 694,818 | Measured, ABI99 release |
-| 11 battle maps, four views each | 770,348 | **Measured** this pass |
+| Core, 36 archived variables | 700,108 | Measured, 2026-11-25 checkpoint |
+| 12 battle maps, four views each | 843,544 | **Measured** this pass |
 | 9 narrative rooms, one direction, 320px | 46,761 | **Measured** this pass |
 | Actor frames, Chapter I cast, native30 | 253,813 | Measured, actor-storage study |
 | Referenced event text, 4 KiB ZX0 chunks | 18,432 | Measured, text census |
-| Map geometry and descriptors, 11 maps | 86,482 | Carried from the pilot, 7,862 a map |
+| Map geometry and descriptors, 12 maps | 94,344 | Carried from the pilot, 7,862 a map |
 | World map | 17,674 | Carried from the pilot (`ffwm`) |
 | Rumors, pack, save, guest records | 3,714 | Carried from the pilot |
-| Archive headers, ~109 variables | 2,507 | Measured rate, 23 bytes each |
-| **Total** | **1,894,549** | |
+| Archive headers, ~113 variables | 2,599 | Measured rate, 23 bytes each |
+| **Total** | **1,980,989** | |
 | Budget: 2,555,826 ceiling − 131,072 reserve | 2,424,754 | Measured, `experiments/archfree` |
-| **Margin** | **530,205** | |
+| **Margin** | **443,765** | |
 
 The margin still has to absorb, and nothing below is in the total:
 
@@ -39,7 +52,8 @@ The margin still has to absorb, and nothing below is in the total:
 - the C2 fidelity delta (section 2).
 
 The earlier report put those at roughly 134,000..242,000 bytes together, so the
-margin covers them about twice over. It assumes an otherwise empty calculator: run
+margin still covers them about twice over, though less comfortably than the
+530,205 of the first pass. It assumes an otherwise empty calculator: run
 `experiments/archfree/` on the target machine before treating 530,205 as real.
 
 ## 1b. What the actor figure covers
@@ -82,12 +96,14 @@ the figure already contains the colour, depth and cover planes.
 | 091 | Thieves Fort | 68,837 | 264 |
 | 103 | Windmill Shed | 72,810 | 216 |
 | 076 | Zeklaus Desert (random) | 62,547 | 336 |
-| | **Total** | **770,348** | |
+| 072 | Fovoham Plains (random) | 73,196 | 276 |
+| | **Total** | **843,544** | |
 
 Depth is a separate, runtime constraint and has its own measurement in section 3.
 
-70,031 bytes a map on average. The earlier estimate was 780,736..890,736 for these
-eleven maps, so the measurement lands 10,388 bytes **below** its low end.
+70,295 bytes a map on average. The earlier estimate was 780,736..890,736 for the
+eleven maps it counted, and those eleven measure 770,348 -- 10,388 bytes **below**
+its low end. Fovoham's 73,196 is a twelfth map that estimate never carried.
 
 **Fidelity.** These views use `extract.views()`'s default four greys, not the approved
 C2 treatment. Against the two maps the pilot actually ships: Gariland 70,801 measured
@@ -100,9 +116,9 @@ figures by 112%. Measured against those same maps, production R4 costs 2.00× (m
 using the 112% calibration understates map storage by roughly half. This inventory
 supersedes it for Chapter I.
 
-## 3. The real blocker: two maps need a shorter scene
+## 3. Depth: every map fits
 
-`FFT_CORE_DEPTH_MAX` is 18,488 bytes: `fft.c` unpacks one view's ragged depth into
+`FFT_CORE_DEPTH_MAX` is 18,520 bytes: `fft.c` unpacks one view's ragged depth into
 `vbuf` and that buffer is the cap. The stream is
 
     4 * sc_h          one DepthRow per scene row
@@ -110,48 +126,49 @@ supersedes it for Chapter I.
 
 so a map's cost splits into a term the authoring pass sets (`sc_h`, which
 `chapter_files.inc` already reads per map) and a term the source geometry sets.
-Measured with the production encoder, worst view per map, each at its own `sc_h`:
 
-| Map | sc_h | Worst view | Margin |
-|---:|---|---:|---:|
-| 034 Cellar of Sand Mouse | 178 | 13,448 | 5,040 |
-| 103 Windmill Shed | 178 | 12,728 | 5,760 |
-| 085 Mandalia Plains | 145 | 15,164 | 3,324 |
-| 091 Thieves Fort | 186 | 15,608 | 2,880 |
-| 076 Zeklaus Desert | 148 | 15,616 | 2,872 |
-| 077 Lenalia Plateau | 180 | 15,808 | 2,680 |
-| 049 Fort Zeakden | 192 | 16,400 | 2,088 |
-| 022 Magic City Gariland | 202 | 18,304 | 184 |
-| 056 Orbonne Monastery | 190 | 18,480 | 8 |
-| **032 Slums in Dorter** | 202 | **21,152** | **−2,664** |
-| **074 Sweegy Woods** | 202 | **21,640** | **−3,152** |
+**The first pass of this document reported two overruns here. They were a
+measurement error, not a map problem.** `map_budget.ragged()` called
+`extract.polygons()`, the raw mesh, where what ships is
+`extract.shipped_polygons()` -- the untextured underside dropped, plus the approved
+prop drops. The underside is never drawn and never occludes, and removing it took
+twenty maps under the cap across the game at once. With the tool reading the shipped
+mesh, worst view per map, scene cropped to `SC_HMAX`:
 
-**Orbonne is not an overrun: it is where the cap came from.** 4 × 192 + 17,720 =
-18,488 exactly, its worst view at its shipped 192-row scene. Gariland's measurement
-is confirmed against the shipped bank, whose R4 header stores depth = 18,304.
+| Map | Worst view | Margin |
+|---|---:|---:|
+| 032 Slums in Dorter | 18,104 | 416 |
+| 074 Sweegy Woods | 16,264 | 2,256 |
+| 072 Fovoham Plains | 16,176 | 2,344 |
+| 022 Magic City Gariland | 16,168 | 2,352 |
+| 076 Zeklaus Desert | 15,264 | 3,256 |
+| 049 Fort Zeakden | 15,080 | 3,440 |
+| 091 Thieves Fort | 14,784 | 3,736 |
+| 077 Lenalia Plateau | 14,552 | 3,968 |
+| 085 Mandalia Plains | 13,820 | 4,700 |
+| 034 Cellar of Sand Mouse | 12,140 | 6,380 |
+| 103 Windmill Shed | 12,080 | 6,440 |
+| 056 Orbonne Monastery | 11,592 | 6,928 |
 
-**Two maps have to lose rows, and the measurement says how many and from which end.**
-Sliding a full-height window never helps — Sweegy's seven legal windows all give
-21,640 — so the scene itself must be shorter. The tallest scene that fits, over every
-window of that height with the worst view counted:
+No map needs a shorter scene, and Slums in Dorter's 416 bytes is the tightest in the
+chapter. These are upper bounds against each map's own shipped `sc_h`, since the
+measurement crops to `SC_HMAX` rather than to the height the authoring pass will set.
 
-| Map | Scene now | Tallest that fits | Rows lost | Cut from | Worst view | Spare |
-|---|---:|---:|---:|---|---:|---:|
-| 074 Sweegy Woods | 202 | **165** | 37 | 43 rows off the **top** | 18,380 | 108 |
-| 032 Slums in Dorter | 202 | **172** | 30 | 54 rows off the **bottom** | 18,440 | 48 |
+**Orbonne is no longer where the cap comes from.** It was, at 18,488 with the raw
+mesh; it costs 11,592 shipped. The cap's binding map over the whole 94-map census is
+**North Wall of Bethla Garrison (067), at exactly 18,520** -- which is why the cap took
+its last 32 bytes. The five maps above it are all optional and out of scope: three
+Colliery floors, and the Deep Dungeon's VOYAGE and END.
 
-The two cut from opposite ends because their costs sit in different places. Sweegy's
-rows cost 41 bytes at the top, 136 in the middle, 44 at the bottom: its canopy is
-cheap, so the sky goes. Slums' rows cost 4 at the top, 151 in the middle, 81 at the
-bottom: its sky is nearly empty and cutting it buys nothing, so the foreground goes.
-
-Where exactly to cut is a picture decision and belongs to the supervised extractor.
-`games/fft/tools/depth_budget.py` writes the per-row cost of every map so the cut is
-priced before it is made, not guessed.
+`games/fft/tools/depth_budget.py` writes the per-row cost of every map, so if an
+authored scene ever does need a cut, it is priced before it is made.
 
 ### What was ruled out
 
-Compressing the height axis looks like the obvious fix and is not: 96% of the stream
+These re-encodings were measured against the **raw-mesh** figures above, when Sweegy
+and Slums still looked like overruns. They are kept because the conclusion holds
+either way: none is worth its cycles, and the question no longer arises for
+Chapter I. Compressing the height axis looks like the obvious fix and is not: 96% of the stream
 is span bytes (20,832 against 808 of row headers on Sweegy), and the rows a shorter
 height axis removes are the cheap ones at the top.
 
