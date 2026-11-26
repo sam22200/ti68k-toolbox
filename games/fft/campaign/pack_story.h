@@ -12,7 +12,8 @@ static unsigned char fp_story(FpRead read,FpCall call,FpProgressRead progress,
                              void (*reset)(void),unsigned short arg,FpNotice *notice)
 {
     const unsigned char *p,*step;
-    unsigned short n,k,id,prerequisite,next;unsigned char result,saved=0;
+    unsigned short n,k,id,prerequisite,next,completion,handoff;
+    unsigned char result,saved=0,done,said=0;
     FpProgress state;
     notice->requested=FP_NONE;
     result=fp_preflight(read,notice->bad);if(result)return result;
@@ -32,6 +33,8 @@ title:
         if(fp_letter(p,0)=='o'&&!call(FP_BATTLE,105))return FP_OK;
     }
     progress(&state);p=read("ffpack",&n);
+    completion=fp_word(p+26);
+    said=fp_flag(state.flags,completion);   /* already over when we got here: say nothing */
     if(prerequisite&&!fp_flag(state.flags,prerequisite)){
         notice->requested=fp_word(p+44);return FP_PREVIOUS;
     }
@@ -49,11 +52,19 @@ title:
     }
     next=fp_word(p+28);
     if(!fp_word(p+42)){
-        if(fp_flag(state.flags,fp_word(p+26))&&next!=FP_NONE){notice->requested=next;return FP_NEXT;}
+        if(fp_flag(state.flags,completion)&&next!=FP_NONE){notice->requested=next;return FP_NEXT;}
         return FP_OK;
     }
+    /* A pack with a world map does not end with its last story battle: FFT lets the
+       player keep travelling, hiring, shopping and taking random fights. So the map
+       stays open, is told the chapter is over, and explains the handover -- once when
+       it happens, and again whenever a destination belongs to a pack not installed. */
     for(;;){
-        unsigned short r=call(FP_MAP,saved);saved=0;
+        unsigned short r;
+        done=fp_flag(state.flags,completion);
+        if(done&&!said){saved=FP_MAP_HANDOFF;said=1;}
+        handoff=done?(next!=FP_NONE&&next<FP_MAP_LAST?next:FP_MAP_LAST):0;
+        r=call(FP_MAP,(unsigned short)(saved+FP_MAP_CHAPTER*handoff));saved=0;
         if(!r)return FP_OK;
         if(r==1)call(FP_MANAGE,0);
         else if(r==2)saved=call(FP_TITLE,3)==3;
@@ -62,11 +73,10 @@ title:
         else{
             p=read("ffpack",&n);
             if(!fp_size(p,n,0))return FP_BAD_PACK;
-            if(r<100||r>=25500||!fp_letter(p,(unsigned char)(r/100-1))){
-                notice->requested=next;return FP_NEXT;
-            }
-            call(FP_BATTLE,r);
+            if(r<100||r>=25500||!fp_letter(p,(unsigned char)(r/100-1)))saved=FP_MAP_HANDOFF;
+            else call(FP_BATTLE,r);
         }
+        progress(&state);          /* a battle entered from the map may have ended the chapter */
     }
 }
 #endif

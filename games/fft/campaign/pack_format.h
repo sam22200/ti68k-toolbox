@@ -12,6 +12,15 @@ typedef const unsigned char *(*FpRead)(const char *, unsigned short *);
 #define FP_NONE 65535U
 enum { FP_SCENE=1, FP_BATTLE, FP_DEPLOY };
 #define FP_SAVE_PROMPT 1   /* step byte 1: offer the Save screen once the step completes */
+/* The world map's argument carries the chapter handover beside its own small codes
+   (0 normal, 1 just saved, 100/101 the Fur Shop). A completed chapter does not end
+   the game: the map keeps towns, management and random fights, says so, and explains
+   what to install next. arg = code + FP_MAP_CHAPTER * chapter, where chapter is 0
+   while the chapter is unfinished, the next chapter's number once it is, and
+   FP_MAP_LAST when there is no next one. */
+#define FP_MAP_HANDOFF 3U    /* code: open the handover panel now */
+#define FP_MAP_CHAPTER 200U  /* multiplier of the chapter number, above every code */
+#define FP_MAP_LAST 255U     /* complete, and no chapter follows */
 enum { FP_OK, FP_MISSING_CORE, FP_BAD_CORE, FP_MISSING_PACK, FP_BAD_PACK,
        FP_WRONG_CORE, FP_MISSING_FILE, FP_BAD_FILE, FP_PREVIOUS, FP_NEXT };
 static unsigned short fp_word(const unsigned char *p)

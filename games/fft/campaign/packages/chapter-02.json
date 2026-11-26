@@ -1,0 +1,54 @@
+{
+  "schema": "FFT_CHAPTER_SPEC_1",
+  "id": 2,
+  "title": "Chapter II skeleton: the other end of the handover",
+  "complete": false,
+  "requires_flag": 2,
+  "completion_flag": 3,
+  "previous": 1,
+  "next": 65535,
+  "world_map": true,
+  "routes": [
+    {
+      "band": 1,
+      "prefix": "g"
+    }
+  ],
+  "persistent_guests": [
+    {
+      "route": "g",
+      "slot": 0,
+      "id": 4
+    }
+  ],
+  "rumor_events": [
+    {
+      "event": 12,
+      "flag": 2
+    }
+  ],
+  "steps": [
+    {
+      "program": "scene",
+      "argument": 0,
+      "skip_flag": 3
+    }
+  ],
+  "variables": [
+    "ffca",
+    "ffcb",
+    "ffs0",
+    "ffflow",
+    "ffwm",
+    "ffru",
+    "ffgv0",
+    "ffgv1",
+    "ffgv2",
+    "ffgv3",
+    "ffga",
+    "ffgi",
+    "ffgd",
+    "ffsv"
+  ],
+  "service_events": []
+}

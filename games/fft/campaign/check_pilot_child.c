@@ -185,6 +185,18 @@ int main(int argc,char **argv)
     final_release();assert(!battle_state&&!rt_state&&!sbuf&&!vbuf&&!navbuf&&!acache);
 #elif PILOT_KIND==5
     assert(bank&&wm.screen==SC_MAP&&(save.flags[0]&2));
+    /* Chapter I is already over when its map first opens, so every call carries the
+       handover: the next chapter's number, and once the panel itself. The chapter
+       does not end the game -- the same map keeps its menu, towns and travel. */
+    assert(wm.chapter==2);
+    argument=(u16)(argument%FP_MAP_CHAPTER);
+    if(argument==FP_MAP_HANDOFF){
+        assert(wm.handoff);tap(K_ENTER);assert(!wm.handoff&&running);
+        tap(K_F1);assert(wm.handoff);                 // and it can be read again
+        tap(K_ESC);assert(!wm.handoff&&running);
+        argument=0;                                   // then behave as an ordinary arrival
+    }
+    assert(!wm.handoff);
 #ifdef PILOT_AUTOPLAY
     if(argument==0&&!pilot_marker("pilot-managed.done")) {
         if(pilot_marker("before-gariland.sav"))pilot_town();

@@ -6,9 +6,18 @@ Optional Ramza/Delita wardrobes fit the measured50KB envelope. Scene/text,
 character lifetimes, detailed map lists, budgets and remaining gates are included.
 No full campaign or new wardrobe banks are installed by this planning study.
 
+Chapter handover (2026-11-25): a finished chapter no longer ends anything. The
+world map keeps its towns, hiring, management and random fights, marks the
+chapter done at the top right, and [F1] reopens a panel saying the save is kept
+and marked, that the core and saves stay, and which `chapter-NN.89g` to send.
+A destination belonging to a pack that is not installed explains itself and
+returns to the map instead of quitting. `make handoff-check` drives the real
+`fp_story` over Chapter I and the Chapter II skeleton; rules and the skeleton's
+limits are in [CORE_PACKAGES.md](CORE_PACKAGES.md).
+
 Current reviewed core checkpoint (2026-11-25): ABI99, key
-`785d5a96d378b836b1bb79c847ebf040`, groups `x/core-abi99-1125/packages/`,
-core706459 + pilot295209 transport bytes. It moves the2026-11-24 checkpoint
+`0a050e5dc87fea8619c2fbb12b2efca3`, groups `x/core-abi99-1125/packages/`,
+core706936 + pilot295209 transport bytes. It moves the2026-11-24 checkpoint
 forward over three accepted changes -- the shared archive tail now carries the
 status pictograms and the creature art (`CONTOUR_BYTES`6892 ->11668),
 `FFT_CORE_DEPTH_MAX` rises18488 ->18520 for North Wall of Bethla, and a crystal

@@ -8,7 +8,7 @@ unchanged. This promotes the core and existing pilot, not a complete Chapter I.
 
 **These measurements belong to that core and were not retaken.** The reviewed
 checkpoint moved on2026-11-25 to `x/core-abi99-1125/packages/`, key
-`785d5a96d378b836b1bb79c847ebf040`, whose `MOD_ZONE` is24 bytes larger
+`0a050e5dc87fea8619c2fbb12b2efca3`, whose `MOD_ZONE` is24 bytes larger
 (9118 ->9142); subtract that from every free/max figure below before reading it
 as current. [CORE_PACKAGES.md](CORE_PACKAGES.md) states what moved.
 

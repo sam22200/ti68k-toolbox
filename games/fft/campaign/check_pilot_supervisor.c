@@ -9,6 +9,7 @@
 typedef struct {char name[9];u8 *p;u16 n;} File;
 static File cache[96];static u8 count,variant,loss;
 static unsigned calls[7],total;static const char *prefix;
+static u16 map_args[8];static u8 map_calls;   /* what the handover told the map, in order */
 static void clear_files(void){while(count)free(cache[--count].p);}
 static const u8 *read_file(const char *name,u16 *size)
 {
@@ -27,6 +28,7 @@ static u16 child(u8 program,u16 arg)
     static const char *const names[]={"","scene","battle","deploy","title","map","manage"};
     char exe[1024],argument[16];const char *action="run";pid_t pid;int status;
     assert(program>0&&program<7&&total++<30);calls[program]++;
+    if(program==FP_MAP){assert(map_calls<8);map_args[map_calls++]=arg;}
     if(program==FP_TITLE)action=arg==3?"save":variant||calls[program]>1?"continue":"new";
     if(program==FP_BATTLE){action=variant==2&&arg==200&&!loss?"lose":"win";if(!strcmp(action,"lose"))loss=1;}
     snprintf(exe,sizeof exe,"%s-%s",prefix,names[program]);snprintf(argument,sizeof argument,"%u",arg);
@@ -47,7 +49,18 @@ int main(int argc,char **argv)
 #endif
     assert(calls[FP_SCENE]==(variant==0?3:0));assert(calls[FP_DEPLOY]==(variant==0?1:0));
     assert(calls[FP_BATTLE]==(variant==1?0:2));assert(calls[FP_TITLE]==(variant==2?3:2));
-    assert((variant==2)==loss);clear_files();
+    assert((variant==2)==loss);
+    /* The handover is announced when the chapter ends, and only then: variant1
+       continues a save that was already complete, so it is never announced again.
+       The chapter number rides every call, so the map keeps its indicator without
+       storing anything. */
+    assert(map_calls==calls[FP_MAP]&&map_calls>=2);
+    {u8 i;
+     for(i=0;i<map_calls;i++)assert(map_args[i]/FP_MAP_CHAPTER==2);
+     if(variant==1)for(i=0;i<map_calls;i++)assert(map_args[i]%FP_MAP_CHAPTER!=FP_MAP_HANDOFF);
+     else{assert(map_args[0]%FP_MAP_CHAPTER==FP_MAP_HANDOFF);
+          for(i=1;i<map_calls;i++)assert(map_args[i]%FP_MAP_CHAPTER!=FP_MAP_HANDOFF);}}
+    clear_files();
     printf("pilot-supervisor variant%u calls%u scenes%u deploy%u battles%u titles%u maps%u passed\n",
            variant,total,calls[FP_SCENE],calls[FP_DEPLOY],calls[FP_BATTLE],calls[FP_TITLE],calls[FP_MAP]);return 0;
 }

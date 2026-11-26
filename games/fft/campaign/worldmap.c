@@ -24,6 +24,7 @@
 #include "services.h"
 #include "../common.h"
 #include "../identity_pool.h"
+#include "pack_format.h"          // the chapter handover codes fftstory passes in
 #ifndef __m68k__
 #include "story_choice_file.h"
 #endif
@@ -54,6 +55,8 @@ typedef struct {
     u8 card, cand;                       // SC_HIRE: the status panel, and which row made him
     u8 rumor, rpage, rlast, rrow, rtop;   // archive record, page bounds and remembered list cursor
     u8 note, changed, tick;
+    u8 chapter;                          // 0 the chapter is unfinished, else the next one (FP_MAP_LAST: none)
+    u8 handoff;                          // the handover panel is open
     u16 result;                          // what fftmap returns
 } Wm;
 Wm wm;
@@ -633,7 +636,9 @@ void game_init(void)
 
 void game_scenario(u16 n)                 // the save's location (n: test doors, Gariland + n)
 {
-    (void)n;
+    wm.chapter = (u8)(n / FP_MAP_CHAPTER);            // the story driver's handover code
+    n = (u16)(n % FP_MAP_CHAPTER);
+    wm.handoff = (u8)(n == FP_MAP_HANDOFF);
     wm.at = save.loc ? (u8)(save.loc - 1) : 6;        // a save before any: Gariland
     wm.sel = wm.at; wm.moving = 0; wm.note = n==1?NOTE_SAVED:0; wm.result = 0;
     if (bank) { wm.x = loc_x(wm.at); wm.y = loc_y(wm.at); }
@@ -808,7 +813,9 @@ u8 game_update(void)
     if (!bank || !mgb) return !(key & K_ESC);
     if (wm.moving) { travel_step(); if(wm.moving)travel_step(); return 1; }
     if (wm.note) { if (key & (K_ENTER | K_A | K_B | K_ESC)) wm.note = 0; return 1; }
+    if (wm.handoff) { if (key & (K_ENTER | K_A | K_B | K_ESC)) wm.handoff = 0; return 1; }
     if (wm.screen) return town_update(key);
+    if ((key & K_F1) && wm.chapter) { wm.handoff = 1; return 1; }   // read the handover again
     if (key & K_ESC) {if(wm.menu){wm.menu=0;return 1;}return leave(0);}
     if (key & (K_C | K_D)) { wm.menu^=1;wm.row=0;return 1; }
     if (wm.menu) {
@@ -1086,6 +1093,39 @@ static void plate(s16 x, const char *s)
     text((s16)(x + 4), 2, s, C_WHITE, 158);
 }
 static void place_plate(const char *name) { plate(-1, name); }
+// The chapter is over but the game is not: a small plate at the right says so, and
+// [F1] reopens the handover. Both read the flag fftstory passed in, so nothing new
+// is stored in the save.
+static void chapter_plate(void)
+{
+    const char *s = "Done F1";
+    plate((s16)(160 - map_menu_width(s) - 12), s);
+}
+// What the player has to do between two chapters, said where they are standing
+// rather than by ending the program.
+static void handoff_panel(void)
+{
+    char file[15];
+    panel(6, 16, 148, 70);
+    if (!wm.chapter) {                                   // a destination of another pack
+        black(12, 21, "Another chapter");
+        black(12, 33, "That place is not in the");
+        black(12, 41, "chapter installed here.");
+    } else {
+        black(12, 21, "Chapter complete");
+        black(12, 33, "Your save is marked and");
+        black(12, 41, "kept. Keep the core and");
+        if (wm.chapter == FP_MAP_LAST) black(12, 49, "the saves: no chapter follows.");
+        else {
+            memcpy(file, "chapter-00.89g", 15);
+            file[8] = (char)('0' + wm.chapter / 10); file[9] = (char)('0' + wm.chapter % 10);
+            black(12, 49, "the saves, then send");
+            black(12, 57, file);
+        }
+    }
+    black(12, 69, "You can keep playing here.");
+    black(12, 78, "ENTER or SHIFT");
+}
 // The day, in its own small panel at the top left, where it has always been.
 static void date_plate(void)
 {
@@ -1476,6 +1516,8 @@ void game_render(void)
         black(26, 40, notes[wm.note]);
         black(26, 48, "ENTER or SHIFT");
     }
+    if (wm.chapter && !wm.handoff) chapter_plate();
+    if (wm.handoff) handoff_panel();
 }
 
 u16 map_result(void) { return wm.result; }
