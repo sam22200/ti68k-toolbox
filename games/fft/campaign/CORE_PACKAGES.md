@@ -457,7 +457,11 @@ deferred weapon panel/line victims), Fast AI (AI turns as with [2nd] held, no 1.
 "Skip this fight?" (No/Yes: every enemy at 0 HP, the ordinary victory, rewards, aftermath and
 session save follow). Flags live in `st.dbg` (State's former alignment byte) for the current
 battle. The turn order ([APPS]) now takes UP/DOWN: the cursor and camera go to the selected
-unit, other keys close it and restore the cursor. While an AI thinks, the units keep their
+unit, other keys close it and restore the cursor. The list is 39 turns deep, as the source's
+own Turn window is, and the six rows scroll through it with the usual continuation marks;
+an enemy's row keeps its dark grey and carries the map's diamond. [F2] and [F4] step the
+cursor from unit to unit with no list at all, the source's START button: one cyclic list,
+the player's units then the enemy's. While an AI thinks, the units keep their
 idle animation: one picture in four is drawn (every one during its final hold).
 
 **Reading the game without screenshots.** `python3 games/fft/tools/fftmem.py battle | watch |

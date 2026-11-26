@@ -1299,3 +1299,40 @@ and response frame hashes, Charge forecast/menu checks and one pilot flow.
 Cold formatting46180 cycles fits the60k task envelope; this excludes the rest
 of the frame. Packer input64795/headroom141 and isolated CPU zones are not full
 stack/fragmentation/residency/worst-frame certificates.
+
+## `core-buffs-check` dies on 68000 when a module image changes -- 2026-11-25
+
+**Known defect, not caused by the change that found it.** At HEAD the check passes
+(`buffs C93E6C8F`, `buff_rules 532EC5EE`, `buff_windows 235BB430`,
+`buff_capacity C53D20A3`). Add **one dead line** to a module-owned function --
+`if (st.act == 0xFE) return;` at the top of `turn_order()`, which changes nothing
+and is reachable by nobody -- rebuild, and its native run dies after 278k cycles:
+
+```
+ti-cycles: address error at ODD address 174107, writing, pc 0473a6, ir 214a
+```
+
+The faulting instruction is `move.l a2,2(a0)` right after `mod_context(MOD_TARGETS)`:
+the resident writes a pointer into the context's union at offset 2, and the context
+pointer is **odd**. `mod_context()` returns `mod_zone + RD16(m, 4)`, and `RD16` reads
+a byte pair, so an odd `m` is read without trapping and yields a nonsense offset.
+Before the crash the run makes four `SymFindPtr` calls where a passing run makes
+1241, so it dies binding the banks, not playing the fixture; the assertions that
+print first (`check_reactions.c:101`, `check_offensive_magic.c:20`) are the fixture
+finding a null map and unknown abilities, i.e. consequences.
+
+Ruled out, each by rebuilding and re-reading the banks: image sizes and the four
+shards' offset tables (every image offset, entry and context offset is even in all
+29 images), `MOD_ZONE` and the bank splits (unchanged at 9142 / 7 / 14 / 21),
+`sizeof(Work)` (two bytes of padding reproduce it exactly as forty do, and the
+field's position in the struct changes nothing), and the emulator's allocator
+(`halloc` aligns every block). What remains is a pointer that goes odd while the
+banks are bound, only when the images move.
+
+**It is not every native check**: `core-area-ui-check` and `core-haste-slow-check`
+both pass with freshly rebuilt banks carrying the same change (`MOD_ZONE 9510`),
+native runs included. Only this one is affected so far.
+
+It will meet the next core change as well, this one included. Investigating it needs
+single-stepping that `ti-cycles` does not offer; read the failure as this defect, not
+as a regression of whatever touched the core, and confirm by rebuilding HEAD.
