@@ -478,6 +478,16 @@ The trap below is why this costs nothing in quantisation: the percentiles are
 already pinned to the full geometry, so putting the skirt back reproduces the
 same three thresholds (29.267, 53.427, 80.617) the manifest froze.
 
+**Propagate the change to all three directories.** `extract.py` feeds the pilot
+(`games/fft`), the opening (`games/fft/opening`, map 56) and the chapter
+(`games/fft/campaign`), and `isometric_style.prepare_iso()` asserts its own
+quantisation against `fftv{rot}.bin`. A half-propagated change fails on that
+assert instead of shipping mismatched banks -- which is the good outcome, but it
+looks like a tool bug. Rebuild pilot views, then `make -C games/fft/opening
+assets`, then delete `x/isometric-style/variant-*.raw` and rebuild `ffgv0..3`.
+The opening is silent about it: with the skirt back its four banks compress to
+exactly the same four sizes while all four contents change, so compare hashes.
+
 **The trap it hides, and it is not the silhouette.** The four-grey thresholds are
 percentiles of the view's own pixels, so removing a large black mass re-quantises
 the WHOLE map: Gariland's roofs went black and 68 walkable tiles changed their
