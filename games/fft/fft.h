@@ -350,7 +350,9 @@ extern const Tile *map_tiles;           // read from ffti (fft.c)
 #else
 #define AI_NONE 0xFD                   // an AI plan without an action
 #endif
-#define ORDER_N 6                      // turns shown in the HUD, the active one first
+#define ORDER_N 6                      // turns shown at once, the active one first: WIN_ROWS
+#define ORDER_DEEP 39                  // and the window scrolls this deep, the source's own
+                                       // Turn list (10 rows of 39 on the PlayStation)
 // the death counter (Unit.dc): 3..0 while KO, then the unit is a crystal or a chest on its tile,
 // gone once picked up
 #define DC_CRYSTAL 0xFD
@@ -629,6 +631,7 @@ u16 node_at(s16 x,s16 z,u8 layer);     // temporary256 means absent; node255 rem
 u8 unit_place(Unit *u,u8 cell);
 u8 cursor_place(u8 cell);
 u8 unit_at_cell(u8 cell);
+void cursor_unit_step(s8 dir);        // [F2]/[F4]: the cursor to the previous/next unit
 #ifdef FFT_CHAPTER
 #define UNIT_CELL(u) ((u)->cell)
 #define CURSOR_CELL (st.cursor_cell)
@@ -651,6 +654,8 @@ void unit_stats(Unit *u);              // FFT's stats from the raw ones, the job
 u8 ct_next(void);                      // FFT's clock to the next turn: its unit
 u8 ct_end(u8 who, u8 moved, u8 acted);     // its CT when the turn ends, then upkeep: 1 a KO
 void turn_order(void);                 // st.turns from the CTs
+u8 turn_forecast(u8 *out, u8 depth);   // the same forecast any depth: its entries
+u8 turn_page(u8 top);                  // st.turns = the Turn window's page; the length
 void turn_end(u8 moved, u8 acted);     // the active unit's turn over, the next one starts
 void compute_reach(u8 who);            // st.reach from unit who (BFS, Move/Jump)
 u8 unit_in_water(u8 who);              // grounded in depth 1, including a walking step's position

@@ -45,12 +45,16 @@ static void make_window(void)
             void *sl=rt_light,*sd=rt_dark;menu.height=h;
             rt_light=l;rt_dark=d;choice_frame(&menu,title);rt_light=sl;rt_dark=sd;
         }
-        if (m == M_SKILLS) {
-            // Cached with the page: triangles occupy its unused top/bottom margin.
+        if (m == M_SKILLS || m == M_ORDER) {
+            // Cached with the page: triangles occupy its unused top/bottom margin. The
+            // turn list has six rows and no bottom margin, so its lower mark sits in the
+            // last row's right edge, which no name reaches.
             void *sl = rt_light, *sd = rt_dark;
             rt_light = l; rt_dark = d;
-            for (i = 0; i < 2; i++) if (i ? known(W->win_k[2], W->win_k[1] + SKILL_ROWS) != NO_ABIL : W->win_k[1] != 0) {
-                u8 y = i ? h - 5 : 5;
+            for (i = 0; i < 2; i++) if (m == M_ORDER
+                    ? (i ? (u8)((u8)W->win_k[1] + ORDER_N) < (u8)(W->win_k[1] >> 8) : (u8)W->win_k[1] != 0)
+                    : (i ? known(W->win_k[2], W->win_k[1] + SKILL_ROWS) != NO_ABIL : W->win_k[1] != 0)) {
+                u8 y = i ? (u8)(h - (m == M_ORDER ? 4 : 5)) : 5;
                 for (r = 0; r < 3; r++) {
                     u8 width = i ? 5 - 2 * r : 1 + 2 * r;
                     draw_rect(57 - (width >> 1), y + r, width, 1, C_BLACK);
@@ -68,4 +72,16 @@ static void make_window(void)
         if(!(m==M_MENU||m==M_AUTO||m==M_ACTS||m==M_SKILLS||m==M_QUIT))menu.text_x=3;
         rt_light=l;rt_dark=d;choice_row(&menu,k,s,c);rt_light=sl;rt_dark=sd;
     }
+    if (m == M_ORDER && st.unit[st.turns[k]].team == TEAM_ENEMY) {
+        // The source colours an enemy's row red; four greys cannot, so the dark-grey
+        // name also carries the diamond the map already puts above an enemy's head.
+        void *sl = rt_light, *sd = rt_dark;
+        rt_light = l; rt_dark = d;
+        for (i = 0; i < 5; i++) {
+            u8 edge = i < 3 ? i : (u8)(4 - i);
+            draw_rect((s16)(53 - edge), (s16)(11 + 6 * k + i), (u8)(1 + 2 * edge), 1, C_BLACK);
+        }
+        rt_light = sl; rt_dark = sd;
+    }
+
 }
