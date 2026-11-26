@@ -158,9 +158,10 @@ anonymous priests are not all Simon. Keep named portraits in shared identity.
 Best bet: EIGHT main packs: I whole; II-A ends after Goug/II-B after Lionel;
 III-A after Orbonne/III-B after Riovanes; IV-1 after Bethla, IV-2 after Igros,
 IV-3 through ending. Story chapter/stock/progression must stay independent of
-content-pack phase. Full four-view map counts11/9/6/7/8/10/8/10 include only
-one extra terrain inI (approved Zeklaus; Fovoham randoms reuse story103), two
-illustrative extras elsewhere. Narrative-only location counts9/9/4/3/5/6/6/4.
+content-pack phase. Full four-view map counts12/9/6/7/8/10/8/10 include two
+extra terrains inI (approved Zeklaus, and Fovoham Plains072 -- the windmill103
+is its story battle, the plain its randoms, and the reuse proposal is
+withdrawn), two illustrative extras elsewhere. Narrative-only location counts9/9/4/3/5/6/6/4.
 Upper core+pack estimates2.51/2.30/1.98/2.03/2.20/2.41/2.33/2.52MB exclude
 the131072 reserve; including it the largest is2.652MB. Six packs with lean
 random pools can theoretically reach2.699MB including reserve but leave only
