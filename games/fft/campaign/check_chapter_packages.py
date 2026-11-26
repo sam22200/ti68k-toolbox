@@ -58,6 +58,40 @@ def synthetic(core, chapter):
             rows = b''.join(_s.pack('>4B5H', identity, first, last, 1, 1, title, text, 0, index)
                             for identity, first, last in gates)
             raw = b'FRU1' + _s.pack('>H', total) + bytes((len(gates), 0)) + rows + body
+        if name=='ffbr':
+            # bar_assets.validate(art=True) fixes this one exactly: 6360 bytes,
+            # the picture at12 and360 bytes a row.
+            import struct as _s
+            raw=b'FBR1'+_s.pack('>4H',6360,12,360,0);raw+=bytes(6360-len(raw))
+        if name in ('ffpr','ffpe','ffpt'):
+            # core_package admits the Propositions banks only through
+            # service_assets.validate(), so the fixture builds the smallest trio
+            # that satisfies its cold bounds rather than filling bytes.
+            import struct as _s, proposition_rules as pr
+            if name=='ffpr':
+                raw=bytearray(b'FPR1\0\0'+bytes((pr.COUNT,1))+_s.pack('>10H',*([100]*10)))
+                raw.extend(bytes(pr.COUNT*25));title=len(raw);raw.extend(b'Job\0')
+                for i in range(pr.COUNT):
+                    at=28+25*i;row=bytearray(23)
+                    row[0]=row[1]=row[6]=row[7]=row[9]=row[12]=row[19]=1;row[2]=i+1
+                    raw[at:at+23]=row;_s.pack_into('>H',raw,at+23,title)
+                _s.pack_into('>H',raw,4,len(raw));raw=bytes(raw)
+            elif name=='ffpe':
+                tables=[]
+                for k,size in enumerate(pr.REWARD_SIZES):
+                    if k<4:tables.append(bytes(size))                       # scores, <=100
+                    elif k<6:tables.append(_s.pack('>%dH'%(size//2),*([1]*(size//2))))
+                    elif k<8:tables.append(bytes([1]*size))                 # paired, both set
+                    else:tables.append(_s.pack('>%dH'%(size//2),*([100]*(size//2))))
+                at=28;offsets=[]
+                for t in tables:offsets.append(at);at+=len(t)
+                raw=b'FPE1'+_s.pack('>H',at)+b'\x0a\x01'+_s.pack('>10H',*offsets)+b''.join(tables)
+            else:
+                head=bytearray(738);body=b'Text\0'+b'\0\0'   # one text, one page at offset0
+                head[0:4]=b'FPT1';head[6:8]=b'\x60\x4d'
+                for i in range(96):_s.pack_into('>HHBB',head,8+6*i,738,743,1,0)
+                for i in range(96,173):_s.pack_into('>H',head,584+2*(i-96),738)
+                _s.pack_into('>H',head,4,738+len(body));raw=bytes(head)+body
         if name=='ffsv':
             # The packager validates this one against the spec it was given
             # (chapter_packages.py: "Service event bindings mismatch"), so the
