@@ -287,6 +287,7 @@ attacks, moves and waits) and `keys/skills.txt` (Ramza's Wish, then Wait), all f
 Game Over); `keys/interface.txt` starts at `fft(31)` and pages Status, returns to Act,
 then browse and the turn order. `keys/status.txt` starts at `fft(32)` and inspects every
 equipment slot, a learned ability, then returns through stats to the command menu.
+`keys/order.txt` opens the turn order and scrolls it past its first two pages.
 
 ## Build
 
