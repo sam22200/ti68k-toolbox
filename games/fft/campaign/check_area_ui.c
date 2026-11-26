@@ -32,7 +32,17 @@ static void real_inputs(void)
     u8 i;u32 seed;Unit before[UNIT_CAPACITY];CastBatch live;u8 reach[256];
     for(i=0;i<5;i++){
         ui_fixture(i);CHECK(st.mode,M_CAST_RANGE);settle_ui();
-        if(!i){ui_key(K_APPS);CHECK(st.mode,M_ORDER);ui_key(K_B);CHECK(st.mode,M_CAST_RANGE);}
+        if(!i){
+            u8 r;
+            ui_key(K_APPS);CHECK(st.mode,M_ORDER);
+            // The turn window is made deeper than the six rows it shows, and the arrows
+            // scroll it while the cursor follows each entry (the source's own Turn list).
+            CHECK((u8)(W->win_k[1]>>8)>ORDER_N,1);CHECK(st.status_row,0);
+            for(r=0;r<ORDER_N;r++){ui_key(K_DOWN);CHECK(st.status_row,r+1);}
+            CHECK((u8)W->win_k[1],1);   // the page turned once, six rows at a time
+            CHECK(unit_at_cell(CURSOR_CELL),st.turns[ORDER_N-1]+1);
+            ui_key(K_B);CHECK(st.mode,M_CAST_RANGE);
+        }
         seed=rng32;memcpy(before,st.unit,sizeof before);live=W->cast;memcpy(reach,st.reach,256);
         ui_key(i&1?K_ENTER:K_A);CHECK(st.mode,M_AREA);CHECK(W->area_ui.ready,1);
         CHECK(W->area_ui.count,i==4?0:i>=2?3:2);CHECK(W->area_ui.follow_id==255,i!=1);
