@@ -88,8 +88,10 @@ debug flags (hidden DEBUG page: Settings then [alpha]). Saves, skips: `games/fft
 
 **FFT campaign packaging:** `make -C games/fft/campaign packages` builds separate core and
 chapter groups. `make chapter-package` in that directory reuses an existing core without
-compiling it. Ownership, matching versions, installation and save preservation:
-`games/fft/campaign/CORE_PACKAGES.md`.
+compiling it. A finished chapter marks the save, says on the world map which
+`chapter-NN.89g` to install next, and keeps playing (`make handoff-check`, against the
+Chapter II skeleton `make chapter2-packages` builds). Ownership, matching versions,
+installation, the handover and save preservation: `games/fft/campaign/CORE_PACKAGES.md`.
 
 **Measure cycles with `ti-cycles`, not TiEmu** (`tools/m68kbench/`): a headless 68000 (Musashi) with
 the MC68000 datasheet timings (movem, shifts, mulu/muls: all verified by `test/cyctest.c`), AMS ROM
