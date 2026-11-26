@@ -1473,13 +1473,13 @@ static void test_turn_prediction(void)
         n = turn_forecast(predicted, ORDER_DEEP);   // the whole list the window scrolls,
         CHECKV(predicted[0], st.act);               // not only the six it shows
         CHECK(n > ORDER_N);
-        for (i = 1; i < n; i++) {
+        turn_order();                               // whose first six are the HUD's own six
+        for (i = 0; i < ORDER_N; i++) CHECKV(st.turns[i], predicted[i]);
+        for (i = 1; i < n; i++) {                   // then the clock itself, entry by entry
             ct_end(st.act, 1, 1);
             st.act = ct_next(); CHECKV(predicted[i], st.act);
         }
         entries = (u16)(entries + n);
-        turn_order();                               // and the six are the list's own first six
-        for (i = 0; i < ORDER_N; i++) CHECKV(st.turns[i], predicted[i]);
     }
     printf("turn prediction: %u scrolled entries equal complete CT clock advances, Speed 1..50\n",
            entries);
@@ -1672,6 +1672,13 @@ int main(int argc, char **argv)
     if (argc > 1 && !strcmp(argv[1], "--find")) { find_spots(); return 0; }
     if (argc > 1 && !strcmp(argv[1], "--latency")) { test_latency(); return fails != 0; }
     if (argc > 1 && !strcmp(argv[1], "--hides")) { verbose_hides = 1; test_hides(); return 0; }
+    // The turn list and the unit cycle alone: the whole suite stalls after test_pace,
+    // on main as well as here, so these two are also runnable on their own.
+    if (argc > 1 && !strcmp(argv[1], "--order")) {
+        test_turn_prediction(); test_unit_cycle();
+        printf(fails ? "%d FAILED\n" : "turn list and unit cycle: all tests passed\n", fails);
+        return fails != 0;
+    }
     ai_diff = argc > 1 && !strcmp(argv[1], "--ai");
     test_rotations();
     test_heights();
