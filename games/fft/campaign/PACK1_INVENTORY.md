@@ -354,4 +354,27 @@ build that sees the resident's hard limit: core 708,319 transport bytes, Chapter
 `art.h`, so nothing moved in the resident -- but the check is cheap and the limit is the
 one that bit the turn-list merge.
 
+**Regenerating after an extraction change touches three directories, in order.**
+`extract.py` feeds the pilot, the opening and the chapter, and `prepare_iso()`
+asserts its own quantisation against `fftv{rot}.bin`, so a half-propagated change
+fails there (`assert pack(original) == source[:plane*2]`) rather than shipping
+mismatched banks:
+
+```sh
+make -C games/fft map.h fftv0.bin fftv1.bin fftv2.bin fftv3.bin tiles.bin
+make -C games/fft/opening assets          # map 56's views: ffov0..3, ~9 min
+rm -f games/fft/x/isometric-style/variant-*.raw games/fft/x/isometric-style/original-*.bin
+make -C games/fft/campaign data/ffgv0.bin data/ffgv1.bin data/ffgv2.bin data/ffgv3.bin
+```
+
+The opening is easy to forget and silent about it: its four views come from map 56
+through its own 192-row window, and with the skirt back they compress to **exactly
+the same four sizes** (30,482 / 18,524 / 18,439 / 18,985) while every one of their
+contents changes. Compare hashes, never sizes.
+
+Verified on the rebuilt set: `make -C games/fft/campaign test` passes and
+`make -C games/fft/campaign packages` builds without a TTPack overrun --
+core 708,513 and chapter 295,145 transport bytes, 1,570,871 planning bytes left
+after the reserve.
+
 The 442,297 margin absorbs the 4,077 without moving the verdict.
