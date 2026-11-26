@@ -46,6 +46,9 @@ static void expected_context(void)
         c->ctx_unit_flash=unit_flash;c->ctx_unit_in_water=unit_in_water;c->ctx_unit_pose=unit_pose;
 #endif
         c->rand15 = rand15; c->known = known; c->spread_start = spread_start; c->spread_go = spread_go;
+        // module_defaults.inc binds these three as well; the check had not
+        // followed, so every context compared unequal on them.
+        c->known2=known2;c->known_cmd=known_cmd;c->status_header=status_header;
         c->bfs = bfs;
         c->charge_query=charge_query;c->skill_cost=skill_cost;
         c->magic_amount=magic_amount;
@@ -86,7 +89,7 @@ static void bindings(void)
     u8 id,pass;u32 seed=rng32;u16 size;const u8 *bank;
     u8 actual_w=map_w,actual_h=map_h,actual_units=encounter_units;
     u16 actual_n=map_n;s16 actual_sc_h=sc_h,actual_sc_top=sc_top;
-    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,384);
+    CHECK(sizeof mod_images,4*MOD_COUNT);CHECK(sizeof expected,400);  // ModCtx grew from 384
     for(pass=0;pass<2;pass++){
         if(pass){map_w=1;map_h=1;map_n=1;encounter_units=13;sc_h=200;sc_top=1;}
         expected_context();
@@ -128,7 +131,7 @@ static void bindings(void)
     {u16 i;u8 zone_id;ModCtx *c;u16 *block=comp_block;
      CHECK(comp_block!=RT_NULL,1);mod_call(MOD_STATUS,255,0);zone_id=mod_id;
      ZB(58);CHECK(special(3,10,0x123,COMPANION_PROBE),(3<<12^10<<8^0x123));ZE(58);
-     CHECK(comp_block!=RT_NULL,1);CHECK(mod_id,zone_id);c=comp_context();CHECK(c->sig,MOD_SIG);CHECK(c->w==W,1);
+     CHECK(comp_block!=RT_NULL,1);CHECK(mod_id,zone_id);c=comp_bind(MOD_COMPANION);CHECK(c!=RT_NULL,1);CHECK(c->sig,MOD_SIG);  // comp_context() became comp_bind(id) in ba7a2a2CHECK(c->w==W,1);
      for(i=0;i<100;i++){ZB(59);CHECK(special((u8)i,(u8)(i>>1),i,COMPANION_PROBE),((i<<12)^((i>>1)<<8)^i)&0xFFFF);ZE(59);}
      CHECK(mod_call(MOD_STATUS,255,0),0);CHECK(mod_id,zone_id);       // the zone image stayed
      CHECK(comp_block==block,1);                                       // never reallocated
