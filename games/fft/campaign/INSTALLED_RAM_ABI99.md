@@ -6,6 +6,12 @@ reviewed core checkpoint is now `x/core-abi99-release/packages/`, key
 exact groups and layouts. Earlier ABI97 and rejected candidate trees remain
 unchanged. This promotes the core and existing pilot, not a complete Chapter I.
 
+**These measurements belong to that core and were not retaken.** The reviewed
+checkpoint moved on2026-11-25 to `x/core-abi99-1125/packages/`, key
+`785d5a96d378b836b1bb79c847ebf040`, whose `MOD_ZONE` is24 bytes larger
+(9118 ->9142); subtract that from every free/max figure below before reading it
+as current. [CORE_PACKAGES.md](CORE_PACKAGES.md) states what moved.
+
 ## Actual Titanium measurements
 
 All measurements use the packed production entry and its matching29 images,

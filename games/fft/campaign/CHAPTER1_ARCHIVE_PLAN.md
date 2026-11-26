@@ -59,8 +59,11 @@ estimate, so their raw replacements are deliberately counted twice.
 **Two depth adaptations remain required:** Sweegy/map74 has an estimated
 19304 bytes (816 above18488); Fovoham/map72 has19176 (688 above). Zeklaus/map76
 now preserves the complete336px mesh on its approved352px canvas; its old
-width-crop requirement is resolved. Keep the measured18488-byte depth
-capacity and42-frame actor cache. Resolve and visually review these depth adaptations
+width-crop requirement is resolved. Keep the measured depth capacity and
+42-frame actor cache -- the capacity is18520 since2026-11-25, not the18488
+this audit was run against, so Sweegy sits784 and Fovoham656 above it
+(CORE_PACKAGES.md). The map census that raised it closed both maps by other
+means; re-run the audit before quoting these two figures. Resolve and visually review these depth adaptations
 during content authoring; a flag or matching PC/TI checksum cannot certify
 handedness or artwork. The tool deliberately exits1 while these gates remain.
 

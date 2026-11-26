@@ -72,7 +72,9 @@ TRAP_DATA_DIR ?= x/tile-traps/shipping-data
 campaign-traps-native-check:
 	$(PY) check_traps_native.py --data-dir $(TRAP_DATA_DIR)
 .PHONY: pilot-route-check pilot-e2e-check core-contract-check
-PILOT_PACKAGE_DIR ?= x/core-abi99-release/packages
+# The reviewed group the contract is frozen on. x/core-abi99-release holds the
+# 2026-11-23 one, kept whole because its RAM and route measurements are quoted.
+PILOT_PACKAGE_DIR ?= x/core-abi99-1125/packages
 PILOT_ROUTE_OUTPUT ?= x/pilot-route/latest
 PILOT_E2E_OUTPUT ?= x/pilot-e2e/latest
 pilot-route-check:
