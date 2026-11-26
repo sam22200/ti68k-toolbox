@@ -344,6 +344,10 @@ packages-routing-check: packages
 # with ours. Without it a change to contour.h leaves the opening banks on the old
 # size, archive_art_tail rejects them, and the scene player loads nothing at all -
 # which surfaces as a null scene set rather than as a missing picture.
+# A frozen package group ages the same way: PILOT_PACKAGE_DIR carries its own
+# ffcu, so once contour.h grows, pilot-route-check compiles today's engine
+# against yesterday's tail and dies on that same null set at scene(0). Rebuild
+# the group (make packages) before reading the failure as a route bug.
 contour-assets:
 	$(PY) ../tools/view_split.py campaign
 	$(PY) ../tools/contour_assets.py --attach data/ffgv0.bin
