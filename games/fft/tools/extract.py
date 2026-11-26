@@ -257,6 +257,33 @@ def prop_polygons(polys, top, props, nx, nz, grow=0.75):
 DROP_UNDERSIDE = True
 
 
+# ...but the drop was a DEPTH remedy, and a map that never needed it kept paying
+# for one (user 2026-11-26: "c'est quand meme plus joli avec"). These are the
+# maps whose worst view stays under FFT_CORE_DEPTH_MAX with the skirt in place,
+# measured by tools/underside_census.py on the shipping windows (this file's
+# MAP_CROP and PROPS_DROPPED), so each line is a measurement, not a preference.
+# Putting it back costs archive bytes and nothing else: the colour planes are raw
+# and always SC_HMAX rows, so only the ZX0 depth grows -- 357 bytes on Gariland,
+# 1,439 on Orbonne Monastery, 4,077 measured over the nine Chapter I maps.
+# Quantisation does not move: views() already measures its percentiles on the
+# full geometry (`quant_polys`), which is why the C2 treatment was reviewed
+# against the picture WITH the skirt.
+# 72 of the 109 maps of the depth census, every number measured. Deliberately
+# absent among Chapter I's: Slums in Dorter 21,792, Fovoham Plains 19,480,
+# Sweegy Woods 19,104, all over 18,520; the whole refused list is in the census
+# output. Orbonne Monastery is in by 40 bytes and Gariland by 216, so re-run the
+# census before changing either one's window or its props. Maps outside Chapter I
+# are measured on the cheapest SC_HMAX window, not on an approved crop they do
+# not have yet: re-measure a map when it is actually extracted.
+KEEP_UNDERSIDE = {
+    2, 4, 8, 9, 11, 13, 14, 18, 19, 20, 21, 22, 23, 24, 25, 27, 31, 34,
+    35, 36, 37, 38, 40, 41, 43, 45, 46, 49, 52, 53, 55, 56, 57, 59, 60,
+    63, 64, 65, 68, 69, 70, 71, 73, 75, 76, 77, 78, 79, 82, 84, 85, 86,
+    89, 90, 91, 92, 93, 94, 96, 101, 102, 103, 104, 105, 106, 107, 109,
+    110, 111, 112, 113, 115,
+}
+
+
 # Scene crops the authoring pass has approved, as (rows, offset): keep `rows`
 # scene rows starting `offset` rows below the view's FIRST LIT ROW -- the same
 # reference `depth_budget` and `crop_review` use, not row 0 of the canvas.
@@ -288,7 +315,7 @@ def shipped_polygons(mesh, nx, nz, m=None):
     it, which made campaign_scenery.py's "depth/mask changed" assertion fire."""
     polys = polygons(mesh)
     drop = set(dropped_props(mesh, nx, nz, m))
-    if DROP_UNDERSIDE:
+    if DROP_UNDERSIDE and (MAP if m is None else m) not in KEEP_UNDERSIDE:
         drop |= {i for i, q in enumerate(polys) if q[1] is None}
     return [q for i, q in enumerate(polys) if i not in drop] if drop else polys
 
