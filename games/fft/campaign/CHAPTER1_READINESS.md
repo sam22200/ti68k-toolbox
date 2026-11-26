@@ -15,7 +15,7 @@ by the [promoted wide-scene core](WIDE_SCENES.md). C2's light tones,
 ledges, white prop outlines and material borders are recorded in the extraction
 skill. Per-map320/352px views preserve all180 source cells,176 stoppable;
 colors/depth/cursor/movement/rotation/cover and allocation retry pass PC/ASan.
-R5 depth peaks17280/18488. The [ABI99 rendering/HUD follow-up](RENDER_OPTIMIZATION.md)
+R5 depth peaks17280/18520 (the cap rose32 bytes on2026-11-25). The [ABI99 rendering/HUD follow-up](RENDER_OPTIMIZATION.md)
 passes the selected ordinary360k gates: Zeklaus peaks331842/327594 at12 units
 and339962/356832 at13. Gariland13 peaks281086/325234.
 The [installed-RAM follow-up](INSTALLED_RAM_ABI99.md) fixes cold fragmentation
@@ -89,10 +89,20 @@ no screenshots, canonical logs/raw states and exact durable-save comparisons.
 It does not certify unripped content, whole-chapter Flash or future-map RAM.
 
 1. Check/adapt the future maps against the fixed RAM/depth/width envelope.
-   Sweegy and Fovoham need depth adaptations (816/688 estimated excess bytes);
+   The depth gate is closed: the census over every non-optional map reports
+   `over_limit: []` against18520, Sweegy at16272 and Fovoham at16384, so the
+   816/688 excess those two were estimated at no longer exists. It closed on
+   four measures, not one -- the untextured underside is dropped everywhere, the
+   tallest tree of Sweegy is the one prop dropped in the whole game, six maps
+   take an approved crop, and the cap took32 bytes for North Wall of Bethla.
+   The15 optional maps (Colliery, Nelveska, Deep Dungeon) stay out of the
+   census; `--include-optional` reopens them and three Colliery floors, VOYAGE
+   and END are structural overruns when it does.
    Zeklaus wide support and selected12/13-unit CPU gates now pass in ABI99,
    with PC/native picture equality. Retain the old failing CPU references.
-   Installed RAM now passes the selected milestone; Zeklaus has only436 free bytes.
+   Installed RAM now passes the selected milestone; Zeklaus had only436 free
+   bytes, measured before `MOD_ZONE` took24 more on2026-11-25 (CORE_PACKAGES.md),
+   so remeasure before budgeting against it.
    Preserve full geometry. Keep difficult RAM recovery deferred;16KiB is a
    target, not a hard threshold.
 2. Rip/author the remaining story scenes and battle maps, pooling resources
