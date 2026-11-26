@@ -1620,7 +1620,7 @@ static void test_unit_cycle(void)
     cursor_place(UNIT_CELL(&st.unit[U_RAMZA]));
     CHECKV(unit_at_cell(CURSOR_CELL), U_RAMZA + 1);
     for (i = 0; i < NUNIT; i++) {                 // forward: each unit once, Ramza last
-        cursor_unit_step(1);
+        cursor_place(unit_cycle(1));
         k = unit_at_cell(CURSOR_CELL);
         CHECK(k != 0);
         if (!k) return;
@@ -1640,9 +1640,9 @@ static void test_unit_cycle(void)
 #undef RANKOF
     }
     cursor_place(UNIT_CELL(&st.unit[U_RAMZA]));   // backward: the same list the other way
-    cursor_unit_step(-1);
+    cursor_place(unit_cycle(0));
     CHECKV(unit_at_cell(CURSOR_CELL), order[NUNIT - 2] + 1);
-    cursor_unit_step(1);
+    cursor_place(unit_cycle(1));
     CHECKV(unit_at_cell(CURSOR_CELL), U_RAMZA + 1);
 
     k = turn_forecast(deep, ORDER_DEEP);          // the window's list (test_turn_prediction

@@ -97,7 +97,11 @@ Example: `feat(runtime): add TileMap engine to the TI backend`
    user.
 
 9. **Merge into `main`** when the task is done: its tests pass (`make test`, and `make xcheck`
-   for a runtime game) and the user has not asked to keep it open. Otherwise leave the branch
+   for a runtime game) and the user has not asked to keep it open.
+   **A change to FFT's battle core also needs `make -C games/fft/campaign packages`**: the
+   checks build test programs, which have no packer, so only that build sees the resident's
+   hard limit. It fails with `Program size of N bytes exceeds maximum by M`; the answer is to
+   move cold code into a module image, not to shrink the feature. Otherwise leave the branch
    pushed and say it is not merged yet.
    ```sh
    git switch main && git pull --ff-only
