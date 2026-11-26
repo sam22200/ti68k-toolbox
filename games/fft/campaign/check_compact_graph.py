@@ -19,7 +19,9 @@ def main():
         with tempfile.TemporaryDirectory(prefix='fft-step-cache-')as name:
             data=Path(name);data_links(data);pc=run([out/'cache'],data)
             assert run(['env','ASAN_OPTIONS=detect_leaks=0',out/'cache-san',scenario],data)==pc
-        cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',scenario,'--max',10000]
+        # One frame, not none: the runtime binds W on its first frame, and the
+        # trials reach the module path, which needs it (check_modready.c).
+        cmd=[ROOT/'tools/bin/ti-cycles','--frames',1,'--arg',scenario,'--max',10000]
         for p in files.values():cmd+=['--file',p]
         native=run([*cmd,out/'cachec.89z'])
         match=re.search(r'compact (\w+) failures 0 checks (\d+)',pc);assert match,pc

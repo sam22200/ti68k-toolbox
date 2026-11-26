@@ -24,7 +24,9 @@ def main():
     if args.pc_only:return
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'actcheck',*common,
          ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
-    cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
+    # One frame, not none: the runtime binds W on its first frame, and the
+    # trials reach the module path, which needs it (check_modready.c).
+    cmd=[ROOT/'tools/bin/ti-cycles','--frames',1,'--arg',61,'--max',10000]
     for bank in 'ffbm ffbn ffbo ffbp ffgv0 ffgv1 ffgv2 ffgv3 ffga ffgi ffgd ffcp ffcu ffcw ffca ffcb ffcj'.split():
         cmd+=['--file',HERE/'data'/(bank+'.89y')]
     native=run([*cmd,out/'actcheck.89z']);(out/'native.log').write_text(native)

@@ -26,7 +26,9 @@ def main():
          ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     files={p.stem:p for d in (HERE.parent/'opening/data',HERE/'data')for p in d.glob('*.89y')}
     files['ffgd']=bank/'ffgd.89y'
-    cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--max',10000]
+    # One frame, not none: the runtime binds W on its first frame, and the
+    # trials reach the module path, which needs it (check_modready.c).
+    cmd=[ROOT/'tools/bin/ti-cycles','--frames',1,'--max',10000]
     for p in files.values():cmd+=['--file',p]
     native=run([*cmd,out/'bridgec.89z'])
     match=re.search(r'jumpbattle (\w+) failures 0 checks (\d+)',pc);assert match,pc

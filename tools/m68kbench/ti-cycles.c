@@ -387,8 +387,20 @@ void instr_hook(unsigned int pc)
     else if (pc == SENTINEL) { done = 1; m68k_end_timeslice(); }
     else if (pc == EXC_ADDR) {
         uint32_t sp = SP;                    /* group 0 (bus/address error): 7 words; others: sr, pc */
+        uint16_t w[7];
+        int i;
+        for (i = 0; i < 7; i++) w[i] = rd16(sp + 2 * i);
         fprintf(stderr, "ti-cycles: CPU exception, stacked words %04x %04x %04x %04x %04x %04x %04x\n",
-                rd16(sp), rd16(sp + 2), rd16(sp + 4), rd16(sp + 6), rd16(sp + 8), rd16(sp + 10), rd16(sp + 12));
+                w[0], w[1], w[2], w[3], w[4], w[5], w[6]);
+        /* A group 0 frame is SSW, the access address, the instruction register,
+           SR and the PC. Decoding it by hand every time wastes a session, so say
+           what it means: an odd address is an address error, an address past RAM
+           a wild pointer. The SSW's bit 4 is read/write, bit 3 instruction/not. */
+        fprintf(stderr, "ti-cycles:   address error at %s address %06x, %s, pc %06x, ir %04x, sr %04x\n",
+                (w[2] & 1) ? "ODD" : "even",
+                ((uint32_t)w[1] << 16 | w[2]) & 0xFFFFFF,
+                (w[0] & 16) ? "reading" : "writing",
+                ((uint32_t)w[5] << 16 | w[6]) & 0xFFFFFF, w[3], w[4]);
         done = 4; m68k_end_timeslice();
     }
 }

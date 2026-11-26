@@ -81,8 +81,11 @@ def prepare_iso():
     _,tex,palettes,thresholds,strong,_ = load_scene()
     disc,files = extract.disc_files(str(HERE/'../../roms/ps1/Final Fantasy Tactics (USA)/Final Fantasy Tactics (USA).cue'))
     _,sector,size = next(r for r in extract.gns_records(disc,files) if r[0] == 0x2e01)
-    mesh = disc.read(sector,size); polys = extract.polygons(mesh)
+    mesh = disc.read(sector,size)
     terrain = struct.unpack_from('<I',mesh,0x68)[0]; nx,nz = mesh[terrain:terrain+2]
+    # The same set views() draws, or the styled variant keeps a skirt the
+    # view bank no longer has and campaign_scenery.py refuses the result.
+    polys = extract.shipped_polygons(mesh,nx,nz,extract.MAP)
     tile_heights = []
     for i in range(nx*nz):
         b = mesh[terrain+2+i*8:terrain+10+i*8]

@@ -114,50 +114,36 @@ the auto-equip chooses the same item the original would. It changes no save
 format and no ABI. Note it would also need the shop's Best fit to follow, since
 both read the same measure.
 
-## 5. Jump's horizontal reach -- DONE, and it needed no ABI change
+## 5. Jump's horizontal reach -- a gap of one works; two and three were TRIED and REVERTED
 
 Jump sets how wide a gap a unit crosses as well as how high it climbs:
-**floor(Jump / 2)** intervening cells, retail clamping Jump to 7 first. Jump 2-3
-crosses 1 tile, 4-5 crosses 2, 6-7 crosses 3.
+**floor(Jump / 2)** intervening cells, retail clamping Jump to 7 first.
 
-**A gap of one was already built.** `movement_edges.inc` loops
+**A gap of one is implemented.** `movement_edges.inc` loops
 `for(j=0;j<=(jump>=2)&&j<room;j++)`, j being the count of intervening cells, so
-j=1 was exactly `long_jump_limit(2..3)`.
+j=1 is exactly `long_jump_limit(2..3)`. It checks the span with
+`surface_jump_layers()` and remembers the cell jumped over in `W->via[t][k]`.
 
-**Two earlier readings of this entry were wrong.** The movement graph was never
-the obstacle, and neither was the `kind` byte. Bits 3-4 of `kind` are *never
-written* by this builder -- it sets bit 0 (j), bit 1 (water), bit 2 (no
-intermediate) and bits 6-7 (direction) -- while `tactical_search.inc` already
-computes `costs_here[kind&3] + ((kind>>3)&3)`. So the extra distance had a free
-field waiting, and the search charges it with no reader changed, no format
-changed and no ABI moved.
+**Extending j to two and three was implemented, and reverted.** Three readings
+of the obstacle, each wrong until the last:
 
-What the change does:
+1. "the movement graph is the obstacle" -- no, j already existed;
+2. "the `kind` byte is full" -- no, bits 3-4 are never written by this builder
+   and `tactical_search.inc` already adds `(kind>>3)&3` to the cost;
+3. "the rows have the space: 64 bytes, 32 links, only 16 used" -- **no**. That
+   is the *diagnostic* reserve. `nav_reserve()` shifts by 6, 5 or **4** for the
+   live builder, so a row holds 16 or **8** links, and a gap of three wants 32.
 
-- `j` now runs to `long_jump_limit(jump)` where the surface columns exist, and
-  stays at 1 elsewhere, since only those columns can check a longer span;
-- every crossed cell is tested with `surface_jump_layers()`, not just the first;
-- j in bit 0 keeps meaning "this link crosses something", and the cells beyond
-  the first go in bits 3-4;
-- a link of j>1 sets bit 2, "presence is explicit": a real gap holds no unit, so
-  there is no single intermediate cell to watch;
-- the emission stops at the row's `1 << edge_shift` bytes. The rows are 64 bytes
-  at two bytes a link, 32 links, and the old builder emitted at most 16; a gap of
-  three needs 4 x 4 x 2 = 32, which fits exactly. **No RAM is added.** If a row
-  ever filled, j rises last, so the longest jumps are dropped and every step is
-  kept.
+The rows overflowed and the emission dropped real edges. `check_jump_graph.py`
+caught it against the original: it runs FFT's own MIPS `horizontal_jump` under
+unicorn and compares every changed edge, and a Jump 4 edge on Orbonne that the
+original keeps had disappeared. With the extension reverted it agrees again on
+536 Orbonne and 544 Gariland edges.
 
-**What is proved and what is not.** `core-long-jump-check` is green at 318
-checks and now asserts the bit packing directly -- that water survives every j,
-that the extra cost reads back, and that nothing strays into the neighbouring
-bits -- which is where the risk was. The chapter build is clean and `save-test`
-and `manage-test` are unchanged. **No test crosses an actual two- or three-cell
-gap end to end**: that needs a synthetic terrain bound through
-`battle_bind_grid()`/`battle_bind_surface()` inside a check whose runner works,
-and `core-jump-check` and `core-compact-check` both fail on their TI leg on main,
-with this change and without it.
-
-The AI reads the same links, so it sees the new reach for free.
+**So the cost is real after all**: more link slots per node, which is
+`NAV_ENVELOPE` and therefore RAM, against the 404 bytes the Zeklaus 13-unit
+diagnostic leaves. The formula and the geometry are done and cross-checked
+(`core-long-jump-check`); what is missing is room no one has.
 
 ---
 

@@ -1,9 +1,6 @@
 // Terrain graph scratch is idle until the complete graph becomes searchable.
 // Cache each side's ceiling once, then reuse it for outgoing and incoming links.
 #ifdef FFT_CHAPTER
-#include "long_jump_geometry.h"
-#endif
-#ifdef FFT_CHAPTER
 #define EDGE_CEILING(k,t) ((k)<2?W->edge_ceiling[(k)&1][t]:W->edge_ceiling_other[(k)&1][t])
 #endif
 static void edges_tables(u8 jump,u16 first,u16 last)
@@ -37,13 +34,6 @@ static void edges_rows(u8 jump,u16 first,u16 last)
     if(W->surface&&!W->move_kind)jump=step_jump_cap(jump);
     if(W->surface_flags&SURFACE_GRID_UPPER)layers=2;
 #endif
-    // A gap of more than one needs the whole span checked, which only the
-    // surface columns can do; elsewhere the one-cell jump stands as before.
-#if defined(FFT_CHAPTER)
-    u8 gap_limit=(W->surface&&!W->move_kind)?long_jump_limit(jump):(u8)(jump>=2);
-#else
-    u8 gap_limit=(u8)(jump>=2);
-#endif
     for(t=first;t<last;t++) {
         u8 x=TILE_X[t],z=TILE_Z[t],h=W->hl[t],n=0,*e=EDGE_ROW(t);
         for(k=0;k<4;k++) {
@@ -62,11 +52,7 @@ static void edges_rows(u8 jump,u16 first,u16 last)
                 }
             }
 #endif
-            // Jump sets how wide a gap a unit crosses as well as how high it
-            // climbs: floor(Jump / 2) intervening cells, retail clamping Jump to
-            // 7 first (long_jump_geometry.h). j IS that count, so the loop only
-            // had to stop counting at one.
-            for(j=0;j<=gap_limit&&j<room;j++) {
+            for(j=0;j<=(jump>=2)&&j<room;j++) {
                 s16 nx=x+dir_x[k]*(j+1),nz=z+dir_z[k]*(j+1);u8 layer;
                 for(layer=0;layer<layers;layer++) {
                     u16 next=node_at(nx,nz,layer),via=t;s16 dh;u8 kind;
@@ -87,11 +73,7 @@ static void edges_rows(u8 jump,u16 first,u16 last)
                         dh=(s16)W->hs[next]-h;
                         if(dh>2*jump||dh<-2*jump||(j&&(dh<0||dh>jump)))continue;
                     }
-                    // j rides in bit 0 as "this link crosses something", and the
-                    // cells beyond the first in bits 3-4, which the search already
-                    // adds to the cost: costs_here[kind&3] + ((kind>>3)&3). No
-                    // reader and no ABI move for it; this builder never set them.
-                    kind=(u8)((j?1:0)|(W->hw[next]&2)|((j>1?j-1:0)<<3));
+                    kind=(u8)(j|(W->hw[next]&2));
                     if(j) {
                         #ifdef FFT_CHAPTER
                         via=intermediate;
@@ -100,16 +82,8 @@ static void edges_rows(u8 jump,u16 first,u16 last)
 #endif
 #ifdef FFT_CHAPTER
                         if(W->surface) {
-                            u8 m,span=1;
-                            for(m=1;m<=j;m++) {   // every cell crossed, not just the first
-                                const u8 *middle=W->surface+
-                                    ((u16)(W->grid_row[z+dir_z[k]*m]+x+dir_x[k]*m)<<3);
-                                if(!surface_jump_layers(middle,shift[k],exit,body,surface_layers)){span=0;break;}
-                            }
-                            if(!span)continue;
-                            // Beyond one cell there is no single cell to watch, and a
-                            // gap holds no unit anyway: presence is explicit.
-                            if(j>1)kind|=4;
+                            const u8 *middle=W->surface+((u16)(W->grid_row[z+dir_z[k]]+x+dir_x[k])<<3);
+                            if(!surface_jump_layers(middle,shift[k],exit,body,surface_layers))continue;
                         } else
 #endif
                         if(via<MAP_N&&W->hl[via]>W->hs[next])continue;
@@ -121,8 +95,12 @@ static void edges_rows(u8 jump,u16 first,u16 last)
                     W->evia[t][n>>1]=via<MAP_N?(u8)via:0;
 #endif
 #ifdef FFT_CHAPTER
-                    // The row holds 1 << edge_shift bytes, two to a link. j rises,
-                    // so a full row drops the LONGEST jumps and keeps every step.
+                    // A node's edge row is 1 << edge_shift bytes, two to a link,
+                    // and nav_reserve() gives 8 or 16 links depending on the map
+                    // while this loop can emit 4 directions x 2 distances x 2
+                    // layers = 16. Nothing stopped it writing past the row and
+                    // into the next node's, which is the memory corruption the
+                    // TI checks died on.
                     if(n+2>(1u<<W->edge_shift))break;
 #endif
                     e[n++]=(u8)next;e[n++]=kind;

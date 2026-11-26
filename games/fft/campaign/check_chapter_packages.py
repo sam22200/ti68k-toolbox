@@ -44,6 +44,26 @@ def synthetic(core, chapter):
             job=94+3*('ffmb','ffmc','ffmd').index(name)
             raw=mbb.pack([{'jobs':[job],
                            'anims':{a:([picture],[8])for a in range(mbb.ANIMS)}}])[0]
+        if name=='ffru':
+            # The packager validates the bank's layout (bar_assets.validate) and
+            # its gate triples against the chapter's declared rumor events
+            # (rumor_rules.validate_bank), so the fixture builds the smallest
+            # bank that satisfies both rather than filling bytes.
+            import struct as _s, rumor_rules
+            gates = rumor_rules.gates(chapter.get('rumor_events', []))
+            start = 8 + 14*len(gates)
+            title, text, index = start, start+2, start+7
+            body = b'T\0' + b'Text\0' + b'\0\0'          # one page, at offset 0
+            total = start + len(body)
+            rows = b''.join(_s.pack('>4B5H', identity, first, last, 1, 1, title, text, 0, index)
+                            for identity, first, last in gates)
+            raw = b'FRU1' + _s.pack('>H', total) + bytes((len(gates), 0)) + rows + body
+        if name=='ffsv':
+            # The packager validates this one against the spec it was given
+            # (chapter_packages.py: "Service event bindings mismatch"), so the
+            # fixture has to derive it the same way instead of filling bytes.
+            import service_assets
+            raw=service_assets.bindings(chapter)
         if re.fullmatch(r'ff[a-z0-9]v[0-3]',name):
             import extract
             raw=extract.view_bank(b'R4',(name.encode()*1600)[:8000],b'',bytes(400))

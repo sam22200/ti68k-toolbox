@@ -14,7 +14,9 @@ def main():
     pc=run([out/'jump'],data)
     assert run(['env','ASAN_OPTIONS=detect_leaks=0',out/'jump-san'],data)==pc
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'jumpc',*common,ROOT/'tools/extgraph/lib/tilemap.a'])
-    cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--max',10000]
+    # One frame, not none: the runtime binds W on its first frame, and the
+    # trials reach the module path, which needs it (check_modready.c).
+    cmd=[ROOT/'tools/bin/ti-cycles','--frames',1,'--max',10000]
     for p in sorted(data.glob('fjq*.bin')):
         run([ROOT/'tools/gcc4ti-bin/bin/ttbin2oth','-89','dat',p.name,p.stem],data)
         cmd+=['--file',p.with_suffix('.89y')]
