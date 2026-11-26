@@ -94,6 +94,15 @@ static void edges_rows(u8 jump,u16 first,u16 last)
 #else
                     W->evia[t][n>>1]=via<MAP_N?(u8)via:0;
 #endif
+#ifdef FFT_CHAPTER
+                    // A node's edge row is 1 << edge_shift bytes, two to a link,
+                    // and nav_reserve() gives 8 or 16 links depending on the map
+                    // while this loop can emit 4 directions x 2 distances x 2
+                    // layers = 16. Nothing stopped it writing past the row and
+                    // into the next node's, which is the memory corruption the
+                    // TI checks died on.
+                    if(n+2>(1u<<W->edge_shift))break;
+#endif
                     e[n++]=(u8)next;e[n++]=kind;
                 }
             }
