@@ -1336,3 +1336,24 @@ native runs included. Only this one is affected so far.
 It will meet the next core change as well, this one included. Investigating it needs
 single-stepping that `ti-cycles` does not offer; read the failure as this defect, not
 as a regression of whatever touched the core, and confirm by rebuilding HEAD.
+
+## `auto-battle-test` does not terminate -- 2026-11-26
+
+`make -C games/fft test` begins with `auto-battle-test`, and
+`x/auto-battle/test x/auto-battle/menu.png` spins at 100% CPU without ending:
+observed at 23 minutes, then reproduced on a **baseline** build (`map.h`, `art.h`
+and the rest re-extracted with `extract.KEEP_UNDERSIDE` emptied, i.e. exactly
+`main`) where it reached 8 minutes with the same profile before it was killed.
+It is therefore not caused by the restored map underside, and not by any asset
+change: it is where the pilot's `make test` already stops.
+
+Consequences, until someone owns it:
+
+- the pilot's `make test` cannot run to the end, so `rings-test` and everything
+  after it never execute through that target. Invoke them directly.
+- the campaign's own `make -C games/fft/campaign test` is unaffected and is the
+  suite that covers the view banks.
+
+Not diagnosed here: the process could not be attached (`ptrace_scope`), so no
+stack was taken. The first thing to try is a counter on `sw_step` in
+`test_autobattle.c` to find which wait never resolves.
