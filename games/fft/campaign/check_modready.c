@@ -35,6 +35,7 @@ static void steps(void)
                                   MOD_COMPANION));
     BENCH_VALUE(mod_ready());
     BENCH_VALUE(mod_images[0]!=RT_NULL);
+    BENCH_VALUE(sizeof(ModCtx));
 }
 #endif
 #ifndef __m68k__

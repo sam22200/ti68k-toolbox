@@ -19,7 +19,9 @@ def main():
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES','-o',out/'mbcalls',HERE/'check_banks.c',ROOT/'runtime/core/rt_core.c',ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     files={p.stem:p for origin in (HERE.parent/'opening/data',HERE/'data')for p in origin.glob('*.89y')if not p.stem.startswith('ffsave')and p.stem!='ffslot'}
     def execute(label,overrides):
-        cmd=[ROOT/'tools/bin/ti-cycles','--frames',0,'--arg',61,'--max',10000]
+        # One frame, not none: the runtime binds W on its first frame and the
+        # bindings need it (check_modready.c).
+        cmd=[ROOT/'tools/bin/ti-cycles','--frames',1,'--arg',61,'--max',10000]
         for name,path in {**files,**overrides}.items():
             if path:cmd+=['--file',path]
         log=run([*cmd,out/'mbcalls.89z']);(out/(label+'.log')).write_text(log);assert '_main returned'in log
