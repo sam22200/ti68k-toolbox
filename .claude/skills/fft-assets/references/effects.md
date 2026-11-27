@@ -187,3 +187,40 @@ carrying **animation scripts** as well as the frame records, so there is more in
 than the 28-byte records -- timing in particular, which is still read off captured video
 here. Decoding that script is the way to stop inferring timing from frames.
 
+## 9. The criterion: let the effect's height decide, not the budget
+
+An effect either fits the ordinary picture or it earns a cut-away. The test is **its own
+requested height**, because that is a property of what is about to be drawn:
+
+```c
+#define FX_TALL 28                      // above this, the picture gets out of the way
+static u8 fx_tall(void)
+{
+    return st.mode == M_ACT && FX_STAGES(st.abil) && FX_SPIKE_H > FX_TALL
+           && st.act_t >= FX_ICE_FROM && st.act_t < FX_ICE_FROM + FX_ICE_LEN;
+}
+```
+
+**Do not gate it on the frame budget.** `W->left` was tried and it is negative all
+through a battle scene, so a budget test fires always or never. The height is honest.
+
+**Both halves of that test matter.** Keyed on the ability alone, the cut-away stayed up
+for the whole wash, and since the effect plays 23 ticks of a 55-tick hold that left 25
+frames of empty grey field with nothing on it. The picture goes away for the *effect*,
+not for the ability.
+
+What a cut-away is: the map becomes a flat field, nothing is dimmed (a uniform field has
+nothing to dim) and only the two units the action concerns are drawn. Measured, that frees
+99,020 cycles -- 28 % of the whole frame budget -- and it is what pays for `E173`'s real
+82 rows, where the ordinary picture affords 28.
+
+| | peak | margin |
+|---|---|---|
+| ordinary picture, 24-row pillar | 352,736 | 7,264 |
+| **cut-away, 82-row pillar** | **337,234** | **22,766** |
+
+The sequence reads as wash on the map, cut to the effect, back to the washed map. Note
+what it costs in fidelity: the original keeps its scene visible throughout. This is a
+trade taken deliberately to get the effect's size right, and it is bounded to the frames
+the effect draws on.
+
