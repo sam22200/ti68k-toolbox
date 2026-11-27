@@ -122,6 +122,7 @@ def main():
     ap.add_argument('ids', nargs='*', type=int, help='effect numbers, e.g. 16 17 18')
     ap.add_argument('--all', action='store_true', help='every effect that is data')
     ap.add_argument('--frames', action='store_true', help='print the frame list instead of writing PNGs')
+    ap.add_argument('--all-frames', action='store_true', dest='all_frames', help='every record, not the first six')
     ap.add_argument('--out', type=Path, help='where the PNGs go; not needed with --frames')
     a = ap.parse_args()
     if not a.ids and not a.all:
@@ -146,7 +147,10 @@ def main():
                 code += 1          # a routine, or no decodable 28-byte record
                 continue
             print('E%03d  %d frames' % (n, len(fr)))
-            for i, f in enumerate(fr[:6]):
+            # Not fr[:6]. Six records is where three wrong versions of Stasis Sword came
+            # from: its animation has 42 of them, and the choreography -- which cell, how
+            # big, where, in what order -- is all in the ones that were never printed.
+            for i, f in enumerate(fr if a.all_frames else fr[:6]):
                 print('   %2d  cell (%3d,%3d) %dx%d  corners %s'
                       % (i, f['u'], f['v'], f['w'], f['h'], f['corners']))
             data += 1

@@ -83,7 +83,7 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 // budget pays 28 of them at about 1,220 cycles a row: H=32 measures 354,778 and H=36
 // measures 359,566, which passes with 434 cycles left -- not a margin, a bet that this
 // scenario reaches the worst frame. 28 keeps the margin the layer had before the asm.
-#define FX_SPIKE_H 28                   // a third of the original's height, by measurement
+#define FX_SPIKE_H 24                   // the pillar, by measurement: see the sweep below
 #define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
 // It comes down, holds, and thins away -- the three the original shows, in its own
 // proportions: the wisp reaches the ground about twelve of its frames after it appears,
@@ -96,51 +96,123 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 // wash and a 32-bit divide would cost about 900 cycles of the 1,220 a row already costs.
 // Past the third phase it returns at once: the tail of a long hold then draws nothing,
 // where before it paid 28 rows a frame to hold a frozen picture.
-#define FX_SPIKE_FALL 8                 // ticks to reach the ground
-#define FX_SPIKE_HOLD 8                 // ticks at full width
-#define FX_SPIKE_GONE 8                 // ticks thinning to nothing
+// Stasis Sword, read frame by frame off the capture rather than off the atlas picture.
+// Bright blue pixels tracked through the wash put the effect in x 83..143, y 0..169 of a
+// 256x240 frame -- it starts at the very TOP of the screen, not above the target.
+//
+//   +24  a faceted shard of ice appears at the top of the screen, point down
+//   +28  it falls, elongated
+//   +32  it reaches the target AND a pillar of light erupts upward from the target
+//   +36  the pillar holds: white at the foot, blue going up, sparks running along it
+//   +56  more shards keep falling into it; then it thins away
+//
+// **There are two movements, not one.** Shards coming down, and a pillar going up. The
+// two earlier versions of this each drew one cone: first rising, then -- correcting the
+// direction -- falling. Both replaced the whole sequence with half of it, and the second
+// lost the pillar, which is the part that carries the effect, to gain the shard.
+#define FX_ICE_FALL 5                   // ticks: the blocks close on the target
+#define FX_ICE_RISE 4                   // the pillar grows out of it
+#define FX_ICE_HOLD 8                   // it stands, shards still falling
+#define FX_ICE_GONE 6                   // it thins away
+// The original's bright core is about 20 px of a 256-wide frame, which is 12 of our 160
+// -- a half-width of 6, roughly one unit across. FX_SPIKE_W is 12, and at that the foot
+// read as a white bar rather than a column.
+#define FX_PILLAR_W 6
+#define FX_SHARD_H 14
+#define FX_SHARD_W 3
+
+// Blocks of ice, converging. This is what E163's animation says and what one shard
+// could never say: of its 42 records, 16..24 are the SAME 40x48 cell over nine frames
+// with its quad corners shearing and closing in -- x -16..9 down to -2..2 -- and 28..38
+// are another doing the same. That convergence is the effect. Around it sit three 16x16
+// cells and a handful of 8x8 ones: distinct pieces, not one mass.
+//
+// `effect_rip.py --frames` printed only the first six records until today, which is why
+// three versions of this were built from a seventh of what the disc says.
+#define FX_BLOCKS 3
+#define FX_FALL_SHIFT 2                 // FX_ICE_FALL - 1 == 4: the convergence is a shift
+static const s8 fx_blk[FX_BLOCKS][2] = { { -13, -58 }, { 11, -72 }, { -4, -82 } };
+
+// One block: a solid diamond with its outline. Solid, not dithered -- these read as ice
+// only if they have an edge and a body, and they are small enough to pay for it.
+static void fx_block(s16 cx, s16 cy, s16 size)
+{
+    s16 r;
+    for (r = (s16)-size; r <= size; r++) {
+        s16 y = (s16)(cy + r), w = (s16)(size - (r < 0 ? -r : r));
+        if ((u16)y >= RT_H) continue;
+        fx_dot((s16)(cx - w - 1), y, 0);
+        fx_dot((s16)(cx + w + 1), y, 0);
+        fx_span((s16)(cx - w), (s16)(cx + w), y, 1, 0xFFu);
+    }
+}
+
+// They start spread above the target and close on it: k runs FX_ICE_FALL-1 down to 0, so
+// at the last tick every block is on the target and the pillar takes over.
+static void fx_blocks(s16 cx, s16 base, u8 t)
+{
+    u8 i;
+    s16 k = (s16)(FX_ICE_FALL - 1 - (s16)t);
+    for (i = 0; i < FX_BLOCKS; i++)
+        fx_block((s16)(cx + ((fx_blk[i][0] * k) >> FX_FALL_SHIFT)),
+                 (s16)(base + ((fx_blk[i][1] * k) >> FX_FALL_SHIFT)), (s16)(4 - i));
+}
+
+// The pillar: out of the target and upward, widest at the foot and tapering, solid for
+// the first rows and a checkerboard above -- the original is white at the base and blue
+// as it climbs, and four greys say that with density. Sparks are a hash of the row and
+// the frame, never the RNG: the picture must not consume it.
+static void fx_pillar(s16 cx, s16 base, s16 h, s16 wmax, u8 t)
+{
+    s16 r;
+    s32 w8 = (s32)wmax << 8, step = ((s32)wmax << 7) / FX_SPIKE_H;   // tapers to half
+    for (r = 0; r < h; r++, w8 -= step) {
+        s16 y = (s16)(base - r);
+        s16 w = (s16)(w8 >> 8);
+        if ((u16)y >= RT_H) break;
+        if (w < 1) break;
+        fx_dot((s16)(cx - w - 1), y, 0);
+        fx_dot((s16)(cx + w + 1), y, 0);
+        fx_span((s16)(cx - w), (s16)(cx + w), y, 1,
+                r < 5 ? 0xFFu : (u8)((y & 1) ? 0xAAu : 0x55u));      // white at the foot
+    }
+    {   // Three sparks climbing it. The height they are at is masked, not taken modulo
+        // h: a modulo is a division, three of them a frame, and this runs on every frame
+        // of a wash. Clamped instead of wrapped, so a spark rests at the top rather than
+        // jumping back to the foot.
+        u8 i;
+        for (i = 0; i < 3; i++) {
+            u16 hsh = (u16)(i * 2654U + t * 97U);
+            s16 up = (s16)((t * 2 + i * 9) & 31);
+            if (up >= h) up = (s16)(h - 1);
+            fx_dot((s16)(cx + ((hsh >> 4) & 7) - 3), (s16)(base - up), 1);
+        }
+    }
+}
+
 static void fx_spike(s16 cx, s16 base, u8 t)
 {
-    s16 r, reach, wmax;
-    s16 top = (s16)(base - FX_SPIKE_H);
-    s32 w8 = 0, step;
-    if (t < FX_SPIKE_FALL) {
-        reach = (s16)(((s16)(t + 1) * FX_SPIKE_H) >> 3);
-        wmax = FX_SPIKE_W;
-    } else if (t < FX_SPIKE_FALL + FX_SPIKE_HOLD) {
-        reach = FX_SPIKE_H;
-        wmax = FX_SPIKE_W;
-    } else {
-        s16 k = (s16)(t - FX_SPIKE_FALL - FX_SPIKE_HOLD);
-        if (k >= FX_SPIKE_GONE) return;         // thinned away: nothing to draw, nothing to pay
-        reach = FX_SPIKE_H;
-        wmax = (s16)((FX_SPIKE_W * (FX_SPIKE_GONE - k)) >> 3);
+    // From off the top of the screen down to the target, not from the middle of it: the
+    // tip starts at -FX_SHARD_H, so the shard enters the picture rather than appearing
+    // in it, and lands ON the target instead of 14 rows under its feet.
+    if (t < FX_ICE_FALL) { fx_blocks(cx, base, t); return; }
+    t = (u8)(t - FX_ICE_FALL);
+    if (t < FX_ICE_RISE) {                       // the pillar grows out of the impact
+        fx_pillar(cx, base, (s16)(((s16)(t + 1) * FX_SPIKE_H) >> 2), FX_PILLAR_W, t);
+        return;
     }
-    if (reach < 2 || wmax < 1) return;
-    step = ((s32)wmax << 8) / FX_SPIKE_H;
-    // It COMES DOWN. Captured on the original (tools/effect_capture.py, Stasis Sword):
-    // a wisp appears high above the target at wash+24, grows into a column reaching the
-    // ground by +36, flares at its foot by +42 and thins away by +54. E173's own frame 0
-    // says the same thing and it was read wrong the first time: its quad spans y -26..110
-    // about its anchor, almost entirely BELOW it, so the anchor is up in the sky and the
-    // effect hangs from it. The atlas picture shows a cone with its point up, and that
-    // was taken for the direction of travel, which it is not.
-    //
-    // So the top is fixed and the foot descends towards the target. The width is a
-    // function of the screen row, not of how far it has come, which is why `step` divides
-    // by FX_SPIKE_H and not by the current reach.
-    for (r = 0; r < reach; r++, w8 += step) {
-        s16 y = (s16)(top + r);
-        s16 w = (s16)(w8 >> 8);
-        fx_dot((s16)(cx - w - 1), y, 0);        // the silhouette, before the body
-        fx_dot((s16)(cx + w + 1), y, 0);
-        // The body is a checkerboard, not an aplat. The original's effects blend
-        // additively and the unit shows through them; filled solid, this spike hid the
-        // very unit the focus had just kept bright. Four greys have no alpha, so every
-        // other pixel is left as it was -- the veil reads white and the unit under it
-        // reads too. It costs the same: the pattern is ANDed into the span's mask.
-        fx_span((s16)(cx - w), (s16)(cx + w), y, 1, (u8)((y & 1) ? 0xAAu : 0x55u));
+    t = (u8)(t - FX_ICE_RISE);
+    if (t < FX_ICE_HOLD) {                       // it stands, and shards keep coming
+        fx_pillar(cx, base, FX_SPIKE_H, FX_PILLAR_W, t);
+        // The original keeps dropping shards into the pillar all through the hold. Ours
+        // does not: a second shard is 14 more rows on every frame of it, and that measured
+        // 377,886 against the 360,000 limit. The pillar is what carries the effect, so the
+        // shards are the part that goes.
+        return;
     }
+    t = (u8)(t - FX_ICE_HOLD);
+    if (t < FX_ICE_GONE)                         // it thins away
+        fx_pillar(cx, base, FX_SPIKE_H, (s16)((FX_PILLAR_W * (FX_ICE_GONE - t)) / FX_ICE_GONE), t);
 }
 
 // Effects are NOT depth tested. seen(), the per-pixel test the water glints use, is
