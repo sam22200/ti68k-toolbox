@@ -190,6 +190,9 @@ static u32 slope_pc[4 * SLOPE_ROWS];    // the PC's native copy (ffti is big-end
 #if MOD_CORE
 static const u8 *wgfx;                  // armed body poses and blades (fftw), read in place
 static u8 *vbuf, vbuf_rot;
+#ifdef FFT_COMBAT_FX
+static u8 fx_act_end(void);             // fx_play.inc: longer when the ability is staged
+#endif
 #ifdef FFT_VIEW_SPLIT
 static u16 vplane;                      // bytes of one plane of the unpacked ragged depth
 #endif
@@ -3154,7 +3157,11 @@ static void attack_step(void)
 #endif
 #endif
     }
+#ifdef FFT_COMBAT_FX
+    if (++st.act_t >= fx_act_end()) {       // a staged ability runs as long as its wash
+#else
     if (++st.act_t >= (st.gain ? ACT_GAIN_END : ACT_END)) {
+#endif
 #ifdef FFT_CHAPTER
         if((st.action.phase==CTX_IMPACT||st.action.phase==CTX_APPLIED)&&st.action.left){
             u8 target;
