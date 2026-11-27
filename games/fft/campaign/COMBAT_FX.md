@@ -402,3 +402,41 @@ And the staging is a **colour wash**, not a dim: blood red for Night Sword, nigh
 blue for Agrias. Four greys cannot tint, so which grey each family takes is a
 decision for the art, not a measurement. `fx_focus.inc` currently darkens by one
 level for everything.
+
+## The staging is stored per ability (2026-11-27)
+
+`fx_play.inc` holds it the way the original does: **a fact against the ability**,
+not something computed from one of its fields. Two bitmaps of 64 bytes, `const`
+in the module image -- 128 bytes, no RAM:
+
+| | |
+|---|---|
+| `fx_staged` | one bit an ability: does the original stage it? |
+| `fx_known` | which of those bits is **measured** rather than defaulted |
+
+The second map is the point. The table it replaces could not tell a fact from a
+blank, and its six "measured" rows were right only by accident of which
+abilities had been watched. A reader can now see exactly what was observed.
+
+| measured, stages | measured, full light |
+|---|---|
+| Wish 3.03 s, Stasis Sword 1.10 s, Night Sword 1.07..5.47 s, Potion 1.63 s, Antidote 1.63 s, Eye Drop 1.97 s, Echo Grass 1.40 s, Phoenix Down 1.47 s | Dash, Throw Stone, Heal, the plain Attack |
+
+**Anything unmeasured defaults to not staged**, and that is a choice with a
+number behind it: the dimming costs 55 kilocycles a frame, so spending it on a
+guess is worse than leaving an effect plain until somebody watches it. A missing
+effect is visible and cheap to fix; a frame over budget is neither.
+
+The header of the table carries both disproved keys with their counter-examples,
+so neither is tried again: `st.effect_kind` falls to a Holy Sword and a plain
+Attack both dealing damage and being staged oppositely, `abilities[].flags` to
+Dash and Wish both carrying 0x00.
+
+`check_combat_fx.c` drives by ability now -- Wish on one side, Dash on the other
+-- so it checks two measured facts instead of an invented rule, and one check
+holds the two maps together: **every bit of `fx_staged` must also be set in
+`fx_known`**. Without it the second map would be a comment, and a staged guess
+could be written without anything noticing. 257 checks.
+
+The other half of `fx_table`, which primitive plays at which phase, is **not**
+measured: those were chosen. Only the staging comes from the original.
