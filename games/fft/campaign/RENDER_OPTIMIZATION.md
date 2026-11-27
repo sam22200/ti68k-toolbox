@@ -136,3 +136,50 @@ separate. No TiEmu run or global contract promotion. Next is the selected
 installed-RAM milestone for this wider candidate, then remaining map depth
 adaptations and source encounter/scene authoring. The difficult16KiB hunt
 remains deferred; do not shrink the measured caches or claim it passed.
+
+## Pre-flipped actor frames: measured and rejected (2026-11-26)
+
+`tools/common_actors.py` does not store a frame that is the exact mirror of
+another: the mapping entry carries bit 15 and `actors.inc` flips the frame after
+decoding it. Zone profiling priced that flip at **22944 cycles**, on top of the
+**17690** the ZX0 decode itself costs, so a mirrored cache miss reaches **45016** --
+an eighth of an ordinary frame, against 19083 for an unmirrored one. The budget
+model charges a flat 32 kilocycles per miss (`fft.c:7750`), which straddles both.
+
+Gariland mirrors only **16 of its 371 logical frames** (4.3%; the rotation replay
+independently shows 4 mirrored decodes of 82, 4.9%). Orbonne mirrors 335 of 723.
+Storing Gariland's sixteen pre-flipped costs **2230 archive bytes** and keeps the
+banks at two variables.
+
+It was built and gated, and it does not pay:
+
+| Case | Mean before / after | Ordinary peak before / after | Checksum |
+|---|---|---|---|
+| 12 actors, board |223461 /223467|286130 /286130| B2B4 = B2B4 |
+| 12 actors, rotations |250807 /250079|336436 /336092| 57DE = 57DE |
+| 13 actors, board |227656 /227662|290368 /290368| B2B4 = B2B4 |
+| 13 actors, rotations |254206 /253480|338234 /337890| 57DE = 57DE |
+
+The peak moves 344 cycles, 0.1%. The board case gets marginally **worse** (+6 per
+frame, +632 cold): it has no mirrored decode to win back but carries sixteen more
+records through the bank walk. Pixels are identical throughout, as the transform
+requires, so the implementation was correct -- the premise was not.
+
+The premise was that a mirrored decode lands in a peak frame, where removing
+22944 cycles would roughly double the 21620 of remaining rotation headroom. It
+does not. The peak is held by unit drawing (zone 4, up to 115268) and the render
+as a whole; the saved cycles fall in frames that already had room. The banks and
+`tools/common_actors.py` were restored and verified byte-for-byte.
+
+This also bounds a wider idea. Replacing the per-frame ZX0 with an indexed pool
+of deduplicated 8-byte rows would target 17690 -> roughly 2000, but by the same
+argument it would not move the peak either. What it would buy is a higher
+`ACTOR_BUDGET`: more actors animating at once, not shorter frames. Anyone picking
+it up should justify it as animation smoothness and measure that, not CPU budget.
+
+What stands as reusable platform fact -- the ZX0 rate, the mirror rate and the
+miss costs -- is in `.claude/skills/ti89-c-dev/reference/ti68k-performance.md`.
+
+Reproduce with `check_capacity_render.py --case board --case rotations --actors
+12|13`, and add `--profile-zones` for the per-component numbers (zone 20 is the
+whole miss; 30, 31 and 14 were temporary sub-zones, not retained).

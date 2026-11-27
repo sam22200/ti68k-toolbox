@@ -1114,3 +1114,30 @@ resident input saves456, at roughly80KB more pilot archive data. Measured
 cold rotation4962432 is separate. Installed startup/exit works in a private
 Titanium emulator, but the remaining16KiB free-RAM gate stays open. Details,
 configuration guards and approved range-overflow pixels: campaign/CORE_REACH_ARCHIVE.md.
+
+### Actor frame decode, and mirroring costs more than decompressing (FFT, ti-cycles, 2026-11-26)
+
+A 208-byte actor frame (16x26 pixels in four planes) costs **17690** datasheet
+68000 cycles to unpack from its ZX0 stream: 85 cycles per output byte. The whole
+cache miss around it is 19083 -- 1256 to 2978 of that is the 42-entry LRU victim
+scan, the rest is the bank walk and bookkeeping.
+
+Flipping that same frame with ExtGraph's `SpriteX8_MIRROR_H_R` (104 words) costs
+a further **22944**, a fixed 220 cycles per word: **more than decompressing it**.
+A mirrored miss therefore reaches **45016** cycles, an eighth of a 360000-cycle
+frame. That single number is why FFT decodes at most one new pose per frame
+(`ACTOR_BUDGET 1`). Budget a run-time mirror as its own decode, not as a cheap
+post-pass.
+
+Small streams decode worse per byte than large ones: the same verified decoder
+moves a 16160-byte view at 56.6 cycles/byte (section above) against 85 cycles/byte
+here. Price ZX0 by the stream's size, not by one global rate.
+
+Storing the mirrored frames pre-flipped instead buys almost nothing, because
+these decodes do not land in the peak frames: measured and rejected in
+`games/fft/campaign/RENDER_OPTIMIZATION.md`. Measure which frames a cost falls in
+before paying storage to remove it.
+
+Measured with the renderer zones of `campaign/check_capacity_render.py
+--profile-zones` on the 13-actor board and rotation cases. Datasheet cycles under
+`ti-cycles`, not a TiEmu or calculator observation.
