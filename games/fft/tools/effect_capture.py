@@ -42,6 +42,11 @@ def vram_dump(psx, stem):
     vram_png(raw, stem + '.png')
     print('vram -> %s.png' % stem, flush=True)
 PRE, POST = 24, 150          # frames kept before the wash, and after it starts
+TAIL = 90                    # and after the wash LIFTS: the sprites outlive it.
+# Stasis Sword's wash holds 66 frames; its animation runs 72 ticks (36 frames at 30 fps)
+# and keeps playing once the screen is bright again. Stopping at the wash cut the last
+# third off the only recording of it, which is why the decoded tail -- the pillar
+# melting -- looked like something the game does not do.
 
 
 def main():
@@ -93,7 +98,12 @@ def main():
                       % (f, hit[0], hit[1], hit[2], f - cur['start']), flush=True)
             if f != cur['start']:
                 cur['frames'].append((f, lum, im))
-            if lum > cur['base'] * 0.88 or f - cur['start'] > POST:
+            if cur.get('lifted') is None and lum > cur['base'] * 0.88:
+                cur['lifted'] = f
+                print('  LIFT  f%-6d  wash%+d, %d more frames' % (f, f - cur['start'], TAIL),
+                      flush=True)
+            if (cur.get('lifted') is not None and f - cur['lifted'] >= TAIL) \
+                    or f - cur['start'] > POST + TAIL:
                 held = f - cur['start']
                 print('  END f%-6d  held %d frames = %.2f s' % (f, held, held / 60.0), flush=True)
                 if held >= 10:
