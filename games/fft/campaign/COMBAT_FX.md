@@ -568,3 +568,48 @@ left as it was. It costs nothing -- the pattern is ANDed into the span's mask.
 Still open: the effect is not depth sorted, the other five primitives are still
 the chosen ones, and only `AB_DAMAGE`'s impact and settle use the spike so far.
 
+## The original's order, captured (2026-11-27)
+
+`tools/effect_capture.py` runs the original from a save state and, around each wash,
+keeps the frames and reads two things **per frame**: the luminance, which says when
+the picture darkens, and every unit's HP, which says when a blow lands. The question
+was an ordering, so it was measured as one rather than judged off a screenshot.
+
+Stasis Sword, Orbonne, wash at frame 2901:
+
+| | |
+|---|---|
+| wash −22 | the scene normal, Agrias at rest |
+| wash −12 | she draws |
+| wash −2 | **the blade fully raised, in full light** |
+| wash +0 | the swing goes out, and **the picture darkens on that frame** |
+| wash +36 | **the effect erupts** on the target, 0.6 s later |
+
+Two corrections follow, and both are now in `fx_play.inc`:
+
+1. **The wash starts at `ACT_BLOW`, not `ACT_WIND`.** Starting at the wind-up dimmed
+   a preparation the original plays lit, and charged `FX_DARK_K` for eight frames
+   that should not have paid it.
+2. **The spike plays at phase 3, not at the impact.** The original leaves 0.6 s
+   between the darkening and the effect; phase 2 is the four flash frames, so the
+   spike belongs after them, from `ACT_HIT + 4`.
+
+The caster stays lit until `ACT_HIT` and the target takes over there: on the original
+the lit figure is the caster while the blade travels.
+
+Peak **358,252 / 360,000**, 302 checks. The margin is down to **1,748 cycles** -- the
+wash now covers frames where the spike also draws, where before the two barely
+overlapped. That is tight enough to be the first thing to look at before any further
+effect work.
+
+**Durations, measured again on this run:** Night Sword 1.83 s and 2.52 s, Stasis Sword
+1.10 s. The 1.07 s in the hold table was the short end of the spread, and our whole
+action window is 1.30 s -- shorter than one of the original's washes. The effects
+reading as too quick is a consequence of that compression, not of the hold table.
+
+**A trap on the way.** The first capture returned exit 0 with no events at all. What
+said it was wrong was not the absent wash but the absent **HP changes over 3,100
+frames**: the save state held a battle that was not advancing. Without that second
+reading, "no wash detected" would have looked like a fact about the game instead of a
+fact about the state.
+
