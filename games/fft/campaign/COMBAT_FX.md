@@ -339,11 +339,26 @@ parameters are chosen, not two primitives.
 the caster lit: Wish for 3.02 s, Potion for 1.62 s. Step 1 was built from a
 specification and now matches an observation.
 
-**But the step 3 table is wrong on one point.** `Heal` does not dim at all. The
-original reserves the staging for the larger effects and plays small ones in
-normal light, while `fx_table` gives every outcome category a primitive and the
-schedule dims whenever an action runs. The table needs a "dims or not" column,
-taken from the original rather than chosen.
+**The step 3 table was wrong on one point, and now carries the measurement.**
+Thirteen of Gariland's abilities were watched:
+
+| plays in full light | dims |
+|---|---|
+| Dash, Throw Stone, Attack, **Heal** | Wish 3.03 s, Potion 1.63 s, Antidote 1.63 s, Eye Drop 1.97 s, Echo Grass 1.40 s, Phoenix Down 1.47 s |
+
+**Heal and Antidote both strip a status and the original stages them oppositely.**
+So what decides is not the outcome but the kind of action: a physical skill or a
+Squire ability plays in full light, an item or an incantation takes the stage --
+and `fx_table` is keyed on the outcome. The column is right where it is measured
+and honest where it is not: six rows carry `D_NO`/`D_YES` from the original, the
+other twenty are marked `D_GUESS`, "NOT OBSERVED". `fx_schedule` now consults it,
+so a category that does not dim never takes the focus at any phase.
+
+Re-keying the table on the kind of action is **not** done. Thirteen observations
+all come from Gariland and all fall on one side of the skill/item split; deciding
+a new axis from them would repeat exactly the mistake just corrected. The
+prologue, with Agrias and Gafgarion, is where other kinds of incantation live --
+and that is finally a reason to go there.
 
 Timing is still not resolved. The total is now observed -- about 3 s for Wish --
 but relating that to an effect file's record count needs the effect number for
