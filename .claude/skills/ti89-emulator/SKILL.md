@@ -56,6 +56,47 @@ game to HOME to resend it, never type paths into the file chooser: a restart fro
 4. Quit the program (often `ti-key --hold 0.5 ESC`) before sending a new version: sending fails
    while a program is running.
 
+## Waiting: on the event, never on a timer
+
+**`ti-emu start/restart` already returns the moment the transfer lands** (it ends
+with `ti-mem wait` on the group's last variable). So run it in the FOREGROUND with
+a `timeout`, and the shell hands control back the second it is done. Putting it in
+the background and then polling it with `sleep 20` loops wastes minutes per step
+and is the single easiest way to turn a 17-second test into a five-minute one.
+The same goes for everything after it: ask the calculator, do not wait on a clock.
+
+| instead of | do |
+|---|---|
+| background + `while ... sleep 20` | foreground `timeout 420 ti-emu restart ...` |
+| `sleep 30` then a screenshot | `ti-mem log`, `ti-mem heap`, or the game's RAM decoder in an `until` loop |
+| a screenshot to know a battle started | `fftmem.py battle` -- it prints "no battle State in RAM" until it has one |
+| a screenshot to know a transfer arrived | `ti-mem wait FILE` (already done by start/restart) |
+
+A named state is the other half: `TI_STATE=fftcore` carries the installed core, so
+a chapter test sends 288 KB in **16.5 s** instead of 1 MB in 57 s.
+
+## A long `-send` path aborts TiEmu (verified, 2026-11-26)
+
+`ti-emu start FILE` with **one** file passes that file's absolute path to
+`-send=`; with **two or more** it first merges them with `ti-group` into
+`tools/tiemu/<calc>/send.89g`, a short path. So a single big group deep in the
+tree aborts the emulator before it maps its window, and the only symptom the
+script reports is `no window after N s ('Set ROM version' dialog?)` -- while the
+container, run with `--rm`, has already vanished, so `docker logs tiemu` answers
+`No such container`. Run the same `docker run` without `-d` to see the real
+message:
+
+```
+*** buffer overflow detected *** : terminated
+```
+
+Measured here: `/home/.../games/fft/campaign/x/build-packages/fft-core.89g`
+(77 chars) aborts, the same file copied to
+`/home/.../tools/tiemu/89t/core.89g` (53 chars) sends fine. This is the same
+TiEmu limit as the 2026-11-07 private-mount note below, reached from the other
+direction. **Copy a lone group next to the profile before sending it**, or pass
+two files so `ti-group` shortens the path for you.
+
 ## Logs instead of screenshots
 
 1. Programs call `tilog("...", ...)` (`lib/tilog.h`, printf format) at transitions and outcomes;
