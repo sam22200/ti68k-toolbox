@@ -777,3 +777,30 @@ struct already had.
 
 What is left for the dimming, then, is the asm route (`movem`, about 30 %) or nothing.
 
+### The asm route, taken and measured (2026-11-27)
+
+Authorised, written and measured rather than estimated. `games/fft/fxdark.s`, benchmarked
+against the very loop it replaces, same 100 rows and both planes, under `ti-cycles`:
+
+| | cycles |
+|---|---|
+| the C loop that shipped | 46,638 |
+| `fx_dark_asm` | **42,010** |
+
+Identical plane checksums and an equality marker in the bench, so the two produce the
+same bytes. **4,628 cycles, 9.9 %** -- not the 30 % that was guessed before anything was
+written. The guess was a hand-wave; an instruction-level count said 5 to 8 %, and the
+measurement landed at 10.
+
+The reason is structural and worth keeping: the map wants **ten long words at once**,
+five of each plane, and the 68000 has eight data registers. `movem` cannot carry both
+planes in one go, so the routine works three words at a time and then two, with one
+register as the shared temporary. A formulation needing no temporary exists -- `d' =
+d | ~l'`, which is exact -- but it costs two extra `not.l` a word, 12 cycles against 4
+for the move, so the move wins.
+
+On the real frame, the peak falls from **349,588 to 340,256**, leaving 19,744 cycles of
+margin instead of 10,412. The PC build keeps the C loop and the 68000 takes the asm, so
+the PC/TI cross-check compares one against the other: it passes with the same checksum
+`D976`, which is the equivalence proof on a real picture rather than on synthetic data.
+

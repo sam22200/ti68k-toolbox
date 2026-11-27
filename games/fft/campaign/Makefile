@@ -332,7 +332,7 @@ package-probe:
 	$(ROOT)/tools/bin/ti-cc -o x/package/heapprob probe_package.c
 packed: $(TI_FILES)
 	$(MAKE) -C ../opening banks
-	$(ROOT)/tools/bin/ti-cc -o fftbat -pack ffbcore native_battle.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
+	$(ROOT)/tools/bin/ti-cc -o fftbat -pack ffbcore native_battle.c $(RT_CORE) ../fxdark.s $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftscn -pack ffscore native_scene.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftdep -pack ffpccore native_deploy.c $(RT_CORE) $(ROOT)/tools/extgraph/lib/tilemap.a
 	$(ROOT)/tools/bin/ti-cc -o fftmap -pack ffwmcore native_worldmap.c $(RT_CORE) $(ROOT)/lib/unpack68k.s $(ROOT)/tools/extgraph/lib/tilemap.a

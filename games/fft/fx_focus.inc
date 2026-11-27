@@ -33,6 +33,17 @@
 #define FX_NO_UNIT 255                  // what a caller passes for "dim everything"
 
 // The 160 visible pixels of a row are its first five long words (screen_scene()).
+//
+// On the 68000 this is fxdark.s. Measured against this very loop under ti-cycles, same
+// 100 rows and both planes: 46,638 cycles for the C, 42,010 for the asm, identical
+// output (campaign/COMBAT_FX.md). 9.9 %, and not more, because the map wants ten long
+// words at once and the machine has eight data registers -- movem cannot carry both
+// planes in one go, so it goes three words at a time and then two.
+#ifdef __m68k__
+void fx_dark_asm(u8 *l asm("%a0"), u8 *d asm("%a1"),
+                 short rows asm("%d0"), long stride asm("%d1")) __attribute__((__regparm__(4)));
+static void fx_dark(void) { fx_dark_asm(rt_light, rt_dark, RT_H, RT_PBYTES); }
+#else
 static void fx_dark(void)
 {
     u8 *lp = rt_light, *dp = rt_dark;
@@ -45,6 +56,7 @@ static void fx_dark(void)
         l[0] = b0 | ~a0; l[1] = b1 | ~a1; l[2] = b2 | ~a2; l[3] = b3 | ~a3; l[4] = b4 | ~a4;
     }
 }
+#endif
 
 // Ask for a focus: unit stays bright, or FX_NO_UNIT for the whole picture. on = 0 restores.
 // The caller owns the timing, so the spec's anticipation and focus phases belong to the
