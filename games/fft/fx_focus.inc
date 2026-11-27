@@ -72,6 +72,11 @@ static u8 fx_apply(const Feet *f, const u8 *vis)
 {
     u8 sel = W->fx_sel;
     if (!sel) return 0;
+    if (fx_tall()) {                    // a cut-away is a flat field: nothing to dim
+        if (sel != FX_ALL && --sel < NUNIT && vis[sel])
+            draw_unit_covered(f[sel].x - st.camx, f[sel].y - st.camy, st.rot, sel, &W->cover[sel]);
+        return 0;
+    }
     fx_dark();
     // The focused unit returns to normal brightness, still occluded by the scenery:
     // its cover mask is the one the ordinary pass just used. A unit out of the view has

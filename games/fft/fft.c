@@ -192,6 +192,7 @@ static const u8 *wgfx;                  // armed body poses and blades (fftw), r
 static u8 *vbuf, vbuf_rot;
 #ifdef FFT_COMBAT_FX
 static u8 fx_act_end(void);             // fx_play.inc: longer when the ability is staged
+static u8 fx_tall(void);                // ...and the picture gets out of a tall effect's way
 #endif
 #ifdef FFT_VIEW_SPLIT
 static u16 vplane;                      // bytes of one plane of the unpacked ragged depth
@@ -6513,6 +6514,17 @@ static void screen_scene(void)
     // A cache completed below saves work from the next frame only. Optional HUD / cursor
     // work must not force itself into this frame as though it had used the cheap copy.
     W->bg_drawn = bg_usable();
+#ifdef FFT_COMBAT_FX
+    // A tall effect gets a cut-away: the map is a flat field for the frames it plays on.
+    // It is not dimmed afterwards either -- a uniform field has nothing to dim -- and
+    // those two together are what pays for the effect's real height (fx_play.inc).
+    if (fx_tall()) {
+        memset(rt_light, 0xFF, RT_DRAW_BYTES);
+        memset(rt_dark, 0x00, RT_DRAW_BYTES);
+        W->bg_drawn = 1;
+        return;
+    }
+#endif
     if (W->bg_drawn) {
         for (y = 0; y < RT_H; y++, l += RT_PBYTES, d += RT_PBYTES) {
             a = (PlaneWord *)l; b = (PlaneWord *)d;
@@ -7741,6 +7753,11 @@ void game_render(void)
     render_poses=0;
     actor_animate(vis);
 #endif
+#ifdef FFT_COMBAT_FX
+    // The focus has to be settled before the units are drawn, because on a cut-away only
+    // the two the action concerns are drawn at all.
+    fx_schedule(f, vis);
+#endif
     for (i = 0; i < NUNIT; i++) {
         u8 k = ord[i];
         Cover *c = &W->cover[k];
@@ -7759,6 +7776,9 @@ void game_render(void)
             for (c->r0 = 2; c->r0 <= UNIT_SH - 3 && !c->cm[c->r0]; c->r0++) ;
             for (c->r1 = UNIT_SH - 3; c->r1 >= c->r0 && !c->cm[c->r1]; c->r1--) ;
         }
+#ifdef FFT_COMBAT_FX
+        if (W->fx_sel && fx_tall() && k != st.atk && k != st.tgt) continue;
+#endif
         if (st.mode == M_ACT && k == st.atk) draw_weapon(f[k].x, f[k].y, k, f[k].depth);
         draw_unit_covered(f[k].x - st.camx, f[k].y - st.camy, st.rot, k, c);
     }
@@ -7775,10 +7795,9 @@ void game_render(void)
     W->left-=(s16)(W->actor_misses*ACTOR_MISS_K+W->actor_mirror*ACTOR_FLIP_K);
 #endif
 #ifdef FFT_COMBAT_FX
-    {                                      // the picture is finished: the running action
-        fx_schedule(f, vis);               // asks for a focus, then it is dimmed, the focus
-        if (fx_apply(f, vis)) W->left -= FX_DARK_K;   // kept bright and the primitive drawn.
-        if (W->fx_sel) fx_play(f, vis);    // The HUD below is composed after, and stays bright.
+    {                                      // the picture is finished: it is dimmed unless
+        if (fx_apply(f, vis)) W->left -= FX_DARK_K;   // the cut-away made that pointless,
+        if (W->fx_sel) fx_play(f, vis);    // the focus kept bright and the primitive drawn.
     }
 #endif
     ZE(4); ZB(5);

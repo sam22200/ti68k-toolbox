@@ -83,7 +83,18 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 // budget pays 28 of them at about 1,220 cycles a row: H=32 measures 354,778 and H=36
 // measures 359,566, which passes with 434 cycles left -- not a margin, a bet that this
 // scenario reaches the worst frame. 28 keeps the margin the layer had before the asm.
-#define FX_SPIKE_H 24                   // the pillar, by measurement: see the sweep below
+// E173's own height is 136, which is 82 rows at the project's 0.6 sprite scale, and 82
+// is what it now asks for. An effect taller than FX_TALL does not fit the ordinary
+// picture -- about 1,220 cycles a row against a 7,264-cycle margin -- so it earns a
+// cut-away instead: the map becomes a flat field, nothing is dimmed (a uniform field has
+// nothing to dim) and only the two units the action concerns are drawn. Measured, that
+// frees 99,020 cycles, which is what pays for the full height.
+//
+// The criterion is the effect's own height and not the frame budget. W->left was tried
+// and it is NEGATIVE all through this scene, so a budget gate fires always or never; the
+// height is a property of what is about to be drawn and it is honest.
+#define FX_TALL 28                      // above this, the picture gets out of the way
+#define FX_SPIKE_H 82                   // 136 * 0.6: the original's height, at last
 #define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
 // It comes down, holds, and thins away -- the three the original shows, in its own
 // proportions: the wisp reaches the ground about twelve of its frames after it appears,
@@ -364,6 +375,21 @@ static u8 fx_hold_of(u16 a)
 // which is why the effects read as hurried whatever the hold table says. An ability that
 // is not staged keeps exactly the length it always had, and the plain Attack is not
 // staged, so the pacing the rest of the suite checks is untouched.
+// Does the running action want more rows than the ordinary picture can pay for, AND is
+// this one of the frames it actually draws on?
+//
+// Both halves matter. The ability's height alone kept the cut-away up for the whole wash,
+// and since the effect plays 23 ticks of a 55-tick hold that left 25 frames of empty grey
+// field with nothing happening on it. The picture goes away for the effect, not for the
+// ability.
+#define FX_ICE_LEN (FX_ICE_FALL + FX_ICE_RISE + FX_ICE_HOLD + FX_ICE_GONE)
+#define FX_ICE_FROM (ACT_HIT + FX_FLASH)
+static u8 fx_tall(void)
+{
+    return (u8)(st.mode == M_ACT && FX_STAGES(st.abil) && FX_SPIKE_H > FX_TALL
+                && st.act_t >= FX_ICE_FROM && st.act_t < FX_ICE_FROM + FX_ICE_LEN);
+}
+
 static u8 fx_act_end(void)
 {
     u8 e = (u8)(st.gain ? ACT_GAIN_END : ACT_END);
