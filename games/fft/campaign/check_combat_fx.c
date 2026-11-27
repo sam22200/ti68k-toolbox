@@ -30,7 +30,7 @@ int main(void)
 
     for (t = 0; t < ACT_GAIN_END; t++) {
         st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
-        st.effect_kind = AB_HEAL;                    // measured: Potion dims, 1.63 s
+        st.abil = 0x098;                             // Wish: measured, dims 3.03 s
         memcpy(before, st.unit, sizeof before);
         seed = rng32;
         frame();
@@ -50,14 +50,14 @@ int main(void)
         // check_capacity_render.py's battle-fx case.
     }
 
-    // A category the original leaves in full light never takes the focus, whatever
-    // the phase. Heal strips a status like Antidote and is staged the opposite way,
-    // which is why this is a table column and not a rule about outcomes.
+    // An ability the original leaves in full light never takes the focus, whatever
+    // the phase. Dash and Wish carry identical flags and the same outcome category
+    // and are staged oppositely, which is why the table holds the fact per ability.
     for (t = 0; t < ACT_END; t++) {
         st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
-        st.effect_kind = AB_CURE;                    // measured: Heal does not dim
+        st.abil = 0x093;                             // Dash: measured, plays in full light
         frame();
-        check("a category that does not dim never focuses", W->fx_sel == 0);
+        check("an ability that does not stage never focuses", W->fx_sel == 0);
     }
 
     // Leaving the action restores by itself: one frame, no repair pass.
@@ -75,6 +75,17 @@ int main(void)
         memcpy(st.unit, before, sizeof before);
         st.act_t = ACT_END - 1; frame();                 // straight to the end
         check("skipped animation lands on the played state", !memcmp(played, st.unit, sizeof played));
+    }
+
+    // fx_known records which bits were watched on the original. Every bit of
+    // fx_staged has to be one of them: a staged bit it does not cover would be a
+    // guess spending 55 kilocycles a frame, which is exactly what the second map
+    // exists to make impossible to write by accident.
+    {
+        u8 i, all_measured = 1;
+        for (i = 0; i < FX_ABILITIES / 8; i++)
+            if (fx_staged[i] & (u8)~fx_known[i]) all_measured = 0;
+        check("every staged ability is a measured one", all_measured);
     }
 
     printf("combat-fx failures %u checks %u\n", failures, checks);
