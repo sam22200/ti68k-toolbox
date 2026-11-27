@@ -145,3 +145,45 @@ Four separate measurements in this layer have reported a healthy peak for frames
 the feature was not running: a missing `st.abil`, a pair of units `fx_play` rejects as
 invisible, a camera orientation with no occluder, and a spike whose growth the walk never
 reached. Assume a green number is covering nothing until a second reading says otherwise.
+
+## 7. Where the cycles come from when an effect does not fit
+
+Measured on Stasis Sword, peak out of 360,000, each against the same frame:
+
+| lever | peak | won |
+|---|---|---|
+| the dimming loop rewritten in 68000 asm | 340,256 | 9,332 |
+| **not drawing the units the action does not concern, during the pillar only** | 333,076 | **19,660** |
+| **the same, for the whole wash** | 304,128 | **48,608** |
+
+The last two are by far the biggest lever in this layer -- more than the dimming itself
+costs -- and they are also the only ones with a visible price: the other units are dim
+silhouettes during a wash and they simply vanish. On the original they stay. So it is a
+fallback, not a default, and bounding it to the frames where the effect is heaviest keeps
+two thirds of the win while cutting the absence from about 55 frames to 18.
+
+Two that did **not** work, so they are not retried:
+
+- **A composed copy of the dimmed picture**, built once and blitted after. It works -- 2
+  compositions and 48 frames served out of a 55-frame wash, same checksum -- but it needs
+  4,000 bytes and the Titanium has **426 free, 420 contiguous** (measured in TiEmu
+  through `fftmem.py set heap on`). It cannot be taken conditionally either:
+  `FFT_COMBAT_FX` is in neither `module.py` nor the campaign Makefile, so a `Work` member
+  under that flag exists in the core and not in its modules, `MOD_SIG` diverges and the
+  core refuses every image.
+- **Depth-testing the effect.** `cover_bytes` per row is about 270 cycles and the shape
+  is tall: 22,000 against a margin that has never exceeded 20,000.
+
+## 8. Where the information lives
+
+There is **no PS1 Final Fantasy Tactics decompilation**. `Nax/wotl` decompiles the PSP
+*War of the Lions*, which is a different build. What exists for the PS1 is modding work:
+`Glain/FFTPatcher` patches effect files by offset, and FFHacktics documents the directory
+and the graphics.
+
+For an effect's choreography none of that is needed: section 0 of the `.BIN` holds it,
+and `effect_rip.py --frames --all-frames` prints it. FFHacktics describes the format as
+carrying **animation scripts** as well as the frame records, so there is more in the file
+than the 28-byte records -- timing in particular, which is still read off captured video
+here. Decoding that script is the way to stop inferring timing from frames.
+
