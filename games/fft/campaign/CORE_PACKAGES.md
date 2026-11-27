@@ -410,12 +410,27 @@ state (once: `ti-emu restart tools/patches/hw3patch/hw3patch.89z`, `ti-key 'hw3p
 `ti-emu save hw3`):
 
 ```sh
-TI_STATE=hw3 ti-emu restart x/packages/fft-core.89g   # returns once received (~26 s), HOME
+cp x/build-packages/fft-core.89g ../../../tools/tiemu/89t/core.89g   # short path, see below
+TI_STATE=hw3 ti-emu restart tools/tiemu/89t/core.89g  # returns once received, HOME
 ti-emu save fftcore                         # again whenever the core changes
 ti-mem mkvar x/packages/tilog.89y           # optional: the supervisor's event log
 TI_STATE=fftcore ti-emu restart x/packages/chapter-01.89g x/packages/tilog.89y
 ti-key 'fftstory()' ENTER; ti-mem log       # story start/call/back lines with free RAM
 ```
+
+**Two traps, both costing an hour the first time** (2026-11-26, both now in the
+`ti89-emulator` skill):
+
+- **`delvar heaplow` or the battle never initialises.** The shared `hw3` state
+  used to carry that diagnostic program, holding 886 bytes; `fftbat(200)` then
+  stops on "Not enough RAM, need 94 KB, free 93 KB", 456 bytes short. The state
+  was cleaned on 2026-11-26 (`getType(heaplow)` now answers `"NONE"`), so this
+  only matters for an older copy of it.
+- **A lone group deep in the tree aborts TiEmu.** One file goes to `-send=` by
+  its full path and the emulator dies with a host buffer overflow before mapping
+  its window; the script only reports `no window after N s`. Copy it beside the
+  profile first, as the command above does. Two or more files are merged by
+  `ti-group` into a short path and are unaffected.
 
 `ti-mem heap` lists the AMS heap blocks (executable copies, battle buffers) when an
 allocation fails. Measured on Titanium AMS 3.10 with the 1 KB log: 187,152 bytes free at
