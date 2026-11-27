@@ -706,3 +706,45 @@ What remains is not a C change:
    PC build checks, and the unfocused units would be baked, so it is a redesign of the
    frame composition rather than a tweak.
 
+### The composed copy: built, proved to work, and refused by the per-frame budget
+
+The second route was tried in full. During a wash with a still camera the dimmed
+scenery and the unfocused units are identical frame to frame, so the picture was
+composed once into `W->bg` -- the screen copy the engine already blits back every frame
+-- and the frames after it skipped both the unit pass and the dimming.
+
+It works. Instrumented over one Night Sword action: **2 compositions, 53 frames served
+from the copy** out of a 55-frame wash, and the PC/68000 checksum is **identical to the
+version without it** (`D976`), which is the point: the redesign has to be invisible.
+
+Three things it needed, all of them real findings:
+
+- The focused unit must **not** be baked in. It animates, and a new pose drawn over a
+  baked old one leaves the old one showing round the edges.
+- The PC invariant check in `screen_scene()` calls `copy_view()` over the planes to
+  compare and **never puts back what it drew**. That was harmless only while the copy
+  and the view were always equal; with a composed copy the PC ended the frame holding
+  the plain scene and the 68000 the dimmed one. A non-destructive check is the fix, and
+  it is a latent bug for any future divergence of copy and view.
+- The save is free if it rides inside the dimming pass, which already reads and writes
+  every one of those words. A separate pass afterwards cost 43,000 cycles.
+
+**It is refused on one number.** The composing frame pays the dimming *and* the save at
+once: **397,286 against the 360,000 limit.** The frames after it pay nothing, but the
+budget is per frame, not per action.
+
+Spreading the save over four frames, the way the engine spreads its own, does not work:
+`W->bg` is the live source `screen_scene()` blits from, so a half-composed copy is
+blitted, and the frames that then dim normally double-dim the rows already saved.
+Keeping the copy out of use while it is built means `copy_view()` at about 105,000 a
+frame, which is worse than what is being saved.
+
+**What would make it fit is a second screen buffer** -- compose there, blit from there
+-- at 4,000 bytes, where 436 are free at 13 actors. That is the decision this is
+waiting on, not more tuning.
+
+**A note on the instrument.** The first run of the counter reported "0 frames served",
+and the branch that serves them simply had no counter: a replacement had dropped it.
+The conclusion "the cache never engages" was one print away from being written down as
+a fact about the design. It is the fifth miscount in this file.
+
