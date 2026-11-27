@@ -440,3 +440,65 @@ could be written without anything noticing. 257 checks.
 
 The other half of `fx_table`, which primitive plays at which phase, is **not**
 measured: those were chosen. Only the staging comes from the original.
+
+## One wash, and the duration per ability (2026-11-27)
+
+**The grey does not vary per family, and the measurement is why.** The original
+stages with a colour wash -- blood red for Night Sword, night blue for Agrias --
+and four greys carry no hue. The one axis the LCD does carry is luminance, and
+`tools/effect_stage.py` fires on `lum < bright * 0.70`: a **darkening** of at
+least 30 %. All eight measured abilities, the five items included, were measured
+moving the same way. Giving items a pale wash would have been a pleasing art
+rationale contradicting the data it claimed to rest on.
+
+The five candidate maps were rendered on the same Gariland frame and compared
+side by side (`ti-view --decision`, 2026-11-27):
+
+| map | verdict |
+|---|---|
+| **DARK1** `d'=d\|l, l'=d\|~l` | **kept, for every family** |
+| LIGHT1 `d'=d&l, l'=d&~l` | contradicts the measurement; the focused unit also loses its white outline against a pale scene |
+| DARK2 | already rejected on the picture: the relief stops reading |
+| BLEACH | fails symmetrically on the light side |
+| INVERT | the unit does not detach; reads as a flash, not a focus |
+
+**What the measurements do separate per ability is the hold.** It is carried over
+as a proportion, not as the second itself:
+
+> this engine's action is `[ACT_WIND, ACT_END)` = 39 ticks = 1.30 s at 30 fps,
+> and the longest measured wash is Wish at 3.03 s = 91 ticks.
+
+Six of the eight last longer than the whole action, so literal seconds saturate
+and stop telling the abilities apart -- the one thing the duration is for. Each
+hold is `round(39 * seconds / 3.03)`:
+
+| ability | measured | ticks |
+|---|---|---|
+| Night Sword `0x0a5` | 1.07 s | 14 |
+| Stasis Sword `0x09b` | 1.10 s | 14 |
+| Echo Grass `0x178` | 1.40 s | 18 |
+| Phoenix Down `0x17d` | 1.47 s | 19 |
+| Potion `0x170`, Antidote `0x176` | 1.63 s | 21 |
+| Eye Drop `0x177` | 1.97 s | 25 |
+| Wish `0x098` | 3.03 s | 39 |
+
+A hold ending before `ACT_END` is not a cut: the kept screen copy is undimmed, so
+the next frame simply stops dimming. A sword art's wash now clears just after the
+impact and the settle plays in full light.
+
+24 bytes of `const`, no RAM: `Work` is full and growing it changes `MOD_SIG`.
+The eight-entry scan runs per staged frame and measured **6 cycles** on the peak.
+
+**A gap this closed.** The `battle-fx` cycle scenario set no `st.abil`, so once
+the key moved to the ability it stopped dimming altogether and the PC/TI
+cross-check no longer covered the feature at all -- its 271,042-cycle peak was a
+frame with no wash. Driving it with Night Sword puts the dimming back under the
+check: **peak 324,462 / 360,000**, the 53,420-cycle difference being `FX_DARK_K`.
+
+`check_combat_fx.c`: 302 checks, including a staged ability whose hold ends
+before the action, and an assertion that every staged ability carries one.
+
+**Limits.** The abilities classed "full light" mean "no 30 % dip", not "no wash":
+a brightening effect would have been invisible to the detector. And Night Sword's
+1.07..5.47 s spread is wide enough to deserve a second pass before it is trusted.
+

@@ -3137,3 +3137,24 @@ Five earlier mistakes in this file were measurements of the wrong subject. This
 one is worse in kind: a plausible cause preferred to re-reading six lines of
 code. What caught it was testing the instrument on cases with known answers
 before trusting it, which is the habit all six would have prevented.
+
+### The detector only ever measured one direction (2026-11-27)
+
+- OBSERVED: `tools/effect_stage.py` enters an effect on `lum < bright * 0.70` and
+  leaves it on `lum > bright * 0.88`. Both thresholds are below the baseline, so
+  the instrument fires on a **darkening of at least 30 % and on nothing else**.
+- OBSERVED: all eight staged abilities -- Night Sword, Stasis Sword, Wish and the
+  five items -- were measured moving that one way.
+- LIMIT: "plays in full light" therefore means **"no 30 % dip"**, not "no wash".
+  An effect that brightens the screen would have been invisible to this run, and
+  Dash, Throw Stone, Heal and the plain Attack are classed on that weaker claim.
+- INTERPRETATION: on four greys the only axis available is luminance, and it is
+  the axis on which every measured family agrees. There is no second grey to give
+  a family: the original separates them by hue, which the LCD cannot carry. The
+  staging was about to be given a pale wash for items on the strength of an art
+  rationale -- "a potion is a soft glow" -- that the measurement contradicts.
+- TARGET: one wash for every family, and the per-ability character carried by the
+  hold instead, which the same measurements do separate (1.07 s to 3.03 s).
+- LIMIT: Night Sword's 1.07..5.47 s spread is wide enough to deserve a second
+  pass before the 14-tick hold derived from its short end is trusted.
+
