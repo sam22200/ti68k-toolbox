@@ -232,7 +232,7 @@ static const u8 fx_known[FX_ABILITIES / 8] = {
 // A hold ending before ACT_END is not a cut: the kept screen copy is undimmed, so the
 // picture simply stops being dimmed on the next frame (fx_focus.inc). The shorter holds
 // also pay less -- 14 dimmed frames instead of 39 is 25 frames not charged FX_DARK_K.
-#define FX_HOLD_FULL (ACT_END - ACT_WIND)       // the whole window: 39 ticks
+#define FX_HOLD_FULL (ACT_END - ACT_BLOW)       // the whole window: 31 ticks
 #define FX_HOLDS 8
 static const u16 fx_hold_abil[FX_HOLDS] = { 0x0a5, 0x09b, 0x178, 0x17d, 0x170, 0x176, 0x177, 0x098 };
 static const u8  fx_hold_tick[FX_HOLDS] = {    14,    14,    18,    19,    21,    21,    25,    39 };
@@ -255,7 +255,14 @@ static u8 fx_hold_of(u16 a)
 enum { FXP_NONE, FXP_RING, FXP_SLASH, FXP_BURST, FXP_BEAM, FXP_COLUMN, FXP_MOTES, FXP_SPIKE };
 #define FX_KINDS 32                     // EFFECT_KIND_MASK + 1
 static const u8 fx_table[FX_KINDS][4] = {   // gather, travel, impact, settle
-    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_SPIKE,  FXP_SPIKE },   // the sword arts: E173's spike
+    // The spike does NOT play at the impact: on the original the picture darkens with the
+    // blow and the effect erupts about 0.6 s later (tools/effect_capture.py). Phase 2 is
+    // the four flash frames, so the spike belongs to phase 3, which starts at ACT_HIT+4.
+    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_NONE,   FXP_SPIKE },   // the sword arts: E173's spike
+    // AB_CURE is the STATUS cure, not a heal: Heal (0x095) and Antidote (0x176) both
+    // resolve to it with amount 0 -- the Squire's Heal restores no HP at all, it lifts
+    // Poison, Darkness and Silence. HP restoration is AB_HEAL (Potion, amount 30). The
+    // sparkle is right for it and a solid shape would not be: a cure is not a blow.
     [AB_CURE]            = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING  },
     [AB_HEAL]            = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_RING  },
     [AB_CLEANSE]         = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING  },
@@ -292,14 +299,23 @@ static void fx_schedule(const Feet *f, const u8 *vis)
     (void)f; (void)vis;
     if (st.mode != M_ACT) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
     t = st.act_t;
-    if (t < ACT_WIND || t >= ACT_END) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
+    // The wash starts with the BLOW, not with the wind-up. Captured on the original
+    // (tools/effect_capture.py, Stasis Sword): the caster draws and raises the blade over
+    // some twenty frames in full light, the picture darkens on the frame the swing goes
+    // out, and the effect itself erupts about 0.6 s after that. Starting at ACT_WIND dimmed
+    // the whole preparation, which the original shows lit -- and it charged FX_DARK_K for
+    // eight frames that should not have been paying it.
+    if (t < ACT_BLOW || t >= ACT_END) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
     // The ability decides, not its outcome: the original's staging is a fact per
     // ability and the table above holds it, measured where it is known.
     if (!FX_STAGES(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
     // ...and it decides for how long, too: the wash ends when the ability's measured
     // hold runs out, which for most of them is before the action does.
-    if ((u8)(t - ACT_WIND) >= fx_hold_of(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
-    fx_focus(t < ACT_BLOW ? st.atk : st.tgt, 1);
+    if ((u8)(t - ACT_BLOW) >= fx_hold_of(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
+    // The caster stays lit through the swing and the target takes over at the impact:
+    // on the original the lit figure is Agrias while the blade travels, and the effect
+    // only erupts on the target afterwards.
+    fx_focus(t < ACT_HIT ? st.atk : st.tgt, 1);
 }
 
 // One primitive, placed for this phase. Separated from the schedule so the table says

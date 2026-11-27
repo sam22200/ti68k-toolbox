@@ -40,8 +40,10 @@ int main(void)
         // The schedule, read back from the one byte that holds it. The focus only
         // engages for a category the original stages: measured with
         // tools/effect_watch.py, Heal plays in full light and Potion does not.
-        if (t < ACT_WIND || t >= ACT_END) check("no focus outside the action", W->fx_sel == 0);
-        else if (t < ACT_BLOW)            check("caster in focus", W->fx_sel == (u8)(atk + 1));
+        // The wash starts at the BLOW, not the wind-up: measured on the original, the
+        // preparation plays in full light (campaign/COMBAT_FX.md).
+        if (t < ACT_BLOW || t >= ACT_END) check("no focus before the blow", W->fx_sel == 0);
+        else if (t < ACT_HIT)             check("caster in focus", W->fx_sel == (u8)(atk + 1));
         else                              check("target in focus", W->fx_sel == (u8)(tgt + 1));
         // Pixel stability across frames is deliberately NOT asserted here. The engine
         // spreads its HUD and screen copy over several frames and keeps animating the
@@ -84,7 +86,7 @@ int main(void)
         st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
         st.abil = 0x0a5;                             // Night Sword: measured, holds 1.07 s
         frame();
-        if (t < ACT_WIND || t >= ACT_WIND + 14) check("short hold released", W->fx_sel == 0);
+        if (t < ACT_BLOW || t >= ACT_BLOW + 14) check("short hold released", W->fx_sel == 0);
         else                                   check("short hold engaged", W->fx_sel != 0);
     }
 
