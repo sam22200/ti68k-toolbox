@@ -3083,3 +3083,57 @@ The fix was not a better sequence. It was to stop guessing when to stop.
 And the AI hand-off was in `oracle.py`'s own header all along: "the player's
 units lose their player-controlled flag ... so the AI plays the whole battle".
 Its tools were borrowed six times without reading its method.
+
+## Which ability dims, named (2026-11-27)
+
+`tools/effect_stage.py` reads the acting unit's **last ability** (`+0x170` of its
+record, what oracle.py's AI trace already reports) at the frame the picture
+changes, so an effect is named rather than merely noticed.
+
+| Ability | id | Unit | Dimmed |
+|---|---|---|---|
+| **Stasis Sword** | 0x09b | 1, Agrias (Holy Knight) | **1.10 s, 1.17 s** |
+| **Night Sword** | 0x0a5 | 2, Gafgarion (Dark Knight) | 5.47 s, 1.80 s, 1.07 s |
+
+### The staging is a colour wash, not a dim
+
+Night Sword turns the whole scene **blood red** while a column of flame rises
+from the target; Agrias's Holy Sword washes it **night blue**. The original is
+not lowering brightness, it is recolouring. `games/fft/fx_focus.inc` only darkens
+by one level, so it reproduces the effect's *reading* and not its look. On four
+greys a tint is impossible, which turns the question into "which grey for which
+family of effect" -- a decision to take, not a measurement to make.
+
+### There is no key to derive
+
+Everything measured, with the ability's own flags:
+
+| full light | flags | dims | flags |
+|---|---|---|---|
+| Dash | 0x00 | **Wish** | **0x00** |
+| Throw Stone | 0x02 | Stasis Sword | 0xa9 |
+| Heal | 0x01 | Night Sword | 0x18 |
+| Attack | -- | Potion, Antidote, Eye Drop, Echo Grass, Phoenix | -- |
+
+**Dash and Wish carry identical flags, 0x00, and are staged oppositely.** Night
+Sword dims without `AF_CAST`; no ability observed carries `AF_CHARGE` at all. So
+neither `st.effect_kind` nor `abilities[].flags` can key the column -- the two
+candidates tried, both disproved by a counter-example from the measurements.
+
+The likeliest reading is that there is nothing to derive: an ability points at an
+effect file and **the file carries its own staging**. Our table should hold the
+fact per ability, as the original does, rather than compute it.
+
+### A cause invented instead of a bug found
+
+The first version of this measured the same Night Sword at 0.03 s, 98 s and
+0.03 s. The explanation offered was that a red wash raises luminance so the
+metric fails on it. **That was invented.** Tested on six frames whose answer was
+known -- two normal, four staged -- luminance separates cleanly: 55..60 against
+25..34, red wash included. The bug was `bright = max(bright, lum)`, a baseline
+that climbed during the effect and made the exit condition incoherent.
+
+Five earlier mistakes in this file were measurements of the wrong subject. This
+one is worse in kind: a plausible cause preferred to re-reading six lines of
+code. What caught it was testing the instrument on cases with known answers
+before trusting it, which is the habit all six would have prevented.

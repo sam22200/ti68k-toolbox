@@ -378,3 +378,27 @@ The candidate key is the ability's own flags -- `abilities[a].flags` with
 `AF_CAST` and `AF_CHARGE` -- which the renderer can already read through
 `st.abil`. Re-keying is **not done**, and the column should not be trusted for a
 cast ability until it is. `games/fft/RE_NOTES.md` has the measurements.
+
+## The DIM column cannot be derived (2026-11-27)
+
+Both candidate keys are disproved by measurement, each by a counter-example:
+
+- **`st.effect_kind`**: a Holy Sword deals damage exactly as a plain Attack does,
+  and the original dims one and not the other.
+- **`abilities[].flags`, `AF_CAST`/`AF_CHARGE`**: Dash and Wish both carry
+  `0x00`, and Wish dims for 3.03 s while Dash plays in full light. Night Sword
+  dims without `AF_CAST`; nothing observed carries `AF_CHARGE`.
+
+So the column should hold the fact **per ability**, as the original does -- an
+ability points at an effect file and the file carries its own staging -- instead
+of computing it from a property of the ability. `fx_table`'s `D_GUESS` rows
+remain guesses and the measured ones remain right only for what was watched.
+
+Measured so far: Stasis Sword 1.10 s, Night Sword 1.07..5.47 s, Wish 3.03 s,
+Potion 1.63 s, Antidote 1.63 s, Eye Drop 1.97 s, Echo Grass 1.40 s, Phoenix Down
+1.47 s; Dash, Throw Stone, Heal and Attack in full light.
+
+And the staging is a **colour wash**, not a dim: blood red for Night Sword, night
+blue for Agrias. Four greys cannot tint, so which grey each family takes is a
+decision for the art, not a measurement. `fx_focus.inc` currently darkens by one
+level for everything.
