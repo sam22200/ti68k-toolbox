@@ -27,17 +27,24 @@ import core_audit  # noqa: E402
 import oracle  # noqa: E402
 from psxrun import PSX  # noqa: E402
 
-# name, oracle menu prefix, entries down. Gariland's own abilities all go through
-# the effect system, which is enough to time one: no later save is needed.
-CASES = {'wish': (oracle.GUTS, 5), 'heal': (oracle.GUTS, 3), 'stone': (oracle.GUTS, 2),
-         'potion': (oracle.ITEM, 0), 'phoenix': (oracle.ITEM, 13)}
+# Gariland's own abilities all go through the effect system, which is enough to see
+# the staging: no later save is needed. The cases come straight from oracle.SKILLS,
+# pokes included, so a case is set up exactly as the oracle sets it up -- Phoenix
+# Down needs its target dead, Antidote needs it poisoned, and so on.
+CASES = {name: (menu, k, hp, sts) for name, menu, k, hp, sts in oracle.SKILLS}
 
 
 def watch(psx, state, name, out, frames=400):
     from PIL import Image
-    menu, k = CASES[name]
+    menu, k, hp, sts = CASES[name]
     psx.load(state)
     oracle.skill_setup(psx)
+    t = oracle.UNITS + oracle.UNIT_SIZE * oracle.TARGET
+    if hp is not None:
+        psx.write(t + 0x28, hp, 2)
+    for b, bit in sts:                       # as oracle.skills() does: current and inflicted
+        for o in (0x58, 0x1bb):
+            psx.write(t + o + b, psx.read(t + o + b) | bit)
     s = oracle.taps(menu + 'DOWN:20 ' * k + 'CIRCLE:60 CIRCLE:60 LEFT:40 CIRCLE:60')
     oracle.run(psx, len(s) + 1, s)
     s = oracle.taps('CIRCLE:60 CIRCLE:60')        # the OK? prompt, then execute
@@ -70,7 +77,7 @@ def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
     state, out = sys.argv[1], sys.argv[2]
-    names = sys.argv[3:] or ['wish', 'heal', 'potion']
+    names = sys.argv[3:] or list(CASES)
     psx = PSX(str(core_audit.DEFAULT_DISC))
     for name in names:
         holds, dark = watch(psx, state, name, out)
