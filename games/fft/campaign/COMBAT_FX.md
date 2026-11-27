@@ -664,3 +664,45 @@ overlap is covered. **That is the fourth measurement in this file that reported 
 for frames where the feature was not running**, after the missing `st.abil`, the
 invisible unit pair and the rotation with no occluder.
 
+## The dimming is at its floor in C (2026-11-27)
+
+It costs 46,638 cycles a frame and gates everything else: the spike is capped at 20
+rows of E173's 82 because of it, and the depth test was refused for the same reason.
+So it was attacked. `experiments/gray/darken.c` under `ti-cycles`, fresh:
+
+| variant | cycles |
+|---|---|
+| dark1 visible 160x100 | 49,212 |
+| dark1 flat, 3000-byte plane | 70,534 |
+| dark1 visible, pointers | 51,812 |
+| **dark1 visible, unrolled (what ships)** | **46,638** |
+| dark2 visible, unrolled | 25,234 |
+
+Four things were tried and none of them works:
+
+- **Dimming less area.** Measured on a real battle frame: **no row is entirely black
+  and only 6 % of words are ones Dark1 leaves alone**. There is no wasted region to
+  skip; the loop does useful work on 94 % of the screen.
+- **A cheaper map.** Dark2 is 21,404 cycles cheaper but was rejected on the picture
+  long ago -- it leaves dark grey and black alone and the relief stops reading. Every
+  cheaper map collapses the four levels to two.
+- **Dimming one row in two.** It halves the cost exactly, and at 160x100 it reads as
+  **stripes**, not as a half-strength veil: the eye does not blend rows at this scale
+  and the focused unit is lost in the banding.
+- **A checkerboard** like the spike's. It changes which pixels are written but still
+  reads and writes every word, so it saves nothing. Dismissed on the cost, not tried.
+
+What remains is not a C change:
+
+1. **68000 asm.** `movem.l` moves five longs in one instruction where the C loop issues
+   five moves. Estimated around 30 %, so roughly 46,638 -> 33,000, which would take the
+   spike from 20 rows to about 31. An improvement, not a transformation, and the
+   project asks before any asm is written.
+2. **Not dimming every frame.** During a wash with a still camera the dimmed scenery
+   and the unfocused units are **identical frame to frame**; only the focused unit, the
+   effect and the damage number change. Composing that once into `W->bg` (which exists
+   and costs no new RAM) and copying it per frame would remove the per-frame dimming
+   entirely. It means the kept copy no longer equals the view, which is an invariant the
+   PC build checks, and the unfocused units would be baked, so it is a redesign of the
+   frame composition rather than a tweak.
+
