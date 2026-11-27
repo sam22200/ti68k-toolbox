@@ -824,3 +824,42 @@ effect, not into the risk.
 E173 asks for 82 rows. The spike is now a third of the original's height instead of a
 quarter, and the comment that called 28 "136 * 0.6" has been corrected -- that is 82.
 
+### It falls, and it thins away (2026-11-27)
+
+Two faults of movement, both found by looking at the captured original rather than at
+our own picture.
+
+**The direction was inverted.** The spike grew upward out of the target's feet; the
+original's column comes down out of the sky. `E173`'s frame 0 had said so all along --
+its quad spans y -26..110 about its anchor, almost entirely **below** it, so the anchor
+is up in the air and the effect hangs from it. What was read instead was the atlas
+picture, a cone with its point up, and that was taken for the direction of travel. A
+sprite's shape never tells you which way it moves.
+
+**It never ended.** `grow` saturated at `FX_SPIKE_H` and the column then held, unchanged,
+for some forty frames. The original is gone by wash+54 while the wash itself runs to +66.
+At the old 39-tick action this lasted a few frames; making the duration faithful made the
+frozen animation the most visible fault of the sequence.
+
+So the effect now has the original's three phases, in its proportions -- twelve of its
+frames is eight of our ticks:
+
+| phase | ticks | |
+|---|---|---|
+| fall | 8 | the foot descends from a fixed top to the target |
+| hold | 8 | full width |
+| thin | 8 | the width decays to nothing |
+
+The thinning is in **width**, not height: at wash+54 the original still has a tall
+column, only a narrower one. It does not retract towards the sky.
+
+Eight each, so all three are shifts: this runs on every frame of a wash and a 32-bit
+divide would cost about 900 cycles against the 1,220 a row already costs. Past the third
+phase it returns at once, so the tail of a long hold draws nothing where it used to pay
+28 rows a frame for a frozen picture.
+
+Verified on the PC render rather than assumed, pixels changed against the version before:
+t=30 and t=36 identical (the hold), t=42 936 pixels (thinning), t=46 onwards 1,728 (gone).
+The cycle scenario's own checksum does not move because the frame it checks falls inside
+the hold -- which is why the picture was compared frame by frame instead.
+
