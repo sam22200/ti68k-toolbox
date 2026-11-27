@@ -1590,3 +1590,37 @@ input limit: the next step merges the chapters into one shared battle engine and
 with chapter data files.
 
 Shared command-window presentation and deployment confirmation: [CHOICE_MENU.md](CHOICE_MENU.md).
+
+## Showing the game: every screen without playing to it
+
+Each screen has its own entry point, so a demo capture does not have to play the
+campaign through. From a state carrying the core and the chapter
+(`TI_STATE=fftcore`, `CORE_PACKAGES.md` § Native test loop):
+
+| run | screen |
+|---|---|
+| `ffttitle()` | the title, FINAL FANTASY TACTICS / - 68k - / New Game / Continue |
+| `fftscn()` | the opening: "Orbonne Monastery" lettering, then Ovelia in the chapel |
+| `fftbat(100)` / `fftbat(200)` | the Orbonne gate / the Gariland battle |
+| `fftmap()` | the world map, its date, War Funds and travelling hand |
+| `fftdep()` | deployment on the next battle's grid |
+| `fftmng()` | Formation, the roster and the unit sheet |
+| the map's town ENTER | Shop / Soldier Office / Bar |
+
+**Three of them need a campaign save.** `fftmap`, `fftmng` and therefore the shop
+answer "No campaign save: win the battle at Gariland" without `ffsave`. Rather
+than win it, send a test save -- `x/chains/save-between-wins-slot.sav` is
+post-Gariland with Ramza at level 16, equipped, 4,500 gil:
+
+```sh
+cp x/chains/save-between-wins-slot.sav /tmp/ffsave.bin   # a SHORT path, see the skill
+cd /tmp && ttbin2oth -89 dat ffsave.bin ffsave
+python3 -c "from pathlib import Path; p=Path('ffsave.89y'); b=bytearray(p.read_bytes()); b[0x49]=3; p.write_bytes(b)"
+TI_STATE=fftcore ti-emu restart <short path>/ffsave.89y   # 0.0 s, it is 3,300 bytes
+```
+
+`fftmap()` reports "Missing ffwm / ffmg" when it cannot reach its banks, which is
+NOT the same failure: both answer `"OTH"` to `getType` when they are installed.
+Read that message as "no save" only after checking the banks are there.
+
+Cutting the takes together: `ti89-emulator` § Cutting several captures into one reel.
