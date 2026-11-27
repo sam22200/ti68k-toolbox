@@ -1276,3 +1276,46 @@ drop a map that needs the path.
 
 Static reference evidence is not a played proof, and the document says so.
 `games/fft/campaign/CORE_MAP_PROFILE.md`.
+
+### Darkening a four-grey scene, and two rules about short loops (ti-cycles, 2026-11-27)
+
+Dimming the whole picture so one thing stands out is a focus effect, and on two
+bitplanes it is pure bitwise work. With `grey = light + 2 * dark` (`rt.h`), one
+level down (`v -> min(v+1,3)`) is `d' = d | l` and `l' = d | ~l`; two levels
+(0,1 -> 2 and 2,3 -> 3) is `d' = ~0` and `l' = d`. Both were checked over all
+four levels. No LUT, no per-pixel branch.
+
+Over the whole 160x100 picture, both planes, `experiments/gray/darken.c`:
+
+| | cycles |
+|---|---:|
+| one level, indexed inner loop | 49212 |
+| one level, post-increment pointers | **51812** |
+| one level, row unrolled | 46638 |
+| two levels, indexed inner loop | 40412 |
+| two levels, row unrolled | **25234** |
+| one level, flat over the 3000-byte plane | 70534 |
+| two levels, flat over the 3000-byte plane | 45034 |
+
+Three findings, and two of them contradict rules elsewhere in this file.
+
+**Pointers lose to indexing on a short inner loop.** A 160-pixel row is five
+longs, and walking it with post-increment pointers is *slower* than `l[i]`
+(51812 against 49212). Pointer walking has to amortise its setup, and five
+iterations is not enough. "Pointers instead of indexing" is a default for long
+loops, not a law.
+
+**Unroll the row instead.** 5% for one level, **38%** for two, where the body is
+five loads, five stores and a constant the compiler can hold in a register.
+
+**Do not widen the work to simplify the loop.** Darkening the full 30-byte
+stride removes all row arithmetic and costs 70534 against 46638: 50% more data
+beats the simpler loop comfortably. Clip to the visible 20 bytes a row.
+
+A quarter of the rows costs 11660 cycles, close to what FFT already pays to keep
+a quarter of its screen copy (`SAVE_K`, 13 kilocycles), so the dimming rides
+along with that existing quartered pass instead of being its own frame.
+A measured action frame peaks at 263424 of 360000, leaving about 85000 cycles
+for the effect itself. `games/fft/campaign/COMBAT_FX.md`.
+
+Datasheet cycles under `ti-cycles`, no emulator or calculator run.
