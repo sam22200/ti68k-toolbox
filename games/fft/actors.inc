@@ -53,6 +53,10 @@ static const u8 *actor_frame(u16 logical, u8 slot)
 #endif
         ac_key[e] = frame_key;
         W->actor_misses++;
+        // Counted apart because it costs more than twice as much: the flip below is
+        // 22,944 cycles against the 17,690 of the decode itself (ti68k-performance.md).
+        // Counted on both CPUs, so the frame budget stays identical PC/TI.
+        if (frame_key & 0x8000) W->actor_mirror++;
         ZE(20);
     }
 found:
@@ -66,5 +70,5 @@ static void actor_reset(void)
 {
     memset(W->actor_key, 255, sizeof W->actor_key);
     memset(ac_key, 255, AC_N * 2);
-    W->actor_budget = 255; W->actor_misses = W->actor_next = 0;
+    W->actor_budget = 255; W->actor_misses = W->actor_next = W->actor_mirror = 0;
 }

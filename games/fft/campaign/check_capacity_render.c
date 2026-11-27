@@ -26,12 +26,12 @@ static u8 ko_original_job;
 u8 game_update(void){
 #ifdef CAP_MENU
     // Static13-actor UI frame: actual renderer/cache budget, no AI/turn work.
-    FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=0;W->ac_now++;
+    FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=W->actor_mirror=0;W->ac_now++;
     return 1;
 #else
 #ifdef CAP_KO
     if(ko_board){
-    FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=0;W->ac_now++;
+    FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=W->actor_mirror=0;W->ac_now++;
     if(ko_board==2)st.morph_t=(u8)((rt_frame%5)*8);
     if(ko_board==3&&rt_frame==15){st.unit[0].job=133;st.unit[0].hp=0;st.unit[0].dc=3;}
     if(ko_board==3&&rt_frame==35){st.unit[0].job=ko_original_job;st.unit[0].hp=st.unit[0].max_hp;}

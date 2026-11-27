@@ -144,7 +144,8 @@ another: the mapping entry carries bit 15 and `actors.inc` flips the frame after
 decoding it. Zone profiling priced that flip at **22944 cycles**, on top of the
 **17690** the ZX0 decode itself costs, so a mirrored cache miss reaches **45016** --
 an eighth of an ordinary frame, against 19083 for an unmirrored one. The budget
-model charges a flat 32 kilocycles per miss (`fft.c:7750`), which straddles both.
+model charged a flat 32 kilocycles per miss, which straddles both; it now prices
+them apart (section below).
 
 Gariland mirrors only **16 of its 371 logical frames** (4.3%; the rotation replay
 independently shows 4 mirrored decodes of 82, 4.9%). Orbonne mirrors 335 of 723.
@@ -183,3 +184,42 @@ miss costs -- is in `.claude/skills/ti89-c-dev/reference/ti68k-performance.md`.
 Reproduce with `check_capacity_render.py --case board --case rotations --actors
 12|13`, and add `--profile-zones` for the per-component numbers (zone 20 is the
 whole miss; 30, 31 and 14 were temporary sub-zones, not retained).
+
+## Pricing a decoded pose apart from a flipped one (2026-11-26)
+
+The same measurement that rejected pre-flipped frames fixes the budget model.
+`W->left` charged `actor_misses * 32` kilocycles, one rate for work measured at
+**19,083** cycles plain and **45,016** flipped. In the battle 95.7% of decodes are
+plain, so the frame scheduler was holding back about 13 kilocycles of optional
+HUD work almost every time it decoded, and under-reserving by 13 on the rest.
+
+`actors.inc` now counts the flipped decodes apart, in `W->actor_mirror`, and
+`fft.c` charges `actor_misses * ACTOR_MISS_K + actor_mirror * ACTOR_FLIP_K`
+(19 and 26, so 19 plain and 45 flipped). The counter is a fourth `u8` in
+`ACTOR_FIELDS`, which lands in the padding byte before `actor_key`:
+**`sizeof(Work)` is unchanged**, verified by compiling both ways. It is
+incremented on both CPUs, not under `#ifdef __m68k__`, so the PC and the 68000
+keep computing the same budget and the same pixels.
+
+| Case | Mean before / after | Ordinary peak before / after | Checksum |
+|---|---|---|---|
+| 12 actors, board |223461 /224014|286130 /**282124**| B2B4 = B2B4 |
+| 12 actors, rotations |250807 /251411|336436 /336534| 57DE = 57DE |
+| 13 actors, board |227656 /228209|290368 /**286044**| B2B4 = B2B4 |
+| 13 actors, rotations |254206 /254811|338234 /338332| 57DE = 57DE |
+
+The mean rises about 550 cycles, which is the point: the withheld budget is now
+spent on optional work. The board's **peak falls 4006/4324**, which was not
+expected. `hud_wait > WAIT_MAX` (`fft.c`) forces a HUD part regardless of the
+remaining budget once the scheduler has deferred it too long, and that forced
+catch-up frame was holding the peak. Charging accurately keeps the HUD moving,
+so the catch-up stops happening: **an over-cautious cost model cost more than an
+absent one**. Pictures are identical throughout.
+
+`monster_ko.inc` also increments `actor_misses` to claim a cache entry, so it
+goes from 32 to 19. That path is not separately measured; its own work is the
+LRU scan, 1256 to 2978 cycles, so 19 still over-reserves it roughly sixfold.
+
+Verified with `make -C games/fft/campaign test` (exit 0; actor cache 57 checks,
+unit-blit 1362, scene player, deployment and title suites) and `make -C
+games/fft/campaign packages` (exit 0, no resident overrun). No emulator run.

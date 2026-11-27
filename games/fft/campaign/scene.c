@@ -328,7 +328,7 @@ void game_scenario(u16 n)
 static u8 scene_choice_update(void)
 {
     const u8 *p=choice_record();u8 result;u32 pressed=rt_keys&~rt_prev;
-    W->actor_budget=1;W->actor_misses=0;W->ac_now++;
+    W->actor_budget=1;W->actor_misses=W->actor_mirror=0;W->ac_now++;
     st.tick++;
     if(!(rt_keys&(K_A|K_ENTER)))st.choice_armed=1;
     if(pressed&(K_ESC|K_B)){st.choice_row=st.choice_error=0;return 1;}
@@ -367,7 +367,7 @@ u8 game_update(void)
         if(skip==2){tilog("scene skipped at step %u",st.step);return scene_skip_remaining();}
         return 1;
     }}
-    W->actor_budget = 1; W->actor_misses = 0; W->ac_now++;
+    W->actor_budget = 1; W->actor_misses = W->actor_mirror = 0; W->ac_now++;
     st.tick++; if (st.open_clock < 250) st.open_clock++;
     if (st.open_fade) {                 // out over 8 frames, the next step in over 8 more
         if (++st.open_fade == 9) { next_step(); if (st.done) return 0; st.open_fade = 9; }
