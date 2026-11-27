@@ -363,3 +363,18 @@ and that is finally a reason to go there.
 Timing is still not resolved. The total is now observed -- about 3 s for Wish --
 but relating that to an effect file's record count needs the effect number for
 each ability, which is the file's name on the FFHacktics list.
+
+## The DIM column is keyed on the wrong thing (2026-11-27)
+
+Agrias's Holy Sword, watched in the prologue through `oracle.py --prologue`,
+**dims the scene for 1.00 s**. It deals damage, exactly as a plain Attack does,
+and the original stages them oppositely.
+
+So the column cannot be a function of `st.effect_kind`. Its six measured rows
+are right only because of which abilities happened to be watched; `AB_DAMAGE`
+carries `D_NO` from Dash, Stone and Attack and is wrong for a Holy Sword.
+
+The candidate key is the ability's own flags -- `abilities[a].flags` with
+`AF_CAST` and `AF_CHARGE` -- which the renderer can already read through
+`st.abil`. Re-keying is **not done**, and the column should not be trusted for a
+cast ability until it is. `games/fft/RE_NOTES.md` has the measurements.

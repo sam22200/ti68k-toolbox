@@ -3,6 +3,7 @@
 turn at Gariland, saved as a core state (never committed). RE_NOTES.md § Battle oracle.
 
 usage: oracle.py DISC.cue OUT.state [trace.txt]
+       oracle.py --prologue DISC.cue OUT.state
        oracle.py --turns DISC.cue STATE N turns.txt
        oracle.py --attack DISC.cue STATE N M attacks.txt
        oracle.py --skills DISC.cue STATE M skills.txt
@@ -446,7 +447,71 @@ def ai_row(name, u, pre, did, post):
                                     ' '.join(','.join(map(str, v)) for v in post))
 
 
+# ---------------------------------------------------------------- the prologue
+# boot() jumps past the opening by poking EVENT to 6, so the Orbonne prologue is
+# never played. It is the only battle in the game's first hour with cast
+# abilities: Agrias is a Holy Knight (job 0x34) and Gafgarion a Dark Knight
+# (0x17), both guests, so the AI uses their Holy and Dark Sword without a menu
+# being driven. Gariland has none -- Squires and Chemists only.
+#
+# Do not stop this at a frame number. A first attempt saved at frame 26000 after
+# thousands of blind taps and landed on a battle that had already been fought and
+# stalled: every CT pinned at 102, one unit at 7 HP, nothing ever advancing. Six
+# runs were then spent trying to restart a battle that was over. Stop on a
+# condition instead -- the table loaded AND the clock moving -- and the run finds
+# the moment itself.
+
+
+def battle_live(psx):
+    """The unit table holds a real battle: at least eight sane HP pairs."""
+    n = 0
+    for i in range(21):
+        a = UNITS + UNIT_SIZE * i
+        hp, mx = psx.read(a + 0x28, 2), psx.read(a + 0x2a, 2)
+        if 0 < hp <= mx <= 999:
+            n += 1
+    return n
+
+
+def clocks(psx):
+    return [psx.read(UNITS + UNIT_SIZE * i + 0x39) for i in range(21)]
+
+
+def prologue(psx, limit=40000):
+    """Reach the prologue and stop the frame its clock starts ticking."""
+    prev = None
+    for f in range(limit):
+        psx.pressed = (key('START') if (f // 60) % 3 == 0 else key('CIRCLE')) \
+                      if f > 300 and f % 60 < 4 else 0
+        psx.run()
+        if f % 10 or f < 8000:
+            continue
+        if battle_live(psx) < 8:
+            continue
+        now = clocks(psx)
+        if prev is not None and now != prev:
+            return f
+        prev = now
+    raise SystemExit('prologue: the clock never started within %d frames' % limit)
+
+
+def ai_plays(psx):
+    """Hand every unit to the AI, as --turns does: clear the player flag."""
+    for i in range(21):
+        a = UNITS + UNIT_SIZE * i
+        psx.write(a + 5, psx.read(a + 5) & ~0x08)
+
+
 def main():
+    if sys.argv[1] == '--prologue':
+        psx = PSX(sys.argv[2])
+        f = prologue(psx)
+        psx.save(sys.argv[3])
+        psx.image().save(os.path.splitext(sys.argv[3])[0] + '.png')
+        print('prologue live at frame %d' % f)
+        for row in unit_table(psx):
+            print(row)
+        return
     if sys.argv[1] == '--ai':
         out = os.dup(1)
         os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
