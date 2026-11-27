@@ -82,7 +82,7 @@ def main():
     module_flags=['-DFFT_MODULE_HEADER="'+str(args.module_dir.resolve()/'modules.h')+'"'] if args.module_dir else []
     zone_flags=[] if args.profile_zones else ['-DFFT_CHECK_NO_ZONES']
     run([ROOT/'tools/bin/ti-cc','-DRT_CYCLES',*zone_flags,*module_flags,*groups,'-o',out/'renderc',*common,
-         ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
+         ROOT/'games/fft/fxdark.s',ROOT/'lib/unpack68k.s',ROOT/'tools/extgraph/lib/tilemap.a'])
     results=[]
     files={p.stem:p for folder in (HERE.parent/'opening/data',HERE/'data')for p in folder.glob('*.89y')}
     if args.module_dir:
