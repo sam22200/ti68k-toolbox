@@ -1392,7 +1392,10 @@ content, exactly as the R4 colour planes are.
 state opens TiEmu's debugger on `hw protection violation: RAM execution at
 $03ab32`. Boot from `hw3` (`CORE_PACKAGES.md` § Native test loop).
 
-**The map base stays out of frame during a battle.** Gariland's south edge
-tiles are not reachable, and the camera is clamped to the playable area
-(`camera_clamp.h`), so the restored skirt is not what a player sees mid-turn --
-it reads on the whole-map views. Do not use an in-battle capture to review it.
+**Review the map base on a scene framing, not an in-battle capture.** Gariland's
+south edge tiles are not reachable and the battle camera is clamped to the
+playable area (`camera_clamp.h`), so a mid-turn capture never shows the skirt.
+That is the framing, not the viewport: `campaign/preview_scenery.c` renders the
+same 160x100 with the camera placed by `cam_target`, and the base is plainly
+there in all four orientations -- which is the framing the earlier style sheets
+under `x/qa/flow/` used. Build that, not a battle screenshot, to judge it.
