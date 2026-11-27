@@ -208,6 +208,16 @@ test: dialogue-test
 test: scene-test
 test: actor-cache-test
 test: unit-blit-test
+test: combat-fx-test
+.PHONY: combat-fx-test
+# The combat-effect layer draws and decides nothing: the spec's single-impact
+# acceptance test (campaign/COMBAT_FX.md). Only this target builds FFT_COMBAT_FX.
+combat-fx-test:
+	@mkdir -p x/qa/fxdata
+	@ln -sf $(CURDIR)/data/*.bin $(CURDIR)/../opening/data/*.bin x/qa/fxdata/
+	$(CC) $(PC_CFLAGS) -w -DRT_DRAW_ROWS=100 -DFFT_COMBAT_FX -o x/qa/combat-fx-test \
+	  check_combat_fx.c $(RT_CORE) $(RT_SW)
+	cd x/qa/fxdata && ../combat-fx-test
 .PHONY: unit-blit-test
 unit-blit-test:
 	@mkdir -p x/qa

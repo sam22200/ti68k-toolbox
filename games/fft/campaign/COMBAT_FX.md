@@ -193,3 +193,82 @@ means enabling this feature never forces a module rebuild.
   on it, all eleven brighten. Two earlier readings of this said otherwise and
   were wrong: one read a frozen picture, the other let the tick advance between
   the two renders it compared.
+
+## Step 2 built and measured (2026-11-27)
+
+`games/fft/fx_play.inc`, behind the same `FFT_COMBAT_FX`. The spec asks for an
+effect scheduler, a result applied exactly once, and reusable primitives. Two of
+those three already existed.
+
+### The schedule was already there
+
+`st.act_t` runs the action with named phases, and the spec's timeline maps onto
+them without adding a second clock:
+
+| Spec phase | Engine |
+|---|---|
+| anticipation | `act_t < ACT_WIND` |
+| focus | `ACT_WIND` .. `ACT_BLOW` |
+| animation | `ACT_BLOW` .. `ACT_HIT` |
+| **impact** | **`ACT_HIT`** |
+| result, return | `ACT_HIT` .. `ACT_END` |
+
+**The single impact needs no work.** The combat core applies the result at
+`ACT_HIT`; the renderer reads it. Skipping or speeding the animation moves
+`act_t`, not the result. What had to be proven is the other half -- that
+presenting an effect never touches battle state -- and that is what
+`check_combat_fx.c` does.
+
+### The primitives carry no state
+
+Every primitive is a pure function of `act_t` and two screen points: a ground
+ring (the 2:1 diamond the map's own tiles use, so it sits on the ground instead
+of floating), an eight-spoke burst, and a swept slash. **No effect state exists**:
+nothing in `Work`, nothing allocated, nothing to reset, and the PC and the 68000
+compute the same picture.
+
+That is not elegance for its own sake. `Work` cannot grow without invalidating
+every built module image (above), and the installed battle has a few hundred
+bytes of RAM free. A stateless primitive sidesteps both. The ring comes first
+because Haste, Slow, Protect, Shell, Stop, MBarrier and Cure are all that shape
+with another radius and cadence.
+
+### Measured, 13 actors
+
+`battle-act` is the action *menu*, not an action in flight, so pricing the
+schedule needed a case that walks the real timeline. `battle-fx` does, **in both
+builds**, so the difference is the effect layer and not the action state.
+
+| `battle-fx` | Mean | Ordinary peak | Free at the peak |
+|---|---:|---:|---:|
+| effects off | 198,684 | 270,598 | 89,402 |
+| **effects on** | 252,834 (+54,150) | **322,068** (+51,470) | **37,932** |
+
+Adding the case costs the existing ones 26 cycles a frame (`battle-act` 263,424
+-> 263,450, `battle-menu` 262,090 -> 262,116) for the one test that steps the
+timeline. Checksums `311B` and `7262` are unchanged, so the pictures are not.
+
+### The acceptance test, and one check deliberately removed
+
+`make -C games/fft/campaign combat-fx-test`, 212 checks, in `test`:
+
+- the units and the RNG are unchanged after **every** frame of the timeline;
+- the focus follows the schedule, read back from the one byte that holds it;
+- the animation skipped lands on the same state as the animation played, which
+  is the spec's acceptance criterion;
+- leaving the action releases the focus in one frame.
+
+A fifth check asserted that two renders of the same `act_t` give the same pixels.
+It failed, and it deserved to: the engine spreads its HUD and screen copy over
+several frames and animates the damage number on its own clock, so consecutive
+frames differ for reasons that have nothing to do with this layer. It was testing
+the engine, not step 2. It is gone, with that reason written where it was.
+PC/68000 equality covers the ground it was aiming at, in `battle-fx`.
+
+### Still not done
+
+- Only three primitives. Beam, aura, ground wave, projectile and particles, and
+  the per-ability table that picks between them, are step 3.
+- Effects draw over everything rather than sorted by depth.
+- The pictures reviewed are from a harness that forces `M_ACT` without a resolved
+  action, which is why the damage number reads "Miss" in them.
