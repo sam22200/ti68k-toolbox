@@ -272,3 +272,61 @@ PC/68000 equality covers the ground it was aiming at, in `battle-fx`.
 - Effects draw over everything rather than sorted by depth.
 - The pictures reviewed are from a harness that forces `M_ACT` without a resolved
   action, which is why the damage number reads "Miss" in them.
+
+## Step 3 built and measured (2026-11-27)
+
+The remaining primitives and the per-ability table. One of the three things this
+step was supposed to contain is deliberately not in it; that is below.
+
+### The table, which is the point of the step
+
+`fx_table` gives four primitives per outcome category -- gather, travel, impact,
+settle -- for 26 of them, four bytes a row, `const` in the module image. No RAM.
+
+It is indexed by `st.effect_kind & EFFECT_KIND_MASK`, the category the engine
+already computes for `act_kind()`, so **there is no second classifier**. Moving an
+ability to another look is editing one row, and the renderer never learns what an
+ability is.
+
+Six primitives now: ground ring, slash, burst, beam, column, motes. All still
+pure functions of `act_t` and two screen points, so step 3 adds no state either.
+Motes scatter from a hash of the index and the frame, never from the RNG, because
+the acceptance test requires the picture not to consume it.
+
+The full dispatch costs **346 cycles** more than step 2's hardcoded sequence.
+
+| `battle-fx`, 13 actors | Mean | Ordinary peak | Free at the peak |
+|---|---:|---:|---:|
+| effects off | 198,684 | 270,598 | 89,402 |
+| step 2, hardcoded | 252,834 | 322,068 | 37,932 |
+| **step 3, table and six primitives** | 253,180 | **322,414** | **37,586** |
+
+Each of the six categories rendered at the same frame gives a different picture,
+which is what says the table dispatches rather than decorating a fixed sequence.
+
+### Depth sorting: built, then removed
+
+`seen()`, the per-pixel depth test the water glints already use, was wired into a
+depth-aware dot so ground effects would sit in the map instead of over it. It is
+compiled out when the chapter's water bank is in (`FFT_WATER_BANK`) -- that is,
+**in the configuration that ships**. A depth test that does nothing where it
+matters reads like a feature, so it was taken out rather than left in.
+
+Effects therefore draw over the scenery. Doing this properly means a depth test
+that survives the water bank, and that is its own piece of work.
+
+### Projectile and ground wave are not separate primitives
+
+The spec lists eight. A projectile is a truncated beam that advances and a ground
+wave is a ring that grows, so adding them as rows would have widened the table
+without putting anything new on screen. They become two rows once their
+parameters are chosen, not two primitives.
+
+### Still open
+
+- Depth, above.
+- The table covers outcome categories, not individual abilities. The spec's
+  signature techniques -- the Holy Sword family, Night and Dark Sword, Dark Holy,
+  Ultima -- need their own rows keyed on the ability, not its outcome.
+- No asset has been drawn. Everything so far is procedural, which is why the
+  archive cost of the whole layer is still zero.
