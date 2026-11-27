@@ -13,6 +13,7 @@ a C version instead. Verified asm routines to reuse:
 | ZX0 v2 decoder (used by `games/campfire`; packer `lib/zx0pack.py`, recipe in `ti68k-c-patterns.md` §10) | `lib/unpack68k.s` | 2.5× | `u8 *zx0_asm(const u8 *s asm("%a0"), u8 *d asm("%a1")) __attribute__((__regparm__(2)));` |
 | `muls16` (16×16 → 32 multiply) | inline `asm()`, `ti68k-performance.md` §4 | avoids `__mulsi3` | |
 | `TriSpans` / `Span2` (verified with ti-cycles; mono caller launched on Titanium) | `games/mode7/src/render.s`; verbatim extraction by `games/tenchu/tools/reuse_mode7.py` | existing flat triangle scanline walker | stack parameters; declarations in `games/mode7/src/mode7.h` |
+| Four-grey Dark 1 over a 160x100 picture, both planes (verified with ti-cycles; PC C against TI asm on a real battle frame, same screen checksum) | `games/fft/fxdark.s` | **1.11x** (46,638 -> 42,010): the map wants ten long words at once and the 68000 has eight data registers, so `movem` cannot carry both planes and it goes 3 words then 2 | `void fx_dark_asm(u8 *l asm("%a0"), u8 *d asm("%a1"), short rows asm("%d0"), long stride asm("%d1")) __attribute__((__regparm__(4)));` |
 
 Add each new verified asm routine to this table.
 
