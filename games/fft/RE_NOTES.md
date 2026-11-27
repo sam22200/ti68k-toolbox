@@ -2919,10 +2919,40 @@ Cure 1-3 are atlases. Some abilities simply have no picture to take.
 ### NOT established
 
 - What sections 0..8 hold. Only section 9 is decoded.
-- How an effect is animated: which sprites of an atlas play in what order. The
-  wiki has an "Effect File Animation" page describing a bytecode; nothing here
-  has been checked against the disc.
+- Timing. The frame list below says which cell and where, not how long a frame
+  holds. It is in one of sections 1, 3, 6 or 7; section 4 is fifteen ramps of
+  160 rising values, which looks like interpolation but has not been shown to be.
+- The first eight of a frame record's fourteen 16-bit fields.
+- The longer frame records: Fire's offset table steps by 28, 52, 76 and 100, so
+  richer variants exist. `effect_rip.py` skips them rather than guess.
+- Section 8 opens with the ASCII tag `feds`. Not pursued.
 - Whether `EFF1/EFF2.SHP/SEQ` index this directory or are a separate small set.
+
+### How an atlas animates (2026-11-27)
+
+**Section 0 is the animation**: a short head, a u16 offset table, then one record
+a frame. `effect_rip.py --frames` reads them. A 28-byte record holds the atlas
+cell at bytes 12..15 -- `u, v, width, height` -- and **six signed 16-bit quad
+corners** at 16..27, where to draw that cell.
+
+**The motion is in the corners**, written out frame by frame rather than stored
+as a curve. Ice walks its top edge 62, 58, 53, 49, 45, 40, 36, 32 while the
+bottom goes 71, 76, 80, 85, 89, 94, 98, 103: the crystal grows. 289 of the 401
+non-empty effects give a frame list this way.
+
+The styles differ, and that matters for what we copy:
+
+- **Cure** centres its quads -- the corners are exactly half the cell, 8 records
+  of 8 checked -- and holds one cell.
+- **Fire** steps its `uv` through a grid of 40x40 cells and anchors the quad near
+  the base: a sprite loop, not a deformation.
+- **Ice** does both: a grid of 39x71 cells *and* corners that march.
+
+A check written to confirm this nearly rejected it: "the corner extent should
+equal the cell size" scored 8/8 on Cure and **0/8 on Fire**. The reading was
+right; the check assumed centred quads, and Fire anchors its own (-20,-12 to
+20,-12 to -20,28 is 40 wide, shifted up). The test was too narrow, not the
+reading -- the same shape of mistake as the colour test above.
 
 ### What this means for the TI
 
