@@ -804,3 +804,23 @@ margin instead of 10,412. The PC build keeps the C loop and the 68000 takes the 
 the PC/TI cross-check compares one against the other: it passes with the same checksum
 `D976`, which is the equivalence proof on a real picture rather than on synthetic data.
 
+### The asm's gain spent on the spike (2026-11-27)
+
+The 9,332 cycles the asm freed on the real frame go into `FX_SPIKE_H`, measured again
+now the curve has moved:
+
+| `FX_SPIKE_H` | peak | margin |
+|---|---|---|
+| **28** | **349,936** | **10,064** |
+| 32 | 354,778 | 5,222 |
+| 36 | 359,566 | 434 |
+
+**28**, not 36. 36 passes, and passes with 434 cycles left, which in this file is not a
+margin but a bet that the cycle scenario reaches the worst frame -- and four measurements
+here have already turned out to cover frames where the feature was not running at all.
+28 restores exactly the margin the layer had before the asm: the gain goes into the
+effect, not into the risk.
+
+E173 asks for 82 rows. The spike is now a third of the original's height instead of a
+quarter, and the comment that called 28 "136 * 0.6" has been corrected -- that is 82.
+

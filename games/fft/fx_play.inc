@@ -79,7 +79,11 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 //
 // The half-width accumulates in 8.8 instead of dividing once a row: 82 divisions would
 // cost more than the fill itself.
-#define FX_SPIKE_H 20                   // 136 * 0.6, the original's height
+// E173's own height is 136, which is 82 rows at the project's 0.6 sprite scale. The
+// budget pays 28 of them at about 1,220 cycles a row: H=32 measures 354,778 and H=36
+// measures 359,566, which passes with 434 cycles left -- not a margin, a bet that this
+// scenario reaches the worst frame. 28 keeps the margin the layer had before the asm.
+#define FX_SPIKE_H 28                   // a third of the original's height, by measurement
 #define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
 static void fx_spike(s16 cx, s16 base, u8 grow)
 {
