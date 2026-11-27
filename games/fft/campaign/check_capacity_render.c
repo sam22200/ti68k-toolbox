@@ -27,6 +27,9 @@ u8 game_update(void){
 #ifdef CAP_MENU
     // Static13-actor UI frame: actual renderer/cache budget, no AI/turn work.
     FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=W->actor_mirror=0;W->ac_now++;
+#ifdef FFT_COMBAT_FX
+    if(rt_frame>=10)fx_focus(0,1);   // the combat-effect focus, priced from frame10 (COMBAT_FX.md)
+#endif
     return 1;
 #else
 #ifdef CAP_KO

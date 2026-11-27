@@ -1360,3 +1360,33 @@ The general lesson: when an address error names an odd address, decide which
 side is odd before hunting. A pointer with even displacements means the pointer
 is wrong; an even pointer with an odd displacement means a `u16` is stored
 through a cast the compiler never saw.
+
+### A struct whose size feeds a compatibility signature cannot grow quietly (FFT, 2026-11-27)
+
+When a program is split into separately built images -- overlays, module images,
+anything loaded from its own file -- the loader usually checks that the pieces
+agree on the layout they share. FFT derives `MOD_SIG` from
+`sizeof(State)`, `sizeof(Work)`, `sizeof(ModCtx)` and `sizeof(Save)`, so **adding
+one field to the shared state invalidates every already-built image**.
+
+The failure does not look like a version mismatch. The core refuses the images,
+nothing is initialised, and the renderer finds all of its pointers null and draws
+"Missing data". It is easy to read that as a missing bank or, worse, as the
+program having run out of RAM -- which is what happened here, costing an hour
+aimed at the wrong problem.
+
+Two things worth doing:
+
+- **Disprove the size theory before acting on it.** Ballast the *working* build
+  with a volatile array until it breaks. If it survives well past the size of the
+  build that failed, the problem is not size. Make the ballast volatile and read
+  it volatilely, or dead-code removal deletes it and every size comes out the
+  same, which looks like a measurement and is not one.
+- **Spend the padding instead of the struct.** A handful of `u8` members usually
+  leaves a byte or two before the next aligned field. A feature whose state fits
+  there costs nothing and never forces the rebuild. FFT's combat-effect focus
+  packs "off / unit n is bright / dim everything" into one such byte rather than
+  two named fields, and the proof it worked is simply that the battle started.
+
+The compile-time check belongs in the shared header, so a future field fails the
+build rather than the loader: `typedef char ThisMustNotGrow[sizeof(Work) == N ? 1 : -1];`

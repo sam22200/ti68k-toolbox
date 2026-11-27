@@ -47,6 +47,7 @@ def main():
     ap.add_argument('--source',type=Path,default=HERE/'check_capacity_render.c',help='isolated reference carrier; default is the actual current engine')
     ap.add_argument('--measure-only',action='store_true',help='retain CPU overruns for profiling; framebuffer/state equality still required, not performance acceptance')
     ap.add_argument('--actors',type=int,choices=(11,12,13),default=13,help='keep the original eleven and add up to two identical diagnostic actors')
+    ap.add_argument('--combat-fx',action='store_true',help='build with FFT_COMBAT_FX so the focus dimming is priced; the gate otherwise measures the engine without it')
     ap.add_argument('--profile-zones',action='store_true',help='enable renderer component zones in the private carrier; instrumented timings are diagnostic')
     ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition','monster-body','battle-menu','battle-act'),
                     help='select affected cases; default is the original four-case certification')
@@ -63,7 +64,7 @@ def main():
     if args.case and 'monster-body'in args.case:
         body=None if args.body_chapter else \
             args.body_bank.read_bytes()if args.body_bank else synthetic_body_bank(out,args.body_scale)
-    common=['-DRT_DRAW_ROWS=100',args.source.resolve(),ROOT/'runtime/core/rt_core.c']
+    common=['-DRT_DRAW_ROWS=100',*(['-DFFT_COMBAT_FX'] if args.combat_fx else []),args.source.resolve(),ROOT/'runtime/core/rt_core.c']
     # The whole battle plus every scenario no longer fits one 68000 variable, so each
     # group of scenarios is its own build: the certified four (CAP_STATUS), the monster
     # KO boards (CAP_KO) and the wide bodies (CAP_BODY). Only the requested one is built.
