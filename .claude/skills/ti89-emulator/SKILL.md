@@ -97,6 +97,29 @@ TiEmu limit as the 2026-11-07 private-mount note below, reached from the other
 direction. **Copy a lone group next to the profile before sending it**, or pass
 two files so `ti-group` shortens the path for you.
 
+## Cutting several captures into one reel (verified, 2026-11-26)
+
+`ti-gif` records one continuous take. A presentation reel is several takes cut
+together, and the obvious way to do it is wrong:
+
+**PIL drops frames that repeat.** `Image.save(save_all=True)` silently skips a
+frame identical to the one before it, with `optimize=False` too -- 959 frames
+written, 553 in the file. The GIF still plays, but every still moment runs short:
+a title screen or a held line of dialogue flicks past. Count what you wrote
+(`sum(1 for _ in ImageSequence.Iterator(im))`) before trusting the file.
+
+Use ffmpeg, which keeps the cadence:
+
+```sh
+# frames as %04d.png, snapped to the four greys first
+ffmpeg -y -framerate 15 -i reel/%04d.png -vf palettegen=max_colors=4 pal.png
+ffmpeg -y -framerate 15 -i reel/%04d.png -i pal.png \
+       -lavfi paletteuse=dither=none -loop 0 reel.gif
+```
+
+Measured: 959 frames, 63.9 s, 354 KB at 160x100. `dither=none` with a 4-colour
+palette keeps the LCD's own greys instead of inventing texture.
+
 ## Logs instead of screenshots
 
 1. Programs call `tilog("...", ...)` (`lib/tilog.h`, printf format) at transitions and outcomes;
