@@ -686,6 +686,8 @@ static u16 status_set_id(u8 i, u8 row)
 #define HUD_K 60                        // a part of the HUD made
 #define HUMAN_CACHE_K 5                 // conservative warm-human saving versus UNIT_K
 #define HUMAN_MISS_K 16                 // composing new rows: charged before optional HUD work
+#define ACTOR_MISS_K 19                 // an actor pose decoded: 17.7k of ZX0 plus the cache scan
+#define ACTOR_FLIP_K 26                 // and 22.9k more when SpriteX8_MIRROR_H_R has to flip it
 #define DK_K 80                         // a banner's shade (ti-cycles: up to 80k, its edge rows)
 #define DK_SPEED 8                     // the shade's diagonal edge (x + y), pixels a frame
 #define DK_N ((RT_W + RT_H) / DK_SPEED + 1)   // its frames, coming then leaving
@@ -6377,7 +6379,7 @@ static u8 battle_update(void)
 #ifndef ACTOR_BUDGET
 #define ACTOR_BUDGET 1                     // new poses decoded per frame (255: all, the raw-bank look)
 #endif
-    if(W){W->actor_budget=ACTOR_BUDGET;W->actor_misses=0;W->ac_now++;}
+    if(W){W->actor_budget=ACTOR_BUDGET;W->actor_misses=W->actor_mirror=0;W->ac_now++;}
 #endif
 #ifdef FFT_CHAPTER
     if (st.open_stage || st.open_fade || (st.end == END_VICTORY && !st.banner && story_after&&!st.story_done)) return map_update();
@@ -7747,7 +7749,11 @@ void game_render(void)
     }
 #ifdef FFT_ACTOR_BANK
     render_poses=0;
-    W->left-=(s16)W->actor_misses*32;
+    // 32 for every miss priced a flipped pose and a plain one the same. Measured under
+    // ti-cycles: 19,083 cycles plain, 45,016 flipped (campaign/RENDER_OPTIMIZATION.md).
+    // A flat 32 withheld ~13k of optional HUD work on the 95.7% of battle decodes that
+    // are plain, and under-reserved by 13k on the rest.
+    W->left-=(s16)(W->actor_misses*ACTOR_MISS_K+W->actor_mirror*ACTOR_FLIP_K);
 #endif
     ZE(4); ZB(5);
 #ifdef FFT_CHAPTER

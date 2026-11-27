@@ -684,6 +684,67 @@ Only after measuring that a specific C routine is the bottleneck and after the o
 **ask the user first** (project rule). Candidates: inner rendering loops (span filling, texture
 mapping), bulk copies not covered by ExtGraph.
 
+## 12. Case studies, and the rules they produced
+
+Everything below is a dated measurement from a real game in this repository,
+kept with its numbers and its caveats. Most of it comes from FFT, which is the
+hardest corner of this machine we have reached: a tactical RPG drawing 160x100
+in four greys inside a 360,000-cycle frame, with a few hundred bytes of free RAM
+and a replaceable-chapter archive. Its findings generalise because the pressure
+was real.
+
+Read the rule here, then the section for the evidence. A rule without its
+section is a rule you cannot check.
+
+**Frame budget and scheduling**
+
+- *Budget a frame in modelled cycles, not in objects.* FFT gives each frame a
+  number (`FRAME_K`, 332 kilocycles) and subtracts a modelled cost per item;
+  optional work runs only while the number is positive. This stays identical on
+  the PC and the 68000, so pictures match, which a wall clock cannot promise.
+- *An over-cautious cost model costs more than no model.* Overcharging one item
+  starves the scheduler until a watchdog forces the work anyway, and that forced
+  catch-up becomes your worst frame. Pricing two decode paths apart cut FFT's
+  board peak by 4,300 cycles while doing **more** work per frame.
+  See "Actor frame decode", and `games/fft/campaign/RENDER_OPTIMIZATION.md`.
+- *Overlap a deliberate pause with the work it hides.* See "Overlap a deliberate
+  pause".
+- *Bound every idle clock.* See "Bound every idle clock".
+
+**Caches**
+
+- *A remembered cache entry must revalidate its key before use*: another
+  consumer may have evicted it. See "Remembered cache entries".
+- *An LRU sized above the live set never evicts a live entry*, which makes
+  reference counting pointless. FFT holds 42 frames for at most 13 actors. The
+  size is a measured trade, not a round number: 48 to 42 cost about 5% more
+  frames in a full AI battle (`games/fft/actors.h`).
+- *Price a cache miss by what the miss actually does.* See "Actor frame decode".
+
+**Storage and RAM**
+
+- *Raw and read in place beats compressed when RAM is the binding constraint*:
+  97,244 cycles against 914,868 for the same 16,160-byte view, and no row
+  backups. See "Raw archived colours versus decode scratch".
+- *Allocate by capacity, loop by the validated count.* See "Allocate by
+  capacity".
+- *Reserve allocation capacity in bytes, not in records.* See "Reserve capacity
+  in bytes".
+- *Pool resources by reuse, not by first consumer* (`CLAUDE.md`, and
+  `games/fft/campaign/CORE_RESOURCES.md`).
+
+**Content and method**
+
+- *Census the content, then gate the expensive path per asset.* See "Census the
+  content".
+- *Do the art offline.* Contrast, outlines and height contours are baked into
+  the banks, not computed per frame: `ti68k-c-patterns.md` "Offline scenery
+  contrast and height contours".
+- *Measure which frames a cost falls in before paying to remove it.* FFT spent
+  2,230 archive bytes removing a 22,944-cycle spike and moved its peak by 344
+  cycles, because the spike was never in a peak frame
+  (`games/fft/campaign/RENDER_OPTIMIZATION.md`).
+
 ### Text in a dialogue box (verified, TiEmu, FFA scenario 53, 2026-09-27)
 
 - 72 characters of `draw_text` (6x8 font, both planes) redrawn every frame: ~125k cycles.
@@ -1141,3 +1202,77 @@ before paying storage to remove it.
 Measured with the renderer zones of `campaign/check_capacity_render.py
 --profile-zones` on the 13-actor board and rotation cases. Datasheet cycles under
 `ti-cycles`, not a TiEmu or calculator observation.
+
+### Overlap a deliberate pause with the work it hides (FFT, 68000-checked, 2026-10-28)
+
+When the design already asks for a pause -- an AI unit "thinking", a turn
+handover, a transition -- do not finish the computation and *then* start the
+pause: a slow plan pays both delays. FFT used to think, then add 48 presentation
+frames. It now arms a 256 Hz timestamp on the first thinking step and waits only
+until 384 ticks (1.5 s) have elapsed, settling the camera and planning inside
+that window. A plan that overruns adds no further pause.
+
+So a computation that is slower than one frame is not automatically a problem to
+split. Ask what the player is doing meanwhile. This is the opposite of the frame
+budget above and both are right: the budget governs work the player is waiting
+through, the pause governs work the player is watching.
+
+Make it a *minimum* pause, never a promise: held keys, repeated updates and low
+frame rates must not earn elapsed-time credit, and unsigned 16-bit subtraction
+must survive one clock wrap. The whole mechanism is one resident two-byte static.
+Details and its 171 assertions: `games/fft/campaign/CORE_AI_PACING.md`.
+
+### Bound every idle clock (FFT, 2026-10-28)
+
+A scheduler that advances actors until one is ready must define what happens when
+none ever will -- every actor stopped, asleep or unable to gain priority. FFT's
+clock yields an explicit "nothing" event after 1,201 internal phases and
+preserves its phase, so the caller resumes instead of restarting. Copying the
+original's quirks matters more than tidying them: its forecast clamps a speed of
+0 to 1 and predicts a remainder the real selection never consumes, and both are
+reproduced on purpose rather than silently corrected.
+`games/fft/campaign/CORE_SCHEDULER.md`.
+
+### Allocate by capacity, loop by the validated count (FFT, 2026-10-24)
+
+Storage sized by a compile-time bound, loops driven by the count the data
+declares. FFT reserves state, pending actions, rewards, cover and draw order for
+`UNIT_CAPACITY` actors and iterates `NUNIT`, the validated encounter count.
+Unused records are cleared as absent rather than left stale, and the loader
+rejects a descriptor claiming 0 or more than the capacity.
+
+Two practical consequences. A C array at file scope must use the bound, not the
+count: a variable bound compiles to a variably modified type and GCC4TI refuses
+it at file scope. And a table indexed by the bound is still bounded by the count
+at run time, so a 13th actor cannot read past an 11-row table that predates it.
+`games/fft/campaign/CORE_CAPACITY.md`.
+
+### Reserve capacity in bytes, not in records (FFT, 2026-10-25)
+
+An allocation measured in records cannot be reused by data with a different
+stride. FFT's battle topology retains *bytes*, so a smaller map, or one whose
+grid has no upper layer and therefore uses a 32-byte row instead of 64, reuses a
+larger existing allocation instead of reallocating. Rows that follow the variable
+part begin after the current edge rows, not after the ones the allocation was
+first sized for, and a failed grow rolls back to the previous binding.
+
+The same milestone shows the storage shape worth copying: store a direction plus
+a few cached first-neighbour IDs rather than an explicit ID per link, and keep an
+explicit presence bit so no index doubles as an invalid sentinel. Gariland's
+150-node topology fell from 7,200 to 5,400 bytes, its five heap requests from
+116,094 to 114,296, for two bytes of `Work`.
+`games/fft/campaign/CORE_COMPACT.md`.
+
+### Census the content, then gate the expensive path per asset (FFT, 2026-10-25)
+
+Before paying for a general rule everywhere, count how much of your content
+actually needs it. FFT read all 109 maps the game can reach off the disc and
+found which ones have a single floor, then disabled the upper-layer rules on
+those. The discipline that makes such a census safe: build the denominator from
+what the game really references (event rows *and* random encounter routes, not a
+convenient subset), check **every** terrain variant of a map, and let a map
+qualify only if all of its variants do. A filter that looks sensible can quietly
+drop a map that needs the path.
+
+Static reference evidence is not a played proof, and the document says so.
+`games/fft/campaign/CORE_MAP_PROFILE.md`.

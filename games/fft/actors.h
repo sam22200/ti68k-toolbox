@@ -4,7 +4,7 @@
 // pose), ACTOR_KEY(logical) (its frame key: bank frame, bit 15 mirrored), and a W pointer
 // whose struct holds ACTOR_FIELDS; actors.inc holds the functions.
 #define ACTOR_FIELDS \
-    u8 actor_budget, actor_misses, actor_next; \
+    u8 actor_budget, actor_misses, actor_next, actor_mirror; \
     u16 actor_key[ACTOR_SLOTS], ac_now;  /* each slot's pose; frames drawn so far */ \
     u8 actor_ent[ACTOR_SLOTS];           /* its acache entry */
 // The chapter's actor frames (tools/common_actors.py): ffca, ffcb (both required), then ffcc..

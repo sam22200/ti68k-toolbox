@@ -60,8 +60,13 @@ visual approval still apply. FFT examples: `games/fft/campaign/CORE_TESTING.md`.
   generated code as proof), **lookup tables** (`tools/bin/ti-table`: sin/atan/recip/row/sqrt,
   rotation and atan2 code), arithmetic and loop rules, graphics strategy, frame
   budget, heuristics, compiler traps (-O2 can be slower), how to benchmark, fastest pixel/text/
-  scroll methods (measured). **Read it before
-  designing any game loop, renderer or algorithm.**
+  scroll methods (measured), and **§12, the case studies and the rules they
+  produced** -- an index of what the repository's games actually measured (frame
+  budgets, caches, storage versus RAM, content censuses), FFT first, each rule
+  pointing at the section that carries its numbers. **Read it before
+  designing any game loop, renderer or algorithm**, and §12 before deciding that
+  an optimisation is worth its complexity: several in there were measured and
+  rejected.
 - `reference/ti68k-game-techniques.md`: algorithms that fit the machine, best version first,
   from the old sources: game-tree search (TI-Chess), cheap AIs (Tetris), grid puzzles, area
   capture, low-RAM A*, 3D pipeline, portal rendering (X3D), raycasting (FAT), Mode 7, roguelikes,
