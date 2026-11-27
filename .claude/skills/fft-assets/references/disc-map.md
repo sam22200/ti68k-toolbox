@@ -115,8 +115,19 @@ across all 291, which reads as a shared 32-colour palette; section 9 is the
 largest and the most variable. Sections 4, 5, 6 and 7 have one size each (2,404,
 600, 24, 6,280) but differ file to file.
 
-Nothing yet links an `E` number to an ability, and no section is decoded. The
-survey, with what is observed against what is guessed:
+**Section 9 is the sprite atlas**, and `games/fft/tools/effect_rip.py` decodes it:
+1,028 bytes of palette, then an 8bpp image 128 wide whose **height varies** --
+`(len(section 9) - 1028) / 128`. Fire is 128x120, Fire 3 is 128x256. Colour is
+BGR555; palette index 0 is transparent, and **bit 15 is the blend flag, not
+black** -- these effects draw additively, so painting a flagged dark colour
+opaque puts a halo around every sprite. Sections 0..8 are not decoded.
+
+Which ability an effect belongs to is the **file's name**, not a table: no
+ability-to-effect table exists in `BATTLE.BIN`, and the 14-byte ability record
+holds the element mask. The numbers track for the first 35 or so and then drift.
+Names: https://ffhacktics.com/wiki/Effects (the site refuses automated clients).
+
+The survey, what was got wrong and what it means for four greys:
 `games/fft/RE_NOTES.md`, "The `EFFECT/` directory".
 
 ## `BATTLE.BIN`

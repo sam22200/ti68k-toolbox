@@ -2883,12 +2883,53 @@ block repeated in every effect, which would have made the distinctive payload a
 couple of kilobytes. **That was wrong** -- over 291 files their contents differ.
 It came from a three-file sample, and the sizes matching was a coincidence of it.
 
+### Settled since (2026-11-27)
+
+Section 9 **is** the pictures, and the decode is in `tools/effect_rip.py`:
+1,028 bytes of palette, then an 8bpp image **128 wide of a height that varies** --
+`(len(section 9) - 1028) / 128`. Fire is 128x120, Fire 2 is 128x160, Fire 3 and
+4 are 128x256. The community rule of thumb (a 32 KB image in files of 34..70 KB)
+holds only for the tall ones; taking it as universal silently drops every smaller
+effect, **Fire included**. 374 of the 512 are named on the FFHacktics wiki's
+Effects page.
+
+Colour is PS1 BGR555 with bit 15 as the semi-transparency flag, and the first
+rip of these got it wrong twice over: palette index 0 is transparent whatever
+colour it holds, and **bit 15 does not mean black**. It marks a colour the
+hardware blends; these effects blend additively, so a dark flagged colour shows
+the scenery through. Painted opaque, they put a black halo around every sprite,
+which is exactly what the user spotted on the ice crystal.
+
+**There is no ability-to-effect table.** The ability's number tracks the effect's
+for the first 35 or so -- Cure 0x001 -> E001, Raise 0x005 -> E005, Holy 0x00f ->
+E015, Fire 0x010 -> E016, Bolt 0x014 -> E020, Ice 0x018 -> E024, Haste 0x020 ->
+E032 -- and then drifts, because the catalogue holds effects no ability uses. A
+scan of `BATTLE.BIN` for a 512-entry u16 table found only lookalikes, and the
+14-byte ability record carries the **element mask**, not an effect id: Fire and
+Ice differ in one byte, 0x80 against 0x20. The mapping is the file's name.
+
+The colour test built to choose between those lookalikes had a blind spot worth
+remembering: it skipped any effect without a 128x256 image, which is 70 of the
+401 -- and Fire is one of them. It could not answer the question it was built
+for. A measurement that silently drops its subject is not evidence.
+
+Routines and data are **mixed**: `E004` is Cure 4 and it is MIPS code, while
+Cure 1-3 are atlases. Some abilities simply have no picture to take.
+
 ### NOT established
 
-- Which `E` number belongs to which ability. Nothing here links the two.
-- What any section means beyond the palette guess, including whether section 9
-  is image data or a display list for the PS1's GPU.
+- What sections 0..8 hold. Only section 9 is decoded.
+- How an effect is animated: which sprites of an atlas play in what order. The
+  wiki has an "Effect File Animation" page describing a bytecode; nothing here
+  has been checked against the disc.
 - Whether `EFF1/EFF2.SHP/SEQ` index this directory or are a separate small set.
+
+### What this means for the TI
+
+These sprites are drawn with **additive blending**, which four greys do not have.
+The glow around a fireball is not an outline to redraw, it is light added to what
+is behind. Choosing what becomes light grey and what disappears is an art
+decision, and it has to be made before any of this is quantised.
 
 ### TARGET
 
