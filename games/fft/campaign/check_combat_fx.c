@@ -30,13 +30,16 @@ int main(void)
 
     for (t = 0; t < ACT_GAIN_END; t++) {
         st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
+        st.effect_kind = AB_HEAL;                    // measured: Potion dims, 1.63 s
         memcpy(before, st.unit, sizeof before);
         seed = rng32;
         frame();
         // Battle state: untouched, every frame of the timeline.
         check("units unchanged", !memcmp(before, st.unit, sizeof before));
         check("rng unchanged", seed == rng32);
-        // The schedule the spec asks for, read back from the one byte that holds it.
+        // The schedule, read back from the one byte that holds it. The focus only
+        // engages for a category the original stages: measured with
+        // tools/effect_watch.py, Heal plays in full light and Potion does not.
         if (t < ACT_WIND || t >= ACT_END) check("no focus outside the action", W->fx_sel == 0);
         else if (t < ACT_BLOW)            check("caster in focus", W->fx_sel == (u8)(atk + 1));
         else                              check("target in focus", W->fx_sel == (u8)(tgt + 1));
@@ -45,6 +48,16 @@ int main(void)
         // damage number on its own clock, so consecutive frames differ for reasons that
         // have nothing to do with this layer. PC/68000 equality covers that ground, in
         // check_capacity_render.py's battle-fx case.
+    }
+
+    // A category the original leaves in full light never takes the focus, whatever
+    // the phase. Heal strips a status like Antidote and is staged the opposite way,
+    // which is why this is a table column and not a rule about outcomes.
+    for (t = 0; t < ACT_END; t++) {
+        st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
+        st.effect_kind = AB_CURE;                    // measured: Heal does not dim
+        frame();
+        check("a category that does not dim never focuses", W->fx_sel == 0);
     }
 
     // Leaving the action restores by itself: one frame, no repair pass.
