@@ -150,6 +150,7 @@ core-audit:
 core-audit-test:
 	$(PY) ../tools/test_core_audit.py
 	$(PY) ../tools/test_mesh_blob.py
+	$(PY) ../tools/test_effect_anim.py
 core-boundaries-check: data/ffbm.89y data/ffbn.89y data/ffbo.89y data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_core_boundaries.py

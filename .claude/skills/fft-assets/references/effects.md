@@ -236,14 +236,63 @@ and CLUT first. The animation records give cell and quad directly, and there are
 of them: start there, and keep the VRAM for questions about residency.
 
 **So no, each effect does not have to be rebuilt by eye.** Its choreography is in its
-file: section 0's records name the cell and the four corners of every frame, and
-`--all-frames` prints them. What is NOT yet decoded is the **sequencing** -- which record
-plays on which frame, and for how long. FFHacktics describes the format as carrying
-animation *scripts* beside the records, and sections 1..8 are still unread here.
-
-Until that script is decoded, timing is the one thing still read off captured video, and
-it is the one thing worth decoding next: it would turn every effect in the catalogue from
-a reading exercise into a conversion.
+file, and section 11 reads it.
 
 **There is no PS1 decompilation to lean on.** `Nax/wotl` is the PSP build.
+
+## 11. The animation decoder: an effect read instead of watched
+
+`tools/effect_anim.py` decodes sections 0, 1 and 3, and plays the result. The video is
+no longer where the timing comes from.
+
+    effect_anim.py 163 --script      the byte-code, one block per sequence
+    effect_anim.py 163 --timeline    tick by tick: which cell is drawn where
+    effect_anim.py 163 --render DIR  PNG per frame and a GIF, from the disc alone
+    effect_anim.py 163 --render DIR --ti     the same at 160x100 in four greys
+    effect_anim.py 0 --audit         decode all 291 data effects and report the misses
+
+**Section 1 is the script**, and it is four opcodes wide:
+
+    0x00..0x7f  <u8 ticks> <u8 flag>   draw that cell of section 0, hold `ticks`
+    0x81                                end of sequence
+    0x82 <s16 x> <s16 y>                set the position
+    0x83 <s8 dx> <s8 dy>                move by (dx, dy)
+
+Its head is `u16 count, u16 0` then `count` u16 offsets **relative to byte 4**. Ticks are
+60 Hz, so the common `02` is one frame at 30 fps. **Section 3 is the cast**: `u16 2, u16
+count`, 16 bytes, then 196-byte records whose *byte 1 is the sequence they play* -- one
+sequence can be cast twice. The rest of the record is still unread.
+
+**Section 0 had been read wrong twice.** An offset points *four bytes before* its record:
+the bytes it lands on are the previous record's last corner. A record is `u16 marker, u16
+npoly` then `npoly` polygons of 24 bytes -- page, palette, `u, v, w, h`, then **four**
+corners, TL TR BL BR. Three consequences, each of which had cost a wrong version:
+
+* records of 52, 76 and 100 bytes are the two-, three- and four-polygon frames. Keeping
+  only the 28-byte ones leaves 42 of Stasis Sword's 128 cells, and the dropped ones are
+  the interesting ones: the shards are drawn three polygons at a time;
+* the fourth corner was being taken from the next record;
+* **`w` and `h` are signed**, and a negative one mirrors the cell. 23 of Stasis Sword's
+  298 polygons carry one, and read unsigned they index 224 columns into a 128-wide atlas.
+
+**What it buys, measured on the whole disc**: 291 data files, 11,233 cells, 1,537
+sequences, 1,893 cast members. Every sequence parses to its `0x81` with no fifth opcode.
+One file (E323) has a frame record that is not `4 + 24n`, and six (E105..E110) cast a
+sequence their table does not hold -- report those, do not paper over them.
+
+**Stasis Sword, read rather than watched.** Eleven sequences: a sword flash at the
+caster, one 48x104 blade falling from y -276 in seven steps of 32 px, four 8x8 sparkles
+falling beside it, and five more standing the column. The blade's own sequence is
+`move to 0,-276`, seven `cell 2 / move by 0,+32`, then `cell 3` held 30 ticks, then
+thirteen cells with `move by 0,-2 .. +2` -- a settle. Total 72 ticks, 36 frames.
+
+**Place the origin, or you will mistake it for a scale problem.** The composite sweeps
+y -283..+99 about its origin, so with the origin on the target's feet almost all of it
+draws below the screen and the standing column looks three times too short. Called
+without `--anchor`, the tool sits the sweep on the canvas and prints where it put it.
+
+Two things the decoder still does not settle: whether cast members ever start at
+different times (nothing in the record looks like a delay, and all of Stasis Sword's
+fall together, which the capture supports), and what the rest of the 196 bytes mean --
+`--cast` prints the fields that move between records so the next reader starts there.
 
