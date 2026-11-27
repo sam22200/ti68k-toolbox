@@ -478,6 +478,12 @@ typedef struct {
     s16 bg_x, bg_y;                     // this camera and scene version (bg_ok): copied to the
     u16 bg_ver;                         // screen without shifts while the camera stands still;
     u8 bg_ok, bg_part, bg_drawn;        // valid cache, next quarter, actually used this frame
+#ifdef FFT_COMBAT_FX
+    u8 fx_sel;                          // combat-effect focus, packed into the padding byte
+                                        // this struct already had: sizeof(Work) must not move,
+                                        // MOD_SIG is derived from it and the built module
+                                        // images would be refused (module.h)
+#endif
     u8 drop_wait, hud_wait, bg_wait;    // frames the rings going, a HUD part, the copy, the cursor's
     u8 cur_wait;                        // dashes waited for room
     s16 left, upd_k;                    // the frame's budget left for optional work, the update's
@@ -688,6 +694,8 @@ static u16 status_set_id(u8 i, u8 row)
 #define HUMAN_MISS_K 16                 // composing new rows: charged before optional HUD work
 #define ACTOR_MISS_K 19                 // an actor pose decoded: 17.7k of ZX0 plus the cache scan
 #define ACTOR_FLIP_K 26                 // and 22.9k more when SpriteX8_MIRROR_H_R has to flip it
+#define FX_DARK_K 55                    // the picture dimmed and the focus redrawn: 55,053 measured
+                                        // end to end, of which 46,638 is the dimming loop itself
 #define DK_K 80                         // a banner's shade (ti-cycles: up to 80k, its edge rows)
 #define DK_SPEED 8                     // the shade's diagonal edge (x + y), pixels a frame
 #define DK_N ((RT_W + RT_H) / DK_SPEED + 1)   // its frames, coming then leaving
@@ -7560,6 +7568,9 @@ u16 mod_entry(u8 op, u8 a)
 #endif
 #endif
 #if MOD_CORE
+#ifdef FFT_COMBAT_FX
+#include "fx_focus.inc"      // combat-effect focus: campaign/COMBAT_FX.md
+#endif
 
 // The battle cannot start: the RAM its buffers need (RESOURCES op 12 says how much), else a
 // missing bank
@@ -7754,6 +7765,12 @@ void game_render(void)
     // A flat 32 withheld ~13k of optional HUD work on the 95.7% of battle decodes that
     // are plain, and under-reserved by 13k on the rest.
     W->left-=(s16)(W->actor_misses*ACTOR_MISS_K+W->actor_mirror*ACTOR_FLIP_K);
+#endif
+#ifdef FFT_COMBAT_FX
+    {                                      // the picture is finished: dim it, keep the focus
+        if (fx_apply(f, vis)) W->left -= FX_DARK_K;   // bright. The HUD below is composed
+                                           // after, and stays undimmed.
+    }
 #endif
     ZE(4); ZB(5);
 #ifdef FFT_CHAPTER
