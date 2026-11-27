@@ -4988,6 +4988,11 @@ static void turn_edge(s16 x, s16 y, s16 xb, s16 yb, u8 white)
 }
 #endif
 
+#ifdef FFT_TURN_UNIT_TRACE
+// Where draw_turn() put each unit this frame, so a test can hold the units to the
+// same oracle as the grid. Never defined by a shipping build.
+s16 turn_unit_x[UNIT_CAPACITY], turn_unit_y[UNIT_CAPACITY];
+#endif
 static void draw_turn(void)
 {
     s16 a = (s16)(4 + 8 * st.rot + st.turn * (s16)(st.turn_t + 1) * (8 / (TURN_FRAMES + 1))) & 31;
@@ -5089,13 +5094,25 @@ static void draw_turn(void)
     turn_expand();
 #endif
 
-    // units on top, at their projected feet (no occlusion while turning)
+    // units on top, at their projected feet (no occlusion while turning).
+    // The X term takes the SAME sign as the grid above: the source camera mirrors it,
+    // and a unit that disagreed with its own ground turned the other way around the
+    // pivot -- the ones near the cursor barely moved, the far ones slid off the map.
     for (i = 0; i < NUNIT; i++) {
         const Unit *un = &st.unit[i];
         s16 x2 = 2 * (un->x - st.cx), z2 = 2 * (un->z - st.cz), sx, sy;
         if (un->x >= MAP_W) continue;
-        sx = pvx + (s16)((muls16(x2, C) - muls16(z2, S)) >> 8);
+        sx = pvx
+#ifdef FFT_SOURCE_CAMERA
+            -
+#else
+            +
+#endif
+            (s16)((muls16(x2, C) - muls16(z2, S)) >> 8);
         sy = pvy + (s16)((muls16(x2, S) + muls16(z2, C)) >> 9) - map_tiles[UNIT_CELL(un)].stand * (HU / 2);
+#ifdef FFT_TURN_UNIT_TRACE                      // test-only: campaign/check_qa_turns.c
+        turn_unit_x[i] = sx; turn_unit_y[i] = sy;
+#endif
         draw_unit_covered(sx, sy, st.rot, (u8)i, RT_NULL);
     }
 }

@@ -88,7 +88,13 @@ accepted actual-renderer before/after comparison and current integration.
 supervisor's bounded file-cache lifetime. `check_qa_turns.c` exercises real
 F1/F5 updates through all three moving steps and the final rotation, checks
 unit/RNG preservation, and renders40 frames per chapter on PC and68000.
-Hashes are `FBA1A09C` for Orbonne and `5E09B132` for Gariland,72 assertions each.
+Hashes are `80A68B9A` for Orbonne and `39325CFD` for Gariland,72 assertions each.
+They moved on2026-11-26 from `FBA1A09C`/`5E09B132`: `draw_turn()` projected the
+units with the opposite X sign to their own ground, so each one turned the wrong
+way around the pivot for the three animated frames. The oracle now holds the
+units to the same expectation as the grid (`FFT_TURN_UNIT_TRACE`, test-only),
+which fails on the old code; the still frames before and after a turn are
+unchanged to the pixel.
 The independent PC floating-point oracle is test-only and reads active campaign
 geometry, never historical perspective/control banks:39600+42240 corners agree
 within2px, cardinal endpoints are exact, and every intermediate sweep has the
