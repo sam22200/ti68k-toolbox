@@ -863,3 +863,33 @@ t=30 and t=36 identical (the hold), t=42 936 pixels (thinning), t=46 onwards 1,7
 The cycle scenario's own checksum does not move because the frame it checks falls inside
 the hold -- which is why the picture was compared frame by frame instead.
 
+### The disc said it all along: 42 records, six of them read (2026-11-27)
+
+Three versions of Stasis Sword were built -- a rising cone, a falling cone, a falling
+shard plus a pillar -- and each was wrong about what the effect *is*. The reason was not
+that the information is hard to get. It was this, in `tools/effect_rip.py`:
+
+```python
+for i, f in enumerate(fr[:6]):
+```
+
+`--frames` printed the first **six** animation records of however many a file has. E163
+has **42**. The choreography was in the file from the first day and was read at one
+seventh, with frame-by-frame video filling the rest.
+
+With `--all-frames`, records 16..24 are the same 40x48 cell over nine frames with its
+quad corners shearing and closing from 25 pixels of spread to 4; records 28..38 are
+another doing the same. **That convergence is the effect**: blocks tumbling in onto the
+target. Around them sit three 16x16 cells and a handful of 8x8 ones -- distinct pieces,
+not one mass, which is exactly what "the blocks do not read" meant.
+
+So `fx_spike`'s fall is now three solid outlined diamonds converging on the target
+(`fx_blocks`), and the pillar rises out of them. **352,736 / 360,000**, margin 7,264:
+the three blocks cost what the single shard they replace cost.
+
+The method, so the next effect does not repeat it, is in
+`.claude/skills/fft-assets/references/effects.md`, and its first rule is now "read all
+the records, not the first six": count them, group them by cell, and look at what the
+corners do over a run. A cell repeated with moving corners is an animation; a cell that
+appears once is a prop.
+
