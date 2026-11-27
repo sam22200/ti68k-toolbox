@@ -330,3 +330,21 @@ parameters are chosen, not two primitives.
   Ultima -- need their own rows keyed on the ability, not its outcome.
 - No asset has been drawn. Everything so far is procedural, which is why the
   archive cost of the whole layer is still zero.
+
+## Checked against the original (2026-11-27)
+
+`games/fft/tools/effect_watch.py` watches the real game play an ability.
+
+**The focus layer is right.** The original dims the scene to night blue and keeps
+the caster lit: Wish for 3.02 s, Potion for 1.62 s. Step 1 was built from a
+specification and now matches an observation.
+
+**But the step 3 table is wrong on one point.** `Heal` does not dim at all. The
+original reserves the staging for the larger effects and plays small ones in
+normal light, while `fx_table` gives every outcome category a primitive and the
+schedule dims whenever an action runs. The table needs a "dims or not" column,
+taken from the original rather than chosen.
+
+Timing is still not resolved. The total is now observed -- about 3 s for Wish --
+but relating that to an effect file's record count needs the effect number for
+each ability, which is the file's name on the FFHacktics list.
