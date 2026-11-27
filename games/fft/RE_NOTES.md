@@ -2971,3 +2971,63 @@ look is one row.
 
 20 MB against a ~294 KB chapter margin means nothing is imported wholesale. The
 question these files answer is **what the effects look like**, not what to ship.
+
+## What the original actually does during an ability (2026-11-27)
+
+Observed, not inferred: `tools/effect_watch.py` drives Gariland's own abilities
+through `oracle.py`'s menu sequences and captures every frame.
+
+### The original dims the scene, and not always
+
+| Ability | Dimmed window | Duration |
+|---|---|---|
+| Wish | frames 89..269 | **3.02 s** |
+| Potion | frames 68..164 | **1.62 s** |
+| Heal | none | -- |
+
+The scene goes to night blue while the caster keeps a bright halo, which is the
+focus layer the spec describes and `games/fft/fx_focus.inc` implements. That the
+architecture was right is now an observation rather than a reading of a PDF.
+
+**Heal does not dim at all.** The focus is not universal: a small effect plays in
+normal light and only the larger ones take the staging. `campaign/COMBAT_FX.md`'s
+table gives every outcome category a primitive, Heal included, so **that table is
+wrong on this point** and should carry a "dims or not" column taken from the
+original rather than chosen.
+
+### A clean number measured on the wrong screen
+
+A first pass reported **"the game displays at 30 Hz"**, from perfectly uniform
+2-frame holds across three abilities. It was measured while the screen showed the
+"Executing action. OK?" prompt, where only a cursor blinked. With the action
+running the holds are mixed -- 1, 2, 2, 1, 2, 1, 1, 3 -- so the game redraws at up
+to 60 Hz and holds when nothing moves.
+
+Executing needs **two** confirmations, not one: the targeting taps raise that
+prompt and a second CIRCLE runs the ability. Capturing after the first one
+photographs a still screen.
+
+That is the third time in this file a measurement returned a clean number about
+the wrong thing: the colour test that silently skipped Fire, the corner test that
+assumed centred quads, and this. The common shape is worth keeping in mind --
+**the measurement was sound and its subject was not.**
+
+### Getting there, and what not to repeat
+
+`oracle.py` skips the Orbonne prologue deliberately, poking the script variable
+EVENT to 6. Reaching the prologue to watch Agrias and Gafgarion cast Holy Sword
+is possible -- booting without that poke lands in the battle, 16 units readable
+in the unit table -- but **driving it is not**: oracle.py's input sequences are
+tuned to the Gariland battle it reaches by its own route and frame alignment, and
+replaying them elsewhere ends with the game out of the battle on a black screen.
+
+Timing never needed the prologue. Any effect answers it, and Gariland's own
+abilities were already driven by working code. The prologue is for comparing our
+drawings to the signature techniques, which is a question of resemblance, and it
+will need its own input sequences rather than borrowed ones.
+
+Two practical notes for whoever picks this up: CIRCLE confirms, not CROSS, and
+`PAD` holds bit indices, so a key is `1 << PAD[name]` as `oracle.key` does. Both
+cost an hour here. And read the battle through the unit table at `0x801908cc`
+rather than by diffing pixels: pixel diffs ranked the battle's opening camera
+above every spell.
