@@ -893,3 +893,53 @@ the records, not the first six": count them, group them by cell, and look at wha
 corners do over a run. A cell repeated with moving corners is an animation; a cell that
 appears once is a prop.
 
+### The effect's height decides whether the picture stays (2026-11-27)
+
+An effect either fits the ordinary picture or it earns a cut-away, and the test is **its
+own requested height**: a property of what is about to be drawn.
+
+```c
+#define FX_TALL 28
+static u8 fx_tall(void)   /* fx_play.inc */
+{
+    return st.mode == M_ACT && FX_STAGES(st.abil) && FX_SPIKE_H > FX_TALL
+           && st.act_t >= FX_ICE_FROM && st.act_t < FX_ICE_FROM + FX_ICE_LEN;
+}
+```
+
+**Not the frame budget.** `W->left` is negative all through a battle scene, so a budget
+gate fires always or never -- that was measured when the composed copy was tried.
+
+**Both halves of the test matter.** Keyed on the ability alone, the cut-away stayed up for
+the whole wash; the effect plays 23 ticks of a 55-tick hold, so 25 frames showed an empty
+grey field. The picture goes away for the *effect*, not for the ability.
+
+A cut-away is: the map a flat field, nothing dimmed (a uniform field has nothing to dim),
+and only the two units the action concerns drawn. The levers measured separately:
+
+| lever | peak | won |
+|---|---|---|
+| flat map, still dimmed | 344,178 | 8,558 |
+| flat map, not dimmed | 302,156 | 50,580 |
+| only the two units, whole wash | 304,128 | 48,608 |
+| **both** | **253,716** | **99,020** |
+
+The flat map is worth almost nothing on its own -- the scene blit already comes from
+`W->bg` and is cheap. What pays is that **a flat field does not need dimming**, which
+removes the asm loop's 42,010 cycles. The gain is in what stops happening, not in what
+replaces it.
+
+That is what buys `E173`'s real height:
+
+| | peak | margin |
+|---|---|---|
+| ordinary picture, 24-row pillar | 352,736 | 7,264 |
+| **cut-away, 82-row pillar** | **337,234** | **22,766** |
+
+`FX_SPIKE_H` is 82 at last -- 136 * 0.6, the original's own height.
+
+**What it costs in fidelity**, since nothing else in this file does: the original never
+cuts away. It keeps its scene visible and dimmed for the whole effect. This is a trade
+taken to get the effect's size right, bounded to the frames the effect draws on, and
+`FX_TALL` above 82 undoes it.
+
