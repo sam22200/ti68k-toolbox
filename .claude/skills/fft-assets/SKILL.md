@@ -10,6 +10,10 @@ Everything below was read from the local retail US disc
 artwork or a generated bank**: add the generated header to the nearest
 `.gitignore`, as `map.h`, `units.h` and `chicken_art.h` are.
 
+Read [reading an original effect](references/effects.md) before rebuilding any combat
+effect: how to find what one actually does (its animation records, not its atlas picture),
+and what four greys and a 360,000-cycle frame allow of it.
+
 Read [the disc catalogue](references/disc-map.md) for file-by-file offsets and
 formats. The rest of this page is the method and the traps.
 
