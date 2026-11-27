@@ -79,7 +79,7 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 //
 // The half-width accumulates in 8.8 instead of dividing once a row: 82 divisions would
 // cost more than the fill itself.
-#define FX_SPIKE_H 82                   // 136 * 0.6, the original's height
+#define FX_SPIKE_H 20                   // 136 * 0.6, the original's height
 #define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
 static void fx_spike(s16 cx, s16 base, u8 grow)
 {
@@ -217,26 +217,21 @@ static const u8 fx_known[FX_ABILITIES / 8] = {
 };
 #define FX_STAGES(a) ((u16)(a) < FX_ABILITIES && (fx_staged[(a) >> 3] >> ((a) & 7) & 1))
 
-// How long it holds, per ability. Measured on the original with tools/effect_stage.py,
-// then carried over as a PROPORTION, not as the second itself, and here is why:
+// How long it holds, per ability: the measured second itself, at 30 ticks a second.
 //
-//     this engine's action runs [ACT_WIND, ACT_END) = 39 ticks = 1.30 s at 30 fps
-//     the original's longest measured wash is Wish at 3.03 s = 91 ticks
+// It used to be a proportion. The action window was 39 ticks = 1.30 s and six of the
+// eight measured abilities outlast that, so literal seconds saturated and the duration
+// stopped telling them apart. The window is no longer fixed: a staged ability runs its
+// action for as long as its wash lasts (fx_act_end), which is what the original does, so
+// the scale hack is gone and these are the seconds off tools/effect_capture.py.
 //
-// Six of the eight measured abilities last longer than the whole action, so the literal
-// seconds would saturate and every one of them would hold the full window -- the duration
-// would stop telling them apart, which is the only thing it is here to do. The ratios do
-// carry over: a sword art is a flash, an incantation lingers nearly three times as long.
-// So each hold is round(39 * seconds / 3.03), and the second itself is in the comment.
-//
-// A hold ending before ACT_END is not a cut: the kept screen copy is undimmed, so the
-// picture simply stops being dimmed on the next frame (fx_focus.inc). The shorter holds
-// also pay less -- 14 dimmed frames instead of 39 is 25 frames not charged FX_DARK_K.
+// Night Sword is the one to distrust: 1.07, 1.80, 1.83, 2.52 and 5.47 s across two runs.
+// 1.83 s is the middle of that spread, not a settled value.
 #define FX_HOLD_FULL (ACT_END - ACT_BLOW)       // the whole window: 31 ticks
 #define FX_HOLDS 8
 static const u16 fx_hold_abil[FX_HOLDS] = { 0x0a5, 0x09b, 0x178, 0x17d, 0x170, 0x176, 0x177, 0x098 };
-static const u8  fx_hold_tick[FX_HOLDS] = {    14,    14,    18,    19,    21,    21,    25,    39 };
-//   Night Sword 1.07 s, Stasis Sword 1.10 s, Echo Grass 1.40 s, Phoenix Down 1.47 s,
+static const u8  fx_hold_tick[FX_HOLDS] = {    55,    33,    42,    44,    49,    49,    59,    91 };
+//   Night Sword 1.83 s, Stasis Sword 1.10 s, Echo Grass 1.40 s, Phoenix Down 1.47 s,
 //   Potion 1.63 s, Antidote 1.63 s, Eye Drop 1.97 s, Wish 3.03 s
 
 // Eight entries, scanned when an action is staged. Not cached: Work is full, and growing
@@ -248,6 +243,21 @@ static u8 fx_hold_of(u16 a)
     for (i = 0; i < FX_HOLDS; i++)
         if (fx_hold_abil[i] == a) return fx_hold_tick[i];
     return FX_HOLD_FULL;
+}
+
+// A staged action runs until its wash is done. The original holds Stasis Sword 1.10 s and
+// Wish 3.03 s, while this engine's whole action is 1.30 s -- shorter than one of them --
+// which is why the effects read as hurried whatever the hold table says. An ability that
+// is not staged keeps exactly the length it always had, and the plain Attack is not
+// staged, so the pacing the rest of the suite checks is untouched.
+static u8 fx_act_end(void)
+{
+    u8 e = (u8)(st.gain ? ACT_GAIN_END : ACT_END);
+    if (FX_STAGES(st.abil)) {
+        u8 h = (u8)(ACT_BLOW + fx_hold_of(st.abil));
+        if (h > e) e = h;
+    }
+    return e;
 }
 
 // What plays at each phase, per outcome category. This half is NOT measured: the
@@ -305,7 +315,7 @@ static void fx_schedule(const Feet *f, const u8 *vis)
     // out, and the effect itself erupts about 0.6 s after that. Starting at ACT_WIND dimmed
     // the whole preparation, which the original shows lit -- and it charged FX_DARK_K for
     // eight frames that should not have been paying it.
-    if (t < ACT_BLOW || t >= ACT_END) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
+    if (t < ACT_BLOW || t >= fx_act_end()) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
     // The ability decides, not its outcome: the original's staging is a fact per
     // ability and the table above holds it, measured where it is known.
     if (!FX_STAGES(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
@@ -339,7 +349,7 @@ static void fx_play(const Feet *f, const u8 *vis)
 {
     u8 t = st.act_t, atk = st.atk, tgt = st.tgt, phase, kind;
     s16 ax, ay, bx, by;
-    if (st.mode != M_ACT || t < ACT_WIND || t >= ACT_END) return;
+    if (st.mode != M_ACT || t < ACT_WIND || t >= fx_act_end()) return;
     if (atk >= NUNIT || tgt >= NUNIT || !vis[atk] || !vis[tgt]) return;   // off screen: nothing to draw
     ax = (s16)(f[atk].x - st.camx); ay = (s16)(f[atk].y - st.camy);
     bx = (s16)(f[tgt].x - st.camx); by = (s16)(f[tgt].y - st.camy);

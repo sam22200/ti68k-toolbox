@@ -41,10 +41,11 @@ int main(void)
         // engages for a category the original stages: measured with
         // tools/effect_watch.py, Heal plays in full light and Potion does not.
         // The wash starts at the BLOW, not the wind-up: measured on the original, the
-        // preparation plays in full light (campaign/COMBAT_FX.md).
-        if (t < ACT_BLOW || t >= ACT_END) check("no focus before the blow", W->fx_sel == 0);
-        else if (t < ACT_HIT)             check("caster in focus", W->fx_sel == (u8)(atk + 1));
-        else                              check("target in focus", W->fx_sel == (u8)(tgt + 1));
+        // preparation plays in full light. Wish holds 3.03 s = 91 ticks from the blow, so
+        // its action runs to 104 and the wash covers this whole sweep (COMBAT_FX.md).
+        if (t < ACT_BLOW)     check("no focus before the blow", W->fx_sel == 0);
+        else if (t < ACT_HIT) check("caster in focus", W->fx_sel == (u8)(atk + 1));
+        else                  check("target in focus", W->fx_sel == (u8)(tgt + 1));
         // Pixel stability across frames is deliberately NOT asserted here. The engine
         // spreads its HUD and screen copy over several frames and keeps animating the
         // damage number on its own clock, so consecutive frames differ for reasons that
@@ -82,13 +83,19 @@ int main(void)
     // A measured hold that ends before the action does. Night Sword holds 14 ticks of
     // the 39 the window offers, so the wash clears just after the impact and the settle
     // plays in full light -- the behaviour the per-ability duration exists to produce.
-    for (t = 0; t < ACT_END; t++) {
+    for (t = 0; t < 80; t++) {
         st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
-        st.abil = 0x0a5;                             // Night Sword: measured, holds 1.07 s
+        st.abil = 0x0a5;                             // Night Sword: measured, holds 1.83 s
         frame();
-        if (t < ACT_BLOW || t >= ACT_BLOW + 14) check("short hold released", W->fx_sel == 0);
-        else                                   check("short hold engaged", W->fx_sel != 0);
+        if (t < ACT_BLOW || t >= ACT_BLOW + 55) check("hold released", W->fx_sel == 0);
+        else                                   check("hold engaged", W->fx_sel != 0);
     }
+
+    // A staged ability runs its action for as long as its wash: that is the whole point of
+    // the change, and without it the hold would simply be cut off at ACT_END.
+    st.abil = 0x098; check("Wish runs past the ordinary end", fx_act_end() > ACT_END);
+    st.abil = 0x0a5; check("Night Sword runs past it too", fx_act_end() > ACT_END);
+    st.abil = 0x093; check("an unstaged ability keeps its length", fx_act_end() == ACT_END);
 
     // Every staged ability carries a measured hold. Without this the table could stage an
     // ability and silently give it the full window, which is the saturation the

@@ -613,3 +613,54 @@ frames**: the save state held a battle that was not advancing. Without that seco
 reading, "no wash detected" would have looked like a fact about the game instead of a
 fact about the state.
 
+## A staged action runs as long as its wash (2026-11-27)
+
+The holds were a proportion because the action window was fixed at 39 ticks = 1.30 s,
+shorter than one of the original's washes. Now a staged ability runs its action for as
+long as its wash lasts (`fx_act_end`), so **the holds are the measured second itself**:
+
+| ability | measured | ticks from `ACT_BLOW` | action ends |
+|---|---|---|---|
+| Stasis Sword | 1.10 s | 33 | 46 |
+| Echo Grass | 1.40 s | 42 | 55 |
+| Phoenix Down | 1.47 s | 44 | 57 |
+| Potion, Antidote | 1.63 s | 49 | 62 |
+| Night Sword | 1.83 s | 55 | 68 |
+| Eye Drop | 1.97 s | 59 | 72 |
+| Wish | 3.03 s | 91 | 104 |
+
+An ability that is not staged keeps exactly the length it always had, and the plain
+Attack is not staged, so the pacing the rest of the suite checks is untouched.
+
+**The lengthening is cheap**: with no effect drawn it peaks at **341,684**, below the
+350,714 of the previous state, because the wash starting at the blow saves more than
+the extra frames cost.
+
+### The spike had never been measured at its full height
+
+Walking the action to its real end exposed this. The cycle scenario used to walk
+`[ACT_WIND, ACT_END)`, and the frames it reached drew the spike at **32 rows, never at
+82**: `grow` had not got there yet. The figures that said "the solid shape is cheaper
+than the dots it replaces" were measured on a third of a spike.
+
+At full height it costs about **1,220 cycles a row**:
+
+| `FX_SPIKE_H` | peak |
+|---|---|
+| 82, the original's proportion | 424,734 over |
+| 48 | 383,580 over |
+| 32 | 364,110 over |
+| 24 | 354,480 PASS |
+| **20** | **349,588 PASS** |
+
+So the budget affords **20 rows where E173 asks for 82** -- a quarter of the original's
+proportion. The spike is now a cone at the target's feet rather than the column the
+original raises. That is a measured limit, not a choice: to draw it at its true size
+the cost has to come from somewhere, and the obvious reserve is the 55,000 cycles the
+dimming spends every frame.
+
+The scenario now walks to `fx_act_end()`, so the half where the wash and the spike
+overlap is covered. **That is the fourth measurement in this file that reported a peak
+for frames where the feature was not running**, after the missing `st.abil`, the
+invisible unit pair and the rotation with no occluder.
+
