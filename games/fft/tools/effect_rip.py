@@ -77,10 +77,10 @@ def animation(raw):
     Records are not all 28 bytes -- Fire's table steps by 28, 52, 76 and 100 --
     so longer variants exist and are skipped here rather than guessed at.
 
-    What this does NOT give: how long a frame holds. The timing lives in one of
-    sections 1, 3, 6 or 7; section 4 is fifteen ramps of 160 rising values, which
-    looks like interpolation but has not been shown to be. The first eight of the
-    record's fourteen 16-bit fields are also unread.
+    This reads only the single-polygon records, and three of their four corners.
+    **Use `effect_anim.py` instead**: it reads the multi-polygon frames too, the
+    script in section 1 (which cell, for how many 60 Hz ticks, moved by how much)
+    and the cast in section 3, and it plays the result without the console.
     """
     if len(raw) < 40 or struct.unpack_from('<I', raw, 0)[0] != 40:
         return []
