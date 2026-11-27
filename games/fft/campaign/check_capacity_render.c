@@ -22,14 +22,15 @@
 #undef game_scenario
 #undef game_update
 static u8 ko_board;
+static u8 fx_walk;          // battle-fx: step through M_ACT for the effect gate
 static u8 ko_original_job;
 u8 game_update(void){
 #ifdef CAP_MENU
     // Static13-actor UI frame: actual renderer/cache budget, no AI/turn work.
     FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=W->actor_mirror=0;W->ac_now++;
-#ifdef FFT_COMBAT_FX
-    if(rt_frame>=10)fx_focus(0,1);   // the combat-effect focus, priced from frame10 (COMBAT_FX.md)
-#endif
+    // battle-fx walks the engine's own action timeline, in BOTH builds, so the gate
+    // compares like with like: the difference is the effect layer, not the action state.
+    if(fx_walk)st.act_t=(u8)(ACT_WIND+(rt_frame%(u16)(ACT_END-ACT_WIND)));
     return 1;
 #else
 #ifdef CAP_KO
@@ -52,6 +53,8 @@ void game_scenario(u16 scenario)
     st.mode=scenario?M_ACTS:M_MENU;st.ai=AI_OFF;st.turn=0;
     st.open_stage=st.open_fade=st.banner=0;st.act=st.sel=U_RAMZA;
     st.menu=st.sub=0;W->win_n=W->win_m=0;W->win_k[0]=0;
+    fx_walk=(u8)(scenario==2);
+    if(fx_walk){st.mode=M_ACT;st.atk=0;st.tgt=(u8)(NUNIT>1?1:0);st.act_t=ACT_WIND;}
 #endif
 #ifdef CAP_STATUS
     if(scenario==1||scenario==2) {

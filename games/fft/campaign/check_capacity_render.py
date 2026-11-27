@@ -49,7 +49,7 @@ def main():
     ap.add_argument('--actors',type=int,choices=(11,12,13),default=13,help='keep the original eleven and add up to two identical diagnostic actors')
     ap.add_argument('--combat-fx',action='store_true',help='build with FFT_COMBAT_FX so the focus dimming is priced; the gate otherwise measures the engine without it')
     ap.add_argument('--profile-zones',action='store_true',help='enable renderer component zones in the private carrier; instrumented timings are diagnostic')
-    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition','monster-body','battle-menu','battle-act'),
+    ap.add_argument('--case',action='append',choices=('board','rotations','status-last','equipment-last','monster-ko','monster-ko-morph','monster-ko-transition','monster-body','battle-menu','battle-act','battle-fx'),
                     help='select affected cases; default is the original four-case certification')
     ap.add_argument('--ko-bank',type=Path,help='private FKO1 bank for the monster-ko case')
     ap.add_argument('--body-bank',type=Path,help='FMB1 bank for the monster-body case; the synthetic creatures of check_monster_body.py by default (games/fft/tools/monster_body_assets.py builds a real one)')
@@ -69,10 +69,10 @@ def main():
     # group of scenarios is its own build: the certified four (CAP_STATUS), the monster
     # KO boards (CAP_KO) and the wide bodies (CAP_BODY). Only the requested one is built.
     wanted=set(args.case or ('board','rotations','status-last','equipment-last'))
-    if wanted&{'battle-menu','battle-act'} and wanted-{'battle-menu','battle-act'}:
+    if wanted&{'battle-menu','battle-act','battle-fx'} and wanted-{'battle-menu','battle-act','battle-fx'}:
         ap.error('Static menu carriers must be selected separately from gameplay/Status cases')
     groups=[]
-    if wanted&{'battle-menu','battle-act'}:groups.append('-DCAP_MENU')
+    if wanted&{'battle-menu','battle-act','battle-fx'}:groups.append('-DCAP_MENU')
     if wanted&{'status-last','equipment-last'}:groups.append('-DCAP_STATUS')
     if wanted&{'monster-ko','monster-ko-morph','monster-ko-transition'}:groups.append('-DCAP_KO')
     if 'monster-body'in wanted:groups.append('-DCAP_BODY')
@@ -116,7 +116,7 @@ def main():
         for label,scenario,frames,keys in (('board',0,90,empty),('rotations',0,100,rotations),
                                          ('status-last',1,100,empty),('equipment-last',2,100,empty),
                                          ('monster-ko',3,60,empty),('monster-ko-morph',4,60,empty),
-                                         ('monster-ko-transition',5,60,empty),('monster-body',1000+args.body_job if args.body_job else 5+args.bodies,90,empty),('battle-menu',0,90,empty),('battle-act',1,90,empty)):
+                                         ('monster-ko-transition',5,60,empty),('monster-body',1000+args.body_job if args.body_job else 5+args.bodies,90,empty),('battle-menu',0,90,empty),('battle-act',1,90,empty),('battle-fx',2,90,empty)):
             if args.case and label not in args.case:continue
             if label.startswith('monster-')and not args.case:continue
             pc=run([out/'render',scenario,frames,keys,out/(label+'-pc.png')],data)
