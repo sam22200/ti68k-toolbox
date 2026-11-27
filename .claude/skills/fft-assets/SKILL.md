@@ -12,7 +12,9 @@ artwork or a generated bank**: add the generated header to the nearest
 
 Read [reading an original effect](references/effects.md) before rebuilding any combat
 effect: how to find what one actually does (its animation records, not its atlas picture),
-and what four greys and a 360,000-cycle frame allow of it.
+and what four greys and a 360,000-cycle frame allow of it. `tools/effect_anim.py` decodes
+and plays an effect's choreography straight from the disc -- cells, script and cast -- so
+the timing no longer has to be read off a video of the console.
 
 Read [the disc catalogue](references/disc-map.md) for file-by-file offsets and
 formats. The rest of this page is the method and the traps.
