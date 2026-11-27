@@ -54,7 +54,9 @@ void game_scenario(u16 scenario)
     st.open_stage=st.open_fade=st.banner=0;st.act=st.sel=U_RAMZA;
     st.menu=st.sub=0;W->win_n=W->win_m=0;W->win_k[0]=0;
     fx_walk=(u8)(scenario==2);
-    if(fx_walk){st.mode=M_ACT;st.atk=0;st.tgt=(u8)(NUNIT>1?1:0);st.act_t=ACT_WIND;}
+    if(fx_walk){st.mode=M_ACT;st.atk=0;st.tgt=(u8)(NUNIT>1?1:0);st.act_t=ACT_WIND;
+        st.abil=0x0a5;}   /* Night Sword: a measured hold shorter than the window,
+                             so the walk crosses both the washed and the clear half */
 #endif
 #ifdef CAP_STATUS
     if(scenario==1||scenario==2) {
