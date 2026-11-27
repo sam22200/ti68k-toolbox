@@ -748,3 +748,32 @@ and the branch that serves them simply had no counter: a replacement had dropped
 The conclusion "the cache never engages" was one print away from being written down as
 a fact about the design. It is the fifth miscount in this file.
 
+### Measured on the Titanium: there are 426 bytes, not 4,000 (2026-11-27)
+
+The composed copy needs 4,000 bytes and the figure it was being weighed against -- 436
+free -- was from 2026-11-24, when `MOD_ZONE` was 9,118. It is 9,510 now. So it was
+measured again, in TiEmu, on a live Gariland battle from the `fftgar` state:
+
+```
+battle heap free 426 max 420
+```
+
+`HeapAvail` **426 bytes**, `HeapMax` **420** -- that is the largest contiguous block.
+68 heap blocks, 237,294 bytes allocated, 10 units on the field. Read through
+`fftmem.py set heap on`, which fires `DBG_HEAP` on the next cached command window
+(`window_cache.inc`), and collected with `ti-mem log`: no screenshot.
+
+**So the second buffer cannot come from RAM.** 4,000 bytes against 426 free and 420
+contiguous is not a tight fit, it is an order of magnitude. Nothing in the composed-copy
+design changes that, and no tuning of it will.
+
+And it could not be taken conditionally even if the RAM existed: `FFT_COMBAT_FX` appears
+in neither `tools/module.py` nor the campaign `Makefile`, so the module images are never
+built with it. A `Work` member added under that flag exists in the core and not in its
+modules, `MOD_SIG` diverges, and the core refuses all eight pointers -- the TI build
+draws "Missing data" and the PC/68000 checksums part company. That is why this layer was
+built to add **zero** bytes to `Work`, and the one byte it does use fits in padding the
+struct already had.
+
+What is left for the dimming, then, is the asm route (`movem`, about 30 %) or nothing.
+
