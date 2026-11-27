@@ -35,6 +35,72 @@ static void fx_dot(s16 x, s16 y, u8 white)
     else       { ((u8 *)rt_light)[o] |= b;      ((u8 *)rt_dark)[o] |= b; }
 }
 
+// A horizontal run, in whole bytes wherever it can. A solid shape filled with fx_dot
+// would cost a call per pixel and the layer has 8,910 cycles of margin (COMBAT_FX.md);
+// per row this touches one byte per eight pixels instead, on both planes.
+static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
+{
+    u8 *lp, *dp, m0, m1;
+    s16 b0, b1;
+    if ((u16)y >= RT_H) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 > RT_W - 1) x1 = RT_W - 1;
+    if (x1 < x0) return;
+    lp = (u8 *)rt_light + (u16)(y * RT_PBYTES);
+    dp = (u8 *)rt_dark + (u16)(y * RT_PBYTES);
+    b0 = (s16)(x0 >> 3); b1 = (s16)(x1 >> 3);
+    m0 = (u8)((0xFFu >> (x0 & 7)) & pat);
+    m1 = (u8)((0xFFu << (7 - (x1 & 7))) & pat);
+    if (b0 == b1) {
+        u8 m = (u8)(m0 & m1);
+        if (white) { lp[b0] &= (u8)~m; dp[b0] &= (u8)~m; }
+        else       { lp[b0] |= m;      dp[b0] |= m; }
+        return;
+    }
+    if (white) { lp[b0] &= (u8)~m0; dp[b0] &= (u8)~m0; }
+    else       { lp[b0] |= m0;      dp[b0] |= m0; }
+    for (b0++; b0 < b1; b0++) {
+        if (white) { lp[b0] &= (u8)~pat; dp[b0] &= (u8)~pat; }
+        else       { lp[b0] |= pat;      dp[b0] |= pat; }
+    }
+    if (white) { lp[b1] &= (u8)~m1; dp[b1] &= (u8)~m1; }
+    else       { lp[b1] |= m1;      dp[b1] |= m1; }
+}
+
+// Night Sword's own shape, read off EFFECT/E173.BIN rather than invented: its frame 0 is
+// a 40x136 atlas cell whose quad spans y -26..110 about the anchor -- a tall spike, point
+// up, base at the target. At the project's 0.6 sprite scale that is 24x82, which is how
+// large it is in the original: about three and a half times a unit's height.
+//
+// This is a SOLID shape, and that is the whole point. A one-pixel halo around a scatter of
+// one-pixel dots is four blacks for one white and reads worse, not better (COMBAT_FX.md);
+// around a silhouette it is the project's ordinary visibility rule and it works. The edge
+// is drawn black, the body white, the body after the edge so the two never fight.
+//
+// The half-width accumulates in 8.8 instead of dividing once a row: 82 divisions would
+// cost more than the fill itself.
+#define FX_SPIKE_H 82                   // 136 * 0.6, the original's height
+#define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
+static void fx_spike(s16 cx, s16 base, u8 grow)
+{
+    s16 r, h = (s16)(grow > FX_SPIKE_H ? FX_SPIKE_H : grow);
+    s32 w8, step;
+    if (h < 2) return;
+    step = ((s32)FX_SPIKE_W << 8) / h;
+    for (r = 0, w8 = 0; r < h; r++, w8 += step) {
+        s16 y = (s16)(base - (h - 1 - r));      // the point is at the top
+        s16 w = (s16)(w8 >> 8);
+        fx_dot((s16)(cx - w - 1), y, 0);        // the silhouette, before the body
+        fx_dot((s16)(cx + w + 1), y, 0);
+        // The body is a checkerboard, not an aplat. The original's effects blend
+        // additively and the unit shows through them; filled solid, this spike hid the
+        // very unit the focus had just kept bright. Four greys have no alpha, so every
+        // other pixel is left as it was -- the veil reads white and the unit under it
+        // reads too. It costs the same: the pattern is ANDed into the span's mask.
+        fx_span((s16)(cx - w), (s16)(cx + w), y, 1, (u8)((y & 1) ? 0xAAu : 0x55u));
+    }
+}
+
 // Effects are NOT depth tested. seen(), the per-pixel test the water glints use, is
 // compiled out when the chapter's water bank is in (FFT_WATER_BANK), so a depth-aware
 // dot would do nothing in the configuration that actually ships. Sorting effects behind
@@ -186,10 +252,10 @@ static u8 fx_hold_of(u16 a)
 
 // What plays at each phase, per outcome category. This half is NOT measured: the
 // primitives were chosen, and only the staging above comes from the original.
-enum { FXP_NONE, FXP_RING, FXP_SLASH, FXP_BURST, FXP_BEAM, FXP_COLUMN, FXP_MOTES };
+enum { FXP_NONE, FXP_RING, FXP_SLASH, FXP_BURST, FXP_BEAM, FXP_COLUMN, FXP_MOTES, FXP_SPIKE };
 #define FX_KINDS 32                     // EFFECT_KIND_MASK + 1
 static const u8 fx_table[FX_KINDS][4] = {   // gather, travel, impact, settle
-    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_RING  },
+    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_SPIKE,  FXP_SPIKE },   // the sword arts: E173's spike
     [AB_CURE]            = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING  },
     [AB_HEAL]            = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_RING  },
     [AB_CLEANSE]         = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING  },
@@ -247,6 +313,7 @@ static void fx_draw(u8 which, u8 t, s16 ax, s16 ay, s16 bx, s16 by)
     case FXP_BEAM:   fx_beam(ax, (s16)(ay + UNIT_FOOT / 2), bx, (s16)(by + UNIT_FOOT / 2), 1); break;
     case FXP_COLUMN: fx_column(bx, (s16)(by + UNIT_FOOT), t, 1); break;
     case FXP_MOTES:  fx_motes(bx, (s16)(by + UNIT_FOOT), t, 10, 1); break;
+    case FXP_SPIKE:  fx_spike(bx, (s16)(by + UNIT_FOOT), (u8)(8 + 12 * t)); break;
     default: break;
     }
 }
