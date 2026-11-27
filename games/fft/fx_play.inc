@@ -111,59 +111,77 @@ static void fx_slash(s16 x0, s16 y0, s16 x1, s16 y1, u8 phase, u8 white)
     }
 }
 
-// What plays at each phase, and whether the picture dims for it.
+// Whether the original stages an ability -- dims and washes the picture for it --
+// is **a fact per ability**, not something derivable. Two candidate keys were
+// tried and each fell to a counter-example from the measurements:
 //
-// The engine already classifies the action -- `st.effect_kind` carries the AB_*
-// category act_kind() resolves -- so this is a table, not a second classifier.
-// Five bytes a row, const, in the module image: no RAM, and an ability moves to
-// another look by editing one row.
+//   st.effect_kind     a Holy Sword and a plain Attack both deal damage, and
+//                      the original stages one and not the other
+//   abilities[].flags  Dash and Wish both carry 0x00, and Wish dims 3.03 s
+//                      while Dash plays in full light. Night Sword dims with
+//                      no AF_CAST; nothing observed carries AF_CHARGE
 //
-// The DIM column is measured on the original, with `tools/effect_watch.py`, and
-// it does not follow the outcome category. Heal and Antidote both strip a status
-// and the original stages them oppositely:
+// So it is stored the way the original stores it: against the ability. In FFT an
+// ability points at an EFFECT file and the file carries its own staging, which is
+// why no rule was ever going to fall out of the ability's own fields.
 //
-//     no dimming   Dash, Throw Stone, Attack, Heal      (skills, physical acts)
-//     dimming      Wish 3.03 s, Potion 1.63 s, Antidote 1.63 s,
-//                  Eye Drop 1.97 s, Echo Grass 1.40 s, Phoenix Down 1.47 s
+// One bit an ability in fx_staged. fx_known says which of those bits is MEASURED
+// (tools/effect_stage.py and tools/effect_watch.py) rather than defaulted, so a
+// reader can tell a fact from a blank -- the previous table could not, and its
+// six "measured" rows were right only by accident of what had been watched.
 //
-// So what decides the staging is the *kind of action* -- a physical skill plays
-// in full light, an item or an incantation gets the stage -- and this table is
-// keyed on the outcome. Six rows below are measured; the rest are marked NOT
-// OBSERVED and default to dimming because most of them are cast. Do not read an
-// unmarked row as evidence.
+//   staged, measured   Wish 3.03 s, Stasis Sword 1.10 s, Night Sword 1.07..5.47 s,
+//                      Potion 1.63 s, Antidote 1.63 s, Eye Drop 1.97 s,
+//                      Echo Grass 1.40 s, Phoenix Down 1.47 s
+//   plain, measured    Dash, Throw Stone, Heal, and the plain Attack
+//
+// Everything unmeasured defaults to **not staged**: the dimming costs 55
+// kilocycles a frame (campaign/COMBAT_FX.md), and spending that on a guess is
+// worse than leaving an effect plain until somebody watches it.
+#define FX_ABILITIES 512
+static const u8 fx_staged[FX_ABILITIES / 8] = {
+    [0x13] = 0x09,                      /* 0x098 Wish, 0x09b Stasis Sword */
+    [0x14] = 0x20,                      /* 0x0a5 Night Sword */
+    [0x2E] = 0xC1,                      /* 0x170 Potion, 0x176 Antidote, 0x177 Eye Drop */
+    [0x2F] = 0x21,                      /* 0x178 Echo Grass, 0x17d Phoenix Down */
+};
+static const u8 fx_known[FX_ABILITIES / 8] = {
+    [0x12] = 0x38,                      /* 0x093 Dash, 0x094 Throw Stone, 0x095 Heal */
+    [0x13] = 0x09, [0x14] = 0x20, [0x2E] = 0xC1, [0x2F] = 0x21,
+};
+#define FX_STAGES(a) ((u16)(a) < FX_ABILITIES && (fx_staged[(a) >> 3] >> ((a) & 7) & 1))
+
+// What plays at each phase, per outcome category. This half is NOT measured: the
+// primitives were chosen, and only the staging above comes from the original.
 enum { FXP_NONE, FXP_RING, FXP_SLASH, FXP_BURST, FXP_BEAM, FXP_COLUMN, FXP_MOTES };
 #define FX_KINDS 32                     // EFFECT_KIND_MASK + 1
-#define FX_DIM 4                        // the fifth byte of a row
-#define D_NO 0                          // measured: plays in full light
-#define D_YES 1                         // measured: the picture dims
-#define D_GUESS 1                       // NOT OBSERVED, dimming assumed
-static const u8 fx_table[FX_KINDS][5] = {   // gather, travel, impact, settle, dim
-    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_RING,  D_NO    },  // Dash, Stone, Attack
-    [AB_CURE]            = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING,  D_NO    },  // Heal
-    [AB_HEAL]            = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_RING,  D_YES   },  // Potion
-    [AB_CLEANSE]         = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING,  D_YES   },  // Antidote, Echo Grass
-    [AB_REVIVE]          = { FXP_MOTES,  FXP_COLUMN, FXP_COLUMN, FXP_RING,  D_YES   },  // Phoenix Down
-    [AB_WISH]            = { FXP_MOTES,  FXP_BEAM,   FXP_MOTES,  FXP_NONE,  D_YES   },  // Wish
-    [AB_HP_DAMAGE_MP_HEAL] = { FXP_RING, FXP_BEAM,   FXP_BURST,  FXP_MOTES, D_GUESS },
-    [AB_MP_DAMAGE]       = { FXP_RING,   FXP_BEAM,   FXP_BURST,  FXP_NONE,  D_GUESS },
-    [AB_HP_MP_HEAL]      = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_RING,  D_GUESS },
-    [AB_MP_HEAL]         = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_NONE,  D_GUESS },
-    [AB_RAISE]           = { FXP_MOTES,  FXP_COLUMN, FXP_COLUMN, FXP_RING,  D_GUESS },
-    [AB_STATUS]          = { FXP_RING,   FXP_BEAM,   FXP_RING,   FXP_RING,  D_GUESS },
-    [AB_DEFEND]          = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING,  D_GUESS },
-    [AB_GOLEM]           = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING,  D_GUESS },
-    [AB_REFLECT]         = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING,  D_GUESS },
-    [AB_BRAVE]           = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_NONE,  D_GUESS },
-    [AB_FAITH]           = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_NONE,  D_GUESS },
-    [AB_SPEED]           = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING,  D_GUESS },
-    [AB_QUICK]           = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING,  D_GUESS },
-    [AB_DEATH]           = { FXP_COLUMN, FXP_BEAM,   FXP_BURST,  FXP_NONE,  D_GUESS },
-    [AB_BREAK]           = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_NONE,  D_NO    },  // like a weapon blow
-    [AB_EQUIP_BREAK]     = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_NONE,  D_NO    },
-    [AB_STEAL_EQUIP]     = { FXP_NONE,   FXP_SLASH,  FXP_MOTES,  FXP_NONE,  D_NO    },
-    [AB_STEAL_GIL]       = { FXP_NONE,   FXP_SLASH,  FXP_MOTES,  FXP_NONE,  D_NO    },
-    [AB_STEAL_EXP]       = { FXP_NONE,   FXP_SLASH,  FXP_MOTES,  FXP_NONE,  D_NO    },
-    [AB_CATCH]           = { FXP_NONE,   FXP_NONE,   FXP_RING,   FXP_NONE,  D_NO    },
+static const u8 fx_table[FX_KINDS][4] = {   // gather, travel, impact, settle
+    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_RING  },
+    [AB_CURE]            = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_HEAL]            = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_RING  },
+    [AB_CLEANSE]         = { FXP_MOTES,  FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_REVIVE]          = { FXP_MOTES,  FXP_COLUMN, FXP_COLUMN, FXP_RING  },
+    [AB_WISH]            = { FXP_MOTES,  FXP_BEAM,   FXP_MOTES,  FXP_NONE  },
+    [AB_HP_DAMAGE_MP_HEAL] = { FXP_RING, FXP_BEAM,   FXP_BURST,  FXP_MOTES },
+    [AB_MP_DAMAGE]       = { FXP_RING,   FXP_BEAM,   FXP_BURST,  FXP_NONE  },
+    [AB_HP_MP_HEAL]      = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_RING  },
+    [AB_MP_HEAL]         = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_NONE  },
+    [AB_RAISE]           = { FXP_MOTES,  FXP_COLUMN, FXP_COLUMN, FXP_RING  },
+    [AB_STATUS]          = { FXP_RING,   FXP_BEAM,   FXP_RING,   FXP_RING  },
+    [AB_DEFEND]          = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_GOLEM]           = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_REFLECT]         = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_BRAVE]           = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_NONE  },
+    [AB_FAITH]           = { FXP_MOTES,  FXP_NONE,   FXP_MOTES,  FXP_NONE  },
+    [AB_SPEED]           = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_QUICK]           = { FXP_RING,   FXP_NONE,   FXP_RING,   FXP_RING  },
+    [AB_DEATH]           = { FXP_COLUMN, FXP_BEAM,   FXP_BURST,  FXP_NONE  },
+    [AB_BREAK]           = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_NONE  },
+    [AB_EQUIP_BREAK]     = { FXP_RING,   FXP_SLASH,  FXP_BURST,  FXP_NONE  },
+    [AB_STEAL_EQUIP]     = { FXP_NONE,   FXP_SLASH,  FXP_MOTES,  FXP_NONE  },
+    [AB_STEAL_GIL]       = { FXP_NONE,   FXP_SLASH,  FXP_MOTES,  FXP_NONE  },
+    [AB_STEAL_EXP]       = { FXP_NONE,   FXP_SLASH,  FXP_MOTES,  FXP_NONE  },
+    [AB_CATCH]           = { FXP_NONE,   FXP_NONE,   FXP_RING,   FXP_NONE  },
 };
 
 // The schedule: what the running action asks for this frame. Called before the dimming,
@@ -176,12 +194,10 @@ static void fx_schedule(const Feet *f, const u8 *vis)
     if (st.mode != M_ACT) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
     t = st.act_t;
     if (t < ACT_WIND || t >= ACT_END) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
-    {   // the original stages an item or an incantation and leaves a physical act
-        // in full light (tools/effect_watch.py), so the row decides, not the phase
-        u8 kind = (u8)(st.effect_kind & EFFECT_KIND_MASK);
-        if (kind >= FX_KINDS || !fx_table[kind][FX_DIM]) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
-        fx_focus(t < ACT_BLOW ? st.atk : st.tgt, 1);
-    }
+    // The ability decides, not its outcome: the original's staging is a fact per
+    // ability and the table above holds it, measured where it is known.
+    if (!FX_STAGES(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
+    fx_focus(t < ACT_BLOW ? st.atk : st.tgt, 1);
 }
 
 // One primitive, placed for this phase. Separated from the schedule so the table says
