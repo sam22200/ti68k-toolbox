@@ -114,10 +114,8 @@ battle-act`:
 |---|---:|---:|---:|
 | `battle-act` | 199,218 | **263,424** / 360,000 | **96,576** |
 
-Dark 1 in one frame would reach 310,062 and still pass. Quartered it reaches
-275,084, leaving about **85,000 cycles a frame for the effect itself** -- on the
-order of 70 masked 16x16 blits. The particles and primitives of the spec fit with
-room to spare.
+Dark 1 in one frame would reach 310,062 and still pass. That projection was
+**optimistic by more than half**: the measurement of the built layer is below.
 
 ## Open, and deliberately not done
 
@@ -129,3 +127,69 @@ room to spare.
 - `battle-act` is a 90-frame diagnostic case, not a played fight.
 - Datasheet cycles throughout. No emulator or calculator run.
 - No effect, primitive, asset or scheduler exists yet. This is a costing.
+
+## Step 1 built and measured (2026-11-27)
+
+`games/fft/fx_focus.inc`, behind `FFT_COMBAT_FX`, off by default. It dims the
+finished picture and redraws one unit at normal brightness through the cover mask
+the ordinary pass just used, so the scenery still occludes it. The HUD is composed
+afterwards and stays bright. No effect, primitive or asset: this is the focus
+layer, the palette and the restoration, and nothing else.
+
+The second, deeper level of the spec was built, reviewed on the picture and
+**dropped**: it leaves the scenery on dark grey and black alone and the relief
+stops reading. With one level, four greys offer no fade, so the dimming arrives
+in a single step; a gradual focus would need dithering, which is not done.
+
+Restoration costs nothing. `W->bg`, the kept screen copy, is never dimmed, so
+ending an effect is one assignment and the next frame simply stops dimming. That
+also leaves `copy_view()`'s PC invariant -- the copy equals the view -- intact.
+
+### Measured, 13 actors
+
+| | Mean | Ordinary peak | Free at the peak |
+|---|---:|---:|---:|
+| `battle-act`, focus off | 199,218 | 263,424 | 96,576 |
+| `battle-act`, **focus on** | 254,271 (+55,053) | **321,476** (+58,052) | **38,524** |
+| `battle-menu`, focus on | 248,903 (+55,053) | 322,864 (+60,774) | 37,136 |
+
+**The headroom for the animation is 38,524 cycles a frame, not the 85,000
+projected above.** The projection added the 46,638-cycle dimming loop to
+`UNIT_K`, 20 kilocycles for the redrawn unit; measured end to end the layer costs
+55,053, of which the redraw is only about 8,400. The budget model now charges the
+measured figure (`FX_DARK_K` 55), not the projection.
+
+That is of the order of 30 masked 16x16 blits a frame while a focus is held. The
+spec's particles and primitives still fit, but they have to be counted.
+
+Reproduce: `check_capacity_render.py --case battle-act --combat-fx --actors 13`,
+against the same command without `--combat-fx`.
+
+### One byte, and why it must stay one byte
+
+The whole state is a single `u8` in `Work`: 0 off, 1..n unit n-1 stays bright,
+255 dim everything. It fills the padding byte the struct already had.
+
+This is not tidiness. `MOD_SIG` (`module.h`) is derived from `sizeof(Work)`, so a
+`Work` that grows makes the core refuse **every already-built module image** and
+the battle never starts -- `game_render()` finds all eight of its pointers null
+and draws "Missing data". A first version of this layer used two bytes and did
+exactly that, and the failure was first misread as the carrier running out of
+room. Ballasting the carrier without the feature disproved it: it still runs at
+57,637 bytes, 260 more than the build that failed. Keeping the state to one byte
+means enabling this feature never forces a module rebuild.
+
+### Verified
+
+- `make -C games/fft/campaign test` and `packages`: exit 0, `MOD_ZONE` unchanged
+  at 9,510. The suite's `sizeof(Work)` assertions pass in configurations other
+  than the carrier's, which is what proves the byte really is free everywhere.
+- Flag off: checksums `311B`/`7262` and peaks 263,424/262,090, the figures from
+  before the layer existed.
+- The four reviewed pictures are byte-identical after the repacking.
+- The dimming maps are exact on the tone histograms: light grey and dark grey
+  land where the table says, and GLOBAL leaves 48 white pixels, which are the HUD.
+- A unit outside the view is correctly left alone (`vis`); with the camera placed
+  on it, all eleven brighten. Two earlier readings of this said otherwise and
+  were wrong: one read a frozen picture, the other let the tick advance between
+  the two renders it compared.
