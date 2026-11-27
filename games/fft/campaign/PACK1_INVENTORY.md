@@ -377,4 +377,9 @@ Verified on the rebuilt set: `make -C games/fft/campaign test` passes and
 core 708,513 and chapter 295,145 transport bytes, 1,570,871 planning bytes left
 after the reserve.
 
+**Approved on the picture, 2026-11-26.** The user reviewed the four orientations
+at the scene framing (`x/underside-review/scene-four-views-with-base.png`,
+rendered by `preview_scenery.c`) and accepted them. The decision markers set with
+`ti-view --decision` are cleared.
+
 The 442,297 margin absorbs the 4,077 without moving the verdict.
