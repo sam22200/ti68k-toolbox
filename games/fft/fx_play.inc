@@ -87,12 +87,23 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 #define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
 static void fx_spike(s16 cx, s16 base, u8 grow)
 {
-    s16 r, h = (s16)(grow > FX_SPIKE_H ? FX_SPIKE_H : grow);
-    s32 w8, step;
-    if (h < 2) return;
-    step = ((s32)FX_SPIKE_W << 8) / h;
-    for (r = 0, w8 = 0; r < h; r++, w8 += step) {
-        s16 y = (s16)(base - (h - 1 - r));      // the point is at the top
+    s16 r, reach = (s16)(grow > FX_SPIKE_H ? FX_SPIKE_H : grow);
+    s16 top = (s16)(base - FX_SPIKE_H);
+    s32 w8 = 0, step = ((s32)FX_SPIKE_W << 8) / FX_SPIKE_H;
+    if (reach < 2) return;
+    // It COMES DOWN. Captured on the original (tools/effect_capture.py, Stasis Sword):
+    // a wisp appears high above the target at wash+24, grows into a column reaching the
+    // ground by +36, flares at its foot by +42 and thins away by +54. E173's own frame 0
+    // says the same thing and it was read wrong the first time: its quad spans y -26..110
+    // about its anchor, almost entirely BELOW it, so the anchor is up in the sky and the
+    // effect hangs from it. The atlas picture shows a cone with its point up, and that
+    // was taken for the direction of travel, which it is not.
+    //
+    // So the top is fixed and the foot descends towards the target. The width is a
+    // function of the screen row, not of how far it has come, which is why `step` divides
+    // by FX_SPIKE_H and not by the current reach.
+    for (r = 0; r < reach; r++, w8 += step) {
+        s16 y = (s16)(top + r);
         s16 w = (s16)(w8 >> 8);
         fx_dot((s16)(cx - w - 1), y, 0);        // the silhouette, before the body
         fx_dot((s16)(cx + w + 1), y, 0);
