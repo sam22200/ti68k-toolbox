@@ -106,15 +106,20 @@ static void stop_pickup(void)
 static void whole_battle(void)
 {
     unsigned frame, actions=0, turns=0; u8 previous, i;
+    // 24000 was this cap when the test was written (18 Oct 2026). Since then the
+    // AI's turn was paced like the original -- cursor glide, target preview,
+    // ability banner -- and two thirds of a battle's frames go to presentation:
+    // BROWSE 32%, AIM 21%, TARGET 11%, against ACT 17%. Gariland now ends at
+    // frame 47405, so the cap says "it finishes", not "it finishes quickly".
     sw_init(10); choose(2); previous=st.act;
-    for(frame=0;frame<24000 && !st.end;frame++) {
+    for(frame=0;frame<120000 && !st.end;frame++) {
         if(st.mode==M_ACT && st.act_t==ACT_HIT) actions++;
         step(0);
         if(st.act!=previous) { turns++; previous=st.act; }
         assert(st.mode!=M_MENU || st.ai || st.banner || st.morph_mask);
         for(i=0;i<NUNIT;i++) assert(st.unit[i].hp<=st.unit[i].max_hp);
     }
-    assert(frame<24000 && st.end && actions && turns>10);
+    assert(frame<120000 && st.end && actions && turns>10);
     printf("auto: full battle ends after %u frames, %u turn changes, %u attacks/abilities (outcome %u)\n",
            frame,turns,actions,st.end);
 }
