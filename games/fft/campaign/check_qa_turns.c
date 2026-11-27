@@ -12,6 +12,9 @@
 #endif
 #define FFT_BATTLE
 #define FFT_SOURCE_CAMERA
+#ifndef __m68k__
+#define FFT_TURN_UNIT_TRACE     // draw_turn() records where it put each unit
+#endif
 #include "../fft.h"
 #ifdef QA_HALF_TURN                    // historical80x50 geometry control, never shipping
 #undef FFT_TURN_LOWPOLY_NATIVE
@@ -96,6 +99,18 @@ static unsigned direction_oracle(void)
                         assert(direction*cross<0); // x reflection reverses screen handedness
                     }
                     oldx[x][z]=gx[x][z];oldy[x][z]=gy[x][z];n++;
+                }
+                // The units must obey the SAME oracle as the ground they stand on.
+                // They did not until 2026-11-26: their X term carried the opposite
+                // sign to the grid's, so each one turned the wrong way around the
+                // pivot during the animation -- invisible to every grid assertion
+                // above, which is why it shipped.
+                for(unsigned u=0;u<NUNIT;u++) {
+                    int dx,dz;double ex;
+                    if(st.unit[u].x>=MAP_W)continue;
+                    dx=2*((int)st.unit[u].x-st.cx);dz=2*((int)st.unit[u].z-st.cz);
+                    ex=px-6.0*sqrt(2.0)*(dx*cos(angle)-dz*sin(angle));
+                    assert(fabs(turn_unit_x[u]-ex)<2.0);
                 }
             }
         }
