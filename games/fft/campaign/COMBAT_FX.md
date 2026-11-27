@@ -489,11 +489,44 @@ impact and the settle plays in full light.
 24 bytes of `const`, no RAM: `Work` is full and growing it changes `MOD_SIG`.
 The eight-entry scan runs per staged frame and measured **6 cycles** on the peak.
 
-**A gap this closed.** The `battle-fx` cycle scenario set no `st.abil`, so once
-the key moved to the ability it stopped dimming altogether and the PC/TI
-cross-check no longer covered the feature at all -- its 271,042-cycle peak was a
-frame with no wash. Driving it with Night Sword puts the dimming back under the
-check: **peak 324,462 / 360,000**, the 53,420-cycle difference being `FX_DARK_K`.
+**Two gaps this closed, and a number to correct.** The `battle-fx` cycle scenario
+set no `st.abil`, so once the key moved to the ability it stopped dimming
+altogether -- its 271,042-cycle peak was a frame with no wash. Driving it with
+Night Sword put the dimming back, at 324,462.
+
+**That second figure was still wrong**, and in the same way: the scenario cast
+from unit 0 at unit 1, a pair `fx_play` rejects as not both visible, so the
+primitives never drew either. It measured the wash alone. Casting from 8 at 10,
+the pair the effect actually plays between:
+
+> **peak 351,090 / 360,000 -- 8,910 cycles of margin.**
+
+That is the real cost of the layer, and it is much closer to the ceiling than
+either earlier number suggested. Any further effect work starts from 8,910, not
+from the 35,538 the previous line claimed.
+
+**The outline this margin refused (2026-11-27).** The effects are drawn white and
+vanish over the pale half of a washed picture, so the project's own visibility
+rule -- a one-pixel outline, as every unit sprite gets -- was implemented and
+measured. Every primitive is a pure translation of its anchor points, so the
+dilation is exact: the same shape drawn black at the four neighbours, all four
+before the white centre.
+
+| passes | peak |
+|---|---|
+| 1, as shipped | 351,090 PASS |
+| 2, a single offset | 362,072 over |
+| 3 | 373,268 over |
+| 5, the full outline | 407,284 over |
+
+**Not even one extra pass fits.** Halving the dot counts to pay for a 2-pass
+outline does fit, at 355,368, but the picture does not improve: a one-pixel halo
+around a one-pixel dot is four blacks for one white, which eats a scatter instead
+of framing it. An outline makes a *silhouette* read, and these primitives have no
+interior. The route to readable effects is solid shapes first -- the original's
+own crescents, cone and orbs are in `EFFECT/E173.BIN` (Night Sword) and
+`E163.BIN` (Stasis Sword), decoded by `tools/effect_rip.py` -- and only then an
+outline around them.
 
 `check_combat_fx.c`: 302 checks, including a staged ability whose hold ends
 before the action, and an assertion that every staged ability carries one.
