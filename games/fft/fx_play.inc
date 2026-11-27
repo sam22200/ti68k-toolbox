@@ -35,6 +35,11 @@ static void fx_dot(s16 x, s16 y, u8 white)
     else       { ((u8 *)rt_light)[o] |= b;      ((u8 *)rt_dark)[o] |= b; }
 }
 
+// Effects are NOT depth tested. seen(), the per-pixel test the water glints use, is
+// compiled out when the chapter's water bank is in (FFT_WATER_BANK), so a depth-aware
+// dot would do nothing in the configuration that actually ships. Sorting effects behind
+// the scenery is left undone rather than half done; campaign/COMBAT_FX.md says so.
+
 // A ground ring: the 2:1 isometric diamond the map's own tiles use, so it sits on the
 // ground instead of floating. One division for the whole ring, then 8.8 accumulation.
 // Haste, Slow, Protect, Shell, Stop, MBarrier and Cure are all this with another radius
@@ -49,6 +54,35 @@ static void fx_ring(s16 cx, s16 cy, s16 r, u8 white)
         s16 d = (s16)(h - (s16)(dy >> 8));
         fx_dot((s16)(cx + i), (s16)(cy + d), white); fx_dot((s16)(cx + i), (s16)(cy - d), white);
         fx_dot((s16)(cx - i), (s16)(cy + d), white); fx_dot((s16)(cx - i), (s16)(cy - d), white);
+    }
+}
+
+// A beam: the whole line from the caster to the target, held while it travels.
+static void fx_beam(s16 x0, s16 y0, s16 x1, s16 y1, u8 white)
+{
+    s16 dx = (s16)(x1 - x0), dy = (s16)(y1 - y0), i;
+    for (i = 0; i <= 32; i++)
+        fx_dot((s16)(x0 + (s16)(((s32)dx * i) >> 5)), (s16)(y0 + (s16)(((s32)dy * i) >> 5)), white);
+}
+
+// A column coming down onto the target: Bolt, Holy and Raise.
+static void fx_column(s16 cx, s16 cy, u8 t, u8 white)
+{
+    s16 y, top = (s16)(cy - 44 + 4 * t);
+    if (top < cy - 44) top = (s16)(cy - 44);
+    for (y = top; y < cy; y += 2) { fx_dot(cx, y, white); fx_dot((s16)(cx + 1), y, white); }
+}
+
+// Motes rising around a unit: Cure, Raise, and the drain back to the caster. Scattered by
+// a hash of the index and the frame, never by the RNG: the picture must not consume it.
+static void fx_motes(s16 cx, s16 cy, u8 t, u8 n, u8 white)
+{
+    u8 i;
+    for (i = 0; i < n; i++) {
+        u16 h = (u16)(i * 2654U + t * 97U);
+        s16 dx = (s16)(((h >> 3) & 15) - 8);
+        s16 up = (s16)((t + i * 3) & 15);
+        fx_dot((s16)(cx + dx), (s16)(cy - up), white);
     }
 }
 
@@ -90,21 +124,70 @@ static void fx_schedule(const Feet *f, const u8 *vis)
     fx_focus(t < ACT_BLOW ? st.atk : st.tgt, 1);
 }
 
+// What plays at each phase, per outcome category. The engine already classifies the
+// action -- `st.effect_kind` carries the AB_* category that act_kind() resolves -- so this
+// is a table and not a second classifier. Four bytes a row, const, in the module image:
+// no RAM, and an ability moves to another look by editing one row.
+enum { FXP_NONE, FXP_RING, FXP_SLASH, FXP_BURST, FXP_BEAM, FXP_COLUMN, FXP_MOTES };
+#define FX_KINDS 32                     // EFFECT_KIND_MASK + 1
+static const u8 fx_table[FX_KINDS][4] = {   // gather, travel, impact, settle
+    [AB_DAMAGE]          = { FXP_RING,   FXP_SLASH,  FXP_BURST, FXP_RING  },
+    [AB_HP_DAMAGE_MP_HEAL] = { FXP_RING, FXP_BEAM,   FXP_BURST, FXP_MOTES },
+    [AB_MP_DAMAGE]       = { FXP_RING,   FXP_BEAM,   FXP_BURST, FXP_NONE  },
+    [AB_HEAL]            = { FXP_MOTES,  FXP_NONE,   FXP_MOTES, FXP_RING  },
+    [AB_HP_MP_HEAL]      = { FXP_MOTES,  FXP_NONE,   FXP_MOTES, FXP_RING  },
+    [AB_MP_HEAL]         = { FXP_MOTES,  FXP_NONE,   FXP_MOTES, FXP_NONE  },
+    [AB_REVIVE]          = { FXP_MOTES,  FXP_COLUMN, FXP_COLUMN, FXP_RING },
+    [AB_RAISE]           = { FXP_MOTES,  FXP_COLUMN, FXP_COLUMN, FXP_RING },
+    [AB_CURE]            = { FXP_MOTES,  FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_CLEANSE]         = { FXP_MOTES,  FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_STATUS]          = { FXP_RING,   FXP_BEAM,   FXP_RING,  FXP_RING  },
+    [AB_DEFEND]          = { FXP_RING,   FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_GOLEM]           = { FXP_RING,   FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_REFLECT]         = { FXP_RING,   FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_BRAVE]           = { FXP_MOTES,  FXP_NONE,   FXP_MOTES, FXP_NONE  },
+    [AB_FAITH]           = { FXP_MOTES,  FXP_NONE,   FXP_MOTES, FXP_NONE  },
+    [AB_SPEED]           = { FXP_RING,   FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_QUICK]           = { FXP_RING,   FXP_NONE,   FXP_RING,  FXP_RING  },
+    [AB_DEATH]           = { FXP_COLUMN, FXP_BEAM,   FXP_BURST, FXP_NONE  },
+    [AB_BREAK]           = { FXP_RING,   FXP_SLASH,  FXP_BURST, FXP_NONE  },
+    [AB_EQUIP_BREAK]     = { FXP_RING,   FXP_SLASH,  FXP_BURST, FXP_NONE  },
+    [AB_STEAL_EQUIP]     = { FXP_NONE,   FXP_SLASH,  FXP_MOTES, FXP_NONE  },
+    [AB_STEAL_GIL]       = { FXP_NONE,   FXP_SLASH,  FXP_MOTES, FXP_NONE  },
+    [AB_STEAL_EXP]       = { FXP_NONE,   FXP_SLASH,  FXP_MOTES, FXP_NONE  },
+    [AB_WISH]            = { FXP_MOTES,  FXP_BEAM,   FXP_MOTES, FXP_NONE  },
+    [AB_CATCH]           = { FXP_NONE,   FXP_NONE,   FXP_RING,  FXP_NONE  },
+};
+
+// One primitive, placed for this phase. Separated from the schedule so the table says
+// what plays and this says where, and neither has to know the other's business.
+static void fx_draw(u8 which, u8 t, s16 ax, s16 ay, s16 bx, s16 by)
+{
+    switch (which) {
+    case FXP_RING:   fx_ring(bx, (s16)(by + UNIT_FOOT), (s16)(4 + 2 * (t & 15)), 1); break;
+    case FXP_SLASH:  fx_slash(ax, (s16)(ay + UNIT_FOOT / 2), bx, (s16)(by + UNIT_FOOT / 2), t, 1); break;
+    case FXP_BURST:  fx_burst(bx, (s16)(by + UNIT_FOOT / 2), (s16)(3 + 4 * (t & 7)), 1); break;
+    case FXP_BEAM:   fx_beam(ax, (s16)(ay + UNIT_FOOT / 2), bx, (s16)(by + UNIT_FOOT / 2), 1); break;
+    case FXP_COLUMN: fx_column(bx, (s16)(by + UNIT_FOOT), t, 1); break;
+    case FXP_MOTES:  fx_motes(bx, (s16)(by + UNIT_FOOT), t, 10, 1); break;
+    default: break;
+    }
+}
+
 // The animation, after the dimming and the focused unit, so it reads over both.
 static void fx_play(const Feet *f, const u8 *vis)
 {
-    u8 t = st.act_t, atk = st.atk, tgt = st.tgt;
+    u8 t = st.act_t, atk = st.atk, tgt = st.tgt, phase, kind;
     s16 ax, ay, bx, by;
     if (st.mode != M_ACT || t < ACT_WIND || t >= ACT_END) return;
     if (atk >= NUNIT || tgt >= NUNIT || !vis[atk] || !vis[tgt]) return;   // off screen: nothing to draw
     ax = (s16)(f[atk].x - st.camx); ay = (s16)(f[atk].y - st.camy);
     bx = (s16)(f[tgt].x - st.camx); by = (s16)(f[tgt].y - st.camy);
-    if (t < ACT_BLOW)                                   // the caster gathers
-        fx_ring(ax, (s16)(ay + UNIT_FOOT), (s16)(2 * (ACT_BLOW - t)), 1);
-    else if (t < ACT_HIT)                               // the sweep reaches the target
-        fx_slash(ax, (s16)(ay + UNIT_FOOT / 2), bx, (s16)(by + UNIT_FOOT / 2), (u8)(t - ACT_BLOW), 1);
-    else if (t < ACT_HIT + FX_FLASH)                    // the impact
-        fx_burst(bx, (s16)(by + UNIT_FOOT / 2), (s16)(3 + 4 * (t - ACT_HIT)), 1);
-    else                                                // the ring settles and fades out
-        fx_ring(bx, (s16)(by + UNIT_FOOT), (s16)(4 + 2 * (t - ACT_HIT - FX_FLASH)), 0);
+    phase = t < ACT_BLOW ? 0 : t < ACT_HIT ? 1 : t < ACT_HIT + FX_FLASH ? 2 : 3;
+    kind  = (u8)(st.effect_kind & EFFECT_KIND_MASK);
+    if (kind >= FX_KINDS) return;
+    fx_draw(fx_table[kind][phase],
+            (u8)(phase == 0 ? ACT_BLOW - t : phase == 1 ? t - ACT_BLOW
+                 : phase == 2 ? t - ACT_HIT : t - ACT_HIT - FX_FLASH),
+            ax, ay, bx, by);
 }
