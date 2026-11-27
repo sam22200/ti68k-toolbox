@@ -151,6 +151,39 @@ static const u8 fx_known[FX_ABILITIES / 8] = {
 };
 #define FX_STAGES(a) ((u16)(a) < FX_ABILITIES && (fx_staged[(a) >> 3] >> ((a) & 7) & 1))
 
+// How long it holds, per ability. Measured on the original with tools/effect_stage.py,
+// then carried over as a PROPORTION, not as the second itself, and here is why:
+//
+//     this engine's action runs [ACT_WIND, ACT_END) = 39 ticks = 1.30 s at 30 fps
+//     the original's longest measured wash is Wish at 3.03 s = 91 ticks
+//
+// Six of the eight measured abilities last longer than the whole action, so the literal
+// seconds would saturate and every one of them would hold the full window -- the duration
+// would stop telling them apart, which is the only thing it is here to do. The ratios do
+// carry over: a sword art is a flash, an incantation lingers nearly three times as long.
+// So each hold is round(39 * seconds / 3.03), and the second itself is in the comment.
+//
+// A hold ending before ACT_END is not a cut: the kept screen copy is undimmed, so the
+// picture simply stops being dimmed on the next frame (fx_focus.inc). The shorter holds
+// also pay less -- 14 dimmed frames instead of 39 is 25 frames not charged FX_DARK_K.
+#define FX_HOLD_FULL (ACT_END - ACT_WIND)       // the whole window: 39 ticks
+#define FX_HOLDS 8
+static const u16 fx_hold_abil[FX_HOLDS] = { 0x0a5, 0x09b, 0x178, 0x17d, 0x170, 0x176, 0x177, 0x098 };
+static const u8  fx_hold_tick[FX_HOLDS] = {    14,    14,    18,    19,    21,    21,    25,    39 };
+//   Night Sword 1.07 s, Stasis Sword 1.10 s, Echo Grass 1.40 s, Phoenix Down 1.47 s,
+//   Potion 1.63 s, Antidote 1.63 s, Eye Drop 1.97 s, Wish 3.03 s
+
+// Eight entries, scanned when an action is staged. Not cached: Work is full, and growing
+// it changes MOD_SIG and makes the core refuse every built module image (fx_focus.inc).
+// Eight u16 compares against a 55-kilocycle dimming is not a cost worth a byte of RAM.
+static u8 fx_hold_of(u16 a)
+{
+    u8 i;
+    for (i = 0; i < FX_HOLDS; i++)
+        if (fx_hold_abil[i] == a) return fx_hold_tick[i];
+    return FX_HOLD_FULL;
+}
+
 // What plays at each phase, per outcome category. This half is NOT measured: the
 // primitives were chosen, and only the staging above comes from the original.
 enum { FXP_NONE, FXP_RING, FXP_SLASH, FXP_BURST, FXP_BEAM, FXP_COLUMN, FXP_MOTES };
@@ -197,6 +230,9 @@ static void fx_schedule(const Feet *f, const u8 *vis)
     // The ability decides, not its outcome: the original's staging is a fact per
     // ability and the table above holds it, measured where it is known.
     if (!FX_STAGES(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
+    // ...and it decides for how long, too: the wash ends when the ability's measured
+    // hold runs out, which for most of them is before the action does.
+    if ((u8)(t - ACT_WIND) >= fx_hold_of(st.abil)) { if (W->fx_sel) fx_focus(FX_NO_UNIT, 0); return; }
     fx_focus(t < ACT_BLOW ? st.atk : st.tgt, 1);
 }
 
