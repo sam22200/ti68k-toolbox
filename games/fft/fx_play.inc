@@ -85,14 +85,52 @@ static void fx_span(s16 x0, s16 x1, s16 y, u8 white, u8 pat)
 // scenario reaches the worst frame. 28 keeps the margin the layer had before the asm.
 #define FX_SPIKE_H 28                   // a third of the original's height, by measurement
 #define FX_SPIKE_W 12                   // 40 * 0.6 / 2, its half-width at the base
-static void fx_spike(s16 cx, s16 base, u8 grow)
+// It comes down, holds, and thins away -- the three the original shows, in its own
+// proportions: the wisp reaches the ground about twelve of its frames after it appears,
+// flares, and is gone twelve more later. Twelve of its frames is eight of our ticks.
+//
+// The thinning is in WIDTH, not in height: at wash+54 the original still has a tall
+// column, only a narrower and sparkier one. It does not retract towards the sky.
+//
+// Eight each, so the three are shifts and not divisions. This runs on every frame of a
+// wash and a 32-bit divide would cost about 900 cycles of the 1,220 a row already costs.
+// Past the third phase it returns at once: the tail of a long hold then draws nothing,
+// where before it paid 28 rows a frame to hold a frozen picture.
+#define FX_SPIKE_FALL 8                 // ticks to reach the ground
+#define FX_SPIKE_HOLD 8                 // ticks at full width
+#define FX_SPIKE_GONE 8                 // ticks thinning to nothing
+static void fx_spike(s16 cx, s16 base, u8 t)
 {
-    s16 r, h = (s16)(grow > FX_SPIKE_H ? FX_SPIKE_H : grow);
-    s32 w8, step;
-    if (h < 2) return;
-    step = ((s32)FX_SPIKE_W << 8) / h;
-    for (r = 0, w8 = 0; r < h; r++, w8 += step) {
-        s16 y = (s16)(base - (h - 1 - r));      // the point is at the top
+    s16 r, reach, wmax;
+    s16 top = (s16)(base - FX_SPIKE_H);
+    s32 w8 = 0, step;
+    if (t < FX_SPIKE_FALL) {
+        reach = (s16)(((s16)(t + 1) * FX_SPIKE_H) >> 3);
+        wmax = FX_SPIKE_W;
+    } else if (t < FX_SPIKE_FALL + FX_SPIKE_HOLD) {
+        reach = FX_SPIKE_H;
+        wmax = FX_SPIKE_W;
+    } else {
+        s16 k = (s16)(t - FX_SPIKE_FALL - FX_SPIKE_HOLD);
+        if (k >= FX_SPIKE_GONE) return;         // thinned away: nothing to draw, nothing to pay
+        reach = FX_SPIKE_H;
+        wmax = (s16)((FX_SPIKE_W * (FX_SPIKE_GONE - k)) >> 3);
+    }
+    if (reach < 2 || wmax < 1) return;
+    step = ((s32)wmax << 8) / FX_SPIKE_H;
+    // It COMES DOWN. Captured on the original (tools/effect_capture.py, Stasis Sword):
+    // a wisp appears high above the target at wash+24, grows into a column reaching the
+    // ground by +36, flares at its foot by +42 and thins away by +54. E173's own frame 0
+    // says the same thing and it was read wrong the first time: its quad spans y -26..110
+    // about its anchor, almost entirely BELOW it, so the anchor is up in the sky and the
+    // effect hangs from it. The atlas picture shows a cone with its point up, and that
+    // was taken for the direction of travel, which it is not.
+    //
+    // So the top is fixed and the foot descends towards the target. The width is a
+    // function of the screen row, not of how far it has come, which is why `step` divides
+    // by FX_SPIKE_H and not by the current reach.
+    for (r = 0; r < reach; r++, w8 += step) {
+        s16 y = (s16)(top + r);
         s16 w = (s16)(w8 >> 8);
         fx_dot((s16)(cx - w - 1), y, 0);        // the silhouette, before the body
         fx_dot((s16)(cx + w + 1), y, 0);
@@ -343,7 +381,7 @@ static void fx_draw(u8 which, u8 t, s16 ax, s16 ay, s16 bx, s16 by)
     case FXP_BEAM:   fx_beam(ax, (s16)(ay + UNIT_FOOT / 2), bx, (s16)(by + UNIT_FOOT / 2), 1); break;
     case FXP_COLUMN: fx_column(bx, (s16)(by + UNIT_FOOT), t, 1); break;
     case FXP_MOTES:  fx_motes(bx, (s16)(by + UNIT_FOOT), t, 10, 1); break;
-    case FXP_SPIKE:  fx_spike(bx, (s16)(by + UNIT_FOOT), (u8)(8 + 12 * t)); break;
+    case FXP_SPIKE:  fx_spike(bx, (s16)(by + UNIT_FOOT), t); break;
     default: break;
     }
 }
