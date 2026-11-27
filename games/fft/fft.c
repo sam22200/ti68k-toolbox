@@ -7570,6 +7570,7 @@ u16 mod_entry(u8 op, u8 a)
 #if MOD_CORE
 #ifdef FFT_COMBAT_FX
 #include "fx_focus.inc"      // combat-effect focus: campaign/COMBAT_FX.md
+#include "fx_play.inc"       // and its schedule and primitives
 #endif
 
 // The battle cannot start: the RAM its buffers need (RESOURCES op 12 says how much), else a
@@ -7767,9 +7768,10 @@ void game_render(void)
     W->left-=(s16)(W->actor_misses*ACTOR_MISS_K+W->actor_mirror*ACTOR_FLIP_K);
 #endif
 #ifdef FFT_COMBAT_FX
-    {                                      // the picture is finished: dim it, keep the focus
-        if (fx_apply(f, vis)) W->left -= FX_DARK_K;   // bright. The HUD below is composed
-                                           // after, and stays undimmed.
+    {                                      // the picture is finished: the running action
+        fx_schedule(f, vis);               // asks for a focus, then it is dimmed, the focus
+        if (fx_apply(f, vis)) W->left -= FX_DARK_K;   // kept bright and the primitive drawn.
+        if (W->fx_sel) fx_play(f, vis);    // The HUD below is composed after, and stays bright.
     }
 #endif
     ZE(4); ZB(5);
