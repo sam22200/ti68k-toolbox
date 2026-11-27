@@ -104,6 +104,21 @@ The human sequences were read by hand and are recorded in `units.py`:
 
 FFT draws two directions and mirrors for the other two.
 
+## Effects: the `EFFECT/` directory
+
+512 files, `E000.BIN` to `E511.BIN`, 401 of them non-empty and 20,127,292 bytes
+in all -- the original's combat effects. **291 are data**, opening with the
+little-endian u32 `40` and a ten-entry u32 offset table; **110 are MIPS code**,
+opening with `0x27bd....` (`addiu sp, sp, -N`), so those effects are routines and
+not assets. Section 2 of a data file is 64 bytes with only five distinct contents
+across all 291, which reads as a shared 32-colour palette; section 9 is the
+largest and the most variable. Sections 4, 5, 6 and 7 have one size each (2,404,
+600, 24, 6,280) but differ file to file.
+
+Nothing yet links an `E` number to an ability, and no section is decoded. The
+survey, with what is observed against what is guessed:
+`games/fft/RE_NOTES.md`, "The `EFFECT/` directory".
+
 ## `BATTLE.BIN`
 
 Per-unit identity tables, addressed from the PS1 load base `0x80067000`:
