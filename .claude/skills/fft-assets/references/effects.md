@@ -224,3 +224,26 @@ what it costs in fidelity: the original keeps its scene visible throughout. This
 trade taken deliberately to get the effect's size right, and it is bounded to the frames
 the effect draws on.
 
+## 10. VRAM, the records, and what is still missing
+
+**The console's VRAM can be read**, and `effect_capture.py` now dumps it at every wash
+(`vram-NNNNNN.bin` and `.png`, the 1 MB seen as 1024x512). It answers *what is loaded*
+while the effect plays, which the file cannot.
+
+It is not the best source for *what is drawn*, though. The pages come out as indexed 4-
+or 8-bit data viewed as 15-bit colour, so reading them means recovering each page's depth
+and CLUT first. The animation records give cell and quad directly, and there are only 42
+of them: start there, and keep the VRAM for questions about residency.
+
+**So no, each effect does not have to be rebuilt by eye.** Its choreography is in its
+file: section 0's records name the cell and the four corners of every frame, and
+`--all-frames` prints them. What is NOT yet decoded is the **sequencing** -- which record
+plays on which frame, and for how long. FFHacktics describes the format as carrying
+animation *scripts* beside the records, and sections 1..8 are still unread here.
+
+Until that script is decoded, timing is the one thing still read off captured video, and
+it is the one thing worth decoding next: it would turn every effect in the catalogue from
+a reading exercise into a conversion.
+
+**There is no PS1 decompilation to lean on.** `Nax/wotl` is the PSP build.
+

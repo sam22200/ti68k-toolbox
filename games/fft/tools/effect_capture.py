@@ -23,6 +23,24 @@ import oracle            # noqa: E402
 from psxrun import PSX   # noqa: E402
 
 LAST_ABILITY, HP, TURN = 0x170, 0x28, 0x8018f520
+
+
+def vram_dump(psx, stem):
+    """The 1 MB VRAM at this instant, raw and as the PS1 sees it (15-bit, 1024x512).
+
+    Which cells of an effect's atlas are actually resident, and where the GPU reads them
+    from, is a fact the console holds and the file does not: the .BIN says what a frame
+    COULD use, the VRAM says what is loaded while it plays.
+    """
+    from psxrun import vram_png
+    if getattr(psx, 'vram', None) is None:
+        print('vram: the core has no RETRO_MEMORY_VIDEO_RAM '
+              '(needs scripts/pcsx_vram.patch)', flush=True)
+        return
+    raw = bytes(psx.vram)
+    open(stem + '.bin', 'wb').write(raw)
+    vram_png(raw, stem + '.png')
+    print('vram -> %s.png' % stem, flush=True)
 PRE, POST = 24, 150          # frames kept before the wash, and after it starts
 
 
@@ -66,6 +84,7 @@ def main():
             nm = names[aid] if aid < len(names) and names[aid] else '?'
             cur = {'start': f, 'unit': unit, 'aid': aid, 'name': nm,
                    'hits': [], 'frames': list(ring), 'base': base}
+            vram_dump(psx, '%s/vram-%06d' % (out, f)) if out else None
             print('WASH  f%-6d %-16s id 0x%03x unit %2d' % (f, nm, aid, unit), flush=True)
         if cur is not None:
             if hit:
