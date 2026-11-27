@@ -3031,3 +3031,55 @@ Two practical notes for whoever picks this up: CIRCLE confirms, not CROSS, and
 cost an hour here. And read the battle through the unit table at `0x801908cc`
 rather than by diffing pixels: pixel diffs ranked the battle's opening camera
 above every spell.
+
+## The prologue, reached properly (2026-11-27)
+
+`oracle.py --prologue` boots without the EVENT=6 poke and stops **on a condition,
+not a frame**: the unit table holding at least eight sane HP pairs and the CTs
+changing between samples. It lands at frame 11980, reproducibly.
+
+The battle is the one with cast abilities, which Gariland has none of:
+
+| Unit | Job | | |
+|---|---|---|---|
+| 0 | 0x02 Squire | lv 9 | Ramza |
+| 1 | **0x34 Holy Knight** | lv 10, 207 HP | **Agrias** |
+| 2 | **0x17 Dark Knight** | lv 10, 210 HP | **Gafgarion** |
+| 3-9 | 0x4a..0x4d | lv 6-9 | Squires, Chemist, Knights, Archers |
+
+Both guests are AI-driven, so clearing the player flag (`team +0x05` bit 0x08,
+what `--turns` already does) plays the whole battle with no menu driven at all.
+
+### Agrias's Holy Sword dims the scene
+
+Captured at frame 2522 of that run: a white-blue crystal erupting from the
+ground over a night-blue scene, **1.00 s of dimming**. The sprite is the shape
+family of `EFFECT/E024`/`E026`, the ice-crystal atlases decoded from the disc
+earlier, so the two halves of this investigation meet.
+
+**And it disproves the axis the effect table is keyed on.** A Holy Sword deals
+damage, exactly like a plain Attack, and the original dims one and not the other:
+
+| full light | dims |
+|---|---|
+| Dash, Throw Stone, Attack, Heal | Potion, Antidote, Eye Drop, Echo Grass, Phoenix Down, Wish, **Holy Sword** |
+
+So `fx_table`'s DIM column cannot be a function of the outcome category, and the
+six measured rows it carries are right only by accident of which abilities were
+watched. The candidate key is the ability's own flags -- `abilities[a].flags`
+carries `AF_CAST` and `AF_CHARGE` -- which is available at render time. Not done.
+
+### Seven runs lost to the wrong question
+
+Every attempt before this assumed a missing *input*: the confirm button, the
+number of cancels, the Auto-battle submenu. What was missing was a *stopping
+condition*. The state used throughout had been saved at frame 26000 because that
+was where the loop ended, and reading it properly showed a battle already fought
+and stalled -- every CT pinned at 102, one unit at 7 of 56 HP. Six runs went into
+restarting a battle that was over.
+
+The fix was not a better sequence. It was to stop guessing when to stop.
+
+And the AI hand-off was in `oracle.py`'s own header all along: "the player's
+units lose their player-controlled flag ... so the AI plays the whole battle".
+Its tools were borrowed six times without reading its method.
