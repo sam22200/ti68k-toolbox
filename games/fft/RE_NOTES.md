@@ -2831,3 +2831,72 @@ image. The facing-axis refactor retains1024 previous classifications. FCJH
 changes only27 low hand bits, including the unarmed marker;26 real compatible
 weapons gain native Two Swords. No renderer/art or gameplay/save layout changes.
 See campaign/CORE_WEAPON_FORMULAS.md and its private verification manifest.
+
+## The `EFFECT/` directory: first survey (2026-11-27)
+
+Prompted by the user's point that our combat effects are invented while every
+other part of this port is taken from the disc. They are, and the disc has the
+real ones. This is a first survey: what is there, not what it means.
+
+### OBSERVED
+
+- `EFFECT/` holds **512 files**, `E000.BIN` to `E511.BIN`. **401 are non-empty**,
+  **20,127,292 bytes** in all. The project's disc catalogue did not mention the
+  directory at all; it listed only `BATTLE/EFF1.SEQ` and `EFF2.SEQ` in passing.
+- **291 of the 401 begin with the little-endian u32 `40` (0x28)**: a ten-entry
+  u32 offset table, every offset inside the file, entry 5 sometimes zero.
+- **110 begin with `0x27bd....`**, which is MIPS `addiu sp, sp, -N`. Those files
+  are **executable code, not data**. `E000.BIN` is one of them (`0x27bdfdb0`).
+  The four most common openings after `0x28` are all of that shape.
+- Among the 291 table files, by section index:
+
+  | Section | Size | Contents across 291 files |
+  |---|---|---|
+  | 0 | 162 sizes, 172..7,920 | 231 distinct |
+  | 1 | 97 sizes, 52..1,124 | 219 distinct |
+  | 2 | 4 sizes, 32..64 | **5 distinct** |
+  | 3 | 15 sizes, 412..3,156 | 267 distinct |
+  | 4 | **always 2,404** | 250 distinct |
+  | 5 | **always 600** | 25 distinct |
+  | 6 | **always 24** | 74 distinct |
+  | 7 | **always 6,280** | 279 distinct |
+  | 8 | 85 sizes, 56..692 | 286 distinct |
+  | 9 | 9 sizes, 9,220..66,564 | 258 distinct |
+
+- Files of equal total size are not copies: five files of 43,752 bytes have five
+  distinct contents.
+- `BATTLE/EFF1.SHP` and `EFF2.SHP` are 3,144 bytes each, `EFF1.SEQ` and
+  `EFF2.SEQ` 1,244 each -- the same sizes in both pairs.
+
+### INTERPRETATION
+
+- Section 2, 64 bytes with only **five distinct contents across 291 effects**, is
+  almost certainly a 32-colour PS1 palette, and the effects share a handful.
+- Section 9, the largest and most variable, is where the pictures are.
+- Sections 4, 6 and 7 holding one size each but differing contents reads as
+  fixed-shape per-effect tables rather than shared resources.
+- The 110 code files mean **part of this catalogue cannot be extracted as data at
+  all**: those effects are native routines and would have to be read as behaviour.
+
+A first pass over three files suggested the fixed-size sections were one shared
+block repeated in every effect, which would have made the distinctive payload a
+couple of kilobytes. **That was wrong** -- over 291 files their contents differ.
+It came from a three-file sample, and the sizes matching was a coincidence of it.
+
+### NOT established
+
+- Which `E` number belongs to which ability. Nothing here links the two.
+- What any section means beyond the palette guess, including whether section 9
+  is image data or a display list for the PS1's GPU.
+- Whether `EFF1/EFF2.SHP/SEQ` index this directory or are a separate small set.
+
+### TARGET
+
+Pick a few reference abilities -- an ordinary attack, Fire, Cure, Haste -- run
+the original headless through `tools/` as the AI and damage work already does,
+capture what they actually look like, and only then decide what the TI should
+draw. The effect table in `campaign/COMBAT_FX.md` is built to be re-pointed: a
+look is one row.
+
+20 MB against a ~294 KB chapter margin means nothing is imported wholesale. The
+question these files answer is **what the effects look like**, not what to ship.
