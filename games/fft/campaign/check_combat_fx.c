@@ -77,6 +77,31 @@ int main(void)
         check("skipped animation lands on the played state", !memcmp(played, st.unit, sizeof played));
     }
 
+    // A measured hold that ends before the action does. Night Sword holds 14 ticks of
+    // the 39 the window offers, so the wash clears just after the impact and the settle
+    // plays in full light -- the behaviour the per-ability duration exists to produce.
+    for (t = 0; t < ACT_END; t++) {
+        st.mode = M_ACT; st.atk = atk; st.tgt = tgt; st.act_t = (u8)t;
+        st.abil = 0x0a5;                             // Night Sword: measured, holds 1.07 s
+        frame();
+        if (t < ACT_WIND || t >= ACT_WIND + 14) check("short hold released", W->fx_sel == 0);
+        else                                   check("short hold engaged", W->fx_sel != 0);
+    }
+
+    // Every staged ability carries a measured hold. Without this the table could stage an
+    // ability and silently give it the full window, which is the saturation the
+    // proportional mapping exists to avoid.
+    {
+        u16 a;
+        u8 i, all_held = 1;
+        for (a = 0; a < FX_ABILITIES; a++) {
+            if (!FX_STAGES(a)) continue;
+            for (i = 0; i < FX_HOLDS && fx_hold_abil[i] != a; i++) {}
+            if (i == FX_HOLDS) all_held = 0;
+        }
+        check("every staged ability carries a hold", all_held);
+    }
+
     // fx_known records which bits were watched on the original. Every bit of
     // fx_staged has to be one of them: a staged bit it does not cover would be a
     // guess spending 55 kilocycles a frame, which is exactly what the second map
