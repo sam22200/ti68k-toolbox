@@ -1357,3 +1357,40 @@ Consequences, until someone owns it:
 Not diagnosed here: the process could not be attached (`ptrace_scope`), so no
 stack was taken. The first thing to try is a counter on `sw_step` in
 `test_autobattle.c` to find which wait never resolves.
+
+## Gariland does not start on a Titanium: 456 bytes short -- 2026-11-26
+
+`fftbat(200)` on the current ABI99 group stops on its own "Not enough RAM"
+panel instead of opening the battle:
+
+```
+Not enough RAM
+need 94 KB, free 93 KB
+```
+
+Measured with a temporary probe in `ram_message()` printing
+`BATTLE_RAM_BYTES - have`: the shortfall is **456 bytes**, on an otherwise empty
+Titanium booted from the `hw3` state with only the core and chapter groups sent
+(`TI_STATE=hw3 ti-emu restart fft-core.89g chapter-01.89g`, 1,003,658 bytes,
+57 s). `ti-mem heap` at that point shows 52 blocks and 143,862 bytes allocated,
+the largest being the 65,322-byte resident copy, 20,122, 16,384 and the
+9,512-byte module zone.
+
+**It is not the restored map underside.** Rebuilt with map 22 removed from
+`extract.KEEP_UNDERSIDE`, repackaged and rerun, the probe prints the same
+**456 bytes**: the battle's buffers are sized from the core's constants
+(`BATTLE_RAM_BYTES`, `SC_HMAX`, `FFT_CORE_DEPTH_MAX`), never from the map's own
+content, exactly as the R4 colour planes are. The skirt costs archive bytes and
+nothing else.
+
+The battle itself is healthy: `fftgar_pc --headless --scenario 0` plays it, and
+with the cursor walked to the south edge the map sits on its black base.
+
+Two things to know before chasing it:
+
+- the Titanium refuses to run the group without HW3Patch at all. Booting the
+  default clean state opens TiEmu's debugger on
+  `hw protection violation: RAM execution at $03ab32`; the state to boot from is
+  `hw3` (`CORE_PACKAGES.md` § Native test loop).
+- the resident copy alone is 65,322 bytes of the 143,862 allocated, so the
+  cheapest 456 bytes are more likely in a cold image than in a buffer.
