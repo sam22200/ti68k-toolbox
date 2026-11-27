@@ -535,3 +535,36 @@ before the action, and an assertion that every staged ability carries one.
 a brightening effect would have been invisible to the detector. And Night Sword's
 1.07..5.47 s spread is wide enough to deserve a second pass before it is trusted.
 
+## The first solid shape, read off the original's atlas (2026-11-27)
+
+The outline failed on a scatter of dots, so the shapes came first. `E173.BIN` is
+Night Sword (the effect belongs to an ability by its file **name**: there is no
+table, and `effect_names.json` holds the list). `tools/effect_rip.py --frames`
+gives its animation, and frame 0 is the whole look:
+
+> cell (56, 48), **40x136**, quad spanning y -26..110 about the anchor
+
+A tall spike, point up, base at the target, about three and a half times a unit's
+height. At the project's 0.6 sprite scale: **24x82**. `fx_spike` draws that.
+
+**It is cheaper than the dots it replaces**, which is the opposite of what adding
+an outline to the scatter did:
+
+| | peak |
+|---|---|
+| the dot scatter, no outline | 351,090 |
+| the dot scatter + a 1-pixel outline | 362,072 (over budget) |
+| **the solid spike, outlined and dithered** | **350,714** |
+
+Two things buy that. `fx_span` fills **whole bytes** instead of calling `fx_dot`
+per pixel -- one touch per eight pixels on each plane -- and the silhouette's
+outline is two dots a row rather than four per lit pixel.
+
+**The body is a checkerboard, not an aplat.** Filled solid, the spike hid the very
+unit the focus had just kept bright. The original's effects blend additively and
+the unit shows through them; four greys have no alpha, so every other pixel is
+left as it was. It costs nothing -- the pattern is ANDed into the span's mask.
+
+Still open: the effect is not depth sorted, the other five primitives are still
+the chosen ones, and only `AB_DAMAGE`'s impact and settle use the spike so far.
+
