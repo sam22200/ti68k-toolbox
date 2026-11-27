@@ -5,10 +5,14 @@ when captures or decision markers change.
 
   ti-view [--port 8000] [DIR...]     then open http://<PC IP>:8000 in Safari
                                      (/?only=gif: the GIFs only, e.g. ti-gif recordings)
+                                     (/?recent=0: the older captures too; the gallery
+                                      shows the last 12 hours unless you ask)
   ti-view --decision IMAGE...       pin these images with a Decision badge
   ti-view --clear-decision IMAGE... remove their decision markers after a verdict
 
-Pending decisions stay visible even with the GIF-only filter and beyond the normal limit.
+Pending decisions stay visible whatever the filters: GIF-only and the normal limit let them
+through, and the 12-hour window dates them by the pinning rather than by the capture. The
+newest batch wears a red Latest badge; pin a new one and the old Latest goes back to Décision.
 Markers are local IMAGE.ti-view-decision sidecars; the images themselves are untouched.
 
 Default DIRs: the repo and this repo's agent scratchpads (/tmp/claude-<uid>/<repo path, / as ->). Only .png/.gif/.jpg files
@@ -21,10 +25,12 @@ EXTS = ('.png', '.gif', '.jpg', '.jpeg')
 SKIP = {'.git', 'tools', 'sources', 'node_modules', '__pycache__'}
 LIMIT = 80
 DECISION_SUFFIX = '.ti-view-decision'
-LISTING_VERSION = 2                    # full file dates; reload already-open gallery pages
+BATCH = 2                              # seconds: markers this close were pinned together
+RECENT = 12 * 3600                     # the gallery's default window
+LISTING_VERSION = 4                    # Latest badge; reload already-open gallery pages
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-def scan(roots, exts=EXTS):
+def scan(roots, exts=EXTS, since=None):
     found = []
     for root in roots:
         for d, dirs, files in os.walk(root):
@@ -34,13 +40,27 @@ def scan(roots, exts=EXTS):
                     p = os.path.join(d, f)
                     try:
                         decision = os.path.getmtime(p + DECISION_SUFFIX) if os.path.isfile(p + DECISION_SUFFIX) else None
+                        m = os.path.getmtime(p)
+                        # A pin is dated by the pinning, not by the capture: pin an old
+                        # picture today and it stays in the window; a pin nobody resolved
+                        # three weeks ago drops out of it. 116 of those had piled up, and
+                        # as a blanket exemption they were showing through every filter.
+                        if since is not None and (decision if decision is not None else m) < since:
+                            continue
                         if decision is not None or f.lower().endswith(exts):
-                            found.append((os.path.getmtime(p), p, decision))
+                            found.append((m, p, decision))
                     except OSError:
                         pass
     found.sort(key=lambda row: (row[2] is not None, row[2] if row[2] is not None else row[0], row[1]), reverse=True)
     pending = sum(row[2] is not None for row in found)
     return found[:max(LIMIT, pending)]
+
+
+def view(gif, recent):
+    """The gallery's own URL for a pair of filters. recent is the default, so it is
+    the OFF state that has to be written down."""
+    q = (['only=gif'] if gif else []) + ([] if recent else ['recent=0'])
+    return '/?' + '&'.join(q) if q else '/'
 
 
 def stamp(captures):
@@ -53,12 +73,13 @@ def mark_decisions(paths, pending):
     for p in images:
         if not p.lower().endswith(EXTS) or not os.path.isfile(p):
             raise ValueError('not an existing image: ' + p)
+    now = time.time()
     for p in images:
         marker = p + DECISION_SUFFIX
         if pending:
             with open(marker, 'a'):
                 pass
-            os.utime(marker, None)
+            os.utime(marker, (now, now))   # one call, one stamp: the batch is the decision
         elif os.path.exists(marker):
             os.unlink(marker)
 
@@ -66,9 +87,12 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>ti-view</title><style>
 body{{margin:0;padding:12px;background:#222;color:#ddd;font:14px -apple-system,sans-serif}}
 .c{{margin:0 0 18px}} nav{{margin:0 0 12px}} nav a{{color:#9cf;margin-right:14px}}
-.g{{background:#9cf;color:#222;border-radius:3px;padding:0 4px;font-size:12px}} .c p{{margin:4px 0;word-break:break-all}} .t{{color:#888}}
+.g{{background:#9cf;color:#222;border-radius:3px;padding:0 4px;font-size:12px}}
+nav label{{color:#ddd;cursor:pointer}} nav input{{vertical-align:middle;margin-right:4px}} .c p{{margin:4px 0;word-break:break-all}} .t{{color:#888}}
 .decision{{border:2px solid #ffc857;border-radius:5px;padding:8px}}
 .badge{{background:#ffc857;color:#222;border-radius:3px;padding:2px 6px;font-weight:bold}}
+.latest{{border:2px solid #e8313a;border-radius:5px;padding:8px}}
+.badge-latest{{background:#e8313a;color:#fff;border-radius:3px;padding:2px 6px;font-weight:bold}}
 img{{max-width:100%;image-rendering:pixelated;background:#555;min-width:min(480px,100%)}}
 </style></head><body>{body}<script>
 const v={stamp!r};setInterval(()=>fetch('/stamp'+location.search).then(r=>r.text()).then(s=>{{if(s!==v)location.reload()}}),2000);
@@ -92,9 +116,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
-        exts = ('.gif',) if urllib.parse.parse_qs(url.query).get('only') == ['gif'] else EXTS
+        query = urllib.parse.parse_qs(url.query)
+        gif = query.get('only') == ['gif']
+        recent = query.get('recent', ['1']) != ['0']
+        exts = ('.gif',) if gif else EXTS
+        since = time.time() - RECENT if recent else None
         if url.path == '/stamp':
-            s = scan(self.roots, exts)
+            s = scan(self.roots, exts, since)
             return self.send(200, 'text/plain', stamp(s).encode())
         if url.path == '/img':
             p = os.path.realpath(urllib.parse.parse_qs(url.query).get('p', [''])[0])
@@ -106,15 +134,25 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, 'text/plain', b'not found')
         if url.path != '/':
             return self.send(404, 'text/plain', b'not found')
-        s = scan(self.roots, exts)
+        s = scan(self.roots, exts, since)
+        # The newest batch of pins is what is being asked about now; older pins are
+        # still open questions, so they keep their badge and lose the colour.
+        newest = max((d for _, _, d in s if d is not None), default=None)
         body = ''.join(
-            f'<div class="c{" decision" if decision is not None else ""}"><p>'
-            f'{"<span class=badge>Décision</span> " if decision is not None else ""}{html.escape(self.rel(p))} '
+            f'<div class="c{"" if decision is None else " latest" if newest - decision <= BATCH else " decision"}"><p>'
+            f'{"" if decision is None else "<span class=badge-latest>Latest</span> " if newest - decision <= BATCH else "<span class=badge>Décision</span> "}{html.escape(self.rel(p))} '
             f'{"<span class=g>GIF</span> " if p.lower().endswith(".gif") else ""}<span class="t">'
             f'Fichier modifié le {time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(m))}</span></p>'
             f'<img src="/img?p={urllib.parse.quote(p)}&m={m}"></div>' for m, p, decision in s) \
-            or '<p>No PNG/GIF yet.</p>'
-        body = '<nav><a href="/">All</a><a href="/?only=gif">GIF only</a></nav>' + body
+            or ('<p>Nothing in the last 12 hours. '
+                f'<a href="{view(gif, False)}">Show them all</a>.</p>' if recent
+                else '<p>No PNG/GIF yet.</p>')
+        body = (f'<nav><a href="{view(False, recent)}">All</a>'
+                f'<a href="{view(True, recent)}">GIF only</a>'
+                f'<label><input type="checkbox"'
+                f'{" checked" if recent else ""} '
+                f'onclick="location.href=\'{view(gif, not recent)}\'">'
+                ' Last 12 hours</label></nav>') + body
         self.send(200, 'text/html; charset=utf-8', PAGE.format(body=body, stamp=stamp(s)).encode())
 
     def log_message(self, *a):

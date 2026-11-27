@@ -77,7 +77,7 @@ ti-mem wait x.89g               # until a transfer has landed (ti-emu start/rest
 ti-emu save NAME; TI_STATE=NAME ti-run x.89z  # a saved state (e.g. a core installed once), only x sent
 ti-gif /path/x.gif 20 &         # animated GIF of the LCD (20 s) while ti-key plays
 ti-play keys/win.txt            # a runtime key script played in TiEmu in real time (held keys, diagonals)
-ti-view                         # PNG/GIF captures on the LAN, newest first: http://<PC IP>:8000 (iPad Safari, /?only=gif)
+ti-view                         # PNG/GIF captures on the LAN, the last 12 hours, newest first: http://<PC IP>:8000 (iPad Safari, /?only=gif, untick the box for older)
 ti-cycles [--arg N] [--png F] name.89z   # the program on the PC: datasheet cycles per zone (average, max), screen as PNG
 make xcheck                     # runtime game: TI binary under ti-cycles = PC headless, per scenario
 ```
