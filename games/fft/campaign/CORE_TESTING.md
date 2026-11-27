@@ -1358,39 +1358,41 @@ Not diagnosed here: the process could not be attached (`ptrace_scope`), so no
 stack was taken. The first thing to try is a counter on `sw_step` in
 `test_autobattle.c` to find which wait never resolves.
 
-## Gariland does not start on a Titanium: 456 bytes short -- 2026-11-26
+## The 456-byte Gariland shortfall was `heaplow`, not the core -- 2026-11-26
 
-`fftbat(200)` on the current ABI99 group stops on its own "Not enough RAM"
-panel instead of opening the battle:
+`fftbat(200)` booted from the shared `hw3` state stops on its own "Not enough
+RAM" panel, 456 bytes short (a temporary `ram_message()` probe printing
+`BATTLE_RAM_BYTES - have` measured it). **The cause is the leftover `heaplow`
+program in that state**, which holds 886 bytes:
+[INSTALLED_RAM_ABI99.md](INSTALLED_RAM_ABI99.md) § Reproducing the Zeklaus 13
+figure already says so -- "with it, `story start` reports 184,676 instead of
+185,562, and the battle never initialises" -- and this is the second time that
+hour has been spent.
 
+```sh
+TI_STATE=hw3 TI_WINDOW_WAIT=400 ti-emu restart fft-core.89g chapter-01.89g
+ti-key --hold 0.3 ON ; ti-key HOME CLEAR CLEAR     # the long transfer lets it sleep
+ti-key 'delvar heaplow' ; ti-key ENTER             # 886 bytes back
+ti-emu save fftgar                                 # keep a state that has it gone
+ti-key 'fftbat(200)' ; ti-key ENTER
 ```
-Not enough RAM
-need 94 KB, free 93 KB
-```
 
-Measured with a temporary probe in `ram_message()` printing
-`BATTLE_RAM_BYTES - have`: the shortfall is **456 bytes**, on an otherwise empty
-Titanium booted from the `hw3` state with only the core and chapter groups sent
-(`TI_STATE=hw3 ti-emu restart fft-core.89g chapter-01.89g`, 1,003,658 bytes,
-57 s). `ti-mem heap` at that point shows 52 blocks and 143,862 bytes allocated,
-the largest being the 65,322-byte resident copy, 20,122, 16,384 and the
-9,512-byte module zone.
+With `heaplow` gone the battle opens normally: the Thief's opening lines, then
+Gariland with Ramza at 52/52 HP, the camera rotating on F5 and the unit plate
+drawn. 886 - 456 leaves 430 free, which matches the 436/430 the Zeklaus
+13-unit diagnostic reports.
 
-**It is not the restored map underside.** Rebuilt with map 22 removed from
+**It is also not the restored map underside.** Rebuilt with map 22 removed from
 `extract.KEEP_UNDERSIDE`, repackaged and rerun, the probe prints the same
 **456 bytes**: the battle's buffers are sized from the core's constants
 (`BATTLE_RAM_BYTES`, `SC_HMAX`, `FFT_CORE_DEPTH_MAX`), never from the map's own
-content, exactly as the R4 colour planes are. The skirt costs archive bytes and
-nothing else.
+content, exactly as the R4 colour planes are.
 
-The battle itself is healthy: `fftgar_pc --headless --scenario 0` plays it, and
-with the cursor walked to the south edge the map sits on its black base.
+**Without HW3Patch the group does not run at all.** Booting the default clean
+state opens TiEmu's debugger on `hw protection violation: RAM execution at
+$03ab32`. Boot from `hw3` (`CORE_PACKAGES.md` § Native test loop).
 
-Two things to know before chasing it:
-
-- the Titanium refuses to run the group without HW3Patch at all. Booting the
-  default clean state opens TiEmu's debugger on
-  `hw protection violation: RAM execution at $03ab32`; the state to boot from is
-  `hw3` (`CORE_PACKAGES.md` § Native test loop).
-- the resident copy alone is 65,322 bytes of the 143,862 allocated, so the
-  cheapest 456 bytes are more likely in a cold image than in a buffer.
+**The map base stays out of frame during a battle.** Gariland's south edge
+tiles are not reachable, and the camera is clamped to the playable area
+(`camera_clamp.h`), so the restored skirt is not what a player sees mid-turn --
+it reads on the whole-map views. Do not use an in-battle capture to review it.
