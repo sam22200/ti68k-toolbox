@@ -30,7 +30,9 @@ u8 game_update(void){
     FRAME_BEGIN();st.tick++;W->actor_budget=1;W->actor_misses=W->actor_mirror=0;W->ac_now++;
     // battle-fx walks the engine's own action timeline, in BOTH builds, so the gate
     // compares like with like: the difference is the effect layer, not the action state.
-    if(fx_walk)st.act_t=(u8)(ACT_WIND+(rt_frame%(u16)(ACT_END-ACT_WIND)));
+    if(fx_walk)st.act_t=(u8)(ACT_WIND+(rt_frame%(u16)(fx_act_end()-ACT_WIND)));
+    /* the staged action is longer than ACT_END now, and the walk has to reach its end
+       or the cycle check stops covering the half where the wash and the spike overlap */
     return 1;
 #else
 #ifdef CAP_KO
