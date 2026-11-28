@@ -96,9 +96,15 @@ LOOP, MOVETO, MOVEBY = 0x81, 0x82, 0x83
 
 
 def sections(raw):
-    """The ten sections of an effect file, or None when it is a MIPS routine."""
-    if len(raw) < 40 or struct.unpack_from('<I', raw, 0)[0] != 40:
+    """The ten sections of an effect file, or None when the file holds none.
+
+    A MIPS overlay can still carry its data file behind its code
+    (`effect_rip.data_base`), which is how Holy is read at all.
+    """
+    base = effect_rip.data_base(raw)
+    if base is None:
         return None
+    raw = raw[base:]
     off = struct.unpack_from('<10I', raw, 0)
     ends = list(off[1:]) + [len(raw)]
     out = []
