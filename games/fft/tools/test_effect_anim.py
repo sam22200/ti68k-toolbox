@@ -46,9 +46,11 @@ def section3(seqs):
 class Frames(unittest.TestCase):
     def test_one_polygon_a_frame(self):
         fr = A.frames(section0([struct.pack('<2H', 0x02a0, 1) + poly(56, 8, 48, 104, -22, -7)]))
-        self.assertEqual(fr[0], [])                       # index 0 is the blank
-        self.assertEqual(len(fr[1]), 1)
-        p = fr[1][0]
+        # The cell table starts at `fd + *(s16*)fd`, so the first record IS cell
+        # 0: there is no blank in front of it.
+        self.assertEqual(len(fr), 1)
+        self.assertEqual(len(fr[0]), 1)
+        p = fr[0][0]
         self.assertEqual((p['u'], p['v'], p['w'], p['h']), (56, 8, 48, 104))
         self.assertEqual(p['pts'], [(-22, -7), (26, -7), (-22, 97), (26, 97)])
 
@@ -58,11 +60,54 @@ class Frames(unittest.TestCase):
             poly(8, 8, 24, 32, 0, 0) for _ in range(3))
         self.assertEqual(len(rec), 4 + 24 * 3)
         fr = A.frames(section0([rec]))
-        self.assertEqual(len(fr[1]), 3)
+        self.assertEqual(len(fr[0]), 3)
 
-    def test_a_negative_size_mirrors_the_cell(self):
+    def test_the_size_is_unsigned_and_wraps_to_mirror(self):
+        """`quad->u1 = quad->u0 + frame->width` is written into a u8, so a width
+        that carries past 255 gives u1 < u0 and the cell interpolates backwards.
+        That wrap is the mirroring -- the field itself is never negative."""
         fr = A.frames(section0([struct.pack('<2H', 0x02a0, 1) + poly(39, 112, -32, 112, 0, 0)]))
-        self.assertEqual(fr[1][0]['w'], -32)              # not 224, which is off the atlas
+        self.assertEqual(fr[0][0]['w'], 224)
+        u, w = fr[0][0]['u'], fr[0][0]['w']
+        self.assertEqual((u + w) & 0xff, 7)               # 39 + 224 wraps to 7
+        self.assertLess((u + w) & 0xff, u)                # so it runs backwards
+
+
+class Physics(unittest.TestCase):
+    """The section 3 header, which opcode 0x27 copies into the integrator."""
+
+    def test_the_header_carries_gravity_and_the_threshold(self):
+        sec3 = (struct.pack('<2H', 2, 0) + struct.pack('<3i', 0, 4096, 0)
+                + struct.pack('<i', 64))
+        self.assertEqual(A.physics(sec3), ((0, 4096, 0), 64))
+
+    def test_the_damping_slows_a_falling_particle(self):
+        """`(mass - threshold) / mass` a frame. Meteor's 64 against a mass of
+        4096 takes 111 frames of fall from 3,030 units down to 1,310."""
+        r = bytearray(A.REC_SIZE)
+        struct.pack_into('<2h', r, 0x5c, 13991, 13991)   # the rock's radial speed
+        struct.pack_into('<h', r, 0x44, 4096)            # its mass
+        struct.pack_into('<h', r, 0x54, -128)            # its weight
+        rec = bytes(r)
+        free = A._motion(rec, (0, 0, 0), 111)[1]
+        damped = A._motion(rec, (0, 0, 0), 111, physics=((0, 4096, 0), 64))[1]
+        self.assertAlmostEqual(free, 111 * 13991 / 512.0, delta=20)
+        self.assertLess(damped, free / 2)
+        self.assertAlmostEqual(damped, 1310, delta=120)
+
+
+class CellIndexing(unittest.TestCase):
+    """`battle_effect_render_particle_sprite`'s two-step lookup."""
+
+    def test_the_group_offset_picks_the_table(self):
+        """fd = section 0 + 4; the halfword there is the group's offset, and the
+        cell table starts at fd + it. Reading from `words[2]` put every cell one
+        slot early -- which is what hid Meteor's rock behind an 8x8 spark."""
+        rec = struct.pack('<2H', 0x02a0, 1) + poly(0, 0, 8, 8, 0, 0)
+        sec = section0([rec])
+        self.assertEqual(struct.unpack_from('<h', sec, 4)[0], 2)
+        self.assertEqual(len(A.frames(sec)), 1)
+        self.assertEqual(len(A.frames(sec)[0]), 1)
 
 
 class Script(unittest.TestCase):
@@ -104,11 +149,11 @@ class Cast(unittest.TestCase):
         rec = struct.pack('<2H', 0x02a0, 1) + poly(0, 0, 8, 8, 0, 0)
         fr = A.frames(section0([rec, rec]))
         seqs = A.script(section1([
-            bytes([1, 4, 0]) + bytes([2, 2, 0]) + bytes([0x81]),
-            bytes([2, 2, 0]) + bytes([0x81])]))
+            bytes([0, 4, 0]) + bytes([1, 2, 0]) + bytes([0x81]),
+            bytes([1, 2, 0]) + bytes([0x81])]))
         tl = A.timeline(fr, seqs, A.cast(section3([0, 1])))
         self.assertEqual([(d['t'], d['inst'], d['frame']) for d in tl],
-                         [(0, 0, 1), (0, 1, 2), (4, 0, 2)])
+                         [(0, 0, 0), (0, 1, 1), (4, 0, 1)])
 
 
 class EffectScript(unittest.TestCase):          # section 2, not the sprite sequences
@@ -122,7 +167,7 @@ class EffectScript(unittest.TestCase):          # section 2, not the sprite sequ
         got = [(o, n, ops) for o, _, n, _, ops in A.program(code)]
         self.assertEqual([g[0] for g in got], [0, 2, 6, 12, 20])
         self.assertEqual([g[1] for g in got],
-                         ['init_particle_physics', 'jump_if_targets_eq',
+                         ['set_gravity', 'jump_if_targets_eq',
                           'jump_if_counter_eq', 'camera_position', 'end'])
         self.assertEqual(got[2][2], [3, 14])
 
@@ -205,11 +250,31 @@ class Scheduled(unittest.TestCase):
         # a 2-tick sequence looping over 4 frames = 8 ticks: four draws
         self.assertEqual([d['t'] for d in got], [0, 2, 4, 6])
 
-    def test_an_endless_particle_stops_with_the_child_timeline(self):
+    def test_a_particle_outlives_its_phase(self):
+        """The script's tail keeps calling `update_all_particles` until the last
+        particle is gone, so a lifetime runs its full count even once the
+        timeline's own frames are spent."""
+        cs = [dict(seq=0, raw=self.emitter(0, life=6))]
+        tl = self.timeline(0, 2, [(0, 1, 0)])       # a two-frame child timeline
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        self.assertEqual([d['t'] for d in got], [0, 2, 4, 6, 8, 10])
+
+    def test_an_animation_driven_particle_stops_with_its_phase(self):
+        """Its real bound is its sequence's frozen frame; a sequence that loops
+        before reaching one would make it immortal, so the phase stays the
+        bound. Holy's sequence 0 is exactly that case."""
         cs = [dict(seq=0, raw=self.emitter(0, life=-1))]
         tl = self.timeline(0, 3, [(0, 1, 0)])
         got = A.schedule(self.fr, self.seqs, cs, tl)
         self.assertEqual([d['t'] for d in got], [0, 2, 4])
+
+    def test_an_animation_driven_particle_dies_on_its_frozen_frame(self):
+        """A hold of 0 freezes the cursor, and `frame_timer == 0` frees it."""
+        seqs = A.script(section1([bytes([1, 2, 0]) + bytes([2, 0, 0])]))
+        cs = [dict(seq=0, raw=self.emitter(0, life=-1))]
+        tl = self.timeline(0, 3, [(0, 1, 0)])
+        got = A.schedule(self.fr, seqs, cs, tl)
+        self.assertEqual([d['t'] for d in got], [0, 2])
 
     def test_no_timeline_means_no_schedule(self):
         self.assertIsNone(A.schedule(self.fr, self.seqs, [], None))
@@ -393,6 +458,235 @@ class Tracks(unittest.TestCase):
                            second=[(0, 0, 0), (0, 0, 0)])
         self.assertEqual(A.screen_colour(A.tracks(sec), 0)[0], (20, 20, 20))
         self.assertEqual(A.screen_colour(A.tracks(sec), 8)[0], (40, 40, 40))
+
+    def test_the_parent_keeps_one_set_of_tracks_per_phase(self):
+        """`effect_timeline_t` puts them at 0xdde, 0x384 apart."""
+        t = self.section([3], [(9, 9, 9)], [0x80], 1)[8 + 0x326:]
+        for phase, at in ((0, A.PARENT_TRACKS), (1, A.PARENT_TRACKS + A.PARENT_TRACKS_SIZE)):
+            sec = bytes(at) + t + bytes(8)
+            got = A.parent_tracks(sec, phase)['affected units']
+            self.assertEqual([(e['frames'], e['colour']) for e in got], [(24, (9, 9, 9))])
+            self.assertFalse(A.parent_tracks(sec, 1 - phase)['affected units'])
+
+    def test_the_phases_run_one_after_the_other(self):
+        """Phase 1 fades, the child's window starts where it stopped."""
+        one = A.tracks(self.section([1], [(40, 0, 0)], [0], 1))
+        two = A.tracks(self.section([1], [(80, 0, 0)], [0], 1))
+        got = A.stage_offsets([(0, 4, one), (4, 8, two), (8, 1 << 30, None)], 'affected units', 8)
+        self.assertEqual([round(c[0]) for c in got], [5, 10, 15, 20, 28, 35, 42, 50])
+
+    def test_a_stage_writes_only_its_own_frames(self):
+        """A keyframe longer than its phase stops at the phase's last frame."""
+        one = A.tracks(self.section([4], [(32, 0, 0)], [0], 1))
+        got = A.stage_offsets([(0, 3, one), (3, 1 << 30, None)], 'affected units', 6)
+        self.assertEqual([round(c[0]) for c in got], [1, 2, 3, 0, 0, 0])
+
+
+class EmitterMotion(unittest.TestCase):
+    """`battle_effect_spawn_emitter_particles`: speed and angles follow curves."""
+
+    def record(self, **kw):
+        r = bytearray(0xc4)
+        for at, fmt, val in kw.values():
+            struct.pack_into(fmt, r, at, *val)
+        return bytes(r)
+
+    def entry(self, curves=0, speed=(0, 0), speed_end=(0, 0),
+              angle=(0, 0, 0), angle_end=(0, 0, 0)):
+        r = bytearray(0xc4)
+        struct.pack_into('<I', r, 0x08, curves)
+        struct.pack_into('<2h', r, 0x5c, *speed)
+        struct.pack_into('<2h', r, 0x60, *speed_end)
+        struct.pack_into('<3h', r, 0x2c, *angle)
+        struct.pack_into('<3h', r, 0x32, *angle_end)
+        return bytes(r)
+
+    def test_a_still_emitter_stays_still(self):
+        self.assertEqual(A._velocity(self.entry(), (0, 0, 0)), (0.0, 0.0, 0.0))
+
+    def test_the_radial_speed_is_lerped_toward_its_end(self):
+        """Haste stores 0 -> 1280 behind nibble 7; the start alone never moves."""
+        rec = self.entry(curves=0x50000000, speed=(0, 0), speed_end=(1280, 1280))
+        table = [[0] * 160, [0] * 160, [0] * 160, [0] * 160, [0, 128, 256] + [256] * 157]
+        self.assertEqual(A._velocity(rec, (0, 0, 0), table, 0), (0.0, 0.0, 0.0))
+        half = A._velocity(rec, (0, 0, 0), table, 1)
+        full = A._velocity(rec, (0, 0, 0), table, 2)
+        self.assertAlmostEqual(half[1], 1280 / 2 / 512.0, places=5)
+        self.assertAlmostEqual(full[1], 1280 / 512.0, places=5)
+
+    def test_the_third_base_angle_turns_the_velocity(self):
+        """`RotMatrix`'s Z, applied last: a quarter turn sends +y to -x."""
+        rec = self.entry(speed=(512, 512), angle=(0, 0, 1024))
+        vx, vy, _ = A._velocity(rec, (0, 0, 0))
+        self.assertAlmostEqual(vx, -1.0, places=5)
+        self.assertAlmostEqual(vy, 0.0, places=5)
+
+    def test_the_base_angle_is_lerped_toward_its_end(self):
+        """Haste's two helices are one turn of that angle, half a turn apart."""
+        rec = self.entry(curves=0x100, speed=(512, 512),
+                         angle=(0, 0, 0), angle_end=(0, 0, 4096))
+        table = [[0, 256] + [256] * 158]
+        at0 = A._velocity(rec, (0, 0, 0), table, 0)
+        at1 = A._velocity(rec, (0, 0, 0), table, 1)
+        self.assertAlmostEqual(at0[1], 1.0, places=5)          # straight up
+        self.assertAlmostEqual(at1[1], 1.0, places=5)          # a whole turn later
+        self.assertAlmostEqual(at0[0], at1[0], places=5)
+
+
+class ScreenOrigin(unittest.TestCase):
+    """The battle's drawing area is not at the origin."""
+
+    def test_the_screen_origin_is_minus_128(self):
+        """`SetDefDrawEnv(env, -0x80, 0, width + 0x80, height)`: a primitive
+        written at x = 0x80 lands on pixel 0, so the 4x4 grid's 128..384 is
+        exactly the 256-wide screen."""
+        self.assertEqual(A.SCREEN_ORIGIN_X, -0x80)
+        self.assertEqual(0x80 + A.SCREEN_ORIGIN_X, 0)
+        self.assertEqual((3 << 6) + 0xc0 + A.SCREEN_ORIGIN_X, 256)
+
+
+class EffectCamera(unittest.TestCase):
+    """`battle_camera_advance_effect_tracks` and its three keyframe tables."""
+
+    def table(self, n, rows):
+        """One `effect_camera_keyframes_21_t`-shaped table: 22n + 2 bytes."""
+        thr = bytearray(2 * n)
+        ang = bytearray(6 * n)
+        pos = bytearray(6 * n)
+        zoom = bytearray(6 * n)
+        sel = bytearray(2 * n)
+        for i, (t, a, p, z, f) in enumerate(rows):
+            struct.pack_into('<h', thr, 2 * i, t)
+            struct.pack_into('<3h', ang, 6 * i, *a)
+            struct.pack_into('<3h', pos, 6 * i, *p)
+            struct.pack_into('<3h', zoom, 6 * i, *z)
+            struct.pack_into('<H', sel, 2 * i, f)
+        return bytes(thr + ang + pos + zoom + sel) + struct.pack('<h', len(rows) - 1)
+
+    def section(self, main=(), per=(), clean=(), phase1=100, child=0, delay=0):
+        """A section 7 carrying just the durations and the three camera tables."""
+        sec = bytearray(A.CAMERA_CLEANUP + 22 * 21 + 2)
+        struct.pack_into('<4H', sec, 0, 0, 0, phase1, delay)
+        struct.pack_into('<H', sec, 0x00a, child)
+        for at, n, rows in ((A.CAMERA_TARGETS, 17, per), (A.CAMERA_MAIN, 21, main),
+                            (A.CAMERA_CLEANUP, 21, clean)):
+            body = self.table(n, rows or [(0, (0, 0, 0), (0, 0, 0), (0, 0, 0), 0)])
+            if not rows:
+                struct.pack_into('<h', body := bytearray(body), 22 * n, -1)
+            sec[at:at + len(body)] = body
+        return bytes(sec)
+
+    def test_the_names_in_the_struct_are_swapped(self):
+        """`position[]` holds the angles, `target[]` the position."""
+        sec = self.section(main=[(4, (1, 2, 3), (4, 5, 6), (7, 8, 9), 0x0247)])
+        tab = A.camera_table(sec, A.CAMERA_MAIN, 21)
+        self.assertEqual(tab['angle'][0], (1, 2, 3))
+        self.assertEqual(tab['position'][0], (4, 5, 6))
+        self.assertEqual(tab['zoom'][0], (7, 8, 9))
+
+    def test_a_given_zoom_of_one_is_a_third_bigger(self):
+        """The tactical view is 0xC00; an effect asking for ONE asks for x1.33."""
+        sec = self.section(main=[(4, (0,) * 3, (0,) * 3, (A.CAMERA_ONE,) * 3, 0x0844)])
+        play = A.camera_play(sec, 6)
+        # The engine steps the frame counter before it interpolates, so frame 0
+        # already carries the move's first step rather than its start.
+        self.assertLess(play[0]['scale'], 1.15)
+        self.assertAlmostEqual(play[4]['scale'], A.CAMERA_ONE / float(A.CAMERA_ZOOM_OUT),
+                               places=2)
+
+    def test_the_cleanup_table_answers_after_the_others(self):
+        """Its thresholds are relative to the end of the per-target window.
+
+        The scanner looks *ahead*, so a cleanup keyframe at 5 past a phase 1 of
+        2 is armed at frame 0 with seven frames to run, and the camera is on it
+        by frame 6.
+        """
+        sec = self.section(main=[(2, (0,) * 3, (0,) * 3, (0,) * 3, 0)],
+                           clean=[(5, (0,) * 3, (0, -40, 0), (0,) * 3, 0x0802)],
+                           phase1=2, child=0, delay=0)
+        play = A.camera_play(sec, 10)
+        self.assertGreater(play[0]['position'][1], -20)   # barely started
+        self.assertAlmostEqual(play[6]['position'][1], -40, delta=1)
+
+    def test_the_map_centre_moves_the_camera_off_the_target(self):
+        """A preview is drawn about the target; `--map-centre` says where the
+        middle of the battlefield is from there. Gariland's is (140, 0, 210)
+        and its roof tile (98, -96, 210), so the vector is (42, 96, 0)."""
+        sec = self.section(main=[(4, (0,) * 3, (0, -40, 0), (0,) * 3, 0x0282)])
+        plain = A.camera_play(sec, 4)
+        moved = A.camera_play(sec, 4, centre=(42, 96, 0))
+        self.assertEqual(plain[1]['position'], (0, -40, 0))
+        self.assertEqual(moved[1]['position'], (42, 56, 0))
+
+    def test_a_track_is_only_armed_while_it_is_idle(self):
+        """A second keyframe does not restart a move that is still running."""
+        sec = self.section(main=[(10, (0,) * 3, (0, -100, 0), (0,) * 3, 0x0802),
+                                 (20, (0,) * 3, (0, 0, 0), (0,) * 3, 0x0802)])
+        play = A.camera_play(sec, 12)
+        self.assertAlmostEqual(play[9]['position'][1], -100, delta=2)
+
+
+class EmitterChildren(unittest.TestCase):
+    """`battle_effect_code_script_25_update_all_particles` spawns the children."""
+
+    def record(self, seq=0, count=1, interval=1, life=3, flags=0, kid=0,
+               kind=0, speed=(0, 0)):
+        r = bytearray(0xc4)
+        r[1] = seq
+        struct.pack_into('<H', r, 0x02, kind)
+        struct.pack_into('<H', r, 0x06, flags)
+        struct.pack_into('<2h', r, 0x5c, *speed)
+        struct.pack_into('<h', r, 0x94, life)
+        struct.pack_into('<h', r, 0xb0, count)
+        struct.pack_into('<h', r, 0xb4, interval)
+        r[0xc1] = kid
+        return bytes(r)
+
+    def run_emit(self, cs, span=8):
+        out, fr = [], [[]]
+        seqs = [[('frame', 0, 2, 0)]]
+        A._emit(out, fr, seqs, cs, 0, 0, 0, 1, span, None, False, A.camera(), None)
+        return out
+
+    def test_without_the_flag_no_child_is_born(self):
+        cs = [dict(seq=0, raw=self.record(flags=0, kid=1)),
+              dict(seq=0, raw=self.record())]
+        self.assertEqual({d['inst'] for d in self.run_emit(cs)}, {0})
+
+    def test_a_mid_life_child_is_born_every_frame_of_the_parent(self):
+        """Mode 1 (0x4) spawns `child_emitter_mid_life` once a frame while it lives."""
+        cs = [dict(seq=0, raw=self.record(flags=0x4, kid=1, life=3)),
+              dict(seq=0, raw=self.record(life=2))]
+        out = self.run_emit(cs)
+        self.assertEqual({d['inst'] for d in out}, {0, 1})
+        born = sorted({d['t'] // 2 for d in out if d['inst'] == 1})
+        self.assertEqual(born, [0, 1, 2])          # one per frame of a 3-frame life
+
+    def test_the_child_rides_its_parent(self):
+        """Its anchor is the parent particle, so it moves with it."""
+        cs = [dict(seq=0, raw=self.record(flags=0x4, kid=1, life=4, speed=(512, 512))),
+              dict(seq=0, raw=self.record(life=2))]
+        kids = [d for d in self.run_emit(cs) if d['inst'] == 1]
+        ys = [d['y'] for d in sorted(kids, key=lambda d: d['t'])]
+        self.assertGreater(ys[-1], ys[0])          # carried along as the parent falls
+
+    def test_a_native_renderer_keyframe_is_not_a_particle_spawn(self):
+        """`selector & 7` names a handler slot; the record is then read through
+        that renderer's view, where 0x14 is `texture_u`, not a spawn position."""
+        fr, seqs = [[]], [[('frame', 0, 2, 0)]]
+        cs = [dict(seq=0, raw=self.record())]
+        chan = [dict(k=1, frm=0, to=2, emitter=0, action=0),
+                dict(k=2, frm=2, to=4, emitter=0, action=3)]
+        tl = dict(phase1=8, child=0, phase2=0, spawn_delay=0,
+                  child_channels=[], phase_channels=[[chan], []])
+        out = A.schedule(fr, seqs, cs, tl, False)
+        self.assertTrue(out)
+        self.assertLess(max(d['t'] // 2 for d in out), 2)   # only the first keyframe
+
+    def test_the_recursion_is_bounded(self):
+        """A file that makes a particle its own child must not run away."""
+        cs = [dict(seq=0, raw=self.record(flags=0x4, kid=0, life=3))]
+        self.assertLess(len(self.run_emit(cs)), 500)
 
 
 if __name__ == '__main__':

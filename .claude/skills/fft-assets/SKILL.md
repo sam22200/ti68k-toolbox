@@ -14,7 +14,10 @@ Read [reading an original effect](references/effects.md) before rebuilding any c
 effect: how to find what one actually does (its animation records, not its atlas picture),
 and what four greys and a 360,000-cycle frame allow of it. `tools/effect_anim.py` decodes
 and plays an effect's choreography straight from the disc -- cells, script and cast -- so
-the timing no longer has to be read off a video of the console.
+the timing no longer has to be read off a video of the console. `--camera` prints the
+effect camera's keyframes and `--eye` plays them over the render; `--map-centre x,y,z`
+gives it the one vector a preview cannot know, from the target to the middle of the
+battlefield (Gariland's roof tile: `42,96,0`).
 
 Read [the disc catalogue](references/disc-map.md) for file-by-file offsets and
 formats. The rest of this page is the method and the traps.
