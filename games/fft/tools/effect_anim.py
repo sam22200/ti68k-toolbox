@@ -303,35 +303,46 @@ def action_text(a):
     return ', '.join(bits)
 
 
-def play_window(ops, nframes, t0, t1):
-    """The draws of one looping sequence between two absolute ticks.
+def play_window(ops, nframes, t0, t1, animation_driven):
+    """One particle's draws, walking its sequence the way the engine walks it.
 
-    0x81 sends the cursor back to the first byte, so the 0x82 that usually opens
-    a sequence runs again and the offset restarts: a loop replays the motion, it
-    does not carry on from where it stopped.
+    Two things end a sequence, and neither is the 0x81:
+
+    * **a hold of 0 freezes the cursor.** The stepper only advances when the
+      hold it just loaded is non-zero (`if (node->frame_timer != 0)
+      node->sequence_offset += 3;`), so a frame written `NN 00 dd` is held for
+      good. Nearly every sequence ends on one, which is why the 0x81 behind it
+      is usually never reached;
+    * **a lifetime of -1 is not endless, it is animation-driven**
+      (`EFFECT_PARTICLE_LIFETIME_ANIMATION_DRIVEN`). Such a particle is freed
+      the frame its `frame_timer` reaches 0 -- that is, on the frozen frame.
+
+    So an animation-driven particle plays its sequence exactly once and dies on
+    the held frame; one with a lifetime holds that frame until its time runs
+    out, and only a sequence with no held frame ever reaches the 0x81 and loops.
+    Reading -1 as "endless" made every shard of Stasis Sword fall twice.
     """
-    out, t = [], t0
-    guard = 0
-    while t < t1 and guard < 10000:
-        x = y = 0
-        moved = False
-        for op in ops:
-            if op[0] == 'moveto':
-                x, y = op[1], op[2]
-            elif op[0] == 'moveby':
-                x += op[1]; y += op[2]
-            elif op[0] == 'frame':
-                f, hold, depth = op[1], op[2], op[3]
-                if f < nframes and t < t1:
-                    out.append(dict(t=t, frame=f, x=x, y=y, depth=depth,
-                                    ticks=min(max(hold, 1), t1 - t)))
-                t += hold
-                moved = moved or hold > 0
-            guard += 1
-            if t >= t1:
-                break
-        if not moved:                 # a sequence of zero-length holds would spin
-            break
+    out, t, i, x, y, guard = [], t0, 0, 0, 0, 0
+    while t < t1 and i < len(ops) and guard < 20000:
+        guard += 1
+        op = ops[i]
+        if op[0] == 'moveto':
+            x, y = op[1], op[2]; i += 1
+        elif op[0] == 'moveby':
+            x += op[1]; y += op[2]; i += 1
+        elif op[0] == 'loop':
+            i = 0                                   # back to the first byte
+        elif op[0] == 'frame':
+            f, hold, depth = op[1], op[2], op[3]
+            if f < nframes:
+                held = 2 if (hold == 0 and animation_driven) else \
+                       (t1 - t if hold == 0 else min(hold, t1 - t))
+                out.append(dict(t=t, frame=f, x=x, y=y, depth=depth, ticks=held))
+            if hold == 0:
+                break                               # frozen: dead, or held to the end
+            t += hold; i += 1
+        else:
+            i += 1
     return out
 
 
@@ -361,13 +372,25 @@ def schedule(fr, seqs, cs, tl):
             count = max(1, struct.unpack_from('<h', rec, 0xb0)[0])
             interval = max(1, struct.unpack_from('<h', rec, 0xb4)[0])
             life = struct.unpack_from('<h', rec, 0x94)[0]
+            # `spawn_position_start` (0x14) and the spread (0x20) say where this
+            # emitter sits and how far it scatters -- Night Sword's ball at
+            # y -112 against its bursts at y 0..-14, which is the structure the
+            # screenshots show. They are **world units**, though, projected
+            # through the camera, and the sprite quads are screen pixels.
+            # Applying them raw pulls the parts apart and smears each stream
+            # into one saturated blob: measured, worse, not shipped. `--cast`
+            # prints them; placing them needs the projection.
             born = k['frm']
             while born < max(k['to'], k['frm'] + 1):
                 die = tl['child'] if life < 0 else min(tl['child'], born + life)
                 t0 = (tl['phase1'] + born) * 2          # frames at 30 fps -> 60 Hz ticks
                 t1 = (tl['phase1'] + die) * 2
                 for _ in range(count):
-                    for d in play_window(seqs[seq], len(fr), t0, t1):
+                    # The spread is a half-extent in WORLD units, which the
+                    # console projects through the camera. Applied raw as screen
+                    # pixels it smears every particle of a stream into one
+                    # saturated blob, so it is off unless asked for.
+                    for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
                         out.append(dict(d, inst=e, seq=seq, chan=c))
                 born += interval
     out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
