@@ -130,5 +130,68 @@ class Quads(unittest.TestCase):
         self.assertEqual(d, sorted(d, reverse=True))
 
 
+class Mesh(unittest.TestCase):
+    """The ring mesh is the stack's renderer with other counts."""
+
+    def test_its_lattice_is_three_rows_of_thirty_two(self):
+        s = M.RingMesh(entry(radius_start=100, radius_end=100), [[0x1000] * 3])
+        pts = s.lattice(0)
+        self.assertEqual(len(pts), 3)
+        self.assertEqual(len(pts[0]), 32)
+
+    def test_two_rings_of_thirty_two_quads(self):
+        s = M.RingMesh(entry(radius_start=100, radius_end=100,
+                             height_start=0x40, height_end=0x40), [[0x1000] * 3])
+        self.assertEqual(len(s.quads(0, lambda x, y, z: (x, y, 64))), 64)
+
+    def test_it_shifts_the_height_left_two(self):
+        """`lerp(height_start, _end, j) << 2`, where the stack takes it raw."""
+        kw = dict(radius_start=10, radius_end=10, height_start=0x100, height_end=0x100,
+                  height_step_start=0, height_step_end=0)
+        stack = M.RingStack(entry(**kw), [[0x1000] * 9]).lattice(0)
+        mesh = M.RingMesh(entry(**kw), [[0x1000] * 3]).lattice(0)
+        self.assertEqual(stack[1][0][1] - stack[0][0][1], 1)
+        self.assertEqual(mesh[1][0][1] - mesh[0][0][1], 4)
+
+
+class Grid(unittest.TestCase):
+    """The 4x4 textured grid: sixteen screen-space quads, never projected."""
+
+    @staticmethod
+    def grid(**kw):
+        raw = bytearray(196)
+        for name, (fmt, off) in (('flags', ('<H', 0x06)), ('curve0', ('<I', 0x08)),
+                                 ('texture_u', ('<H', 0x14)), ('texture_v', ('<H', 0x16)),
+                                 ('page_flags', ('<h', 0x4c)), ('brightness_row', ('<h', 0x4e)),
+                                 ('ot_depth', ('<h', 0x54)), ('speed_start', ('<h', 0x5c)),
+                                 ('speed_end', ('<h', 0x60)), ('tex_w', ('<h', 0xa8)),
+                                 ('tex_h', ('<h', 0xaa))):
+            if name in kw:
+                struct.pack_into(fmt, raw, off, kw[name])
+        return M.QuadGrid4x4(bytes(raw), [[0x1000] * 5])
+
+    def test_sixteen_quads_of_sixty_four_pixels(self):
+        q = self.grid(tex_w=64, tex_h=64, ot_depth=40).quads(0)
+        self.assertEqual(len(q), 16)
+        (x0, y0), (x1, _), _, (_, y3) = q[0]['pts']
+        self.assertEqual((x1 - x0, y3 - y0), (M.QuadGrid4x4.CELL, M.QuadGrid4x4.CELL))
+
+    def test_they_are_screen_space(self):
+        q = self.grid(tex_w=64, tex_h=64, ot_depth=40).quads(0)
+        self.assertTrue(q[0]['screen'])
+        self.assertEqual(q[0]['pts'][0], (M.QuadGrid4x4.ORIGIN_X, 0))
+
+    def test_the_depth_is_pinned_and_clamped(self):
+        self.assertEqual(self.grid(tex_w=8, tex_h=8, ot_depth=0).quads(0)[0]['depth'], 1)
+        self.assertEqual(self.grid(tex_w=8, tex_h=8, ot_depth=-5).quads(0)[0]['depth'], 1)
+        self.assertEqual(self.grid(tex_w=8, tex_h=8, ot_depth=0x400).quads(0)[0]['depth'],
+                         M.OT_DEPTH_LIMIT - 1)
+
+    def test_the_window_wraps_inside_half_the_texture(self):
+        g = self.grid(tex_w=64, tex_h=64, ot_depth=40, speed_start=0x40, speed_end=0x40)
+        seen = {g.step(i)[0] for i in range(40)}
+        self.assertTrue(max(seen) < 32 + 1)         # texture_width / 2
+
+
 if __name__ == '__main__':
     unittest.main()
