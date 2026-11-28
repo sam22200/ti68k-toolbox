@@ -116,24 +116,47 @@ def sections(raw):
     return out
 
 
-def frames(sec0):
-    """[[poly, ...], ...] -- the cells of each frame, in drawing order."""
-    if len(sec0) < 6:
+def frames(sec0, group=0):
+    """[[poly, ...], ...] -- the cells of each frame, in drawing order.
+
+    The indexing is `battle_effect_render_particle_sprite`'s, and it has two
+    steps that were being collapsed into one:
+
+        g_battle_effect_frame_data = (u8*)header + header->frame_data + 4;
+        frame = *(u16*)(fd + sprite_frame_index * 2
+                           + *(s16*)(fd + frame_group_index)) + fd;
+
+    So the data pointer is **four bytes into section 0**, the halfword there is
+    the frame GROUP's offset (`frame_group_index` is the emitter's group times
+    two, and every effect read so far holds one group, at 2), and the cell table
+    begins at `fd + that`. Reading the table from `words[2]` instead put every
+    cell one slot early.
+
+    That is why Meteor had no meteor. Its emitter 0 falls for 111 frames playing
+    sequence 0, which asks for cells 0 and 38 -- both of them three polygons of
+    260x364, the rock that fills the screen. One slot early, cell 0 landed
+    inside the table (drawn as nothing) and cell 38 on an 8x8 spark.
+    """
+    if len(sec0) < 8:
         return []
-    words = struct.unpack_from('<%dH' % (len(sec0) // 2), sec0, 0)
+    fd = 4
+    base = fd + struct.unpack_from('<h', sec0, fd + 2 * group)[0]
+    if not 0 <= base < len(sec0):
+        return []
     tbl = []
-    for v in words[2:]:                       # the table stops where it stops rising
-        if v == 0 or v >= len(sec0) or (tbl and v <= tbl[-1]):
+    for i in range((len(sec0) - base) // 2):  # the table stops where it stops rising
+        v = struct.unpack_from('<H', sec0, base + 2 * i)[0]
+        if v == 0 or fd + v >= len(sec0) or (tbl and v <= tbl[-1]):
             break
         tbl.append(v)
     out = []
-    head = 4 + 2 * len(tbl)                   # the table itself
+    head = base + 2 * len(tbl)                # the table itself
     for i, t in enumerate(tbl):
-        a = t + 4                             # the offset lands on the previous tail
-        b = (tbl[i + 1] + 4) if i + 1 < len(tbl) else len(sec0)
+        a = fd + t
+        b = (fd + tbl[i + 1]) if i + 1 < len(tbl) else len(sec0)
         if a < head or b - a < 4 or (b - a - 4) % 24:
-            out.append([])                    # the low indices point into the table:
-            continue                          # cell 0 is the blank, drawn as a pause
+            out.append([])                    # an offset that lands in the table
+            continue
         n = struct.unpack_from('<H', sec0, a + 2)[0]
         polys = []
         for k in range(min(n, (b - a - 4) // 24)):
@@ -142,8 +165,16 @@ def frames(sec0):
             # w and h are SIGNED: a negative one mirrors the cell. 23 of Stasis
             # Sword's 298 polygons carry one, and read unsigned they index 224
             # columns into a 128-wide atlas.
+            # **w and h are UNSIGNED.** `battle_effect_submit_sprite_to_ordering_
+            # table` writes `quad->u1 = quad->u0 + frame->width` into a u8, and
+            # the struct spells both as `u8`. The mirroring that reading them
+            # signed was invented to explain is the WRAP of that addition: u0 =
+            # 239 plus width 200 gives u1 = 183, an interpolation that runs
+            # backwards. Read signed, Meteor's rock asked for a window at
+            # u = -88 -- off the atlas, so it drew as a black hole with a halo.
+            # Read unsigned it is (8, 8) 160x224, and that window IS the rock.
             u, v = sec0[o + 4], sec0[o + 5]
-            w, h = struct.unpack_from('<2b', sec0, o + 6)
+            w, h = sec0[o + 6], sec0[o + 7]
             pts = struct.unpack_from('<8h', sec0, o + 8)
             polys.append(dict(tpage=tpage, clut=clut, u=u, v=v, w=w, h=h,
                               pts=[(pts[0], pts[1]), (pts[2], pts[3]),
@@ -201,6 +232,19 @@ def cast(sec3):
     return out
 
 
+def physics(sec3):
+    """`g_effect_geometry_table`'s header: the gravity and the inertia threshold.
+
+    Effect script opcode 0x27 (`battle_effect_code_script_27_set_gravity`)
+    copies both into the globals the integrator reads, so they belong to the
+    file and not to any one emitter.
+    """
+    if len(sec3) < 20:
+        return (0, 0, 0), 0
+    return (struct.unpack_from('<3i', sec3, 4),
+            struct.unpack_from('<i', sec3, 0x10)[0])
+
+
 def play(ops, nframes):
     """A sequence as [(tick, frame, x, y, flag), ...] -- one entry per draw, in order."""
     x = y = t = 0
@@ -241,7 +285,7 @@ SCRIPT_OPS = {
     0x1f: ('jump_if_targets_eq', 4), 0x20: ('counter_inc', 2),
     0x21: ('counter_dec', 2), 0x22: ('counter_add', 4), 0x23: ('counter_sub', 4),
     0x24: ('restore_camera_zoom', 2), 0x25: ('update_all_particles', 2),
-    0x26: ('spawn_emitter_particles', 2), 0x27: ('init_particle_physics', 2),
+    0x26: ('spawn_emitter_particles', 2), 0x27: ('set_gravity', 2),
     0x28: ('step_child_timeline', 2), 0x29: ('step_parent_timeline', 4),
     0x2a: ('reset_child_timeline', 2), 0x2b: ('reset_parent_timeline', 2),
     0x2c: ('nop', 2), 0x2d: ('nop', 2),
@@ -358,6 +402,31 @@ def tracks(sec7):
     return out
 
 
+# `effect_timeline_t` -- the parent's own view of the same section -- keeps two
+# sets of colour tracks at 0xdde, one per phase, each laid out like the child's
+# (affected units, caster, target, then the wider screen track).
+PARENT_TRACKS = 0xdde
+PARENT_TRACKS_SIZE = 3 * PALETTE_TRACK + BACKGROUND_TRACK
+
+
+def parent_tracks(sec7, phase):
+    """Phase 1's or phase 2's four colour tracks, by name.
+
+    `battle_effect_code_script_29_step_parent_timeline` advances
+    `color_tracks[0]` while the frame counter is below `phase1_duration` and
+    `color_tracks[1]` once phase 2 has begun, through the very
+    `battle_effect_advance_map_background_track` the child timeline calls on
+    its own. Reading the child's four alone leaves a file whose fade lives in
+    its parent with no fade at all: Cure 4's white flash and Haste's darkening
+    are both phase-1 keyframes.
+    """
+    base = PARENT_TRACKS + PARENT_TRACKS_SIZE * phase
+    out = {}
+    for i, name in enumerate(COLOUR_TRACKS):
+        out[name] = _track(sec7, base + PALETTE_TRACK * min(i, 3), name == 'screen')
+    return out
+
+
 def track_offsets(tr, name, frames, phase1=0, double=False):
     """The screen track's colour on each 30 fps frame, as the source applies it.
 
@@ -378,15 +447,36 @@ def track_offsets(tr, name, frames, phase1=0, double=False):
     """
     seq = (tr or {}).get(name) or []
     out = [(0.0, 0.0, 0.0)] * max(0, frames)
+    _fade(seq, out, phase1, frames, [0.0, 0.0, 0.0], double)
+    return out
+
+
+def stage_offsets(stages, name, frames, double=False):
+    """The same track over the three stages the parent script runs in turn.
+
+    There is one gradient, and phase 1, the child and phase 2 each advance it
+    while they are the stage that runs, so a stage picks the fade up where the
+    one before it left off instead of starting from black again.
+    """
+    out = [(0.0, 0.0, 0.0)] * max(0, frames)
+    cur = [0.0, 0.0, 0.0]
+    for at, end, tr in stages:
+        cur = _fade((tr or {}).get(name) or [], out, at, min(end, frames), cur, double)
+    return out
+
+
+def _fade(seq, out, at, end, cur, double):
+    """One stage's keyframes written into `out`, and the colour it ends on."""
+    frames = end
     # `base` is `g_battle_map_background_gradient_transition.colors[i]` -- the
     # map's **own** gradient colour, which a fade never touches -- and not the
     # colour last applied. Taking it for the latter left Night Sword's flash red
     # instead of white: the keyframe after it offsets `base` by (0, -128, -128),
     # which from a constant base clamps to black rather than keeping 126 of red.
     # A preview has no map, so its base is black and the result is the offset.
-    cur = [0.0, 0.0, 0.0]
+    cur = list(cur)
     base = [0.0, 0.0, 0.0]
-    at = phase1
+    last = list(cur)                 # where the window leaves the gradient
     for e in seq:
         n = e['frames']
         off = [(2.0 if double else 1.0) * c for c in e['colour']]
@@ -411,11 +501,12 @@ def track_offsets(tr, name, frames, phase1=0, double=False):
             c = [cur[k] + (target[k] - cur[k]) * t for k in range(3)]
             if 0 <= at + i < frames:
                 out[at + i] = tuple(c)
+                last = c
         cur = list(target)
         at += n
         if at >= frames:
             break
-    return out
+    return last
 
 
 def screen_colour(tr, frame):
@@ -463,17 +554,29 @@ PITCH, YAW = 0x12e, 0x200          # tilt low, and the isometric 45-degree yaw
 
 
 def camera(pitch=PITCH, yaw=YAW):
-    """(vx, vy) of a world (dx, dy, dz): two rows of Rx(pitch) * Ry(yaw).
+    """(vx, vy) of a world (dx, dy, dz), and its depth: the battle camera matrix.
 
-    At tilt low a world y reaches the screen at cos 26.5 = 0.895, and a
-    horizontal offset splits between x at cos/sin of the yaw and y at 0.316.
+    Read out of `g_battle_camera_matrix` (0x80098a24) in a saved Gariland state
+    rather than derived, because three of its signs are not the ones a plain
+    `Rx(pitch) * Ry(yaw)` gives. At tilt low and the isometric yaw it holds
+
+        [ 2896     0  -2892 ]     / 4096 = [  0.707   0.000  -0.706 ]
+        [-1292  3661  -1294 ]             [ -0.315   0.894  -0.316 ]
+        [ 2584  1830   2588 ]             [  0.631   0.447   0.632 ]
+
+    which is what the parameterisation below reproduces. The signs matter: the
+    depth row was being built with its x negated, and `battle_effect_render_
+    particle_sprite` drops any sprite whose depth comes out below zero, so
+    Meteor's rock -- born 1,354 units up and reading 4 against a mode that
+    subtracts 8 -- was thrown away for its entire fall. With the measured row it
+    reads 15, and survives.
     """
     th, ph = pitch / 4096.0 * 2 * math.pi, yaw / 4096.0 * 2 * math.pi
     st, ct, sp, cp = math.sin(th), math.cos(th), math.sin(ph), math.cos(ph)
 
     def project(dx, dy, dz=0):
-        return (cp * dx + sp * dz, st * sp * dx + ct * dy - st * cp * dz)
-    project.depth = lambda dx, dy, dz: -ct * sp * dx + st * dy + ct * cp * dz
+        return (cp * dx - sp * dz, -st * sp * dx + ct * dy - st * cp * dz)
+    project.depth = lambda dx, dy, dz: ct * sp * dx + st * dy + ct * cp * dz
     return project
 
 
@@ -511,7 +614,7 @@ def _tint(rec, cur, n):
     return tuple(out)
 
 
-def _velocity(rec, key):
+def _velocity(rec, key, cur=None, step=0):
     """One particle's world displacement per frame, from its emitter's motion.
 
     `(0, radial_speed, 0)` rotated by the base angle plus a random spread, times
@@ -520,19 +623,53 @@ def _velocity(rec, key):
     The integration damps by `(inertia - threshold) / inertia`, and the engine's
     threshold starts at 0, which leaves the velocity constant; acceleration and
     gravity are not modelled.
+
+    **Both the speed and the angles are lerped toward their end values** by the
+    curve their `curve_indices[0]` nibble names -- 7 the radial speed, 2 the base
+    angle, 3 the spread -- indexed by `step`, the emitter's own frame inside the
+    keyframe, not by the particle's age (`battle_effect_spawn_emitter_particles`
+    is handed that counter and does `frame % 160` on it). Reading the starts
+    alone leaves every emitter whose motion is written as "from nothing to
+    something" perfectly still: Haste stores speed 0 -> 1280 and a base angle
+    turning 2048 -> 6144, which is exactly its two counter-rotating helices of
+    roman numerals, and the preview drew them as one motionless stack.
+
+    The third angle is the Z of `RotMatrix(rotation)`, applied to the already
+    rotated vector. Dropping it costs nothing when it is zero -- which it is
+    everywhere the preview had been checked -- and costs Haste its whole ring.
     """
+    idx = struct.unpack_from('<I', rec, 0x08)[0]
+    n_speed, n_angle, n_spread = (idx >> 28) & 0xf, (idx >> 8) & 0xf, (idx >> 12) & 0xf
     lo, hi = struct.unpack_from('<2h', rec, 0x5c)          # radial_speed_start
+    if n_speed:
+        f = effect_mesh.curve(cur or (), n_speed, step)
+        lo2, hi2 = struct.unpack_from('<2h', rec, 0x60)    # radial_speed_end
+        lo, hi = effect_mesh.lerp(lo, lo2, f), effect_mesh.lerp(hi, hi2, f)
     if lo == 0 and hi == 0:
         return 0.0, 0.0, 0.0
-    ax, ay, _ = struct.unpack_from('<3h', rec, 0x14 + 0x18)   # velocity_base_angle
-    sx, sy, _ = struct.unpack_from('<3h', rec, 0x14 + 0x24)   # velocity_spread
+    a = list(struct.unpack_from('<3h', rec, 0x14 + 0x18))     # velocity_base_angle
+    s = list(struct.unpack_from('<3h', rec, 0x14 + 0x24))     # velocity_spread
+    if n_angle:
+        f = effect_mesh.curve(cur or (), n_angle, step)
+        b = struct.unpack_from('<3h', rec, 0x14 + 0x1e)
+        a = [effect_mesh.lerp(a[i], b[i], f) for i in range(3)]
+    if n_spread:
+        f = effect_mesh.curve(cur or (), n_spread, step)
+        b = struct.unpack_from('<3h', rec, 0x14 + 0x2a)
+        s = [effect_mesh.lerp(s[i], b[i], f) for i in range(3)]
+    else:
+        s = [v / 2.0 for v in s]                              # halved without a curve
     r = _rand3(key)
-    th = (ax + r[0] * (sx / 2.0)) / 4096.0 * 2 * math.pi
-    ph = (ay + r[1] * (sy / 2.0)) / 4096.0 * 2 * math.pi
+    rz = _rand3(key + (7,))[0]            # the Z spread has a draw of its own
+    th = (a[0] + r[0] * s[0]) / 4096.0 * 2 * math.pi
+    ph = (a[1] + r[1] * s[1]) / 4096.0 * 2 * math.pi
+    ps = (a[2] + rz * s[2]) / 4096.0 * 2 * math.pi
     speed = (lo + (hi - lo) * (r[2] + 1) / 2.0) / 512.0
-    return (speed * math.sin(th) * math.sin(ph),
-            speed * math.cos(th),
-            speed * math.sin(th) * math.cos(ph))
+    vx = speed * math.sin(th) * math.sin(ph)
+    vy = speed * math.cos(th)
+    vz = speed * math.sin(th) * math.cos(ph)
+    c, sn = math.cos(ps), math.sin(ps)                        # RotMatrix's Z, applied last
+    return vx * c - vy * sn, vx * sn + vy * c, vz
 
 
 def _rand3(key):
@@ -564,20 +701,45 @@ def _spawn_offset(spread, box, key):
     return v[0] / n * sx, v[1] / n * sy, v[2] / n * sz
 
 
-def _motion(rec, key, n):
-    """A particle's world offset after `n` frames: velocity, acceleration, homing.
+def _motion(rec, key, n, cur=None, step=0, physics=None):
+    """A particle's world offset after `n` frames.
 
-    `effect_particle_integrate_motion` is `position += velocity`, then
-    `velocity += acceleration` once the inertia terms cancel (the engine's
-    threshold starts at 0), then `acceleration += acceleration_step` -- or, when
-    `homing_strength` is set, the acceleration is steered toward the target with
-    the `(step - delta) * strength / 127 + delta` of the original, `strength`
-    being -128 without a homing curve. Gravity is a global an opcode sets and is
-    not modelled.
+    `battle_effect_integrate_particle_motion`, to the letter:
+
+        position += velocity
+        velocity  = (mass - threshold) * velocity / mass
+                  + (force << 12) / mass
+                  + (gravity * weight >> 12)
+
+    Two of those three terms were missing, and together they are the difference
+    between a rock that lands and one that falls through the world.
+
+    * **the damping is real.** `mass` is the emitter's inertia (0x44) and
+      `threshold` is `g_effect_geometry_table->inertia_threshold`, which effect
+      script opcode 0x27 -- `set_gravity`, not "init particle physics" -- copies
+      out of the section 3 header. Meteor's is 64 against a mass of 4096: 1.6%
+      of the speed goes every frame, 0.984^111 = 0.17 over the rock's life.
+    * **gravity is in the same header** (0x04, `(0, 4096, 0)` in six of the
+      seven effects read) and is scaled by the particle's own `weight` (0x54),
+      which is **-128** for the rock -- it brakes upward.
+
+    With the starting 27.3 units a frame alone the rock falls 3,030 units from
+    1,450 up and leaves the world. With the damping and the brake it falls
+    1,310 and comes to rest just above the ground, which is what the console
+    shows.
+
+    Homing, when `homing_strength` is set, steers the force toward the target
+    with the original's `(step - delta) * strength / 127 + delta`, `strength`
+    being -128 without a homing curve.
     """
-    vel = list(_velocity(rec, key))
+    vel = list(_velocity(rec, key, cur, step))
     if n <= 0:
         return 0.0, 0.0, 0.0
+    mass = struct.unpack_from('<h', rec, 0x44)[0] or 4096
+    weight = struct.unpack_from('<h', rec, 0x54)[0]
+    gravity, threshold = physics or ((0, 0, 0), 0)
+    damp = (mass - threshold) / float(mass)
+    pull = [(g * weight >> 12) / 4096.0 for g in gravity]
     acc = [struct.unpack_from('<2h', rec, 0x64 + 4 * k)[0] / 4096.0 for k in range(3)]
     step = [struct.unpack_from('<2h', rec, 0x7c + 4 * k)[0] / 4096.0 for k in range(3)]
     homing = struct.unpack_from('<2h', rec, 0xb8)[0] / 4096.0
@@ -586,7 +748,7 @@ def _motion(rec, key, n):
     for _ in range(min(n, 600)):
         for k in range(3):
             pos[k] += vel[k]
-            vel[k] += acc[k]
+            vel[k] = vel[k] * damp + acc[k] + pull[k]
         if homing:
             d = [target[k] - pos[k] for k in range(3)]
             m = math.sqrt(sum(x * x for x in d))
@@ -647,7 +809,152 @@ def _tint_factor(cur, nibble, frame):
     return effect_mesh.curve(cur or (), nibble, frame)
 
 
-def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
+# `battle_effect_code_script_25_update_all_particles` walks every live particle
+# once a frame and, when its `flags` carry mid-life child mode 1 or 2 (0x4 or
+# 0x8), calls `battle_effect_spawn_emitter_particles` again for
+# `child_emitter_mid_life` with the particle itself as the transform -- so the
+# child's `EFFECT_EMITTER_ORIGIN_PARENT_PARTICLE` anchor rides along. Modes 1
+# and 2 of `flags & 3` do the same once, at death, for
+# `child_emitter_on_death`.
+#
+# Nothing in the timeline ever names those child emitters, so reading the
+# channels alone leaves them unborn. Meteor's rock is one: emitter 0 is a
+# **timer** whose own sequence holds a cell with no polygons for 180 ticks, and
+# every frame of its fall it spawns five particles of emitter 1 -- the sequence
+# that draws the rock and its trail.
+MID_LIFE_CHILD_MASK, DEATH_CHILD_MASK = 0x000c, 0x0003
+CHILD_DEPTH_LIMIT = 2                   # two generations is all any file uses
+
+
+def _per_frame(d, t1):
+    """One entry a frame over a held cell's life, so a moving particle is placed
+    where it actually is on each of them."""
+    end = min(d['t'] + d['ticks'], t1)
+    return [dict(d, t=t, ticks=2) for t in range(d['t'], max(end, d['t'] + 2), 2)]
+
+
+def _emit(out, fr, seqs, cs, e, base, frm, to, span, cur, scatter, project,
+          centre, chan=0, origin=None, step0=None, depth=0, cam=None, phys=None):
+    """Every draw of emitter `e`'s particles born in [frm, to), children included.
+
+    `origin` is a function of the absolute frame giving the world point a child
+    hangs off; without one the emitter uses its own anchor. `step0` is the frame
+    the curves are read from: the keyframe's own start for a timeline emitter,
+    and the effect's frame counter for a child, which is what the script hands
+    `battle_effect_spawn_emitter_particles` in each case.
+    """
+    rec = cs[e]['raw']
+    seq = rec[1]
+    if seq >= len(seqs):
+        return
+    count = max(1, struct.unpack_from('<h', rec, 0xb0)[0])
+    interval = max(1, struct.unpack_from('<h', rec, 0xb4)[0])
+    life = struct.unpack_from('<h', rec, 0x94)[0]
+    kind = struct.unpack_from('<H', rec, 0x02)[0]
+    flags = struct.unpack_from('<H', rec, 0x06)[0]
+    orient = kind & 2
+    spawn_curve = struct.unpack_from('<I', rec, 0x08)[0] & 0xf
+    anchor_mode = kind & effect_mesh.ORIGIN_MASK
+    sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
+    box = kind & 0x0100
+    home = (list(centre) if centre and anchor_mode == effect_mesh.ORIGIN_MAP_CENTRE
+            else [0.0, 0.0, 0.0])
+    kid = rec[0xc1] if flags & MID_LIFE_CHILD_MASK else None
+    if kid is not None and (kid >= len(cs) or depth >= CHILD_DEPTH_LIMIT):
+        kid = None
+
+    # A keyframe's `to` can run far past its phase -- Holy's reach 600 against a
+    # 229-frame timeline -- because `battle_effect_step_emitter_timeline` only
+    # ever steps the channel while the phase's own counter is running. So the
+    # SPAWNING stops at the end of the phase; what a particle does afterwards is
+    # its own business, and the script's tail keeps it alive.
+    born = frm
+    if step0 is None:
+        to = min(to, max(span, frm + 1))
+    while born < to:
+        # The parent reads its curves at its step inside the keyframe; a child
+        # is handed `record->frame_counter`, the effect's own frame.
+        step = (born - frm) if step0 is None else (base + born)
+        # **A particle outlives its phase.** The effect script does not stop at
+        # the end of the timeline: `jump_after_total_duration` sends it to a
+        # tail that calls `update_all_particles` and loops on
+        # `jump_if_particles_eq 0` until the last one is gone. Clamping a
+        # lifetime to the end of its own phase -- `min(span, born + life)` --
+        # cut every effect short at the point the original is still burning
+        # down. A stored lifetime therefore runs its full count.
+        #
+        # An animation-driven one (-1) is still clamped to its phase, and that
+        # is an approximation, not the engine: such a particle is freed when its
+        # `frame_timer` reaches 0, i.e. on its sequence's frozen frame. Some
+        # sequences loop back BEFORE reaching theirs -- Holy's sequence 0 does --
+        # which makes the particle immortal on this reading, and emitter 10 then
+        # drew 12,340 times out to frame 811. Whatever frees it in the original
+        # is not in `battle_effect_code_script_25_update_all_particles`, so the
+        # phase stays the bound until that is found.
+        die = (born + life) if life >= 0 else span
+        t0, t1 = (base + born) * 2, (base + die) * 2
+        for i in range(count):
+            key = (e, born, i, depth)
+            j = _spawn_offset(sw, box, key) if scatter else (0, 0, 0)
+            pw = effect_mesh.spawn_position(rec, _tint_factor(cur, spawn_curve, step))
+
+            def at(age, _pw=pw, _j=j, _key=key, _step=step, _born=born):
+                """The particle's world point `age` frames after it was born."""
+                m = _motion(rec, _key, age, cur, _step, phys)
+                root = origin(base + _born + age) if origin else (0.0, 0.0, 0.0)
+                return [_pw[q] + _j[q] + m[q] + home[q] + root[q] for q in range(3)]
+
+            for d0 in play_window(seqs[seq], len(fr), t0, t1, life < 0):
+              # **A held cell still moves.** `play_window` returns one entry per
+              # cell change, and a cell can be held for hundreds of ticks --
+              # Meteor's rock holds one for 180 while it falls 2,400 units. The
+              # engine re-runs `RotTrans` every frame, so a single entry placed
+              # at the particle's birth is both drawn in the wrong place and
+              # judged for depth there: the rock read as behind the lens on the
+              # frame it was born and was dropped for its whole fall. A moving
+              # particle is therefore emitted frame by frame.
+              moves = any(_velocity(rec, key, cur, step)) or cam
+              for d in (_per_frame(d0, t1) if moves and d0['ticks'] > 2 else [d0]):
+                n = (d['t'] - t0) // 2              # frames this one has lived
+                w = at(n)
+                # `battle_effect_render_particle_sprite` takes the depth from
+                # `RotTrans` through the CURRENT camera matrix, translation and
+                # all, and drops the sprite when it comes out negative. The
+                # preview applies the effect camera to the screen as a 2D pan
+                # and zoom, so it has to apply the same pan here or the depth is
+                # measured from a camera that never moved: Meteor's rock is born
+                # 1,354 units up, which reads as behind the lens and is thrown
+                # away for the whole of its fall.
+                eye = cam[min(d['t'] // 2, len(cam) - 1)]['position'] if cam else None
+                dw = [w[q] - eye[q] for q in range(3)] if eye else w
+                ot = sprite_depth(0x280 + project.depth(*dw), d['depth'])
+                if ot is None:
+                    continue
+                ox, oy = project(*w)
+                sx, sy = project(d['x'], d['y'])
+                ang = 0.0
+                if orient:                          # ratan2 of the projected velocity
+                    q = at(n + 1)
+                    vx, vy = project(q[0] - w[0], q[1] - w[1], q[2] - w[2])
+                    if vx or vy:
+                        ang = math.atan2(vy, vx)
+                out.append(dict(d, inst=e, seq=seq, chan=chan, tint=_tint(rec, cur, n),
+                                x=ox + sx, y=oy + sy, ot=ot, angle=ang))
+            if kid is not None:
+                # One spawn attempt a frame for as long as this particle lives.
+                _emit(out, fr, seqs, cs, kid, base, born, die, span, cur, scatter,
+                      project, centre, chan, origin=at_of(at, base, born),
+                      step0=0, depth=depth + 1, cam=cam, phys=phys)
+        born += interval
+
+
+def at_of(at, base, born):
+    """`at`, readdressed from the particle's age to the effect's frame counter."""
+    return lambda f: at(max(0, f - base - born))
+
+
+def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None, centre=None,
+             cam=None, phys=None):
     """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
 
     Each keyframe of a particle channel spawns its emitter's `particle_count`
@@ -662,85 +969,36 @@ def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
         return None
     project = project or camera()
     out = []
-    for c, kfs in enumerate(tl['child_channels']):
-        for k in kfs or []:
-            e = k['emitter']
-            if e is None or e >= len(cs):
-                continue
-            rec = cs[e]['raw']
-            seq = rec[1]
-            if seq >= len(seqs):
-                continue
-            count = max(1, struct.unpack_from('<h', rec, 0xb0)[0])
-            interval = max(1, struct.unpack_from('<h', rec, 0xb4)[0])
-            life = struct.unpack_from('<h', rec, 0x94)[0]
-            # Where this emitter sits, from `spawn_position_start` (0x14).
-            # `EFFECT_LIST_NODE_WORLD` adds the particle's world position and
-            # the sequence's own offset *before* the camera matrix and projects
-            # them with RotTrans -- no perspective divide -- so both are world
-            # units, and the quad corners alone are screen pixels. Both go
-            # through the camera here, so Night Sword's ball lands high and its
-            # burst on the victim. The spread at 0x20 is `--scatter`: it is the
-            # ellipsoid a spawn fills, and without the particle velocities that
-            # is only half the model.
-            # `work_kind_flags` bit 1 orients the particle to its velocity
-            # (battle_effect_update_node_from_work).
-            orient = struct.unpack_from('<H', rec, 0x02)[0] & 2
-            # `battle_effect_interpolate_emitter_spawn_position`: start at 0x14
-            # and end at 0x1a, lerped by curve_indices[0] nibble 0. The start
-            # alone pins an emitter the original walks across the effect.
-            spawn_curve = struct.unpack_from('<I', rec, 0x08)[0] & 0xf
-            # `placement_flags` bits 9-11 name the anchor. A preview draws about
-            # the target, so every anchor that resolves to a unit or to the
-            # cursor's tile is already that point; the parent particle and the
-            # map centre are somewhere else and nothing here can place them.
-            anchor_mode = struct.unpack_from('<H', rec, 0x02)[0] & effect_mesh.ORIGIN_MASK
-            sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
-            box = struct.unpack_from('<H', rec, 0x02)[0] & 0x0100
-            # The spawn gate is `time % spawn_interval != 0`, and `time` is NOT
-            # the record's frame counter: the child timeline passes
-            # `step = state.child.step[i]++`, which `state.child.step[i] = 0`
-            # resets on entering each keyframe. So the count starts at 0 inside
-            # every keyframe, step 0 always passes, and an emitter spawns on the
-            # keyframe's first frame and then every `interval` frames.
-            # That is why Stasis Sword's shards appear at all with an interval
-            # of 49 inside 2-frame keyframes -- only step 0 ever passes -- and
-            # it is also why Night Sword's ball is spawned three times: interval
-            # 1 across a 3-frame keyframe. Those three are in the file.
-            born = k['frm']
-            while born < max(k['to'], k['frm'] + 1):
-                die = tl['child'] if life < 0 else min(tl['child'], born + life)
-                t0 = (tl['phase1'] + born) * 2          # frames at 30 fps -> 60 Hz ticks
-                t1 = (tl['phase1'] + die) * 2
-                for i in range(count):
-                    key = (e, born, i)
-                    j = _spawn_offset(sw, box, key) if scatter else (0, 0, 0)
-                    for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
-                        n = (d['t'] - t0) // 2          # frames this one has lived
-                        tint = _tint(rec, cur, n)
-                        m = _motion(rec, key, n)
-                        pw = effect_mesh.spawn_position(
-                            rec, _tint_factor(cur, spawn_curve, n))
-                        wx = pw[0] + j[0] + m[0]
-                        wy = pw[1] + j[1] + m[1]
-                        wz = pw[2] + j[2] + m[2]
-                        ox, oy = project(wx, wy, wz)
-                        sx, sy = project(d['x'], d['y'])
-                        # The ordering-table index: the projected z over four,
-                        # about the camera's own 0x280 (g_battle_offset_screen_coords),
-                        # then the sequence op's depth mode. A negative one is dropped.
-                        ot = sprite_depth(0x280 + project.depth(wx, wy, wz), d['depth'])
-                        if ot is None:
-                            continue
-                        ang = 0.0
-                        if orient:                      # ratan2 of the projected velocity
-                            q = _motion(rec, key, n + 1)
-                            vx, vy = project(q[0] - m[0], q[1] - m[1], q[2] - m[2])
-                            if vx or vy:
-                                ang = math.atan2(vy, vx)
-                        out.append(dict(d, inst=e, seq=seq, chan=c, tint=tint,
-                                        x=ox + sx, y=oy + sy, ot=ot, angle=ang))
-                born += interval
+    # `battle_effect_code_script_29_step_parent_timeline` steps
+    # `particle_channels[0]` while the frame counter is below phase1_duration
+    # and `particle_channels[1]` once phase 2 has begun, through the very
+    # `battle_effect_step_emitter_timeline` the child timeline calls. Reading
+    # the child's five channels alone therefore misses every emitter a file
+    # puts in its parent: Meteor puts all nine of them there, and drew
+    # nothing at all.
+    groups = [(0, tl['phase_channels'][0], tl['phase1']),
+              (tl['phase1'], tl['child_channels'], tl['child']),
+              (tl['phase1'] + tl['child'], tl['phase_channels'][1], tl['phase2'])]
+    for base, chans, span in groups:
+        for c, kfs in enumerate(chans or ()):
+            for k in kfs or []:
+                e = k['emitter']
+                if e is None or e >= len(cs):
+                    continue
+                # `battle_effect_code_script_28_step_child_timeline`: a
+                # keyframe's `selector & 7` is zero for an ordinary particle
+                # emitter and otherwise names the handler slot that takes it
+                # over. Such a keyframe is NOT a particle spawn -- its geometry
+                # record is read through the renderer's own view, where 0x14 and
+                # 0x16 are `texture_u`/`texture_v` and not a spawn position.
+                # Drawing it both ways put Meteor's big quad at (182, 246),
+                # right off a 256x240 frame, while `mesh_actors` drew the real
+                # one; the texture coordinates were being flown as a position.
+                if k['action'] & 7:
+                    continue
+                _emit(out, fr, seqs, cs, e, base, k['frm'],
+                      max(k['to'], k['frm'] + 1), span, cur, scatter, project,
+                      centre, chan=c, cam=cam, phys=phys)
     # The ordering table is walked from its far end, so the farthest index is
     # drawn first; within one index the last primitive added is drawn first.
     out.sort(key=lambda d: (d['t'], -d['ot'], -d['chan'], -d['inst']))
@@ -1027,16 +1285,270 @@ def p_pts(fr, d):
     return out
 
 
+# ------------------------------------------------- section 7: the effect camera
+# `battle_camera_advance_effect_tracks(frame)` drives three tracks off the same
+# keyframe tables: rotation (selector bit 0), position (bit 1) and zoom (bit 2).
+# **The struct's field names are misleading.** The dispatcher reads
+# `main.position[k]` for `battle_camera_execute_angle_command` and
+# `main.target[k]` for `battle_camera_execute_position_command`, so the array
+# called `position` holds the ANGLES and the one called `target` the position.
+#
+# Three tables answer, in this order: `main` while the frame is under
+# `phase1_duration`, the 17-entry for-each-target table of the timeline itself
+# while the children run, and `cleanup` after them.
+CAMERA_MAIN, CAMERA_CLEANUP, CAMERA_TARGETS = 0x14e6, 0x16b6, 0x6b2
+CAMERA_SOURCE_MASK, CAMERA_MODE_MASK = 0x1e0, 0x1e00
+CAMERA_MODES = {0x000: 'idle', 0x200: 'snap', 0x400: 'cosine',
+                0x600: 'cosine q12', 0x800: 'linear', 0xa00: 'add accelerating',
+                0xc00: 'add', 0xe00: 'add decelerating', 0x1000: 'shake growing',
+                0x1200: 'shake', 0x1400: 'shake decaying'}
+CAMERA_SOURCES = {0x000: 'target', 0x020: 'current yaw/roll', 0x040: 'given',
+                  0x060: 'saved pitch', 0x080: 'map centre', 0x0c0: 'current',
+                  0x100: 'saved', 0x140: 'caster', 0x180: 'target average',
+                  0x1c0: 'cursor tile'}
+# `battle_camera_zoom_map` has exactly two levels: ONE zoomed in, 0xC00
+# zoomed out. The tactical view a spell is cast from is the zoomed-out one, and
+# an effect that writes `zoom = ONE` -- which Haste and Meteor both do on their
+# first keyframe -- is therefore asking for x1.33, not for nothing. Starting the
+# preview at ONE made every such keyframe a no-op; the console's own frames
+# align onto the scene at 1.4-1.6 by correlation, which is that 1.33 within the
+# precision of a measurement taken through a fade.
+CAMERA_ONE = 4096                       # libgte's ONE: zoomed in
+CAMERA_ZOOM_OUT = 0xC00                 # the tactical view an effect starts from
+
+
+def camera_table(sec7, at, n):
+    """One keyframe table: `effect_camera_keyframes_21_t` at 21, the timeline's at 17.
+
+    Both are the same 22n + 2 layout -- thresholds, angles, positions, zooms,
+    selectors, last index -- which is why 0x6b2 through 0x828 reads with the
+    very same code as 0x14e6.
+    """
+    if len(sec7) < at + 22 * n + 2:
+        return None
+    vec = lambda base: [struct.unpack_from('<3h', sec7, base + 6 * i) for i in range(n)]
+    return dict(thresholds=list(struct.unpack_from('<%dh' % n, sec7, at)),
+                angle=vec(at + 2 * n), position=vec(at + 8 * n), zoom=vec(at + 14 * n),
+                selector=list(struct.unpack_from('<%dH' % n, sec7, at + 20 * n)),
+                last=struct.unpack_from('<h', sec7, at + 22 * n)[0])
+
+
+def camera_tables(sec7):
+    """The three tables the dispatcher picks between: main, for-each-target, cleanup."""
+    return (camera_table(sec7, CAMERA_MAIN, 21),
+            camera_table(sec7, CAMERA_TARGETS, 17),
+            camera_table(sec7, CAMERA_CLEANUP, 21))
+
+
+def camera_find(frame, mask, tabs, phase1, spawn_delay, phase2_delay, hits):
+    """`battle_camera_find_active_keyframe`: (table, index, end frame) or None.
+
+    The first keyframe of `mask`'s channel still ahead of `frame`. The main
+    table covers the frames before phase 1 ends, the for-each-target table
+    repeats every `spawn_delay` per hit target, and the cleanup table is
+    relative to the end of that window.
+    """
+    main, per, clean = tabs
+    if main and frame < phase1:
+        for i in range(main['last'] + 1):
+            if frame < main['thresholds'][i] and mask & main['selector'][i]:
+                return 0, i, main['thresholds'][i]
+    delay = spawn_delay if hits else 0
+    gap = phase2_delay if hits else 0
+    if per and delay and frame < phase1 + (hits - 1) * delay:
+        at = 0
+        local = -1
+        if frame >= phase1:
+            at = (frame - phase1) // delay
+            local = frame - phase1 - at * delay
+        for first in (True, False):
+            if not first:
+                at += 1
+                local = -1
+                if at >= hits:
+                    break
+            for i in range(per['last'] + 1):
+                if per['thresholds'][i] >= delay:
+                    break
+                if local < per['thresholds'][i] and mask & per['selector'][i]:
+                    return 1, i, per['thresholds'][i] + at * delay + phase1
+    if per and hits:
+        at = hits - 1
+        start = phase1 + at * delay
+        if frame < start + gap:
+            local = frame - start if frame >= start else -1
+            for i in range(per['last'] + 1):
+                if local < per['thresholds'][i] and mask & per['selector'][i]:
+                    return 1, i, per['thresholds'][i] + at * delay + phase1
+    end = phase1 + (hits - 1) * delay + gap
+    local = frame - end if frame >= end else -1
+    if clean:
+        for i in range(clean['last'] + 1):
+            if local < clean['thresholds'][i] and mask & clean['selector'][i]:
+                return 2, i, clean['thresholds'][i] + end
+    return None
+
+
+def _q13(a, b, t):
+    """`battle_effect_lerp_component_q13`: t is q13, 0x2000 being one."""
+    return [a[k] + (b[k] - a[k]) * t / 0x2000 for k in range(3)]
+
+
+def _factor(mode, frame, duration):
+    """The q13 t of `battle_effect_interpolate_vector_q13_{linear,cos}`."""
+    if duration <= 0:
+        return 0x2000
+    if mode in (0x400, 0x600):                      # cosine: ONE - rcos(half a turn)
+        return CAMERA_ONE - int(round(math.cos((frame << 11) / duration
+                                               / 4096.0 * 2 * math.pi) * 4096))
+    return (frame << 13) // duration
+
+
+class _Track:
+    """One camera track's running state: start, target, mode, duration, frame.
+
+    `battle_camera_update_effect_rotation_and_zoom` steps all three the same
+    way, so one class covers rotation, position and zoom. Only the modes a
+    preview can mean anything by are played: snap, the two cosines, linear and
+    the three adds. The shakes are random offsets about the start and are left
+    at the start, which is what they average to.
+    """
+
+    def __init__(self, value):
+        self.cur = list(value)
+        self.start = list(value)
+        self.target = list(value)
+        self.mode = 0
+        self.duration = 0
+        self.frame = 0
+
+    def command(self, flags, duration, vec, absolute, centre=None):
+        """`execute_{angle,position,zoom}_command`: pick the source, arm the mode."""
+        src = flags & CAMERA_SOURCE_MASK
+        if src in (0x0c0, 0x100):                   # current, or saved, plus the offset
+            base = self.cur if src == 0x0c0 else self.start
+            self.target = [base[k] + vec[k] for k in range(3)]
+        elif src == 0x080 and centre:               # the map centre, plus the offset
+            self.target = [centre[k] + vec[k] for k in range(3)]
+        elif src in CAMERA_SOURCES:
+            # Every other source is a point of the battle -- the target, the
+            # caster, the map centre, or a zoom given outright -- and a preview
+            # is drawn about that point, so in its own frame of reference the
+            # source is the origin and the keyframe's vector is the whole of it.
+            self.target = list(vec)
+        else:
+            return
+        self.mode = flags & CAMERA_MODE_MASK
+        self.duration = duration
+        self.frame = 0
+
+    def step(self):
+        m, d = self.mode, self.duration
+        if m == 0:
+            return self.cur
+        if m == 0x200:                              # snap
+            self.cur = list(self.target)
+            self.start = list(self.cur)
+            self.mode, self.frame = 0, d
+        elif m in (0x400, 0x600, 0x800):            # cosine, cosine q12, linear
+            if d > self.frame:
+                self.frame += 1
+                self.cur = _q13(self.start, self.target, _factor(m, self.frame, d))
+            if d == self.frame:
+                self.start = list(self.target)
+                self.mode = 0
+        elif m in (0xa00, 0xc00, 0xe00):            # add, accelerating, decelerating
+            if d > self.frame:
+                self.frame += 1
+                if m == 0xc00:
+                    step = self.target
+                else:
+                    t = _factor(0x800, self.frame, d)
+                    step = (_q13([0, 0, 0], self.target, t) if m == 0xa00
+                            else _q13(self.target, [0, 0, 0], t))
+                self.cur = [self.cur[k] + step[k] for k in range(3)]
+            if d == self.frame:
+                self.target = list(self.cur)
+                self.start = list(self.cur)
+                self.mode = 0
+        else:                                       # the three shakes: their mean
+            if d > self.frame:
+                self.frame += 1
+            if d == self.frame:
+                self.mode = 0
+        return self.cur
+
+
+def camera_play(sec7, frames, hits=1, zoom0=CAMERA_ZOOM_OUT, centre=None):
+    """The effect camera frame by frame, about the target: angles, position, zoom.
+
+    `battle_camera_advance_effect_tracks` arms a track only while it is idle,
+    and `battle_camera_update_effect_rotation_and_zoom` steps it one frame.
+    The preview has no battle behind it, so the camera starts on the target
+    with the battle zoom (`ONE`) and every keyframe reads as an offset from
+    there -- which is exactly what the ones that matter say: Haste and Meteor
+    both zoom from the caster's own view onto the receiver.
+    """
+    tabs = camera_tables(sec7)
+    if not any(tabs):
+        return []
+    ph = phases(sec7) or {}
+    # `phases` reads 0x00a as the child's duration; the struct calls it
+    # `phase2_delay`, and the keyframe scanner bounds the per-target window with
+    # it. Same halfword, two names for one thing.
+    p1, delay, gap = ph.get('phase1', 0), ph.get('spawn_delay', 0), ph.get('child', 0)
+    tracks = [_Track((0, 0, 0)), _Track((0, 0, 0)), _Track((zoom0,) * 3)]
+    names = ('angle', 'position', 'zoom')
+    out = []
+    for f in range(max(0, frames)):
+        for bit, (tr, name) in enumerate(zip(tracks, names)):
+            if tr.mode:
+                continue
+            got = camera_find(f, 1 << bit, tabs, p1, delay, gap, hits)
+            if not got:
+                continue
+            which, i, end = got
+            tab = tabs[which]
+            tr.command(tab['selector'][i], end - f, tab[name][i], name == 'zoom',
+                       None if name == 'zoom' else centre)
+        zoom = tuple(tracks[2].step())
+        out.append(dict(angle=tuple(tracks[0].step()),
+                        position=tuple(tracks[1].step()),
+                        zoom=zoom, scale=zoom[0] / float(zoom0 or 1)))
+    return out
+
+
+def _scene_through(scene, anchor, at, zoom):
+    """The scene picture as the effect camera sees it this frame.
+
+    The same map `p -> at + (p - anchor) * zoom` the quads go through, run
+    backwards because `Image.transform` samples the source for each output
+    pixel. Past the edges of the scene picture it fills with black, which is
+    what the console shows too: Meteor's camera climbs right off the
+    battlefield and the frames there are black with sparks in them.
+    """
+    from PIL import Image as _I
+    k = 1.0 / (zoom or 1.0)
+    return scene.transform(scene.size, _I.AFFINE,
+                           (k, 0.0, anchor[0] - at[0] * k,
+                            0.0, k, anchor[1] - at[1] * k),
+                           resample=_I.BILINEAR)
+
+
 def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False,
-           effect_id=None, over=None):
+           effect_id=None, over=None, eye=False, centre=None):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
     if tex is None:
         return []
     tex, alpha = tex
+    eye_track = (camera_play(raw_sections[7], (phases(raw_sections[7]) or {}).get('total', 0),
+                             centre=centre)
+                 if eye and raw_sections else None)
     tl = schedule(fr, seqs, cs, phases(raw_sections[7]), scatter,
-                  cur=curves(raw_sections[4])) if raw_sections else None
+                  cur=curves(raw_sections[4]), centre=centre, cam=eye_track,
+                  phys=physics(raw_sections[3])) if raw_sections else None
     if tl is None:
         tl = timeline(fr, seqs, cs)
     mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4]), effect_id) if raw_sections else []
@@ -1079,14 +1591,32 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
         """The battle camera, plus a depth for the ordering table's own sort."""
         sx, sy = flat(x, y, z)
         return sx, sy, 0xC0 - int((z - x) / 8)
-    under = None
+    under = scene = None
     if over:
         from PIL import Image as _I
-        im = _I.open(over).convert('RGB').resize(size)
-        under = np.asarray(im).astype(float)
-    tr = tracks(raw_sections[7]) if raw_sections else None
-    ph1 = (phases(raw_sections[7]) or {}).get('phase1', 0) if raw_sections else 0
-    nfr = last // 2 + 1
+        scene = _I.open(over).convert('RGB').resize(size)
+        under = np.asarray(scene).astype(float)
+    ph = (phases(raw_sections[7]) or {}) if raw_sections else {}
+    ph1, chd = ph.get('phase1', 0), ph.get('child', 0)
+    # The three stages the parent script runs in turn, each with the colour
+    # tracks `battle_effect_code_script_29_step_parent_timeline` advances while
+    # it is the one that runs: phase 1's, then the child's, then phase 2's.
+    stages = ([(0, ph1, parent_tracks(raw_sections[7], 0)),
+               (ph1, ph1 + chd, tracks(raw_sections[7])),
+               (ph1 + chd, 1 << 30, parent_tracks(raw_sections[7], 1))]
+              if raw_sections else [])
+    # The effect lasts the parent timeline's three stages, not just until its
+    # last sprite: `battle_effect_code_script_29_step_parent_timeline` keeps
+    # stepping the colour tracks once every emitter is spent. Meteor's two
+    # seconds of white screen are phase 2, after the last quad is drawn, and
+    # stopping at the last draw cut them off.
+    nfr = max(last // 2 + 1, ph1 + chd + ph.get('phase2', 0))
+    last = max(last, nfr * 2)
+    # `--eye` plays the effect camera over the preview: the scene picture and
+    # every quad move and scale together, which is the only way the preview can
+    # be compared with the console frame for frame. Without it the battle
+    # camera stands still and Meteor's rock stays the size its quads make it.
+    cam = camera_play(raw_sections[7], nfr, centre=centre) if eye and raw_sections else []
     # The screen track offsets the background gradient; `battle_map_color_field`
     # colours the map and the units from the affected-units track. A preview's
     # scene IS the map, so both are applied to it -- and only to it, since
@@ -1099,8 +1629,8 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
     # (126, 126, 126) and offsets it by (0, -128, -128). Whether `base` is the
     # colour just applied or the one before the fade began is the part of
     # `battle_map_blend_background_gradient_color` still unread.
-    screen = track_offsets(tr, 'screen', nfr, ph1, double=True)
-    field = track_offsets(tr, 'affected units', nfr, ph1)
+    screen = stage_offsets(stages, 'screen', nfr, double=True)
+    field = stage_offsets(stages, 'affected units', nfr)
     for t in range(0, last, 2):                        # 60 Hz ticks, 30 fps frames
         # `--over` starts each frame on a picture of the battlefield instead of
         # black. The effect's parts are B+F against it exactly as against
@@ -1108,8 +1638,20 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
         # the file has no scene in it, and its colour tracks only darken one.
         fb = np.zeros((size[1], size[0], 3), dtype=float)
         f30 = t // 2
-        if under is not None:
-            fb[:] = under
+        ax, ay, sc, bg = anchor[0], anchor[1], scale, under
+        if cam:
+            c = cam[min(f30, len(cam) - 1)]
+            zoom = c['scale']
+            # The camera looks at `position`, so the world origin -- where the
+            # preview's anchor sits -- moves the other way, by that point
+            # projected and scaled like everything else.
+            px, py = flat(*c['position'])
+            ax, ay = anchor[0] - px * zoom, anchor[1] - py * zoom
+            sc = scale * zoom
+            if scene is not None:
+                bg = np.asarray(_scene_through(scene, anchor, (ax, ay), zoom)).astype(float)
+        if bg is not None:
+            fb[:] = bg
             if f30 < len(field):
                 fb[:] = np.clip(fb + np.array(field[f30]), 0, 255)
             if f30 < len(screen):
@@ -1122,14 +1664,13 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
             corners = rotate2(p_pts(fr, d), d.get('angle', 0.0))
             k = 0
             for p in fr[d['frame']]:
-                q = [(anchor[0] + (d['x'] + px) * scale,
-                      anchor[1] + (d['y'] + py) * scale)
+                q = [(ax + (d['x'] + px) * sc, ay + (d['y'] + py) * sc)
                      for px, py in corners[k:k + 4]]
                 k += 4
-                u, v, w, h = p['u'], p['v'], p['w'], p['h']
-                s = [(u, v), (u + w, v), (u, v + h), (u + w, v + h)]
-                cell = (min(u, u + w), min(v, v + h),
-                        max(u, u + w) - 1, max(v, v + h) - 1)
+                u, v = p['u'], p['v']
+                u1, v1 = (u + p['w']) & 0xff, (v + p['h']) & 0xff
+                s = [(u, v), (u1, v), (u, v1), (u1, v1)]
+                cell = (min(u, u1), min(v, v1), max(u, u1) - 1, max(v, v1) - 1)
                 tint = d.get('tint')
                 tx = tex * np.array(tint) if tint else tex
                 # One POLY_FT4 a part, rasterised whole and then blended once.
@@ -1149,13 +1690,21 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                   else st.quads(f30 - m['frm'], project3))
             for q in qs:
                 if q.get('screen'):
-                    # Screen-space quads: the source writes their corners once and
-                    # never projects them, so they sit where the console's own
-                    # drawing area puts them -- centred here on our frame.
-                    off = ((size[0] - 256) // 2, (size[1] - 256) // 2)
+                    # Screen-space quads: the source writes their corners once
+                    # and never projects them, so they land wherever the battle's
+                    # own drawing area puts them -- and that area is NOT at the
+                    # origin. `battle_state_init_deployment_display` calls
+                    # `SetDefDrawEnv(env, -0x80, 0, width + 0x80, height)`, so a
+                    # primitive written at x = 0x80 is drawn at pixel 0. The 4x4
+                    # grid writes `(column << 6) + 0x80`, i.e. 128..384, which is
+                    # exactly the 256-wide screen once that -128 is applied.
+                    # Centring the grid on our frame instead left Meteor's rock
+                    # three quarters off the right edge.
+                    off = (SCREEN_ORIGIN_X + (size[0] - 256) // 2,
+                           (size[1] - 240) // 2)
                     d = [(off[0] + x, off[1] + y) for x, y in q['pts']]
                 else:
-                    d = [(anchor[0] + x * scale, anchor[1] + y * scale) for x, y in q['pts']]
+                    d = [(ax + x * sc, ay + y * sc) for x, y in q['pts']]
                 uv = q['uv']
                 cell = (min(p[0] for p in uv), min(p[1] for p in uv),
                         max(p[0] for p in uv) - 1, max(p[1] for p in uv) - 1)
@@ -1171,6 +1720,7 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
     return out
 
 
+SCREEN_ORIGIN_X = -0x80   # battle draw env: SetDefDrawEnv(env, -0x80, 0, ...)
 TI_W, TI_H = 160, 100
 TI_SCALE = 0.55                  # the original's 256-wide picture onto 160 px
 
@@ -1281,6 +1831,13 @@ def main():
     ap.add_argument('--program', action='store_true', help='section 2: the effect script')
     ap.add_argument('--phases', action='store_true', help='section 7: durations and channels')
     ap.add_argument('--tracks', action='store_true', help='section 7: the four colour tracks')
+    ap.add_argument('--map-centre', dest='map_centre', default=None,
+                    help='the world vector from the target to the map centre, "x,y,z"; '
+                         'Gariland from the roof tile is 42,96,0')
+    ap.add_argument('--eye', action='store_true',
+                    help='play the effect camera over the render: pan, zoom, scene and all')
+    ap.add_argument('--camera', action='store_true',
+                    help='section 7: the effect camera, keyframes then frame by frame')
     ap.add_argument('--render', type=Path, help='PNG per frame plus a GIF, in this directory')
     ap.add_argument('--size', default=None,
                     help='the render canvas; by default 256x240, grown to fit the effect at 1:1')
@@ -1312,6 +1869,34 @@ def main():
     fr, seqs, cs = frames(sec[0]), script(sec[1]), cast(sec[3])
     print('E%03d  %d cells, %d sequences, %d cast members'
           % (a.id, len(fr), len(seqs), len(cs)))
+
+    if a.camera:
+        sec7 = sec[7] if len(sec) > 7 else b''
+        names = ('main', 'for each target', 'cleanup')
+        for tab, name in zip(camera_tables(sec7), names):
+            if not tab or tab['last'] < 0:
+                continue
+            print(' %s, %d keyframes' % (name, tab['last'] + 1))
+            for i in range(tab['last'] + 1):
+                sel = tab['selector'][i]
+                what = [n for b, n in ((1, 'angle'), (2, 'position'), (4, 'zoom'))
+                        if sel & b]
+                print('   f%-4d %-22s %-14s %s  angle %s  pos %s  zoom %s'
+                      % (tab['thresholds'][i],
+                         CAMERA_MODES.get(sel & CAMERA_MODE_MASK, '?'),
+                         CAMERA_SOURCES.get(sel & CAMERA_SOURCE_MASK, '?'),
+                         ','.join(what) or '-',
+                         tab['angle'][i], tab['position'][i], tab['zoom'][i]))
+        ph = phases(sec7) or {}
+        play = camera_play(sec7, ph.get('total', 0))
+        prev = None
+        for f, c in enumerate(play):
+            row = (c['position'], c['zoom'])
+            if row != prev:
+                print('   frame %3d  pos %-20s zoom %-20s  x%.2f'
+                      % (f, '%d,%d,%d' % tuple(int(v) for v in c['position']),
+                         '%d,%d,%d' % tuple(int(v) for v in c['zoom']), c['scale']))
+            prev = row
 
     if a.cells:
         for i, polys in enumerate(fr):
@@ -1394,12 +1979,14 @@ def main():
         from PIL import Image
         w, h = (int(v) for v in (a.size or '256x240').split('x'))
         anchor = tuple(int(v) for v in a.anchor.split(',')) if a.anchor else None
+        centre = [int(v) for v in a.map_centre.split(',')] if a.map_centre else None
         if a.ti:
             w, h = TI_W, TI_H
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
                      None if a.flat else sec, not a.no_scatter,
-                     grow=a.size is None and not a.ti, effect_id=a.id, over=a.over)
+                     grow=a.size is None and not a.ti, effect_id=a.id, over=a.over,
+                     eye=a.eye, centre=centre)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
