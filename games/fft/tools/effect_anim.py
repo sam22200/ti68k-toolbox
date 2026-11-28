@@ -81,6 +81,7 @@ except the three things listed here.
 """
 import argparse
 import math
+import os
 import struct
 import sys
 from pathlib import Path
@@ -789,7 +790,21 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def mesh_actors(raw, sec, cur):
+_HANDLERS = None
+
+
+def handler_table():
+    """`effect_handlers.json`, read once: which overlay carries which renderer."""
+    global _HANDLERS
+    if _HANDLERS is None:
+        import json
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'effect_handlers.json')) as f:
+            _HANDLERS = json.load(f)
+    return _HANDLERS
+
+
+def mesh_actors(raw, sec, cur, effect_id=None):
     """The overlay's own mesh renderers, and when the timeline runs each of them.
 
     `battle_effect_code_script_28_step_child_timeline` is explicit: a keyframe's
@@ -826,35 +841,41 @@ def mesh_actors(raw, sec, cur):
         i += SCRIPT_OPS[op][1]
     if not slots:
         return out
-    # `g_battle_effect_file_ptrs` at 0x801b50d0 in BATTLE.BIN is a static table of
-    # 198 routine addresses, and it settles the slot-to-handler question outright:
-    # [7] 0x801C2500, [8] 0x801C39F8, [9] 0x801C4FC8 -- E015's three functions in
-    # the order `target/effect.yaml` lists them. Sorting the registered ids is
-    # therefore the same thing as reading that table, for this overlay.
-    order = sorted(set(slots.values()))
-    # E015's three tables, at the addresses `target/effect.yaml` gives them.
-    # Each renderer reads its own: nine columns for the stack's lattice rows,
-    # three for the ring's, five for the grid's four quad rows.
-    kinds = [(effect_mesh.RingStack, 0x801C573C, 9),
-             (effect_mesh.RingMesh, 0x801C5814, 3),
-             (effect_mesh.QuadGrid4x4, 0x801C585C, 5)]
+    # Every overlay loads at 0x801c2500, so a routine pointer in
+    # `g_battle_effect_file_ptrs` is an offset into whichever one is loaded, and
+    # `effect_handlers.json` says which function sits there and where that
+    # renderer's own brightness table is. No ordering, no guess.
+    table = handler_table()
+    over = table['overlays'].get(str(effect_id)) if effect_id is not None else None
     ph = phases(sec[7])
-    if not ph:
+    if not ph or not over:
         return out
-    for chan in ph['child_channels']:
-        for kf in chan or ():
-            sel = kf['action'] & 7
-            if not sel or kf['emitter'] is None:
-                continue
-            routine = slots.get(sel - 1)
-            if routine is None or order.index(routine) >= len(kinds):
-                continue
-            cls, addr, width = kinds[order.index(routine)]
-            bright = effect_mesh.brightness_table(raw, addr - 0x801C2500, width=width)
-            rec = sec[3][20 + 196 * kf['emitter']:20 + 196 * (kf['emitter'] + 1)]
-            if len(rec) < 196 or not bright:
-                continue
-            out.append(dict(frm=kf['frm'], to=kf['to'], stack=cls(rec, bright, cur)))
+    # The parent timeline runs phase 1, then the child, then phase 2, and each
+    # has its own five channels; a handler called from a phase channel is called
+    # the same way. Walking the child's alone left most overlays' renderers
+    # unreached, and left the child's own windows short by phase 1's frames.
+    groups = [(0, ph['phase_channels'][0]),
+              (ph['phase1'], ph['child_channels']),
+              (ph['phase1'] + ph['child'], ph['phase_channels'][1])]
+    for base, chans in groups:
+        for chan in chans or ():
+            for kf in chan or ():
+                sel = kf['action'] & 7
+                if not sel or kf['emitter'] is None:
+                    continue
+                routine = slots.get(sel - 1)
+                if routine is None or not 0 <= routine < len(table['routines']):
+                    continue
+                found = over.get(str(table['routines'][routine]))
+                if not found:
+                    continue                      # a family not transcribed yet
+                family, table_off, width = found
+                rec = sec[3][20 + 196 * kf['emitter']:20 + 196 * (kf['emitter'] + 1)]
+                bright = effect_mesh.brightness_table(raw, table_off, width=width)
+                if len(rec) < 196 or not bright:
+                    continue
+                out.append(dict(frm=base + kf['frm'], to=base + kf['to'],
+                                stack=effect_mesh.FAMILY[family](rec, bright, cur)))
     return out
 
 
@@ -866,7 +887,8 @@ def p_pts(fr, d):
     return out
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False,
+           effect_id=None):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
@@ -877,10 +899,12 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                   cur=curves(raw_sections[4])) if raw_sections else None
     if tl is None:
         tl = timeline(fr, seqs, cs)
-    if not tl:
+    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4]), effect_id) if raw_sections else []
+    if not tl and not mesh:
         return []
+    tl = tl or []
     if anchor is None:                          # fit the sweep, then sit it low
-        x0, y0, x1, y1 = extent(fr, tl)
+        x0, y0, x1, y1 = extent(fr, tl) if tl else (-64, -64, 64, 64)
         # Night Sword sweeps 251 px against a 240-px frame, so its ball fell off
         # the top: shrink until the whole thing is inside before placing it.
         fit = min(1.0, (size[1] * 0.96) / max(1, y1 - y0),
@@ -903,11 +927,12 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                   int(size[1] * 0.98 - y1 * scale))
         print('origin at %d,%d  (the animation sweeps x %d..%d, y %d..%d)'
               % (anchor[0], anchor[1], x0, x1, y0, y1))
-    last = max(d['t'] + d['ticks'] for d in tl)
+    # An effect whose picture is entirely native -- E071 is one -- has no sprite
+    # timeline at all, and its length is its handlers' windows instead.
+    last = max([d['t'] + d['ticks'] for d in tl] + [m['to'] * 2 for m in mesh])
     out = []
     prim = np.zeros((size[1], size[0], 3), dtype=float)
     cov = np.zeros((size[1], size[0]), dtype=float)
-    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4])) if raw_sections else []
     flat = camera()
 
     def project3(x, y, z):
@@ -947,7 +972,7 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
             if not (m['frm'] <= f30 < m['to']):
                 continue
             st = m['stack']
-            qs = (st.quads(f30 - m['frm']) if isinstance(st, effect_mesh.QuadGrid4x4)
+            qs = (st.quads(f30 - m['frm']) if st.SCREEN
                   else st.quads(f30 - m['frm'], project3))
             for q in qs:
                 if q.get('screen'):
@@ -1183,7 +1208,7 @@ def main():
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
                      None if a.flat else sec, not a.no_scatter,
-                     grow=a.size is None and not a.ti)
+                     grow=a.size is None and not a.ti, effect_id=a.id)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
