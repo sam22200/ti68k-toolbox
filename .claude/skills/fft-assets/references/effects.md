@@ -321,3 +321,37 @@ Section 2, which this page had dismissed as 64 constant bytes, is the **effect s
 a 9-bit-opcode interpreter with counters, branches, child spawning and camera control.
 Decoding sections 2 and 7 is what would make the playback the game's.
 
+
+
+## 13. The particle model, and how far it was checked
+
+`effect_anim.py --render` plays an effect from its timeline. What that took, and
+what each piece is worth, measured rather than argued:
+
+* **the spawn** -- a keyframe's emitter spawns on the keyframe's own frame count,
+  which `state.child.step[i] = 0` resets on entering it, so step 0 always passes
+  and the gate `step % spawn_interval` lets the first frame through. Stasis
+  Sword's shards have interval 49 inside 2-frame keyframes: one spawn each;
+* **the death** -- lifetime -1 is `ANIMATION_DRIVEN`, and the particle is freed
+  the frame its sprite node's `frame_timer` reads 0. `draw_particle_sprite` runs
+  the sequence step *before* that check and reloads the timer with the hold it
+  just read, so the timer is 0 only on a `hold 0` op. Every sequence ends on one;
+* **the spread** -- `EFFECT_EMITTER_BOX_SPREAD` clear means **on the ellipsoid's
+  surface**, not inside it, and that is 1,429 of the disc's 1,893 emitters;
+* **the blend** -- bits 5-6 of a part's tpage: 11,743 polygons B+F, 2,041 B+F/4,
+  499 B-F, 341 B/2+F/2. One uniform add burns the quarter-strength parts;
+* **the tint** -- three colour curves a particle, read at its own frame counter,
+  128 neutral. They brighten as well as dim: Night Sword's ball curve peaks at
+  255, averages 153.
+
+**Where it lands.** Night Sword's ball in the game measures (240, 177, 171)
+against (79, 54, 42) for one cell of it -- **three layers**, which is exactly
+what its emitter spawns. The render gives (237, 220, 208): the red matches to
+within a percent and green and blue run about a quarter high, which is the
+tint's x1.19 average. The model is right; the remaining error is exposure, and
+comparing a clean render against a photograph of a television is at the edge of
+what the measurement can settle.
+
+**Not modelled**: gravity (a global an opcode sets), and the bloom the console
+spreads over a lit scene -- which is most of what still separates the two
+pictures.
