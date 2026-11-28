@@ -25,25 +25,39 @@ the records of exactly 28 bytes -- the single-polygon ones -- and read three of 
 corners. For Stasis Sword that is 42 frames out of 128, and the dropped ones are the
 interesting ones: the shards are drawn as three polygons at a time.
 
-**Section 1 -- the script.** `u16 count, u16 0`, then `count` u16 offsets *relative to
-byte 4*, then one byte-code stream per sequence:
+**Section 1 -- the sprite sequences.** `u16 count, u16 0`, then `count` u16 offsets
+*relative to byte 4*, then one byte-code stream per sequence:
 
-    0x00..0x7f  <u8 ticks> <u8 flag>   draw that frame of section 0, hold `ticks`
-    0x81                                end of sequence
-    0x82 <s16 x> <s16 y>                set the position
+    0x00..0x7f  <u8 hold> <u8 depth>   draw that frame of section 0, hold `hold` ticks
+    0x81                                LOOP, back to the first byte
+    0x82 <s16 x> <s16 y>                set the offset
     0x83 <s8 dx> <s8 dy>                move by (dx, dy)
 
-Ticks are 60 Hz: the usual `02` is one frame at 30 fps. Verified by decoding every effect
-on the disc: 1537 sequences, all of them parse to their 0x81 with no fifth opcode.
+Ticks are 60 Hz: the usual `02` is one frame at 30 fps. Every sequence of all 291 data
+effects parses with these four and no fifth. `depth` is the ordering-table depth mode
+(0 unchanged, 1 nearer 8, 2 fixed 8, 3 farthest, 4 fixed 16, 5 nearer 16).
 
-**Section 3 -- the cast.** `u16 2, u16 count`, 16 more bytes, then `count` records of 196
-bytes. Byte 1 of a record is the sequence it plays, so one sequence can be cast twice.
-The rest is unread; 4096 appears where a scale would (the PS1's 1.0), and the fields that
-move between records are listed by `--cast`.
+**Section 3 -- the particle emitters**, `effect_geometry_entry_t`, 196 bytes each: byte
+0x01 is the sprite sequence its particles play, 0x04 its frame group, 0xb0 the particles
+per spawn and 0xb4 the frames between spawns.
 
-What this does *not* do: the first eight bytes of a polygon are the hardware's texture
-page and palette, and are ignored here in favour of section 9's own atlas, which is what
-`effect_rip.py` already decodes.
+**What this tool does NOT model, and why its playback is not the game's.** A sequence
+*loops*; what makes an effect start, stagger and stop is elsewhere:
+
+* section 2 is the **effect script**, a 9-bit-opcode interpreter (spawn child, free
+  child, counters, branches, camera, step timeline);
+* section 7 is the **timeline**, 6278 bytes: `phase1_duration`, `phase2_duration`,
+  **`spawn_delay` -- the frames between child spawns**, and per particle channel a
+  keyframe table of 25 `frame_start` boundaries with an emitter each.
+
+So this plays every emitter's sequence once, from t=0, with no stagger and no end. That
+is why the decoded tail of an effect can show something the game never reaches, and why
+nothing here could find the start delay: it is in section 7, not in the emitter record.
+
+The layouts above are the names of **adamrt/fft_decomp**, a byte-exact decompilation of
+SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
+`effect_emitter_data.h`. Everything this tool had reverse-engineered by hand matched it,
+except the three things listed here.
 """
 import argparse
 import struct
@@ -56,8 +70,8 @@ import core_audit  # noqa: E402
 import effect_rip  # noqa: E402
 import extract  # noqa: E402
 
-REC_SIZE = 196          # one section-3 record
-END, MOVETO, MOVEBY = 0x81, 0x82, 0x83
+REC_SIZE = 196          # effect_geometry_entry_t: one particle emitter
+LOOP, MOVETO, MOVEBY = 0x81, 0x82, 0x83
 
 
 def sections(raw):
@@ -125,9 +139,10 @@ def script(sec1):
         while p < end:
             op = sec1[p]
             if op < 0x80:
+                # frame_index, hold, depth_mode (the ordering-table depth)
                 ops.append(('frame', op, sec1[p + 1], sec1[p + 2])); p += 3
-            elif op == END:
-                ops.append(('end',)); p += 1; break
+            elif op == LOOP:
+                ops.append(('loop',)); p += 1; break    # back to the first byte
             elif op == MOVETO:
                 ops.append(('moveto',) + struct.unpack_from('<2h', sec1, p + 1)); p += 5
             elif op == MOVEBY:
@@ -139,7 +154,12 @@ def script(sec1):
 
 
 def cast(sec3):
-    """The section-3 records: which sequence each one plays, and its raw 196 bytes."""
+    """The particle emitters of section 3: `effect_geometry_entry_t`, 196 bytes.
+
+    Byte 0x01 is `animation_index`, the sprite sequence its particles play, and
+    0x04 the frame group of that sequence. The rest is spawn geometry, curve
+    bindings, lifetime, `particle_count` at 0xb0 and `spawn_interval` at 0xb4.
+    """
     if len(sec3) < 20:
         return []
     ver, cnt = struct.unpack_from('<2H', sec3, 0)
@@ -329,8 +349,8 @@ def audit(disc, files):
         for i, ops in enumerate(sq):
             if any(o[0].startswith('?') for o in ops):
                 unknown.append((n, i, [o[0] for o in ops if o[0].startswith('?')]))
-            if not ops or ops[-1][0] != 'end':
-                unknown.append((n, i, ['no end']))
+            if not ops or ops[-1][0] != 'loop':
+                unknown.append((n, i, ['no loop']))
         if any(c['seq'] >= len(sq) for c in cs):
             orphan.append(n)
     print('%d data files, %d MIPS routines' % (data, routine))
@@ -392,7 +412,7 @@ def main():
             for op in ops:
                 if op[0] == 'frame':
                     print('   t%+5d  cell %3d  x%d ticks%s'
-                          % (t, op[1], op[2], '' if op[3] == 1 else '   flag %d' % op[3]))
+                          % (t, op[1], op[2], '' if op[3] == 1 else '   depth %d' % op[3]))
                     t += op[2]
                 elif op[0] == 'moveto':
                     print('   t%+5d  move to  %5d,%-5d' % (t, op[1], op[2]))
@@ -400,7 +420,7 @@ def main():
                     print('   t%+5d  move by  %5d,%-5d' % (t, op[1], op[2]))
                 else:
                     print('   t%+5d  %s' % (t, op[0]))
-            print('   total %d ticks (%d frames at 30 fps)' % (t, t // 2))
+            print('   loops after %d ticks (%d frames at 30 fps)' % (t, t // 2))
     if a.cast:
         words = [struct.unpack_from('<%dh' % (REC_SIZE // 2), c['raw'], 0) for c in cs]
         print(' %-4s %-4s %s' % ('#', 'seq', 'fields that differ between records'))

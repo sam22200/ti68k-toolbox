@@ -66,13 +66,14 @@ class Frames(unittest.TestCase):
 
 class Script(unittest.TestCase):
     def test_the_four_opcodes(self):
+        """0x81 is LOOP, not an end: a sequence repeats until the timeline stops it."""
         stream = (bytes([0x82]) + struct.pack('<2h', 0, -276)
                   + bytes([2, 2, 0]) + bytes([0x83, 0, 32])
                   + bytes([3, 30, 0]) + bytes([0x83]) + struct.pack('<2b', -8, -2)
                   + bytes([0x81]))
         ops = A.script(section1([stream]))[0]
         self.assertEqual(ops, [('moveto', 0, -276), ('frame', 2, 2, 0), ('moveby', 0, 32),
-                               ('frame', 3, 30, 0), ('moveby', -8, -2), ('end',)])
+                               ('frame', 3, 30, 0), ('moveby', -8, -2), ('loop',)])
 
     def test_play_accumulates_the_moves_and_the_clock(self):
         stream = (bytes([0x82]) + struct.pack('<2h', 10, -100)
