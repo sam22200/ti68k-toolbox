@@ -343,13 +343,18 @@ def camera(pitch=PITCH, yaw=YAW):
 
 
 def curves(sec4):
-    """Section 4's animation curves: one 160-value ramp each, 128 being neutral."""
-    if len(sec4) < 4:
-        return []
-    n = struct.unpack_from('<I', sec4, 0)[0]
-    if n > 64 or 4 + 160 * n > len(sec4):
-        return []
-    return [list(sec4[4 + 160 * i:4 + 160 * (i + 1)]) for i in range(n)]
+    """Section 4's animation curves, 128 being neutral.
+
+    `battle_effect_integrate_particle_motion` reads one as
+    `(curve_data + track * 0xa0 + offset)[4]`: the section is **rows of 160
+    bytes whose first four are a header**, and the ramp is the 156 after it.
+    The leading word was being read as a row count, which happens to be 15 in
+    every effect on the disc and happens to equal what the section holds -- two
+    coincidences that make a wrong model look right. A nibble is four bits, so
+    sixteen rows are all that can ever be named.
+    """
+    rows = min(16, len(sec4) // 160)
+    return [list(sec4[4 + 160 * i:4 + 160 * (i + 1)]) for i in range(rows)]
 
 
 def _tint(rec, cur, n):
