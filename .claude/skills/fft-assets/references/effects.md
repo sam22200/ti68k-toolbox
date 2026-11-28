@@ -856,3 +856,478 @@ Stasis Sword comes out the other way: a peak of 159.6 against the console's
 other side. Both are off by a factor the modes decide, so neither is tuned here:
 **a magic multiplier that makes one picture agree is how a decoder stops being a
 transcription.**
+
+## 25. The parent timeline: its own emitters, its own colour tracks
+
+Section 7 is read through **two** structures, and only one of them was being
+read. `battle_effect_tick_channels_t` is the **child** timeline, eight bytes
+into the section: five particle channels at 0x004, three sound tracks at
+0x284, then its four colour tracks at 0x326, 0x3ee, 0x4b6 and 0x57e.
+`effect_timeline_t` is the **parent**'s view of the very same bytes, with its
+own `particle_channels[2][5]` at 0x82a, `sound_tracks[2][3]` at 0xd2a and
+`color_tracks[2]` at 0xdde -- 0x384 apart, which `main` at 0x14e6 confirms to
+the byte.
+
+`battle_effect_code_script_29_step_parent_timeline` steps the first set while
+its frame counter is below `phase1_duration` and the second once phase 2 has
+begun, through the very `battle_effect_step_emitter_timeline` and
+`battle_effect_advance_map_background_track` the child calls on its own. So an
+effect runs **three stages in turn** -- phase 1, the child, phase 2 -- and each
+stage has five particle channels and four colour tracks of its own.
+
+Reading the child's alone is invisible on a file that keeps everything there,
+and total on one that does not:
+
+| | emitters | what was missing |
+|---|---|---|
+| Stasis Sword, Night Sword, Holy, Flare, Haste | child only | nothing drawn; their phase tracks are a terminator |
+| Cure 4 | both | six of its emitters, and the white flash |
+| **Meteor** | **phase 1 only** | **the whole effect: not one sprite drawn** |
+
+Meteor is the proof. Its nine emitters are all in phase-1 channels, its
+timeline is 229 frames long and rich, its atlas holds a meteor and three
+glows -- and the renderer drew an empty frame, because the five channels it
+read were the child's and the child's hold only display actions.
+
+There is one gradient, not three, so the stages chain: a stage picks the fade
+up where the one before it left off, and writes only inside its own window
+(`stage_offsets`). Wiring it changed nothing at all for Night Sword and Holy,
+and 18 of Stasis Sword's 66 frames by at most 15 of 255. It took Cure 4's peak
+from 57 to 205 against the console's 182, and Meteor's from 150 to 228 against
+252.
+
+**A track's last keyframe is a terminator**: `(-128, -128, -128)` with the
+offset bit clear and a duration of 70-odd, i.e. hundreds of frames of black. It
+always starts at or after its stage's last frame, which is what makes it
+harmless -- and what makes clamping each stage to its own window necessary
+rather than cosmetic.
+
+### What the file does not hold: the camera
+
+Two of the five spells differ from the console in a way no track explains.
+Haste's console frames are **zoomed onto the receiver** and the field around it
+darkened; its own colour tracks are empty (every keyframe `(0, 0, 0)` mode 5,
+then the terminator), so the darkening is not the effect's. Meteor fills the
+whole screen on the console because the camera flies into the rock; ours keeps
+the battle camera and the meteor stays the size the quads make it.
+
+Both are `effect_camera_keyframes_21_t main`/`cleanup` at 0x14e6 and 0x16b6,
+advanced by `battle_camera_advance_effect_tracks(frame)` -- the one part of the
+timeline the preview does not play. Naming it is the point: these two are not
+decoding errors.
+
+## 26. The emitter's motion is written as a curve, not as a number
+
+`battle_effect_spawn_emitter_particles` reads **every** geometry field as a
+start/end pair lerped by the curve its `curve_indices` nibble names, and it
+indexes that curve with the emitter's own step inside the keyframe -- `frame`
+is the channel counter the timeline hands it, reset to 0 on entering the
+keyframe, and the function's first line is `frame = frame % 160`. The
+particle's age drives its colour and nothing else.
+
+    curve_indices[0]  nibble 0 spawn position   1 spawn spread
+                             2 velocity base angle  3 velocity spread
+                             7 radial speed  (bits 28-31)
+    radial speed      min 0x5c, max 0x5e; their ends at 0x60 and 0x62
+    base angle        0x2c, end 0x32        spread 0x38, end 0x3e
+
+Reading the starts alone leaves still every emitter whose motion is written as
+"from nothing to something". **Haste is exactly that**: its two helices of
+roman numerals are emitters 3 and 4, radial speed `0 -> 1280` behind nibble 7
+and a base angle whose Z turns `2048 -> 6144` and `0 -> 4096` behind nibble 2 --
+one full turn each, half a turn apart, which is the counter-rotating pair the
+console draws. With the starts alone both spawn 22 numerals on one spot and the
+preview showed a single motionless green block where the original rings the
+target.
+
+The third angle matters too. The engine builds the direction with
+`RotMatrix(rotation)` over `(0, speed, 0)`, and our sin/cos pair was that
+matrix with its Z dropped -- correct wherever the Z is zero, which is every
+effect the preview had been checked against, and fatal to Haste, whose whole
+ring is that Z.
+
+Without a bound curve the stored **spread is halved** and the start is used
+as-is; with one, the lerped value is used whole.
+
+Measured, re-rendering each effect before and after: Stasis Sword, Night Sword
+and Holy move by at most 1.2, 2.5 and 2.7 of 255 on their most-changed frame
+(47, 53 and 176 frames touched out of 66, 107 and 212), Meteor by 2.3, and
+Flare -- which binds a speed curve of its own -- by 22.1.
+
+### An effect lasts its timeline, not its last sprite
+
+`render` stopped at the last tick a quad was drawn on. The parent script keeps
+stepping the colour tracks through phase 2 after every emitter is spent, and
+that is where Meteor's two seconds of white screen live: the console holds a
+flat 252 of mean luminance for about 145 of its 60 Hz frames, between the
+impact and the damage numbers. The render window is now
+`phase1 + child + phase2` frames at least, which takes Haste from 65 frames to
+104 and Meteor from 173 to its full 229.
+
+What is still camera, and still not ours: Haste's zoom onto the receiver, and
+Meteor's fly-in -- its first stage is a small rock falling, then the camera
+travels up to uncover the real one. Both are `effect_camera_keyframes_21_t`
+(§25), and they are why our ring is about twice the radius the console's looks:
+the console is zoomed in on the same ring.
+
+## 27. The effect camera, played
+
+`battle_camera_advance_effect_tracks(frame)` drives three tracks -- rotation,
+position and zoom -- off three keyframe tables of the same 22n + 2 shape:
+
+    main             0x14e6, 21 keyframes, while frame < phase1_duration
+    for each target  0x6b2,  17 keyframes, repeating every spawn_delay per hit
+    cleanup          0x16b6, 21 keyframes, relative to the end of that window
+
+**The field names in `effect_camera_keyframes_21_t` are swapped.** The
+dispatcher reads `main.position[k]` for `battle_camera_execute_angle_command`
+and `main.target[k]` for `battle_camera_execute_position_command`, so the array
+called `position` carries the ANGLES and the one called `target` the position.
+
+Each keyframe's selector holds a source in bits 0x1e0 (the effect target, the
+caster, the map centre, the current camera, the saved one, a vector given
+outright...) and a mode in bits 0x1e00: snap, cosine, cosine q12, linear, three
+adds and three shakes. The scanner looks *ahead* -- it arms the first keyframe
+still in front of the current frame, with `threshold - frame` as the duration --
+and a track is only armed while it is idle, so a keyframe never interrupts a
+move still running.
+
+### The tactical view is 0xC00, not ONE
+
+`battle_camera_zoom_map` has two levels and two only: `ONE` (4096) zoomed in and
+`0xC00` (3072) zoomed out. A spell is cast from the zoomed-out one, so an
+effect whose first keyframe says `zoom = ONE` -- Haste and Meteor both do -- is
+asking for **x1.33**, not for nothing. Starting a preview at ONE makes every
+such keyframe a no-op, which is what hid Haste's zoom. Measured independently:
+correlating the console's own frames onto the scene before the spell gives a
+best fit at 1.4-1.6, and that is the 1.33 within the precision of a measurement
+taken through a fade.
+
+With the camera played (`effect_anim.py --eye`), Haste's frames sit at the
+console's own framing, and Meteor performs the choreography the player sees:
+the camera climbs to y = -1197 by frame 54, falls back while the zoom pulls out
+to x0.40 by frame 118 -- which is how a rock that large fits on screen -- then
+snaps back to x1.06 for the impact and returns to the tactical view by frame
+174. Past the edges of the scene picture the preview fills with black, which is
+what the console shows there as well.
+
+### The map centre, and the one vector a preview needs
+
+Seven of Meteor's nine emitters are anchored to **the map centre**, not to the
+target (the other two hang off the parent particle) -- emitter 0 is born at
+y = -1450, a hundred and eleven frames of falling. Its camera asks for the same
+place: `map centre` is the source of four of its position keyframes. A preview
+is drawn about the target and has no idea where the map centre is relative to
+it, so without help the rock is placed as though the two coincided.
+
+`EFFECT_EMITTER_ORIGIN_MAP_CENTRE` adds `max * 14` on x and z and **leaves the
+height at 0** -- a tile is 28 units wide, so that is the middle of the
+battlefield at ground level. For Gariland `g_battle_map_max_x/y` read 10 and 15,
+so the centre is (140, 0, 210); the roof tile the preview is anchored on sits at
+(98, -96, 210), which makes the vector from target to centre **(42, 96, 0)**.
+That is what `effect_anim.py --map-centre 42,96,0` passes, and it reaches both
+the emitters and the camera.
+
+Of the seven effects decoded so far only Meteor is anchored that way, so the
+option changes nothing for the other six.
+
+**It is not what the rock was waiting for.** With the vector passed, the
+emitters do move onto the field and the camera's `map centre` keyframes resolve,
+but the console's huge red sphere still does not appear. Two guesses died on the
+way and are worth not making again:
+
+* *the ordering table was dropping it* -- it was not. Emitter 0's depth runs
+  `ot` 2, 93, 185, 276 over its fall: in range the whole way.
+* *emitter 0 is the rock* -- it is not. Its sequence holds **cell 0, which has
+  no polygons at all**, for 180 ticks, and only then draws cell 38 for 42. It is
+  a timer, visible once, at frame 123.
+
+Emitters 5 and 3 are not it either: they are nuees of 2 particles a frame over
+spawn ellipsoids 256 and 137 units across, with no speed to speak of -- the
+embers around the impact, which is why the preview painted flat red there.
+
+## 28. An emitter can be the child of a particle
+
+`battle_effect_code_script_25_update_all_particles` walks every live particle
+once a frame and calls `battle_effect_spawn_emitter_particles` **again** when
+the particle's flags ask for it:
+
+    flags & 0x000c == 0x4 or 0x8   ->  child_emitter_mid_life (0xc1), every frame
+    flags & 0x0003 == 0x1 or 0x2   ->  child_emitter_on_death (0xc0), once, at death
+
+The particle itself is passed as the `transform`, which is what
+`EFFECT_EMITTER_ORIGIN_PARENT_PARTICLE` anchors to -- so the child rides its
+parent. And the frame handed over is `record->frame_counter`, the effect's own
+clock, not the keyframe step a timeline emitter gets: a child reads its curves
+and its spawn gate off the global frame.
+
+**No timeline channel ever names a child emitter.** Reading the channels alone
+therefore leaves them unborn, and that is the whole of Meteor's missing rock:
+
+    emitter 0  flags 0x0044  mid-life child 1   a TIMER: its sequence holds a
+                                                cell with no polygons for 180
+                                                ticks, then draws once
+    emitter 1  anchor parent particle           5 particles a frame, sequence 1:
+                                                the rock and its trail
+    emitter 2  flags 0x0004  mid-life child 4   same pattern, 4 rides 2
+
+Wiring it takes Meteor from 6,086 draws to 27,536 -- emitter 1 alone is 16,650
+of them, emitter 4 another 4,800. Measured on the effects already reviewed, the
+same change moves Night Sword by at most 3.7 of 255 on its worst frame (81 of
+130 frames touched), Stasis Sword by 1.9 (48 of 86) and Haste by 1.3 (53 of
+104): they have children too, smaller ones.
+
+The recursion is bounded at two generations (`CHILD_DEPTH_LIMIT`), which is all
+any file on the disc uses and which keeps a file that makes a particle its own
+child from running away.
+
+Still unmodelled, and visibly doing work in the original: emitter 0 falls at 27
+world units a frame -- 13991/512, straight out of `radial_speed` with no curve --
+and ends 2,400 units below the field. The drag at 0x7c is not integrated.
+
+
+### The "2" spells are separate abilities with separate effects
+
+`g_battle_effect_ability_ids` keeps them far apart, so capturing one says
+nothing about the other:
+
+    0x01f Flare      E031        0x0df Flare 2    E235   (a monster skill set)
+    0x020 Haste      E032        0x021 Haste 2    E033
+    0x14e Giga Flare E385        0x15d Nanoflare  E408
+
+What has been captured and rendered so far is Flare and Haste -- the console's
+own `Effect / Flare` banner and the Time Magic list's entry 0, with `Haste 2`
+the line below it, both read off the capture rather than inferred. E235 and
+E033 both parse (12 and 9 emitters, 223 and 137 frames) and are unrendered.
+
+### Meteor's remaining emitters, and where its light actually is
+
+    em 6  seq 5  cell 37 alone, two 103x191 quads mirrored -> 206x191 on screen
+                 1 particle a frame, motionless at (216, 88, 0), frames 130-166
+    em 7  seq 4  5 a frame, life 19, spread 192, 8 units/frame   frames 4-32, 158-173
+    em 8  seq 4  4 a frame, life 16, spread 176, born at y = -448 frames 30-68
+
+So emitter 6 is the one big sprite in the file and the other two are nuees of
+the same shrinking 39 -> 3 px ball (sequence 4, shared with emitters 4 and 5).
+
+**Cell 39 is the giant one** -- three polygons, 260x364, 260x364 and 185x259 --
+and **no sequence plays it**. E047 is an overlay: `effect_handlers.json` gives
+it a native `quad_grid_4x4` renderer over frames 130-166, and that is what the
+cell belongs to. `mesh_actors` does instantiate it.
+
+Two measurements worth keeping, taken with the render aligned f0 = console 1000:
+
+    frame      90     100    110    120    130    140    150    200
+    ours      3.6    30.6   39.5   30.9   47.5  208.7  228.5  154.4
+    console 104.2   111.4  105.0   99.2   79.3   67.3   67.7  252.0
+
+* **the white flash is about 55 render frames early, and never ends.** The
+  console holds 65-110 through that stretch and only saturates at its frame
+  1400; ours is at 208 by frame 140 and never falls below 150 again.
+* **between frames 90 and 130 most of the light is missing** -- 30 against 105.
+
+Both point the same way: the file's timeline is 229 frames (458 at 60 Hz) and
+the console spends about 550 of its own frames on the spell. Something stretches
+it that the preview plays straight through, and until that is found the frames
+cannot be compared one to one.
+
+### A native renderer's keyframe is not a particle spawn
+
+`battle_effect_code_script_28_step_child_timeline` reads a keyframe's
+`selector & 7`: zero means an ordinary particle emitter, anything else is
+`slot = (selector & 7) - 1` and the handler in that slot takes the keyframe
+over. `mesh_actors` already honoured it; `schedule` did not, and drew those
+keyframes **a second time** as particles.
+
+That is worse than a duplicate, because the geometry record is then read
+through the wrong view. For a textured-quad renderer 0x14 and 0x16 are
+`texture_u` and `texture_v` (`effect_textured_quad_geometry_view_t`), not a
+spawn position. Meteor's emitter 6 carries (216, 88) there, and the preview
+flew its 206x191 quad to (182, 246) -- right off a 256x240 frame -- while
+`mesh_actors` drew the real one in place.
+
+Skipping them removes 540 ghost draws from Meteor, 2,160 from Holy (emitters 3,
+4, 5, 7, 8 and 13 were all phantoms) and 66 from Cure 4. Stasis Sword, Night
+Sword, Flare and Haste have no native renderer and do not move.
+
+### The battle's drawing area starts at x = -128
+
+`battle_state_init_deployment_display`:
+
+    SetDefDrawEnv(&g_main_gfx_draw_envs[0], -0x80, 0, width + 0x80, height);
+    SetDefDispEnv(&g_main_gfx_display_envs[0], 0, second_y, width, height);
+
+The drawing area's origin is **-0x80**, so a primitive written at x = 0x80 is
+drawn at pixel 0. That is why the 4x4 quad grid writes `(column << 6) + 0x80`:
+its 128..384 is exactly the 256-wide screen, not a band off to the right.
+
+The preview had been centring screen-space quads on its own frame, which put
+Meteor's rock three quarters off the right edge -- the renderer was running, its
+sixteen quads were being built correctly, and they were simply drawn in the
+wrong place. `SCREEN_ORIGIN_X = -0x80` is the whole fix.
+
+### The script outlives the timeline
+
+Holy's and Meteor's scripts have the same shape, and it is not a straight run:
+
+    1e jump_after_total_duration -> the tail
+    29 step_parent_timeline
+    25 update_all_particles
+    00 jump_and_yield            -> back to 1e
+    (tail:)
+    25 update_all_particles
+    16 jump_if_particles_eq 0    -> end
+    00 jump_and_yield            -> back to the tail
+
+Once the timeline's frames are spent the script keeps calling
+`update_all_particles` **until no particle is left**. An effect therefore lasts
+its timeline *plus* however long its last particles take to die, which is part
+of why the console spends about 550 frames on Meteor where the file's timeline
+is 458. The preview cuts every particle's life at the end of its phase
+(`die = min(span, born + life)`) and so cannot show that tail.
+
+No unknown opcodes in any of the seven effects decoded so far.
+
+### The particle tail, and what it is worth
+
+`_emit` clamped every particle's death to the end of its own phase
+(`min(span, born + life)`). A stored lifetime now runs its full count instead,
+which is what the script's tail does in the original. Two corrections came with
+it:
+
+* **the spawning**, not the living, is what the phase bounds. A keyframe's `to`
+  can run far past its phase -- Holy's reach 600 against a 229-frame timeline --
+  because `battle_effect_step_emitter_timeline` only steps the channel while the
+  phase's counter runs.
+* **an animation-driven particle (-1) is still clamped to its phase**, and that
+  is an approximation. Its real bound is its sequence's frozen frame, but some
+  sequences loop back *before* reaching one -- Holy's sequence 0 does -- which
+  makes the particle immortal on this reading: emitter 10 drew 12,340 times out
+  to frame 811. Whatever frees it is not in
+  `battle_effect_code_script_25_update_all_particles`.
+
+The tail is worth little in practice, because most particles are
+animation-driven: Meteor gains 225 draws, Cure 4 twelve, the other five none.
+
+### Where Meteor's rock is NOT, after four eliminations
+
+With `SCREEN_ORIGIN_X` applied, Meteor and Holy render **byte for byte the same**
+-- 0 of 229 frames differ. The 4x4 grid was never drawing anything to move, so
+the origin fix is correct and invisible. The rock is still missing, and these
+four readings are now ruled out:
+
+* **not emitters 5, 3, 7 or 8** -- nuees of 2 to 5 particles a frame over spawn
+  ellipsoids 137 to 192 units across, playing the shrinking 39 -> 3 px ball of
+  sequence 4. Embers.
+* **not the native renderer.** E047 has exactly one (`src/effect/` holds a
+  single `effect_e047_*` file), and all sixteen of its quads share ONE texture
+  window -- the source writes `u = scroll_u + texture_u`, `u + texture_width`
+  for every cell. With `texture_width` 7/2 = 3 that is a 3x3 texel window
+  stretched over the screen: a wash, not a rock. And at (216, 88) the atlas is
+  empty -- alpha 0 across the window -- so it draws nothing at all.
+* **not a lost half of the atlas.** E047's section 9 is 66,564 bytes with
+  `0x403 = 1`, so the picture is **256x256**, and `effect_rip` reads it as such.
+  The cells' own polygons reach u = 239, well inside it.
+* **not a frame group.** `battle_effect_render_particle_sprite` indexes cells
+  through `frame_group_index`, a per-emitter table selector -- but section 0
+  opens with a group count of **1** in every effect decoded so far, and all
+  their emitters carry group 0.
+
+### Found: the cell table was being read one slot early
+
+`battle_effect_render_particle_sprite` looks a cell up in **two** steps, and
+they were being collapsed into one:
+
+    g_battle_effect_frame_data = (u8*)header + header->frame_data + 4;   /* set_frame_data_pointer */
+    frame = *(u16*)(fd + sprite_frame_index * 2
+                       + *(s16*)(fd + frame_group_index)) + fd;
+
+So `fd` is **four bytes into section 0**; the halfword there is the frame
+GROUP's offset (2 in every effect read so far, one group per file); and the cell
+table starts at `fd + that`, i.e. at section 0 + 6. Reading it from section 0 + 4
+-- "two head words, then the offsets" -- shifted every cell one slot early, and
+invented a trailing one out of whatever followed the table.
+
+That is the whole of Meteor's missing rock. Its emitter 0 falls for 111 frames
+playing sequence 0, which asks for cells **0 and 38**, and read correctly both
+are three polygons of 260x364, 260x364 and 185x259 -- the rock that fills the
+screen. One slot early, cell 0 landed inside the table (drawn as nothing at all,
+which is what made emitter 0 look like a "timer") and cell 38 landed on an 8x8
+spark.
+
+E047 has **39** cells, not 40; the fortieth was the table's tail read as a
+record, which is where the 166-polygon, 30545x26882 nonsense came from. Every
+effect loses its phantom cell the same way: Stasis Sword 128 -> 127, Night Sword
+56 -> 55, Holy 60 -> 59, Cure 4 63 -> 62, Flare 35 -> 34, Haste 35 -> 34.
+
+
+## 29. Three more things the decompilation settled about the rock
+
+Finding the cell table was not enough: the rock was decoded and still never
+appeared. Three separate readings were wrong, each confirmed against the source
+or against the console's own memory.
+
+### The camera matrix has three signs we did not have
+
+`g_battle_camera_matrix` (0x80098a24), read out of a saved Gariland state at
+tilt low and the isometric yaw:
+
+    [ 2896     0  -2892 ]     / 4096 = [  0.707   0.000  -0.706 ]
+    [-1292  3661  -1294 ]             [ -0.315   0.894  -0.316 ]
+    [ 2584  1830   2588 ]             [  0.631   0.447   0.632 ]
+
+A plain `Rx(pitch) * Ry(yaw)` gives the x of the depth row, and the z of the
+first row, and the x of the second, with the opposite sign. It did not show on
+anything checked so far because almost every effect moves along world y, where
+the signs agree. It showed on the rock, which is born 1,354 units up:
+`battle_effect_render_particle_sprite` ends with `if (depth < 0) return;`, and
+the wrong row put it just below zero.
+
+### The depth is measured from where the camera IS
+
+That same function takes its depth from `RotTrans` through the **current**
+camera matrix, translation and all. The preview applies the effect camera to
+the screen as a 2D pan and zoom, so it has to subtract the camera's position
+before measuring depth, or every sprite is judged from a camera that never
+moved.
+
+### A held cell still moves
+
+`play_window` returns one entry per cell *change*, and a cell can be held for
+hundreds of ticks -- the rock holds one for 180 while it falls 2,400 units. The
+engine re-runs `RotTrans` every frame. One entry placed at the particle's birth
+is drawn in the wrong place for the rest of the hold and, worse, judged for
+depth there: the rock read as behind the lens on the frame it was born and was
+dropped for its entire fall. A moving particle is now emitted frame by frame
+(`_per_frame`), which takes emitter 0 from 1 draw to 107 and Meteor from 27,217
+to 30,163.
+
+
+## 30. A cell's width and height are UNSIGNED, and the wrap is the mirror
+
+`battle_effect_submit_sprite_to_ordering_table` writes
+
+    quad->u1 = quad->u3 = quad->u0 + frame->width;
+    quad->v2 = quad->v3 = quad->v0 + frame->height;
+
+into a POLY_FT4's **u8** fields, and `battle_effect_sprite_frame_t` spells both
+`width` and `height` as `u8`. Reading them signed -- which this decoder did, to
+explain the cells whose quad "mirrors" -- is wrong twice over:
+
+* the mirroring is the **wrap** of that u8 addition. u0 = 39 plus width 224
+  gives u1 = 7, and a quad whose u runs 39 -> 7 interpolates backwards. No sign
+  is involved.
+* a width read as -96 sends the window off the left of the atlas. Meteor's rock
+  carries `u, v = 8, 8` and `w, h = 160, 224`; read signed that is a window at
+  u = -88, which samples nothing, and the rock drew as a black hole with a red
+  halo around it. **Read unsigned, that window is the rock** -- an incandescent
+  mass with the same ragged dark holes the console shows.
+
+So the renderer now takes `u1 = (u + w) & 0xff` and `v1 = (v + h) & 0xff`, which
+gives the mirror where the addition carries and the true window where it does
+not.
+
+While confirming it: the dark core of those fireballs is in the data. The centre
+texel of each is palette index 255, and `palette[255] = 0x0000` -- transparent.
+The console fills it by stacking the cell's three polygons, two of them additive
+copies of each other.
