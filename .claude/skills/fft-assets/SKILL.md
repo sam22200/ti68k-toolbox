@@ -19,6 +19,13 @@ the timing no longer has to be read off a video of the console.
 Read [the disc catalogue](references/disc-map.md) for file-by-file offsets and
 formats. The rest of this page is the method and the traps.
 
+**Before reversing any FFT format, check it against the decompilation.**
+[adamrt/fft_decomp](https://github.com/adamrt/fft_decomp) is a byte-exact, 100 %
+decompilation of SCUS-94221 -- the same North American disc this skill reads. Its
+`include/fft/` headers name every structure with a `size_must_be_N` assertion, and its
+source gives behaviour. It ships no game data, so it complements the local disc rather
+than replacing it. `git clone --depth 1` is 18 MB; grep it first and guess second.
+
 ## The three questions, in order
 
 1. **Where is it?** The catalogue. Do not search the ISO by hand; every known
