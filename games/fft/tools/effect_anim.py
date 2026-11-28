@@ -429,15 +429,16 @@ def schedule(fr, seqs, cs, tl, scatter=False, project=None):
             # is only half the model.
             pw = struct.unpack_from('<3h', rec, 0x14)
             sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
-            # The engine gates on `time % spawn_interval != 0` with `time` the
-            # record's own frame counter, so a window shorter than the interval
-            # can spawn nothing at all -- which cannot be right for Stasis
-            # Sword, whose shards have interval 49 inside 2-frame keyframes and
-            # plainly appear. Until that is settled this spawns once on entering
-            # the keyframe and then every `interval` frames, which gives the
-            # right structure. The cost shows on a window of 3 frames with
-            # interval 1, where three copies a frame apart read as a doubled
-            # sprite instead of one.
+            # The spawn gate is `time % spawn_interval != 0`, and `time` is NOT
+            # the record's frame counter: the child timeline passes
+            # `step = state.child.step[i]++`, which `state.child.step[i] = 0`
+            # resets on entering each keyframe. So the count starts at 0 inside
+            # every keyframe, step 0 always passes, and an emitter spawns on the
+            # keyframe's first frame and then every `interval` frames.
+            # That is why Stasis Sword's shards appear at all with an interval
+            # of 49 inside 2-frame keyframes -- only step 0 ever passes -- and
+            # it is also why Night Sword's ball is spawned three times: interval
+            # 1 across a 3-frame keyframe. Those three are in the file.
             born = k['frm']
             while born < max(k['to'], k['frm'] + 1):
                 die = tl['child'] if life < 0 else min(tl['child'], born + life)
