@@ -64,14 +64,15 @@ lasts; each particle loops the emitter's sprite sequence for its lifetime (-1 me
 until the effect ends), and the whole thing starts after phase 1. `--flat` gives the old
 behaviour -- every sequence once from t=0 -- for comparing the two.
 
-**Still not modelled: the emitter's spawn spread and velocities**, and that is the gap
-between this and the console. They are world units the camera projects, and the sprite
-quads are screen pixels, so applying them raw is worse than leaving them out (measured on
-Night Sword: the parts pull apart and each stream smears into one saturated blob). The
-cost is visible: Night Sword's emitter 2 spawns a particle a frame for 35 frames, 315
-draws of the same cell. Scattered through its spread that is the tall white column the
-game shows; piled on one point it is a white dot. Phase 1 and phase 2 also draw nothing,
-their own channels being empty in the effects looked at so far.
+Each emitter is placed by its `spawn_position_start`, which is what separates Night
+Sword's ball overhead from its burst on the victim.
+
+**Still not modelled: the spawn spread and the particle velocities.** Night Sword's
+emitter 2 spawns a particle a frame for 35 frames -- 315 draws of one cell. Scattered
+through its spread that is the tall white column the game shows; piled on one point it is
+a white dot. Scattering in screen space only smears it, so it stays out until the camera
+matrix is here. Phase 1 and phase 2 draw nothing either, their own channels being empty
+in the effects looked at so far.
 
 The layouts above are the names of **adamrt/fft_decomp**, a byte-exact decompilation of
 SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
@@ -377,14 +378,17 @@ def schedule(fr, seqs, cs, tl):
             count = max(1, struct.unpack_from('<h', rec, 0xb0)[0])
             interval = max(1, struct.unpack_from('<h', rec, 0xb4)[0])
             life = struct.unpack_from('<h', rec, 0x94)[0]
-            # `spawn_position_start` (0x14) and the spread (0x20) say where this
-            # emitter sits and how far it scatters -- Night Sword's ball at
-            # y -112 against its bursts at y 0..-14, which is the structure the
-            # screenshots show. They are **world units**, though, projected
-            # through the camera, and the sprite quads are screen pixels.
-            # Applying them raw pulls the parts apart and smears each stream
-            # into one saturated blob: measured, worse, not shipped. `--cast`
-            # prints them; placing them needs the projection.
+            # Where this emitter sits, from `spawn_position_start` (0x14).
+            # `EFFECT_LIST_NODE_WORLD` adds the particle's world position and
+            # the sequence's own offset *before* the camera matrix and projects
+            # them with RotTrans -- no perspective divide -- so both are world
+            # units and the quad corners alone are screen pixels. FFT's battle
+            # camera scales the vertical about 1:1, which is why adding them
+            # straight works: Night Sword's ball lands high and its burst on
+            # the victim, as the screenshots show. The spread at 0x20 is not
+            # applied: scattering in screen space smears each stream into one
+            # saturated blob, and it needs the real matrix to do properly.
+            px, py = struct.unpack_from('<2h', rec, 0x14)
             born = k['frm']
             while born < max(k['to'], k['frm'] + 1):
                 die = tl['child'] if life < 0 else min(tl['child'], born + life)
@@ -396,7 +400,8 @@ def schedule(fr, seqs, cs, tl):
                     # pixels it smears every particle of a stream into one
                     # saturated blob, so it is off unless asked for.
                     for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
-                        out.append(dict(d, inst=e, seq=seq, chan=c))
+                        out.append(dict(d, inst=e, seq=seq, chan=c,
+                                        x=d['x'] + px, y=d['y'] + py))
                 born += interval
     out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
     return out
