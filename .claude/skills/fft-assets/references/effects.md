@@ -730,3 +730,44 @@ So the answer to "the main layer is too transparent", after the blend model, the
 15-bit frame buffer, the shrink-to-fit and the black background, is this: the
 layer is right and the field is missing. Transcribing those four tracks is what
 is left, and it is worth more than any sixth mesh family.
+
+
+## 22. The four colour tracks, decoded -- and why they are not the missing field
+
+`battle_effect_code_script_28_step_child_timeline` recolours four things, and
+`--tracks` now reads all four: **affected units, caster, target, screen**. They
+sit after the child timeline's five keyframe tables and three sound tracks, at
+section 7 + 0x32e; a palette track is 0xc8 bytes and the screen's 0x12c, each 33
+keyframes of `duration`, `colour[3]` as **signed bytes** and `preset`. A
+keyframe lasts `duration * 8` frames, a duration of 0 lasting one, and `preset`
+bit 7 says the colour is an **offset** applied through one of
+`battle_map_blend_background_gradient_color`'s eleven modes -- current,
+current/2, its grey, base, restore and the rest.
+
+### They were not the white field
+
+The hope was that these carried the console's bright background. They do not.
+Night Sword's screen track reads, in frames:
+
+    0..8    base/2   offset (-64, -64, -64)
+    8..40   current  set    (0, 0, 0)
+    40..48  base/2   offset (-64, -64, -64)
+    48..49  base     offset (63, 63, 63)
+    ...
+    91..595 base     offset (0, 0, 0)
+
+Overwhelmingly **negative**: the effect *darkens* what it plays over. Painting
+those offsets as a background makes the picture blacker, which is what trying it
+did -- Stasis Sword's mean luminance did not move off 5.9 against the console's
+118.1.
+
+What they modulate is the **map**: `battle_map_color_field` for the units,
+`battle_map_modify_background_gradient` for the sky. The console's bright field
+is the battlefield itself, lit, with the effect's own additive sprites
+saturating over it. A preview has no battlefield, and no track supplies one.
+Applying them would mean inventing a map to offset, so they are decoded, dumped
+and left alone.
+
+**That closes the "too transparent" thread.** The layer is right, the blend is
+right, the colours are right; what is missing is the scene underneath, and
+nothing in the effect file holds it.

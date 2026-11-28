@@ -346,5 +346,54 @@ class Curves(unittest.TestCase):
         self.assertEqual(A.curves(b'\x0f\x00\x00\x00'), [])
 
 
+class Tracks(unittest.TestCase):
+    """The child timeline's four colour tracks."""
+
+    @staticmethod
+    def section(dur, colour, preset, count, second=None):
+        """A section 7 holding one palette or background track at its place."""
+        n = A.TRACK_KEYFRAMES
+        background = second is not None
+        size = A.BACKGROUND_TRACK if background else A.PALETTE_TRACK
+        t = bytearray(size)
+        struct.pack_into('<%dh' % n, t, 0, *((dur + [0] * n)[:n]))
+        flat = [c for k in range(n) for c in (colour[k] if k < len(colour) else (0, 0, 0))]
+        struct.pack_into('<%db' % (3 * n), t, 2 * n, *flat)
+        at = 5 * n
+        if background:
+            flat2 = [c for k in range(n) for c in (second[k] if k < len(second) else (0, 0, 0))]
+            struct.pack_into('<%db' % (3 * n), t, at, *flat2)
+            at = 8 * n
+        struct.pack_into('<%dB' % n, t, at, *((preset + [0] * n)[:n]))
+        struct.pack_into('<h', t, size - 2, count)
+        base = 8 + 0x326 + (A.PALETTE_TRACK * 3 if background else 0)
+        return bytes(base) + bytes(t) + bytes(8)
+
+    def test_a_keyframe_lasts_its_duration_times_eight(self):
+        t = A.tracks(self.section([2, 0], [(1, 2, 3), (4, 5, 6)], [0x80, 0x80], 2))
+        self.assertEqual([e['frames'] for e in t['affected units']], [16, 1])
+
+    def test_bit_seven_makes_the_colour_an_offset(self):
+        t = A.tracks(self.section([1, 1], [(1, 2, 3), (4, 5, 6)], [0x85, 0x05], 2))
+        a, b = t['affected units']
+        self.assertEqual((a['offset'], a['mode']), (True, 5))
+        self.assertEqual((b['offset'], b['mode']), (False, 5))
+
+    def test_the_count_bounds_the_keyframes(self):
+        t = A.tracks(self.section([1] * 10, [(1, 1, 1)] * 10, [0] * 10, 3))
+        self.assertEqual(len(t['affected units']), 3)
+
+    def test_the_screen_track_carries_a_second_colour(self):
+        sec = self.section([1], [(7, 8, 9)], [0], 1, second=[(1, 2, 3)])
+        self.assertEqual(t0 := A.tracks(sec)['screen'][0]['second'], (1, 2, 3))
+        self.assertEqual(t0, (1, 2, 3))
+
+    def test_the_screen_colour_is_walked_by_frame(self):
+        sec = self.section([1, 1], [(10, 10, 10), (20, 20, 20)], [0x80, 0x80], 2,
+                           second=[(0, 0, 0), (0, 0, 0)])
+        self.assertEqual(A.screen_colour(A.tracks(sec), 0)[0], (20, 20, 20))
+        self.assertEqual(A.screen_colour(A.tracks(sec), 8)[0], (40, 40, 40))
+
+
 if __name__ == '__main__':
     unittest.main()
