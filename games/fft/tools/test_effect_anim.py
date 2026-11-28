@@ -4,6 +4,7 @@ import struct
 import unittest
 
 import effect_anim as A
+import effect_rip as R
 
 
 def poly(u, v, w, h, x, y):
@@ -212,6 +213,34 @@ class Scheduled(unittest.TestCase):
 
     def test_no_timeline_means_no_schedule(self):
         self.assertIsNone(A.schedule(self.fr, self.seqs, [], None))
+
+
+
+class EmbeddedData(unittest.TestCase):
+    """110 effect files are MIPS overlays that carry their data behind the code."""
+
+    @staticmethod
+    def built(prefix):
+        """`prefix` bytes, then a ten-word header and enough palette and pixels."""
+        body = bytes(0x400) + b'\x00\x00\x00\x01' + bytes(R.PALETTE_BYTES - 0x404 + 128)
+        head = struct.pack('<10I', 40, 44, 48, 52, 56, 60, 64, 68, 72, 76)
+        pad = bytes(76 - 40)                       # sections 0..8, one word each
+        return prefix + head + pad + body
+
+    def test_plain_file_starts_at_zero(self):
+        self.assertEqual(R.data_base(self.built(b'')), 0)
+
+    def test_header_found_behind_code(self):
+        code = struct.pack('<I', 0x27bdf980) * 64   # addiu $sp, $sp, -0x680, over and over
+        self.assertEqual(R.data_base(self.built(code)), len(code))
+
+    def test_code_without_data_is_none(self):
+        self.assertIsNone(R.data_base(struct.pack('<I', 0x27bdf980) * 64))
+
+    def test_a_bare_forty_is_not_a_header(self):
+        """The word 40 alone does not open a file: the nine offsets must hold up."""
+        bad = struct.pack('<10I', 40, 9, 8, 7, 6, 5, 4, 3, 2, 1) + bytes(4096)
+        self.assertIsNone(R.data_base(bad))
 
 
 if __name__ == '__main__':
