@@ -462,8 +462,22 @@ nothing about it is. The console draws at 1:1 and lets what overflows overflow.
 `--render` now grows the frame instead, and says so. Judging an effect through
 a shrink is the same mistake as judging it against black.
 
-### And one that is genuinely missing
+### The last two, since transcribed
 
-`node->screen_rotation_angle` -- a particle oriented to its velocity is drawn
-rotated -- and the ordering table's depth modes. Neither changes how bright
-anything is, which is why neither explains a faint layer.
+`node->screen_rotation_angle` and the ordering table's depth modes. Neither
+changes how bright anything is -- which is why neither explained a faint layer
+-- but both decide what a frame looks like:
+
+* **the turn.** `work_kind_flags` bit 1 orients a particle to its velocity, and
+  `submit_sprite` then turns the part's own corners by
+  `[[cos, -sin], [sin, cos]] >> 12` before adding the position. **557 of the
+  disc's 3,227 emitters set it, across 225 effects** -- Flare turns 2,862 of its
+  6,334 draws over a 180-degree spread, which is what gives its ring its
+  tangential streaks;
+* **the depth.** A sprite's ordering-table index is its projected z over four,
+  which the sequence op's third byte overrides: 1 and 5 pull it forward by 8 or
+  16, 2, 3 and 4 pin it to 8, the far end or 16. Catalogue-wide: mode 1 on
+  21,265 draws, 2 on 3,960, 0 on 1,560, 4 on 664, 5 on 109, 3 on 10. **A
+  negative index is not clamped, the sprite is dropped** (`if (depth < 0)
+  return;`). Drawing by channel order instead put the 4,743 pinned sprites in
+  the wrong layer.
