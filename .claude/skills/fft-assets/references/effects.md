@@ -397,3 +397,38 @@ is the full 360 you see on the console, and it is 64 textured quads rotated in
 data sections tell you what accompanies the effect, not what it mostly looks
 like. For the TI the arbitration is easy here, because the part the renderer
 cannot play is also the part that has no answer in four greys at 160x100.
+
+
+## 13. "Too transparent" was not a layer bug: five checks against the decompilation
+
+A main layer that reads as a ghost -- Stasis Sword's ice block, Night Sword's
+blade -- sends you looking for a lost layer. It is worth checking the pipeline
+against `fft_decomp` before changing anything, because every lever is named
+there and each one can be counted on the disc:
+
+| what | where it is decided | measured |
+|---|---|---|
+| is the part blended at all | `flags & 0x200` -> POLY_FT4 code 0x2e, else 0x2c | 22,512 of 22,916 blended; **all** of E163, E173, E015 |
+| which blend mode | the part's tpage bits 5-6 | 19,092 B+F, 2,630 B+F/4, 727 B-F, 467 B/2+F/2 |
+| which palette | `flags & 0xf` CLUT row, `& 0x10` bank, **computed, not stored** | row 0 throughout those three |
+| the tint | `battle_effect_update_node_from_work`: a curve, or neutral `0x80` | neutral is x1, as modelled |
+| per-texel opacity | the texel's bit 15 (STP) | 252 of 252 palette entries set it: nothing is opaque |
+
+All five came back negative. Note the field order while you are there:
+`battle_effect_sprite_part_t` is **`u16 flags` then `u16 tpage`** -- a decoder
+that calls the first word `tpage` has them swapped, which is survivable only as
+long as nothing reads the first word's bits.
+
+### What was really wrong, and what was not
+
+Really wrong: the renderer accumulated every part in float and clipped once at
+the end. The console writes **15 bits**, so each primitive saturates and is
+quantised to 5 bits a channel as it is drawn, in order. `_blend` does that now.
+It changes little on these two effects -- they rarely cover a pixel twice -- but
+it is the hardware's rule rather than a convenient one.
+
+Not wrong at all: the look itself. These are additive sprites, and the render
+has **nothing behind them**. Add the same frames to a background of 48 or 96 and
+the ice block reads as a solid bright mass, which is what the console shows over
+a lit battlefield. Judging an additive effect against black will always call its
+broad, dim shapes transparent. Put a floor under them before deciding.

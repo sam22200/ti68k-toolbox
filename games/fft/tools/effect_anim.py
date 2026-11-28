@@ -617,15 +617,20 @@ def _atlas_rgb(raw):
 
 
 # The tpage's bits 5-6 are the hardware's semi-transparency mode, and the parts
-# do not all share one: of the disc's 11,233 cells, 11,743 polygons are B+F,
-# 2,041 are B+F/4, 499 B-F and 341 B/2+F/2. Adding them all at full strength
-# burns Night Sword's ball white -- its first cell is a quarter-strength one.
-# B/2+F/2 halves what is underneath too; this only scales what is added.
-BLEND = {0: 0.5, 1: 1.0, 2: -1.0, 3: 0.25}
+# do not all share one: of the disc's 22,916 polygons 19,092 are B+F, 2,630 are
+# B+F/4, 727 B-F and 467 B/2+F/2. `_blend` applies them; B/2+F/2 halves what is
+# underneath as well, which scaling the addend alone could not express.
+# Whether a part is blended at all is its own `flags & 0x200`, not the mode:
+# 404 of the 22,916 are opaque (none in Stasis Sword, Night Sword or Holy).
 
 
-def _tri(acc, tex, alpha, dst, src, cell, blend=1.0):
-    """Add one textured triangle to the accumulator, PS1-style (additive)."""
+def _tri(acc, cov, tex, alpha, dst, src, cell):
+    """Rasterise one textured triangle into a primitive's own colour and coverage.
+
+    No blending here: the GPU blends a whole primitive against the frame buffer
+    once (`_quad`), and compositing triangle by triangle would blend the shared
+    edge twice.
+    """
     import numpy as np
     (x0, y0), (x1, y1), (x2, y2) = dst
     det = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
@@ -652,8 +657,44 @@ def _tri(acc, tex, alpha, dst, src, cell, blend=1.0):
     u0, v0, u1, v1 = cell
     su = np.clip(su.astype(int), u0, u1)
     sv = np.clip(sv.astype(int), v0, v1)
-    a = (alpha[sv, su] * inside)[:, :, None]
-    acc[lo_y:hi_y, lo_x:hi_x] += tex[sv, su] * a * blend
+    a = alpha[sv, su] * inside
+    box = cov[lo_y:hi_y, lo_x:hi_x]
+    fresh = (a > 0) & (box == 0)
+    box[fresh] = 1
+    acc[lo_y:hi_y, lo_x:hi_x][fresh] = tex[sv, su][fresh]
+
+
+def _blend(fb, prim, cov, abe, mode):
+    """Composite one primitive into the frame buffer the way the GPU does.
+
+    `battle_effect_submit_sprite_to_ordering_table` gives every part a POLY_FT4
+    with code 0x2c, or 0x2e when `flags & 0x200`: 0x2e is the only one the
+    hardware blends, and then the tpage's bits 5-6 pick which of the four modes.
+
+    **The frame buffer is 15 bits.** Each primitive's result saturates and is
+    quantised to 5 bits a channel the moment it is written, in draw order.
+    Accumulating every part in float and clipping once at the end -- which is
+    what this did -- leaves a wide, dim shape dim: on the console the same shape
+    reaches white in two or three passes, because each pass clamps at 31. That is
+    the whole of the "the main layer is too transparent" look.
+    """
+    import numpy as np
+    m = cov > 0
+    if not m.any():
+        return
+    f = np.floor(prim[m] / 8.0)              # 5 bits a channel, as the GPU sees it
+    b = np.floor(fb[m] / 8.0)
+    if not abe:
+        out = f                              # code 0x2c: the texel replaces
+    elif mode == 0:
+        out = b / 2 + f / 2
+    elif mode == 1:
+        out = b + f
+    elif mode == 2:
+        out = b - f
+    else:
+        out = b + f / 4
+    fb[m] = np.clip(np.floor(out), 0, 31) * 8
 
 
 def extent(fr, tl):
@@ -695,8 +736,10 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
               % (anchor[0], anchor[1], x0, x1, y0, y1))
     last = max(d['t'] + d['ticks'] for d in tl)
     out = []
+    prim = np.zeros((size[1], size[0], 3), dtype=float)
+    cov = np.zeros((size[1], size[0]), dtype=float)
     for t in range(0, last, 2):                        # 60 Hz ticks, 30 fps frames
-        acc = np.zeros((size[1], size[0], 3), dtype=float)
+        fb = np.zeros((size[1], size[0], 3), dtype=float)
         for d in tl:
             if not (d['t'] <= t < d['t'] + max(d['ticks'], 1)):
                 continue
@@ -707,12 +750,15 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                 s = [(u, v), (u + w, v), (u, v + h), (u + w, v + h)]
                 cell = (min(u, u + w), min(v, v + h),
                         max(u, u + w) - 1, max(v, v + h) - 1)
-                bl = BLEND.get((p['clut'] >> 5) & 3, 1.0)
                 tint = d.get('tint')
                 tx = tex * np.array(tint) if tint else tex
-                _tri(acc, tx, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell, bl)
-                _tri(acc, tx, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell, bl)
-        out.append(np.clip(acc, 0, 255).astype(np.uint8))
+                # One POLY_FT4 a part, rasterised whole and then blended once.
+                prim[:] = 0
+                cov[:] = 0
+                _tri(prim, cov, tx, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell)
+                _tri(prim, cov, tx, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell)
+                _blend(fb, prim, cov, (p['tpage'] & 0x200) != 0, (p['clut'] >> 5) & 3)
+        out.append(np.clip(fb, 0, 255).astype(np.uint8))
     return out
 
 
