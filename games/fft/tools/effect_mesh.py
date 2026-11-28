@@ -90,7 +90,16 @@ class RingMeshView:
 
 
 class RingStack:
-    """One live ring stack: the work block the overlay keeps between frames."""
+    """One live ring stack: the work block the overlay keeps between frames.
+
+    `RingMesh` is the same renderer with other counts, so the lattice is built
+    from these three: nine rows of eight for the stack, three rows of
+    thirty-two for the mesh, and the mesh shifts its height step left 2.
+    """
+
+    ROWS = RING_ROWS
+    SEGMENTS = RING_SEGMENTS
+    HEIGHT_SHIFT = 0
 
     def __init__(self, entry, bright, curves=()):
         self.e = entry if isinstance(entry, RingMeshView) else RingMeshView(entry)
@@ -108,34 +117,25 @@ class RingStack:
         radius = lerp(e.radius_start, e.radius_end, j)
         j = curve(self.curves, e.wave_curves & 0xf, frame)
         gx = lerp(e.growth_start, e.growth_end, j)
-        gy = lerp(e.height_start, e.height_end, j)
+        gy = lerp(e.height_start, e.height_end, j) << self.HEIGHT_SHIFT
         gz = lerp(e.row_radius_start, e.row_radius_end, j)
         j = curve(self.curves, (e.wave_curves >> 4) & 0xf, frame)
         sx = lerp(e.growth_step_start, e.growth_step_end, j)
-        sy = lerp(e.height_step_start, e.height_step_end, j)
+        sy = lerp(e.height_step_start, e.height_step_end, j) << self.HEIGHT_SHIFT
         sz = lerp(e.row_radius_step_start, e.row_radius_step_end, j)
         j = curve(self.curves, e.scroll_curves >> 28, frame)
         self.spin = (self.spin + lerp(e.spin_speed_start, e.spin_speed_end, j)) & 0xfff
-        sin0, sin1 = rsin(self.spin), rsin(self.spin + 0x200)
-        cos0, cos1 = rcos(self.spin), rcos(self.spin + 0x200)
+        step = 0x1000 // self.SEGMENTS
         pts, n, k = [], 0, 0
-        for _ in range(RING_ROWS):
+        for _ in range(self.ROWS):
             r = radius + ((k + self.radius_offset) >> 8)
-            a = (cos0 * r) >> 12
-            b = (sin0 * r) >> 12
-            c = (cos1 * r) >> 12
-            d = (sin1 * r) >> 12
             y = n >> 8
-            # The eight points are two rsin/rcos pairs mirrored into four quadrants.
-            row = [None] * RING_SEGMENTS
-            row[0] = (a, y, b)
-            row[1] = (c, y, d)
-            row[2] = (-b, y, a)
-            row[3] = (-d, y, c)
-            row[4] = (-a, y, -b)
-            row[5] = (-c, y, -d)
-            row[6] = (b, y, -a)
-            row[7] = (d, y, -c)
+            # The source builds one quadrant and mirrors or rotates it into the
+            # other three; rotating by a quarter turn is adding 0x400 to the
+            # angle, so walking the whole turn in `step` gives the same points.
+            row = [(((rcos(self.spin + step * i) * r) >> 12), y,
+                    ((rsin(self.spin + step * i) * r) >> 12))
+                   for i in range(self.SEGMENTS)]
             pts.append(row)
             gy += sy
             gz += sz
@@ -182,9 +182,9 @@ class RingStack:
         row = self.bright[e.brightness_row % len(self.bright)]
         scr = [[project(*p) for p in r] for r in pts]
         out = []
-        for j in range(RING_SEGMENTS):
-            for i in range(RING_SEGMENTS):
-                nxt = (i + 1) % RING_SEGMENTS
+        for j in range(self.ROWS - 1):
+            for i in range(self.SEGMENTS):
+                nxt = (i + 1) % self.SEGMENTS
                 c = [scr[j + 1][i], scr[j + 1][nxt], scr[j][i], scr[j][nxt]]
                 depth = (c[0][2] + c[1][2] + c[2][2] + c[3][2]) // 16
                 if not 0 <= depth < OT_DEPTH_LIMIT:
@@ -202,6 +202,109 @@ class RingStack:
                     abe=(e.texture_page_flags & 4) == 0,
                     mode=e.texture_page_flags & 3))
         out.sort(key=lambda q: -q['depth'])        # the ordering table, back to front
+        return out
+
+
+class RingMesh(RingStack):
+    """`effect_e015_update_ring_mesh_state`: the ring that turns around the target.
+
+    The ring stack's sibling, and the same geometry view. Three lattice rows of
+    nine points cover one quadrant 0x80 apart; the source builds that quadrant
+    and rotates it into the other three, which is the same 32 points as walking
+    the whole turn in 0x80 steps, so they are walked. Two rings of 32 quads, and
+    **the height step is shifted left 2** where the stack takes it raw.
+    """
+
+    ROWS = 3
+    SEGMENTS = 32
+    HEIGHT_SHIFT = 2
+
+
+class QuadGrid4x4:
+    """`effect_e015_update_textured_quad_grid_4x4`: the wash over the whole scene.
+
+    Sixteen POLY_GT4 in a 4x4 grid of 64-pixel cells, **in screen space** -- the
+    source writes their corners once in phase 1 and never projects them -- with
+    the texture window scrolling along a speed and an angle and each quad row
+    tinted from `g_effect_gfx_brightness_table`. That is Holy's halo: it does not
+    move with the camera because it never meets it.
+    """
+
+    CELL = 0x40
+    ORIGIN_X = 0x80
+
+    def __init__(self, raw, bright, curves=()):
+        self.raw = raw
+        self.bright = bright          # g_effect_gfx_brightness_table, 5 wide
+        self.curves = curves
+        self.scroll_u = 0
+        self.scroll_v = 0
+        f = lambda fmt, off: struct.unpack_from(fmt, raw, off)[0]
+        self.flags = f('<H', 0x06)
+        self.curve0 = f('<I', 0x08)
+        self.colour_curves = f('<I', 0x10)
+        self.texture_u = f('<H', 0x14)
+        self.texture_v = f('<H', 0x16)
+        self.angle_start = f('<h', 0x2e)
+        self.angle_end = f('<h', 0x34)
+        self.page_flags = f('<h', 0x4c)
+        self.brightness_row = f('<h', 0x4e)
+        self.ot_depth = f('<h', 0x54)
+        self.speed_start = f('<h', 0x5c)
+        self.speed_end = f('<h', 0x60)
+        self.tex_w = f('<h', 0xa8) // 2
+        self.tex_h = f('<h', 0xaa) // 2
+
+    def step(self, frame):
+        """Advance the texture window; (u, v) of its top left."""
+        j = curve(self.curves, self.curve0 >> 28, frame)
+        speed = lerp(self.speed_start, self.speed_end, j) << 4
+        j = curve(self.curves, (self.curve0 >> 8) & 0xf, frame)
+        angle = lerp(self.angle_start, self.angle_end, j)
+        self.scroll_u += (rcos(angle) * speed) >> 12
+        while self.tex_w and self.scroll_u >= self.tex_w << 12:
+            self.scroll_u -= self.tex_w << 12
+        while self.tex_w and self.scroll_u < 0:
+            self.scroll_u += self.tex_w << 12
+        self.scroll_v += (rsin(angle) * speed) >> 12
+        while self.tex_h and self.scroll_v >= self.tex_h << 12:
+            self.scroll_v -= self.tex_h << 12
+        while self.tex_h and self.scroll_v < 0:
+            self.scroll_v += self.tex_h << 12
+        return (self.scroll_u >> 12) + self.texture_u, (self.scroll_v >> 12) + self.texture_v
+
+    def colour(self, frame):
+        if not (self.flags & GEOMETRY_FLAG_COLOUR_CURVES):
+            return 0x80, 0x80, 0x80
+        k = self.colour_curves & 0xfff
+        return (palette(self.curves, k & 0xf, frame),
+                palette(self.curves, (k >> 4) & 0xf, frame),
+                palette(self.curves, (k >> 8) & 0xf, frame))
+
+    def quads(self, frame):
+        """The sixteen quads, all at the entry's own ordering-table depth."""
+        u, v = self.step(frame)
+        red, green, blue = self.colour(frame)
+        row = self.bright[self.brightness_row % len(self.bright)]
+        depth = self.ot_depth
+        depth = 1 if depth <= 0 else min(depth, OT_DEPTH_LIMIT - 1)
+        out = []
+        for qr in range(4):
+            for qc in range(4):
+                x0 = (qc << 6) + self.ORIGIN_X
+                y0 = qr << 6
+                top, bot = row[qr], row[qr + 1]
+                def tint(k):
+                    return ((k * red) >> 12, (k * green) >> 12, (k * blue) >> 12)
+                out.append(dict(
+                    pts=[(x0, y0), (x0 + self.CELL, y0),
+                         (x0, y0 + self.CELL), (x0 + self.CELL, y0 + self.CELL)],
+                    uv=[(u, v), (u + self.tex_w, v),
+                        (u, v + self.tex_h), (u + self.tex_w, v + self.tex_h)],
+                    rgb=[tint(top), tint(top), tint(bot), tint(bot)],
+                    depth=depth, screen=True,
+                    abe=(self.page_flags & 4) == 0,
+                    mode=self.page_flags & 3))
         return out
 
 

@@ -765,7 +765,7 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def mesh_actors(raw, sec, cur):
+def mesh_actors(raw, sec, cur, all_kinds=False):
     """The overlay's own mesh renderers, and when the timeline runs each of them.
 
     `battle_effect_code_script_28_step_child_timeline` is explicit: a keyframe's
@@ -803,9 +803,14 @@ def mesh_actors(raw, sec, cur):
     if not slots:
         return out
     order = sorted(set(slots.values()))           # ids ascending, handlers in address order
-    bright = effect_mesh.brightness_table(raw, 0x801C573C - 0x801C2500)
+    # E015's three tables, at the addresses `target/effect.yaml` gives them.
+    # Each renderer reads its own: nine columns for the stack's lattice rows,
+    # three for the ring's, five for the grid's four quad rows.
+    kinds = [(effect_mesh.RingStack, 0x801C573C, 9),
+             (effect_mesh.RingMesh, 0x801C5814, 3),
+             (effect_mesh.QuadGrid4x4, 0x801C585C, 5)]
     ph = phases(sec[7])
-    if not ph or not bright:
+    if not ph:
         return out
     for chan in ph['child_channels']:
         for kf in chan or ():
@@ -813,13 +818,23 @@ def mesh_actors(raw, sec, cur):
             if not sel or kf['emitter'] is None:
                 continue
             routine = slots.get(sel - 1)
-            if routine is None or order.index(routine) != 0:
-                continue                          # only the first handler, the ring stack
-            rec = sec[3][20 + 196 * kf['emitter']:20 + 196 * (kf['emitter'] + 1)]
-            if len(rec) < 196:
+            if routine is None or order.index(routine) >= len(kinds):
                 continue
-            out.append(dict(frm=kf['frm'], to=kf['to'],
-                            stack=effect_mesh.RingStack(rec, bright, cur)))
+            # Only the ring stack is wired by default. The slot-to-handler
+            # reading -- ids ascending onto the overlay's functions in address
+            # order -- is cross-checked for slot 0 (the timeline drives entry 4
+            # through it for a hundred frames, and entry 4 is the one tall thin
+            # lattice) and for slot 0 ALONE. Taken at face value for slots 1 and
+            # 2 it paints flat slabs across the frame, so it is wrong there, or
+            # those entries want another view. `all_kinds` shows it anyway.
+            if order.index(routine) and not all_kinds:
+                continue
+            cls, addr, width = kinds[order.index(routine)]
+            bright = effect_mesh.brightness_table(raw, addr - 0x801C2500, width=width)
+            rec = sec[3][20 + 196 * kf['emitter']:20 + 196 * (kf['emitter'] + 1)]
+            if len(rec) < 196 or not bright:
+                continue
+            out.append(dict(frm=kf['frm'], to=kf['to'], stack=cls(rec, bright, cur)))
     return out
 
 
@@ -831,7 +846,8 @@ def p_pts(fr, d):
     return out
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False,
+           all_kinds=False):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
@@ -872,7 +888,7 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
     out = []
     prim = np.zeros((size[1], size[0], 3), dtype=float)
     cov = np.zeros((size[1], size[0]), dtype=float)
-    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4])) if raw_sections else []
+    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4]), all_kinds) if raw_sections else []
     flat = camera()
 
     def project3(x, y, z):
@@ -911,8 +927,18 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
         for m in mesh:
             if not (m['frm'] <= f30 < m['to']):
                 continue
-            for q in m['stack'].quads(f30 - m['frm'], project3):
-                d = [(anchor[0] + x * scale, anchor[1] + y * scale) for x, y in q['pts']]
+            st = m['stack']
+            qs = (st.quads(f30 - m['frm']) if isinstance(st, effect_mesh.QuadGrid4x4)
+                  else st.quads(f30 - m['frm'], project3))
+            for q in qs:
+                if q.get('screen'):
+                    # Screen-space quads: the source writes their corners once and
+                    # never projects them, so they sit where the console's own
+                    # drawing area puts them -- centred here on our frame.
+                    off = ((size[0] - 256) // 2, (size[1] - 256) // 2)
+                    d = [(off[0] + x, off[1] + y) for x, y in q['pts']]
+                else:
+                    d = [(anchor[0] + x * scale, anchor[1] + y * scale) for x, y in q['pts']]
                 uv = q['uv']
                 cell = (min(p[0] for p in uv), min(p[1] for p in uv),
                         max(p[0] for p in uv) - 1, max(p[1] for p in uv) - 1)
@@ -1041,6 +1067,8 @@ def main():
                     help='the render canvas; by default 256x240, grown to fit the effect at 1:1')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
+    ap.add_argument('--mesh-all', action='store_true', dest='mesh_all',
+                    help='run every native mesh handler, not just the ring stack')
     ap.add_argument('--no-scatter', action='store_true', dest='no_scatter',
                     help='ignore the emitters\' spawn spread, piling each stream on one point')
     ap.add_argument('--flat', action='store_true',
@@ -1137,7 +1165,7 @@ def main():
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
                      None if a.flat else sec, not a.no_scatter,
-                     grow=a.size is None and not a.ti)
+                     grow=a.size is None and not a.ti, all_kinds=a.mesh_all)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
