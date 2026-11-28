@@ -396,19 +396,58 @@ def _rand3(key):
     return out
 
 
-def _ellipsoid(sx, sy, sz, key):
-    """A repeatable point inside the spawn spread's ellipsoid."""
-    h = 2166136261
-    for _ in range(24):
-        v = []
-        for i in range(3):
-            for q in key + (i,):
-                h = ((h ^ (q & 0xffff)) * 16777619) & 0xffffffff
-            v.append(((h >> 8) & 0xffff) / 65535.0 * 2 - 1)
-        if v[0] ** 2 + v[1] ** 2 + v[2] ** 2 <= 1:
-            return v[0] * sx, v[1] * sy, v[2] * sz
-        key = (key[0] + 7919,) + key[1:]
-    return 0, 0, 0
+def _spawn_offset(spread, box, key):
+    """Where in its spread a particle is born.
+
+    `EFFECT_EMITTER_BOX_SPREAD` (0x0100 of the placement flags) says "spawn
+    inside the spread box; **clear, on the spread ellipsoid**". Clear is the
+    common case -- 1,429 of the disc's 1,893 emitters against 464 boxes -- and
+    filling the volume instead of its surface piles every particle of a stream
+    near one point, which is what burned Night Sword's ball white.
+    """
+    sx, sy, sz = spread
+    if not (sx or sy or sz):
+        return 0.0, 0.0, 0.0
+    v = _rand3(key)
+    if box:
+        return v[0] * sx, v[1] * sy, v[2] * sz
+    n = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2) or 1.0   # onto the surface
+    return v[0] / n * sx, v[1] / n * sy, v[2] / n * sz
+
+
+def _motion(rec, key, n):
+    """A particle's world offset after `n` frames: velocity, acceleration, homing.
+
+    `effect_particle_integrate_motion` is `position += velocity`, then
+    `velocity += acceleration` once the inertia terms cancel (the engine's
+    threshold starts at 0), then `acceleration += acceleration_step` -- or, when
+    `homing_strength` is set, the acceleration is steered toward the target with
+    the `(step - delta) * strength / 127 + delta` of the original, `strength`
+    being -128 without a homing curve. Gravity is a global an opcode sets and is
+    not modelled.
+    """
+    vel = list(_velocity(rec, key))
+    if n <= 0:
+        return 0.0, 0.0, 0.0
+    acc = [struct.unpack_from('<2h', rec, 0x64 + 4 * k)[0] / 4096.0 for k in range(3)]
+    step = [struct.unpack_from('<2h', rec, 0x7c + 4 * k)[0] / 4096.0 for k in range(3)]
+    homing = struct.unpack_from('<2h', rec, 0xb8)[0] / 4096.0
+    target = [v / 1.0 for v in struct.unpack_from('<3h', rec, 0x9c)]
+    pos = [0.0, 0.0, 0.0]
+    for _ in range(min(n, 600)):
+        for k in range(3):
+            pos[k] += vel[k]
+            vel[k] += acc[k]
+        if homing:
+            d = [target[k] - pos[k] for k in range(3)]
+            m = math.sqrt(sum(x * x for x in d))
+            d = [x / m * homing for x in d] if m else [0.0, 0.0, 0.0]
+            for k in range(3):
+                acc[k] += (step[k] - d[k]) * -128 / 127.0 + d[k]
+        else:
+            for k in range(3):
+                acc[k] += step[k]
+    return pos[0], pos[1], pos[2]
 
 
 def play_window(ops, nframes, t0, t1, animation_driven):
@@ -454,7 +493,7 @@ def play_window(ops, nframes, t0, t1, animation_driven):
     return out
 
 
-def schedule(fr, seqs, cs, tl, scatter=False, project=None, cur=None):
+def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
     """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
 
     Each keyframe of a particle channel spawns its emitter's `particle_count`
@@ -492,6 +531,7 @@ def schedule(fr, seqs, cs, tl, scatter=False, project=None, cur=None):
             # is only half the model.
             pw = struct.unpack_from('<3h', rec, 0x14)
             sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
+            box = struct.unpack_from('<H', rec, 0x02)[0] & 0x0100
             # The spawn gate is `time % spawn_interval != 0`, and `time` is NOT
             # the record's frame counter: the child timeline passes
             # `step = state.child.step[i]++`, which `state.child.step[i] = 0`
@@ -508,15 +548,15 @@ def schedule(fr, seqs, cs, tl, scatter=False, project=None, cur=None):
                 t0 = (tl['phase1'] + born) * 2          # frames at 30 fps -> 60 Hz ticks
                 t1 = (tl['phase1'] + die) * 2
                 for i in range(count):
-                    j = _ellipsoid(sw[0], sw[1], sw[2], (e, born, i)) if scatter \
-                        else (0, 0, 0)
-                    vel = _velocity(rec, (e, born, i))
+                    key = (e, born, i)
+                    j = _spawn_offset(sw, box, key) if scatter else (0, 0, 0)
                     for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
                         n = (d['t'] - t0) // 2          # frames this one has lived
                         tint = _tint(rec, cur, n)
-                        ox, oy = project(pw[0] + j[0] + vel[0] * n,
-                                         pw[1] + j[1] + vel[1] * n,
-                                         pw[2] + j[2] + vel[2] * n)
+                        m = _motion(rec, key, n)
+                        ox, oy = project(pw[0] + j[0] + m[0],
+                                         pw[1] + j[1] + m[1],
+                                         pw[2] + j[2] + m[2])
                         sx, sy = project(d['x'], d['y'])
                         out.append(dict(d, inst=e, seq=seq, chan=c, tint=tint,
                                         x=ox + sx, y=oy + sy))
@@ -620,7 +660,7 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=False):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
@@ -783,9 +823,8 @@ def main():
     ap.add_argument('--size', default='256x240', help='the render canvas (default 256x240)')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
-    ap.add_argument('--scatter', action='store_true',
-                    help="spread each spawn through the emitter's ellipsoid "
-                         '(half a model without the particle velocities)')
+    ap.add_argument('--no-scatter', action='store_true', dest='no_scatter',
+                    help='ignore the emitters\' spawn spread, piling each stream on one point')
     ap.add_argument('--flat', action='store_true',
                     help='ignore the timeline: play every sequence once from t=0')
     ap.add_argument('--ti', action='store_true',
@@ -879,7 +918,7 @@ def main():
             w, h = TI_W, TI_H
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
-                     None if a.flat else sec, a.scatter)
+                     None if a.flat else sec, not a.no_scatter)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
