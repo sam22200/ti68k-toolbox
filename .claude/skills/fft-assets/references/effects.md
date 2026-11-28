@@ -700,3 +700,33 @@ glow and the healing number. Of the brightest pixels at the flash:
 the file had already said so (`colour_curves = 0x66e` takes red from row 14, and
 row 14 is all zeros), and the console agrees. An effect's colour is a
 measurement, like everything else here.
+
+
+## 21. The two swords on the console: same shapes, and a field we never draw
+
+`capture_ability.py OUT SET INDEX` stages any ability the same way -- Stasis
+Sword is `0x1d 0`, Night Sword `0x20 0`, Cure 4 `0x0a 3`.
+
+| | console | our render |
+|---|---|---|
+| Stasis Sword, its pillar at full height | **118.1** mean luminance | **5.9** |
+| Night Sword, its blade at full height | **186.0** | **14.4** |
+
+The shapes match and the colours match: the console's ice pillar is the same
+white-blue column our decoder draws, its brightest pixels measuring RGB
+(185, 223, 253). What does not match is everything around it. **The console
+whitens the whole field while the effect plays** -- Night Sword's terrain, units
+and sky all go white -- and the blade then sits on a lit scene, where ours sits
+on nothing. Twenty to thirty times the luminance, from the background alone.
+
+That whitening is not bloom and not an artefact: it is the effect's own
+**colour tracks**. `battle_effect_code_script_28_step_child_timeline` recolours
+"the affected units, the caster, the current target and the screen" from four
+tracks of the timeline, each with its own keyframes, duration and preset -- the
+state for them (`color_keyframe[4]`, `color_remaining[4]`) is decoded here and
+**nothing applies it**.
+
+So the answer to "the main layer is too transparent", after the blend model, the
+15-bit frame buffer, the shrink-to-fit and the black background, is this: the
+layer is right and the field is missing. Transcribing those four tracks is what
+is left, and it is worth more than any sixth mesh family.
