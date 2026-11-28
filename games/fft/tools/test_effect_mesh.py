@@ -28,6 +28,17 @@ class Helpers(unittest.TestCase):
         self.assertEqual(M.curve([[7, 8]], 0, 0), 0)
         self.assertEqual(M.curve([[7, 8]], 1, 1), 8)
 
+    def test_the_colour_curves_are_read_straight(self):
+        """They are not READ_CURVE: row 0 is a real row.
+
+        The source indexes `g_effect_palette_table[k & 0xf]` with the nibble
+        itself. Subtracting one there turned every ring stack black, Holy's beam
+        included, and the geometry was right the whole time.
+        """
+        self.assertEqual(M.palette([[9, 10], [20]], 0, 0), 9)
+        self.assertEqual(M.palette([[9, 10], [20]], 1, 0), 20)
+        self.assertEqual(M.palette([[9]], 5, 0), 0)          # past the table
+
     def test_a_whole_turn_is_4096(self):
         self.assertEqual(M.rcos(0), 4096)
         self.assertEqual(M.rsin(1024), 4096)         # a quarter turn
@@ -86,6 +97,13 @@ class Quads(unittest.TestCase):
         # the last segment of ring 0 joins point 7 back to point 0
         last = q[M.RING_SEGMENTS - 1]
         self.assertEqual(len(last['pts']), 4)
+
+    def test_colour_curves_tint_the_whole_stack(self):
+        e = entry(radius_start=10, radius_end=10, flags=M.GEOMETRY_FLAG_COLOUR_CURVES,
+                  colour_curves=0x012)
+        s = M.RingStack(e, FLAT, [[0x40], [0x80], [0xc0]])
+        # red takes the low nibble, green the next, blue the high byte
+        self.assertEqual(s.colour(0), (0xc0, 0x80, 0x40))
 
     def test_neutral_colour_without_the_curve_flag(self):
         s = M.RingStack(entry(radius_start=10, radius_end=10), FLAT)
