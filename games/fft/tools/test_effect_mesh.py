@@ -241,5 +241,83 @@ class Spawn(unittest.TestCase):
             self.assertNotEqual(a[0]['pts'][0], b[0]['pts'][0])
 
 
+class Dome(unittest.TestCase):
+    """The summon dome: nine rows that narrow and climb instead of stacking."""
+
+    @staticmethod
+    def dome(**kw):
+        return M.SummonMesh(entry(**kw), [[0x1000] * 9])
+
+    def test_nine_rows_of_sixteen(self):
+        pts = self.dome(radius_start=200, radius_end=200,
+                        height_start=0x100, height_end=0x100).lattice(0)
+        self.assertEqual(len(pts), 9)
+        self.assertTrue(all(len(r) == 16 for r in pts))
+
+    def test_the_ring_narrows_with_its_row(self):
+        """`k = (radius * rcos(row << 7)) >> 12`: row 8 is a quarter turn, so zero."""
+        pts = self.dome(radius_start=200, radius_end=200,
+                        height_start=0x100, height_end=0x100).lattice(0)
+        wide = max(abs(p[0]) for p in pts[0])
+        narrow = max(abs(p[0]) for p in pts[8])
+        self.assertEqual(wide, 200)
+        self.assertEqual(narrow, 0)
+
+    def test_it_climbs_by_the_scaled_sine(self):
+        pts = self.dome(radius_start=200, radius_end=200,
+                        height_start=0x100, height_end=0x100).lattice(0)
+        ys = [r[0][1] for r in pts]
+        self.assertEqual(ys[0], 0)                       # sin 0
+        self.assertTrue(ys[8] < ys[4] < ys[0])           # negative is upward
+
+    def test_one_hundred_and_twenty_eight_quads(self):
+        d = self.dome(radius_start=200, radius_end=200,
+                      height_start=0x100, height_end=0x100)
+        self.assertEqual(len(d.quads(0, lambda x, y, z: (x, y, 64))), 8 * 16)
+
+
+class Polar(unittest.TestCase):
+    """The polar mesh: four quadrants of five rings of four, in screen space."""
+
+    @staticmethod
+    def polar(**kw):
+        raw = bytearray(196)
+        off = {'radius_start': ('<h', 0x20), 'radius_end': ('<h', 0x26),
+               'angle_start': ('<h', 0x44), 'angle_end': ('<h', 0x48),
+               'page_flags': ('<H', 0x4c), 'ot_depth': ('<h', 0x54),
+               'tex_w': ('<h', 0xa8), 'tex_h': ('<h', 0xaa)}
+        for k, v in kw.items():
+            fmt, at = off[k]
+            struct.pack_into(fmt, raw, at, v)
+        return M.PolarMesh(bytes(raw), [[0x1000] * 6])
+
+    def test_six_rings_of_five_points(self):
+        r = self.polar(radius_start=100, radius_end=100).rings()
+        self.assertEqual(len(r), M.PolarMesh.RINGS)
+        self.assertTrue(all(len(p) == M.PolarMesh.POINTS for p in r))
+
+    def test_the_fifth_point_closes_the_quadrant(self):
+        """`p[4] = (-p[0].y, p[0].x)` -- the first point turned a quarter."""
+        r = self.polar(radius_start=100, radius_end=100).rings()
+        self.assertEqual(r[0][4], (-r[0][0][1], r[0][0][0]))
+
+    def test_eighty_quads_in_screen_space(self):
+        q = self.polar(radius_start=100, radius_end=100, tex_w=32, tex_h=32,
+                       ot_depth=40).quads(0)
+        self.assertEqual(len(q), 4 * 5 * 4)
+        self.assertTrue(q[0]['screen'])
+
+    def test_the_depth_floor_is_four(self):
+        self.assertEqual(self.polar(radius_start=10, radius_end=10, tex_w=8, tex_h=8,
+                                    ot_depth=0).quads(0)[0]['depth'], 4)
+
+    def test_its_own_frame_counter_advances_once_an_update(self):
+        p = self.polar(radius_start=10, radius_end=10, tex_w=8, tex_h=8, ot_depth=40)
+        self.assertEqual(p.frame, 0)
+        p.quads(0)
+        p.quads(0)
+        self.assertEqual(p.frame, 2)
+
+
 if __name__ == '__main__':
     unittest.main()
