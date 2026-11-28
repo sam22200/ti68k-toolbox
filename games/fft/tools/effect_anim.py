@@ -472,16 +472,34 @@ def timeline(fr, seqs, cs):
 # ---------------------------------------------------------------- rendering
 
 def _atlas_rgb(raw):
-    """The effect's own atlas as float RGB and alpha arrays, from section 9."""
+    """The atlas as RGB and a draw mask, blended the way the hardware does.
+
+    The parts carry `EFFECT_SPRITE_PART_FLAG_SEMI_TRANSPARENT` and a tpage whose
+    blend mode is B+F, so a texel **adds its own colour, whole**. `effect_rip`'s
+    alpha -- brightness/2 for a flagged colour -- was invented to make an atlas
+    legible, and weighting by it keeps bright edges while dimming the body: the
+    three copies of Night Sword's ball, superposed exactly, then read as one
+    ball inside two ghost outlines instead of saturating into one.
+
+    Two colours are not drawn: palette index 0, and 0xFFFF wherever it appears.
+    In Stasis Sword's blade 0xFFFF is 58 texels, **every one of them on the
+    silhouette's edge** and a quarter of that edge -- a dotted white outline
+    the console does not show. Treating it as a colour draws that outline.
+    """
     import numpy as np
     got = effect_rip.atlas(raw)
     if not got:
         return None
     w, h, pixels, colours = got
-    lut = np.array([effect_rip.rgba(colours, i) for i in range(256)], dtype=float)
+    lut = np.zeros((256, 4))
+    for i in range(1, 256):
+        c = colours[i]
+        if c == 0 or c == 0xFFFF:
+            continue
+        lut[i] = ((c & 31) << 3, ((c >> 5) & 31) << 3, ((c >> 10) & 31) << 3, 1.0)
     idx = np.frombuffer(pixels, dtype=np.uint8).reshape(h, w)
     px = lut[idx]
-    return px[:, :, :3], px[:, :, 3] / 255.0
+    return px[:, :, :3], px[:, :, 3]
 
 
 def _tri(acc, tex, alpha, dst, src, cell):
