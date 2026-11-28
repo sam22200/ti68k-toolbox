@@ -378,6 +378,12 @@ def track_offsets(tr, name, frames, phase1=0, double=False):
     """
     seq = (tr or {}).get(name) or []
     out = [(0.0, 0.0, 0.0)] * max(0, frames)
+    # `base` is `g_battle_map_background_gradient_transition.colors[i]` -- the
+    # map's **own** gradient colour, which a fade never touches -- and not the
+    # colour last applied. Taking it for the latter left Night Sword's flash red
+    # instead of white: the keyframe after it offsets `base` by (0, -128, -128),
+    # which from a constant base clamps to black rather than keeping 126 of red.
+    # A preview has no map, so its base is black and the result is the offset.
     cur = [0.0, 0.0, 0.0]
     base = [0.0, 0.0, 0.0]
     at = phase1
@@ -397,13 +403,15 @@ def track_offsets(tr, name, frames, phase1=0, double=False):
             else:
                 start = list(src)
             target = start if m == 8 else [start[k] + off[k] for k in range(3)]
+        # The fade runs over `duration * 8` frames, which is the keyframe's own
+        # length; a duration of 0 snaps and holds for its single frame.
+        target = [min(255.0, max(0.0, c)) for c in target]
         for i in range(n):
-            t = (i + 1) / float(n)
+            t = 1.0 if e['duration'] == 0 else (i + 1) / float(n)
             c = [cur[k] + (target[k] - cur[k]) * t for k in range(3)]
             if 0 <= at + i < frames:
                 out[at + i] = tuple(c)
         cur = list(target)
-        base = list(target)
         at += n
         if at >= frames:
             break

@@ -827,12 +827,29 @@ Night Sword against the console, mean luminance:
 | after it | 56 | 171 |
 
 **The blade matches to a point or two all the way up**, and the flash arrives on
-the frame it should. It comes out **red where the console is white**: the
-keyframe after the flash reads `base` as (126, 126, 126) and offsets it by
-(0, -128, -128), leaving red alone. Whether `base` is the colour just applied or
-the one in flight before the fade began is the part of
-`battle_map_blend_background_gradient_color` left unread -- and it is one read,
-not a mystery.
+the frame it should. It first came out **red where the console is white**, and
+the read settled it in one line: `base` is
+`g_battle_map_background_gradient_transition.colors[i]` -- **the map's own
+gradient colour, which a fade never touches** -- and not the colour last
+applied. Taken for the latter, the keyframe after the flash offset (126, 126,
+126) by (0, -128, -128) and kept the red; from a constant base it offsets black
+and clamps away. The same read gives the fade's length, `duration * 8` frames,
+and a duration of 0 snapping instead.
+
+With `base` read right:
+
+| | ours | console |
+|---|---|---|
+| the blade appearing | 8 | 7 |
+| rising | 9 | 8 |
+| at full height | 12 | 12 |
+| **the flash** | **165**, RGB (166, 163, 164) | **200**, white |
+| the warm tail | 106 | 171 |
+
+Three moments exact, the flash white and within a fifth. What is left of the
+difference is the base a preview does not have -- the map's gradient is black
+here -- and the console's bloom. Stasis Sword lands at 131.0 against 118.1 the
+same way.
 
 Stasis Sword comes out the other way: a peak of 159.6 against the console's
 118.1, brighter rather than dimmer, which is the same arithmetic seen from the
