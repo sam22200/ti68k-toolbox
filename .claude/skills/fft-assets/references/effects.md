@@ -498,19 +498,26 @@ The ring mesh is the stack's renderer with other counts, so they share one
 lattice; the source builds one quadrant and rotates it into the other three,
 which is the same 32 points as walking the whole turn in 0x80 steps.
 
-### What the timeline proves, and where it stops
+### Which routine is which handler: read it, do not infer it
 
 `step_child_timeline` gives `slot = (selector & 7) - 1`, and script opcode 0x06
 fills the slots (`command[1] >> 2`). Holy's four registrations hold routines 7,
-8, 9 and 8. **Which routine is which handler is an inference**: the ids are
-three ascending values, the overlay carries exactly three functions, and
-`target/effect.yaml` lists them in address order.
+8, 9 and 8, and **`g_battle_effect_file_ptrs` at 0x801b50d0 in BATTLE.BIN is a
+static table of 198 routine addresses** that answers the rest outright:
 
-For slot 0 that inference is cross-checked and holds: the timeline drives
-geometry entry 4 through it for a hundred frames, and entry 4 is the one entry
-whose lattice measures 368 units tall and 3 wide. **For slots 1 and 2 it does
-not.** Taken at face value the ring mesh and the grid paint flat slabs across
-the frame, so either the order is wrong or those entries want a different view
-over the same 196 bytes. They are behind `--mesh-all` until that is settled;
-the default renders the ring stack alone. A renderer that is wrong by default
-teaches the next reader something false.
+    [7] 0x801C2500   effect_e015_update_ring_stack_mesh_state
+    [8] 0x801C39F8   effect_e015_update_ring_mesh_state
+    [9] 0x801C4FC8   effect_e015_update_textured_quad_grid_4x4
+
+It had been inferred -- ids ascending onto the overlay's functions in address
+order -- and the inference was right, which is luck rather than method. The
+table costs one read and needs no luck.
+
+### What actually made them slabs
+
+Not the mapping. **These are POLY_GT4**: each vertex carries its own colour and
+the hardware interpolates it across the primitive. Painting the whole quad in
+one of the four turns a graded wash into a flat plate, which is what the 4x4
+grid and the ring mesh looked like, and it flattened every sprite quad too.
+`_tri` interpolates the three corner colours barycentrically now, 0x80 neutral,
+and all three renderers run by default.
