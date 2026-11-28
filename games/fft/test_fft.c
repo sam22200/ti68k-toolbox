@@ -1082,8 +1082,11 @@ static void test_ai(void)
 static void test_ai_battle(void)
 {
     u32 i, think = 0, frozen = 0, turns = 0, most = 0, run = 0, fmost = 0, frun = 0;
+    // 20000 was this cap when the test was written. The AI's turn is paced like the
+    // original now -- cursor glide, preview, ability banner -- and the whole battle takes
+    // 113,470 frames over 824 turns. The cap says "it ends", not "it ends quickly".
     sw_init(16);
-    for (i = 0; i < 20000 && st.mode != M_END; i++) {
+    for (i = 0; i < 150000 && st.mode != M_END; i++) {
         u8 a = st.ai == AI_THINK, t = st.act;
         if (a && ai_frozen()) { frozen++; if (++frun > fmost) fmost = frun; } else if (!a) frun = 0;
         sw_step(0);
@@ -1143,7 +1146,7 @@ static void test_pace(void)
         CHECKV(st.mode, M_MENU);
     }
     sw_init(16);                                          // the AI plays the whole battle
-    for (i = 0; i < 30000 && st.mode != M_END; i++) {
+    for (i = 0; i < 150000 && st.mode != M_END; i++) {
         u8 r = st.rot, aim = st.ai == AI_AIM && st.mode == M_AIM && !st.turn, at = st.ai_t;
         cx = st.cx; cz = st.cz;
         sw_step(0);
