@@ -5766,7 +5766,10 @@ void game_scenario(u16 n)
         else if (n == 51) st.unit[U_RAMZA].hp = 1;
     }
     if (n >= 53 && n <= 58) {                     // equipment and ability inspection
-        st.ai = AI_OFF; st.mode = M_STATUS; st.back = M_MENU; st.page = st.status_info = 1;
+        // The sheet's tab is st.page, and status_col follows it: 53..55 inspect a
+        // piece of equipment, so they open on Eqp., not on the ability page.
+        st.ai = AI_OFF; st.mode = M_STATUS; st.back = M_MENU; st.status_info = 1;
+        st.page = (u8)(n >= 56);
         st.sel = U_RAMZA; st.status_row = n == 53 ? EQ_WEAPON : n == 55 ? 4 : 0;
         if (n >= 56) {
             st.status_col = 1;
@@ -7359,9 +7362,16 @@ static u8 status_hand_y, status_hand_live;   // where its glove last stood
 // whole screen, which is all the sway and the sprite can reach.
 static void status_band(u8 y)
 {
-    const u8 *l = (const u8 *)W->status[0] + (u16)y * RT_PBYTES;
-    const u8 *d = (const u8 *)W->status[1] + (u16)y * RT_PBYTES;
-    u8 rows = (u8)(y + 14 > RT_H ? RT_H - y : 14);
+    const u8 *l, *d;
+    u8 rows;
+    // `RT_H - y` is unsigned: a glove below the screen wrapped it past 200 rows and
+    // copy_box wrote clean off the end of the planes, over whatever the runtime kept
+    // behind them. The Abil. page reaches that when a unit has five abilities and
+    // Defend, which makes a sixth row the layout has no room for.
+    if (y >= RT_H) return;
+    l = (const u8 *)W->status[0] + (u16)y * RT_PBYTES;
+    d = (const u8 *)W->status[1] + (u16)y * RT_PBYTES;
+    rows = (u8)(y + 14 > RT_H ? RT_H - y : 14);
     copy_box((const u16 *)l, (const u16 *)d, 0, y, 5, rows);
 }
 static u8 status_hand_row(void)
