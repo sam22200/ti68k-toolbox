@@ -355,3 +355,45 @@ what the measurement can settle.
 **Not modelled**: gravity (a global an opcode sets), and the bloom the console
 spreads over a lit scene -- which is most of what still separates the two
 pictures.
+
+
+## 12. Code is not "no data": 110 effects hide theirs behind their MIPS
+
+`effect_rip.py` used to answer "a MIPS routine, not data" for 110 of the 401
+non-empty effect files, Holy among them, and that was taken to mean those
+abilities have no art to read. It is wrong. **Every one of the 110 carries a
+complete data file after its code.** The header is the landmark: `frame_data`
+is 40, because section 0 follows the ten-word header, and the nine other
+offsets never decrease and stay inside what is left of the file. `data_base()`
+scans for it; for the 291 plain data files it returns 0 on the first word.
+**401 of 401 now decode.**
+
+### Which file an ability plays, from the disc rather than from its name
+
+Two tables in BATTLE.BIN answer it, and neither was being read:
+
+| symbol | address | contents |
+|---|---|---|
+| `g_battle_effect_ability_ids` | `0x801b63f0` | 492 s16: ability id -> effect id, masked `& 0x1ff`, negative = no effect file |
+| `g_battle_effect_disc_entries` | `0x801b53e8` | `{sector, size}` per effect id, what `battle_effect_load_lba_and_size` reads |
+
+Resolving the sector back to a file name proves the name convention instead of
+assuming it: ability 15 (Holy) -> effect 15 -> lba 61383 -> `EFFECT/E015.BIN`.
+
+### What a code overlay still will not give you
+
+Holy decodes to 60 cells, 11 sprite sequences, 16 emitters, 5 particle channels
+and a 229-frame timeline -- and its *main* image is in none of them. Its script
+registers three native handlers, and `fft_decomp` names them:
+`effect_e015_update_ring_mesh_state`, `..._ring_stack_mesh_state` and
+`..._textured_quad_grid_4x4`. The first builds a ring of 2x32 textured quads
+around the target from three lattice rows of nine points, and spins it:
+
+    work->spin = (work->spin + lerp(spin_speed_start, spin_speed_end, j)) & 0xfff
+
+`0xfff` is 4096, a whole turn, so the ring comes round every revolution -- that
+is the full 360 you see on the console, and it is 64 textured quads rotated in
+3D per frame. **Read the overlay's handlers before promising an effect**: the
+data sections tell you what accompanies the effect, not what it mostly looks
+like. For the TI the arbitration is easy here, because the part the renderer
+cannot play is also the part that has no answer in four greys at 160x100.
