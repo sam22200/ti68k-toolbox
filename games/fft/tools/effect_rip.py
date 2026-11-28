@@ -2,8 +2,10 @@
 """Decode an EFFECT/Exxx.BIN sprite atlas from the local disc into a PNG.
 
 The original's combat effects live in EFFECT/, 512 files, 401 of them non-empty.
-291 are data and the rest are MIPS routines, mixed in with no separation: Cure 4
-is code, Cure 1-3 are data, so some abilities have no atlas to take.
+291 are data from byte 0; the other 110 are MIPS overlays -- and **every one of
+them carries a complete data file behind its code** (`data_base`). Holy (E015)
+is an overlay of three native renderers whose sections start at 0x33e8, right
+past its brightness tables. All 401 decode.
 
 A data file opens with the little-endian u32 40 and a ten-entry u32 offset table.
 Section 9 holds the pictures: 1028 bytes of palette, then an 8bpp image 128 or
@@ -23,11 +25,17 @@ Colour is PS1 BGR555 with the top bit as the semi-transparency flag:
     almost nothing and shows the scenery through. Painting those opaque puts a
     black halo around every sprite, which is what a first pass at this did.
 
-Which ability an effect belongs to is the file's *name*, not a table: there is no
-ability-to-effect table in BATTLE.BIN. The number tracks the ability id for the
-first 35 or so (Cure 0x001 -> E001, Fire 0x010 -> E016, Ice 0x018 -> E024) and
-then drifts, because the catalogue holds effects no ability uses. The 14-byte
-ability record carries the element mask, not an effect id. Names:
+**There are two tables in BATTLE.BIN**, and together they answer "which file
+does this ability play" without guessing from names:
+
+  * `g_battle_effect_ability_ids` at 0x801b63f0 -- 492 s16, ability id to effect
+    id, masked with 0x1ff, negative meaning the ability has no effect file;
+  * `g_battle_effect_disc_entries` at 0x801b53e8 -- {sector, size} per effect id,
+    which is what `battle_effect_load_lba_and_size` reads.
+
+Resolving the sector back to a file name is the proof that the name convention
+holds: ability 15 (Holy) -> effect 15 -> lba 61383 -> EFFECT/E015.BIN. The
+14-byte ability record carries the element mask, not an effect id. Names:
 https://ffhacktics.com/wiki/Effects
 
 Usage:  effect_rip.py 16 17 18 --out DIR     (or --all)
@@ -47,6 +55,37 @@ WIDTH = 128
 WIDE = 256                 # the palette section's wide_image flag
 
 
+def data_base(raw):
+    """File offset of the effect's data file, or None when the file holds none.
+
+    291 files are data from byte 0. The rest are MIPS overlays -- and many of
+    those carry a complete data file *after* their code: Holy (E015) draws
+    through three native handlers (a ring mesh, a stack of rings and a 4x4
+    textured grid, `fft_decomp` `src/effect/effect_e015_*`) and still ships its
+    sections at 0x33e8, right past its brightness tables. Refusing anything
+    whose first word is not 40 dropped every one of them.
+
+    The header is the only landmark: `frame_data` is 40, because section 0
+    follows the ten-word header, and the nine other offsets never decrease and
+    stay inside what is left of the file. `sound_section` is 0 when the effect
+    is silent, so a zero is skipped rather than failing the test.
+    """
+    for off in range(0, len(raw) - 40, 4):
+        if struct.unpack_from('<I', raw, off)[0] != 40:
+            continue
+        rest = len(raw) - off
+        o = struct.unpack_from('<10I', raw, off)
+        if any(v >= rest for v in o):
+            continue
+        seen = [v for v in o if v]
+        if seen != sorted(seen):
+            continue
+        if not o[9] or rest - o[9] < PALETTE_BYTES + WIDTH:
+            continue
+        return off
+    return None
+
+
 def atlas(raw):
     """(width, height, pixels, palette) of an effect file, or None when it is not data.
 
@@ -56,8 +95,10 @@ def atlas(raw):
     says 256-byte rows instead of 128, and 20 of the 291 effects set it. Read at
     128 they come out as a ribbon of 512 rows with every sprite cut in half.
     """
-    if len(raw) < 40 or struct.unpack_from('<I', raw, 0)[0] != 40:
-        return None                      # a MIPS routine, not an atlas
+    base = data_base(raw)
+    if base is None:
+        return None                      # a MIPS routine with no data of its own
+    raw = raw[base:]
     off = struct.unpack_from('<10I', raw, 0)
     if not off[9] or off[9] >= len(raw):
         return None
