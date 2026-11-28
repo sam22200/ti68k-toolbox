@@ -333,6 +333,40 @@ def camera(pitch=PITCH, yaw=YAW):
     return project
 
 
+def _velocity(rec, key):
+    """One particle's world displacement per frame, from its emitter's motion.
+
+    `(0, radial_speed, 0)` rotated by the base angle plus a random spread, times
+    eight, against a position carrying 12 fractional bits -- so the world step is
+    `out / 512` a frame. Without a curve bound the stored spread is **halved**.
+    The integration damps by `(inertia - threshold) / inertia`, and the engine's
+    threshold starts at 0, which leaves the velocity constant; acceleration and
+    gravity are not modelled.
+    """
+    lo, hi = struct.unpack_from('<2h', rec, 0x5c)          # radial_speed_start
+    if lo == 0 and hi == 0:
+        return 0.0, 0.0, 0.0
+    ax, ay, _ = struct.unpack_from('<3h', rec, 0x14 + 0x18)   # velocity_base_angle
+    sx, sy, _ = struct.unpack_from('<3h', rec, 0x14 + 0x24)   # velocity_spread
+    r = _rand3(key)
+    th = (ax + r[0] * (sx / 2.0)) / 4096.0 * 2 * math.pi
+    ph = (ay + r[1] * (sy / 2.0)) / 4096.0 * 2 * math.pi
+    speed = (lo + (hi - lo) * (r[2] + 1) / 2.0) / 512.0
+    return (speed * math.sin(th) * math.sin(ph),
+            speed * math.cos(th),
+            speed * math.sin(th) * math.cos(ph))
+
+
+def _rand3(key):
+    """Three repeatable values in [-1, 1]."""
+    h, out = 2166136261, []
+    for i in range(3):
+        for q in key + (i,):
+            h = ((h ^ (q & 0xffff)) * 16777619) & 0xffffffff
+        out.append(((h >> 8) & 0xffff) / 65535.0 * 2 - 1)
+    return out
+
+
 def _ellipsoid(sx, sy, sz, key):
     """A repeatable point inside the spawn spread's ellipsoid."""
     h = 2166136261
@@ -447,8 +481,12 @@ def schedule(fr, seqs, cs, tl, scatter=False, project=None):
                 for i in range(count):
                     j = _ellipsoid(sw[0], sw[1], sw[2], (e, born, i)) if scatter \
                         else (0, 0, 0)
-                    ox, oy = project(pw[0] + j[0], pw[1] + j[1], pw[2] + j[2])
+                    vel = _velocity(rec, (e, born, i))
                     for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
+                        n = (d['t'] - t0) // 2          # frames this one has lived
+                        ox, oy = project(pw[0] + j[0] + vel[0] * n,
+                                         pw[1] + j[1] + vel[1] * n,
+                                         pw[2] + j[2] + vel[2] * n)
                         sx, sy = project(d['x'], d['y'])
                         out.append(dict(d, inst=e, seq=seq, chan=c,
                                         x=ox + sx, y=oy + sy))
