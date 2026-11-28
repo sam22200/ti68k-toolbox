@@ -238,7 +238,10 @@ of them: start there, and keep the VRAM for questions about residency.
 **So no, each effect does not have to be rebuilt by eye.** Its choreography is in its
 file, and section 11 reads it.
 
-**There is no PS1 decompilation to lean on.** `Nax/wotl` is the PSP build.
+**There IS a PS1 decompilation**: [adamrt/fft_decomp](https://github.com/adamrt/fft_decomp),
+byte-exact on SCUS-94221, 100 % decompiled. `include/fft/effect/` names every structure
+this page reverse-engineered. Read it before guessing at a format again. (`Nax/wotl`
+decompiles the PSP build, which is a different thing.)
 
 ## 11. The animation decoder: an effect read instead of watched
 
@@ -291,8 +294,30 @@ y -283..+99 about its origin, so with the origin on the target's feet almost all
 draws below the screen and the standing column looks three times too short. Called
 without `--anchor`, the tool sits the sweep on the canvas and prints where it put it.
 
-Two things the decoder still does not settle: whether cast members ever start at
-different times (nothing in the record looks like a delay, and all of Stasis Sword's
-fall together, which the capture supports), and what the rest of the 196 bytes mean --
-`--cast` prints the fields that move between records so the next reader starts there.
+## 12. What the decompilation corrected
+
+Every layout section 11 derived by hand matched `fft_decomp`'s headers -- section map,
+24-byte polygon with four corners, signed cell size, the four sequence opcodes, 196-byte
+emitter records whose byte 1 names a sprite sequence, 6278-byte timeline, 600-byte timing
+curves, 24-byte flags, `4 + 15*160` curves. Three things were wrong, and they are the
+three that mattered:
+
+* **`0x81` is LOOP, not END.** A sprite sequence runs back to its first byte. Nothing in
+  it ends an effect, so "the decoded animation is longer than the game's" was never a
+  timing discovery -- it was a missing stop.
+* **The third byte of a frame is the ordering-table depth mode**, not a flag: 0
+  unchanged, 1 nearer 8, 2 fixed 8, 3 farthest, 4 fixed 16, 5 nearer 16. The original
+  sorts its effect sprites, and says so per frame.
+* **The atlas is 128 or 256 wide**, and byte 0x403 of section 9 (`wide_image`) says
+  which. 20 of the 291 effects are 256 wide; read at 128 they come out as a 512-row
+  ribbon with every sprite cut in half. `effect_rip.py` had assumed 128 since the start.
+
+And the start delay that section 11 could not find is **`spawn_delay` in the timeline**
+(section 7, offset 0x06), "frames between child spawns", beside `phase1_duration` and
+`phase2_duration` and, per particle channel, a 25-keyframe table. It was never in the
+emitter record, which is why reading that record harder was never going to find it.
+
+Section 2, which this page had dismissed as 64 constant bytes, is the **effect script**:
+a 9-bit-opcode interpreter with counters, branches, child spawning and camera control.
+Decoding sections 2 and 7 is what would make the playback the game's.
 
