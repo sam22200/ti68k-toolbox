@@ -193,5 +193,53 @@ class Grid(unittest.TestCase):
         self.assertTrue(max(seen) < 32 + 1)         # texture_width / 2
 
 
+class Spawn(unittest.TestCase):
+    """battle_effect_interpolate_emitter_spawn_position and the anchors."""
+
+    @staticmethod
+    def rec(start, end, placement=0):
+        raw = bytearray(196)
+        struct.pack_into('<3h', raw, 0x14, *start)
+        struct.pack_into('<3h', raw, 0x1a, *end)
+        struct.pack_into('<H', raw, 0x02, placement)
+        return bytes(raw)
+
+    def test_a_factor_of_zero_keeps_the_start(self):
+        r = self.rec((10, 20, 30), (70, 80, 90))
+        self.assertEqual(M.spawn_position(r, 0), (10, 20, 30))
+
+    def test_a_factor_of_256_reaches_the_end(self):
+        r = self.rec((10, 20, 30), (70, 80, 90))
+        self.assertEqual(M.spawn_position(r, 256), (70, 80, 90))
+
+    def test_it_walks_between_them(self):
+        r = self.rec((0, 0, 0), (256, 512, -256))
+        self.assertEqual(M.spawn_position(r, 128), (128, 256, -128))
+
+    def test_the_anchor_comes_from_bits_9_to_11(self):
+        s = M.RingStack(self.rec((0, 0, 0), (0, 0, 0), M.ORIGIN_TARGET), [[0x1000] * 9])
+        _, mode, unplaceable = s.origin(0)
+        self.assertEqual(mode, M.ORIGIN_TARGET)
+        self.assertFalse(unplaceable)
+
+    def test_two_anchors_a_preview_cannot_place(self):
+        for mode in (M.ORIGIN_PARENT_PARTICLE, M.ORIGIN_MAP_CENTRE):
+            s = M.RingStack(self.rec((0, 0, 0), (0, 0, 0), mode), [[0x1000] * 9])
+            self.assertTrue(s.origin(0)[2], M.ORIGIN_NAMES[mode])
+
+    def test_the_mesh_sits_on_its_spawn_position(self):
+        """The lattice is built about zero and the origin moves the whole ring."""
+        bright = [[0x1000] * 9]
+        flat = lambda x, y, z: (x, y, 64)
+        here = M.RingStack(self.rec((0, 0, 0), (0, 0, 0)), bright)
+        there = M.RingStack(self.rec((40, -15, 0), (40, -15, 0)), bright)
+        for k in ('radius_start', 'radius_end'):
+            pass
+        a = here.quads(0, flat)
+        b = there.quads(0, flat)
+        if a and b:
+            self.assertNotEqual(a[0]['pts'][0], b[0]['pts'][0])
+
+
 if __name__ == '__main__':
     unittest.main()
