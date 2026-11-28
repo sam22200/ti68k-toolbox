@@ -968,7 +968,7 @@ def p_pts(fr, d):
 
 
 def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False,
-           effect_id=None):
+           effect_id=None, over=None):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
@@ -1019,8 +1019,19 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
         """The battle camera, plus a depth for the ordering table's own sort."""
         sx, sy = flat(x, y, z)
         return sx, sy, 0xC0 - int((z - x) / 8)
+    under = None
+    if over:
+        from PIL import Image as _I
+        im = _I.open(over).convert('RGB').resize(size)
+        under = np.floor(np.asarray(im).astype(float) / 8)
     for t in range(0, last, 2):                        # 60 Hz ticks, 30 fps frames
+        # `--over` starts each frame on a picture of the battlefield instead of
+        # black. The effect's parts are B+F against it exactly as against
+        # anything else, which is the only way to see what the console sees:
+        # the file has no scene in it, and its colour tracks only darken one.
         fb = np.zeros((size[1], size[0], 3), dtype=float)
+        if under is not None:
+            fb[:] = under * 8
         for d in tl:
             if not (d['t'] <= t < d['t'] + max(d['ticks'], 1)):
                 continue
@@ -1192,6 +1203,8 @@ def main():
     ap.add_argument('--size', default=None,
                     help='the render canvas; by default 256x240, grown to fit the effect at 1:1')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
+    ap.add_argument('--over', default=None,
+                    help='a picture of the battlefield to draw the effect onto')
     ap.add_argument('--scale', type=float, default=1.0)
     ap.add_argument('--no-scatter', action='store_true', dest='no_scatter',
                     help='ignore the emitters\' spawn spread, piling each stream on one point')
@@ -1304,7 +1317,7 @@ def main():
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
                      None if a.flat else sec, not a.no_scatter,
-                     grow=a.size is None and not a.ti, effect_id=a.id)
+                     grow=a.size is None and not a.ti, effect_id=a.id, over=a.over)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
