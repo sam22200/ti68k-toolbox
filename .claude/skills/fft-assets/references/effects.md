@@ -1331,3 +1331,51 @@ While confirming it: the dark core of those fireballs is in the data. The centre
 texel of each is palette index 255, and `palette[255] = 0x0000` -- transparent.
 The console fills it by stacking the cell's three polygons, two of them additive
 copies of each other.
+
+## 31. A colour mode does not just add: `base/2` halves the scene
+
+`battle_map_blend_background_gradient_color`'s mode picks what the target
+colour is BUILT FROM, and two of the five modes these files use halve it:
+
+    case MAP_COLOR_MODE_BASE_HALF:
+        target_red = (colors[i].red << 15) + (red << 16);   /* base/2 + offset */
+
+Taking `base` for black -- "a preview has no map" -- collapsed every one of
+those into its offset alone. Since a `base/2` keyframe is written as a small
+offset on top of a halved gradient, **a darkening read as a brightening**.
+Flare is the clearest case: the console drops from 52 to 16 mean luminance over
+its charge while the preview climbed to 62.
+
+It is not a corner case. Across the seven decoded effects, of 330 offset
+keyframes:
+
+    mode 5 base/2     226        mode 4 base        61
+    mode 8 restore     37        mode 0 current      5
+    mode 1 current/2    1        (no grey mode is used at all)
+
+Each rendered frame now carries `(gain, r, g, b)` and the scene is multiplied
+before the offset is added.
+
+**The two tracks' gains must not compound.** `affected_units` colours the units
+and `screen` the background gradient; a preview puts both on one picture, so
+their offsets add but applying each gain in turn halves the scene twice over
+(0.25). That mistake flattered the effects that need darkening and broke the
+two that need white.
+
+Measured against the console, root-mean-square of the mean-luminance curve at
+each effect's best alignment:
+
+    effect   no gain   gain twice   gain once   peak    console
+    Stasis      10.7         10.1         3.9   150.7     136.1
+    Night       35.1         21.1        20.9   188.1     194.7
+    Cure 4      32.2         14.0         6.9   183.1     181.6
+    Flare       25.3         16.7        12.7   138.4     152.0
+    Haste       21.2         10.6         4.8    51.8      74.7
+    Holy        29.9         42.1        35.6   198.9     252.0
+    Meteor      58.4         76.6        71.8   237.7     252.0
+
+Five improve, two do not, and the mean goes 30.4 -> 22.4. **Holy and Meteor are
+the two whose console peaks saturate at 252**, and the gain holds them under
+it. The model is an approximation -- the engine applies the gradient to the
+map's own polygons through `battle_map_color_field`, not to finished pixels --
+and that is where the remaining error for those two lives.

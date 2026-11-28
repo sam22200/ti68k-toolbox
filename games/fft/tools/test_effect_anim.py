@@ -473,13 +473,36 @@ class Tracks(unittest.TestCase):
         one = A.tracks(self.section([1], [(40, 0, 0)], [0], 1))
         two = A.tracks(self.section([1], [(80, 0, 0)], [0], 1))
         got = A.stage_offsets([(0, 4, one), (4, 8, two), (8, 1 << 30, None)], 'affected units', 8)
-        self.assertEqual([round(c[0]) for c in got], [5, 10, 15, 20, 28, 35, 42, 50])
+        # each frame is (gain, r, g, b); these keyframes set a colour outright
+        self.assertEqual([round(c[1]) for c in got], [5, 10, 15, 20, 28, 35, 42, 50])
+
+    def test_base_half_halves_the_scene(self):
+        """`MAP_COLOR_MODE_BASE_HALF` builds its target from HALF the map's own
+        gradient, so the scene it lights is multiplied by 0.5 before the offset
+        is added. Read as an offset alone -- `base` taken for black -- a
+        darkening keyframe reads as a brightening, which is why Flare climbed to
+        62 mean luminance where the console drops to 16."""
+        tr = A.tracks(self.section([1], [(-8, -14, -14)], [0x80 | 5], 1))
+        got = A.track_offsets(tr, 'affected units', 8)
+        self.assertAlmostEqual(got[-1][0], 0.5, places=2)        # the gain
+        self.assertAlmostEqual(got[-1][1], -8.0, places=1)       # the offset
+        plain = A.track_offsets(A.tracks(self.section([1], [(-8, -14, -14)], [0x80 | 4], 1)),
+                                'affected units', 8)
+        self.assertAlmostEqual(plain[-1][0], 1.0, places=2)      # `base` does not halve
+
+    def test_restore_puts_the_scene_back(self):
+        """Mode 8 returns to the map's own gradient and ignores the offsets."""
+        tr = A.tracks(self.section([1, 1], [(-40, -40, -40), (99, 99, 99)],
+                                   [0x80 | 5, 0x80 | 8], 2))
+        got = A.track_offsets(tr, 'affected units', 16)
+        self.assertAlmostEqual(got[-1][0], 1.0, places=2)
+        self.assertAlmostEqual(got[-1][1], 0.0, places=1)
 
     def test_a_stage_writes_only_its_own_frames(self):
         """A keyframe longer than its phase stops at the phase's last frame."""
         one = A.tracks(self.section([4], [(32, 0, 0)], [0], 1))
         got = A.stage_offsets([(0, 3, one), (3, 1 << 30, None)], 'affected units', 6)
-        self.assertEqual([round(c[0]) for c in got], [1, 2, 3, 0, 0, 0])
+        self.assertEqual([round(c[1]) for c in got], [1, 2, 3, 0, 0, 0])
 
 
 class EmitterMotion(unittest.TestCase):
