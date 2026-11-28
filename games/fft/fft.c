@@ -6772,7 +6772,10 @@ static u8 status_magic_evade(const Unit *u)
 // The core draws the plate and the bar; the page body under them belongs to the screens
 // module, beside draw_status -- both of its pages are the management sheet's own renderers.
 static const char *const status_tabs[3] = { "Eqp.", "Abil.", "Status" };
-static void status_header(u8 i, u8 tab, u8 slots)
+// The plate and the tab bar are built on separate frames (draw_status): together with
+// the sheet's own first render they came to 476,894 cycles, over the 360k budget, and
+// the plate is 196,704 of that. status_header keeps both for the module table.
+static void status_plate(u8 i)
 {
     const Unit *u = &st.unit[i];
     UnitSheet sheet, *d = &sheet;
@@ -6799,9 +6802,21 @@ static void status_header(u8 i, u8 tab, u8 slots)
     d->v[US_WEV] = status_item_evade(u, EQ_WEAPON);
     d->v[US_MEV] = status_magic_evade(u);
     unit_sheet_plate(d, 0, 0);
+}
+static void status_bar(u8 tab, u8 slots)
+{
     unit_sheet_tabs(US_PLATE_H, status_tabs, 3, tab, 0);
     // The keys live at the bar's free right end, which frees the whole body for the page.
     ui_text(108, US_PLATE_H + 1, slots ? "2nd ESC" : "ESC back", C_LGRAY, 158);
+}
+// draw_status calls this twice, and W->status_n says which piece is due: the tab bar on
+// the sheet's first chunk (status_n 1), the plate on its third (status_n 3). Splitting it
+// here rather than at the call keeps one symbol in the module table -- draw_status is
+// compiled into the SCREENS image and reaches the core only through it.
+static void status_header(u8 i, u8 tab, u8 slots)
+{
+    if (W->status_n > 2) { status_plate(i); return; }
+    status_bar(tab, slots);
 }
 
 
@@ -7407,20 +7422,20 @@ static void draw_status(void)
         W->status_info = st.status_info; W->status_col = st.status_col; W->status_row = st.status_row;
     }
     rt_light = W->status[0]; rt_dark = W->status[1];
+    ZB(10);
     k = W->status_n;
     if (k < 9) {
         W->status_n++; status_settled = 0;
         if (!k) {
             memset(W->status, 0, sizeof W->status);
-            // the campaign's own plate and the sheet's tab bar
-            status_header(st.sel, st.page, (u8)(!st.status_info));
+            status_header(st.sel, st.page, (u8)(!st.status_info));   // the sheet's tab bar
         } else if (k == 1) {
 #ifdef US_PAGES
             // ... then the page itself: Eqp. and Abil. are the management sheet's own
             if (!st.status_info && st.page < 2) status_page(st.sel, st.page);
 #endif
         } else if (k == 2) {
-            // free: the plate and the page carry what the card parts used to
+            status_header(st.sel, st.page, (u8)(!st.status_info));   // the campaign's plate
         } else if (st.status_info) status_detail(k);
         else if (st.page == 2) {                // Status: who it is and what ails it
             s16 y = (s16)(STATUS_ROW0 + (k - 3) * STATUS_PITCH);
@@ -7430,6 +7445,7 @@ static void draw_status(void)
             if (k <= 5) { s[n] = 0; ui_text(6, (s16)(y + 3), s, C_BLACK, 159); }
         }
     }
+    ZE(10);
     rt_light = sl; rt_dark = sd;
 #ifndef FFT_NO_SETTLE
     // A finished page with nothing live on it has to reach the hidden planes once each and
