@@ -481,3 +481,36 @@ changes how bright anything is -- which is why neither explained a faint layer
   negative index is not clamped, the sprite is dropped** (`if (depth < 0)
   return;`). Drawing by channel order instead put the 4,743 pinned sprites in
   the wrong layer.
+
+
+## 15. Three of the twenty-five families, and the limit of an inference
+
+`effect_mesh.py` now carries three of the 25 native renderer families,
+transcribed from `src/effect/effect_e015_*`:
+
+| family | what it builds | overlays |
+|---|---|---|
+| `RingStack` | 9 lattice rows of 8, 8 rings of 8 quads, texture scrolling in v | 31 |
+| `RingMesh` | 3 rows of 32, 2 rings of 32, **height shifted left 2** | 32 |
+| `QuadGrid4x4` | 16 quads of 64 px in **screen space**, never projected | 27 |
+
+The ring mesh is the stack's renderer with other counts, so they share one
+lattice; the source builds one quadrant and rotates it into the other three,
+which is the same 32 points as walking the whole turn in 0x80 steps.
+
+### What the timeline proves, and where it stops
+
+`step_child_timeline` gives `slot = (selector & 7) - 1`, and script opcode 0x06
+fills the slots (`command[1] >> 2`). Holy's four registrations hold routines 7,
+8, 9 and 8. **Which routine is which handler is an inference**: the ids are
+three ascending values, the overlay carries exactly three functions, and
+`target/effect.yaml` lists them in address order.
+
+For slot 0 that inference is cross-checked and holds: the timeline drives
+geometry entry 4 through it for a hundred frames, and entry 4 is the one entry
+whose lattice measures 368 units tall and 3 wide. **For slots 1 and 2 it does
+not.** Taken at face value the ring mesh and the grid paint flat slabs across
+the frame, so either the order is wrong or those entries want a different view
+over the same 196 bytes. They are behind `--mesh-all` until that is settled;
+the default renders the ring stack alone. A renderer that is wrong by default
+teaches the next reader something false.
