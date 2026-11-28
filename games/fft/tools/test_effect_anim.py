@@ -73,6 +73,28 @@ class Frames(unittest.TestCase):
         self.assertLess((u + w) & 0xff, u)                # so it runs backwards
 
 
+class ParticleTint(unittest.TestCase):
+    """`battle_effect_update_node_from_work` only reads the colour curves when
+    the work record carries `EFFECT_WORK_FLAG_COLOUR_CURVES`."""
+
+    def record(self, flags):
+        r = bytearray(A.REC_SIZE)
+        struct.pack_into('<H', r, 0x06, flags)
+        struct.pack_into('<I', r, 0x10, 0x210)       # r -> row 0, g -> 1, b -> 2
+        return bytes(r)
+
+    def test_without_the_flag_the_particle_is_neutral(self):
+        table = [[64] * 160, [192] * 160, [255] * 160]
+        self.assertEqual(A._tint(self.record(0), table, 0), (1.0, 1.0, 1.0))
+
+    def test_with_the_flag_each_channel_takes_its_row(self):
+        table = [[64] * 160, [192] * 160, [255] * 160]
+        got = A._tint(self.record(0x40), table, 0)
+        self.assertAlmostEqual(got[0], 64 / 128.0, places=3)
+        self.assertAlmostEqual(got[1], 192 / 128.0, places=3)
+        self.assertAlmostEqual(got[2], 255 / 128.0, places=3)
+
+
 class Physics(unittest.TestCase):
     """The section 3 header, which opcode 0x27 copies into the integrator."""
 
