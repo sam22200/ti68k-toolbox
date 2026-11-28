@@ -48,13 +48,14 @@ u8 forecast_text(u8 a, u8 t, AbId ab, char *s)
         } else n = put_s(s, n, "Miss");
     } else {                                   // a sure KO (the least damage left): "KO";
         const Unit *ut = &st.unit[t];          // a heal up to the HP the target can take
-        u8 harm =
+        // `effect_damage` is not chapter-only, and an ability carries its kind:
+        // hard-coding this to 1 made the demo forecast a Potion as damage, and
+        // on a hurt unit it announced the Potion would KO it.
+        u8 harm = effect_damage(
 #ifdef FFT_CHAPTER
-            effect_damage(kind);
+            kind);
 #else
-            1;    // the demo forecasts an attack, which always damages; the arm
-                  // that used to stand here read a member Ability does not have
-                  // and a `kind` out of scope, so it had never compiled
+            b ? b->kind : AB_DAMAGE);
 #endif
         u16 v = b ? skill_amount(a,t,ab,(b->flags&AF_CHARGE)?FORMULA_FORECAST:0) : attack_prediction(a,t);
 #ifdef FFT_CHAPTER
