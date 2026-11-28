@@ -744,9 +744,17 @@ bit 7 says the colour is an **offset** applied through one of
 `battle_map_blend_background_gradient_color`'s eleven modes -- current,
 current/2, its grey, base, restore and the rest.
 
-### They were not the white field
+### Correction: they do carry it, and reading one keyframe hid it
 
-The hope was that these carried the console's bright background. They do not.
+An earlier pass here concluded these tracks were "overwhelmingly negative" and
+could not be the console's bright field. **That was wrong**, and wrong for a
+precise reason: a keyframe does not set a colour, it *starts a fade*
+(`battle_map_blend_background_gradient_color(mode, duration, r, g, b)`), and
+sampling one keyframe at a frame lands in whichever the effect is sitting in.
+Night Sword sits in a long `(0, 0, 0)` tail, and its flash is a **one-frame**
+keyframe of `(63, 63, 63)` -- doubled to `(126, 126, 126)` -- three keyframes
+earlier. `track_offsets` walks them with the fade now.
+
 Night Sword's screen track reads, in frames:
 
     0..8    base/2   offset (-64, -64, -64)
@@ -799,3 +807,35 @@ also softer and wider, which is its bloom.
 So the honest statement of where the decoder stands: it reproduces what the
 effect **draws**. It does not reproduce what the effect **lights**, and nothing
 in the effect file would let it -- the light belongs to the map renderer.
+
+
+## 24. The tracks applied to the map: what matches and what does not
+
+`--over` now applies two of the four tracks to the scene it draws on, and only
+to it -- without a map there is nothing to recolour. The screen track offsets
+the background gradient; `battle_map_color_field` colours the map and its units
+from the affected-units track.
+
+Night Sword against the console, mean luminance:
+
+| | ours | console |
+|---|---|---|
+| the blade appearing | 8 | 7 |
+| rising | 8 | 8 |
+| at full height | 27 | 12 |
+| **the flash** | **64** | **200** |
+| after it | 56 | 171 |
+
+**The blade matches to a point or two all the way up**, and the flash arrives on
+the frame it should. It comes out **red where the console is white**: the
+keyframe after the flash reads `base` as (126, 126, 126) and offsets it by
+(0, -128, -128), leaving red alone. Whether `base` is the colour just applied or
+the one in flight before the fade began is the part of
+`battle_map_blend_background_gradient_color` left unread -- and it is one read,
+not a mystery.
+
+Stasis Sword comes out the other way: a peak of 159.6 against the console's
+118.1, brighter rather than dimmer, which is the same arithmetic seen from the
+other side. Both are off by a factor the modes decide, so neither is tuned here:
+**a magic multiplier that makes one picture agree is how a decoder stops being a
+transcription.**
