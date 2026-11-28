@@ -155,6 +155,7 @@ core-audit-test:
 	$(PY) ../tools/test_core_audit.py
 	$(PY) ../tools/test_mesh_blob.py
 	$(PY) ../tools/test_effect_anim.py
+	$(PY) ../tools/test_effect_mesh.py
 core-boundaries-check: $(CORE_BANKS) data/ffgd.89y
 	$(MAKE) -C ../opening data/ffod.89y
 	$(PY) check_core_boundaries.py
