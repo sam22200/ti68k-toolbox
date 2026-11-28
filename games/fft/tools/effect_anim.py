@@ -333,6 +333,35 @@ def camera(pitch=PITCH, yaw=YAW):
     return project
 
 
+def curves(sec4):
+    """Section 4's animation curves: one 160-value ramp each, 128 being neutral."""
+    if len(sec4) < 4:
+        return []
+    n = struct.unpack_from('<I', sec4, 0)[0]
+    if n > 64 or 4 + 160 * n > len(sec4):
+        return []
+    return [list(sec4[4 + 160 * i:4 + 160 * (i + 1)]) for i in range(n)]
+
+
+def _tint(rec, cur, n):
+    """A particle's colour this frame, from its emitter's three colour curves.
+
+    `block->header.color` starts at `EFFECT_COLOR_NEUTRAL` (128) and the particle
+    renderer feeds it `curves[color_curves.r][curve_frame]` and its green and
+    blue, with `curve_frame` counting the particle's own frames and wrapping at
+    160. So a particle fades over its life -- which is what keeps a stack of
+    them from clipping to white the way nineteen flat copies do.
+    """
+    if not cur:
+        return (1.0, 1.0, 1.0)
+    sel = struct.unpack_from('<I', rec, 0x10)[0]
+    out = []
+    for k in range(3):
+        i = (sel >> (4 * k)) & 0xf
+        out.append(cur[i][n % 160] / 128.0 if i < len(cur) else 1.0)
+    return tuple(out)
+
+
 def _velocity(rec, key):
     """One particle's world displacement per frame, from its emitter's motion.
 
@@ -425,7 +454,7 @@ def play_window(ops, nframes, t0, t1, animation_driven):
     return out
 
 
-def schedule(fr, seqs, cs, tl, scatter=False, project=None):
+def schedule(fr, seqs, cs, tl, scatter=False, project=None, cur=None):
     """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
 
     Each keyframe of a particle channel spawns its emitter's `particle_count`
@@ -484,11 +513,12 @@ def schedule(fr, seqs, cs, tl, scatter=False, project=None):
                     vel = _velocity(rec, (e, born, i))
                     for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
                         n = (d['t'] - t0) // 2          # frames this one has lived
+                        tint = _tint(rec, cur, n)
                         ox, oy = project(pw[0] + j[0] + vel[0] * n,
                                          pw[1] + j[1] + vel[1] * n,
                                          pw[2] + j[2] + vel[2] * n)
                         sx, sy = project(d['x'], d['y'])
-                        out.append(dict(d, inst=e, seq=seq, chan=c,
+                        out.append(dict(d, inst=e, seq=seq, chan=c, tint=tint,
                                         x=ox + sx, y=oy + sy))
                 born += interval
     out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
@@ -597,7 +627,8 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Fa
     if tex is None:
         return []
     tex, alpha = tex
-    tl = schedule(fr, seqs, cs, phases(raw_sections[7]), scatter) if raw_sections else None
+    tl = schedule(fr, seqs, cs, phases(raw_sections[7]), scatter,
+                  cur=curves(raw_sections[4])) if raw_sections else None
     if tl is None:
         tl = timeline(fr, seqs, cs)
     if not tl:
@@ -631,8 +662,10 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Fa
                 cell = (min(u, u + w), min(v, v + h),
                         max(u, u + w) - 1, max(v, v + h) - 1)
                 bl = BLEND.get((p['clut'] >> 5) & 3, 1.0)
-                _tri(acc, tex, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell, bl)
-                _tri(acc, tex, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell, bl)
+                tint = d.get('tint')
+                tx = tex * np.array(tint) if tint else tex
+                _tri(acc, tx, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell, bl)
+                _tri(acc, tx, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell, bl)
         out.append(np.clip(acc, 0, 255).astype(np.uint8))
     return out
 
