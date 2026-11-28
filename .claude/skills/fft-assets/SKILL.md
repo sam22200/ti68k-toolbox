@@ -19,6 +19,15 @@ effect camera's keyframes and `--eye` plays them over the render; `--map-centre 
 gives it the one vector a preview cannot know, from the target to the middle of the
 battlefield (Gariland's roof tile: `42,96,0`).
 
+**The console is no longer in the loop.** The decoder plays an effect's whole
+choreography from the disc -- cells, sequences, emitters and their children, the colour
+tracks, the effect camera -- so an effect can be rendered, measured and budgeted without
+running the PlayStation. Read [putting an effect on the TI](references/effects-on-ti.md)
+for what that costs on the calculator: the load per frame of each decoded effect, the
+three concessions that buy the budget (a spark is a pixel, a quad over 16 px is a
+dithered flat, effects run at 15 fps), which four of the seven fit outright and what to
+trim from the three that do not.
+
 Read [the disc catalogue](references/disc-map.md) for file-by-file offsets and
 formats. The rest of this page is the method and the traps.
 
