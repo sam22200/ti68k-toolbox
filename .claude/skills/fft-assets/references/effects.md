@@ -551,3 +551,36 @@ and without one the factor is 0 and the lerp returns the start for ever. The
 pair that actually moves anything is the **260** that have both, across 138
 effects -- Holy and the three Cures among them, neither sword. Counting the
 pairs alone would have overstated it twelve-fold.
+
+
+## 17. The unit system, and why nothing was oversized
+
+`battle_effect_resolve_target_render_coords` is the last place a scale factor
+could have hidden, and there is none in it. It is a pure translation:
+
+    tile centre = (tile_x * 28 + 14, -(tile->height * 12), tile_y * 28 + 14)
+
+A unit target copies the unit's own screen-coordinate record; with the terrain
+flag set, Y is lowered to the tile's surface including its depth. **A tile is 28
+world units across and a height level is 12**, Y negative upward. A preview that
+draws about the target is already standing on that point, so it needs nothing
+from this function -- which is the useful answer, not a disappointing one.
+
+### Measure a mesh in tiles, not in pixels
+
+The ring mesh looked alarming at "511 x 650 px" until it was put back into the
+game's own units, where it is nothing of the kind:
+
+| what | at its widest | in tiles |
+|---|---|---|
+| the beam (ring stack, f10..110) | 30 x 368 | 1.1 wide, **13.1 tall** -- 30.7 height levels |
+| the second beam (f152..176) | 128 x 304 | 4.6 x 10.9 |
+| the flash (ring mesh, f80..116) | 510 x 472 | **18.2 x 16.9** |
+| the ring on the victim (f132..152) | 68 x 32 | 2.4 x 1.1 |
+| the halo (4x4 grid) | screen | 256 x 256, no world at all |
+
+A column thirteen tiles tall rising out of the victim and a ring eighteen tiles
+across are exactly what the console shows: the beam leaves the top of the frame
+and the flash fills it. **Pixels on a canvas you chose the size of say nothing**
+-- the frame was 256x618 here and 256x240 there. Convert to tiles before calling
+a mesh too big.
