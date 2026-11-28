@@ -620,8 +620,15 @@ def _tint(rec, cur, n):
     blue, with `curve_frame` counting the particle's own frames and wrapping at
     160. So a particle fades over its life -- which is what keeps a stack of
     them from clipping to white the way nineteen flat copies do.
+
+    **Only when its emitter asks for it.** `battle_effect_update_node_from_work`
+    reads the curves for a work record carrying `EFFECT_WORK_FLAG_COLOUR_CURVES`
+    (bit 6 of the geometry entry's `flags`, copied to the work record) and hands
+    every other particle a flat `0x80, 0x80, 0x80` -- neutral. 14 of the 72
+    emitters across the seven decoded effects do not carry it, and were being
+    tinted by whatever row their `colour_curves` nibbles happened to name.
     """
-    if not cur:
+    if not cur or not (struct.unpack_from('<H', rec, 0x06)[0] & 0x40):
         return (1.0, 1.0, 1.0)
     sel = struct.unpack_from('<I', rec, 0x10)[0]
     out = []
