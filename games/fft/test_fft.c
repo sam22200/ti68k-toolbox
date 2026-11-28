@@ -1320,19 +1320,29 @@ static void test_interface(void)
     sw_init(26); steps(0, 30); CHECK(hud_shown());
     old = sw_checksum(); st.unit[st.act].hp--; st.unit[st.act].ct++;
     steps(0, 30); CHECK(sw_checksum() != old); CHECK(hud_shown());
+    // The sheet is three tabs -- Eqp. | Abil. | Status (UNIT_SHEET.md) -- opening on Eqp.
+    // Left and right change tab and wrap; up and down walk the tab's own rows; the column
+    // is no longer steered, it is `st.page == 1`.
     sw_init(31); steps(0, 12); original = st; page0 = sw_checksum();
-    CHECK(st.page == 0 && st.mode == M_STATUS);
+    CHECK(st.page == 0 && st.mode == M_STATUS && !st.status_col);
     press(K_RIGHT); steps(0, 12); page1 = sw_checksum();
-    CHECK(st.page == 1 && st.mode == M_STATUS && page0 != page1);
+    CHECK(st.page == 1 && st.status_col && st.mode == M_STATUS && page0 != page1);
     CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
-    press(K_LEFT); steps(0, 12); CHECKV(sw_checksum(), page0);
+    press(K_LEFT); steps(0, 12); CHECKV(st.page, 0);   // the round trip
+    CHECK(sw_checksum() != page1);
+    // The tabs wrap both ways. Only the page is checked here: the glove sways, so a
+    // screen is only the same screen again after the same number of frames.
+    press(K_RIGHT); press(K_RIGHT); CHECKV(st.page, 2); CHECKV(st.status_col, 0);
+    press(K_RIGHT); CHECKV(st.page, 0);
+    press(K_LEFT); CHECKV(st.page, 2);
+    press(K_LEFT); CHECKV(st.page, 1); CHECKV(st.status_col, 1);
+    press(K_LEFT); steps(0, 12); CHECKV(st.page, 0); CHECKV(st.status_row, 0);
     press(K_ESC); CHECKV(st.mode, M_MENU);
     st.menu = MN_STATUS; press(K_A); steps(0, 12); CHECKV(sw_checksum(), page0);
-    press(K_RIGHT); steps(0, 12);
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 5; i++) {                                 // Eqp.: the five slots
         CHECKV(st.status_row, i); CHECKV(st.status_col, 0);
         press(K_A); steps(0, 12); CHECK(st.status_info && st.mode == M_STATUS);
-        old = sw_checksum(); CHECK(old != page1);
+        old = sw_checksum(); CHECK(old != page0);
         press(K_DOWN); CHECKV(sw_checksum(), old); CHECKV(st.status_row, i);
         press(K_ESC); steps(0, 12); CHECK(!st.status_info && st.mode == M_STATUS);
         CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
@@ -1341,21 +1351,24 @@ static void test_interface(void)
     }
     CHECKV(st.status_row, 0); press(K_UP); CHECKV(st.status_row, 4);
     for (j = 0; known(st.sel, j) != NO_ABIL; j++) ;
-    press(K_RIGHT); CHECKV(st.status_col, 1); CHECK(st.status_row < j);
+    press(K_RIGHT); steps(0, 12);                             // Abil.: one row an ability
+    CHECKV(st.status_col, 1); CHECKV(st.status_row, 0);
     for (i = 0; i < j; i++) {
         st.status_row = i; press(K_A); steps(0, 12); CHECK(st.status_info);
         CHECK(known(st.sel, i) != NO_ABIL);
         press(K_ESC); CHECK(!st.status_info); CHECK(!memcmp(original.unit, st.unit, sizeof st.unit));
     }
-    press(K_RIGHT); CHECKV(st.page, 0); press(K_ESC); CHECKV(st.mode, M_MENU);
+    press(K_RIGHT); CHECKV(st.page, 2); press(K_ESC); CHECKV(st.mode, M_MENU);
     sw_init(58); steps(0, 12); CHECK(st.unit[st.sel].defend && known(st.sel, st.status_row) == NO_ABIL);
     press(K_ESC); CHECK(!st.status_info); press(K_A); CHECK(st.status_info);
     sw_init(55); steps(0, 12); CHECKV(st.unit[st.sel].eq[st.status_row], 0xFF);
     sw_init(32); st.unit[st.sel].learned = 0; st.unit[st.sel].defend = 0;
-    st.status_col = 1; st.status_row = 0; press(K_A); steps(0, 12); CHECKV(known(st.sel, st.status_row), NO_ABIL);
-    sw_init(40); st.unit[st.sel].learned = 0xFF; st.unit[st.sel].defend = 1;
-    press(K_RIGHT); st.status_row = 4; press(K_DOWN); steps(0, 12); CHECKV(st.status_row, 5);
-    press(K_A); steps(0, 12); CHECK(st.status_info && known(st.sel, 5) == NO_ABIL);
+    st.status_row = 0; press(K_A); steps(0, 12); CHECKV(known(st.sel, st.status_row), NO_ABIL);
+    // Defend takes the row after the last ability, and the page holds five rows, so
+    // four abilities put it on row 4 -- where its glove still stands on the screen.
+    sw_init(40); st.unit[st.sel].learned = 0x0F; st.unit[st.sel].defend = 1;
+    steps(0, 12); st.status_row = 3; press(K_DOWN); steps(0, 12); CHECKV(st.status_row, 4);
+    press(K_A); steps(0, 12); CHECK(st.status_info && known(st.sel, 4) == NO_ABIL);
     press(K_ESC); press(K_DOWN); CHECKV(st.status_row, 0);
     // The old height/depth area shows only scenery, on both canal and dry tiles.
     for (i = 0; i < 2; i++) {
