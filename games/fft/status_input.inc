@@ -9,6 +9,7 @@ static u8 status_ability_count(void)
     u8 n = 0;
     n=(u8)known(st.sel,255);
     n += st.unit[st.sel].defend;
+    if (n > US_SET_ROWS) n = US_SET_ROWS;   // a sixth row's glove stands off the screen
     return n ? n : 1;
 }
 

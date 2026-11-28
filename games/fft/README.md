@@ -149,9 +149,11 @@ its target, its preview and its ability's name, its camera turned when a unit is
 hidden (milestone 23). The reach as FFT's tiles (white, a 2-pixel black edge drawing the grid), all
 shown at once, [MODE] drawing them over the scenery in front (milestone 24); an attack's or an
 ability's reach inverted (black, a white edge), the picked tile drawn as the inverse of its reach's.
-An AI turn's unit is shown 1.5 s (`AI_HOLD`, the world moving) once its plan is made; the active
-unit's pointer bobs up and down. From a play-through on the PC: [2nd] held speeds AI turns up
-(`AI_FAST` steps a frame, never while thinking or over the budget), the aimed unit is drawn over
+An AI turn's unit is shown 1.5 s (`AI_HOLD_TICKS`, the world moving) once its plan is made; the
+active unit's pointer bobs up and down. From a play-through on the PC: [2nd] held speeds AI turns
+up (`AI_FAST` steps a frame, never while thinking or over the budget, and the rest of that 1.5 s
+pause skipped: it is counted in real ticks, which no number of steps a frame can shorten), the
+aimed unit is drawn over
 the others every other 8 frames, the prediction says "KO" for a sure kill and caps a heal, a KO
 enemy keeps a smaller diamond, the item list is titled with its skill set, and the results add
 Ramza's rounds, the player's side's KOs and the crystals or chests left. Banners drawn by a tiny

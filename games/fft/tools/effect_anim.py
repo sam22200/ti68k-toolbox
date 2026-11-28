@@ -25,27 +25,62 @@ the records of exactly 28 bytes -- the single-polygon ones -- and read three of 
 corners. For Stasis Sword that is 42 frames out of 128, and the dropped ones are the
 interesting ones: the shards are drawn as three polygons at a time.
 
-**Section 1 -- the script.** `u16 count, u16 0`, then `count` u16 offsets *relative to
-byte 4*, then one byte-code stream per sequence:
+**Section 1 -- the sprite sequences.** `u16 count, u16 0`, then `count` u16 offsets
+*relative to byte 4*, then one byte-code stream per sequence:
 
-    0x00..0x7f  <u8 ticks> <u8 flag>   draw that frame of section 0, hold `ticks`
-    0x81                                end of sequence
-    0x82 <s16 x> <s16 y>                set the position
+    0x00..0x7f  <u8 hold> <u8 depth>   draw that frame of section 0, hold `hold` ticks
+    0x81                                LOOP, back to the first byte
+    0x82 <s16 x> <s16 y>                set the offset
     0x83 <s8 dx> <s8 dy>                move by (dx, dy)
 
-Ticks are 60 Hz: the usual `02` is one frame at 30 fps. Verified by decoding every effect
-on the disc: 1537 sequences, all of them parse to their 0x81 with no fifth opcode.
+Ticks are 60 Hz: the usual `02` is one frame at 30 fps. Every sequence of all 291 data
+effects parses with these four and no fifth. `depth` is the ordering-table depth mode
+(0 unchanged, 1 nearer 8, 2 fixed 8, 3 farthest, 4 fixed 16, 5 nearer 16).
 
-**Section 3 -- the cast.** `u16 2, u16 count`, 16 more bytes, then `count` records of 196
-bytes. Byte 1 of a record is the sequence it plays, so one sequence can be cast twice.
-The rest is unread; 4096 appears where a scale would (the PS1's 1.0), and the fields that
-move between records are listed by `--cast`.
+**Section 3 -- the particle emitters**, `effect_geometry_entry_t`, 196 bytes each: byte
+0x01 is the sprite sequence its particles play, 0x04 its frame group, 0xb0 the particles
+per spawn and 0xb4 the frames between spawns.
 
-What this does *not* do: the first eight bytes of a polygon are the hardware's texture
-page and palette, and are ignored here in favour of section 9's own atlas, which is what
-`effect_rip.py` already decodes.
+**Section 2 -- the effect script** (`--program`). A 9-bit opcode in a 16-bit header,
+seven selector bits above it, and 2, 4, 6 or 8 bytes wide by opcode. Stasis Sword's is
+eleven instructions: initialise the particles, end if there is no target, run the parent
+timeline to its total duration while updating the particles every frame, then keep
+updating until no particle is left, then end. **That is the stop a sequence does not
+have.**
+
+**Section 7 -- the timeline** (`--phases`), 6278 bytes. `phase1_duration`,
+`child.duration`, `phase2_duration` and `spawn_delay`, then five particle channels, each
+a table of 25 keyframe boundaries naming an emitter and an action. Frames here are the
+battle's 30 fps, not the sequences' 60 Hz ticks.
+
+**This is the choreography.** Stasis Sword: 11 + 55 + 20 = 86 frames, and channel 0 of
+its child timeline starts emitters 2, 3, 4, 5 and 6 at frames 2, 5, 8, 11 and 14 -- the
+five shards, three frames apart. The stagger was never in the emitter record, which is
+why reading that record harder was never going to find it.
+
+**`--render` plays that timeline.** Each keyframe of a particle channel spawns its
+emitter's `particle_count` particles every `spawn_interval` frames while the keyframe
+lasts; each particle loops the emitter's sprite sequence for its lifetime (-1 meaning
+until the effect ends), and the whole thing starts after phase 1. `--flat` gives the old
+behaviour -- every sequence once from t=0 -- for comparing the two.
+
+Each emitter is placed by its `spawn_position_start`, which is what separates Night
+Sword's ball overhead from its burst on the victim.
+
+**Still not modelled: the spawn spread and the particle velocities.** Night Sword's
+emitter 2 spawns a particle a frame for 35 frames -- 315 draws of one cell. Scattered
+through its spread that is the tall white column the game shows; piled on one point it is
+a white dot. Scattering in screen space only smears it, so it stays out until the camera
+matrix is here. Phase 1 and phase 2 draw nothing either, their own channels being empty
+in the effects looked at so far.
+
+The layouts above are the names of **adamrt/fft_decomp**, a byte-exact decompilation of
+SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
+`effect_emitter_data.h`. Everything this tool had reverse-engineered by hand matched it,
+except the three things listed here.
 """
 import argparse
+import math
 import struct
 import sys
 from pathlib import Path
@@ -56,8 +91,8 @@ import core_audit  # noqa: E402
 import effect_rip  # noqa: E402
 import extract  # noqa: E402
 
-REC_SIZE = 196          # one section-3 record
-END, MOVETO, MOVEBY = 0x81, 0x82, 0x83
+REC_SIZE = 196          # effect_geometry_entry_t: one particle emitter
+LOOP, MOVETO, MOVEBY = 0x81, 0x82, 0x83
 
 
 def sections(raw):
@@ -125,9 +160,10 @@ def script(sec1):
         while p < end:
             op = sec1[p]
             if op < 0x80:
+                # frame_index, hold, depth_mode (the ordering-table depth)
                 ops.append(('frame', op, sec1[p + 1], sec1[p + 2])); p += 3
-            elif op == END:
-                ops.append(('end',)); p += 1; break
+            elif op == LOOP:
+                ops.append(('loop',)); p += 1; break    # back to the first byte
             elif op == MOVETO:
                 ops.append(('moveto',) + struct.unpack_from('<2h', sec1, p + 1)); p += 5
             elif op == MOVEBY:
@@ -139,7 +175,12 @@ def script(sec1):
 
 
 def cast(sec3):
-    """The section-3 records: which sequence each one plays, and its raw 196 bytes."""
+    """The particle emitters of section 3: `effect_geometry_entry_t`, 196 bytes.
+
+    Byte 0x01 is `animation_index`, the sprite sequence its particles play, and
+    0x04 the frame group of that sequence. The rest is spawn geometry, curve
+    bindings, lifetime, `particle_count` at 0xb0 and `spawn_interval` at 0xb4.
+    """
     if len(sec3) < 20:
         return []
     ver, cnt = struct.unpack_from('<2H', sec3, 0)
@@ -169,6 +210,361 @@ def play(ops, nframes):
     return out
 
 
+# ------------------------------------------- section 2: the effect script
+# Opcode in the low nine bits of a 16-bit header, the seven bits above it are
+# selectors. Widths are each handler's `record->pc +=` in the decompilation
+# (src/battle/effects/playback.c); a jump sets the cursor instead.
+SCRIPT_OPS = {
+    0x00: ('jump_and_yield', 4), 0x01: ('jump', 4), 0x02: ('spawn_child', 4),
+    0x03: ('free_child', 2), 0x04: ('end', 2), 0x05: ('store_high_nibble', 2),
+    0x06: ('register_callback', 4), 0x07: ('call_callback', 4),
+    0x08: ('camera_position', 8), 0x09: ('save_camera_position', 2),
+    0x0a: ('restore_camera_position', 2), 0x0b: ('camera_rotation', 8),
+    0x0c: ('save_camera_rotation', 2), 0x0d: ('restore_camera_rotation', 2),
+    0x0e: ('camera_zoom', 8), 0x0f: ('save_camera_zoom', 2),
+    0x10: ('set_counter', 4),
+    0x11: ('jump_if_counter_eq', 6), 0x12: ('jump_if_counter_ge', 6),
+    0x13: ('jump_if_counter_gt', 6), 0x14: ('jump_if_counter_le', 6),
+    0x15: ('jump_if_counter_lt', 6), 0x16: ('jump_if_particles_eq', 6),
+    0x17: ('jump_if_particles_gt', 6), 0x18: ('jump_if_particles_lt', 6),
+    0x19: ('jump_if_children_eq', 6), 0x1a: ('jump_if_child_active', 4),
+    0x1b: ('jump_if_child_inactive', 4), 0x1c: ('jump_if_counter_ne', 6),
+    0x1d: ('jump_after_child_timeline', 4), 0x1e: ('jump_after_total_duration', 4),
+    0x1f: ('jump_if_targets_eq', 4), 0x20: ('counter_inc', 2),
+    0x21: ('counter_dec', 2), 0x22: ('counter_add', 4), 0x23: ('counter_sub', 4),
+    0x24: ('restore_camera_zoom', 2), 0x25: ('update_all_particles', 2),
+    0x26: ('spawn_emitter_particles', 2), 0x27: ('init_particle_physics', 2),
+    0x28: ('step_child_timeline', 2), 0x29: ('step_parent_timeline', 4),
+    0x2a: ('reset_child_timeline', 2), 0x2b: ('reset_parent_timeline', 2),
+    0x2c: ('nop', 2), 0x2d: ('nop', 2),
+}
+
+
+def program(sec2):
+    """Section 2 disassembled: [(offset, opcode, name, selectors, operands), ...]."""
+    out, p = [], 0
+    while p + 2 <= len(sec2):
+        head = struct.unpack_from('<H', sec2, p)[0]
+        op = head & 0x1ff
+        name, width = SCRIPT_OPS.get(op, ('?%03x' % op, 2))
+        ops = [struct.unpack_from('<h', sec2, p + 2 + 2 * i)[0]
+               for i in range((width - 2) // 2) if p + 4 + 2 * i <= len(sec2)]
+        out.append((p, op, name, head >> 9, ops))
+        p += width
+        if op == 0x04:
+            break                               # end of this routine
+    return out
+
+
+# ------------------------------------------- section 7: the timeline
+KEYFRAMES = 128         # effect_keyframe_table_t
+
+
+def _keyframes(buf, at):
+    if at + KEYFRAMES > len(buf):
+        return None
+    start = struct.unpack_from('<25H', buf, at)
+    emitter = struct.unpack_from('<24B', buf, at + 0x32)
+    action = struct.unpack_from('<25H', buf, at + 0x4a)
+    last = struct.unpack_from('<h', buf, at + 0x7e)[0]
+    if last <= 0 or not any(emitter):
+        return None
+    return [dict(k=k, frm=start[k - 1], to=start[k],
+                 emitter=(emitter[k - 1] - 1) if emitter[k - 1] else None,
+                 action=action[k])
+            for k in range(1, min(last, 24) + 1)]
+
+
+def phases(sec7):
+    """`effect_timeline_t`: the durations, the spawn delay and the particle channels.
+
+    The script runs the parent timeline in three stages: phase 1 for
+    `phase1_duration` frames, then one child per effect target `spawn_delay`
+    frames apart each running the child timeline for `child.duration`, then
+    phase 2. Frames are the battle's 30 fps, not the sequences' 60 Hz ticks.
+    """
+    if len(sec7) < 6278:
+        return None
+    _, p2, p1, delay = struct.unpack_from('<4H', sec7, 0)
+    child = struct.unpack_from('<H', sec7, 0x00a)[0]
+    out = dict(phase1=p1, child=child, phase2=p2, spawn_delay=delay,
+               total=p1 + child + p2, child_channels=[], phase_channels=[])
+    for c in range(5):
+        out['child_channels'].append(_keyframes(sec7, 0x00c + KEYFRAMES * c))
+    for ph in range(2):
+        out['phase_channels'].append(
+            [_keyframes(sec7, 0x82a + KEYFRAMES * (ph * 5 + c)) for c in range(5)])
+    return out
+
+
+KEYFRAME_ACTIONS = ((0x0008, 'caster only'), (0x0010, 'post-action display'),
+                    (0x0020, 'update display'), (0x0040, 'target animation'))
+
+
+def action_text(a):
+    bits = [n for m, n in KEYFRAME_ACTIONS if a & m]
+    if a & 0x0007:
+        bits.append('callback %d' % (a & 7))
+    if a >> 8:
+        bits.append('animation %d' % (a >> 8))
+    return ', '.join(bits)
+
+
+# ---------------------------------------------- the battle camera's projection
+# `camera_update_matrices` is `RotMatrix(rotation)` then `ScaleMatrix(zoom)`, and
+# the header names the values: pitch `CAMERA_TILT_LOW` 0x12e or `CAMERA_TILT_HIGH`
+# 0x1c0 (4096 is a full turn, so 26.5 and 39.4 degrees), zoom ONE or 0xc00. The
+# effect renderer projects with RotTrans, not RotTransPers -- no perspective
+# divide -- so world to screen is the rotation's first two rows and nothing else.
+PITCH, YAW = 0x12e, 0x200          # tilt low, and the isometric 45-degree yaw
+
+
+def camera(pitch=PITCH, yaw=YAW):
+    """(vx, vy) of a world (dx, dy, dz): two rows of Rx(pitch) * Ry(yaw).
+
+    At tilt low a world y reaches the screen at cos 26.5 = 0.895, and a
+    horizontal offset splits between x at cos/sin of the yaw and y at 0.316.
+    """
+    th, ph = pitch / 4096.0 * 2 * math.pi, yaw / 4096.0 * 2 * math.pi
+    st, ct, sp, cp = math.sin(th), math.cos(th), math.sin(ph), math.cos(ph)
+
+    def project(dx, dy, dz=0):
+        return (cp * dx + sp * dz, st * sp * dx + ct * dy - st * cp * dz)
+    return project
+
+
+def curves(sec4):
+    """Section 4's animation curves: one 160-value ramp each, 128 being neutral."""
+    if len(sec4) < 4:
+        return []
+    n = struct.unpack_from('<I', sec4, 0)[0]
+    if n > 64 or 4 + 160 * n > len(sec4):
+        return []
+    return [list(sec4[4 + 160 * i:4 + 160 * (i + 1)]) for i in range(n)]
+
+
+def _tint(rec, cur, n):
+    """A particle's colour this frame, from its emitter's three colour curves.
+
+    `block->header.color` starts at `EFFECT_COLOR_NEUTRAL` (128) and the particle
+    renderer feeds it `curves[color_curves.r][curve_frame]` and its green and
+    blue, with `curve_frame` counting the particle's own frames and wrapping at
+    160. So a particle fades over its life -- which is what keeps a stack of
+    them from clipping to white the way nineteen flat copies do.
+    """
+    if not cur:
+        return (1.0, 1.0, 1.0)
+    sel = struct.unpack_from('<I', rec, 0x10)[0]
+    out = []
+    for k in range(3):
+        i = (sel >> (4 * k)) & 0xf
+        out.append(cur[i][n % 160] / 128.0 if i < len(cur) else 1.0)
+    return tuple(out)
+
+
+def _velocity(rec, key):
+    """One particle's world displacement per frame, from its emitter's motion.
+
+    `(0, radial_speed, 0)` rotated by the base angle plus a random spread, times
+    eight, against a position carrying 12 fractional bits -- so the world step is
+    `out / 512` a frame. Without a curve bound the stored spread is **halved**.
+    The integration damps by `(inertia - threshold) / inertia`, and the engine's
+    threshold starts at 0, which leaves the velocity constant; acceleration and
+    gravity are not modelled.
+    """
+    lo, hi = struct.unpack_from('<2h', rec, 0x5c)          # radial_speed_start
+    if lo == 0 and hi == 0:
+        return 0.0, 0.0, 0.0
+    ax, ay, _ = struct.unpack_from('<3h', rec, 0x14 + 0x18)   # velocity_base_angle
+    sx, sy, _ = struct.unpack_from('<3h', rec, 0x14 + 0x24)   # velocity_spread
+    r = _rand3(key)
+    th = (ax + r[0] * (sx / 2.0)) / 4096.0 * 2 * math.pi
+    ph = (ay + r[1] * (sy / 2.0)) / 4096.0 * 2 * math.pi
+    speed = (lo + (hi - lo) * (r[2] + 1) / 2.0) / 512.0
+    return (speed * math.sin(th) * math.sin(ph),
+            speed * math.cos(th),
+            speed * math.sin(th) * math.cos(ph))
+
+
+def _rand3(key):
+    """Three repeatable values in [-1, 1]."""
+    h, out = 2166136261, []
+    for i in range(3):
+        for q in key + (i,):
+            h = ((h ^ (q & 0xffff)) * 16777619) & 0xffffffff
+        out.append(((h >> 8) & 0xffff) / 65535.0 * 2 - 1)
+    return out
+
+
+def _spawn_offset(spread, box, key):
+    """Where in its spread a particle is born.
+
+    `EFFECT_EMITTER_BOX_SPREAD` (0x0100 of the placement flags) says "spawn
+    inside the spread box; **clear, on the spread ellipsoid**". Clear is the
+    common case -- 1,429 of the disc's 1,893 emitters against 464 boxes -- and
+    filling the volume instead of its surface piles every particle of a stream
+    near one point, which is what burned Night Sword's ball white.
+    """
+    sx, sy, sz = spread
+    if not (sx or sy or sz):
+        return 0.0, 0.0, 0.0
+    v = _rand3(key)
+    if box:
+        return v[0] * sx, v[1] * sy, v[2] * sz
+    n = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2) or 1.0   # onto the surface
+    return v[0] / n * sx, v[1] / n * sy, v[2] / n * sz
+
+
+def _motion(rec, key, n):
+    """A particle's world offset after `n` frames: velocity, acceleration, homing.
+
+    `effect_particle_integrate_motion` is `position += velocity`, then
+    `velocity += acceleration` once the inertia terms cancel (the engine's
+    threshold starts at 0), then `acceleration += acceleration_step` -- or, when
+    `homing_strength` is set, the acceleration is steered toward the target with
+    the `(step - delta) * strength / 127 + delta` of the original, `strength`
+    being -128 without a homing curve. Gravity is a global an opcode sets and is
+    not modelled.
+    """
+    vel = list(_velocity(rec, key))
+    if n <= 0:
+        return 0.0, 0.0, 0.0
+    acc = [struct.unpack_from('<2h', rec, 0x64 + 4 * k)[0] / 4096.0 for k in range(3)]
+    step = [struct.unpack_from('<2h', rec, 0x7c + 4 * k)[0] / 4096.0 for k in range(3)]
+    homing = struct.unpack_from('<2h', rec, 0xb8)[0] / 4096.0
+    target = [v / 1.0 for v in struct.unpack_from('<3h', rec, 0x9c)]
+    pos = [0.0, 0.0, 0.0]
+    for _ in range(min(n, 600)):
+        for k in range(3):
+            pos[k] += vel[k]
+            vel[k] += acc[k]
+        if homing:
+            d = [target[k] - pos[k] for k in range(3)]
+            m = math.sqrt(sum(x * x for x in d))
+            d = [x / m * homing for x in d] if m else [0.0, 0.0, 0.0]
+            for k in range(3):
+                acc[k] += (step[k] - d[k]) * -128 / 127.0 + d[k]
+        else:
+            for k in range(3):
+                acc[k] += step[k]
+    return pos[0], pos[1], pos[2]
+
+
+def play_window(ops, nframes, t0, t1, animation_driven):
+    """One particle's draws, walking its sequence the way the engine walks it.
+
+    Two things end a sequence, and neither is the 0x81:
+
+    * **a hold of 0 freezes the cursor.** The stepper only advances when the
+      hold it just loaded is non-zero (`if (node->frame_timer != 0)
+      node->sequence_offset += 3;`), so a frame written `NN 00 dd` is held for
+      good. Nearly every sequence ends on one, which is why the 0x81 behind it
+      is usually never reached;
+    * **a lifetime of -1 is not endless, it is animation-driven**
+      (`EFFECT_PARTICLE_LIFETIME_ANIMATION_DRIVEN`). Such a particle is freed
+      the frame its `frame_timer` reaches 0 -- that is, on the frozen frame.
+
+    So an animation-driven particle plays its sequence exactly once and dies on
+    the held frame; one with a lifetime holds that frame until its time runs
+    out, and only a sequence with no held frame ever reaches the 0x81 and loops.
+    Reading -1 as "endless" made every shard of Stasis Sword fall twice.
+    """
+    out, t, i, x, y, guard = [], t0, 0, 0, 0, 0
+    while t < t1 and i < len(ops) and guard < 20000:
+        guard += 1
+        op = ops[i]
+        if op[0] == 'moveto':
+            x, y = op[1], op[2]; i += 1
+        elif op[0] == 'moveby':
+            x += op[1]; y += op[2]; i += 1
+        elif op[0] == 'loop':
+            i = 0                                   # back to the first byte
+        elif op[0] == 'frame':
+            f, hold, depth = op[1], op[2], op[3]
+            if f < nframes:
+                held = 2 if (hold == 0 and animation_driven) else \
+                       (t1 - t if hold == 0 else min(hold, t1 - t))
+                out.append(dict(t=t, frame=f, x=x, y=y, depth=depth, ticks=held))
+            if hold == 0:
+                break                               # frozen: dead, or held to the end
+            t += hold; i += 1
+        else:
+            i += 1
+    return out
+
+
+def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
+    """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
+
+    Each keyframe of a particle channel spawns its emitter's `particle_count`
+    particles every `spawn_interval` frames while the keyframe lasts; each
+    particle plays the emitter's sprite sequence, looping, for its lifetime
+    (-1 meaning until the effect ends). The child timeline starts after phase 1.
+
+    Not modelled: the spawn spread and velocities of the emitter's geometry, so
+    the particles of one spawn land on top of each other instead of scattering.
+    """
+    if not tl:
+        return None
+    project = project or camera()
+    out = []
+    for c, kfs in enumerate(tl['child_channels']):
+        for k in kfs or []:
+            e = k['emitter']
+            if e is None or e >= len(cs):
+                continue
+            rec = cs[e]['raw']
+            seq = rec[1]
+            if seq >= len(seqs):
+                continue
+            count = max(1, struct.unpack_from('<h', rec, 0xb0)[0])
+            interval = max(1, struct.unpack_from('<h', rec, 0xb4)[0])
+            life = struct.unpack_from('<h', rec, 0x94)[0]
+            # Where this emitter sits, from `spawn_position_start` (0x14).
+            # `EFFECT_LIST_NODE_WORLD` adds the particle's world position and
+            # the sequence's own offset *before* the camera matrix and projects
+            # them with RotTrans -- no perspective divide -- so both are world
+            # units, and the quad corners alone are screen pixels. Both go
+            # through the camera here, so Night Sword's ball lands high and its
+            # burst on the victim. The spread at 0x20 is `--scatter`: it is the
+            # ellipsoid a spawn fills, and without the particle velocities that
+            # is only half the model.
+            pw = struct.unpack_from('<3h', rec, 0x14)
+            sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
+            box = struct.unpack_from('<H', rec, 0x02)[0] & 0x0100
+            # The spawn gate is `time % spawn_interval != 0`, and `time` is NOT
+            # the record's frame counter: the child timeline passes
+            # `step = state.child.step[i]++`, which `state.child.step[i] = 0`
+            # resets on entering each keyframe. So the count starts at 0 inside
+            # every keyframe, step 0 always passes, and an emitter spawns on the
+            # keyframe's first frame and then every `interval` frames.
+            # That is why Stasis Sword's shards appear at all with an interval
+            # of 49 inside 2-frame keyframes -- only step 0 ever passes -- and
+            # it is also why Night Sword's ball is spawned three times: interval
+            # 1 across a 3-frame keyframe. Those three are in the file.
+            born = k['frm']
+            while born < max(k['to'], k['frm'] + 1):
+                die = tl['child'] if life < 0 else min(tl['child'], born + life)
+                t0 = (tl['phase1'] + born) * 2          # frames at 30 fps -> 60 Hz ticks
+                t1 = (tl['phase1'] + die) * 2
+                for i in range(count):
+                    key = (e, born, i)
+                    j = _spawn_offset(sw, box, key) if scatter else (0, 0, 0)
+                    for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
+                        n = (d['t'] - t0) // 2          # frames this one has lived
+                        tint = _tint(rec, cur, n)
+                        m = _motion(rec, key, n)
+                        ox, oy = project(pw[0] + j[0] + m[0],
+                                         pw[1] + j[1] + m[1],
+                                         pw[2] + j[2] + m[2])
+                        sx, sy = project(d['x'], d['y'])
+                        out.append(dict(d, inst=e, seq=seq, chan=c, tint=tint,
+                                        x=ox + sx, y=oy + sy))
+                born += interval
+    out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
+    return out
+
+
 def timeline(fr, seqs, cs):
     """Every draw of the whole effect, as (tick, instance, sequence, frame, x, y)."""
     out = []
@@ -184,19 +580,45 @@ def timeline(fr, seqs, cs):
 # ---------------------------------------------------------------- rendering
 
 def _atlas_rgb(raw):
-    """The effect's own atlas as float RGB and alpha arrays, from section 9."""
+    """The atlas as RGB and a draw mask, blended the way the hardware does.
+
+    The parts carry `EFFECT_SPRITE_PART_FLAG_SEMI_TRANSPARENT` and a tpage whose
+    blend mode is B+F, so a texel **adds its own colour, whole**. `effect_rip`'s
+    alpha -- brightness/2 for a flagged colour -- was invented to make an atlas
+    legible, and weighting by it keeps bright edges while dimming the body: the
+    three copies of Night Sword's ball, superposed exactly, then read as one
+    ball inside two ghost outlines instead of saturating into one.
+
+    Two colours are not drawn: palette index 0, and 0xFFFF wherever it appears.
+    In Stasis Sword's blade 0xFFFF is 58 texels, **every one of them on the
+    silhouette's edge** and a quarter of that edge -- a dotted white outline
+    the console does not show. Treating it as a colour draws that outline.
+    """
     import numpy as np
     got = effect_rip.atlas(raw)
     if not got:
         return None
     w, h, pixels, colours = got
-    lut = np.array([effect_rip.rgba(colours, i) for i in range(256)], dtype=float)
+    lut = np.zeros((256, 4))
+    for i in range(1, 256):
+        c = colours[i]
+        if c == 0 or c == 0xFFFF:
+            continue
+        lut[i] = ((c & 31) << 3, ((c >> 5) & 31) << 3, ((c >> 10) & 31) << 3, 1.0)
     idx = np.frombuffer(pixels, dtype=np.uint8).reshape(h, w)
     px = lut[idx]
-    return px[:, :, :3], px[:, :, 3] / 255.0
+    return px[:, :, :3], px[:, :, 3]
 
 
-def _tri(acc, tex, alpha, dst, src, cell):
+# The tpage's bits 5-6 are the hardware's semi-transparency mode, and the parts
+# do not all share one: of the disc's 11,233 cells, 11,743 polygons are B+F,
+# 2,041 are B+F/4, 499 B-F and 341 B/2+F/2. Adding them all at full strength
+# burns Night Sword's ball white -- its first cell is a quarter-strength one.
+# B/2+F/2 halves what is underneath too; this only scales what is added.
+BLEND = {0: 0.5, 1: 1.0, 2: -1.0, 3: 0.25}
+
+
+def _tri(acc, tex, alpha, dst, src, cell, blend=1.0):
     """Add one textured triangle to the accumulator, PS1-style (additive)."""
     import numpy as np
     (x0, y0), (x1, y1), (x2, y2) = dst
@@ -225,7 +647,7 @@ def _tri(acc, tex, alpha, dst, src, cell):
     su = np.clip(su.astype(int), u0, u1)
     sv = np.clip(sv.astype(int), v0, v1)
     a = (alpha[sv, su] * inside)[:, :, None]
-    acc[lo_y:hi_y, lo_x:hi_x] += tex[sv, su] * a
+    acc[lo_y:hi_y, lo_x:hi_x] += tex[sv, su] * a * blend
 
 
 def extent(fr, tl):
@@ -238,20 +660,31 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
     if tex is None:
         return []
     tex, alpha = tex
-    tl = timeline(fr, seqs, cs)
+    tl = schedule(fr, seqs, cs, phases(raw_sections[7]), scatter,
+                  cur=curves(raw_sections[4])) if raw_sections else None
+    if tl is None:
+        tl = timeline(fr, seqs, cs)
     if not tl:
         return []
-    if anchor is None:                          # sit the sweep on the ground line
+    if anchor is None:                          # fit the sweep, then sit it low
         x0, y0, x1, y1 = extent(fr, tl)
+        # Night Sword sweeps 251 px against a 240-px frame, so its ball fell off
+        # the top: shrink until the whole thing is inside before placing it.
+        fit = min(1.0, (size[1] * 0.96) / max(1, y1 - y0),
+                  (size[0] * 0.96) / max(1, x1 - x0))
+        if fit < 1.0:
+            scale *= fit
+            print('scaled to %.2f so the %dx%d sweep fits the %dx%d frame'
+                  % (scale, x1 - x0, y1 - y0, size[0], size[1]))
         anchor = (int(size[0] / 2 - (x0 + x1) / 2 * scale),
-                  int(size[1] * 0.92 - y1 * scale))
+                  int(size[1] * 0.98 - y1 * scale))
         print('origin at %d,%d  (the animation sweeps x %d..%d, y %d..%d)'
               % (anchor[0], anchor[1], x0, x1, y0, y1))
     last = max(d['t'] + d['ticks'] for d in tl)
@@ -268,8 +701,11 @@ def render(raw, fr, seqs, cs, size, anchor, scale):
                 s = [(u, v), (u + w, v), (u, v + h), (u + w, v + h)]
                 cell = (min(u, u + w), min(v, v + h),
                         max(u, u + w) - 1, max(v, v + h) - 1)
-                _tri(acc, tex, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell)
-                _tri(acc, tex, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell)
+                bl = BLEND.get((p['clut'] >> 5) & 3, 1.0)
+                tint = d.get('tint')
+                tx = tex * np.array(tint) if tint else tex
+                _tri(acc, tx, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell, bl)
+                _tri(acc, tx, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell, bl)
         out.append(np.clip(acc, 0, 255).astype(np.uint8))
     return out
 
@@ -288,8 +724,12 @@ def grey4(im):
     return np.repeat(out[:, :, None], 3, axis=2)
 
 
-def gif(path, png_dir, n, fps=15):
-    """ffmpeg, not PIL: PIL drops a frame identical to the one before it."""
+def gif(path, png_dir, n, fps=30):
+    """ffmpeg, not PIL: PIL drops a frame identical to the one before it.
+
+    30 fps, not 15: one PNG is one battle frame and the battle runs at 30. At 15
+    the whole effect played at half the speed the console shows.
+    """
     import subprocess
     if n == 0:
         return
@@ -311,6 +751,8 @@ def audit(disc, files):
     data = routine = 0
     cells = seqs = casts = 0
     unknown, odd, orphan = [], [], []
+    scripts = bad_op = no_end = off_boundary = tls = 0
+    tmin, tmax = 10 ** 9, 0
     for n in range(512):
         key = 'EFFECT/E%03d.BIN' % n
         if key not in files or files[key][1] == 0:
@@ -329,10 +771,28 @@ def audit(disc, files):
         for i, ops in enumerate(sq):
             if any(o[0].startswith('?') for o in ops):
                 unknown.append((n, i, [o[0] for o in ops if o[0].startswith('?')]))
-            if not ops or ops[-1][0] != 'end':
-                unknown.append((n, i, ['no end']))
+            if not ops or ops[-1][0] != 'loop':
+                unknown.append((n, i, ['no loop']))
         if any(c['seq'] >= len(sq) for c in cs):
             orphan.append(n)
+        pr = program(sec[2])
+        if pr:
+            scripts += 1
+            bounds = {o for o, _, _, _, _ in pr}
+            if any(nm.startswith('?') for _, _, nm, _, _ in pr):
+                bad_op += 1
+            if pr[-1][1] != 0x04:
+                no_end += 1
+            # every jump operand is a byte offset into the script: it must land on
+            # an instruction. This is what checks the widths taken from the decomp.
+            for _, op, nm, _, ops in pr:
+                if nm.startswith('jump') and ops and ops[-1] not in bounds:
+                    off_boundary += 1
+                    break
+        t = phases(sec[7])
+        if t:
+            tls += 1
+            tmin = min(tmin, t['total']); tmax = max(tmax, t['total'])
     print('%d data files, %d MIPS routines' % (data, routine))
     print('%d cells, %d sequences, %d cast members' % (cells, seqs, casts))
     print('sequences with an opcode this does not know: %d' % len(unknown))
@@ -341,6 +801,10 @@ def audit(disc, files):
     print('files with a frame record that is not 4 + 24n, past the blanks: %d  %s'
           % (len(odd), odd[:10]))
     print('files casting a sequence that does not exist: %d  %s' % (len(orphan), orphan[:10]))
+    print('scripts: %d disassembled, %d with an unknown opcode, %d ending without `end`,'
+          ' %d with a jump off an instruction boundary'
+          % (scripts, bad_op, no_end, off_boundary))
+    print('timelines: %d read; durations %d..%d frames at 30 fps' % (tls, tmin, tmax))
 
 
 # ---------------------------------------------------------------- CLI
@@ -353,10 +817,16 @@ def main():
     ap.add_argument('--cells', action='store_true', help='the section-0 frames')
     ap.add_argument('--cast', action='store_true', help='the section-3 records')
     ap.add_argument('--timeline', action='store_true', help='every draw, in tick order')
+    ap.add_argument('--program', action='store_true', help='section 2: the effect script')
+    ap.add_argument('--phases', action='store_true', help='section 7: durations and channels')
     ap.add_argument('--render', type=Path, help='PNG per frame plus a GIF, in this directory')
     ap.add_argument('--size', default='256x240', help='the render canvas (default 256x240)')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
+    ap.add_argument('--no-scatter', action='store_true', dest='no_scatter',
+                    help='ignore the emitters\' spawn spread, piling each stream on one point')
+    ap.add_argument('--flat', action='store_true',
+                    help='ignore the timeline: play every sequence once from t=0')
     ap.add_argument('--ti', action='store_true',
                     help='render the TI screen instead: 160x100, four greys')
     ap.add_argument('--audit', action='store_true',
@@ -392,7 +862,7 @@ def main():
             for op in ops:
                 if op[0] == 'frame':
                     print('   t%+5d  cell %3d  x%d ticks%s'
-                          % (t, op[1], op[2], '' if op[3] == 1 else '   flag %d' % op[3]))
+                          % (t, op[1], op[2], '' if op[3] == 1 else '   depth %d' % op[3]))
                     t += op[2]
                 elif op[0] == 'moveto':
                     print('   t%+5d  move to  %5d,%-5d' % (t, op[1], op[2]))
@@ -400,7 +870,7 @@ def main():
                     print('   t%+5d  move by  %5d,%-5d' % (t, op[1], op[2]))
                 else:
                     print('   t%+5d  %s' % (t, op[0]))
-            print('   total %d ticks (%d frames at 30 fps)' % (t, t // 2))
+            print('   loops after %d ticks (%d frames at 30 fps)' % (t, t // 2))
     if a.cast:
         words = [struct.unpack_from('<%dh' % (REC_SIZE // 2), c['raw'], 0) for c in cs]
         print(' %-4s %-4s %s' % ('#', 'seq', 'fields that differ between records'))
@@ -409,6 +879,33 @@ def main():
         print('      byte  ' + ' '.join('%6d' % (2 * w) for w in varying))
         for i, c in enumerate(cs):
             print(' %-4d %-4d ' % (i, c['seq']) + ' '.join('%6d' % words[i][w] for w in varying))
+    if a.program:
+        for off, op, name, sel, ops in program(sec[2]):
+            print('   %04x  %02x %-26s %s%s' % (off, op, name,
+                  ' '.join('%6d' % v for v in ops), '   sel %02x' % sel if sel else ''))
+    if a.phases:
+        t = phases(sec[7])
+        if not t:
+            print(' no timeline')
+        else:
+            print(' phase 1 %d frames, child %d, phase 2 %d  -> %d frames at 30 fps'
+                  ' (spawn delay %d between children)'
+                  % (t['phase1'], t['child'], t['phase2'], t['total'], t['spawn_delay']))
+            for label, chans in (('child', t['child_channels']),
+                                 ('phase 1', t['phase_channels'][0]),
+                                 ('phase 2', t['phase_channels'][1])):
+                for c, kfs in enumerate(chans):
+                    if not kfs:
+                        continue
+                    print('   %s, particle channel %d' % (label, c))
+                    for k in kfs:
+                        if k['emitter'] is None and not k['action']:
+                            continue
+                        print('      f%3d..%-3d  %s%s'
+                              % (k['frm'], k['to'],
+                                 'emitter %-3d' % k['emitter'] if k['emitter'] is not None
+                                 else '           ',
+                                 '  ' + action_text(k['action']) if k['action'] else ''))
     if a.timeline:
         for d in timeline(fr, seqs, cs):
             print(' t%4d (f%3d)  inst %2d seq %2d  cell %3d  at %5d,%-5d  %d ticks'
@@ -419,7 +916,9 @@ def main():
         anchor = tuple(int(v) for v in a.anchor.split(',')) if a.anchor else None
         if a.ti:
             w, h = TI_W, TI_H
-        ims = render(raw, fr, seqs, cs, (w, h), anchor, a.scale * (TI_SCALE if a.ti else 1.0))
+        ims = render(raw, fr, seqs, cs, (w, h), anchor,
+                     a.scale * (TI_SCALE if a.ti else 1.0),
+                     None if a.flat else sec, not a.no_scatter)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)

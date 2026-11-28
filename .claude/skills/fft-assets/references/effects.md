@@ -238,7 +238,10 @@ of them: start there, and keep the VRAM for questions about residency.
 **So no, each effect does not have to be rebuilt by eye.** Its choreography is in its
 file, and section 11 reads it.
 
-**There is no PS1 decompilation to lean on.** `Nax/wotl` is the PSP build.
+**There IS a PS1 decompilation**: [adamrt/fft_decomp](https://github.com/adamrt/fft_decomp),
+byte-exact on SCUS-94221, 100 % decompiled. `include/fft/effect/` names every structure
+this page reverse-engineered. Read it before guessing at a format again. (`Nax/wotl`
+decompiles the PSP build, which is a different thing.)
 
 ## 11. The animation decoder: an effect read instead of watched
 
@@ -291,8 +294,64 @@ y -283..+99 about its origin, so with the origin on the target's feet almost all
 draws below the screen and the standing column looks three times too short. Called
 without `--anchor`, the tool sits the sweep on the canvas and prints where it put it.
 
-Two things the decoder still does not settle: whether cast members ever start at
-different times (nothing in the record looks like a delay, and all of Stasis Sword's
-fall together, which the capture supports), and what the rest of the 196 bytes mean --
-`--cast` prints the fields that move between records so the next reader starts there.
+## 12. What the decompilation corrected
 
+Every layout section 11 derived by hand matched `fft_decomp`'s headers -- section map,
+24-byte polygon with four corners, signed cell size, the four sequence opcodes, 196-byte
+emitter records whose byte 1 names a sprite sequence, 6278-byte timeline, 600-byte timing
+curves, 24-byte flags, `4 + 15*160` curves. Three things were wrong, and they are the
+three that mattered:
+
+* **`0x81` is LOOP, not END.** A sprite sequence runs back to its first byte. Nothing in
+  it ends an effect, so "the decoded animation is longer than the game's" was never a
+  timing discovery -- it was a missing stop.
+* **The third byte of a frame is the ordering-table depth mode**, not a flag: 0
+  unchanged, 1 nearer 8, 2 fixed 8, 3 farthest, 4 fixed 16, 5 nearer 16. The original
+  sorts its effect sprites, and says so per frame.
+* **The atlas is 128 or 256 wide**, and byte 0x403 of section 9 (`wide_image`) says
+  which. 20 of the 291 effects are 256 wide; read at 128 they come out as a 512-row
+  ribbon with every sprite cut in half. `effect_rip.py` had assumed 128 since the start.
+
+And the start delay that section 11 could not find is **`spawn_delay` in the timeline**
+(section 7, offset 0x06), "frames between child spawns", beside `phase1_duration` and
+`phase2_duration` and, per particle channel, a 25-keyframe table. It was never in the
+emitter record, which is why reading that record harder was never going to find it.
+
+Section 2, which this page had dismissed as 64 constant bytes, is the **effect script**:
+a 9-bit-opcode interpreter with counters, branches, child spawning and camera control.
+Decoding sections 2 and 7 is what would make the playback the game's.
+
+
+
+## 13. The particle model, and how far it was checked
+
+`effect_anim.py --render` plays an effect from its timeline. What that took, and
+what each piece is worth, measured rather than argued:
+
+* **the spawn** -- a keyframe's emitter spawns on the keyframe's own frame count,
+  which `state.child.step[i] = 0` resets on entering it, so step 0 always passes
+  and the gate `step % spawn_interval` lets the first frame through. Stasis
+  Sword's shards have interval 49 inside 2-frame keyframes: one spawn each;
+* **the death** -- lifetime -1 is `ANIMATION_DRIVEN`, and the particle is freed
+  the frame its sprite node's `frame_timer` reads 0. `draw_particle_sprite` runs
+  the sequence step *before* that check and reloads the timer with the hold it
+  just read, so the timer is 0 only on a `hold 0` op. Every sequence ends on one;
+* **the spread** -- `EFFECT_EMITTER_BOX_SPREAD` clear means **on the ellipsoid's
+  surface**, not inside it, and that is 1,429 of the disc's 1,893 emitters;
+* **the blend** -- bits 5-6 of a part's tpage: 11,743 polygons B+F, 2,041 B+F/4,
+  499 B-F, 341 B/2+F/2. One uniform add burns the quarter-strength parts;
+* **the tint** -- three colour curves a particle, read at its own frame counter,
+  128 neutral. They brighten as well as dim: Night Sword's ball curve peaks at
+  255, averages 153.
+
+**Where it lands.** Night Sword's ball in the game measures (240, 177, 171)
+against (79, 54, 42) for one cell of it -- **three layers**, which is exactly
+what its emitter spawns. The render gives (237, 220, 208): the red matches to
+within a percent and green and blue run about a quarter high, which is the
+tint's x1.19 average. The model is right; the remaining error is exposure, and
+comparing a clean render against a photograph of a television is at the edge of
+what the measurement can settle.
+
+**Not modelled**: gravity (a global an opcode sets), and the bloom the console
+spreads over a lit scene -- which is most of what still separates the two
+pictures.

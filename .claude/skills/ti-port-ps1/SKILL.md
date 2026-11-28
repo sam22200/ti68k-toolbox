@@ -134,6 +134,31 @@ go on. The grilling must not grow the project.
 
 ## 3. Study the original (static + dynamic, only what the mechanic needs)
 
+**Look for a decompilation before you reverse anything.** A matching decompilation turns
+guesswork into transcription, and for some PS1 games one exists:
+
+| game | project | state |
+|------|---------|-------|
+| Final Fantasy Tactics (SCUS-94221) | [adamrt/fft_decomp](https://github.com/adamrt/fft_decomp) | **100 % decompiled, byte-exact**; `include/fft/` names every structure |
+
+Clone it beside the work (`git clone --depth 1`, 18 MB) and grep it. It carries no game
+data, only C that rebuilds the original bytes, so it answers what a format *is* rather
+than what it looks like. Headers first (`include/`, with their `size_must_be_N`
+assertions, which are the layout), then the source for behaviour -- an interpreter's
+instruction widths, for instance, are each handler's `pc +=`.
+
+Two rules, learned the hard way on FFT's effect files:
+- **check what you derived against it rather than starting over**: a hand-read format
+  that matches confirms the reading *and* the tooling around it. On FFT's effects the
+  section map, the 24-byte polygon, the signed cell size and the emitter record were all
+  right; three things were not, and those three were exactly the ones that mattered;
+- **what you could not find is usually in a section you dismissed.** The start delay of
+  FFT's effects was not in the emitter record however hard it was read: it is
+  `spawn_delay` in the timeline, a section that had been written off as padding.
+
+A decompilation is also the only honest way to settle "is this a sentinel or a colour?"
+kinds of question, which a renderer can argue about forever.
+
 Per `reference/behaviour-study.md`:
 - **Find the player's variables by experiment**: dumps standing vs moving (`--dump`,
   `ramdiff.py`), then a trace (`--trace ADDR:s2,...`) while a key script moves, jumps, climbs,

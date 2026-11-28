@@ -77,6 +77,8 @@ static u8 command_effect(u8 a,u8 t,AbId ab)
     st.hit = skill_effect_hit(a, t, ab) == 100;
 #ifdef FFT_CHAPTER
     if (b->flags & AF_EVADE) st.hit = magic_hit(a, t, ab, 1);   // magic_evasion.inc, likewise
+#else
+    if (b->flags & AF_EVADE) st.hit = roll_hit(a, t);           // Throw Stone, as the preview says
 #endif
     if (!st.hit) return 1;
     st.dmg = skill_amount(a, t, ab,

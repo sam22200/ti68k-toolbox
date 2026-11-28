@@ -8,6 +8,13 @@ static void attack_roll(u8 a,u8 t)
 #elif defined(FFT_CHAPTER)
     weapon_prepare(a,t);
 #else
-    (void)a;(void)t;   // the demo has no weapon abilities to prepare
+    // The demo has no weapon panel, but it still has to ROLL: weapon_prepare()
+    // is what decides hit, damage and knockback, and it only exists under
+    // FFT_CHAPTER. Stubbing this out left st.hit at 0 for ever, and the
+    // scenario doors that retry until a blow lands (9, 17..25, 37) spun on it.
+    st.hit=roll_hit(a,t);if(!st.hit)return;
+    st.crit=(u8)(((u32)rand15()*100>>15)<4);
+    st.dmg=attack_damage(a,t,st.crit,st.crit?rand15():0);
+    if(st.crit)knockback(a,t);
 #endif
 }

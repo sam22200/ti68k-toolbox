@@ -66,13 +66,14 @@ class Frames(unittest.TestCase):
 
 class Script(unittest.TestCase):
     def test_the_four_opcodes(self):
+        """0x81 is LOOP, not an end: a sequence repeats until the timeline stops it."""
         stream = (bytes([0x82]) + struct.pack('<2h', 0, -276)
                   + bytes([2, 2, 0]) + bytes([0x83, 0, 32])
                   + bytes([3, 30, 0]) + bytes([0x83]) + struct.pack('<2b', -8, -2)
                   + bytes([0x81]))
         ops = A.script(section1([stream]))[0]
         self.assertEqual(ops, [('moveto', 0, -276), ('frame', 2, 2, 0), ('moveby', 0, 32),
-                               ('frame', 3, 30, 0), ('moveby', -8, -2), ('end',)])
+                               ('frame', 3, 30, 0), ('moveby', -8, -2), ('loop',)])
 
     def test_play_accumulates_the_moves_and_the_clock(self):
         stream = (bytes([0x82]) + struct.pack('<2h', 10, -100)
@@ -107,6 +108,110 @@ class Cast(unittest.TestCase):
         tl = A.timeline(fr, seqs, A.cast(section3([0, 1])))
         self.assertEqual([(d['t'], d['inst'], d['frame']) for d in tl],
                          [(0, 0, 1), (0, 1, 2), (4, 0, 2)])
+
+
+class EffectScript(unittest.TestCase):          # section 2, not the sprite sequences
+    def test_widths_come_from_the_handlers(self):
+        """A jump is 4 bytes, a counter test 6, a camera move 8, a bare op 2."""
+        code = (struct.pack('<2H', 0x27, 0)[:2]          # init_particle_physics
+                + struct.pack('<2H', 0x1f, 0x22)         # jump_if_targets_eq -> 0x22
+                + struct.pack('<3H', 0x11, 3, 0x0e)      # jump_if_counter_eq 3 -> 0x0e
+                + struct.pack('<4H', 0x08, 1, 2, 3)      # camera_position
+                + struct.pack('<2H', 0x04, 0))           # end
+        got = [(o, n, ops) for o, _, n, _, ops in A.program(code)]
+        self.assertEqual([g[0] for g in got], [0, 2, 6, 12, 20])
+        self.assertEqual([g[1] for g in got],
+                         ['init_particle_physics', 'jump_if_targets_eq',
+                          'jump_if_counter_eq', 'camera_position', 'end'])
+        self.assertEqual(got[2][2], [3, 14])
+
+    def test_it_stops_at_end(self):
+        code = struct.pack('<2H', 0x04, 0) + b'\xff' * 8
+        self.assertEqual(len(A.program(code)), 1)
+
+
+class Timeline(unittest.TestCase):
+    def build(self, phase1, child, phase2, delay, keyframes):
+        buf = bytearray(6278)
+        struct.pack_into('<4H', buf, 0, 0, phase2, phase1, delay)
+        struct.pack_into('<H', buf, 0x00a, child)
+        for k, (start, end, emitter, action) in enumerate(keyframes, 1):
+            struct.pack_into('<H', buf, 0x00c + 2 * (k - 1), start)
+            struct.pack_into('<H', buf, 0x00c + 2 * k, end)
+            buf[0x00c + 0x32 + k - 1] = emitter + 1
+            struct.pack_into('<H', buf, 0x00c + 0x4a + 2 * k, action)
+        struct.pack_into('<h', buf, 0x00c + 0x7e, len(keyframes))
+        return bytes(buf)
+
+    def test_durations_and_the_spawn_delay(self):
+        t = A.phases(self.build(11, 55, 20, 50, [(2, 4, 2, 0)]))
+        self.assertEqual((t['phase1'], t['child'], t['phase2']), (11, 55, 20))
+        self.assertEqual(t['spawn_delay'], 50)
+        self.assertEqual(t['total'], 86)
+
+    def test_a_channel_gives_its_emitters_and_frames(self):
+        t = A.phases(self.build(0, 10, 0, 0, [(2, 4, 2, 0), (4, 6, 3, 0x40)]))
+        c = t['child_channels'][0]
+        self.assertEqual([(k['frm'], k['to'], k['emitter']) for k in c],
+                         [(2, 4, 2), (4, 6, 3)])
+        self.assertEqual(A.action_text(c[1]['action']), 'target animation')
+
+    def test_a_short_section_is_refused(self):
+        self.assertIsNone(A.phases(b'\0' * 100))
+
+
+class Scheduled(unittest.TestCase):
+    """The timeline drives the playback: when an emitter starts, and for how long."""
+
+    def emitter(self, seq, count=1, interval=1, life=-1):
+        r = bytearray(A.REC_SIZE)
+        r[1] = seq
+        struct.pack_into('<h', r, 0x94, life)
+        struct.pack_into('<h', r, 0xb0, count)
+        struct.pack_into('<h', r, 0xb4, interval)
+        return bytes(r)
+
+    def setUp(self):
+        rec = struct.pack('<2H', 0x02a0, 1) + poly(0, 0, 8, 8, 0, 0)
+        self.fr = A.frames(section0([rec, rec, rec]))
+        self.seqs = A.script(section1([
+            bytes([1, 2, 0]) + bytes([0x81]),
+            bytes([2, 2, 0]) + bytes([0x81])]))
+
+    def timeline(self, phase1, child, keyframes):
+        buf = bytearray(6278)
+        struct.pack_into('<4H', buf, 0, 0, 0, phase1, 0)
+        struct.pack_into('<H', buf, 0x00a, child)
+        for k, (start, end, em) in enumerate(keyframes, 1):
+            struct.pack_into('<H', buf, 0x00c + 2 * (k - 1), start)
+            struct.pack_into('<H', buf, 0x00c + 2 * k, end)
+            buf[0x00c + 0x32 + k - 1] = em + 1
+        struct.pack_into('<h', buf, 0x00c + 0x7e, len(keyframes))
+        return A.phases(bytes(buf))
+
+    def test_an_emitter_starts_at_its_keyframe_after_phase_one(self):
+        cs = [dict(seq=0, raw=self.emitter(0)), dict(seq=1, raw=self.emitter(1))]
+        tl = self.timeline(5, 10, [(2, 3, 1)])
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        # phase 1 is 5 frames, the keyframe starts at child frame 2: tick (5+2)*2
+        self.assertEqual(got[0]['t'], 14)
+        self.assertEqual(got[0]['frame'], 2)        # emitter 1 plays sequence 1
+
+    def test_it_loops_until_the_lifetime_runs_out(self):
+        cs = [dict(seq=0, raw=self.emitter(0, life=4))]
+        tl = self.timeline(0, 20, [(0, 1, 0)])
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        # a 2-tick sequence looping over 4 frames = 8 ticks: four draws
+        self.assertEqual([d['t'] for d in got], [0, 2, 4, 6])
+
+    def test_an_endless_particle_stops_with_the_child_timeline(self):
+        cs = [dict(seq=0, raw=self.emitter(0, life=-1))]
+        tl = self.timeline(0, 3, [(0, 1, 0)])
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        self.assertEqual([d['t'] for d in got], [0, 2, 4])
+
+    def test_no_timeline_means_no_schedule(self):
+        self.assertIsNone(A.schedule(self.fr, self.seqs, [], None))
 
 
 if __name__ == '__main__':

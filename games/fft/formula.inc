@@ -51,7 +51,9 @@ static u8 skill_effect_hit(u8 a, u8 t, AbId ab)
 #ifdef FFT_CHAPTER
     return b->flags & AF_EVADE ? magic_hit(a,t,ab,0) : 100;
 #else
-    return 100;        // magic evasion is the chapter's; the demo always lands
+    // The demo's one evadeable ability is Throw Stone, and FFT evades it exactly as it
+    // evades an attack: the recruit's class evade takes it to 95, Defending to 90.
+    return b->flags & AF_EVADE ? hit_chance(a,t) : 100;
 #endif
 }
 FFT_FORMULA_FN u8 skill_hit(u8 a,u8 t,AbId ab)

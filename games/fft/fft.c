@@ -3282,7 +3282,12 @@ static void chapter_grid(void)
 #endif
 
 #define AI_SPREAD 90
-#define AI_WORK 12
+#ifdef FFT_CHAPTER
+#define AI_WORK 12                     // the chapter's abilities carry geometry and overlays
+#else
+#define AI_WORK 50                     // the demo's nine are plain range checks (its own
+                                       // measured value, before the chapter lowered this)
+#endif
 #if MOD_PART(MOD_AI) || MOD_PART(MOD_AI_SETUP)
 // a unit's worth with hp HP and those statuses (Poison -26, Darkness -64: FFT's weights)
 
@@ -3341,7 +3346,10 @@ static u8 ai_usable(u8 a, AbId ab)
 static u8 ai_useful(u8 a, AbId ab, u8 t)
 {
     const Unit *ua = &st.unit[a], *ut = &st.unit[t];
-    u8 kind = weapon_order(ab)?weapon_kind(a,t,ab):abilities[ab].kind;
+    // Same trap as in ai_score: NO_ABIL is the weapon's Attack, not an abilities[] index.
+    // The demo's weapon_order() is 0, so this read ran off the table and the AI decided
+    // Attack was useful against nobody -- it was never even tried.
+    u8 kind = weapon_order(ab) ? weapon_kind(a,t,ab) : ab == NO_ABIL ? AB_DAMAGE : abilities[ab].kind;
     if (DC_OBJ(ut->dc)) return 0;
 #ifdef FFT_CHAPTER
     if(restore_ability(ab)){
@@ -3472,7 +3480,12 @@ static s16 __attribute__((noinline)) ai_score(u8 a, AbId ab, u8 t, u8 o, u8 *hit
 {
     Unit *ua = &st.unit[a], *ut = &st.unit[t];
     u8 isweapon=weapon_order(ab);
-    u8 kind = isweapon?weapon_kind(a,t,ab):abilities[ab].kind, status = ut->status;
+    // NO_ABIL is the weapon's Attack, and it is no index into abilities[]: the chapter
+    // catches it through weapon_order(), but the demo's weapon_order() is 0, so this read
+    // ran off the end of the nine-ability table. The AI then scored every Attack on a
+    // garbage kind and never ranked one.
+    u8 kind = isweapon ? weapon_kind(a,t,ab) : ab == NO_ABIL ? AB_DAMAGE : abilities[ab].kind;
+    u8 status = ut->status;
     u16 hp = ut->hp, m;
     s16 d;
 #ifdef FFT_CHAPTER
@@ -5766,7 +5779,10 @@ void game_scenario(u16 n)
         else if (n == 51) st.unit[U_RAMZA].hp = 1;
     }
     if (n >= 53 && n <= 58) {                     // equipment and ability inspection
-        st.ai = AI_OFF; st.mode = M_STATUS; st.back = M_MENU; st.page = st.status_info = 1;
+        // The sheet's tab is st.page, and status_col follows it: 53..55 inspect a
+        // piece of equipment, so they open on Eqp., not on the ability page.
+        st.ai = AI_OFF; st.mode = M_STATUS; st.back = M_MENU; st.status_info = 1;
+        st.page = (u8)(n >= 56);
         st.sel = U_RAMZA; st.status_row = n == 53 ? EQ_WEAPON : n == 55 ? 4 : 0;
         if (n >= 56) {
             st.status_col = 1;
@@ -6089,7 +6105,11 @@ static void ai_step(void)
             if (done) st.ai = AI_GO;            // (this frame keeps the picture)
         }
     } else if (st.ai == AI_GO) {                // thinking counts toward the turn's pause
-        if (st.ai_t != AI_HOLD_SKIP && !(st.dbg & DBG_FAST) && (u16)(rt_ticks()-ai_hold_start)<AI_HOLD_TICKS) return;
+        // [2nd] held skips the rest of the pause. It is counted in real ticks, not in frames,
+        // so the extra steps of a held [2nd] cannot shorten it: without this it pinned every AI
+        // turn to AI_HOLD_TICKS however fast the rest ran -- a third of a sped-up turn's frames.
+        if (st.ai_t != AI_HOLD_SKIP && !(st.dbg & DBG_FAST) && !(rt_keys & (K_A | K_ENTER))
+            && (u16)(rt_ticks()-ai_hold_start)<AI_HOLD_TICKS) return;
         ai_camera(); ai_next(); W->hold = 1;    // then the plan shown from the next
     }                                           // frame (this one keeps the picture)
     else if (st.ai == AI_FACE ? ++st.ai_t >= AI_SHOW / 2 : ai_shown()) {
@@ -7359,9 +7379,16 @@ static u8 status_hand_y, status_hand_live;   // where its glove last stood
 // whole screen, which is all the sway and the sprite can reach.
 static void status_band(u8 y)
 {
-    const u8 *l = (const u8 *)W->status[0] + (u16)y * RT_PBYTES;
-    const u8 *d = (const u8 *)W->status[1] + (u16)y * RT_PBYTES;
-    u8 rows = (u8)(y + 14 > RT_H ? RT_H - y : 14);
+    const u8 *l, *d;
+    u8 rows;
+    // `RT_H - y` is unsigned: a glove below the screen wrapped it past 200 rows and
+    // copy_box wrote clean off the end of the planes, over whatever the runtime kept
+    // behind them. The Abil. page reaches that when a unit has five abilities and
+    // Defend, which makes a sixth row the layout has no room for.
+    if (y >= RT_H) return;
+    l = (const u8 *)W->status[0] + (u16)y * RT_PBYTES;
+    d = (const u8 *)W->status[1] + (u16)y * RT_PBYTES;
+    rows = (u8)(y + 14 > RT_H ? RT_H - y : 14);
     copy_box((const u16 *)l, (const u16 *)d, 0, y, 5, rows);
 }
 static u8 status_hand_row(void)

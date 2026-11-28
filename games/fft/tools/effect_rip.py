@@ -6,7 +6,8 @@ The original's combat effects live in EFFECT/, 512 files, 401 of them non-empty.
 is code, Cure 1-3 are data, so some abilities have no atlas to take.
 
 A data file opens with the little-endian u32 40 and a ten-entry u32 offset table.
-Section 9 holds the pictures: 1028 bytes of palette, then an 8bpp image 128 wide.
+Section 9 holds the pictures: 1028 bytes of palette, then an 8bpp image 128 or
+256 wide -- byte 0x403 of that section says which.
 
   **The height is not fixed.** It is (len(section 9) - 1028) / 128, and it varies:
   Fire is 128x120, Fire 2 is 128x160, Fire 3 and 4 are 128x256. Assuming 256 --
@@ -43,10 +44,18 @@ import extract  # noqa: E402
 
 PALETTE_BYTES = 1028
 WIDTH = 128
+WIDE = 256                 # the palette section's wide_image flag
 
 
 def atlas(raw):
-    """(width, height, pixels) of an effect file, or None when it is not data."""
+    """(width, height, pixels, palette) of an effect file, or None when it is not data.
+
+    The palette section is `clut primary, clut secondary, u8 image_size[3],
+    u8 wide_image` and then the pixels (adamrt/fft_decomp,
+    `include/fft/effect/effect_file.h`). **`wide_image` is not decoration**: it
+    says 256-byte rows instead of 128, and 20 of the 291 effects set it. Read at
+    128 they come out as a ribbon of 512 rows with every sprite cut in half.
+    """
     if len(raw) < 40 or struct.unpack_from('<I', raw, 0)[0] != 40:
         return None                      # a MIPS routine, not an atlas
     off = struct.unpack_from('<10I', raw, 0)
@@ -55,9 +64,10 @@ def atlas(raw):
     sec = raw[off[9]:]
     if len(sec) < PALETTE_BYTES + WIDTH:
         return None
-    height = (len(sec) - PALETTE_BYTES) // WIDTH
+    width = WIDE if sec[0x403] else WIDTH
+    height = (len(sec) - PALETTE_BYTES) // width
     colours = struct.unpack_from('<512H', sec, 4)[:256]
-    return WIDTH, height, sec[PALETTE_BYTES:PALETTE_BYTES + WIDTH * height], colours
+    return width, height, sec[PALETTE_BYTES:PALETTE_BYTES + width * height], colours
 
 
 def animation(raw):

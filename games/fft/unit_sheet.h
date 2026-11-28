@@ -34,6 +34,9 @@ enum { US_PLATE_H = 32 };   // the portrait's own height, so it never spills
 // 9): the owner resolves each row to a string and an icon, the renderer owns where they go.
 // So the battle's Status screen and the management sheet are literally the same picture.
 enum { US_SLOTS = 5, US_LIST_Y = 41, US_EQ_PITCH = 12, US_SET_PITCH = 11 };
+// Rows the ability page can hold: its glove starts at US_LIST_Y + 10 = 51 and
+// steps by 11, so row 5 would stand at 106 on a screen 100 tall.
+enum { US_SET_ROWS = 5 };
 typedef struct UnitEquip {
     const u8 *icon[US_SLOTS];        // the item's own 8x8 icon (three planes of 8), 0: none
     const char *name[US_SLOTS];      // 0: the slot is empty
