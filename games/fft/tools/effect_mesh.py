@@ -354,6 +354,194 @@ class QuadGrid4x4:
         return out
 
 
+class SummonMesh(RingStack):
+    """`effect_e071_update_summon_mesh_state`: a spinning dome of 8x16 quads.
+
+    Nine lattice rows at 0x80 angle steps: each row's ring radius shrinks by the
+    cosine of its own step and the row rises by the scaled sine, so the rows walk
+    a quarter circle instead of a straight column. Seventeen points a row at
+    0x100 steps close the ring. Its view is the ring mesh's but for the row
+    radius terms, which a dome has no use for.
+    """
+
+    ROWS = 9
+    SEGMENTS = 16
+
+    def lattice(self, frame):
+        e = self.e
+        j = curve(self.curves, (e.wave_curves >> 16) & 0xf, frame)
+        radius = lerp(e.radius_start, e.radius_end, j)
+        j = curve(self.curves, e.wave_curves & 0xf, frame)
+        gx = lerp(e.growth_start, e.growth_end, j)
+        gy = lerp(e.height_start, e.height_end, j)
+        j = curve(self.curves, (e.wave_curves >> 4) & 0xf, frame)
+        sx = lerp(e.growth_step_start, e.growth_step_end, j)
+        sy = lerp(e.height_step_start, e.height_step_end, j)
+        j = curve(self.curves, e.scroll_curves >> 28, frame)
+        self.spin = (self.spin + lerp(e.spin_speed_start, e.spin_speed_end, j)) & 0xfff
+        pts = []
+        for row in range(self.ROWS):
+            r = radius + (self.radius_offset >> 8)
+            k = (r * rcos(row << 7)) >> 12                   # the ring narrows with the row
+            n = (((r * rsin(row << 7)) >> 12) * gy) >> 8     # and climbs by the scaled sine
+            pts.append([(((rcos(self.spin + (i << 8)) * k) >> 12), -n,
+                         ((rsin(self.spin + (i << 8)) * k) >> 12))
+                        for i in range(self.SEGMENTS)])
+            gy += sy
+        self.radius_speed += sx
+        self.radius_offset += gx + self.radius_speed
+        return pts
+
+
+class PolarMesh:
+    """`effect_e004_update_polar_mesh_state`: a four-fold polar mesh, in screen space.
+
+    Six rings of five points from a radius and an angle that each carry a step
+    and a step of their own, mirrored into four quadrants of 5x4 quads -- 80 in
+    all. The centre drifts by a velocity that gains an acceleration **between
+    rings**, and like the 4x4 grid the corners are written straight to screen
+    coordinates about 0x80, never projected.
+
+    One detail worth keeping: every curve here is read at the handler's own
+    frame counter, which advances once an update, **except the scroll**, which
+    the source reads at the caller's frame.
+    """
+
+    RINGS = 6
+    POINTS = 5
+    ORIGIN_X = 0x80
+
+    def __init__(self, raw, bright, curves=()):
+        self.raw = raw
+        self.bright = bright
+        self.curves = curves
+        self.frame = 0
+        self.scroll_u = 0
+        self.scroll_v = 0
+        f = lambda fmt, off: struct.unpack_from(fmt, raw, off)[0]
+        self.flags = f('<H', 0x06)
+        self.c0 = f('<I', 0x08)
+        self.c1 = f('<I', 0x0c)
+        self.colour_curves = f('<I', 0x10)
+        self.radius = (f('<h', 0x20), f('<h', 0x26))
+        self.vel_angle = (f('<h', 0x2c), f('<h', 0x32))
+        self.vel_speed = (f('<h', 0x2e), f('<h', 0x34))
+        self.acc_angle = (f('<h', 0x38), f('<h', 0x3e))
+        self.acc_speed = (f('<h', 0x3a), f('<h', 0x40))
+        self.angle = (f('<h', 0x44), f('<h', 0x48))
+        self.page_flags = f('<H', 0x4c)
+        self.brightness_row = f('<h', 0x4e)
+        self.ot_depth = f('<h', 0x54)
+        self.radius_step = (f('<h', 0x5c), f('<h', 0x60))
+        self.radius_step_delta = (f('<h', 0x64), f('<h', 0x70))
+        self.scroll_u_speed = (f('<h', 0x7c), f('<h', 0x88))
+        self.scroll_v_speed = (f('<h', 0x80), f('<h', 0x8c))
+        self.angle_step = (f('<h', 0x9c), f('<h', 0xa2))
+        self.half_w = f('<h', 0xa8) // 2
+        self.half_h = f('<h', 0xaa) // 2
+        self.angle_step_delta = (f('<h', 0xb4), f('<h', 0xb6))
+        self.texture_u = f('<H', 0xb8)
+        self.texture_v = f('<H', 0xba)
+
+    def rings(self):
+        """points[ring][0..4], the quadrant one ring covers."""
+        n = self.frame
+        c = lambda nib: curve(self.curves, nib, n)
+        radius = lerp(*self.radius, c((self.c0 >> 4) & 0xf)) << 12
+        r_step = lerp(*self.radius_step, c(self.c0 >> 28)) << 4
+        r_delta = lerp(*self.radius_step_delta, c(self.c1 & 0xf)) << 4
+        angle = lerp(*self.angle, c((self.c0 >> 16) & 0xf)) << 4
+        a_step = lerp(*self.angle_step, c((self.c1 >> 12) & 0xf))
+        a_delta = lerp(*self.angle_step_delta, c((self.c1 >> 24) & 0xf))
+        out = []
+        for _ in range(self.RINGS):
+            p = [((rcos(angle + (i << 8)) * (radius >> 12)) >> 12,
+                  (rsin(angle + (i << 8)) * (radius >> 12)) >> 12) for i in range(4)]
+            p.append((-p[0][1], p[0][0]))     # the fifth point closes the quadrant
+            out.append(p)
+            radius += r_step
+            r_step += r_delta
+            angle += a_step
+            a_step += a_delta
+        return out
+
+    def drift(self):
+        """The centre, and the velocity and acceleration it gains between rings."""
+        n = self.frame
+        c = lambda nib: curve(self.curves, nib, n)
+        centre = list(spawn_position(self.raw, c(self.c0 & 0xf))[:2])
+        f = c((self.c0 >> 8) & 0xf)
+        va = lerp(*self.vel_angle, f) << 4
+        vs = lerp(*self.vel_speed, f) << 4
+        vel = [(rcos(va) * vs) >> 12, (rsin(va) * vs) >> 12]
+        f = c((self.c0 >> 12) & 0xf)
+        aa = lerp(*self.acc_angle, f) << 4
+        as_ = lerp(*self.acc_speed, f) << 4
+        acc = [(rcos(aa) * as_) >> 12, (rsin(aa) * as_) >> 12]
+        return centre, vel, acc
+
+    def texture(self, frame):
+        """The scroll window. This curve alone is read at the caller's frame."""
+        j = curve(self.curves, (self.c1 >> 4) & 0xf, frame)
+        self.scroll_u += lerp(*self.scroll_u_speed, j) << 4
+        while self.half_w and self.scroll_u >= self.half_w << 12:
+            self.scroll_u -= self.half_w << 12
+        while self.half_w and self.scroll_u < 0:
+            self.scroll_u += self.half_w << 12
+        j = curve(self.curves, (self.c1 >> 8) & 0xf, frame)
+        self.scroll_v += lerp(*self.scroll_v_speed, j) << 4
+        while self.half_h and self.scroll_v >= self.half_h << 12:
+            self.scroll_v -= self.half_h << 12
+        while self.half_h and self.scroll_v < 0:
+            self.scroll_v += self.half_h << 12
+        return (self.scroll_u >> 12) + self.texture_u, (self.scroll_v >> 12) + self.texture_v
+
+    def colour(self, frame):
+        if not (self.flags & GEOMETRY_FLAG_COLOUR_CURVES):
+            return 0x80, 0x80, 0x80
+        k = self.colour_curves & 0xfff
+        return (palette(self.curves, k & 0xf, frame),
+                palette(self.curves, (k >> 4) & 0xf, frame),
+                palette(self.curves, (k >> 8) & 0xf, frame))
+
+    QUADRANTS = ((1, 0, 0, 1), (0, -1, 1, 0), (-1, 0, 0, -1), (0, 1, -1, 0))
+
+    def quads(self, frame):
+        """The eighty screen-space quads: four quadrants of five rings of four."""
+        rings = self.rings()
+        centre, vel, acc = self.drift()
+        u, v = self.texture(frame)
+        red, green, blue = self.colour(self.frame)
+        row = self.bright[self.brightness_row % len(self.bright)]
+        depth = max(4, min(self.ot_depth, OT_DEPTH_LIMIT - 1))
+        out = []
+        for r in range(self.RINGS - 1):
+            for qx, qy, qz, qw in self.QUADRANTS:
+                for i in range(4):
+                    a, b = rings[r][i], rings[r][i + 1]
+                    c2, d2 = rings[r + 1][i], rings[r + 1][i + 1]
+                    def put(p):
+                        return (centre[0] + qx * p[0] + qy * p[1] + self.ORIGIN_X,
+                                centre[1] + qz * p[0] + qw * p[1])
+                    def tint(k):
+                        return ((k * red) >> 12, (k * green) >> 12, (k * blue) >> 12)
+                    t, bo = row[r % len(row)], row[(r + 1) % len(row)]
+                    out.append(dict(
+                        pts=[put(a), put(b), put(c2), put(d2)],
+                        uv=[(u, v), (u + self.half_w, v),
+                            (u, v + self.half_h), (u + self.half_w, v + self.half_h)],
+                        rgb=[tint(t), tint(t), tint(bo), tint(bo)],
+                        depth=depth, screen=True,
+                        abe=(self.page_flags & 4) == 0,
+                        mode=self.page_flags & 3))
+            centre[0] += vel[0] >> 12
+            centre[1] += vel[1] >> 12
+            vel[0] += acc[0]
+            vel[1] += acc[1]
+        self.frame += 1
+        return out
+
+
 def brightness_table(raw, base, rows=16, width=9):
     """The overlay's own vertex brightness rows, 12-bit fixed, u32 each."""
     out = []
