@@ -521,3 +521,33 @@ one of the four turns a graded wash into a flat plate, which is what the 4x4
 grid and the ring mesh looked like, and it flattened every sprite quad too.
 `_tri` interpolates the three corner colours barycentrically now, 0x80 neutral,
 and all three renderers run by default.
+
+
+## 16. Where an emitter sits: the spawn position and its seven anchors
+
+`battle_effect_interpolate_emitter_spawn_position` lerps three words --
+`spawn_position_start` at 0x14 against `spawn_position_end` at 0x1a -- by the
+curve the caller read, and `placement_flags` bits 9-11 then name what that
+position is measured from:
+
+| anchor | emitters | a preview can place it |
+|---|---|---|
+| target | 1,717 | yes, it is the point drawn about |
+| caster | 525 | yes |
+| parent particle | 347 | **no** |
+| map centre | 267 | **no** |
+| cursor tile | 186 | yes |
+| world | 132 | yes |
+| tracked entity | 53 | yes |
+
+**614 of the 3,227 anchor somewhere a preview has no way to find**, and saying
+so is better than drawing them at the origin and calling it done.
+
+### Read the curve before believing the pair
+
+3,154 of the 3,227 have `start != end`, which looks like almost every emitter
+walking across its effect. It is not: only **262 carry a spawn-position curve**,
+and without one the factor is 0 and the lerp returns the start for ever. The
+pair that actually moves anything is the **260** that have both, across 138
+effects -- Holy and the three Cures among them, neither sword. Counting the
+pairs alone would have overstated it twelve-fold.
