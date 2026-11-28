@@ -321,5 +321,30 @@ class Rotation(unittest.TestCase):
             self.assertAlmostEqual(y, ey, places=6)
 
 
+class Curves(unittest.TestCase):
+    """Section 4 is rows of 160 bytes whose first four are a header."""
+
+    @staticmethod
+    def section(rows):
+        out = bytearray()
+        for r in rows:
+            out += bytes(4) + bytes((r + [0] * 156)[:156])
+        return bytes(out)
+
+    def test_the_ramp_starts_four_bytes_into_its_row(self):
+        c = A.curves(self.section([[1, 2, 3], [9, 8, 7]]))
+        self.assertEqual(c[0][:3], [1, 2, 3])
+        self.assertEqual(c[1][:3], [9, 8, 7])
+
+    def test_the_row_count_comes_from_the_section_not_a_header_word(self):
+        self.assertEqual(len(A.curves(self.section([[1]] * 3))), 3)
+
+    def test_a_nibble_can_never_name_more_than_sixteen(self):
+        self.assertEqual(len(A.curves(self.section([[1]] * 20))), 16)
+
+    def test_a_section_too_short_for_a_row_has_none(self):
+        self.assertEqual(A.curves(b'\x0f\x00\x00\x00'), [])
+
+
 if __name__ == '__main__':
     unittest.main()
