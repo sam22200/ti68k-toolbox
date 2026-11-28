@@ -236,8 +236,13 @@ test: secondary-test
 .PHONY: status-frames-test
 # The reference hash is the one a build that redraws everything produces
 # (-DFFT_NO_SETTLE); the two must stay equal.
+# 0xA1E1D4AC until the sheet's plate moved to its third chunk: the plate alone was
+# 196,704 cycles and, on the first frame beside the tab bar and the sheet's own first
+# render, took it to 476,894 -- over the 360k budget. The settled picture is the same
+# (core-capacity-render-check's FD25 and E2C3 are unchanged); the first two frames show
+# the tab bar and the page before the plate arrives.
 status-frames-test: data/ffcj.bin data/ffgd.bin
-	$(CC) $(PC_CFLAGS) -w -DSTATUS_FRAMES_HASH=0xA1E1D4ACUL -o x/qa/status-frames-test \
+	$(CC) $(PC_CFLAGS) -w -DSTATUS_FRAMES_HASH=0x57512F12UL -o x/qa/status-frames-test \
 	  check_status_frames.c $(RT_CORE) $(RT_SW)
 	cd data && ../x/qa/status-frames-test
 test: status-frames-test
