@@ -668,3 +668,35 @@ and every section holds exactly 15 rows. Two coincidences that make a wrong
 model look right, and it only takes one effect built differently to break it.
 The count comes from the section's length now, capped at the sixteen a four-bit
 nibble can name.
+
+
+## 20. Cure 4 on the console: the reference, and the claim it settles
+
+`capture_cure4.py` stages the spell on the original the way `oracle.py` stages
+the others -- Gariland has no Priest -- and keeps the frames:
+
+* the caster's primary skill set poked to **White Magic (0x0a)**, whose list
+  opens Cure, Cure 2, Cure 3, **Cure 4**, Raise, Raise 2;
+* **the learned bitmap is wider than `skill_setup` writes.** Filling
+  +0x99..+0x9e left "No Abilities can be used" and the set greyed out; +0x90 to
+  +0xb0 opens it. That is the whole of what blocked three attempts;
+* **MP was never the blocker.** Cure 4 costs 10 and the caster had 16 -- the
+  spell list shows the costs, which is the cheapest way to find out. MP sits at
+  +0x2c with its maximum at +0x2e beside HP at +0x28, and a poke there sticks
+  (99 after 125 frames);
+* the turn menu is **Move / Act / Wait / Status / Auto-battle**: the sets are
+  one level in, behind Act. Two downs from the top is Wait, which ends the turn
+  and was how two runs quietly threw themselves away.
+
+### What it shows
+
+The spell washes the field dark blue for 541 frames, flashes the screen
+white-blue with a four-pointed star over the target, and settles to a blue-white
+glow and the healing number. Of the brightest pixels at the flash:
+
+    RGB (158, 201, 236) -- blue strongest, red weakest
+
+**It is blue-white, not green.** The render was right and the memory was wrong;
+the file had already said so (`colour_curves = 0x66e` takes red from row 14, and
+row 14 is all zeros), and the console agrees. An effect's colour is a
+measurement, like everything else here.
