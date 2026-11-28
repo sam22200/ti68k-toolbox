@@ -160,5 +160,59 @@ class Timeline(unittest.TestCase):
         self.assertIsNone(A.phases(b'\0' * 100))
 
 
+class Scheduled(unittest.TestCase):
+    """The timeline drives the playback: when an emitter starts, and for how long."""
+
+    def emitter(self, seq, count=1, interval=1, life=-1):
+        r = bytearray(A.REC_SIZE)
+        r[1] = seq
+        struct.pack_into('<h', r, 0x94, life)
+        struct.pack_into('<h', r, 0xb0, count)
+        struct.pack_into('<h', r, 0xb4, interval)
+        return bytes(r)
+
+    def setUp(self):
+        rec = struct.pack('<2H', 0x02a0, 1) + poly(0, 0, 8, 8, 0, 0)
+        self.fr = A.frames(section0([rec, rec, rec]))
+        self.seqs = A.script(section1([
+            bytes([1, 2, 0]) + bytes([0x81]),
+            bytes([2, 2, 0]) + bytes([0x81])]))
+
+    def timeline(self, phase1, child, keyframes):
+        buf = bytearray(6278)
+        struct.pack_into('<4H', buf, 0, 0, 0, phase1, 0)
+        struct.pack_into('<H', buf, 0x00a, child)
+        for k, (start, end, em) in enumerate(keyframes, 1):
+            struct.pack_into('<H', buf, 0x00c + 2 * (k - 1), start)
+            struct.pack_into('<H', buf, 0x00c + 2 * k, end)
+            buf[0x00c + 0x32 + k - 1] = em + 1
+        struct.pack_into('<h', buf, 0x00c + 0x7e, len(keyframes))
+        return A.phases(bytes(buf))
+
+    def test_an_emitter_starts_at_its_keyframe_after_phase_one(self):
+        cs = [dict(seq=0, raw=self.emitter(0)), dict(seq=1, raw=self.emitter(1))]
+        tl = self.timeline(5, 10, [(2, 3, 1)])
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        # phase 1 is 5 frames, the keyframe starts at child frame 2: tick (5+2)*2
+        self.assertEqual(got[0]['t'], 14)
+        self.assertEqual(got[0]['frame'], 2)        # emitter 1 plays sequence 1
+
+    def test_it_loops_until_the_lifetime_runs_out(self):
+        cs = [dict(seq=0, raw=self.emitter(0, life=4))]
+        tl = self.timeline(0, 20, [(0, 1, 0)])
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        # a 2-tick sequence looping over 4 frames = 8 ticks: four draws
+        self.assertEqual([d['t'] for d in got], [0, 2, 4, 6])
+
+    def test_an_endless_particle_stops_with_the_child_timeline(self):
+        cs = [dict(seq=0, raw=self.emitter(0, life=-1))]
+        tl = self.timeline(0, 3, [(0, 1, 0)])
+        got = A.schedule(self.fr, self.seqs, cs, tl)
+        self.assertEqual([d['t'] for d in got], [0, 2, 4])
+
+    def test_no_timeline_means_no_schedule(self):
+        self.assertIsNone(A.schedule(self.fr, self.seqs, [], None))
+
+
 if __name__ == '__main__':
     unittest.main()

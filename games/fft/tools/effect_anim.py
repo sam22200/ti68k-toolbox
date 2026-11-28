@@ -58,9 +58,15 @@ its child timeline starts emitters 2, 3, 4, 5 and 6 at frames 2, 5, 8, 11 and 14
 five shards, three frames apart. The stagger was never in the emitter record, which is
 why reading that record harder was never going to find it.
 
-**What this tool still does NOT do** is play that: `--render` runs every emitter's
-sequence once from t=0, with no stagger and no end, which is why its tail can show
-something the game never reaches.
+**`--render` plays that timeline.** Each keyframe of a particle channel spawns its
+emitter's `particle_count` particles every `spawn_interval` frames while the keyframe
+lasts; each particle loops the emitter's sprite sequence for its lifetime (-1 meaning
+until the effect ends), and the whole thing starts after phase 1. `--flat` gives the old
+behaviour -- every sequence once from t=0 -- for comparing the two.
+
+Still not modelled: the emitter's spawn spread and velocities, so the particles of one
+spawn land on top of each other instead of scattering, and phase 1 and phase 2 draw
+nothing because their own channels are empty in the effects looked at so far.
 
 The layouts above are the names of **adamrt/fft_decomp**, a byte-exact decompilation of
 SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
@@ -297,6 +303,77 @@ def action_text(a):
     return ', '.join(bits)
 
 
+def play_window(ops, nframes, t0, t1):
+    """The draws of one looping sequence between two absolute ticks.
+
+    0x81 sends the cursor back to the first byte, so the 0x82 that usually opens
+    a sequence runs again and the offset restarts: a loop replays the motion, it
+    does not carry on from where it stopped.
+    """
+    out, t = [], t0
+    guard = 0
+    while t < t1 and guard < 10000:
+        x = y = 0
+        moved = False
+        for op in ops:
+            if op[0] == 'moveto':
+                x, y = op[1], op[2]
+            elif op[0] == 'moveby':
+                x += op[1]; y += op[2]
+            elif op[0] == 'frame':
+                f, hold, depth = op[1], op[2], op[3]
+                if f < nframes and t < t1:
+                    out.append(dict(t=t, frame=f, x=x, y=y, depth=depth,
+                                    ticks=min(max(hold, 1), t1 - t)))
+                t += hold
+                moved = moved or hold > 0
+            guard += 1
+            if t >= t1:
+                break
+        if not moved:                 # a sequence of zero-length holds would spin
+            break
+    return out
+
+
+def schedule(fr, seqs, cs, tl):
+    """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
+
+    Each keyframe of a particle channel spawns its emitter's `particle_count`
+    particles every `spawn_interval` frames while the keyframe lasts; each
+    particle plays the emitter's sprite sequence, looping, for its lifetime
+    (-1 meaning until the effect ends). The child timeline starts after phase 1.
+
+    Not modelled: the spawn spread and velocities of the emitter's geometry, so
+    the particles of one spawn land on top of each other instead of scattering.
+    """
+    if not tl:
+        return None
+    out = []
+    for c, kfs in enumerate(tl['child_channels']):
+        for k in kfs or []:
+            e = k['emitter']
+            if e is None or e >= len(cs):
+                continue
+            rec = cs[e]['raw']
+            seq = rec[1]
+            if seq >= len(seqs):
+                continue
+            count = max(1, struct.unpack_from('<h', rec, 0xb0)[0])
+            interval = max(1, struct.unpack_from('<h', rec, 0xb4)[0])
+            life = struct.unpack_from('<h', rec, 0x94)[0]
+            born = k['frm']
+            while born < max(k['to'], k['frm'] + 1):
+                die = tl['child'] if life < 0 else min(tl['child'], born + life)
+                t0 = (tl['phase1'] + born) * 2          # frames at 30 fps -> 60 Hz ticks
+                t1 = (tl['phase1'] + die) * 2
+                for _ in range(count):
+                    for d in play_window(seqs[seq], len(fr), t0, t1):
+                        out.append(dict(d, inst=e, seq=seq, chan=c))
+                born += interval
+    out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
+    return out
+
+
 def timeline(fr, seqs, cs):
     """Every draw of the whole effect, as (tick, instance, sequence, frame, x, y)."""
     out = []
@@ -366,14 +443,16 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
     if tex is None:
         return []
     tex, alpha = tex
-    tl = timeline(fr, seqs, cs)
+    tl = schedule(fr, seqs, cs, phases(raw_sections[7])) if raw_sections else None
+    if tl is None:
+        tl = timeline(fr, seqs, cs)
     if not tl:
         return []
     if anchor is None:                          # sit the sweep on the ground line
@@ -511,6 +590,8 @@ def main():
     ap.add_argument('--size', default='256x240', help='the render canvas (default 256x240)')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
+    ap.add_argument('--flat', action='store_true',
+                    help='ignore the timeline: play every sequence once from t=0')
     ap.add_argument('--ti', action='store_true',
                     help='render the TI screen instead: 160x100, four greys')
     ap.add_argument('--audit', action='store_true',
@@ -600,7 +681,9 @@ def main():
         anchor = tuple(int(v) for v in a.anchor.split(',')) if a.anchor else None
         if a.ti:
             w, h = TI_W, TI_H
-        ims = render(raw, fr, seqs, cs, (w, h), anchor, a.scale * (TI_SCALE if a.ti else 1.0))
+        ims = render(raw, fr, seqs, cs, (w, h), anchor,
+                     a.scale * (TI_SCALE if a.ti else 1.0),
+                     None if a.flat else sec)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
