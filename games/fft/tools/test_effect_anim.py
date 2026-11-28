@@ -276,5 +276,50 @@ class Blend(unittest.TestCase):
         self.assertEqual(fb[0, 0, 0], 72.0)
 
 
+class Depth(unittest.TestCase):
+    """The ordering-table index of a sprite, and the modes that override it."""
+
+    def test_the_default_is_the_projected_z_over_four(self):
+        self.assertEqual(A.sprite_depth(400, 0), 100)
+
+    def test_the_two_nearer_modes_pull_it_forward(self):
+        self.assertEqual(A.sprite_depth(400, 1), 92)
+        self.assertEqual(A.sprite_depth(400, 5), 84)
+
+    def test_the_fixed_modes_ignore_the_position(self):
+        self.assertEqual(A.sprite_depth(400, 2), 8)
+        self.assertEqual(A.sprite_depth(400, 4), 0x10)
+        self.assertEqual(A.sprite_depth(4, 3), A.SPRITE_DEPTH_LIMIT)
+
+    def test_a_negative_index_drops_the_sprite(self):
+        """`if (depth < 0) return;` -- it is not clamped, it is not drawn."""
+        self.assertIsNone(A.sprite_depth(4, 1))
+        self.assertIsNone(A.sprite_depth(-40, 0))
+
+    def test_it_clamps_at_the_far_end(self):
+        self.assertEqual(A.sprite_depth(0x10000, 0), A.SPRITE_DEPTH_LIMIT)
+
+
+class Rotation(unittest.TestCase):
+    """The 2D matrix submit_sprite builds from the node's screen angle."""
+
+    def test_no_angle_leaves_the_corners_alone(self):
+        pts = [(1, 2), (3, 4)]
+        self.assertIs(A.rotate2(pts, 0.0), pts)
+
+    def test_a_quarter_turn(self):
+        import math
+        (x, y), = A.rotate2([(10, 0)], math.pi / 2)
+        self.assertAlmostEqual(x, 0, places=6)
+        self.assertAlmostEqual(y, 10, places=6)
+
+    def test_it_turns_every_corner_about_the_sprite_origin(self):
+        import math
+        out = A.rotate2([(1, 0), (0, 1), (-1, 0), (0, -1)], math.pi)
+        for (x, y), (ex, ey) in zip(out, [(-1, 0), (0, -1), (1, 0), (0, 1)]):
+            self.assertAlmostEqual(x, ex, places=6)
+            self.assertAlmostEqual(y, ey, places=6)
+
+
 if __name__ == '__main__':
     unittest.main()
