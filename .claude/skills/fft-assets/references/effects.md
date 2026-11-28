@@ -771,3 +771,31 @@ and left alone.
 **That closes the "too transparent" thread.** The layer is right, the blend is
 right, the colours are right; what is missing is the scene underneath, and
 nothing in the effect file holds it.
+
+
+## 23. Drawing an effect on the map: `--over`, and what still differs
+
+`effect_anim.py 163 --render DIR --size 256x240 --anchor 112,150 --over SCENE.png`
+starts each frame on a picture of the battlefield instead of black and draws the
+effect's parts B+F against it, exactly as against anything else. A capture frame
+of the darkened field works as the scene -- `capture_ability.py` leaves plenty.
+
+Stasis Sword, our decode on the map against the console at the same moments:
+
+| | ours | console |
+|---|---|---|
+| the pillar rising | 26.2 | 31.2 |
+| at mid height | 30.2 | 34.0 |
+| **at the flash** | **33.0** | **118.1** |
+| the spike fading | 29.3 | 33.3 |
+
+Shape, position, colour and timing match, and the mean luminance is within
+about 15 % for three of the four. **The flash is where it parts company**, and
+for a reason a fixed background cannot fix: on the console the effect *lights
+the scene* -- its flare raises the terrain, the units and the sky together --
+while a composite can only add to a photograph of them. The console's picture is
+also softer and wider, which is its bloom.
+
+So the honest statement of where the decoder stands: it reproduces what the
+effect **draws**. It does not reproduce what the effect **lights**, and nothing
+in the effect file would let it -- the light belongs to the map renderer.
