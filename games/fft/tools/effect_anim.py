@@ -358,6 +358,58 @@ def tracks(sec7):
     return out
 
 
+def track_offsets(tr, name, frames, phase1=0, double=False):
+    """The screen track's colour on each 30 fps frame, as the source applies it.
+
+    A keyframe does not set a colour, it **starts a fade** toward one:
+    `battle_map_blend_background_gradient_color(mode, duration, r, g, b)` builds
+    its target from the gradient already in flight and the offsets, then takes
+    `duration` to get there. The modes are current, current/2, their grey, the
+    base (the last applied colour), its halves and greys, and restore.
+
+    Reading one keyframe's colour at a frame -- which is what came before --
+    lands on whichever one the effect is sitting in, and Night Sword sits in a
+    long `(0, 0, 0)` tail. Its flash is a **one-frame** keyframe of `(63, 63,
+    63)`, doubled to `(126, 126, 126)`, which only a fade carries into the
+    frames that follow.
+
+    A preview has no map gradient, so it starts from black and the result is the
+    offset the effect adds to whatever it plays over.
+    """
+    seq = (tr or {}).get(name) or []
+    out = [(0.0, 0.0, 0.0)] * max(0, frames)
+    cur = [0.0, 0.0, 0.0]
+    base = [0.0, 0.0, 0.0]
+    at = phase1
+    for e in seq:
+        n = e['frames']
+        off = [(2.0 if double else 1.0) * c for c in e['colour']]
+        if not e['offset']:
+            target = [float(c) for c in e['colour']]
+        else:
+            m = e['mode']
+            src = cur if m < 4 else base
+            if m in (2, 3, 6, 7):
+                g = (src[0] * 2 + src[1] * 3 + src[2]) / (6.0 if m in (2, 6) else 12.0)
+                start = [g, g, g]
+            elif m in (1, 5):
+                start = [c / 2.0 for c in src]
+            else:
+                start = list(src)
+            target = start if m == 8 else [start[k] + off[k] for k in range(3)]
+        for i in range(n):
+            t = (i + 1) / float(n)
+            c = [cur[k] + (target[k] - cur[k]) * t for k in range(3)]
+            if 0 <= at + i < frames:
+                out[at + i] = tuple(c)
+        cur = list(target)
+        base = list(target)
+        at += n
+        if at >= frames:
+            break
+    return out
+
+
 def screen_colour(tr, frame):
     """The screen track at a 30 fps frame: (colour, mode, is_offset).
 
@@ -1023,15 +1075,37 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
     if over:
         from PIL import Image as _I
         im = _I.open(over).convert('RGB').resize(size)
-        under = np.floor(np.asarray(im).astype(float) / 8)
+        under = np.asarray(im).astype(float)
+    tr = tracks(raw_sections[7]) if raw_sections else None
+    ph1 = (phases(raw_sections[7]) or {}).get('phase1', 0) if raw_sections else 0
+    nfr = last // 2 + 1
+    # The screen track offsets the background gradient; `battle_map_color_field`
+    # colours the map and the units from the affected-units track. A preview's
+    # scene IS the map, so both are applied to it -- and only to it, since
+    # without `--over` there is no map to recolour.
+    #
+    # They fire at the right frame and with the right magnitude: Night Sword's
+    # blade matches the console to a point or two of mean luminance all the way
+    # up, and the flash arrives on the frame it should. **It comes out red where
+    # the console is white**, because the keyframe after it reads `base` as
+    # (126, 126, 126) and offsets it by (0, -128, -128). Whether `base` is the
+    # colour just applied or the one before the fade began is the part of
+    # `battle_map_blend_background_gradient_color` still unread.
+    screen = track_offsets(tr, 'screen', nfr, ph1, double=True)
+    field = track_offsets(tr, 'affected units', nfr, ph1)
     for t in range(0, last, 2):                        # 60 Hz ticks, 30 fps frames
         # `--over` starts each frame on a picture of the battlefield instead of
         # black. The effect's parts are B+F against it exactly as against
         # anything else, which is the only way to see what the console sees:
         # the file has no scene in it, and its colour tracks only darken one.
         fb = np.zeros((size[1], size[0], 3), dtype=float)
+        f30 = t // 2
         if under is not None:
-            fb[:] = under * 8
+            fb[:] = under
+            if f30 < len(field):
+                fb[:] = np.clip(fb + np.array(field[f30]), 0, 255)
+            if f30 < len(screen):
+                fb[:] = np.clip(fb + np.array(screen[f30]), 0, 255)
         for d in tl:
             if not (d['t'] <= t < d['t'] + max(d['ticks'], 1)):
                 continue
