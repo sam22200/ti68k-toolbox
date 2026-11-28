@@ -31,6 +31,37 @@ RING_SEGMENTS = 8          # points around one ring
 OT_DEPTH_LIMIT = 0x180
 GEOMETRY_FLAG_COLOUR_CURVES = 0x40
 
+# `placement_flags` bits 9-11 say what the emitter's position is measured from.
+ORIGIN_MASK = 0xe00
+ORIGIN_WORLD = 0x000
+ORIGIN_CURSOR_TILE = 0x200
+ORIGIN_CASTER = 0x400
+ORIGIN_TARGET = 0x600
+ORIGIN_PARENT_PARTICLE = 0x800
+ORIGIN_MAP_CENTRE = 0xa00
+ORIGIN_TRACKED_ENTITY = 0xc00
+ORIGIN_NAMES = {ORIGIN_WORLD: 'world', ORIGIN_CURSOR_TILE: 'cursor tile',
+                ORIGIN_CASTER: 'caster', ORIGIN_TARGET: 'target',
+                ORIGIN_PARENT_PARTICLE: 'parent particle',
+                ORIGIN_MAP_CENTRE: 'map centre', ORIGIN_TRACKED_ENTITY: 'tracked entity'}
+# A preview has no battlefield, so the anchors that resolve to a unit or to the
+# cursor's tile all land on the one point it draws about. Only these two are
+# somewhere else, and nothing here can place them.
+ORIGIN_UNPLACEABLE = (ORIGIN_PARENT_PARTICLE, ORIGIN_MAP_CENTRE)
+
+
+def spawn_position(raw, factor):
+    """`battle_effect_interpolate_emitter_spawn_position`: three lerped words.
+
+    `spawn_position_start` at 0x14 and `spawn_position_end` at 0x1a, each lerped
+    by the curve the caller read. Taking the start alone -- which is what came
+    before -- pins an emitter that the original walks from one place to another
+    across the effect.
+    """
+    a = struct.unpack_from('<3h', raw, 0x14)
+    b = struct.unpack_from('<3h', raw, 0x1a)
+    return tuple(lerp(a[i], b[i], factor) for i in range(3))
+
 
 def rsin(a):
     """libgte's rsin: 4096 is a whole turn, the result 12-bit fixed."""
@@ -102,6 +133,7 @@ class RingStack:
     HEIGHT_SHIFT = 0
 
     def __init__(self, entry, bright, curves=()):
+        self.raw = entry
         self.e = entry if isinstance(entry, RingMeshView) else RingMeshView(entry)
         self.bright = bright          # [row][0..8], 12-bit fixed
         self.curves = curves          # g_effect_palette_table
@@ -109,6 +141,19 @@ class RingStack:
         self.v_scroll = 0
         self.radius_offset = 0
         self.radius_speed = 0
+
+    def origin(self, frame):
+        """Where this mesh is measured from, and the point it is placed at.
+
+        The source lerps `spawn_position` by the `scroll_curves` nibble 0 curve
+        and then adds the anchor the placement flags name. A preview draws about
+        the target, so every anchor that resolves to a unit or to the cursor's
+        tile is already that point; `unplaceable` says when it is not.
+        """
+        e = self.e
+        j = curve(self.curves, e.scroll_curves & 0xf, frame)
+        mode = e.placement_flags & ORIGIN_MASK
+        return spawn_position(self.raw, j), mode, mode in ORIGIN_UNPLACEABLE
 
     def lattice(self, frame):
         """points[row][point] = (x, y, z), and the growth the row carried."""
@@ -177,10 +222,11 @@ class RingStack:
         """
         e = self.e
         pts = self.lattice(frame)
+        (ox, oy, oz), _, _ = self.origin(frame)
         u, v = self.texture(frame)
         red, green, blue = self.colour(frame)
         row = self.bright[e.brightness_row % len(self.bright)]
-        scr = [[project(*p) for p in r] for r in pts]
+        scr = [[project(p[0] + ox, p[1] + oy, p[2] + oz) for p in r] for r in pts]
         out = []
         for j in range(self.ROWS - 1):
             for i in range(self.SEGMENTS):
