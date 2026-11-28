@@ -540,7 +540,15 @@ def _atlas_rgb(raw):
     return px[:, :, :3], px[:, :, 3]
 
 
-def _tri(acc, tex, alpha, dst, src, cell):
+# The tpage's bits 5-6 are the hardware's semi-transparency mode, and the parts
+# do not all share one: of the disc's 11,233 cells, 11,743 polygons are B+F,
+# 2,041 are B+F/4, 499 B-F and 341 B/2+F/2. Adding them all at full strength
+# burns Night Sword's ball white -- its first cell is a quarter-strength one.
+# B/2+F/2 halves what is underneath too; this only scales what is added.
+BLEND = {0: 0.5, 1: 1.0, 2: -1.0, 3: 0.25}
+
+
+def _tri(acc, tex, alpha, dst, src, cell, blend=1.0):
     """Add one textured triangle to the accumulator, PS1-style (additive)."""
     import numpy as np
     (x0, y0), (x1, y1), (x2, y2) = dst
@@ -569,7 +577,7 @@ def _tri(acc, tex, alpha, dst, src, cell):
     su = np.clip(su.astype(int), u0, u1)
     sv = np.clip(sv.astype(int), v0, v1)
     a = (alpha[sv, su] * inside)[:, :, None]
-    acc[lo_y:hi_y, lo_x:hi_x] += tex[sv, su] * a
+    acc[lo_y:hi_y, lo_x:hi_x] += tex[sv, su] * a * blend
 
 
 def extent(fr, tl):
@@ -622,8 +630,9 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Fa
                 s = [(u, v), (u + w, v), (u, v + h), (u + w, v + h)]
                 cell = (min(u, u + w), min(v, v + h),
                         max(u, u + w) - 1, max(v, v + h) - 1)
-                _tri(acc, tex, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell)
-                _tri(acc, tex, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell)
+                bl = BLEND.get((p['clut'] >> 5) & 3, 1.0)
+                _tri(acc, tex, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell, bl)
+                _tri(acc, tex, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell, bl)
         out.append(np.clip(acc, 0, 255).astype(np.uint8))
     return out
 
