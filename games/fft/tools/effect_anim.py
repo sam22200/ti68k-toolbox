@@ -337,6 +337,7 @@ def camera(pitch=PITCH, yaw=YAW):
 
     def project(dx, dy, dz=0):
         return (cp * dx + sp * dz, st * sp * dx + ct * dy - st * cp * dz)
+    project.depth = lambda dx, dy, dz: -ct * sp * dx + st * dy + ct * cp * dz
     return project
 
 
@@ -536,6 +537,9 @@ def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
             # burst on the victim. The spread at 0x20 is `--scatter`: it is the
             # ellipsoid a spawn fills, and without the particle velocities that
             # is only half the model.
+            # `work_kind_flags` bit 1 orients the particle to its velocity
+            # (battle_effect_update_node_from_work).
+            orient = struct.unpack_from('<H', rec, 0x02)[0] & 2
             pw = struct.unpack_from('<3h', rec, 0x14)
             sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
             box = struct.unpack_from('<H', rec, 0x02)[0] & 0x0100
@@ -561,14 +565,29 @@ def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
                         n = (d['t'] - t0) // 2          # frames this one has lived
                         tint = _tint(rec, cur, n)
                         m = _motion(rec, key, n)
-                        ox, oy = project(pw[0] + j[0] + m[0],
-                                         pw[1] + j[1] + m[1],
-                                         pw[2] + j[2] + m[2])
+                        wx = pw[0] + j[0] + m[0]
+                        wy = pw[1] + j[1] + m[1]
+                        wz = pw[2] + j[2] + m[2]
+                        ox, oy = project(wx, wy, wz)
                         sx, sy = project(d['x'], d['y'])
+                        # The ordering-table index: the projected z over four,
+                        # about the camera's own 0x280 (g_battle_offset_screen_coords),
+                        # then the sequence op's depth mode. A negative one is dropped.
+                        ot = sprite_depth(0x280 + project.depth(wx, wy, wz), d['depth'])
+                        if ot is None:
+                            continue
+                        ang = 0.0
+                        if orient:                      # ratan2 of the projected velocity
+                            q = _motion(rec, key, n + 1)
+                            vx, vy = project(q[0] - m[0], q[1] - m[1], q[2] - m[2])
+                            if vx or vy:
+                                ang = math.atan2(vy, vx)
                         out.append(dict(d, inst=e, seq=seq, chan=c, tint=tint,
-                                        x=ox + sx, y=oy + sy))
+                                        x=ox + sx, y=oy + sy, ot=ot, angle=ang))
                 born += interval
-    out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
+    # The ordering table is walked from its far end, so the farthest index is
+    # drawn first; within one index the last primitive added is drawn first.
+    out.sort(key=lambda d: (d['t'], -d['ot'], -d['chan'], -d['inst']))
     return out
 
 
@@ -623,6 +642,44 @@ def _atlas_rgb(raw):
 # underneath as well, which scaling the addend alone could not express.
 # Whether a part is blended at all is its own `flags & 0x200`, not the mode:
 # 404 of the 22,916 are opaque (none in Stasis Sword, Night Sword or Holy).
+
+
+# battle_effect_render_particle_sprite: the ordering-table index of a sprite is
+# its projected z over four, which the sequence op's third byte can override.
+# A sprite whose index comes out negative is not drawn at all.
+SPRITE_DEPTH_LIMIT = 0x17e
+
+
+def sprite_depth(vz, mode):
+    """The ordering-table index, or None when the sprite is dropped."""
+    d = int(vz) >> 2
+    if mode == 1:
+        d -= 8
+    elif mode == 2:
+        d = 8
+    elif mode == 3:
+        d = SPRITE_DEPTH_LIMIT
+    elif mode == 4:
+        d = 0x10
+    elif mode == 5:
+        d -= 0x10
+    if d < 0:
+        return None
+    return min(d, SPRITE_DEPTH_LIMIT)
+
+
+def rotate2(pts, angle):
+    """The 2D matrix `battle_effect_submit_sprite_to_ordering_table` builds.
+
+    `[[cos, -sin], [sin, cos]] >> 12` at a camera zoom of ONE, applied to the
+    part's own corners before the position is added. A particle only carries an
+    angle when its emitter sets `work_kind_flags` bit 1, which orients it to its
+    velocity (`battle_effect_update_node_from_work`).
+    """
+    if not angle:
+        return pts
+    c, sn = math.cos(angle), math.sin(angle)
+    return [(x * c - y * sn, x * sn + y * c) for x, y in pts]
 
 
 def _tri(acc, cov, tex, alpha, dst, src, cell):
@@ -766,6 +823,14 @@ def mesh_actors(raw, sec, cur):
     return out
 
 
+def p_pts(fr, d):
+    """Every corner of one draw's parts, in order, ready to be turned together."""
+    out = []
+    for p in fr[d['frame']]:
+        out.extend(p['pts'])
+    return out
+
+
 def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
@@ -819,9 +884,15 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
         for d in tl:
             if not (d['t'] <= t < d['t'] + max(d['ticks'], 1)):
                 continue
+            # The part's own corners turn with the sprite before its position
+            # is added, exactly as the 2D matrix of submit_sprite does.
+            corners = rotate2(p_pts(fr, d), d.get('angle', 0.0))
+            k = 0
             for p in fr[d['frame']]:
                 q = [(anchor[0] + (d['x'] + px) * scale,
-                      anchor[1] + (d['y'] + py) * scale) for px, py in p['pts']]
+                      anchor[1] + (d['y'] + py) * scale)
+                     for px, py in corners[k:k + 4]]
+                k += 4
                 u, v, w, h = p['u'], p['v'], p['w'], p['h']
                 s = [(u, v), (u + w, v), (u, v + h), (u + w, v + h)]
                 cell = (min(u, u + w), min(v, v + h),
