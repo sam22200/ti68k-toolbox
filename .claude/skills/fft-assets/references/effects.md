@@ -634,3 +634,37 @@ child's own windows, which were short by phase 1's frames.
 **An effect's picture can be entirely native.** E071 has no sprite timeline at
 all, so a renderer driven by that timeline produced nothing for it; its length
 is its handlers' windows instead.
+
+
+## 19. The colour: six stages checked, no defect, and a claim withdrawn
+
+Cure 4 renders cyan and I said it should be green. That was memory, not a
+reference, and the disc disagrees. Every stage of the colour path, against the
+source and counted on the disc:
+
+| stage | the rule | what the disc says |
+|---|---|---|
+| the texel | BGR555: bits 0-4 R, 5-9 G, 10-14 B, 15 blend | as decoded |
+| transparency | texel index 0, and a raw 0x0000 | as decoded |
+| the CLUT | `flags & 0xf` row, `& 0x10` bank; the meshes pin `clut = 0x7b00` | row 0 throughout; **the palette section's second CLUT is all zeros in every effect checked** |
+| the curve rows | `(curve_data + track * 0xa0 + offset)[4]` -- 160 a row, ramp at +4 | 15 rows in 401 of 401 effects |
+| the channel order | `red = table[k & 0xf]`, green `>> 4`, blue `>> 8` | see below |
+| the tint | 0x80 neutral, multiplied into the texel | as modelled |
+
+**The channel order is the one that would be easy to get backwards**, and there
+is a measurement for it: 2,622 emitters carry colour curves, and of their 7,866
+channels only 21 red, 29 green and 35 blue name a row that is empty. A reversed
+order would pile those on one channel; spread evenly, they are deliberate.
+
+Cure 4's polar mesh reads `colour_curves = 0x66e`: red from row 14, green and
+blue from row 6. **Row 14 is all zeros.** Its red really is off, and the cyan is
+the file's own.
+
+### The coincidence that hid a wrong model
+
+`curves()` read the section's leading word as a row count. It is not one -- it
+is row 0's own four-byte header -- but it holds 15 in every effect on the disc,
+and every section holds exactly 15 rows. Two coincidences that make a wrong
+model look right, and it only takes one effect built differently to break it.
+The count comes from the section's length now, capped at the sixteen a four-bit
+nibble can name.
