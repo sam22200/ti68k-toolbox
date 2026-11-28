@@ -584,3 +584,34 @@ across are exactly what the console shows: the beam leaves the top of the frame
 and the flash fills it. **Pixels on a canvas you chose the size of say nothing**
 -- the frame was 256x618 here and 256x240 there. Convert to tiles before calling
 a mesh too big.
+
+
+## 18. Five families of twenty-five, and what wiring one still needs
+
+`effect_mesh.py` carries five now, transcribed from their own sources:
+
+| family | what it builds | where | overlays |
+|---|---|---|---|
+| `RingStack` | 9 rows of 8, 8 rings of 8 quads | world | 31 |
+| `RingMesh` | 3 rows of 32, 2 rings, height `<< 2` | world | 32 |
+| `SummonMesh` | 9 rows of 17 that **narrow by the cosine and climb by the scaled sine** -- a dome, 8x16 quads | world | 12 |
+| `QuadGrid4x4` | 16 quads of 64 px | **screen** | 27 |
+| `PolarMesh` | 6 rings of 5 mirrored into four quadrants, 80 quads, the centre drifting by a velocity that gains an acceleration **between rings** | **screen** | 23 |
+
+That is 125 of the 198 handler instances. The dome's view is the ring mesh's
+but for the row-radius terms a dome has no use for, so they share a class; the
+polar mesh has its own, where `radius_start` sits at 0x20 and the angle at 0x44.
+
+**One detail that is easy to lose**: in the polar mesh every curve is read at
+the handler's own frame counter, which advances once an update -- except the
+scroll, which the source reads at the caller's frame. They are not the same
+number once a keyframe repeats.
+
+### What a sixth needs that a fifth did not
+
+Wiring a family to an overlay needs that overlay's **own** brightness-table
+address: `g_effect_e015_ring_stack_mesh_brightness_table` is at 0x801c573c, and
+every one of the 110 overlays has its own. `target/effect.yaml` lists them, and
+until those addresses are carried here, only E015's three are wired. The classes
+themselves need nothing: give one a 196-byte record, a table and the curves and
+it answers.
