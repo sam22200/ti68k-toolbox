@@ -446,8 +446,8 @@ def track_offsets(tr, name, frames, phase1=0, double=False):
     offset the effect adds to whatever it plays over.
     """
     seq = (tr or {}).get(name) or []
-    out = [(0.0, 0.0, 0.0)] * max(0, frames)
-    _fade(seq, out, phase1, frames, [0.0, 0.0, 0.0], double)
+    out = [(1.0, 0.0, 0.0, 0.0)] * max(0, frames)
+    _fade(seq, out, phase1, frames, [1.0, 0.0, 0.0, 0.0], double)
     return out
 
 
@@ -458,47 +458,64 @@ def stage_offsets(stages, name, frames, double=False):
     while they are the stage that runs, so a stage picks the fade up where the
     one before it left off instead of starting from black again.
     """
-    out = [(0.0, 0.0, 0.0)] * max(0, frames)
-    cur = [0.0, 0.0, 0.0]
+    out = [(1.0, 0.0, 0.0, 0.0)] * max(0, frames)
+    cur = [1.0, 0.0, 0.0, 0.0]
     for at, end, tr in stages:
         cur = _fade((tr or {}).get(name) or [], out, at, min(end, frames), cur, double)
     return out
 
 
 def _fade(seq, out, at, end, cur, double):
-    """One stage's keyframes written into `out`, and the colour it ends on."""
+    """One stage's keyframes written into `out`, and the state it ends on.
+
+    Each frame is `(gain, r, g, b)`: the scene is multiplied by `gain` and then
+    offset, because `battle_map_blend_background_gradient_color` does not simply
+    add. Its mode picks what the target colour is BUILT FROM, and two of the
+    five modes these files use halve it:
+
+        0 current     the colour in transition, plus the offsets
+        1 current/2   half of it, plus the offsets
+        4 base        the map's own gradient, plus the offsets
+        5 base/2      HALF the map's own gradient, plus the offsets
+        8 restore     the map's own gradient; the offsets are ignored
+
+    Taking `base` for black -- "a preview has no map" -- turned every one of
+    those into its offset alone, and since a `base/2` keyframe is written as a
+    small offset on top of a halved gradient, that read a darkening as a
+    brightening. Flare is the clearest case: the console drops from 52 to 16
+    mean luminance over its charge while the preview climbed to 62. 226 of the
+    330 offset keyframes across the seven decoded effects are `base/2`.
+
+    `base` is `g_battle_map_background_gradient_transition.colors[i]` -- the
+    map's **own** gradient, which a fade never touches -- and not the colour
+    last applied. Taking it for the latter left Night Sword's flash red instead
+    of white.
+    """
     frames = end
-    # `base` is `g_battle_map_background_gradient_transition.colors[i]` -- the
-    # map's **own** gradient colour, which a fade never touches -- and not the
-    # colour last applied. Taking it for the latter left Night Sword's flash red
-    # instead of white: the keyframe after it offsets `base` by (0, -128, -128),
-    # which from a constant base clamps to black rather than keeping 126 of red.
-    # A preview has no map, so its base is black and the result is the offset.
-    cur = list(cur)
-    base = [0.0, 0.0, 0.0]
+    cur = list(cur)                  # (gain, r, g, b)
     last = list(cur)                 # where the window leaves the gradient
     for e in seq:
         n = e['frames']
         off = [(2.0 if double else 1.0) * c for c in e['colour']]
         if not e['offset']:
-            target = [float(c) for c in e['colour']]
+            target = [1.0] + [float(c) for c in e['colour']]
         else:
             m = e['mode']
-            src = cur if m < 4 else base
-            if m in (2, 3, 6, 7):
-                g = (src[0] * 2 + src[1] * 3 + src[2]) / (6.0 if m in (2, 6) else 12.0)
-                start = [g, g, g]
-            elif m in (1, 5):
-                start = [c / 2.0 for c in src]
-            else:
-                start = list(src)
-            target = start if m == 8 else [start[k] + off[k] for k in range(3)]
+            half = m in (1, 3, 5, 7)
+            if m == 8:                               # restore: the gradient itself
+                target = [1.0, 0.0, 0.0, 0.0]
+            elif m < 4:                              # current: build on what is applied
+                g = cur[0] / 2.0 if half else cur[0]
+                target = [g] + [cur[k + 1] / (2.0 if half else 1.0) + off[k]
+                                for k in range(3)]
+            else:                                    # base, base/2, base repeat
+                target = [0.5 if half else 1.0] + list(off)
+        target = [target[0]] + [min(255.0, max(-255.0, c)) for c in target[1:]]
         # The fade runs over `duration * 8` frames, which is the keyframe's own
         # length; a duration of 0 snaps and holds for its single frame.
-        target = [min(255.0, max(0.0, c)) for c in target]
         for i in range(n):
             t = 1.0 if e['duration'] == 0 else (i + 1) / float(n)
-            c = [cur[k] + (target[k] - cur[k]) * t for k in range(3)]
+            c = [cur[k] + (target[k] - cur[k]) * t for k in range(4)]
             if 0 <= at + i < frames:
                 out[at + i] = tuple(c)
                 last = c
@@ -1652,10 +1669,16 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                 bg = np.asarray(_scene_through(scene, anchor, (ax, ay), zoom)).astype(float)
         if bg is not None:
             fb[:] = bg
-            if f30 < len(field):
-                fb[:] = np.clip(fb + np.array(field[f30]), 0, 255)
-            if f30 < len(screen):
-                fb[:] = np.clip(fb + np.array(screen[f30]), 0, 255)
+            # `gain` once, then both offsets. The two tracks colour different
+            # things in the engine -- `affected_units` the units, `screen` the
+            # background gradient -- and a preview has to put both on one
+            # picture. Their offsets add, but their gains must NOT: multiplying
+            # by each in turn halves the scene twice over (0.25), which fixed
+            # Flare's charge and broke Holy's and Meteor's white.
+            g = screen[f30] if f30 < len(screen) else (1.0, 0.0, 0.0, 0.0)
+            u = field[f30] if f30 < len(field) else (1.0, 0.0, 0.0, 0.0)
+            fb[:] = np.clip(fb * min(g[0], u[0])
+                            + np.array(g[1:]) + np.array(u[1:]), 0, 255)
         for d in tl:
             if not (d['t'] <= t < d['t'] + max(d['ticks'], 1)):
                 continue
