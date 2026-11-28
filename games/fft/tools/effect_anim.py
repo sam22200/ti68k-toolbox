@@ -80,6 +80,7 @@ SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
 except the three things listed here.
 """
 import argparse
+import math
 import struct
 import sys
 from pathlib import Path
@@ -309,6 +310,44 @@ def action_text(a):
     return ', '.join(bits)
 
 
+# ---------------------------------------------- the battle camera's projection
+# `camera_update_matrices` is `RotMatrix(rotation)` then `ScaleMatrix(zoom)`, and
+# the header names the values: pitch `CAMERA_TILT_LOW` 0x12e or `CAMERA_TILT_HIGH`
+# 0x1c0 (4096 is a full turn, so 26.5 and 39.4 degrees), zoom ONE or 0xc00. The
+# effect renderer projects with RotTrans, not RotTransPers -- no perspective
+# divide -- so world to screen is the rotation's first two rows and nothing else.
+PITCH, YAW = 0x12e, 0x200          # tilt low, and the isometric 45-degree yaw
+
+
+def camera(pitch=PITCH, yaw=YAW):
+    """(vx, vy) of a world (dx, dy, dz): two rows of Rx(pitch) * Ry(yaw).
+
+    At tilt low a world y reaches the screen at cos 26.5 = 0.895, and a
+    horizontal offset splits between x at cos/sin of the yaw and y at 0.316.
+    """
+    th, ph = pitch / 4096.0 * 2 * math.pi, yaw / 4096.0 * 2 * math.pi
+    st, ct, sp, cp = math.sin(th), math.cos(th), math.sin(ph), math.cos(ph)
+
+    def project(dx, dy, dz=0):
+        return (cp * dx + sp * dz, st * sp * dx + ct * dy - st * cp * dz)
+    return project
+
+
+def _ellipsoid(sx, sy, sz, key):
+    """A repeatable point inside the spawn spread's ellipsoid."""
+    h = 2166136261
+    for _ in range(24):
+        v = []
+        for i in range(3):
+            for q in key + (i,):
+                h = ((h ^ (q & 0xffff)) * 16777619) & 0xffffffff
+            v.append(((h >> 8) & 0xffff) / 65535.0 * 2 - 1)
+        if v[0] ** 2 + v[1] ** 2 + v[2] ** 2 <= 1:
+            return v[0] * sx, v[1] * sy, v[2] * sz
+        key = (key[0] + 7919,) + key[1:]
+    return 0, 0, 0
+
+
 def play_window(ops, nframes, t0, t1, animation_driven):
     """One particle's draws, walking its sequence the way the engine walks it.
 
@@ -352,7 +391,7 @@ def play_window(ops, nframes, t0, t1, animation_driven):
     return out
 
 
-def schedule(fr, seqs, cs, tl):
+def schedule(fr, seqs, cs, tl, scatter=False, project=None):
     """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
 
     Each keyframe of a particle channel spawns its emitter's `particle_count`
@@ -365,6 +404,7 @@ def schedule(fr, seqs, cs, tl):
     """
     if not tl:
         return None
+    project = project or camera()
     out = []
     for c, kfs in enumerate(tl['child_channels']):
         for k in kfs or []:
@@ -382,26 +422,35 @@ def schedule(fr, seqs, cs, tl):
             # `EFFECT_LIST_NODE_WORLD` adds the particle's world position and
             # the sequence's own offset *before* the camera matrix and projects
             # them with RotTrans -- no perspective divide -- so both are world
-            # units and the quad corners alone are screen pixels. FFT's battle
-            # camera scales the vertical about 1:1, which is why adding them
-            # straight works: Night Sword's ball lands high and its burst on
-            # the victim, as the screenshots show. The spread at 0x20 is not
-            # applied: scattering in screen space smears each stream into one
-            # saturated blob, and it needs the real matrix to do properly.
-            px, py = struct.unpack_from('<2h', rec, 0x14)
+            # units, and the quad corners alone are screen pixels. Both go
+            # through the camera here, so Night Sword's ball lands high and its
+            # burst on the victim. The spread at 0x20 is `--scatter`: it is the
+            # ellipsoid a spawn fills, and without the particle velocities that
+            # is only half the model.
+            pw = struct.unpack_from('<3h', rec, 0x14)
+            sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
+            # The engine gates on `time % spawn_interval != 0` with `time` the
+            # record's own frame counter, so a window shorter than the interval
+            # can spawn nothing at all -- which cannot be right for Stasis
+            # Sword, whose shards have interval 49 inside 2-frame keyframes and
+            # plainly appear. Until that is settled this spawns once on entering
+            # the keyframe and then every `interval` frames, which gives the
+            # right structure. The cost shows on a window of 3 frames with
+            # interval 1, where three copies a frame apart read as a doubled
+            # sprite instead of one.
             born = k['frm']
             while born < max(k['to'], k['frm'] + 1):
                 die = tl['child'] if life < 0 else min(tl['child'], born + life)
                 t0 = (tl['phase1'] + born) * 2          # frames at 30 fps -> 60 Hz ticks
                 t1 = (tl['phase1'] + die) * 2
-                for _ in range(count):
-                    # The spread is a half-extent in WORLD units, which the
-                    # console projects through the camera. Applied raw as screen
-                    # pixels it smears every particle of a stream into one
-                    # saturated blob, so it is off unless asked for.
+                for i in range(count):
+                    j = _ellipsoid(sw[0], sw[1], sw[2], (e, born, i)) if scatter \
+                        else (0, 0, 0)
+                    ox, oy = project(pw[0] + j[0], pw[1] + j[1], pw[2] + j[2])
                     for d in play_window(seqs[seq], len(fr), t0, t1, life < 0):
+                        sx, sy = project(d['x'], d['y'])
                         out.append(dict(d, inst=e, seq=seq, chan=c,
-                                        x=d['x'] + px, y=d['y'] + py))
+                                        x=ox + sx, y=oy + sy))
                 born += interval
     out.sort(key=lambda d: (d['t'], d['chan'], d['inst']))
     return out
@@ -476,14 +525,14 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=False):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
     if tex is None:
         return []
     tex, alpha = tex
-    tl = schedule(fr, seqs, cs, phases(raw_sections[7])) if raw_sections else None
+    tl = schedule(fr, seqs, cs, phases(raw_sections[7]), scatter) if raw_sections else None
     if tl is None:
         tl = timeline(fr, seqs, cs)
     if not tl:
@@ -536,8 +585,12 @@ def grey4(im):
     return np.repeat(out[:, :, None], 3, axis=2)
 
 
-def gif(path, png_dir, n, fps=15):
-    """ffmpeg, not PIL: PIL drops a frame identical to the one before it."""
+def gif(path, png_dir, n, fps=30):
+    """ffmpeg, not PIL: PIL drops a frame identical to the one before it.
+
+    30 fps, not 15: one PNG is one battle frame and the battle runs at 30. At 15
+    the whole effect played at half the speed the console shows.
+    """
     import subprocess
     if n == 0:
         return
@@ -631,6 +684,9 @@ def main():
     ap.add_argument('--size', default='256x240', help='the render canvas (default 256x240)')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
+    ap.add_argument('--scatter', action='store_true',
+                    help="spread each spawn through the emitter's ellipsoid "
+                         '(half a model without the particle velocities)')
     ap.add_argument('--flat', action='store_true',
                     help='ignore the timeline: play every sequence once from t=0')
     ap.add_argument('--ti', action='store_true',
@@ -724,7 +780,7 @@ def main():
             w, h = TI_W, TI_H
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
-                     None if a.flat else sec)
+                     None if a.flat else sec, a.scatter)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
