@@ -305,6 +305,81 @@ def phases(sec7):
     return out
 
 
+# ---------------------------------------- section 7: the four colour tracks
+# `battle_effect_code_script_28_step_child_timeline` recolours four things from
+# four tracks of the child timeline: the affected units, the caster, the current
+# target and the screen. Each keyframe lasts `duration * 8` frames (a duration of
+# 0 lasts one), and `preset` bit 7 says the colour is an offset applied through
+# `battle_map_blend_background_gradient_color`'s mode rather than a gradient set
+# outright. The screen's offsets are **doubled** before use.
+COLOUR_TRACKS = ('affected units', 'caster', 'target', 'screen')
+PALETTE_TRACK, BACKGROUND_TRACK = 0xC8, 0x12C
+TRACK_KEYFRAMES = 33
+# The modes of `battle_map_blend_background_gradient_color`, which fades the
+# gradient toward a target built from the one it already has.
+COLOUR_MODES = ('current', 'current/2', 'current grey', 'current grey/2',
+                'base', 'base/2', 'base grey', 'base grey/2',
+                'restore', 'base repeat', 'stop repeat')
+
+
+def _track(buf, at, background):
+    """One colour track: its keyframes, in order."""
+    size = BACKGROUND_TRACK if background else PALETTE_TRACK
+    if at + size > len(buf):
+        return None
+    n = TRACK_KEYFRAMES
+    dur = struct.unpack_from('<%dh' % n, buf, at)
+    col = struct.unpack_from('<%db' % (3 * n), buf, at + 2 * n)
+    second = struct.unpack_from('<%db' % (3 * n), buf, at + 5 * n) if background else None
+    pre = struct.unpack_from('<%dB' % n, buf, at + (8 if background else 5) * n)
+    count = struct.unpack_from('<h', buf, at + size - 2)[0]
+    out = []
+    for k in range(max(0, min(count, n))):
+        e = dict(k=k, frames=(dur[k] * 8) or 1, duration=dur[k], preset=pre[k],
+                 mode=pre[k] & 0x7f, offset=bool(pre[k] & 0x80),
+                 colour=tuple(col[3 * k:3 * k + 3]))
+        if second is not None:
+            e['second'] = tuple(second[3 * k:3 * k + 3])
+        out.append(e)
+    return out
+
+
+def tracks(sec7):
+    """The child timeline's four colour tracks, by name.
+
+    They sit after its five keyframe tables and three sound tracks, eight bytes
+    into the section: 0x326 for the first of them.
+    """
+    base = 8 + 0x326
+    out = {}
+    for i, name in enumerate(COLOUR_TRACKS):
+        at = base + PALETTE_TRACK * min(i, 3)
+        out[name] = _track(sec7, at, name == 'screen')
+    return out
+
+
+def screen_colour(tr, frame):
+    """The screen track at a 30 fps frame: (colour, mode, is_offset).
+
+    A keyframe is entered when the one before it runs out. **It does not give a
+    background.** With `preset` bit 7 the colour is an offset applied to the
+    gradient the map already has, through one of
+    `battle_map_blend_background_gradient_color`'s eleven modes -- and those
+    offsets are overwhelmingly negative, so a preview that painted them would
+    draw a darker black. Without the bit it sets the two gradient stops outright.
+    Either way it modulates a battlefield, which a preview does not have.
+    """
+    seq = (tr or {}).get('screen') or []
+    t = 0
+    for e in seq:
+        if frame < t + e['frames']:
+            if not e['offset']:
+                return e['colour'], e['mode'], False
+            return tuple(2 * c for c in e['colour']), e['mode'], True
+        t += e['frames']
+    return (0, 0, 0), 0, True
+
+
 KEYFRAME_ACTIONS = ((0x0008, 'caster only'), (0x0010, 'post-action display'),
                     (0x0020, 'update display'), (0x0040, 'target animation'))
 
@@ -1112,6 +1187,7 @@ def main():
     ap.add_argument('--timeline', action='store_true', help='every draw, in tick order')
     ap.add_argument('--program', action='store_true', help='section 2: the effect script')
     ap.add_argument('--phases', action='store_true', help='section 7: durations and channels')
+    ap.add_argument('--tracks', action='store_true', help='section 7: the four colour tracks')
     ap.add_argument('--render', type=Path, help='PNG per frame plus a GIF, in this directory')
     ap.add_argument('--size', default=None,
                     help='the render canvas; by default 256x240, grown to fit the effect at 1:1')
@@ -1177,6 +1253,21 @@ def main():
         for off, op, name, sel, ops in program(sec[2]):
             print('   %04x  %02x %-26s %s%s' % (off, op, name,
                   ' '.join('%6d' % v for v in ops), '   sel %02x' % sel if sel else ''))
+    if a.tracks:
+        tr = tracks(sec[7])
+        for name in COLOUR_TRACKS:
+            seq = tr.get(name)
+            if not seq:
+                continue
+            print(' %s' % name)
+            t = 0
+            for e in seq:
+                print('   f%4d..%-4d  %-13s %-6s %s%s'
+                      % (t, t + e['frames'],
+                         COLOUR_MODES[e['mode']] if e['mode'] < len(COLOUR_MODES) else e['mode'],
+                         'offset' if e['offset'] else 'set', e['colour'],
+                         ('  lower ' + str(e['second'])) if 'second' in e else ''))
+                t += e['frames']
     if a.phases:
         t = phases(sec[7])
         if not t:
