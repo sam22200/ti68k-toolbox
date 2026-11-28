@@ -1379,3 +1379,44 @@ the two whose console peaks saturate at 252**, and the gain holds them under
 it. The model is an approximation -- the engine applies the gradient to the
 map's own polygons through `battle_map_color_field`, not to finished pixels --
 and that is where the remaining error for those two lives.
+
+## 32. A particle is only tinted when its emitter asks to be
+
+`battle_effect_update_node_from_work` reads the colour curves for a work record
+carrying `EFFECT_WORK_FLAG_COLOUR_CURVES` -- bit 6 of the geometry entry's
+`flags`, copied onto the record -- and hands every other particle a flat
+neutral:
+
+    if (work->flags & EFFECT_WORK_FLAG_COLOUR_CURVES) {
+        battle_effect_render_particle_sprite(work->data,
+            g_effect_palette_table[work->colour_curves[0]].factor[work->palette_frame], ...);
+    } else {
+        battle_effect_render_particle_sprite(work->data, 0x80, 0x80, 0x80);
+    }
+
+14 of the 72 emitters across the seven decoded effects do not carry it and were
+being tinted by whatever palette row their `colour_curves` nibbles happened to
+name. Measured: only Cure 4 moves (75 of 116 frames, at most 4.1 of 255);
+Stasis Sword, Night Sword, Flare and Haste are identical to the pixel.
+
+### What the audit ruled OUT, with its numbers
+
+So the same ground is not walked again:
+
+* **the camera's rotation track.** Five of the seven effects carry one and at
+  least one turns a full 4,096-unit yaw in twenty frames. It cannot be played:
+  the preview's scene is a photograph, not geometry. (It is also the "Holy spins
+  360, we are not doing that" the port set aside from the start.)
+* **the `caster` and `target` colour tracks.** They recolour unit sprite
+  palettes, and a preview draws no units.
+* **`EFFECT_EMITTER_VELOCITY_TOWARD_TARGET`.** Not one of the 72 emitters uses
+  it -- 60 are `outward`, 12 `inward` -- and the case is empty in the source.
+* **homing** (2 emitters of 72), **velocity-oriented sprites** (3), and the four
+  **grey colour modes** (0 keyframes).
+
+### Still open
+
+`battle_map_color_field` applies the gradient to the map's own polygons; the
+preview applies it to finished pixels. That is where Holy's and Meteor's
+remaining error lives -- they are the two whose console peaks saturate at 252,
+and the `base/2` gain holds them under it.
