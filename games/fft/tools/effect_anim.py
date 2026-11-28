@@ -501,6 +501,11 @@ def play_window(ops, nframes, t0, t1, animation_driven):
     return out
 
 
+def _tint_factor(cur, nibble, frame):
+    """READ_CURVE against the palette table, for a caller that has a frame."""
+    return effect_mesh.curve(cur or (), nibble, frame)
+
+
 def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
     """Every draw of the effect as its timeline orders it, in 60 Hz ticks.
 
@@ -540,7 +545,15 @@ def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
             # `work_kind_flags` bit 1 orients the particle to its velocity
             # (battle_effect_update_node_from_work).
             orient = struct.unpack_from('<H', rec, 0x02)[0] & 2
-            pw = struct.unpack_from('<3h', rec, 0x14)
+            # `battle_effect_interpolate_emitter_spawn_position`: start at 0x14
+            # and end at 0x1a, lerped by curve_indices[0] nibble 0. The start
+            # alone pins an emitter the original walks across the effect.
+            spawn_curve = struct.unpack_from('<I', rec, 0x08)[0] & 0xf
+            # `placement_flags` bits 9-11 name the anchor. A preview draws about
+            # the target, so every anchor that resolves to a unit or to the
+            # cursor's tile is already that point; the parent particle and the
+            # map centre are somewhere else and nothing here can place them.
+            anchor_mode = struct.unpack_from('<H', rec, 0x02)[0] & effect_mesh.ORIGIN_MASK
             sw = [abs(v) for v in struct.unpack_from('<3h', rec, 0x14 + 0x0c)]
             box = struct.unpack_from('<H', rec, 0x02)[0] & 0x0100
             # The spawn gate is `time % spawn_interval != 0`, and `time` is NOT
@@ -565,6 +578,8 @@ def schedule(fr, seqs, cs, tl, scatter=True, project=None, cur=None):
                         n = (d['t'] - t0) // 2          # frames this one has lived
                         tint = _tint(rec, cur, n)
                         m = _motion(rec, key, n)
+                        pw = effect_mesh.spawn_position(
+                            rec, _tint_factor(cur, spawn_curve, n))
                         wx = pw[0] + j[0] + m[0]
                         wy = pw[1] + j[1] + m[1]
                         wz = pw[2] + j[2] + m[2]
