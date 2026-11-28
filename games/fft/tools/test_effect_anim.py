@@ -243,5 +243,38 @@ class EmbeddedData(unittest.TestCase):
         self.assertIsNone(R.data_base(bad))
 
 
+class Blend(unittest.TestCase):
+    """The GPU's own compositing: 5 bits a channel, saturated per primitive."""
+
+    @staticmethod
+    def one(back, front, abe, mode):
+        import numpy as np
+        fb = np.full((1, 1, 3), float(back))
+        prim = np.full((1, 1, 3), float(front))
+        A._blend(fb, prim, np.ones((1, 1)), abe, mode)
+        return fb[0, 0, 0]
+
+    def test_opaque_replaces(self):
+        self.assertEqual(self.one(200, 64, False, 1), 64)
+        self.assertEqual(self.one(200, 64, False, 3), 64)   # the mode is not consulted
+
+    def test_add_saturates_at_five_bits(self):
+        self.assertEqual(self.one(128, 64, True, 1), 192)
+        self.assertEqual(self.one(200, 200, True, 1), 248)  # 25 + 25 -> 31, not 50
+
+    def test_half_and_quarter(self):
+        self.assertEqual(self.one(128, 64, True, 0), 96)    # (16 + 8) / 2 -> 12
+        self.assertEqual(self.one(128, 64, True, 3), 144)   # 16 + 8/4 -> 18
+
+    def test_subtract_floors_at_zero(self):
+        self.assertEqual(self.one(64, 200, True, 2), 0)
+
+    def test_nothing_drawn_where_the_primitive_is_not_covered(self):
+        import numpy as np
+        fb = np.full((1, 1, 3), 72.0)
+        A._blend(fb, np.full((1, 1, 3), 255.0), np.zeros((1, 1)), True, 1)
+        self.assertEqual(fb[0, 0, 0], 72.0)
+
+
 if __name__ == '__main__':
     unittest.main()
