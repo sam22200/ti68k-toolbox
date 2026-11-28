@@ -64,9 +64,14 @@ lasts; each particle loops the emitter's sprite sequence for its lifetime (-1 me
 until the effect ends), and the whole thing starts after phase 1. `--flat` gives the old
 behaviour -- every sequence once from t=0 -- for comparing the two.
 
-Still not modelled: the emitter's spawn spread and velocities, so the particles of one
-spawn land on top of each other instead of scattering, and phase 1 and phase 2 draw
-nothing because their own channels are empty in the effects looked at so far.
+**Still not modelled: the emitter's spawn spread and velocities**, and that is the gap
+between this and the console. They are world units the camera projects, and the sprite
+quads are screen pixels, so applying them raw is worse than leaving them out (measured on
+Night Sword: the parts pull apart and each stream smears into one saturated blob). The
+cost is visible: Night Sword's emitter 2 spawns a particle a frame for 35 frames, 315
+draws of the same cell. Scattered through its spread that is the tall white column the
+game shows; piled on one point it is a white dot. Phase 1 and phase 2 also draw nothing,
+their own channels being empty in the effects looked at so far.
 
 The layouts above are the names of **adamrt/fft_decomp**, a byte-exact decompilation of
 SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
@@ -478,10 +483,18 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None):
         tl = timeline(fr, seqs, cs)
     if not tl:
         return []
-    if anchor is None:                          # sit the sweep on the ground line
+    if anchor is None:                          # fit the sweep, then sit it low
         x0, y0, x1, y1 = extent(fr, tl)
+        # Night Sword sweeps 251 px against a 240-px frame, so its ball fell off
+        # the top: shrink until the whole thing is inside before placing it.
+        fit = min(1.0, (size[1] * 0.96) / max(1, y1 - y0),
+                  (size[0] * 0.96) / max(1, x1 - x0))
+        if fit < 1.0:
+            scale *= fit
+            print('scaled to %.2f so the %dx%d sweep fits the %dx%d frame'
+                  % (scale, x1 - x0, y1 - y0, size[0], size[1]))
         anchor = (int(size[0] / 2 - (x0 + x1) / 2 * scale),
-                  int(size[1] * 0.92 - y1 * scale))
+                  int(size[1] * 0.98 - y1 * scale))
         print('origin at %d,%d  (the animation sweeps x %d..%d, y %d..%d)'
               % (anchor[0], anchor[1], x0, x1, y0, y1))
     last = max(d['t'] + d['ticks'] for d in tl)
