@@ -682,7 +682,7 @@ def rotate2(pts, angle):
     return [(x * c - y * sn, x * sn + y * c) for x, y in pts]
 
 
-def _tri(acc, cov, tex, alpha, dst, src, cell):
+def _tri(acc, cov, tex, alpha, dst, src, cell, rgb=None):
     """Rasterise one textured triangle into a primitive's own colour and coverage.
 
     No blending here: the GPU blends a whole primitive against the frame buffer
@@ -719,7 +719,16 @@ def _tri(acc, cov, tex, alpha, dst, src, cell):
     box = cov[lo_y:hi_y, lo_x:hi_x]
     fresh = (a > 0) & (box == 0)
     box[fresh] = 1
-    acc[lo_y:hi_y, lo_x:hi_x][fresh] = tex[sv, su][fresh]
+    texel = tex[sv, su]
+    if rgb is not None:
+        # POLY_GT4: each vertex carries its own colour and the hardware
+        # interpolates it across the primitive, 0x80 being neutral. Painting
+        # the whole quad in one of the four turns a graded wash into a slab,
+        # which is what the 4x4 grid and the ring mesh looked like.
+        c = (l0[:, :, None] * np.array(rgb[0]) + l1[:, :, None] * np.array(rgb[1])
+             + l2[:, :, None] * np.array(rgb[2]))
+        texel = texel * c / 128.0
+    acc[lo_y:hi_y, lo_x:hi_x][fresh] = texel[fresh]
 
 
 def _blend(fb, prim, cov, abe, mode):
@@ -765,7 +774,7 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def mesh_actors(raw, sec, cur, all_kinds=False):
+def mesh_actors(raw, sec, cur):
     """The overlay's own mesh renderers, and when the timeline runs each of them.
 
     `battle_effect_code_script_28_step_child_timeline` is explicit: a keyframe's
@@ -802,7 +811,12 @@ def mesh_actors(raw, sec, cur, all_kinds=False):
         i += SCRIPT_OPS[op][1]
     if not slots:
         return out
-    order = sorted(set(slots.values()))           # ids ascending, handlers in address order
+    # `g_battle_effect_file_ptrs` at 0x801b50d0 in BATTLE.BIN is a static table of
+    # 198 routine addresses, and it settles the slot-to-handler question outright:
+    # [7] 0x801C2500, [8] 0x801C39F8, [9] 0x801C4FC8 -- E015's three functions in
+    # the order `target/effect.yaml` lists them. Sorting the registered ids is
+    # therefore the same thing as reading that table, for this overlay.
+    order = sorted(set(slots.values()))
     # E015's three tables, at the addresses `target/effect.yaml` gives them.
     # Each renderer reads its own: nine columns for the stack's lattice rows,
     # three for the ring's, five for the grid's four quad rows.
@@ -819,15 +833,6 @@ def mesh_actors(raw, sec, cur, all_kinds=False):
                 continue
             routine = slots.get(sel - 1)
             if routine is None or order.index(routine) >= len(kinds):
-                continue
-            # Only the ring stack is wired by default. The slot-to-handler
-            # reading -- ids ascending onto the overlay's functions in address
-            # order -- is cross-checked for slot 0 (the timeline drives entry 4
-            # through it for a hundred frames, and entry 4 is the one tall thin
-            # lattice) and for slot 0 ALONE. Taken at face value for slots 1 and
-            # 2 it paints flat slabs across the frame, so it is wrong there, or
-            # those entries want another view. `all_kinds` shows it anyway.
-            if order.index(routine) and not all_kinds:
                 continue
             cls, addr, width = kinds[order.index(routine)]
             bright = effect_mesh.brightness_table(raw, addr - 0x801C2500, width=width)
@@ -846,8 +851,7 @@ def p_pts(fr, d):
     return out
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False,
-           all_kinds=False):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
@@ -888,7 +892,7 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
     out = []
     prim = np.zeros((size[1], size[0], 3), dtype=float)
     cov = np.zeros((size[1], size[0]), dtype=float)
-    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4]), all_kinds) if raw_sections else []
+    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4])) if raw_sections else []
     flat = camera()
 
     def project3(x, y, z):
@@ -942,12 +946,13 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                 uv = q['uv']
                 cell = (min(p[0] for p in uv), min(p[1] for p in uv),
                         max(p[0] for p in uv) - 1, max(p[1] for p in uv) - 1)
-                c = q['rgb'][0]
-                tx = tex * np.array([c[0] / 128.0, c[1] / 128.0, c[2] / 128.0])
+                g = q['rgb']
                 prim[:] = 0
                 cov[:] = 0
-                _tri(prim, cov, tx, alpha, (d[0], d[1], d[2]), (uv[0], uv[1], uv[2]), cell)
-                _tri(prim, cov, tx, alpha, (d[1], d[3], d[2]), (uv[1], uv[3], uv[2]), cell)
+                _tri(prim, cov, tex, alpha, (d[0], d[1], d[2]), (uv[0], uv[1], uv[2]), cell,
+                     (g[0], g[1], g[2]))
+                _tri(prim, cov, tex, alpha, (d[1], d[3], d[2]), (uv[1], uv[3], uv[2]), cell,
+                     (g[1], g[3], g[2]))
                 _blend(fb, prim, cov, q['abe'], q['mode'])
         out.append(np.clip(fb, 0, 255).astype(np.uint8))
     return out
@@ -1067,8 +1072,6 @@ def main():
                     help='the render canvas; by default 256x240, grown to fit the effect at 1:1')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
-    ap.add_argument('--mesh-all', action='store_true', dest='mesh_all',
-                    help='run every native mesh handler, not just the ring stack')
     ap.add_argument('--no-scatter', action='store_true', dest='no_scatter',
                     help='ignore the emitters\' spawn spread, piling each stream on one point')
     ap.add_argument('--flat', action='store_true',
@@ -1165,7 +1168,7 @@ def main():
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
                      None if a.flat else sec, not a.no_scatter,
-                     grow=a.size is None and not a.ti, all_kinds=a.mesh_all)
+                     grow=a.size is None and not a.ti)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
