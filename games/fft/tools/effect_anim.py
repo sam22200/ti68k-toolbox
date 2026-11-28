@@ -41,18 +41,26 @@ effects parses with these four and no fifth. `depth` is the ordering-table depth
 0x01 is the sprite sequence its particles play, 0x04 its frame group, 0xb0 the particles
 per spawn and 0xb4 the frames between spawns.
 
-**What this tool does NOT model, and why its playback is not the game's.** A sequence
-*loops*; what makes an effect start, stagger and stop is elsewhere:
+**Section 2 -- the effect script** (`--program`). A 9-bit opcode in a 16-bit header,
+seven selector bits above it, and 2, 4, 6 or 8 bytes wide by opcode. Stasis Sword's is
+eleven instructions: initialise the particles, end if there is no target, run the parent
+timeline to its total duration while updating the particles every frame, then keep
+updating until no particle is left, then end. **That is the stop a sequence does not
+have.**
 
-* section 2 is the **effect script**, a 9-bit-opcode interpreter (spawn child, free
-  child, counters, branches, camera, step timeline);
-* section 7 is the **timeline**, 6278 bytes: `phase1_duration`, `phase2_duration`,
-  **`spawn_delay` -- the frames between child spawns**, and per particle channel a
-  keyframe table of 25 `frame_start` boundaries with an emitter each.
+**Section 7 -- the timeline** (`--phases`), 6278 bytes. `phase1_duration`,
+`child.duration`, `phase2_duration` and `spawn_delay`, then five particle channels, each
+a table of 25 keyframe boundaries naming an emitter and an action. Frames here are the
+battle's 30 fps, not the sequences' 60 Hz ticks.
 
-So this plays every emitter's sequence once, from t=0, with no stagger and no end. That
-is why the decoded tail of an effect can show something the game never reaches, and why
-nothing here could find the start delay: it is in section 7, not in the emitter record.
+**This is the choreography.** Stasis Sword: 11 + 55 + 20 = 86 frames, and channel 0 of
+its child timeline starts emitters 2, 3, 4, 5 and 6 at frames 2, 5, 8, 11 and 14 -- the
+five shards, three frames apart. The stagger was never in the emitter record, which is
+why reading that record harder was never going to find it.
+
+**What this tool still does NOT do** is play that: `--render` runs every emitter's
+sequence once from t=0, with no stagger and no end, which is why its tail can show
+something the game never reaches.
 
 The layouts above are the names of **adamrt/fft_decomp**, a byte-exact decompilation of
 SCUS-94221; `include/fft/effect/effect_file.h`, `effect_timeline.h` and
@@ -187,6 +195,106 @@ def play(ops, nframes):
                 out.append(dict(t=t, frame=f, x=x, y=y, ticks=ticks, flag=flag))
             t += ticks
     return out
+
+
+# ------------------------------------------- section 2: the effect script
+# Opcode in the low nine bits of a 16-bit header, the seven bits above it are
+# selectors. Widths are each handler's `record->pc +=` in the decompilation
+# (src/battle/effects/playback.c); a jump sets the cursor instead.
+SCRIPT_OPS = {
+    0x00: ('jump_and_yield', 4), 0x01: ('jump', 4), 0x02: ('spawn_child', 4),
+    0x03: ('free_child', 2), 0x04: ('end', 2), 0x05: ('store_high_nibble', 2),
+    0x06: ('register_callback', 4), 0x07: ('call_callback', 4),
+    0x08: ('camera_position', 8), 0x09: ('save_camera_position', 2),
+    0x0a: ('restore_camera_position', 2), 0x0b: ('camera_rotation', 8),
+    0x0c: ('save_camera_rotation', 2), 0x0d: ('restore_camera_rotation', 2),
+    0x0e: ('camera_zoom', 8), 0x0f: ('save_camera_zoom', 2),
+    0x10: ('set_counter', 4),
+    0x11: ('jump_if_counter_eq', 6), 0x12: ('jump_if_counter_ge', 6),
+    0x13: ('jump_if_counter_gt', 6), 0x14: ('jump_if_counter_le', 6),
+    0x15: ('jump_if_counter_lt', 6), 0x16: ('jump_if_particles_eq', 6),
+    0x17: ('jump_if_particles_gt', 6), 0x18: ('jump_if_particles_lt', 6),
+    0x19: ('jump_if_children_eq', 6), 0x1a: ('jump_if_child_active', 4),
+    0x1b: ('jump_if_child_inactive', 4), 0x1c: ('jump_if_counter_ne', 6),
+    0x1d: ('jump_after_child_timeline', 4), 0x1e: ('jump_after_total_duration', 4),
+    0x1f: ('jump_if_targets_eq', 4), 0x20: ('counter_inc', 2),
+    0x21: ('counter_dec', 2), 0x22: ('counter_add', 4), 0x23: ('counter_sub', 4),
+    0x24: ('restore_camera_zoom', 2), 0x25: ('update_all_particles', 2),
+    0x26: ('spawn_emitter_particles', 2), 0x27: ('init_particle_physics', 2),
+    0x28: ('step_child_timeline', 2), 0x29: ('step_parent_timeline', 4),
+    0x2a: ('reset_child_timeline', 2), 0x2b: ('reset_parent_timeline', 2),
+    0x2c: ('nop', 2), 0x2d: ('nop', 2),
+}
+
+
+def program(sec2):
+    """Section 2 disassembled: [(offset, opcode, name, selectors, operands), ...]."""
+    out, p = [], 0
+    while p + 2 <= len(sec2):
+        head = struct.unpack_from('<H', sec2, p)[0]
+        op = head & 0x1ff
+        name, width = SCRIPT_OPS.get(op, ('?%03x' % op, 2))
+        ops = [struct.unpack_from('<h', sec2, p + 2 + 2 * i)[0]
+               for i in range((width - 2) // 2) if p + 4 + 2 * i <= len(sec2)]
+        out.append((p, op, name, head >> 9, ops))
+        p += width
+        if op == 0x04:
+            break                               # end of this routine
+    return out
+
+
+# ------------------------------------------- section 7: the timeline
+KEYFRAMES = 128         # effect_keyframe_table_t
+
+
+def _keyframes(buf, at):
+    if at + KEYFRAMES > len(buf):
+        return None
+    start = struct.unpack_from('<25H', buf, at)
+    emitter = struct.unpack_from('<24B', buf, at + 0x32)
+    action = struct.unpack_from('<25H', buf, at + 0x4a)
+    last = struct.unpack_from('<h', buf, at + 0x7e)[0]
+    if last <= 0 or not any(emitter):
+        return None
+    return [dict(k=k, frm=start[k - 1], to=start[k],
+                 emitter=(emitter[k - 1] - 1) if emitter[k - 1] else None,
+                 action=action[k])
+            for k in range(1, min(last, 24) + 1)]
+
+
+def phases(sec7):
+    """`effect_timeline_t`: the durations, the spawn delay and the particle channels.
+
+    The script runs the parent timeline in three stages: phase 1 for
+    `phase1_duration` frames, then one child per effect target `spawn_delay`
+    frames apart each running the child timeline for `child.duration`, then
+    phase 2. Frames are the battle's 30 fps, not the sequences' 60 Hz ticks.
+    """
+    if len(sec7) < 6278:
+        return None
+    _, p2, p1, delay = struct.unpack_from('<4H', sec7, 0)
+    child = struct.unpack_from('<H', sec7, 0x00a)[0]
+    out = dict(phase1=p1, child=child, phase2=p2, spawn_delay=delay,
+               total=p1 + child + p2, child_channels=[], phase_channels=[])
+    for c in range(5):
+        out['child_channels'].append(_keyframes(sec7, 0x00c + KEYFRAMES * c))
+    for ph in range(2):
+        out['phase_channels'].append(
+            [_keyframes(sec7, 0x82a + KEYFRAMES * (ph * 5 + c)) for c in range(5)])
+    return out
+
+
+KEYFRAME_ACTIONS = ((0x0008, 'caster only'), (0x0010, 'post-action display'),
+                    (0x0020, 'update display'), (0x0040, 'target animation'))
+
+
+def action_text(a):
+    bits = [n for m, n in KEYFRAME_ACTIONS if a & m]
+    if a & 0x0007:
+        bits.append('callback %d' % (a & 7))
+    if a >> 8:
+        bits.append('animation %d' % (a >> 8))
+    return ', '.join(bits)
 
 
 def timeline(fr, seqs, cs):
@@ -331,6 +439,8 @@ def audit(disc, files):
     data = routine = 0
     cells = seqs = casts = 0
     unknown, odd, orphan = [], [], []
+    scripts = bad_op = no_end = off_boundary = tls = 0
+    tmin, tmax = 10 ** 9, 0
     for n in range(512):
         key = 'EFFECT/E%03d.BIN' % n
         if key not in files or files[key][1] == 0:
@@ -353,6 +463,24 @@ def audit(disc, files):
                 unknown.append((n, i, ['no loop']))
         if any(c['seq'] >= len(sq) for c in cs):
             orphan.append(n)
+        pr = program(sec[2])
+        if pr:
+            scripts += 1
+            bounds = {o for o, _, _, _, _ in pr}
+            if any(nm.startswith('?') for _, _, nm, _, _ in pr):
+                bad_op += 1
+            if pr[-1][1] != 0x04:
+                no_end += 1
+            # every jump operand is a byte offset into the script: it must land on
+            # an instruction. This is what checks the widths taken from the decomp.
+            for _, op, nm, _, ops in pr:
+                if nm.startswith('jump') and ops and ops[-1] not in bounds:
+                    off_boundary += 1
+                    break
+        t = phases(sec[7])
+        if t:
+            tls += 1
+            tmin = min(tmin, t['total']); tmax = max(tmax, t['total'])
     print('%d data files, %d MIPS routines' % (data, routine))
     print('%d cells, %d sequences, %d cast members' % (cells, seqs, casts))
     print('sequences with an opcode this does not know: %d' % len(unknown))
@@ -361,6 +489,10 @@ def audit(disc, files):
     print('files with a frame record that is not 4 + 24n, past the blanks: %d  %s'
           % (len(odd), odd[:10]))
     print('files casting a sequence that does not exist: %d  %s' % (len(orphan), orphan[:10]))
+    print('scripts: %d disassembled, %d with an unknown opcode, %d ending without `end`,'
+          ' %d with a jump off an instruction boundary'
+          % (scripts, bad_op, no_end, off_boundary))
+    print('timelines: %d read; durations %d..%d frames at 30 fps' % (tls, tmin, tmax))
 
 
 # ---------------------------------------------------------------- CLI
@@ -373,6 +505,8 @@ def main():
     ap.add_argument('--cells', action='store_true', help='the section-0 frames')
     ap.add_argument('--cast', action='store_true', help='the section-3 records')
     ap.add_argument('--timeline', action='store_true', help='every draw, in tick order')
+    ap.add_argument('--program', action='store_true', help='section 2: the effect script')
+    ap.add_argument('--phases', action='store_true', help='section 7: durations and channels')
     ap.add_argument('--render', type=Path, help='PNG per frame plus a GIF, in this directory')
     ap.add_argument('--size', default='256x240', help='the render canvas (default 256x240)')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
@@ -429,6 +563,33 @@ def main():
         print('      byte  ' + ' '.join('%6d' % (2 * w) for w in varying))
         for i, c in enumerate(cs):
             print(' %-4d %-4d ' % (i, c['seq']) + ' '.join('%6d' % words[i][w] for w in varying))
+    if a.program:
+        for off, op, name, sel, ops in program(sec[2]):
+            print('   %04x  %02x %-26s %s%s' % (off, op, name,
+                  ' '.join('%6d' % v for v in ops), '   sel %02x' % sel if sel else ''))
+    if a.phases:
+        t = phases(sec[7])
+        if not t:
+            print(' no timeline')
+        else:
+            print(' phase 1 %d frames, child %d, phase 2 %d  -> %d frames at 30 fps'
+                  ' (spawn delay %d between children)'
+                  % (t['phase1'], t['child'], t['phase2'], t['total'], t['spawn_delay']))
+            for label, chans in (('child', t['child_channels']),
+                                 ('phase 1', t['phase_channels'][0]),
+                                 ('phase 2', t['phase_channels'][1])):
+                for c, kfs in enumerate(chans):
+                    if not kfs:
+                        continue
+                    print('   %s, particle channel %d' % (label, c))
+                    for k in kfs:
+                        if k['emitter'] is None and not k['action']:
+                            continue
+                        print('      f%3d..%-3d  %s%s'
+                              % (k['frm'], k['to'],
+                                 'emitter %-3d' % k['emitter'] if k['emitter'] is not None
+                                 else '           ',
+                                 '  ' + action_text(k['action']) if k['action'] else ''))
     if a.timeline:
         for d in timeline(fr, seqs, cs):
             print(' t%4d (f%3d)  inst %2d seq %2d  cell %3d  at %5d,%-5d  %d ticks'

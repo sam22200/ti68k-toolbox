@@ -110,5 +110,55 @@ class Cast(unittest.TestCase):
                          [(0, 0, 1), (0, 1, 2), (4, 0, 2)])
 
 
+class EffectScript(unittest.TestCase):          # section 2, not the sprite sequences
+    def test_widths_come_from_the_handlers(self):
+        """A jump is 4 bytes, a counter test 6, a camera move 8, a bare op 2."""
+        code = (struct.pack('<2H', 0x27, 0)[:2]          # init_particle_physics
+                + struct.pack('<2H', 0x1f, 0x22)         # jump_if_targets_eq -> 0x22
+                + struct.pack('<3H', 0x11, 3, 0x0e)      # jump_if_counter_eq 3 -> 0x0e
+                + struct.pack('<4H', 0x08, 1, 2, 3)      # camera_position
+                + struct.pack('<2H', 0x04, 0))           # end
+        got = [(o, n, ops) for o, _, n, _, ops in A.program(code)]
+        self.assertEqual([g[0] for g in got], [0, 2, 6, 12, 20])
+        self.assertEqual([g[1] for g in got],
+                         ['init_particle_physics', 'jump_if_targets_eq',
+                          'jump_if_counter_eq', 'camera_position', 'end'])
+        self.assertEqual(got[2][2], [3, 14])
+
+    def test_it_stops_at_end(self):
+        code = struct.pack('<2H', 0x04, 0) + b'\xff' * 8
+        self.assertEqual(len(A.program(code)), 1)
+
+
+class Timeline(unittest.TestCase):
+    def build(self, phase1, child, phase2, delay, keyframes):
+        buf = bytearray(6278)
+        struct.pack_into('<4H', buf, 0, 0, phase2, phase1, delay)
+        struct.pack_into('<H', buf, 0x00a, child)
+        for k, (start, end, emitter, action) in enumerate(keyframes, 1):
+            struct.pack_into('<H', buf, 0x00c + 2 * (k - 1), start)
+            struct.pack_into('<H', buf, 0x00c + 2 * k, end)
+            buf[0x00c + 0x32 + k - 1] = emitter + 1
+            struct.pack_into('<H', buf, 0x00c + 0x4a + 2 * k, action)
+        struct.pack_into('<h', buf, 0x00c + 0x7e, len(keyframes))
+        return bytes(buf)
+
+    def test_durations_and_the_spawn_delay(self):
+        t = A.phases(self.build(11, 55, 20, 50, [(2, 4, 2, 0)]))
+        self.assertEqual((t['phase1'], t['child'], t['phase2']), (11, 55, 20))
+        self.assertEqual(t['spawn_delay'], 50)
+        self.assertEqual(t['total'], 86)
+
+    def test_a_channel_gives_its_emitters_and_frames(self):
+        t = A.phases(self.build(0, 10, 0, 0, [(2, 4, 2, 0), (4, 6, 3, 0x40)]))
+        c = t['child_channels'][0]
+        self.assertEqual([(k['frm'], k['to'], k['emitter']) for k in c],
+                         [(2, 4, 2), (4, 6, 3)])
+        self.assertEqual(A.action_text(c[1]['action']), 'target animation')
+
+    def test_a_short_section_is_refused(self):
+        self.assertIsNone(A.phases(b'\0' * 100))
+
+
 if __name__ == '__main__':
     unittest.main()
