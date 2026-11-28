@@ -432,3 +432,38 @@ has **nothing behind them**. Add the same frames to a background of 48 or 96 and
 the ice block reads as a solid bright mass, which is what the console shows over
 a lit battlefield. Judging an additive effect against black will always call its
 broad, dim shapes transparent. Put a floor under them before deciding.
+
+
+## 14. Transcribing the sprite path: nine levers, eight already right
+
+`schedule()` was written by inference before the decompilation was found, so it
+was read back line by line against `battle_effect_render_particle_sprite` and
+`battle_effect_submit_sprite_to_ordering_table`. Eight of its nine levers were
+already faithful, and each is countable, so the check is repeatable:
+
+| lever | the source's rule | on the disc |
+|---|---|---|
+| sequence stepping | `frame_timer -= 2` a frame; ops 0x81 loop, 0x82/0x83 move | already transcribed, hold 0 freezing included |
+| the spawn gate | `time % lerp(spawn_interval_start, _end, factor)` | every curve nibble is 0, so it is the start value |
+| the particle count | `lerp(particle_count_start, _end, factor)` | likewise: 1..3, never curve-driven |
+| placement | `work_kind_flags` bits 12-15 pick the list-node kind | the catalogue has only WORLD (2,672) and WORLD\_UNSCALED (555) |
+| the camera zoom | `g_battle_camera_zoom` | `battle_camera_init_defaults` sets it to `ONE`; zoomed out is 0xC00 |
+| the primitive code | 0x2c, or 0x2e when `flags & 0x200` | 22,512 of 22,916 polygons blended |
+| the blend mode | the tpage's bits 5-6 | 19,092 B+F, 2,630 B+F/4, 727 B-F, 467 B/2+F/2 |
+| the tint | a curve, else neutral `0x80` | as modelled |
+| the frame buffer | 15 bits, saturating per primitive | **this one was wrong**, see section 13 |
+
+### The lever that was not in the engine at all
+
+The renderer shrank the effect to fit its frame: Night Sword's 114x275 sweep
+scaled by **0.84** into a 256x240 default. That thins its blade to two pixels
+and takes the contrast with it, and the blade then reads as too faint when
+nothing about it is. The console draws at 1:1 and lets what overflows overflow.
+`--render` now grows the frame instead, and says so. Judging an effect through
+a shrink is the same mistake as judging it against black.
+
+### And one that is genuinely missing
+
+`node->screen_rotation_angle` -- a particle oriented to its velocity is drawn
+rotated -- and the ordering table's depth modes. Neither changes how bright
+anything is, which is why neither explains a faint layer.

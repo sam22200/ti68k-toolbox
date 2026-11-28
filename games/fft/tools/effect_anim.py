@@ -766,7 +766,7 @@ def mesh_actors(raw, sec, cur):
     return out
 
 
-def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True):
+def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True, grow=False):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
     tex = _atlas_rgb(raw)
@@ -785,6 +785,16 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
         # the top: shrink until the whole thing is inside before placing it.
         fit = min(1.0, (size[1] * 0.96) / max(1, y1 - y0),
                   (size[0] * 0.96) / max(1, x1 - x0))
+        if fit < 1.0 and grow:
+            # Grow the frame rather than shrink the effect. Shrinking is what a
+            # 256x240 default did to Night Sword -- 0.84, which thins its blade
+            # to two pixels and takes the contrast with it, and the blade then
+            # reads as too faint when nothing about it is.
+            size = (max(size[0], int((x1 - x0) / 0.96) + 2),
+                    max(size[1], int((y1 - y0) / 0.96) + 2))
+            print('frame grown to %dx%d so the %dx%d sweep fits at 1:1'
+                  % (size[0], size[1], x1 - x0, y1 - y0))
+            fit = 1.0
         if fit < 1.0:
             scale *= fit
             print('scaled to %.2f so the %dx%d sweep fits the %dx%d frame'
@@ -956,7 +966,8 @@ def main():
     ap.add_argument('--program', action='store_true', help='section 2: the effect script')
     ap.add_argument('--phases', action='store_true', help='section 7: durations and channels')
     ap.add_argument('--render', type=Path, help='PNG per frame plus a GIF, in this directory')
-    ap.add_argument('--size', default='256x240', help='the render canvas (default 256x240)')
+    ap.add_argument('--size', default=None,
+                    help='the render canvas; by default 256x240, grown to fit the effect at 1:1')
     ap.add_argument('--anchor', default=None, help='where the effect origin sits, "x,y"')
     ap.add_argument('--scale', type=float, default=1.0)
     ap.add_argument('--no-scatter', action='store_true', dest='no_scatter',
@@ -1048,13 +1059,14 @@ def main():
                   % (d['t'], d['t'] // 2, d['inst'], d['seq'], d['frame'], d['x'], d['y'], d['ticks']))
     if a.render:
         from PIL import Image
-        w, h = (int(v) for v in a.size.split('x'))
+        w, h = (int(v) for v in (a.size or '256x240').split('x'))
         anchor = tuple(int(v) for v in a.anchor.split(',')) if a.anchor else None
         if a.ti:
             w, h = TI_W, TI_H
         ims = render(raw, fr, seqs, cs, (w, h), anchor,
                      a.scale * (TI_SCALE if a.ti else 1.0),
-                     None if a.flat else sec, not a.no_scatter)
+                     None if a.flat else sec, not a.no_scatter,
+                     grow=a.size is None and not a.ti)
         if a.ti:
             ims = [grey4(im) for im in ims]
         a.render.mkdir(parents=True, exist_ok=True)
