@@ -50,13 +50,20 @@ def lerp(start, end, factor):
 
 def curve(table, nibble, frame):
     """READ_CURVE: nibble 0 is no curve and reads 0, else row nibble - 1."""
-    i = nibble - 1
-    if i == -1:
+    return palette(table, nibble - 1, frame) if nibble else 0
+
+
+def palette(table, row, frame):
+    """g_effect_palette_table[row].factor[frame], read straight.
+
+    The colour curves are **not** READ_CURVE: the source indexes the table with
+    the nibble itself, so row 0 is a real row and not "no curve". Subtracting
+    one there turned every ring stack black, Holy's beam included.
+    """
+    if row < 0 or row >= len(table):
         return 0
-    row = table[i] if i < len(table) else None
-    if not row:
-        return 0
-    return row[frame % len(row)]
+    r = table[row]
+    return r[frame % len(r)] if r else 0
 
 
 class RingMeshView:
@@ -157,9 +164,9 @@ class RingStack:
         if not (e.flags & GEOMETRY_FLAG_COLOUR_CURVES):
             return 0x80, 0x80, 0x80
         k = e.colour_curves & 0xfff
-        return (curve(self.curves, k & 0xf, frame),
-                curve(self.curves, (k >> 4) & 0xf, frame),
-                curve(self.curves, k >> 8, frame))
+        return (palette(self.curves, k & 0xf, frame),
+                palette(self.curves, (k >> 4) & 0xf, frame),
+                palette(self.curves, k >> 8, frame))
 
     def quads(self, frame, project):
         """The 64 POLY_GT4 of this frame, farthest first.

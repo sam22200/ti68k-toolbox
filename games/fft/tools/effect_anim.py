@@ -88,6 +88,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import core_audit  # noqa: E402
+import effect_mesh  # noqa: E402
 import effect_rip  # noqa: E402
 import extract  # noqa: E402
 
@@ -707,6 +708,64 @@ def extent(fr, tl):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
+def mesh_actors(raw, sec, cur):
+    """The overlay's own mesh renderers, and when the timeline runs each of them.
+
+    `battle_effect_code_script_28_step_child_timeline` is explicit: a keyframe's
+    `action` is the geometry index plus one, and its `selector & 7` is zero for
+    an ordinary particle emitter, otherwise `slot = (selector & 7) - 1` and the
+    handler in that slot is called with that geometry index and the keyframe's
+    own step counter.
+
+    The slots are filled by script opcode 0x06
+    (`battle_effect_code_script_06_load_callback_pointer`): four bytes, the
+    second `>> 2` being the slot and the s16 at +2 the routine. Holy's are
+    0x00, 0x04, 0x08, 0x0c -- slots 0 to 3 -- holding 7, 8, 9 and 8.
+
+    Which routine each id is remains an inference: E015 carries exactly three
+    handlers, the ids are three ascending values with one repeated, and
+    `target/effect.yaml` lists the three in address order. Taking them in that
+    order puts the ring stack in slot 0 -- and the timeline then drives geometry
+    entry 4 through it for a hundred frames, which is the one entry whose
+    lattice measures 368 units tall and 3 wide. Two readings that never met
+    agreeing on the beam is the evidence for it.
+    """
+    out = []
+    slots = {}
+    s2 = sec[2]
+    i = 0
+    while i + 2 <= len(s2):                       # walk the script by its own widths
+        op = s2[i]
+        if op not in SCRIPT_OPS:
+            break
+        if op == 6 and i + 4 <= len(s2):
+            slots[s2[i + 1] >> 2] = struct.unpack_from('<h', s2, i + 2)[0]
+        if op in (0x00, 0x01):                    # a jump sets the cursor; stop reading
+            break
+        i += SCRIPT_OPS[op][1]
+    if not slots:
+        return out
+    order = sorted(set(slots.values()))           # ids ascending, handlers in address order
+    bright = effect_mesh.brightness_table(raw, 0x801C573C - 0x801C2500)
+    ph = phases(sec[7])
+    if not ph or not bright:
+        return out
+    for chan in ph['child_channels']:
+        for kf in chan or ():
+            sel = kf['action'] & 7
+            if not sel or kf['emitter'] is None:
+                continue
+            routine = slots.get(sel - 1)
+            if routine is None or order.index(routine) != 0:
+                continue                          # only the first handler, the ring stack
+            rec = sec[3][20 + 196 * kf['emitter']:20 + 196 * (kf['emitter'] + 1)]
+            if len(rec) < 196:
+                continue
+            out.append(dict(frm=kf['frm'], to=kf['to'],
+                            stack=effect_mesh.RingStack(rec, bright, cur)))
+    return out
+
+
 def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=True):
     """One RGB image per displayed 30 fps frame, the whole cast composited."""
     import numpy as np
@@ -738,6 +797,13 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
     out = []
     prim = np.zeros((size[1], size[0], 3), dtype=float)
     cov = np.zeros((size[1], size[0]), dtype=float)
+    mesh = mesh_actors(raw, raw_sections, curves(raw_sections[4])) if raw_sections else []
+    flat = camera()
+
+    def project3(x, y, z):
+        """The battle camera, plus a depth for the ordering table's own sort."""
+        sx, sy = flat(x, y, z)
+        return sx, sy, 0xC0 - int((z - x) / 8)
     for t in range(0, last, 2):                        # 60 Hz ticks, 30 fps frames
         fb = np.zeros((size[1], size[0], 3), dtype=float)
         for d in tl:
@@ -758,6 +824,24 @@ def render(raw, fr, seqs, cs, size, anchor, scale, raw_sections=None, scatter=Tr
                 _tri(prim, cov, tx, alpha, (q[0], q[1], q[2]), (s[0], s[1], s[2]), cell)
                 _tri(prim, cov, tx, alpha, (q[1], q[3], q[2]), (s[1], s[3], s[2]), cell)
                 _blend(fb, prim, cov, (p['tpage'] & 0x200) != 0, (p['clut'] >> 5) & 3)
+        # The overlay's own renderers, after the sprites: their quads come back
+        # farthest first, which is the ordering table's own answer.
+        f30 = t // 2
+        for m in mesh:
+            if not (m['frm'] <= f30 < m['to']):
+                continue
+            for q in m['stack'].quads(f30 - m['frm'], project3):
+                d = [(anchor[0] + x * scale, anchor[1] + y * scale) for x, y in q['pts']]
+                uv = q['uv']
+                cell = (min(p[0] for p in uv), min(p[1] for p in uv),
+                        max(p[0] for p in uv) - 1, max(p[1] for p in uv) - 1)
+                c = q['rgb'][0]
+                tx = tex * np.array([c[0] / 128.0, c[1] / 128.0, c[2] / 128.0])
+                prim[:] = 0
+                cov[:] = 0
+                _tri(prim, cov, tx, alpha, (d[0], d[1], d[2]), (uv[0], uv[1], uv[2]), cell)
+                _tri(prim, cov, tx, alpha, (d[1], d[3], d[2]), (uv[1], uv[3], uv[2]), cell)
+                _blend(fb, prim, cov, q['abe'], q['mode'])
         out.append(np.clip(fb, 0, 255).astype(np.uint8))
     return out
 
