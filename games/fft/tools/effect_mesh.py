@@ -121,6 +121,7 @@ class RingMeshView:
 
 
 class RingStack:
+    SCREEN = False
     """One live ring stack: the work block the overlay keeps between frames.
 
     `RingMesh` is the same renderer with other counts, so the lattice is built
@@ -267,6 +268,7 @@ class RingMesh(RingStack):
 
 
 class QuadGrid4x4:
+    SCREEN = True
     """`effect_e015_update_textured_quad_grid_4x4`: the wash over the whole scene.
 
     Sixteen POLY_GT4 in a 4x4 grid of 64-pixel cells, **in screen space** -- the
@@ -394,6 +396,7 @@ class SummonMesh(RingStack):
 
 
 class PolarMesh:
+    SCREEN = True
     """`effect_e004_update_polar_mesh_state`: a four-fold polar mesh, in screen space.
 
     Six rings of five points from a radius and an angle that each carry a step
@@ -551,3 +554,8 @@ def brightness_table(raw, base, rows=16, width=9):
             break
         out.append(list(struct.unpack_from('<%dI' % width, raw, o)))
     return out
+
+
+# The five families, by the name `effect_handlers.py` writes into its table.
+FAMILY = {'ring_stack': RingStack, 'ring_mesh': RingMesh, 'summon_mesh': SummonMesh,
+          'quad_grid_4x4': QuadGrid4x4, 'polar_mesh': PolarMesh}

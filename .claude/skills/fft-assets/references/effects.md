@@ -607,11 +607,30 @@ the handler's own frame counter, which advances once an update -- except the
 scroll, which the source reads at the caller's frame. They are not the same
 number once a keyframe repeats.
 
-### What a sixth needs that a fifth did not
+### Wiring them all: one offset and one address an overlay
 
-Wiring a family to an overlay needs that overlay's **own** brightness-table
-address: `g_effect_e015_ring_stack_mesh_brightness_table` is at 0x801c573c, and
-every one of the 110 overlays has its own. `target/effect.yaml` lists them, and
-until those addresses are carried here, only E015's three are wired. The classes
-themselves need nothing: give one a 196-byte record, a table and the curves and
-it answers.
+**Every one of the 110 overlays loads at the same address, 0x801c2500.** So a
+routine pointer in `g_battle_effect_file_ptrs` is really an *offset into
+whichever overlay is loaded*, and `target/effect.yaml` says which function sits
+at that offset in a given overlay, and where that renderer's own brightness
+table is. `effect_handlers.py` reports the pair into `effect_handlers.json`,
+committed so the decoder does not need the decompilation checked out:
+
+    offset = g_battle_effect_file_ptrs[id] - 0x801c2500
+    family, table, width = overlays[effect][offset]
+
+125 handlers over 85 overlays, and no ordering, no guess.
+
+### Walk the phase channels, not only the child's
+
+With that table in hand only **25** effects resolved a renderer, which was the
+reading and not the table: `mesh_actors` walked `child_channels` alone. The
+parent timeline runs phase 1, then the child, then phase 2, and each has its own
+five channels; a handler called from a phase channel is called the same way.
+Walking all three took it to **84 effects and 195 wired instances** -- ring stack
+61, polar mesh 43, ring mesh 40, 4x4 grid 38, summon dome 13 -- and fixed the
+child's own windows, which were short by phase 1's frames.
+
+**An effect's picture can be entirely native.** E071 has no sprite timeline at
+all, so a renderer driven by that timeline produced nothing for it; its length
+is its handlers' windows instead.
